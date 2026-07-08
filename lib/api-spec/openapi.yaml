@@ -508,7 +508,7 @@ components:
           type: integer
         role:
           type: string
-          enum: [seeker, disciple, mentor, elder]
+          enum: [student, peer_guide, church_leader, regional_admin, moderator, super_admin]
         gifts:
           type: array
           items:
@@ -548,7 +548,7 @@ components:
           type: integer
         role:
           type: string
-          enum: [seeker, disciple, mentor, elder]
+          enum: [student, peer_guide, church_leader, regional_admin, moderator, super_admin]
         gifts:
           type: array
           items:

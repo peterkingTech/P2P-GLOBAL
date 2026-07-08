@@ -33,7 +33,7 @@ export const GetProfileResponse = zod.object({
   "country": zod.string().nullish(),
   "languageCode": zod.string(),
   "growthLevel": zod.number(),
-  "role": zod.enum(['seeker', 'disciple', 'mentor', 'elder']),
+  "role": zod.enum(['student', 'peer_guide', 'church_leader', 'regional_admin', 'moderator', 'super_admin']),
   "gifts": zod.array(zod.string()),
   "mentorId": zod.string().uuid().nullish(),
   "isPraying": zod.boolean(),
@@ -54,7 +54,7 @@ export const UpdateProfileBody = zod.object({
   "country": zod.string().optional(),
   "languageCode": zod.string().optional(),
   "growthLevel": zod.number().optional(),
-  "role": zod.enum(['seeker', 'disciple', 'mentor', 'elder']).optional(),
+  "role": zod.enum(['student', 'peer_guide', 'church_leader', 'regional_admin', 'moderator', 'super_admin']).optional(),
   "gifts": zod.array(zod.string()).optional(),
   "isPraying": zod.boolean().optional()
 })
@@ -68,7 +68,7 @@ export const UpdateProfileResponse = zod.object({
   "country": zod.string().nullish(),
   "languageCode": zod.string(),
   "growthLevel": zod.number(),
-  "role": zod.enum(['seeker', 'disciple', 'mentor', 'elder']),
+  "role": zod.enum(['student', 'peer_guide', 'church_leader', 'regional_admin', 'moderator', 'super_admin']),
   "gifts": zod.array(zod.string()),
   "mentorId": zod.string().uuid().nullish(),
   "isPraying": zod.boolean(),

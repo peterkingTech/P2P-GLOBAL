@@ -15,10 +15,12 @@ import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 const ROLE_COLORS: Record<string, string> = {
-  elder: colors.brightYellow,
-  mentor: colors.accentGreen,
-  disciple: colors.lightGreen,
-  seeker: colors.borderBeige,
+  super_admin: colors.brightYellow,
+  moderator: colors.brightYellow,
+  regional_admin: colors.accentGreen,
+  church_leader: colors.accentGreen,
+  peer_guide: colors.lightGreen,
+  student: colors.borderBeige,
 };
 
 function NodeCard({

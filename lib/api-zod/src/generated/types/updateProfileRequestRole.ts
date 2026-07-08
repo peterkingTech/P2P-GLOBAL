@@ -10,8 +10,10 @@ export type UpdateProfileRequestRole = typeof UpdateProfileRequestRole[keyof typ
 
 
 export const UpdateProfileRequestRole = {
-  seeker: 'seeker',
-  disciple: 'disciple',
-  mentor: 'mentor',
-  elder: 'elder',
+  student: 'student',
+  peer_guide: 'peer_guide',
+  church_leader: 'church_leader',
+  regional_admin: 'regional_admin',
+  moderator: 'moderator',
+  super_admin: 'super_admin',
 } as const;

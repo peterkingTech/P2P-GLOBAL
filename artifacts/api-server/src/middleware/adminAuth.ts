@@ -1,10 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase } from "../lib/supabase";
 
-const ADMIN_ROLES = new Set(["mentor", "elder"]);
+const ADMIN_ROLES = new Set([
+  "peer_guide",
+  "church_leader",
+  "regional_admin",
+  "moderator",
+  "super_admin",
+]);
 
 /**
- * Middleware that verifies the caller is an authenticated admin (mentor or elder).
+ * Middleware that verifies the caller is an authenticated admin (any role above student).
  * Expects: Authorization: Bearer <supabase-jwt>
  */
 export async function requireAdmin(
@@ -40,7 +46,7 @@ export async function requireAdmin(
   }
 
   if (!ADMIN_ROLES.has(profile.role as string)) {
-    res.status(403).json({ error: "Admin access required (mentor or elder role)." });
+    res.status(403).json({ error: "Admin access required (peer_guide, church_leader, regional_admin, moderator, or super_admin role)." });
     return;
   }
 

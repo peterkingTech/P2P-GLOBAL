@@ -14,8 +14,8 @@ import colors from "@/constants/colors";
 const ADMIN_ROLES = new Set([
   "peer_guide",
   "church_leader",
-  "regional_director",
-  "global_admin",
+  "regional_admin",
+  "moderator",
   "super_admin",
 ]);
 

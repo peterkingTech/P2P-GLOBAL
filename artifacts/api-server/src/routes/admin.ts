@@ -4,7 +4,7 @@ import { requireAdmin } from "../middleware/adminAuth";
 
 const router = Router();
 
-// All admin routes require an authenticated mentor or elder
+// All admin routes require an authenticated peer_guide, church_leader, regional_admin, moderator, or super_admin
 router.use(requireAdmin);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

@@ -35,8 +35,8 @@ export type DiscipleRole =
   | "student"
   | "peer_guide"
   | "church_leader"
-  | "regional_director"
-  | "global_admin"
+  | "regional_admin"
+  | "moderator"
   | "super_admin";
 
 export interface UserProfile {

@@ -10,11 +10,13 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ── Enums ────────────────────────────────────────────────────────────────────
-export const discipleRoleEnum = pgEnum("disciple_role", [
-  "seeker",
-  "disciple",
-  "mentor",
-  "elder",
+export const discipleRoleEnum = pgEnum("user_role", [
+  "student",
+  "peer_guide",
+  "church_leader",
+  "regional_admin",
+  "moderator",
+  "super_admin",
 ]);
 
 // ── p2p_profiles ─────────────────────────────────────────────────────────────
@@ -27,7 +29,7 @@ export const p2pProfiles = pgTable("p2p_profiles", {
   country: text("country"),
   languageCode: text("language_code").notNull().default("en"),
   growthLevel: integer("growth_level").notNull().default(0),
-  role: text("role").notNull().default("disciple"),
+  role: text("role").notNull().default("student"),
   gifts: jsonb("gifts").$type<string[]>().notNull().default([]),
   mentorId: uuid("mentor_id"),
   isPraying: boolean("is_praying").notNull().default(false),

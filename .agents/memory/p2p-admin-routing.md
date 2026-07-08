@@ -32,6 +32,10 @@ description: How /admin/* routes are guarded in the Expo app, including the Auth
 
 ## Role vocabulary correction (2026-07-08)
 
-The app was originally written against an invented role vocabulary (`seeker`/`disciple`/`mentor`/`elder`) that never matched the real deployed Postgres enum `user_role` (`student`/`peer_guide`/`church_leader`/`regional_director`/`global_admin`/`super_admin`, default `student`). Since `role` is a Postgres enum, inserting `"disciple"` would hard-error, and the old admin gates checking for `"mentor"`/`"elder"` could never match any real row — admin login was structurally broken against production. Fixed by switching `DiscipleRole` and all admin-gate checks to the real enum values.
-**Why:** the enum is the source of truth; app code must conform to it, not the other way around.
-**How to apply:** any new role-based UI/gating must use the 6 real enum values above — never reintroduce `seeker`/`disciple`/`mentor`/`elder`.
+The app was originally written against an invented role vocabulary (`seeker`/`disciple`/`mentor`/`elder`) that never matched the deployed Postgres enum. Fixed in two passes:
+1. First aligned app code to the then-live enum: `student`/`peer_guide`/`church_leader`/`regional_director`/`global_admin`/`super_admin`.
+2. Then the live enum itself was found to have drifted from the project blueprint, so it was migrated (see `migrations/003_fix_role_enum.sql`) to the blueprint's six roles: `student`/`peer_guide`/`church_leader`/`regional_admin`/`moderator`/`super_admin` — renaming `regional_director`→`regional_admin`, adding `moderator`, and folding `global_admin` into `super_admin` (Postgres enums can't drop a value, so the type was recreated). App code (AuthContext.tsx, admin/_layout.tsx, admin/login.tsx, adminAuth.ts middleware, forest.tsx role colors), the Drizzle schema, and openapi.yaml (+ regenerated codegen) were all updated to match.
+
+**Final canonical role list: `student`, `peer_guide`, `church_leader`, `regional_admin`, `moderator`, `super_admin`.** Admin access = any role except `student`.
+**Why:** the blueprint/enum is the source of truth; app code must conform to it, not the other way around. Enum changes with existing data require checking row counts first and recreating (not just renaming) the Postgres type to remove a value.
+**How to apply:** any new role-based UI/gating must use the 6 roles above — never reintroduce `seeker`/`disciple`/`mentor`/`elder`/`regional_director`/`global_admin`.
