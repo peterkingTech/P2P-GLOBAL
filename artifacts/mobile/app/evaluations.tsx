@@ -19,10 +19,10 @@ import colors from "@/constants/colors";
 function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
   const { resolveEvaluation } = useData();
   const [feedback, setFeedback] = useState("");
-  const [submitting, setSubmitting] = useState<"approved" | "revision_requested" | null>(null);
+  const [submitting, setSubmitting] = useState<"approved" | "needs_revision" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleResolve(status: "approved" | "revision_requested") {
+  async function handleResolve(status: "approved" | "needs_revision") {
     if (submitting) return;
     setSubmitting(status);
     setError(null);
@@ -65,11 +65,11 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.actionBtn, styles.reviseBtn]}
-          onPress={() => handleResolve("revision_requested")}
+          onPress={() => handleResolve("needs_revision")}
           disabled={submitting !== null}
           activeOpacity={0.85}
         >
-          {submitting === "revision_requested" ? (
+          {submitting === "needs_revision" ? (
             <ActivityIndicator color={colors.textDark} size="small" />
           ) : (
             <>

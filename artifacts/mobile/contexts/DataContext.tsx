@@ -101,6 +101,14 @@ export interface PendingEvaluation {
   assignedAt: string;
 }
 
+export interface SubmissionStatus {
+  submissionId: string;
+  content: string;
+  evaluationStatus: "pending" | "approved" | "needs_revision" | null;
+  feedback: string | null;
+  selfApproved: boolean;
+}
+
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
@@ -118,11 +126,12 @@ interface DataContextValue {
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
   getMySubmission: (lessonId: string) => Promise<{ id: string; content: string } | null>;
+  getSubmissionStatus: (lessonId: string) => Promise<SubmissionStatus | null>;
   submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
   refreshPendingEvaluations: () => Promise<void>;
   resolveEvaluation: (
     evaluationId: string,
-    status: "approved" | "revision_requested",
+    status: "approved" | "needs_revision",
     feedback: string
   ) => Promise<string | null>;
 }
@@ -485,6 +494,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  const getSubmissionStatus = useCallback(async (lessonId: string): Promise<SubmissionStatus | null> => {
+    if (!profile) return null;
+    try {
+      const { data: sub, error: subError } = await supabase
+        .from("p2p_assignment_submissions")
+        .select("id,content")
+        .eq("lesson_id", lessonId)
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (subError || !sub) return null;
+
+      const { data: evaluation } = await supabase
+        .from("p2p_lesson_evaluations")
+        .select("status,feedback,self_approved")
+        .eq("submission_id", sub.id)
+        .maybeSingle();
+
+      return {
+        submissionId: sub.id as string,
+        content: (sub.content as string) ?? "",
+        evaluationStatus: (evaluation?.status as SubmissionStatus["evaluationStatus"]) ?? null,
+        feedback: (evaluation?.feedback as string) ?? null,
+        selfApproved: Boolean(evaluation?.self_approved),
+      };
+    } catch {
+      return null;
+    }
+  }, [profile]);
+
   const submitAssignment = useCallback(async (assignmentId: string, lessonId: string, content: string): Promise<string | null> => {
     if (!profile) return "You must be signed in to submit.";
     try {
@@ -550,7 +590,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const resolveEvaluation = useCallback(async (
     evaluationId: string,
-    status: "approved" | "revision_requested",
+    status: "approved" | "needs_revision",
     feedback: string
   ): Promise<string | null> => {
     if (!profile) return "You must be signed in.";
@@ -592,6 +632,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         refreshData,
         getAssignmentForLesson,
         getMySubmission,
+        getSubmissionStatus,
         submitAssignment,
         refreshPendingEvaluations,
         resolveEvaluation,

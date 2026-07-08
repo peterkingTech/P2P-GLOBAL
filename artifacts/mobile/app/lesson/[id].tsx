@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/contexts/AuthContext";
-import { useData, Assignment } from "@/contexts/DataContext";
+import { useData, Assignment, SubmissionStatus } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 interface LessonContent {
@@ -28,13 +28,13 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { lessons, markLessonComplete, getAssignmentForLesson, getMySubmission, submitAssignment } = useData();
+  const { lessons, markLessonComplete, getAssignmentForLesson, getSubmissionStatus, submitAssignment } = useData();
   const [content, setContent] = useState<LessonContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissionText, setSubmissionText] = useState("");
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -96,11 +96,11 @@ export default function LessonScreen() {
       if (cancelled) return;
       setAssignment(a);
       if (a) {
-        const sub = await getMySubmission(id);
+        const status = await getSubmissionStatus(id);
         if (cancelled) return;
-        if (sub) {
-          setSubmissionText(sub.content);
-          setAlreadySubmitted(true);
+        if (status) {
+          setSubmissionText(status.content);
+          setSubmissionStatus(status);
         }
       }
     }
@@ -108,7 +108,7 @@ export default function LessonScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, getAssignmentForLesson, getMySubmission]);
+  }, [id, getAssignmentForLesson, getSubmissionStatus]);
 
   async function handleSubmitAssignment() {
     if (!assignment || !id || submitting || !submissionText.trim()) return;
@@ -118,8 +118,9 @@ export default function LessonScreen() {
     if (err) {
       setSubmitError(err);
     } else {
-      setAlreadySubmitted(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const status = await getSubmissionStatus(id);
+      setSubmissionStatus(status);
     }
     setSubmitting(false);
   }
@@ -194,72 +195,97 @@ export default function LessonScreen() {
             </View>
           )}
 
-          {assignment && (
-            <View style={styles.assignmentCard}>
-              <View style={styles.questionsHeader}>
-                <Ionicons name="create" size={16} color={colors.accentGreen} />
-                <Text style={styles.questionsTitle}>{assignment.title}</Text>
-              </View>
-              <Text style={styles.assignmentInstructions}>{assignment.instructions}</Text>
-              <TextInput
-                style={[styles.assignmentInput, alreadySubmitted && styles.assignmentInputDisabled]}
-                multiline
-                placeholder="Write your response here..."
-                placeholderTextColor={colors.textMuted}
-                value={submissionText}
-                onChangeText={setSubmissionText}
-                editable={!alreadySubmitted}
-              />
-              {submitError && <Text style={styles.submitError}>{submitError}</Text>}
-              {alreadySubmitted ? (
-                <View style={styles.completedBanner}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
-                  <Text style={styles.completedBannerText}>Submitted for peer review</Text>
+          {assignment && (() => {
+            const evalStatus = submissionStatus?.evaluationStatus ?? null;
+            const canEdit = evalStatus === null || evalStatus === "needs_revision";
+            return (
+              <View style={styles.assignmentCard}>
+                <View style={styles.questionsHeader}>
+                  <Ionicons name="create" size={16} color={colors.accentGreen} />
+                  <Text style={styles.questionsTitle}>{assignment.title}</Text>
                 </View>
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.completeBtn,
-                    (submitting || !submissionText.trim()) && styles.completeBtnDisabled,
-                  ]}
-                  onPress={handleSubmitAssignment}
-                  activeOpacity={0.85}
-                  disabled={submitting || !submissionText.trim()}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color={colors.cream} />
-                  ) : (
-                    <>
-                      <Ionicons name="send" size={18} color={colors.cream} />
-                      <Text style={styles.completeBtnText}>Submit Assignment</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                <Text style={styles.assignmentInstructions}>{assignment.instructions}</Text>
+                <TextInput
+                  style={[styles.assignmentInput, !canEdit && styles.assignmentInputDisabled]}
+                  multiline
+                  placeholder="Write your response here..."
+                  placeholderTextColor={colors.textMuted}
+                  value={submissionText}
+                  onChangeText={setSubmissionText}
+                  editable={canEdit}
+                />
+                {submitError && <Text style={styles.submitError}>{submitError}</Text>}
 
-          {!completed ? (
-            <TouchableOpacity
-              style={[styles.completeBtn, completing && styles.completeBtnDisabled]}
-              onPress={handleComplete}
-              activeOpacity={0.85}
-              disabled={completing}
-            >
-              {completing ? (
-                <ActivityIndicator color={colors.cream} />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
-                  <Text style={styles.completeBtnText}>Mark as Complete</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.completedBanner}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
-              <Text style={styles.completedBannerText}>Lesson completed!</Text>
-            </View>
+                {evalStatus === "needs_revision" && submissionStatus?.feedback && (
+                  <View style={styles.revisionBanner}>
+                    <Ionicons name="alert-circle" size={16} color={colors.amber} />
+                    <Text style={styles.revisionBannerText}>{submissionStatus.feedback}</Text>
+                  </View>
+                )}
+
+                {evalStatus === "pending" ? (
+                  <View style={styles.completedBanner}>
+                    <Ionicons name="hourglass" size={18} color={colors.accentGreen} />
+                    <Text style={styles.completedBannerText}>Submitted — awaiting peer review</Text>
+                  </View>
+                ) : evalStatus === "approved" ? (
+                  <View style={styles.completedBanner}>
+                    <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
+                    <Text style={styles.completedBannerText}>
+                      {submissionStatus?.selfApproved
+                        ? "Approved — first through this lesson, unevaluated"
+                        : "Approved by your peer evaluator"}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.completeBtn,
+                      (submitting || !submissionText.trim()) && styles.completeBtnDisabled,
+                    ]}
+                    onPress={handleSubmitAssignment}
+                    activeOpacity={0.85}
+                    disabled={submitting || !submissionText.trim()}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator color={colors.cream} />
+                    ) : (
+                      <>
+                        <Ionicons name="send" size={18} color={colors.cream} />
+                        <Text style={styles.completeBtnText}>
+                          {evalStatus === "needs_revision" ? "Resubmit Assignment" : "Submit Assignment"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })()}
+
+          {!assignment && (
+            !completed ? (
+              <TouchableOpacity
+                style={[styles.completeBtn, completing && styles.completeBtnDisabled]}
+                onPress={handleComplete}
+                activeOpacity={0.85}
+                disabled={completing}
+              >
+                {completing ? (
+                  <ActivityIndicator color={colors.cream} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
+                    <Text style={styles.completeBtnText}>Mark as Complete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.completedBanner}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
+                <Text style={styles.completedBannerText}>Lesson completed!</Text>
+              </View>
+            )
           )}
         </ScrollView>
       )}
@@ -355,5 +381,15 @@ const styles = StyleSheet.create({
   assignmentInputDisabled: { opacity: 0.6 },
   submitError: {
     fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular",
+  },
+  revisionBanner: {
+    flexDirection: "row", gap: 8, alignItems: "flex-start",
+    backgroundColor: "rgba(217,164,65,0.12)",
+    borderRadius: 12, borderWidth: 1, borderColor: "rgba(217,164,65,0.35)",
+    padding: 12, marginBottom: 12,
+  },
+  revisionBannerText: {
+    flex: 1, fontSize: 13, color: colors.textDark, lineHeight: 20,
+    fontFamily: "Inter_400Regular",
   },
 });
