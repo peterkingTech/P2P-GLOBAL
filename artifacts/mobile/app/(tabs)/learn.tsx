@@ -18,30 +18,40 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
   const isStarted = module.completedLessons > 0;
   const isComplete = pct === 100;
+  const isLocked = module.isLocked;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[styles.card, isLocked && styles.cardLocked]}
+      onPress={onPress}
+      activeOpacity={isLocked ? 1 : 0.85}
+      disabled={isLocked}
+    >
       <View style={styles.cardLeft}>
-        <View style={[styles.levelBadge, { backgroundColor: isComplete ? colors.accentGreen : isStarted ? colors.amber : colors.borderBeige }]}>
+        <View style={[styles.levelBadge, { backgroundColor: isLocked ? colors.borderBeige : isComplete ? colors.accentGreen : isStarted ? colors.amber : colors.borderBeige }]}>
           <Text style={[styles.levelText, { color: isComplete || isStarted ? colors.cream : colors.textMuted }]}>
             L{module.level}
           </Text>
         </View>
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.moduleTitle}>{module.title}</Text>
+        <Text style={[styles.moduleTitle, isLocked && styles.textLocked]}>{module.title}</Text>
         <Text style={styles.moduleDesc}>{module.description}</Text>
-        <View style={styles.progressRow}>
-          <View style={styles.progressBg}>
-            <View style={[styles.progressFill, { width: `${pct}%` }]} />
+        {!isLocked && (
+          <View style={styles.progressRow}>
+            <View style={styles.progressBg}>
+              <View style={[styles.progressFill, { width: `${pct}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {module.completedLessons}/{module.lessonCount}
+            </Text>
           </View>
-          <Text style={styles.progressText}>
-            {module.completedLessons}/{module.lessonCount}
-          </Text>
-        </View>
+        )}
       </View>
       <View style={styles.cardRight}>
-        {isComplete ? (
+        {isLocked ? (
+          <Ionicons name="lock-closed" size={18} color={colors.textMuted} />
+        ) : isComplete ? (
           <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
         ) : (
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -162,6 +172,8 @@ const styles = StyleSheet.create({
     padding: 14, flexDirection: "row", gap: 12, alignItems: "center",
     marginBottom: 2,
   },
+  cardLocked: { opacity: 0.55 },
+  textLocked: { color: colors.textMuted },
   cardLeft: {},
   levelBadge: {
     width: 36, height: 36, borderRadius: 10,

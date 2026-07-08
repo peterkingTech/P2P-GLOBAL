@@ -10,11 +10,13 @@ import { supabase, useAuth } from "./AuthContext";
 
 export interface Module {
   id: string;
+  curriculumId: string;
   title: string;
   description: string;
   level: number;
   lessonCount: number;
   completedLessons: number;
+  isLocked: boolean;
   imageUrl?: string;
 }
 
@@ -26,6 +28,7 @@ export interface Lesson {
   verseRef?: string;
   verseText?: string;
   isCompleted: boolean;
+  isLocked: boolean;
   order: number;
 }
 
@@ -108,12 +111,8 @@ const DAILY_VERSES = [
   { ref: "Acts 2:42", text: "They devoted themselves to the apostles' teaching and to fellowship, to the breaking of bread and to prayer." },
 ];
 
-const MOCK_MODULES: Module[] = [
-  { id: "m1", title: "Foundations of Faith", description: "The essentials of Christian discipleship", level: 1, lessonCount: 6, completedLessons: 3, imageUrl: undefined },
-  { id: "m2", title: "The Word of God", description: "How to study and apply Scripture", level: 1, lessonCount: 8, completedLessons: 0, imageUrl: undefined },
-  { id: "m3", title: "Prayer & Intercession", description: "Developing a vibrant prayer life", level: 2, lessonCount: 5, completedLessons: 0, imageUrl: undefined },
-  { id: "m4", title: "Sharing Your Faith", description: "Evangelism in everyday life", level: 2, lessonCount: 7, completedLessons: 0, imageUrl: undefined },
-  { id: "m5", title: "Discipling Others", description: "How to walk alongside new believers", level: 3, lessonCount: 9, completedLessons: 0, imageUrl: undefined },
+const FALLBACK_MODULES: Module[] = [
+  { id: "m1", curriculumId: "", title: "Foundations of Faith", description: "The essentials of Christian discipleship", level: 1, lessonCount: 6, completedLessons: 0, isLocked: false, imageUrl: undefined },
 ];
 
 const MOCK_MISSIONS: Mission[] = [
@@ -204,7 +203,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ]);
       }
 
-      setModules(MOCK_MODULES);
+      await loadCurriculum(profile?.id);
       setFruits(MOCK_FRUITS);
 
       // Build simple forest from profile
@@ -228,11 +227,129 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       setDailyVerse(DAILY_VERSES[0]);
-      setModules(MOCK_MODULES);
+      setModules(FALLBACK_MODULES);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, profile]);
+  }, [isAuthenticated, profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadCurriculum = useCallback(async (userId?: string) => {
+    try {
+      const { data: curriculums } = await supabase
+        .from("p2p_curriculums")
+        .select("id,title,status")
+        .eq("status", "published");
+
+      if (!curriculums || curriculums.length === 0) {
+        setModules(FALLBACK_MODULES);
+        setLessons([]);
+        return;
+      }
+
+      const curriculumIds = curriculums.map((c: Record<string, unknown>) => c.id as string);
+      const { data: allModules } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id,title,description,order_index")
+        .in("curriculum_id", curriculumIds)
+        .order("order_index", { ascending: true });
+
+      if (!allModules || allModules.length === 0) {
+        setModules(FALLBACK_MODULES);
+        setLessons([]);
+        return;
+      }
+
+      // Pick the published curriculum with the most modules (the "real" active one).
+      const countsByCurriculum = new Map<string, number>();
+      for (const m of allModules as Record<string, unknown>[]) {
+        const cId = m.curriculum_id as string;
+        countsByCurriculum.set(cId, (countsByCurriculum.get(cId) ?? 0) + 1);
+      }
+      let activeCurriculumId = curriculumIds[0];
+      let bestCount = -1;
+      for (const [cId, count] of countsByCurriculum) {
+        if (count > bestCount) {
+          bestCount = count;
+          activeCurriculumId = cId;
+        }
+      }
+
+      const activeModulesRaw = (allModules as Record<string, unknown>[])
+        .filter((m) => (m.curriculum_id as string) === activeCurriculumId)
+        .sort((a, b) => (a.order_index as number) - (b.order_index as number));
+
+      const moduleIds = activeModulesRaw.map((m) => m.id as string);
+
+      const { data: allLessons } = await supabase
+        .from("p2p_lessons")
+        .select("id,module_id,title,subtitle,order_index")
+        .in("module_id", moduleIds)
+        .order("order_index", { ascending: true });
+
+      const lessonsRaw = (allLessons ?? []) as Record<string, unknown>[];
+
+      let progressByLesson = new Map<string, boolean>();
+      if (userId) {
+        const { data: progressRows } = await supabase
+          .from("p2p_lesson_progress")
+          .select("lesson_id,completed")
+          .eq("user_id", userId);
+        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+          progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+        }
+      }
+
+      const builtModules: Module[] = [];
+      const builtLessons: Lesson[] = [];
+      let previousModuleComplete = true;
+
+      activeModulesRaw.forEach((m, moduleIdx) => {
+        const moduleId = m.id as string;
+        const moduleLessons = lessonsRaw
+          .filter((l) => (l.module_id as string) === moduleId)
+          .sort((a, b) => (a.order_index as number) - (b.order_index as number));
+
+        const lessonCount = moduleLessons.length;
+        const completedLessons = moduleLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+        const moduleComplete = lessonCount > 0 && completedLessons === lessonCount;
+        const moduleLocked = !previousModuleComplete;
+
+        builtModules.push({
+          id: moduleId,
+          curriculumId: activeCurriculumId,
+          title: m.title as string,
+          description: (m.description as string) ?? "",
+          level: moduleIdx + 1,
+          lessonCount,
+          completedLessons,
+          isLocked: moduleLocked,
+        });
+
+        let previousLessonComplete = true;
+        moduleLessons.forEach((l) => {
+          const isCompleted = Boolean(progressByLesson.get(l.id as string));
+          builtLessons.push({
+            id: l.id as string,
+            moduleId,
+            title: l.title as string,
+            content: (l.subtitle as string) ?? "",
+            isCompleted,
+            isLocked: moduleLocked || !previousLessonComplete,
+            order: l.order_index as number,
+          });
+          previousLessonComplete = isCompleted;
+        });
+
+        previousModuleComplete = moduleComplete;
+      });
+
+      setModules(builtModules);
+      setLessons(builtLessons);
+    } catch {
+      setModules(FALLBACK_MODULES);
+      setLessons([]);
+    }
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -275,13 +392,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markLessonComplete = useCallback(async (lessonId: string) => {
-    setLessons((prev) =>
-      prev.map((l) => (l.id === lessonId ? { ...l, isCompleted: true } : l))
-    );
     try {
       await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true");
     } catch {}
-  }, []);
+
+    if (profile) {
+      try {
+        await supabase.from("p2p_lesson_progress").upsert(
+          {
+            user_id: profile.id,
+            lesson_id: lessonId,
+            completed: true,
+            progress_percent: 100,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,lesson_id" }
+        );
+      } catch {}
+      // Recompute module/lesson lock state now that progress changed.
+      await loadCurriculum(profile.id);
+    } else {
+      setLessons((prev) =>
+        prev.map((l) => (l.id === lessonId ? { ...l, isCompleted: true } : l))
+      );
+    }
+  }, [profile, loadCurriculum]);
 
   const refreshData = useCallback(() => loadData(), [loadData]);
 

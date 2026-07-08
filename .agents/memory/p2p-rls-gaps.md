@@ -29,3 +29,13 @@ populated/wired up somewhere; as of this writing it's dead schema.
 **How to apply:** if a new table is added and admin screens report RLS errors, or list screens show
 "no data yet" while inserts fail, check `pg_policies` for that table before debugging app code —
 it's very likely a missing-policy issue, not an app logic bug.
+
+## Same gap found in `p2p_lesson_progress` / `p2p_enrollments` (2026-07-08)
+
+Same zero-policy pattern hit these two tables when wiring real lesson progress tracking. Fixed in
+`migrations/005_lesson_progress_rls.sql` (self-access SELECT/INSERT/UPDATE + admin SELECT). Also
+had to add a missing `UNIQUE(user_id, lesson_id)` constraint on `p2p_lesson_progress`
+(`migrations/006_lesson_progress_unique_constraint.sql`) — Supabase `.upsert(..., { onConflict })`
+silently fails to dedupe without a matching unique/exclusion constraint on those columns.
+**How to apply:** before using `.upsert()` with `onConflict` on any p2p_* table, confirm a real
+unique constraint exists on those columns, not just an assumption from the app model.

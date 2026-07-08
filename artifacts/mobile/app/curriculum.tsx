@@ -38,26 +38,36 @@ export default function CurriculumScreen() {
         keyExtractor={(m) => m.id}
         renderItem={({ item }) => {
           const pct = item.lessonCount > 0 ? (item.completedLessons / item.lessonCount) * 100 : 0;
+          const isLocked = item.isLocked;
           return (
             <TouchableOpacity
-              style={styles.currCard}
-              onPress={() => router.push(`/module/${item.id}`)}
-              activeOpacity={0.85}
+              style={[styles.currCard, isLocked && styles.currCardLocked]}
+              onPress={() => !isLocked && router.push(`/module/${item.id}`)}
+              activeOpacity={isLocked ? 1 : 0.85}
+              disabled={isLocked}
             >
               <View style={styles.currTop}>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelBadgeText}>Level {item.level}</Text>
+                <View style={[styles.levelBadge, isLocked && styles.levelBadgeLocked]}>
+                  <Text style={[styles.levelBadgeText, isLocked && styles.levelBadgeTextLocked]}>Level {item.level}</Text>
                 </View>
-                <Text style={styles.lessonCount}>{item.lessonCount} lessons</Text>
+                {isLocked ? (
+                  <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
+                ) : (
+                  <Text style={styles.lessonCount}>{item.lessonCount} lessons</Text>
+                )}
               </View>
-              <Text style={styles.currTitle}>{item.title}</Text>
+              <Text style={[styles.currTitle, isLocked && styles.textLocked]}>{item.title}</Text>
               <Text style={styles.currDesc}>{item.description}</Text>
-              <View style={styles.currProgress}>
-                <View style={styles.progressBg}>
-                  <View style={[styles.progressFill, { width: `${pct}%` }]} />
+              {isLocked ? (
+                <Text style={styles.lockedHint}>Complete the previous level to unlock</Text>
+              ) : (
+                <View style={styles.currProgress}>
+                  <View style={styles.progressBg}>
+                    <View style={[styles.progressFill, { width: `${pct}%` }]} />
+                  </View>
+                  <Text style={styles.progressText}>{Math.round(pct)}%</Text>
                 </View>
-                <Text style={styles.progressText}>{Math.round(pct)}%</Text>
-              </View>
+              )}
             </TouchableOpacity>
           );
         }}
@@ -93,15 +103,20 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderBeige,
     padding: 16, marginBottom: 12,
   },
+  currCardLocked: { opacity: 0.55 },
   currTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   levelBadge: {
     backgroundColor: "rgba(29,158,117,0.12)",
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
   },
+  levelBadgeLocked: { backgroundColor: colors.borderBeige },
   levelBadgeText: { fontSize: 11, color: colors.accentGreen, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  levelBadgeTextLocked: { color: colors.textMuted },
   lessonCount: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   currTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  textLocked: { color: colors.textMuted },
   currDesc: { fontSize: 13, color: colors.textMuted, lineHeight: 20, fontFamily: "Inter_400Regular", marginBottom: 12 },
+  lockedHint: { fontSize: 12, color: colors.textMuted, fontStyle: "italic", fontFamily: "Inter_400Regular" },
   currProgress: { flexDirection: "row", alignItems: "center", gap: 8 },
   progressBg: { flex: 1, height: 5, backgroundColor: colors.progressTrack, borderRadius: 3 },
   progressFill: { height: 5, backgroundColor: colors.progressFill, borderRadius: 3 },

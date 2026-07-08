@@ -13,25 +13,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
-const MOCK_LESSONS = [
-  { id: "l1", title: "What is Discipleship?", duration: "12 min", isCompleted: true },
-  { id: "l2", title: "The Call to Follow", duration: "15 min", isCompleted: true },
-  { id: "l3", title: "The Cost of Discipleship", duration: "18 min", isCompleted: true },
-  { id: "l4", title: "Fruit That Remains", duration: "14 min", isCompleted: false },
-  { id: "l5", title: "Making Disciples", duration: "20 min", isCompleted: false },
-  { id: "l6", title: "Review & Memory Verse", duration: "10 min", isCompleted: false },
-];
-
 export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modules } = useData();
+  const { modules, lessons } = useData();
 
   const module = modules.find((m) => m.id === id) ?? modules[0];
+  const moduleLessons = lessons
+    .filter((l) => l.moduleId === module?.id)
+    .sort((a, b) => a.order - b.order);
 
-  const completed = MOCK_LESSONS.filter((l) => l.isCompleted).length;
-  const pct = Math.round((completed / MOCK_LESSONS.length) * 100);
+  const completed = moduleLessons.filter((l) => l.isCompleted).length;
+  const pct = moduleLessons.length > 0 ? Math.round((completed / moduleLessons.length) * 100) : 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -55,22 +49,29 @@ export default function ModuleDetailScreen() {
           <Text style={styles.moduleTitle}>{module?.title ?? "Module"}</Text>
           <Text style={styles.moduleDesc}>{module?.description ?? ""}</Text>
 
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>{pct}% complete</Text>
-              <Text style={styles.progressCount}>{completed}/{MOCK_LESSONS.length}</Text>
+          {module?.isLocked ? (
+            <View style={styles.lockedBanner}>
+              <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
+              <Text style={styles.lockedBannerText}>Finish the previous level to unlock this one</Text>
             </View>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${pct}%` }]} />
+          ) : (
+            <View style={styles.progressSection}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>{pct}% complete</Text>
+                <Text style={styles.progressCount}>{completed}/{moduleLessons.length}</Text>
+              </View>
+              <View style={styles.progressBg}>
+                <View style={[styles.progressFill, { width: `${pct}%` }]} />
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Lessons */}
         <Text style={styles.sectionTitle}>Lessons</Text>
         <View style={styles.lessonList}>
-          {MOCK_LESSONS.map((lesson, idx) => {
-            const isLocked = idx > completed;
+          {moduleLessons.map((lesson, idx) => {
+            const isLocked = lesson.isLocked;
             return (
               <TouchableOpacity
                 key={lesson.id}
@@ -93,7 +94,6 @@ export default function ModuleDetailScreen() {
                   <Text style={[styles.lessonTitle, isLocked && styles.lessonTitleLocked]}>
                     {lesson.title}
                   </Text>
-                  <Text style={styles.lessonDuration}>{lesson.duration}</Text>
                 </View>
                 {isLocked ? (
                   <Ionicons name="lock-closed" size={16} color={colors.borderBeige} />
@@ -132,6 +132,12 @@ const styles = StyleSheet.create({
   levelTagText: { fontSize: 11, color: colors.accentGreen, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   moduleTitle: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 6 },
   moduleDesc: { fontSize: 14, color: colors.textMuted, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 16 },
+  lockedBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: colors.lightCream, borderRadius: 10,
+    padding: 10, borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  lockedBannerText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", flex: 1 },
   progressSection: {},
   progressHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   progressLabel: { fontSize: 13, fontWeight: "600", color: colors.primaryGreen, fontFamily: "Inter_600SemiBold" },

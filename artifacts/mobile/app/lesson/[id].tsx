@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,40 +6,91 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { supabase } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
-const LESSON_CONTENT = {
-  title: "The Cost of Discipleship",
-  verseRef: "Luke 14:27",
-  verseText: "Whoever does not carry their cross and follow me cannot be my disciple.",
-  body: `Discipleship was never meant to be comfortable. Jesus didn't promise safety — he promised presence. The invitation to follow him comes with a cost, and counting that cost is the first act of wisdom for any would-be disciple.
-
-What does 'bearing a cross' mean in the 21st century? It means choosing obedience when convenience beckons the other way. It means walking toward people who are difficult to love. It means releasing ambitions that don't align with the Kingdom.
-
-The paradox of the gospel is this: the cost that feels like loss is actually the path to the fullest kind of life. Jesus doesn't diminish you — he clarifies you. He strips away what was never truly yours, and what remains is imperishable.
-
-As you study with your peer this week, talk honestly about what following Jesus has cost you personally. Where have you felt the weight of the cross? Where have you experienced the lightness that comes after surrender?`,
-  questions: [
-    "What has discipleship personally cost you in the last year?",
-    "Is there an area where you have been counting the cost but have not yet made the decision?",
-    "How does knowing Jesus paid an infinite cost change how you view your own sacrifice?",
-  ],
-};
+interface LessonContent {
+  title: string;
+  sections: { id: string; title: string; content: string }[];
+  scriptures: { id: string; reference: string; verse: string }[];
+  questions: { id: string; question: string }[];
+}
 
 export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [completed, setCompleted] = useState(false);
+  const { lessons, markLessonComplete } = useData();
+  const [content, setContent] = useState<LessonContent | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
 
-  function markComplete() {
-    setCompleted(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const lessonMeta = lessons.find((l) => l.id === id);
+  const completed = lessonMeta?.isCompleted ?? false;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!id) return;
+      setIsLoading(true);
+      try {
+        const [{ data: lesson }, { data: sections }, { data: scriptures }, { data: questions }] =
+          await Promise.all([
+            supabase.from("p2p_lessons").select("id,title").eq("id", id).maybeSingle(),
+            supabase.from("p2p_lesson_sections").select("id,title,content,section_order").eq("lesson_id", id).order("section_order", { ascending: true }),
+            supabase.from("p2p_scriptures").select("id,reference,verse,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
+            supabase.from("p2p_reflection_questions").select("id,question,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
+          ]);
+
+        if (!cancelled) {
+          setContent({
+            title: (lesson?.title as string) ?? lessonMeta?.title ?? "Lesson",
+            sections: ((sections ?? []) as Record<string, unknown>[]).map((s) => ({
+              id: s.id as string,
+              title: (s.title as string) ?? "",
+              content: (s.content as string) ?? "",
+            })),
+            scriptures: ((scriptures ?? []) as Record<string, unknown>[]).map((s) => ({
+              id: s.id as string,
+              reference: s.reference as string,
+              verse: s.verse as string,
+            })),
+            questions: ((questions ?? []) as Record<string, unknown>[]).map((q) => ({
+              id: q.id as string,
+              question: q.question as string,
+            })),
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setContent({ title: lessonMeta?.title ?? "Lesson", sections: [], scriptures: [], questions: [] });
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  async function handleComplete() {
+    if (!id || completing) return;
+    setCompleting(true);
+    try {
+      await markLessonComplete(id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setCompleting(false);
+    }
   }
 
   return (
@@ -57,55 +108,74 @@ export default function LessonScreen() {
         )}
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.lessonTitle}>{LESSON_CONTENT.title}</Text>
-
-        {/* Verse */}
-        <View style={styles.verseCard}>
-          <Text style={styles.verseText}>"{LESSON_CONTENT.verseText}"</Text>
-          <Text style={styles.verseRef}>— {LESSON_CONTENT.verseRef}</Text>
+      {isLoading || !content ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={colors.accentGreen} />
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.lessonTitle}>{content.title}</Text>
 
-        {/* Body */}
-        {LESSON_CONTENT.body.split("\n\n").map((para, idx) => (
-          <Text key={idx} style={styles.bodyPara}>{para}</Text>
-        ))}
-
-        {/* Discussion Questions */}
-        <View style={styles.questionsCard}>
-          <View style={styles.questionsHeader}>
-            <Ionicons name="people" size={16} color={colors.accentGreen} />
-            <Text style={styles.questionsTitle}>Discussion Questions</Text>
-          </View>
-          {LESSON_CONTENT.questions.map((q, idx) => (
-            <View key={idx} style={styles.questionRow}>
-              <View style={styles.questionNum}>
-                <Text style={styles.questionNumText}>{idx + 1}</Text>
-              </View>
-              <Text style={styles.questionText}>{q}</Text>
+          {content.scriptures.map((s) => (
+            <View key={s.id} style={styles.verseCard}>
+              <Text style={styles.verseText}>"{s.verse}"</Text>
+              <Text style={styles.verseRef}>— {s.reference}</Text>
             </View>
           ))}
-        </View>
 
-        {!completed ? (
-          <TouchableOpacity
-            style={styles.completeBtn}
-            onPress={markComplete}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
-            <Text style={styles.completeBtnText}>Mark as Complete</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.completedBanner}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
-            <Text style={styles.completedBannerText}>Lesson completed!</Text>
-          </View>
-        )}
-      </ScrollView>
+          {content.sections.map((section) => (
+            <View key={section.id}>
+              {section.title ? <Text style={styles.sectionHeading}>{section.title}</Text> : null}
+              {section.content.split("\n\n").map((para, idx) => (
+                <Text key={idx} style={styles.bodyPara}>{para}</Text>
+              ))}
+            </View>
+          ))}
+
+          {content.questions.length > 0 && (
+            <View style={styles.questionsCard}>
+              <View style={styles.questionsHeader}>
+                <Ionicons name="people" size={16} color={colors.accentGreen} />
+                <Text style={styles.questionsTitle}>Discussion Questions</Text>
+              </View>
+              {content.questions.map((q, idx) => (
+                <View key={q.id} style={styles.questionRow}>
+                  <View style={styles.questionNum}>
+                    <Text style={styles.questionNumText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={styles.questionText}>{q.question}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {!completed ? (
+            <TouchableOpacity
+              style={[styles.completeBtn, completing && styles.completeBtnDisabled]}
+              onPress={handleComplete}
+              activeOpacity={0.85}
+              disabled={completing}
+            >
+              {completing ? (
+                <ActivityIndicator color={colors.cream} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
+                  <Text style={styles.completeBtnText}>Mark as Complete</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.completedBanner}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
+              <Text style={styles.completedBannerText}>Lesson completed!</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -125,6 +195,7 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
   completedTagText: { color: colors.cream, fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: 20, paddingTop: 24 },
   lessonTitle: {
     fontSize: 24, fontWeight: "700", color: colors.textDark,
@@ -141,6 +212,10 @@ const styles = StyleSheet.create({
     lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 8,
   },
   verseRef: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
+  sectionHeading: {
+    fontSize: 16, fontWeight: "700", color: colors.textDark,
+    fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4,
+  },
   bodyPara: {
     fontSize: 15, color: colors.textDark, lineHeight: 26,
     fontFamily: "Inter_400Regular", marginBottom: 16,
@@ -166,6 +241,7 @@ const styles = StyleSheet.create({
     height: 54, flexDirection: "row", gap: 8,
     alignItems: "center", justifyContent: "center",
   },
+  completeBtnDisabled: { opacity: 0.7 },
   completeBtnText: { color: colors.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   completedBanner: {
     backgroundColor: "rgba(29,158,117,0.1)",
