@@ -1,10 +1,5 @@
 -- Adds RLS policies for curriculum content tables.
--- These tables had rowsecurity=true but ZERO policies defined, which silently
--- blocked all reads (returned empty sets) and hard-blocked all writes
--- ("new row violates row-level security policy").
---
--- Pattern: anyone (authenticated) can read published curriculum content;
--- only admins (any p2p_profiles.role other than 'student') can write.
+-- Idempotent: drops policies before re-creating so this can be re-run safely.
 
 CREATE OR REPLACE FUNCTION p2p_is_admin() RETURNS boolean AS $$
   SELECT EXISTS (
@@ -34,6 +29,11 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY content_tables LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Authenticated users can read %1$s" ON %1$s', t);
+    EXECUTE format('DROP POLICY IF EXISTS "Admins can insert %1$s" ON %1$s', t);
+    EXECUTE format('DROP POLICY IF EXISTS "Admins can update %1$s" ON %1$s', t);
+    EXECUTE format('DROP POLICY IF EXISTS "Admins can delete %1$s" ON %1$s', t);
+
     EXECUTE format(
       'CREATE POLICY "Authenticated users can read %1$s" ON %1$s FOR SELECT TO authenticated USING (true)',
       t

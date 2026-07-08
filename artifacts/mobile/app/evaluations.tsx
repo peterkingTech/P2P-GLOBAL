@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData, PendingEvaluation } from "@/contexts/DataContext";
+import MediaPlayer from "@/components/MediaPlayer";
 import colors from "@/constants/colors";
 
 function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
@@ -27,13 +28,11 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
     setSubmitting(status);
     setError(null);
     const err = await resolveEvaluation(evaluation.id, status, feedback.trim());
-    if (err) {
-      setError(err);
-      setSubmitting(null);
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    if (err) { setError(err); setSubmitting(null); }
+    else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
   }
+
+  const isMedia = evaluation.submissionType === "audio" || evaluation.submissionType === "video";
 
   return (
     <View style={styles.card}>
@@ -45,11 +44,39 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
           <Text style={styles.submitterName}>{evaluation.submitterName}</Text>
           <Text style={styles.lessonTitle}>{evaluation.lessonTitle}</Text>
         </View>
+        <View style={styles.typeBadge}>
+          <Ionicons
+            name={
+              evaluation.submissionType === "audio"
+                ? "mic"
+                : evaluation.submissionType === "video"
+                ? "videocam"
+                : "create"
+            }
+            size={12}
+            color={colors.textMid}
+          />
+          <Text style={styles.typeBadgeText}>
+            {evaluation.submissionType.charAt(0).toUpperCase() + evaluation.submissionType.slice(1)}
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.contentBox}>
-        <Text style={styles.contentText}>{evaluation.content}</Text>
-      </View>
+      {isMedia && evaluation.mediaUrl ? (
+        <View style={styles.mediaBox}>
+          <MediaPlayer
+            storagePath={evaluation.mediaUrl}
+            submissionType={evaluation.submissionType as "audio" | "video"}
+            durationSeconds={evaluation.durationSeconds}
+          />
+        </View>
+      ) : (
+        <View style={styles.contentBox}>
+          <Text style={styles.contentText}>
+            {evaluation.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}
+          </Text>
+        </View>
+      )}
 
       <TextInput
         style={styles.feedbackInput}
@@ -143,22 +170,23 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
   emptySub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", lineHeight: 20 },
-  card: {
-    backgroundColor: colors.card, borderRadius: 16,
-    borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 16,
-  },
+  card: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 16 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
   avatarCircle: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(29,158,117,0.12)",
-    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(29,158,117,0.12)", alignItems: "center", justifyContent: "center",
   },
   submitterName: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   lessonTitle: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
+  typeBadge: {
+    flexDirection: "row", gap: 4, alignItems: "center",
+    backgroundColor: colors.cardBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  typeBadgeText: { fontSize: 11, color: colors.textMid, fontFamily: "Inter_500Medium" },
+  mediaBox: { marginBottom: 12 },
   contentBox: {
-    backgroundColor: colors.cardBeige, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.warmBeige,
+    backgroundColor: colors.cardBeige, borderRadius: 12, borderWidth: 1, borderColor: colors.warmBeige,
     padding: 12, marginBottom: 12,
   },
   contentText: { fontSize: 14, color: colors.textDark, lineHeight: 22, fontFamily: "Inter_400Regular" },
@@ -170,10 +198,7 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular" },
   actionRow: { flexDirection: "row", gap: 10 },
-  actionBtn: {
-    flex: 1, height: 44, borderRadius: 12,
-    flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-  },
+  actionBtn: { flex: 1, height: 44, borderRadius: 12, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" },
   reviseBtn: { backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige },
   reviseBtnText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   approveBtn: { backgroundColor: colors.primaryGreen },
