@@ -1,0 +1,22 @@
+Implement a two-setting language system: App Language (UI chrome) and Content Language (which language version of content displays), independent of each other. Translation happens externally (AI tool or human translator) — the app never auto-translates admin content, only stores and displays what's pasted in.
+
+1. New table p2p_languages (code, name, is_default boolean). Seed with: en (default), de, es, fr, pt, sw, ar, hi.
+2. Add two columns to p2p_profiles: app_language, content_language (both reference p2p_languages.code, default to platform default).
+3. UI-string localization (i18next + per-language JSON files) driven by app_language — covers only buttons/nav/system messages, separate from content below.
+4. Translation tables for curriculum content, all additive (canonical/default-language row is never modified by these):
+   - p2p_curriculum_translations (curriculum_id, language_code, title, description)
+   - p2p_module_translations (module_id, language_code, title, description)
+   - p2p_lesson_translations (lesson_id, language_code, title, subtitle)
+   - p2p_lesson_section_translations (section_id, language_code, title, content)
+   - p2p_scripture_translations (scripture_id, language_code, verse) — reference stays as-is, only verse text translates
+   - p2p_reflection_question_translations (question_id, language_code, question)
+5. Build one reusable query helper: given any content id + requested language_code, return the translation if it exists, else fall back to the canonical/default row. Every content screen must use this helper. Content must never render blank due to a missing translation.
+6. Settings screen: two clearly separate pickers, "App Language" and "Content Language."
+
+Seed SQL once the migration runs:
+INSERT INTO public.p2p_languages (code, name, is_default) VALUES
+  ('en', 'English', true), ('de', 'German', false), ('es', 'Spanish', false),
+  ('fr', 'French', false), ('pt', 'Portuguese', false), ('sw', 'Swahili', false),
+  ('ar', 'Arabic', false), ('hi', 'Hindi', false);
+
+We are launching content in English only initially — this step is about building the architecture so every lesson going forward is translation-ready from creation, not about translating existing content yet. Confirm migrations ran clean and the fallback helper works (test a lesson in a language with no translation — must show English, not blank) before continuing.

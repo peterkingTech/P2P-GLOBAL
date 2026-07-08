@@ -1,0 +1,26 @@
+Continue building this app — read replit.md and this project's existing structure first (pnpm workspace, artifacts/p2p-bible is an Expo/React Native app, artifacts/api-server is Express, lib/db is Drizzle ORM).
+Critical first step — do not skip: lib/db/src/schema/index.ts is currently empty placeholder code, and lib/db/src/index.ts expects a DATABASE_URL env var. This app must connect to the existing production Supabase Postgres database — do NOT provision a new/separate database. Get the Postgres connection string from Supabase (Dashboard → Project Settings → Database → Connection string → URI, "Transaction" pooler mode) and set it as DATABASE_URL in Replit's Secrets. Confirm with me before proceeding if you can't find these credentials.
+The production schema already exists and must not be recreated. Define Drizzle table schemas in lib/db/src/schema/ that map to these existing tables (use pgTable with the exact real column names — introspect the live database first rather than guessing):
+p2p_profiles, p2p_churches, p2p_curriculums, p2p_modules, p2p_lessons,
+p2p_lesson_sections, p2p_scriptures, p2p_reflection_questions,
+p2p_assignments, p2p_enrollments, p2p_lesson_progress, p2p_sessions,
+p2p_session_notes, p2p_session_attendance, p2p_discipleship_links,
+p2p_groups, p2p_group_members, p2p_regions, p2p_admin_roles,
+p2p_content_approvals, p2p_audit_logs, p2p_user_flags,
+p2p_platform_metrics, p2p_notifications, p2p_prayer_requests
+Note: p2p_lesson_blocks also exists but is NOT the real content path — ignore it. Real curriculum content hierarchy is p2p_lessons → p2p_lesson_sections (teaching text) + p2p_scriptures (memory verse) + p2p_reflection_questions (discussion) + p2p_assignments (currently empty, don't fabricate content for it).
+Then, in this order:
+
+Build real Express routes in artifacts/api-server/src/routes/ for: profiles/auth, curriculum browsing (curriculums → modules → lessons → sections/scriptures/questions), lesson progress tracking, living tree growth metrics, discipleship links (mentor/mentee), sessions, prayer requests, admin (approvals, audit logs, user flags).
+Run the Orval codegen (pnpm --filter @workspace/api-spec run codegen) to regenerate the typed API client/React Query hooks in lib/api-client-react.
+Wire the already-existing Expo screens to real data via those hooks — don't rebuild these screens from scratch, they exist: app/(tabs)/learn.tsx, app/(tabs)/connect.tsx, app/(tabs)/forest.tsx, app/(tabs)/prayer.tsx, app/(tabs)/missions.tsx, app/curriculum.tsx, app/living-tree.tsx, app/fruit.tsx, app/stages.tsx, app/module/[id].tsx, app/lesson/[id].tsx, app/session/[id].tsx, app/(auth)/login.tsx, app/(auth)/register.tsx, app/(auth)/onboarding.tsx, app/(auth)/profile-setup.tsx.
+
+Hard rules — do not violate:
+
+No mock/hardcoded/placeholder data in any screen once wired — every screen queries real data or shows a real empty/loading state.
+Don't invent new tables or rename existing columns to suit convenience — adapt the code to match the real schema, not the other way around.
+p2p_assignments has zero real content in production right now — leave it as an empty state in the UI, don't fake entries.
+Living Tree growth must be computed from real activity (lesson completions, sessions, discipleship links, prayers, streak) — never a hardcoded percentage.
+Update replit.md's placeholder sections (Product, Architecture decisions, Where things live) as you go, so it stays useful instead of staying template text forever.
+
+Once the schema and first 2-3 routes are working end-to-end (e.g. login + curriculum browsing), stop and let me review before continuing to the rest

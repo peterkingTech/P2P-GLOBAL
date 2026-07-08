@@ -1,0 +1,17 @@
+Implement a two-setting language system: App Language (UI chrome) and Content Language (which language version of content displays), independent of each other.
+
+1. New table p2p_languages (code, name, is_default boolean) — seed with your initial set of languages.
+2. Add two columns to p2p_profiles: app_language (references p2p_languages.code) and content_language (references p2p_languages.code). Default both to the platform's default language.
+3. Set up UI-string localization (i18next + per-language JSON files) driven by app_language — this is separate from all content below and only covers buttons/nav/system messages.
+4. Translation tables for admin-authored content (all reference the original row + a language_code, and are purely additive — the original/default-language row is never deleted or modified by this):
+   - p2p_curriculum_translations (curriculum_id, language_code, title, description)
+   - p2p_module_translations (module_id, language_code, title, description)
+   - p2p_lesson_translations (lesson_id, language_code, title, subtitle)
+   - p2p_lesson_section_translations (section_id, language_code, title, content)
+   - p2p_scripture_translations (scripture_id, language_code, verse) — reference like "John 3:16" stays as-is, only verse text translates
+   - p2p_reflection_question_translations (question_id, language_code, question)
+   - p2p_guided_content_translations (guided_content_id, language_code, title, body)
+   - p2p_video_captions (video_id, language_code, caption_text or caption_file_url)
+5. Build a single reusable query helper: given any content id + a requested language_code, return the translation row if one exists for that language, otherwise fall back to the canonical/default row. Every screen that displays content must use this helper — never query the base table directly when content_language could be non-default. A lesson must never render blank just because a translation hasn't been added yet.
+6. Add a language picker in Settings with the two options clearly separated: "App Language" and "Content Language" as distinct controls, not one combined setting.
+7. Build the Admin Language Manager: for any piece of content (curriculum/module/lesson/section/scripture/question/guided content/video), show which languages currently have a translation and which don't (simple checklist/badges, e.g. "English (original) · Spanish ✓ · French — missing"). Clicking a missing language opens a paste-in form (just text fields matching the content type) that writes to the relevant translation table. This is meant to be used by pasting in text already translated externally — no in-app translation happening, just data entry.

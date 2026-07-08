@@ -1,0 +1,901 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: P2P Global Bible Study Network API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: profiles
+    description: User profile operations
+  - name: curriculum
+    description: Curriculum, modules and lessons
+  - name: progress
+    description: Lesson progress tracking
+  - name: prayer
+    description: Prayer requests
+  - name: sessions
+    description: Study sessions
+  - name: discipleship
+    description: Discipleship links (mentor/disciple)
+  - name: notifications
+    description: User notifications
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Profiles ────────────────────────────────────────────────────────────────
+  /profiles/{userId}:
+    get:
+      operationId: getProfile
+      tags: [profiles]
+      summary: Get a user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Profile found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateProfile
+      tags: [profiles]
+      summary: Update a user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /profiles/{userId}/forest:
+    get:
+      operationId: getForestTree
+      tags: [profiles]
+      summary: Get a user's discipleship forest tree
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Forest tree
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForestNode"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Curriculum ───────────────────────────────────────────────────────────────
+  /curriculum:
+    get:
+      operationId: listCurriculums
+      tags: [curriculum]
+      summary: List published curriculums
+      responses:
+        "200":
+          description: List of curriculums
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Curriculum"
+
+  /curriculum/{curriculumId}/modules:
+    get:
+      operationId: listModules
+      tags: [curriculum]
+      summary: List modules for a curriculum
+      parameters:
+        - name: curriculumId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+
+  /modules:
+    get:
+      operationId: listAllModules
+      tags: [curriculum]
+      summary: List all modules (across all curriculums)
+      responses:
+        "200":
+          description: List of modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+
+  /modules/{moduleId}:
+    get:
+      operationId: getModule
+      tags: [curriculum]
+      summary: Get a module with its lessons
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Module with lessons
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleWithLessons"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /lessons/{lessonId}:
+    get:
+      operationId: getLesson
+      tags: [curriculum]
+      summary: Get a single lesson
+      parameters:
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lesson
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Progress ─────────────────────────────────────────────────────────────────
+  /progress/{userId}:
+    get:
+      operationId: getUserProgress
+      tags: [progress]
+      summary: Get all lesson progress for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of progress records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LessonProgress"
+
+  /progress/{userId}/{lessonId}:
+    put:
+      operationId: markLessonComplete
+      tags: [progress]
+      summary: Mark a lesson as complete for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: lessonId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Progress updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonProgress"
+
+  # ── Prayer ───────────────────────────────────────────────────────────────────
+  /prayers:
+    get:
+      operationId: listPrayerRequests
+      tags: [prayer]
+      summary: List recent prayer requests
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Prayer requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PrayerRequest"
+    post:
+      operationId: createPrayerRequest
+      tags: [prayer]
+      summary: Create a prayer request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrayerRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrayerRequest"
+
+  /prayers/{id}/pray:
+    post:
+      operationId: incrementPrayerCount
+      tags: [prayer]
+      summary: Increment prayer count for a request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Updated prayer count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrayerRequest"
+
+  # ── Sessions ─────────────────────────────────────────────────────────────────
+  /sessions:
+    get:
+      operationId: listStudySessions
+      tags: [sessions]
+      summary: List upcoming study sessions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Study sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudySession"
+    post:
+      operationId: createStudySession
+      tags: [sessions]
+      summary: Create a study session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudySessionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySession"
+
+  # ── Discipleship ──────────────────────────────────────────────────────────────
+  /discipleship/{userId}/disciples:
+    get:
+      operationId: listDisciples
+      tags: [discipleship]
+      summary: List disciples for a mentor
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disciples
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscipleshipLink"
+
+  /discipleship:
+    post:
+      operationId: createDiscipleshipLink
+      tags: [discipleship]
+      summary: Create a discipleship relationship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiscipleshipLinkRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscipleshipLink"
+
+  # ── Notifications ─────────────────────────────────────────────────────────────
+  /notifications/{userId}:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{userId}/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        languageCode:
+          type: string
+        growthLevel:
+          type: integer
+        role:
+          type: string
+          enum: [seeker, disciple, mentor, elder]
+        gifts:
+          type: array
+          items:
+            type: string
+        mentorId:
+          type: string
+          format: uuid
+          nullable: true
+        isPraying:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - displayName
+        - email
+        - languageCode
+        - growthLevel
+        - role
+        - gifts
+        - isPraying
+        - createdAt
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        languageCode:
+          type: string
+        growthLevel:
+          type: integer
+        role:
+          type: string
+          enum: [seeker, disciple, mentor, elder]
+        gifts:
+          type: array
+          items:
+            type: string
+        isPraying:
+          type: boolean
+
+    ForestNode:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+        growthLevel:
+          type: integer
+        country:
+          type: string
+          nullable: true
+        depth:
+          type: integer
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForestNode"
+      required:
+        - id
+        - name
+        - role
+        - growthLevel
+        - depth
+        - children
+
+    Curriculum:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        isPublished:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - isPublished
+        - createdAt
+
+    Module:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        curriculumId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        level:
+          type: integer
+        lessonCount:
+          type: integer
+        imageUrl:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        completedLessons:
+          type: integer
+          description: Populated per-user when userId is in context
+      required:
+        - id
+        - title
+        - level
+        - lessonCount
+        - sortOrder
+
+    ModuleWithLessons:
+      allOf:
+        - $ref: "#/components/schemas/Module"
+        - type: object
+          properties:
+            lessons:
+              type: array
+              items:
+                $ref: "#/components/schemas/Lesson"
+          required:
+            - lessons
+
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        moduleId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        content:
+          type: string
+          nullable: true
+        verseRef:
+          type: string
+          nullable: true
+        verseText:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        isCompleted:
+          type: boolean
+          description: Populated per-user when userId is in context
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - sortOrder
+        - createdAt
+
+    LessonProgress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        lessonId:
+          type: string
+          format: uuid
+        isCompleted:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - lessonId
+        - isCompleted
+        - createdAt
+
+    PrayerRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        nation:
+          type: string
+          nullable: true
+        text:
+          type: string
+        prayerCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        hasPrayed:
+          type: boolean
+          description: Client-side only flag
+      required:
+        - id
+        - userId
+        - userName
+        - text
+        - prayerCount
+        - createdAt
+
+    CreatePrayerRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        userName:
+          type: string
+        nation:
+          type: string
+        text:
+          type: string
+      required:
+        - userId
+        - userName
+        - text
+
+    StudySession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        hostId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        participantCount:
+          type: integer
+        isLive:
+          type: boolean
+        hostName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - hostId
+        - title
+        - scheduledAt
+        - durationMinutes
+        - participantCount
+        - isLive
+        - createdAt
+
+    CreateStudySessionRequest:
+      type: object
+      properties:
+        hostId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        hostName:
+          type: string
+      required:
+        - hostId
+        - title
+        - scheduledAt
+        - durationMinutes
+
+    DiscipleshipLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        mentorId:
+          type: string
+          format: uuid
+        discipleId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - mentorId
+        - discipleId
+        - startedAt
+        - isActive
+        - createdAt
+
+    CreateDiscipleshipLinkRequest:
+      type: object
+      properties:
+        mentorId:
+          type: string
+          format: uuid
+        discipleId:
+          type: string
+          format: uuid
+      required:
+        - mentorId
+        - discipleId
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - isRead
+        - createdAt

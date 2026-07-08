@@ -1,0 +1,3 @@
+- [P2P App Setup](p2p-app-setup.md) — Supabase table prefix, DB URL secret quirk, and metro symlink fix for pnpm.
+- [P2P Admin Routing](p2p-admin-routing.md) — How /admin/* routes are guarded; AuthGate bypass pattern for admin login.
+- [P2P Schema Additions](p2p-schema-additions.md) — New tables added in migration 001; canonical vs translation table split.
