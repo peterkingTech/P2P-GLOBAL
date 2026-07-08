@@ -1,0 +1,43 @@
+Admin curriculum creation is failing with "new row violates row-level security policy" — confirmed on p2p_curriculums, and the same will happen on every other curriculum table since none of them have admin write policies yet.
+
+Add RLS policies allowing admin roles to fully manage (insert/update/delete) every curriculum-related table. Admin roles are: church_leader, regional_admin, super_admin (per the corrected user_role enum — do NOT use the old invented values seeker/disciple/mentor/elder, and do not use global_admin/regional_director, those were removed).
+
+Apply this same policy pattern to EACH of these tables — don't stop after fixing p2p_curriculums, all of them need it:
+- p2p_curriculums
+- p2p_modules
+- p2p_lessons
+- p2p_lesson_sections
+- p2p_scriptures
+- p2p_reflection_questions
+- p2p_assignments
+- p2p_curriculum_translations
+- p2p_module_translations
+- p2p_lesson_translations
+- p2p_lesson_section_translations
+- p2p_scripture_translations
+- p2p_reflection_question_translations
+
+For each table, add a policy like this (adjust table name each time):
+
+CREATE POLICY "Admins can manage [table_name]"
+ON [table_name]
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM p2p_profiles
+    WHERE p2p_profiles.id = auth.uid()
+    AND p2p_profiles.role IN ('church_leader', 'regional_admin', 'super_admin')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM p2p_profiles
+    WHERE p2p_profiles.id = auth.uid()
+    AND p2p_profiles.role IN ('church_leader', 'regional_admin', 'super_admin')
+  )
+);
+
+Also confirm regular (non-admin) users still have appropriate READ-ONLY access to published content on all these tables — this admin-write policy should be additive, not replace whatever read policies already let students browse curriculum. Check existing SELECT policies on each table before adding these; don't duplicate or conflict with them.
+
+After adding all policies, test end-to-end in the Curriculum Manager: create a curriculum, then a module inside it, then a lesson inside that module, then add a teaching section, a memory verse, a reflection question, and an assignment to that lesson — confirm every single one saves without error. Report back exactly which step (if any) still fails.
