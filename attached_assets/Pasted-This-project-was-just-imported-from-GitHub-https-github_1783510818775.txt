@@ -1,0 +1,14 @@
+This project was just imported from GitHub (https://github.com/peterkingTech/P2P-GLOBAL) into a fresh Replit environment. Read CLAUDE.md (if present) or explore the codebase to understand the project first, then do these in order:
+
+1. VERIFY ENVIRONMENT: Confirm `pnpm install` has run successfully. Confirm the DATABASE_URL secret is set and points to the existing production Supabase Postgres instance — this is NOT a new database, it's the same one the old Replit environment was using, so do not run any "create fresh database" step. If DATABASE_URL is missing, stop and tell me — I need to re-add it from the old environment's secrets.
+
+2. FIX THE OUTSTANDING BUG: The registration intake form was failing with "insert or update on table p2p_registration_profiles violates foreign key constraint p2p_registration_profiles_user_id_fkey" — meaning a p2p_registration_profiles row is being created before the corresponding p2p_profiles row exists for that user. Trace the actual signup flow: find exactly where p2p_profiles gets created relative to when the intake form saves, and fix the sequencing so p2p_profiles always exists first. Test by creating a brand new test account and completing the full registration form end to end — confirm no errors, and confirm both p2p_profiles and p2p_registration_profiles have a row for that user afterward.
+
+3. Once that's confirmed working, give me a status update on what's actually built and working right now versus what's still pending, based on the project's current state — don't assume anything from before still works, verify each piece:
+   - Home greeting (real name + time of day)
+   - Registration intake form (2 sections) + Registration Responses admin page
+   - Multi-language architecture (p2p_languages table, translation tables, App/Content language settings, fallback logic)
+   - Curriculum Manager admin UI
+   - Admin login/access (still no dedicated admin login screen as of last check — confirm if this changed)
+
+Stop after step 3 and give me the real status before we decide what to build next.
