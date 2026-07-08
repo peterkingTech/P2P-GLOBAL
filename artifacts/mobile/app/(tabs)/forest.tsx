@@ -116,7 +116,7 @@ export default function ForestTab() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNum}>{profile?.role ?? "disciple"}</Text>
+            <Text style={styles.statNum}>{profile?.role ?? "student"}</Text>
             <Text style={styles.statLabel}>Your Role</Text>
           </View>
         </View>

@@ -35,6 +35,14 @@ description: Tables and columns added in migrations/001_schema_additions.sql —
 **Registration**
 - `p2p_registration_profiles(id, user_id→p2p_profiles, full_name, email, location_city, location_country, contact?, primary_language, other_languages TEXT[], faith_journey_stage INT 1-5, born_again CHECK IN ('yes','no','other'), born_again_other?, walking_with_christ_duration CHECK IN ('less_than_1_year','1_3_years','3_10_years','10_plus_years'), church_involvement?, follow_up_status DEFAULT 'not_contacted' CHECK IN ('not_contacted','contacted','in_progress','resolved'), admin_notes?, submitted_at)`
 
+## Real p2p_profiles schema vs. app assumptions (corrected 2026-07-08)
+
+The real deployed `p2p_profiles` table columns are: `id, email, full_name, photo_url, role (enum user_role: student/peer_guide/church_leader/regional_director/global_admin/super_admin, default student), country, language (default 'en'), church_id, created_at, streak_days, last_active_date, app_language, content_language`, plus `growth_level int default 0`, `gifts text[] default '{}'`, `is_praying boolean default false` (added in `migrations/002_fix_profile_rls.sql` because the UI already depended on them but they were missing from the deployed table). There is no `display_name`, `language_code`, or `city` column — the app-level camelCase names map to `full_name` and `language` respectively; `city` has no DB equivalent.
+
+`p2p_profiles` originally had RLS enabled with only a SELECT policy — no INSERT/UPDATE policy — so `AuthContext.signUp`'s upsert was silently blocked and no profile row was ever created, which caused `p2p_registration_profiles_user_id_fkey` violations downstream in the intake form. Fixed in `migrations/002_fix_profile_rls.sql` by adding `auth.uid() = id` INSERT/UPDATE policies.
+**Why:** always verify RLS policies (not just table existence) when a Supabase write silently "succeeds" but no row appears — check `pg_policy` for the table, not just column names.
+**How to apply:** before writing to any Supabase table from client code, confirm real column names AND that INSERT/UPDATE policies exist, don't assume from app code or docs.
+
 ## Key design rules
 
 - Canonical rows (English) are NEVER modified by translation saves — translation screens write only to `*_translations` tables.

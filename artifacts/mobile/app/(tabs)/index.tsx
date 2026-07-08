@@ -191,7 +191,7 @@ export default function HomeTab() {
           { icon: "flower", label: "Fruit Collection", sub: "See the fruit you've earned", route: "/fruit" },
           { icon: "trophy", label: "Hall of Faith", sub: "Celebrate faithful disciples", route: "/hall-of-faith" },
           { icon: "person-circle", label: "My Profile", sub: "View your discipleship profile", route: "/profile" },
-          ...(profile?.role === "mentor" || profile?.role === "elder"
+          ...(profile?.role && profile.role !== "student"
             ? [{ icon: "settings", label: "Admin", sub: "Curriculum manager & registration responses", route: "/admin/curriculum" }]
             : []),
         ].map((item) => (

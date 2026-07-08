@@ -11,7 +11,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
-const ADMIN_ROLES = new Set(["mentor", "elder"]);
+const ADMIN_ROLES = new Set([
+  "peer_guide",
+  "church_leader",
+  "regional_director",
+  "global_admin",
+  "super_admin",
+]);
 
 const NAV_ITEMS = [
   { label: "Curriculum", path: "/admin/curriculum", icon: "book" as const },

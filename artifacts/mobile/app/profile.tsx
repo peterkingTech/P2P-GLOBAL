@@ -75,7 +75,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNum}>{profile?.role ?? "disciple"}</Text>
+            <Text style={styles.statNum}>{profile?.role ?? "student"}</Text>
             <Text style={styles.statLabel}>Role</Text>
           </View>
           <View style={styles.statDivider} />

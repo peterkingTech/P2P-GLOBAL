@@ -18,7 +18,13 @@ import colors from "@/constants/colors";
 
 const LOGO = require("@/assets/images/logo.png");
 
-const ADMIN_ROLES = new Set(["mentor", "elder"]);
+const ADMIN_ROLES = new Set([
+  "peer_guide",
+  "church_leader",
+  "regional_director",
+  "global_admin",
+  "super_admin",
+]);
 
 export default function AdminLoginScreen() {
   const router = useRouter();
@@ -129,7 +135,7 @@ export default function AdminLoginScreen() {
           </View>
         </View>
         <Text style={styles.title}>Admin Sign In</Text>
-        <Text style={styles.subtitle}>Mentors and elders only</Text>
+        <Text style={styles.subtitle}>Peer guides, leaders and admins only</Text>
       </View>
 
       {/* Role error — clear, non-alarming message */}
@@ -213,8 +219,8 @@ export default function AdminLoginScreen() {
       </View>
 
       <Text style={styles.hint}>
-        This portal is restricted to network mentors and elders. Regular
-        members should use the standard sign-in page.
+        This portal is restricted to peer guides, church leaders, and
+        network admins. Regular members should use the standard sign-in page.
       </Text>
     </KeyboardAwareScrollView>
   );

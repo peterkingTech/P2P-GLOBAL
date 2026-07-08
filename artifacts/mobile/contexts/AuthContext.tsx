@@ -31,7 +31,13 @@ export type SpiritualGift =
   | "giving"
   | "prophecy";
 
-export type DiscipleRole = "seeker" | "disciple" | "mentor" | "elder";
+export type DiscipleRole =
+  | "student"
+  | "peer_guide"
+  | "church_leader"
+  | "regional_director"
+  | "global_admin"
+  | "super_admin";
 
 export interface UserProfile {
   id: string;
@@ -68,14 +74,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function mapProfileRow(row: Record<string, unknown>): UserProfile {
   return {
     id: row.id as string,
-    displayName: (row.display_name as string) ?? "",
+    displayName: (row.full_name as string) ?? "",
     email: (row.email as string) ?? "",
-    avatarUrl: row.avatar_url as string | undefined,
+    avatarUrl: row.photo_url as string | undefined,
     city: row.city as string | undefined,
     country: row.country as string | undefined,
-    languageCode: (row.language_code as string) ?? "en",
+    languageCode: (row.language as string) ?? "en",
     growthLevel: (row.growth_level as number) ?? 0,
-    role: ((row.role as string) ?? "disciple") as DiscipleRole,
+    role: ((row.role as string) ?? "student") as DiscipleRole,
     gifts: ((row.gifts as string[]) ?? []) as SpiritualGift[],
     mentorId: row.mentor_id as string | undefined,
     isPraying: (row.is_praying as boolean) ?? false,
@@ -135,17 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return error.message;
 
     if (data.user) {
-      await supabase.from("p2p_profiles").upsert({
+      const { error: profileErr } = await supabase.from("p2p_profiles").upsert({
         id: data.user.id,
         email,
-        display_name: name,
-        growth_level: 0,
-        role: "disciple",
-        gifts: [],
-        is_praying: false,
-        language_code: "en",
+        full_name: name,
         created_at: new Date().toISOString(),
       });
+      if (profileErr) return profileErr.message;
     }
     return null;
   }, []);
@@ -164,8 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<string | null> => {
     if (!session?.user) return "Not authenticated";
     const dbUpdates: Record<string, unknown> = {};
-    if (updates.displayName !== undefined) dbUpdates.display_name = updates.displayName;
-    if (updates.city !== undefined) dbUpdates.city = updates.city;
+    if (updates.displayName !== undefined) dbUpdates.full_name = updates.displayName;
     if (updates.country !== undefined) dbUpdates.country = updates.country;
     if (updates.gifts !== undefined) dbUpdates.gifts = updates.gifts;
     if (updates.role !== undefined) dbUpdates.role = updates.role;
