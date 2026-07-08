@@ -7,10 +7,9 @@ function mapNotification(row: Record<string, unknown>) {
   return {
     id: row.id,
     userId: row.user_id,
-    type: row.type,
     title: row.title,
-    body: row.body ?? null,
-    isRead: row.is_read ?? false,
+    message: row.message ?? null,
+    isRead: row.read ?? false,
     createdAt: row.created_at,
   };
 }
@@ -36,7 +35,7 @@ router.post("/:userId/:id/read", async (req, res) => {
   // Scope update by both id AND user_id to prevent cross-user modification
   const { data, error } = await supabase
     .from("p2p_notifications")
-    .update({ is_read: true })
+    .update({ read: true })
     .eq("id", id)
     .eq("user_id", userId)
     .select()

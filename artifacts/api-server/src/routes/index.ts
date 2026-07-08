@@ -9,6 +9,7 @@ import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
 import adminRouter from "./admin";
 import registrationRouter from "./registration";
+import evaluationsRouter from "./evaluations";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,7 @@ router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/admin", adminRouter);
+router.use("/admin/evaluations", evaluationsRouter);
 router.use("/registration", registrationRouter);
 
 export default router;

@@ -83,6 +83,24 @@ export interface Mission {
   religion: string;
 }
 
+export interface Assignment {
+  id: string;
+  lessonId: string;
+  title: string;
+  instructions: string;
+}
+
+export interface PendingEvaluation {
+  id: string;
+  submissionId: string;
+  lessonId: string;
+  lessonTitle: string;
+  submitterId: string;
+  submitterName: string;
+  content: string;
+  assignedAt: string;
+}
+
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
@@ -92,11 +110,21 @@ interface DataContextValue {
   fruits: Fruit[];
   missions: Mission[];
   dailyVerse: { ref: string; text: string } | null;
+  pendingEvaluations: PendingEvaluation[];
   isLoading: boolean;
   addPrayer: (text: string, nation?: string) => Promise<void>;
   prayForRequest: (id: string) => Promise<void>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
+  getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
+  getMySubmission: (lessonId: string) => Promise<{ id: string; content: string } | null>;
+  submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
+  refreshPendingEvaluations: () => Promise<void>;
+  resolveEvaluation: (
+    evaluationId: string,
+    status: "approved" | "revision_requested",
+    feedback: string
+  ) => Promise<string | null>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -138,6 +166,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [fruits, setFruits] = useState<Fruit[]>([]);
   const [missions] = useState<Mission[]>(MOCK_MISSIONS);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
+  const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -204,6 +233,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
 
       await loadCurriculum(profile?.id);
+      if (profile?.id) await refreshPendingEvaluations(profile.id);
       setFruits(MOCK_FRUITS);
 
       // Build simple forest from profile
@@ -420,6 +450,129 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(() => loadData(), [loadData]);
 
+  const getAssignmentForLesson = useCallback(async (lessonId: string): Promise<Assignment | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("p2p_assignments")
+        .select("id,lesson_id,title,instructions")
+        .eq("lesson_id", lessonId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return {
+        id: data.id as string,
+        lessonId: data.lesson_id as string,
+        title: (data.title as string) ?? "Assignment",
+        instructions: (data.instructions as string) ?? "",
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const getMySubmission = useCallback(async (lessonId: string): Promise<{ id: string; content: string } | null> => {
+    if (!profile) return null;
+    try {
+      const { data, error } = await supabase
+        .from("p2p_assignment_submissions")
+        .select("id,content")
+        .eq("lesson_id", lessonId)
+        .eq("user_id", profile.id)
+        .maybeSingle();
+      if (error || !data) return null;
+      return { id: data.id as string, content: (data.content as string) ?? "" };
+    } catch {
+      return null;
+    }
+  }, [profile]);
+
+  const submitAssignment = useCallback(async (assignmentId: string, lessonId: string, content: string): Promise<string | null> => {
+    if (!profile) return "You must be signed in to submit.";
+    try {
+      const { error } = await supabase.from("p2p_assignment_submissions").insert({
+        assignment_id: assignmentId,
+        lesson_id: lessonId,
+        user_id: profile.id,
+        content,
+      });
+      if (error) return error.message;
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Failed to submit assignment.";
+    }
+  }, [profile]);
+
+  const refreshPendingEvaluations = useCallback(async (userId?: string) => {
+    const uid = userId ?? profile?.id;
+    if (!uid) return;
+    try {
+      const { data: evalRows, error } = await supabase
+        .from("p2p_lesson_evaluations")
+        .select("id,submission_id,lesson_id,submitter_id,assigned_at")
+        .eq("evaluator_id", uid)
+        .eq("status", "pending")
+        .order("assigned_at", { ascending: true });
+
+      if (error || !evalRows || evalRows.length === 0) {
+        setPendingEvaluations([]);
+        return;
+      }
+
+      const rows = evalRows as Record<string, unknown>[];
+      const submissionIds = Array.from(new Set(rows.map((r) => r.submission_id as string)));
+      const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
+      const submitterIds = Array.from(new Set(rows.map((r) => r.submitter_id as string)));
+
+      const [{ data: subs }, { data: lessonsData }, { data: submitters }] = await Promise.all([
+        supabase.from("p2p_assignment_submissions").select("id,content").in("id", submissionIds),
+        supabase.from("p2p_lessons").select("id,title").in("id", lessonIds),
+        supabase.from("p2p_profiles").select("id,full_name").in("id", submitterIds),
+      ]);
+
+      const contentById = new Map((subs ?? []).map((s: Record<string, unknown>) => [s.id as string, (s.content as string) ?? ""]));
+      const titleById = new Map((lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"]));
+      const nameById = new Map((submitters ?? []).map((p: Record<string, unknown>) => [p.id as string, (p.full_name as string) ?? "A fellow disciple"]));
+
+      const mapped: PendingEvaluation[] = rows.map((row) => ({
+        id: row.id as string,
+        submissionId: row.submission_id as string,
+        lessonId: row.lesson_id as string,
+        lessonTitle: titleById.get(row.lesson_id as string) ?? "Lesson",
+        submitterId: row.submitter_id as string,
+        submitterName: nameById.get(row.submitter_id as string) ?? "A fellow disciple",
+        content: contentById.get(row.submission_id as string) ?? "",
+        assignedAt: row.assigned_at as string,
+      }));
+      setPendingEvaluations(mapped);
+    } catch {
+      setPendingEvaluations([]);
+    }
+  }, [profile]);
+
+  const resolveEvaluation = useCallback(async (
+    evaluationId: string,
+    status: "approved" | "revision_requested",
+    feedback: string
+  ): Promise<string | null> => {
+    if (!profile) return "You must be signed in.";
+    try {
+      const { error } = await supabase
+        .from("p2p_lesson_evaluations")
+        .update({
+          status,
+          feedback,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", evaluationId)
+        .eq("evaluator_id", profile.id)
+        .eq("status", "pending");
+      if (error) return error.message;
+      setPendingEvaluations((prev) => prev.filter((e) => e.id !== evaluationId));
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Failed to resolve evaluation.";
+    }
+  }, [profile]);
+
   return (
     <DataContext.Provider
       value={{
@@ -431,11 +584,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         fruits,
         missions,
         dailyVerse,
+        pendingEvaluations,
         isLoading,
         addPrayer,
         prayForRequest,
         markLessonComplete,
         refreshData,
+        getAssignmentForLesson,
+        getMySubmission,
+        submitAssignment,
+        refreshPendingEvaluations,
+        resolveEvaluation,
       }}
     >
       {children}

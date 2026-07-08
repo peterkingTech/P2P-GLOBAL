@@ -83,6 +83,11 @@ export default function ProfileScreen() {
             <Text style={styles.statNum}>{profile?.gifts?.length ?? 0}</Text>
             <Text style={styles.statLabel}>Gifts</Text>
           </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNum}>{profile?.servantScore ?? 0}</Text>
+            <Text style={styles.statLabel}>Servant Score</Text>
+          </View>
         </View>
 
         {/* Spiritual Gifts */}

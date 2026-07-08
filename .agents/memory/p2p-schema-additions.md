@@ -43,6 +43,20 @@ The real deployed `p2p_profiles` table columns are: `id, email, full_name, photo
 **Why:** always verify RLS policies (not just table existence) when a Supabase write silently "succeeds" but no row appears — check `pg_policy` for the table, not just column names.
 **How to apply:** before writing to any Supabase table from client code, confirm real column names AND that INSERT/UPDATE policies exist, don't assume from app code or docs.
 
+## p2p_notifications real schema vs. assumed (corrected 2026-07-08)
+
+Real columns are `id, user_id, title, message, read (bool), created_at` — there is no `type` or `body` or `is_read` column, even though existing API route code (`notifications.ts`) and a newly-written migration trigger both assumed `type`/`body`/`is_read`. Also had zero RLS policies (silent-block pattern, see above) until fixed.
+**Why:** this table's real shape doesn't match the naming convention used elsewhere (`is_*` prefix for booleans is not followed here); assuming column names from sibling tables' conventions caused a runtime `column does not exist` error caught only by an end-to-end DB test.
+**How to apply:** always query `information_schema.columns` for the exact table before writing SQL functions/triggers or API routes against it — never infer from naming patterns in other tables.
+
+## p2p_lesson_progress real column is `completed`, not `is_completed`
+
+Confirmed via working `DataContext.tsx` queries (`.select("lesson_id,completed")`). The stale Drizzle schema file (`lib/db/src/schema/p2p.ts`) is NOT authoritative and should not be trusted for real column names — always verify against `information_schema.columns` or working app code.
+
+## pg_cron requires explicit extension creation on this Supabase project
+
+`select cron.schedule(...)` fails with `schema "cron" does not exist` unless `create extension if not exists pg_cron;` is run first in the same or a prior migration — the extension being "available" (listed in `pg_available_extensions`) does not mean it's enabled.
+
 ## Key design rules
 
 - Canonical rows (English) are NEVER modified by translation saves — translation screens write only to `*_translations` tables.

@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
+import { useData, Assignment } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 interface LessonContent {
@@ -27,10 +28,15 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { lessons, markLessonComplete } = useData();
+  const { lessons, markLessonComplete, getAssignmentForLesson, getMySubmission, submitAssignment } = useData();
   const [content, setContent] = useState<LessonContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submissionText, setSubmissionText] = useState("");
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const lessonMeta = lessons.find((l) => l.id === id);
   const completed = lessonMeta?.isCompleted ?? false;
@@ -81,6 +87,42 @@ export default function LessonScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAssignment() {
+      if (!id) return;
+      const a = await getAssignmentForLesson(id);
+      if (cancelled) return;
+      setAssignment(a);
+      if (a) {
+        const sub = await getMySubmission(id);
+        if (cancelled) return;
+        if (sub) {
+          setSubmissionText(sub.content);
+          setAlreadySubmitted(true);
+        }
+      }
+    }
+    loadAssignment();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, getAssignmentForLesson, getMySubmission]);
+
+  async function handleSubmitAssignment() {
+    if (!assignment || !id || submitting || !submissionText.trim()) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    const err = await submitAssignment(assignment.id, id, submissionText.trim());
+    if (err) {
+      setSubmitError(err);
+    } else {
+      setAlreadySubmitted(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setSubmitting(false);
+  }
 
   async function handleComplete() {
     if (!id || completing) return;
@@ -149,6 +191,51 @@ export default function LessonScreen() {
                   <Text style={styles.questionText}>{q.question}</Text>
                 </View>
               ))}
+            </View>
+          )}
+
+          {assignment && (
+            <View style={styles.assignmentCard}>
+              <View style={styles.questionsHeader}>
+                <Ionicons name="create" size={16} color={colors.accentGreen} />
+                <Text style={styles.questionsTitle}>{assignment.title}</Text>
+              </View>
+              <Text style={styles.assignmentInstructions}>{assignment.instructions}</Text>
+              <TextInput
+                style={[styles.assignmentInput, alreadySubmitted && styles.assignmentInputDisabled]}
+                multiline
+                placeholder="Write your response here..."
+                placeholderTextColor={colors.textMuted}
+                value={submissionText}
+                onChangeText={setSubmissionText}
+                editable={!alreadySubmitted}
+              />
+              {submitError && <Text style={styles.submitError}>{submitError}</Text>}
+              {alreadySubmitted ? (
+                <View style={styles.completedBanner}>
+                  <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
+                  <Text style={styles.completedBannerText}>Submitted for peer review</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.completeBtn,
+                    (submitting || !submissionText.trim()) && styles.completeBtnDisabled,
+                  ]}
+                  onPress={handleSubmitAssignment}
+                  activeOpacity={0.85}
+                  disabled={submitting || !submissionText.trim()}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={colors.cream} />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={18} color={colors.cream} />
+                      <Text style={styles.completeBtnText}>Submit Assignment</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -250,4 +337,23 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   completedBannerText: { color: colors.accentGreen, fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  assignmentCard: {
+    backgroundColor: colors.card, borderRadius: 16,
+    borderWidth: 1, borderColor: colors.borderBeige,
+    padding: 16, marginBottom: 20,
+  },
+  assignmentInstructions: {
+    fontSize: 14, color: colors.textMid, lineHeight: 22,
+    fontFamily: "Inter_400Regular", marginBottom: 14,
+  },
+  assignmentInput: {
+    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
+    padding: 12, minHeight: 100, textAlignVertical: "top",
+    fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular",
+    marginBottom: 12, backgroundColor: colors.lightCream,
+  },
+  assignmentInputDisabled: { opacity: 0.6 },
+  submitError: {
+    fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular",
+  },
 });

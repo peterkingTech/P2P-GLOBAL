@@ -24,7 +24,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, sessions, isLoading, refreshData } = useData();
+  const { dailyVerse, sessions, isLoading, refreshData, pendingEvaluations } = useData();
 
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   const hour = new Date().getHours();
@@ -141,6 +141,32 @@ export default function HomeTab() {
           <Text style={styles.verseText}>"{dailyVerse.text}"</Text>
           <Text style={styles.verseRef}>— {dailyVerse.ref}</Text>
         </View>
+      )}
+
+      {/* Evaluations waiting for you */}
+      {pendingEvaluations.length > 0 && (
+        <TouchableOpacity
+          style={styles.evalCard}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/evaluations");
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={styles.evalIconWrap}>
+            <Ionicons name="people-circle" size={22} color={colors.upperRoomAmber} />
+            <View style={styles.evalBadge}>
+              <Text style={styles.evalBadgeText}>{pendingEvaluations.length}</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.evalTitle}>Evaluations waiting for you</Text>
+            <Text style={styles.evalSub}>
+              {pendingEvaluations.length} fellow disciple{pendingEvaluations.length === 1 ? "" : "s"} need your review
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.amber} />
+        </TouchableOpacity>
       )}
 
       {/* Live Session Banner */}
@@ -312,6 +338,21 @@ const styles = StyleSheet.create({
   },
   verseRef: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
 
+  evalCard: {
+    backgroundColor: "rgba(224,164,65,0.1)",
+    borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
+    padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12,
+  },
+  evalIconWrap: { position: "relative" },
+  evalBadge: {
+    position: "absolute", top: -6, right: -8,
+    backgroundColor: "#C0392B", borderRadius: 9,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
+    alignItems: "center", justifyContent: "center",
+  },
+  evalBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  evalTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  evalSub: { fontSize: 12, color: colors.textMid, marginTop: 2, fontFamily: "Inter_400Regular" },
   liveCard: {
     backgroundColor: colors.primaryGreen,
     borderRadius: 14, padding: 14,

@@ -53,6 +53,7 @@ export interface UserProfile {
   mentorId?: string;
   isPraying: boolean;
   createdAt: string;
+  servantScore: number;
 }
 
 interface AuthContextValue {
@@ -86,6 +87,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     mentorId: row.mentor_id as string | undefined,
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
+    servantScore: (row.servant_score as number) ?? 0,
   };
 }
 
