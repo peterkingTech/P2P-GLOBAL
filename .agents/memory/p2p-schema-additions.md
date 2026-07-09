@@ -16,8 +16,8 @@ description: Tables and columns added in migrations/001_schema_additions.sql —
 **Lesson content (canonical, English)**
 - `p2p_lesson_sections(id, lesson_id→p2p_lessons, title?, content, sort_order)`
 - `p2p_scriptures(id, lesson_id, verse_ref, verse_text, sort_order)`
-- `p2p_reflection_questions(id, lesson_id, question, sort_order)`
-- `p2p_assignments(id, lesson_id, title, instructions, sort_order)`
+- `p2p_reflection_questions(id, lesson_id, question, display_order)` — ordering column is `display_order`, NOT `sort_order` (differs from this migration file's original intent).
+- `p2p_assignments(id, lesson_id, title, instructions, due_after_days)` — no `sort_order`/ordering column; one row per lesson.
 
 **Translation tables (additive — never modify canonical rows)**
 - `p2p_curriculum_translations(curriculum_id, language_code, title, description)` UNIQUE(curriculum_id, language_code)
