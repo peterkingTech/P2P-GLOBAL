@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { label: "Curriculum", path: "/admin/curriculum", icon: "book" as const },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const },
   { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const },
+  { label: "Team", path: "/admin/team", icon: "people-circle" as const },
 ];
 
 export default function AdminLayout() {

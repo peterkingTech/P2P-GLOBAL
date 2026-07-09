@@ -93,6 +93,14 @@ export interface HelpRequest {
   createdAt: string;
 }
 
+export interface TeamProfile {
+  id: string;
+  fullName: string;
+  email: string | null;
+  role: string;
+  isCrisisResponder: boolean;
+}
+
 export interface StudySession {
   id: string;
   title: string;
@@ -242,6 +250,9 @@ interface DataContextValue {
   }) => Promise<string | null>;
   getHelpRequests: (filters?: { tier?: HelpRequestTier; status?: HelpRequestStatus }) => Promise<HelpRequest[]>;
   updateHelpRequestStatus: (id: string, status: HelpRequestStatus) => Promise<string | null>;
+  getAllProfiles: () => Promise<TeamProfile[]>;
+  getCrisisResponderIds: () => Promise<string[]>;
+  setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
@@ -912,6 +923,55 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
+    try {
+      const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
+        supabase.from("p2p_profiles").select("id, full_name, email, role").order("full_name", { ascending: true }),
+        supabase.from("p2p_admin_roles").select("user_id").eq("role", "crisis_responder"),
+      ]);
+      if (profilesErr) throw profilesErr;
+      if (rolesErr) throw rolesErr;
+      const crisisIds = new Set((rolesData || []).map((r: any) => r.user_id));
+      return (profilesData || []).map((p: any) => ({
+        id: p.id,
+        fullName: p.full_name || "Unnamed",
+        email: p.email,
+        role: p.role,
+        isCrisisResponder: crisisIds.has(p.id),
+      }));
+    } catch (e) {
+      console.error("getAllProfiles failed", e);
+      return [];
+    }
+  }, []);
+
+  const getCrisisResponderIds = useCallback(async (): Promise<string[]> => {
+    try {
+      const { data, error } = await supabase.from("p2p_admin_roles").select("user_id").eq("role", "crisis_responder");
+      if (error) throw error;
+      return (data || []).map((r: any) => r.user_id);
+    } catch (e) {
+      console.error("getCrisisResponderIds failed", e);
+      return [];
+    }
+  }, []);
+
+  const setCrisisResponder = useCallback(async (userId: string, enabled: boolean): Promise<string | null> => {
+    try {
+      if (enabled) {
+        const { error } = await supabase.from("p2p_admin_roles").insert({ user_id: userId, role: "crisis_responder" });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("p2p_admin_roles").delete().eq("user_id", userId).eq("role", "crisis_responder");
+        if (error) throw error;
+      }
+      return null;
+    } catch (e: any) {
+      console.error("setCrisisResponder failed", e);
+      return e?.message || "Could not update crisis responder status";
+    }
+  }, []);
+
   const markLessonComplete = useCallback(async (lessonId: string) => {
     try { await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true"); } catch {}
     if (profile) {
@@ -1135,6 +1195,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
       submitHelpRequest, getHelpRequests, updateHelpRequestStatus,
+      getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,

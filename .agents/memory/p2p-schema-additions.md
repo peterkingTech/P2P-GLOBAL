@@ -75,6 +75,9 @@ New table `p2p_help_requests(id, user_id, tier crisis|struggling, category?, not
 **Why:** first trigger draft mistakenly checked `p2p_admin_roles` for the struggling-tier fanout too, which is empty/unused for normal role gating — caught only via an end-to-end insert+notification test, not by reading schema alone.
 **How to apply:** when fanning out notifications to "admins" in this app, check `p2p_profiles.role != 'student'`, not `p2p_admin_roles` (that table is reserved for the one-off `crisis_responder` flag added here).
 
+`p2p_admin_roles` had RLS enabled but zero policies (fully locked) until this feature added admin-gated SELECT/INSERT/DELETE policies (`p2p_is_admin()`). An admin Team screen (`app/admin/team.tsx`) now lets admins toggle the `crisis_responder` flag per user via a switch — this is the only supported way to assign it (no seed data ships with a responder assigned; the screen shows a warning banner when zero responders exist).
+**Why:** RLS-enabled-with-no-policies silently blocks all access rather than erroring clearly — same footgun as the earlier `p2p_profiles`/`p2p_notifications` RLS issues in this file; always check `pg_policies` (not just `relrowsecurity`) before assuming a table is reachable from the client.
+
 ## Key design rules
 
 - Canonical rows (English) are NEVER modified by translation saves — translation screens write only to `*_translations` tables.
