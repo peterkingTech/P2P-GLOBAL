@@ -17,7 +17,6 @@ import { supabase } from "@/contexts/AuthContext";
 import {
   useData,
   Assignment,
-  SubmissionStatus,
   QuestionSubmission,
   SubmissionType,
 } from "@/contexts/DataContext";
@@ -91,11 +90,15 @@ function QuestionResponseCard({
   questionIndex,
   lessonId,
   existingSub,
+  kind = "reflection",
+  assignmentId,
 }: {
   question: { id: string; question: string };
   questionIndex: number;
   lessonId: string;
   existingSub: QuestionSubmission | undefined;
+  kind?: "reflection" | "assignment";
+  assignmentId?: string;
 }) {
   const { submitContent } = useData();
   const [expanded, setExpanded] = useState(false);
@@ -111,7 +114,9 @@ function QuestionResponseCard({
     setError(null);
     const err = await submitContent({
       lessonId,
-      questionId: question.id,
+      questionId: kind === "reflection" ? question.id : null,
+      assignmentQuestionId: kind === "assignment" ? question.id : null,
+      assignmentId: kind === "assignment" ? assignmentId : null,
       type: "text",
       text: text.trim(),
     });
@@ -125,7 +130,9 @@ function QuestionResponseCard({
   async function handleMediaSubmit(localUri: string, durationSeconds: number) {
     const err = await submitContent({
       lessonId,
-      questionId: question.id,
+      questionId: kind === "reflection" ? question.id : null,
+      assignmentQuestionId: kind === "assignment" ? question.id : null,
+      assignmentId: kind === "assignment" ? assignmentId : null,
       type: mode as "audio" | "video",
       mediaUri: localUri,
       durationSeconds,
@@ -256,27 +263,20 @@ export default function LessonScreen() {
   const insets = useSafeAreaInsets();
   const {
     lessons, markLessonComplete,
-    getAssignmentForLesson, getSubmissionStatus, getQuestionSubmissionsForLesson,
-    submitContent,
+    getAssignmentForLesson, getQuestionSubmissionsForLesson,
+    getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
   } = useData();
 
   const [content, setContent] = useState<LessonContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus | null>(null);
+  const [assignmentQuestions, setAssignmentQuestions] = useState<{ id: string; question: string }[]>([]);
   const [questionSubs, setQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
-
-  // Assignment submission state
-  const [assignmentMode, setAssignmentMode] = useState<SubmissionType>("text");
-  const [submissionText, setSubmissionText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [assignmentQuestionSubs, setAssignmentQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
 
   const lessonMeta = lessons.find((l) => l.id === id);
   const completed = lessonMeta?.isCompleted ?? false;
-  const evalStatus = submissionStatus?.evaluationStatus ?? null;
-  const canResubmit = evalStatus === null || evalStatus === "needs_revision";
 
   // Load lesson content
   useEffect(() => {
@@ -315,61 +315,25 @@ export default function LessonScreen() {
     let cancelled = false;
     async function loadSubmissions() {
       if (!id) return;
-      const [a, qSubs] = await Promise.all([
+      const [a, qSubs, aQuestions, aQSubs] = await Promise.all([
         getAssignmentForLesson(id),
         getQuestionSubmissionsForLesson(id),
+        getAssignmentQuestionsForLesson(id),
+        getAssignmentQuestionSubmissionsForLesson(id),
       ]);
       if (cancelled) return;
       setAssignment(a);
+      setAssignmentQuestions(aQuestions);
       const map = new Map<string, QuestionSubmission>();
       for (const s of qSubs) map.set(s.questionId, s);
       setQuestionSubs(map);
-      if (a) {
-        const status = await getSubmissionStatus(id);
-        if (cancelled) return;
-        if (status) {
-          setSubmissionText(status.content);
-          setAssignmentMode(status.submissionType);
-          setSubmissionStatus(status);
-        }
-      }
+      const aMap = new Map<string, QuestionSubmission>();
+      for (const s of aQSubs) aMap.set(s.questionId, s);
+      setAssignmentQuestionSubs(aMap);
     }
     loadSubmissions();
     return () => { cancelled = true; };
-  }, [id, getAssignmentForLesson, getSubmissionStatus, getQuestionSubmissionsForLesson]);
-
-  async function handleSubmitAssignment() {
-    if (!assignment || !id || submitting) return;
-    if (assignmentMode === "text" && !submissionText.trim()) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    const err = await submitContent({
-      lessonId: id,
-      assignmentId: assignment.id,
-      type: assignmentMode,
-      text: assignmentMode === "text" ? submissionText.trim() : null,
-    });
-    if (err) { setSubmitError(err); setSubmitting(false); return; }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const status = await getSubmissionStatus(id);
-    setSubmissionStatus(status);
-    setSubmitting(false);
-  }
-
-  async function handleMediaAssignmentSubmit(localUri: string, durationSeconds: number) {
-    if (!assignment || !id) return;
-    const err = await submitContent({
-      lessonId: id,
-      assignmentId: assignment.id,
-      type: assignmentMode as "audio" | "video",
-      mediaUri: localUri,
-      durationSeconds,
-    });
-    if (err) { setSubmitError(err); return; }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const status = await getSubmissionStatus(id);
-    setSubmissionStatus(status);
-  }
+  }, [id, getAssignmentForLesson, getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson]);
 
   async function handleComplete() {
     if (!id || completing) return;
@@ -433,85 +397,27 @@ export default function LessonScreen() {
             </View>
           )}
 
-          {assignment && (() => {
-            return (
-              <View style={styles.assignmentCard}>
-                <View style={styles.questionsHeader}>
-                  <Ionicons name="create" size={16} color={colors.accentGreen} />
-                  <Text style={styles.questionsTitle}>{assignment.title}</Text>
-                </View>
-                <Text style={styles.assignmentInstructions}>{assignment.instructions}</Text>
-
-                {canResubmit && (
-                  <TypeTabs value={assignmentMode} onChange={setAssignmentMode} disabled={submitting} />
-                )}
-
-                {evalStatus === "needs_revision" && submissionStatus?.feedback && (
-                  <View style={styles.revisionBanner}>
-                    <Ionicons name="alert-circle" size={16} color={colors.amber} />
-                    <Text style={styles.revisionBannerText}>{submissionStatus.feedback}</Text>
-                  </View>
-                )}
-
-                {canResubmit && assignmentMode === "text" && (
-                  <TextInput
-                    style={styles.assignmentInput}
-                    multiline
-                    placeholder="Write your response here..."
-                    placeholderTextColor={colors.textMuted}
-                    value={submissionText}
-                    onChangeText={setSubmissionText}
-                  />
-                )}
-
-                {submitError && <Text style={styles.submitError}>{submitError}</Text>}
-
-                {evalStatus === "pending" ? (
-                  <View style={styles.completedBanner}>
-                    <Ionicons name="hourglass" size={18} color={colors.accentGreen} />
-                    <Text style={styles.completedBannerText}>Submitted — awaiting peer review</Text>
-                  </View>
-                ) : evalStatus === "approved" ? (
-                  <View style={styles.completedBanner}>
-                    <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
-                    <Text style={styles.completedBannerText}>
-                      {submissionStatus?.selfApproved
-                        ? "Approved — first through this lesson, unevaluated"
-                        : "Approved by your peer evaluator"}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {canResubmit && assignmentMode === "audio" && (
-                      <AudioRecorder onSubmit={handleMediaAssignmentSubmit} disabled={submitting} />
-                    )}
-                    {canResubmit && assignmentMode === "video" && (
-                      <VideoRecorder onSubmit={handleMediaAssignmentSubmit} disabled={submitting} />
-                    )}
-                    {assignmentMode === "text" && (
-                      <TouchableOpacity
-                        style={[styles.completeBtn, (submitting || !submissionText.trim()) && styles.completeBtnDisabled]}
-                        onPress={handleSubmitAssignment}
-                        activeOpacity={0.85}
-                        disabled={submitting || !submissionText.trim()}
-                      >
-                        {submitting ? <ActivityIndicator color={colors.cream} /> : (
-                          <>
-                            <Ionicons name="send" size={18} color={colors.cream} />
-                            <Text style={styles.completeBtnText}>
-                              {evalStatus === "needs_revision" ? "Resubmit Assignment" : "Submit Assignment"}
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
+          {assignment && assignmentQuestions.length > 0 && (
+            <View style={styles.questionsCard}>
+              <View style={styles.questionsHeader}>
+                <Ionicons name="create" size={16} color={colors.accentGreen} />
+                <Text style={styles.questionsTitle}>{assignment.title}</Text>
               </View>
-            );
-          })()}
+              {assignmentQuestions.map((q, idx) => (
+                <QuestionResponseCard
+                  key={q.id}
+                  question={q}
+                  questionIndex={idx}
+                  lessonId={id ?? ""}
+                  existingSub={assignmentQuestionSubs.get(q.id)}
+                  kind="assignment"
+                  assignmentId={assignment.id}
+                />
+              ))}
+            </View>
+          )}
 
-          {!assignment && (
+          {(!assignment || assignmentQuestions.length === 0) && (
             !completed ? (
               <TouchableOpacity
                 style={[styles.completeBtn, completing && styles.completeBtnDisabled]}

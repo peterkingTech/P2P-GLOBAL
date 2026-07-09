@@ -94,6 +94,11 @@ export interface Assignment {
   instructions: string;
 }
 
+export interface AssignmentQuestion {
+  id: string;
+  question: string;
+}
+
 export interface PendingEvaluation {
   id: string;
   submissionId: string;
@@ -133,6 +138,7 @@ export interface SubmitContentParams {
   lessonId: string;
   assignmentId?: string | null;
   questionId?: string | null;
+  assignmentQuestionId?: string | null;
   type: SubmissionType;
   text?: string | null;
   mediaUri?: string | null;
@@ -176,6 +182,8 @@ interface DataContextValue {
   getMySubmission: (lessonId: string) => Promise<{ id: string; content: string } | null>;
   getSubmissionStatus: (lessonId: string) => Promise<SubmissionStatus | null>;
   getQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
+  getAssignmentQuestionsForLesson: (lessonId: string) => Promise<AssignmentQuestion[]>;
+  getAssignmentQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
   submitContent: (params: SubmitContentParams) => Promise<string | null>;
   submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
   refreshPendingEvaluations: () => Promise<void>;
@@ -726,9 +734,58 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch { return []; }
   }, [profile]);
 
+  const getAssignmentQuestionsForLesson = useCallback(async (lessonId: string): Promise<AssignmentQuestion[]> => {
+    try {
+      const { data: assignment } = await supabase
+        .from("p2p_assignments")
+        .select("id")
+        .eq("lesson_id", lessonId)
+        .maybeSingle();
+      if (!assignment) return [];
+      const { data, error } = await supabase
+        .from("p2p_assignment_questions")
+        .select("id,question,display_order")
+        .eq("assignment_id", assignment.id)
+        .order("display_order", { ascending: true });
+      if (error || !data) return [];
+      return (data as Record<string, unknown>[]).map((q) => ({ id: q.id as string, question: q.question as string }));
+    } catch { return []; }
+  }, []);
+
+  const getAssignmentQuestionSubmissionsForLesson = useCallback(async (lessonId: string): Promise<QuestionSubmission[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_submissions")
+        .select("id,assignment_question_id,submission_type,text_content,media_url,duration_seconds,created_at")
+        .eq("lesson_id", lessonId)
+        .eq("user_id", profile.id)
+        .not("assignment_question_id", "is", null)
+        .order("created_at", { ascending: false });
+      if (error || !data) return [];
+      const seen = new Set<string>();
+      return (data as Record<string, unknown>[])
+        .filter((r) => {
+          const qid = r.assignment_question_id as string;
+          if (seen.has(qid)) return false;
+          seen.add(qid);
+          return true;
+        })
+        .map((r) => ({
+          id: r.id as string,
+          questionId: r.assignment_question_id as string,
+          submissionType: (r.submission_type as SubmissionType) ?? "text",
+          textContent: (r.text_content as string) ?? null,
+          mediaUrl: (r.media_url as string) ?? null,
+          durationSeconds: (r.duration_seconds as number) ?? null,
+          createdAt: r.created_at as string,
+        }));
+    } catch { return []; }
+  }, [profile]);
+
   const submitContent = useCallback(async (params: SubmitContentParams): Promise<string | null> => {
     if (!profile) return "You must be signed in to submit.";
-    const { lessonId, assignmentId, questionId, type, text, mediaUri, durationSeconds } = params;
+    const { lessonId, assignmentId, questionId, assignmentQuestionId, type, text, mediaUri, durationSeconds } = params;
     try {
       const submissionId = generateUUID();
       let mediaPath: string | null = null;
@@ -745,6 +802,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         lesson_id: lessonId,
         assignment_id: assignmentId ?? null,
         reflection_question_id: questionId ?? null,
+        assignment_question_id: assignmentQuestionId ?? null,
         submission_type: type,
         text_content: text ?? null,
         media_url: mediaPath,
@@ -791,7 +849,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest, markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
-      getQuestionSubmissionsForLesson, submitContent, submitAssignment,
+      getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
+      submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
     }}>
