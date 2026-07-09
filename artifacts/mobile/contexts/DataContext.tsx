@@ -139,6 +139,17 @@ export interface SubmitContentParams {
   durationSeconds?: number | null;
 }
 
+export type GrowthEventType = "lesson_completed" | "module_completed" | "disciple_gained";
+
+export interface GrowthEvent {
+  id: string;
+  eventType: GrowthEventType;
+  label: string;
+  scoreBefore: number;
+  scoreAfter: number;
+  createdAt: string;
+}
+
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
@@ -166,6 +177,10 @@ interface DataContextValue {
     status: "approved" | "needs_revision",
     feedback: string
   ) => Promise<string | null>;
+  toastEvent: GrowthEvent | null;
+  celebrationEvent: GrowthEvent | null;
+  dismissToastEvent: () => void;
+  dismissCelebrationEvent: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -247,6 +262,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [toastEvent, setToastEvent] = useState<GrowthEvent | null>(null);
+  const [celebrationEvent, setCelebrationEvent] = useState<GrowthEvent | null>(null);
 
   const loadCurriculum = useCallback(async (userId?: string) => {
     try {
@@ -424,7 +441,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ]);
       }
       await loadCurriculum(profile?.id);
-      if (profile?.id) await refreshPendingEvaluations(profile.id);
+      if (profile?.id) {
+        await refreshPendingEvaluations(profile.id);
+        await checkGrowthEvents(profile.id);
+      }
       setFruits(MOCK_FRUITS);
       if (profile) {
         setForestNodes([{
@@ -447,6 +467,51 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, profile, loadCurriculum, refreshPendingEvaluations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const checkGrowthEvents = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("p2p_growth_events")
+        .select("id,event_type,label,score_before,score_after,created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error || !data || data.length === 0) return;
+
+      const lastSeenKey = `growth_event_last_seen_${userId}`;
+      let lastSeenAt = "";
+      try { lastSeenAt = (await AsyncStorage.getItem(lastSeenKey)) ?? ""; } catch {}
+
+      const rows = data as Record<string, unknown>[];
+      const newest = rows[0].created_at as string;
+
+      const unseen = rows.filter((r) => !lastSeenAt || (r.created_at as string) > lastSeenAt);
+      if (unseen.length === 0) return;
+
+      const toEvent = (r: Record<string, unknown>): GrowthEvent => ({
+        id: r.id as string,
+        eventType: r.event_type as GrowthEventType,
+        label: r.label as string,
+        scoreBefore: r.score_before as number,
+        scoreAfter: r.score_after as number,
+        createdAt: r.created_at as string,
+      });
+
+      const moduleEvent = unseen.find((r) => r.event_type === "module_completed");
+      const lessonEvent = unseen.find((r) => r.event_type === "lesson_completed");
+
+      if (moduleEvent) {
+        setCelebrationEvent(toEvent(moduleEvent));
+      } else if (lessonEvent) {
+        setToastEvent(toEvent(lessonEvent));
+      }
+
+      try { await AsyncStorage.setItem(lastSeenKey, newest); } catch {}
+    } catch {}
+  }, []);
+
+  const dismissToastEvent = useCallback(() => setToastEvent(null), []);
+  const dismissCelebrationEvent = useCallback(() => setCelebrationEvent(null), []);
 
   const addPrayer = useCallback(async (text: string, nation?: string) => {
     if (!profile) return;
@@ -478,10 +543,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         );
       } catch {}
       await loadCurriculum(profile.id);
+      await checkGrowthEvents(profile.id);
     } else {
       setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, isCompleted: true } : l));
     }
-  }, [profile, loadCurriculum]);
+  }, [profile, loadCurriculum, checkGrowthEvents]);
 
   const refreshData = useCallback(() => loadData(), [loadData]);
 
@@ -599,11 +665,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         duration_seconds: durationSeconds ?? null,
       });
       if (error) return error.message;
+      // Covers the self-approval edge case (no evaluator available yet), where
+      // the evaluation — and any resulting growth event — is created synchronously.
+      await checkGrowthEvents(profile.id);
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : "Failed to submit.";
     }
-  }, [profile]);
+  }, [profile, checkGrowthEvents]);
 
   const submitAssignment = useCallback(async (assignmentId: string, lessonId: string, content: string): Promise<string | null> => {
     return submitContent({ lessonId, assignmentId, type: "text", text: content });
@@ -638,6 +707,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation,
+      toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
     }}>
       {children}
     </DataContext.Provider>

@@ -8,8 +8,7 @@ function mapLink(row: Record<string, unknown>) {
     id: row.id,
     mentorId: row.mentor_id,
     discipleId: row.disciple_id,
-    startedAt: row.started_at,
-    isActive: row.is_active ?? true,
+    isActive: row.active ?? true,
     createdAt: row.created_at,
   };
 }
@@ -21,7 +20,7 @@ router.get("/:userId/disciples", async (req, res) => {
     .from("p2p_discipleship_links")
     .select("*")
     .eq("mentor_id", userId)
-    .eq("is_active", true);
+    .eq("active", true);
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -41,8 +40,7 @@ router.post("/", async (req, res) => {
     .insert({
       mentor_id: mentorId,
       disciple_id: discipleId,
-      started_at: new Date().toISOString(),
-      is_active: true,
+      active: true,
       created_at: new Date().toISOString(),
     })
     .select()

@@ -14,8 +14,10 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GrowthToast } from "@/components/GrowthToast";
+import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { DataProvider } from "@/contexts/DataContext";
+import { DataProvider, useData } from "@/contexts/DataContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -50,11 +52,35 @@ function AuthGate() {
   return <Slot />;
 }
 
+function GrowthCelebrationHost() {
+  const { toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent } = useData();
+  const router = useRouter();
+
+  return (
+    <>
+      {toastEvent && (
+        <GrowthToast label={toastEvent.label} onDismiss={dismissToastEvent} />
+      )}
+      {celebrationEvent && (
+        <ModuleCelebrationModal
+          label={celebrationEvent.label.replace(/ completed$/i, "")}
+          onWatchGrowth={() => {
+            dismissCelebrationEvent();
+            router.push("/living-tree");
+          }}
+          onDismiss={dismissCelebrationEvent}
+        />
+      )}
+    </>
+  );
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
       <DataProvider>
         <AuthGate />
+        <GrowthCelebrationHost />
       </DataProvider>
     </AuthProvider>
   );

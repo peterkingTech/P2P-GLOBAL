@@ -53,6 +53,14 @@ Real columns are `id, user_id, title, message, read (bool), created_at` — ther
 
 Confirmed via working `DataContext.tsx` queries (`.select("lesson_id,completed")`). The stale Drizzle schema file (`lib/db/src/schema/p2p.ts`) is NOT authoritative and should not be trusted for real column names — always verify against `information_schema.columns` or working app code.
 
+## More real column names vs. stale Drizzle schema (corrected 2026-07-09)
+
+- `p2p_modules`: real columns are `id, curriculum_id, title, description, order_index, created_at, status` — no `level`, `lesson_count`, `image_url`, `sort_order` (ordering column is `order_index`, not `sort_order`).
+- `p2p_lessons`: real columns are `id, module_id, title, subtitle, order_index, status, created_at` — no `content`, `verse_ref`, `verse_text`, `sort_order` (those live in `p2p_lesson_sections`/`p2p_scriptures`; ordering is `order_index`).
+- `p2p_discipleship_links`: real columns are `id, mentor_id, disciple_id, assigned_by, active, created_at` — boolean column is `active`, not `is_active`; there is no `started_at`. An API route (`discipleship.ts`) had been written against the wrong names and was silently failing.
+**Why:** the Drizzle schema file in `lib/db/src/schema/p2p.ts` is aspirational/stale across most P2P tables, not just profiles — treat it as documentation-only.
+**How to apply:** before writing any new SQL trigger/function or API route touching a `p2p_*` table, run `select column_name from information_schema.columns where table_name = '...'` first — every session this has been skipped has cost multiple failed-migration round trips.
+
 ## pg_cron requires explicit extension creation on this Supabase project
 
 `select cron.schedule(...)` fails with `schema "cron" does not exist` unless `create extension if not exists pg_cron;` is run first in the same or a prior migration — the extension being "available" (listed in `pg_available_extensions`) does not mean it's enabled.

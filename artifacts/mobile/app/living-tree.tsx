@@ -31,7 +31,7 @@ export default function LivingTreeScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
 
-  const growthPoints = MOCK_GROWTH.points;
+  const growthPoints = profile?.growthLevel ?? MOCK_GROWTH.points;
   const stageIndex = getStageFromPoints(growthPoints);
   const stage = STAGES[stageIndex];
   const nextStage = STAGES[stageIndex + 1] ?? null;
