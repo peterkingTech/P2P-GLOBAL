@@ -79,6 +79,20 @@ export interface PrayerWallComment {
   createdAt: string;
 }
 
+export type HelpRequestTier = "crisis" | "struggling";
+export type HelpRequestStatus = "open" | "contacted" | "resolved";
+
+export interface HelpRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  tier: HelpRequestTier;
+  category: string | null;
+  note: string | null;
+  status: HelpRequestStatus;
+  createdAt: string;
+}
+
 export interface StudySession {
   id: string;
   title: string;
@@ -221,6 +235,13 @@ interface DataContextValue {
   markPostAnswered: (postId: string) => Promise<string | null>;
   getComments: (postId: string) => Promise<PrayerWallComment[]>;
   addComment: (postId: string, body: string) => Promise<string | null>;
+  submitHelpRequest: (params: {
+    tier: HelpRequestTier;
+    category?: string | null;
+    note?: string | null;
+  }) => Promise<string | null>;
+  getHelpRequests: (filters?: { tier?: HelpRequestTier; status?: HelpRequestStatus }) => Promise<HelpRequest[]>;
+  updateHelpRequestStatus: (id: string, status: HelpRequestStatus) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
@@ -831,6 +852,66 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  const submitHelpRequest = useCallback(async (params: {
+    tier: HelpRequestTier;
+    category?: string | null;
+    note?: string | null;
+  }): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_help_requests").insert({
+        user_id: profile.id,
+        tier: params.tier,
+        category: params.category || null,
+        note: params.note || null,
+        status: "open",
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("submitHelpRequest failed", e);
+      return e?.message || "Could not submit help request";
+    }
+  }, [profile]);
+
+  const getHelpRequests = useCallback(async (filters?: { tier?: HelpRequestTier; status?: HelpRequestStatus }): Promise<HelpRequest[]> => {
+    if (!profile) return [];
+    try {
+      let query = supabase
+        .from("p2p_help_requests")
+        .select("*, p2p_profiles ( full_name )")
+        .order("created_at", { ascending: false });
+      if (filters?.tier) query = query.eq("tier", filters.tier);
+      if (filters?.status) query = query.eq("status", filters.status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        userName: r.p2p_profiles?.full_name || "A user",
+        tier: r.tier,
+        category: r.category,
+        note: r.note,
+        status: r.status,
+        createdAt: r.created_at,
+      }));
+    } catch (e) {
+      console.error("getHelpRequests failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const updateHelpRequestStatus = useCallback(async (id: string, status: HelpRequestStatus): Promise<string | null> => {
+    try {
+      const { error } = await supabase.from("p2p_help_requests").update({ status }).eq("id", id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("updateHelpRequestStatus failed", e);
+      return e?.message || "Could not update status";
+    }
+  }, []);
+
   const markLessonComplete = useCallback(async (lessonId: string) => {
     try { await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true"); } catch {}
     if (profile) {
@@ -1053,6 +1134,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
+      submitHelpRequest, getHelpRequests, updateHelpRequestStatus,
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
