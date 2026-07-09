@@ -4,3 +4,4 @@
 - [P2P Peer-Evaluation Gate](p2p-evaluation-gate.md) — completion gated by DB trigger not client; status vocabulary; self-approval edge case.
 - [P2P Mock Data Migration](p2p-mock-data-migration.md) — learn/module/lesson screens ran on hardcoded mock arrays; real curriculum selection + unlock logic.
 - [P2P RLS Gaps](p2p-rls-gaps.md) — Many tables have rowsecurity=true but zero policies (silent empty reads, hard-fail writes); check before assuming a table is broken elsewhere.
+- [P2P Growth Video & Forest Transition](p2p-growth-video-forest.md) — video segment/stage mapping, one-time forest transition gating, Forest Builder vs Nations via real data.

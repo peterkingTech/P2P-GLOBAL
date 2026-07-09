@@ -18,6 +18,7 @@ import { GrowthToast } from "@/components/GrowthToast";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
+import { getStageFromPoints } from "@/constants/stages";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -65,8 +66,12 @@ function GrowthCelebrationHost() {
         <ModuleCelebrationModal
           label={celebrationEvent.label.replace(/ completed$/i, "")}
           onWatchGrowth={() => {
+            const prevStage = getStageFromPoints(celebrationEvent.scoreBefore);
             dismissCelebrationEvent();
-            router.push("/living-tree");
+            router.push({
+              pathname: "/living-tree",
+              params: { prevStage: String(prevStage) },
+            });
           }}
           onDismiss={dismissCelebrationEvent}
         />

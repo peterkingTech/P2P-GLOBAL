@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
+import { getStageFromPoints } from "@/constants/stages";
 import colors from "@/constants/colors";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -90,7 +91,7 @@ function NodeCard({
 export default function ForestTab() {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { forestNodes, isLoading } = useData();
+  const { forestNodes, forestStats, isLoading } = useData();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -99,6 +100,11 @@ export default function ForestTab() {
   function countDescendants(node: ForestNode): number {
     return node.children.reduce((a, c) => a + 1 + countDescendants(c), 0);
   }
+
+  const stageIndex = getStageFromPoints(profile?.growthLevel ?? 0);
+  const isForestBuilder = stageIndex === 4;
+  const isForestOfNations = stageIndex >= 5;
+  const countriesCount = forestStats.countriesReached.length;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
@@ -113,15 +119,31 @@ export default function ForestTab() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNum}>{profile?.growthLevel ?? 0}</Text>
-            <Text style={styles.statLabel}>Growth Level</Text>
+            <Text style={styles.statNum}>{forestStats.totalDisciples}</Text>
+            <Text style={styles.statLabel}>Disciples</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNum}>{profile?.role ?? "student"}</Text>
-            <Text style={styles.statLabel}>Your Role</Text>
+            <Text style={styles.statNum}>{countriesCount}</Text>
+            <Text style={styles.statLabel}>Countries</Text>
           </View>
         </View>
+
+        {(isForestBuilder || isForestOfNations) && (
+          <View style={[styles.stageBanner, isForestOfNations && styles.stageBannerNations]}>
+            <Text style={styles.stageBannerEmoji}>{isForestOfNations ? "🌍" : "🌲"}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stageBannerTitle}>
+                {isForestOfNations ? "Forest of Nations" : "Forest Builder"}
+              </Text>
+              <Text style={styles.stageBannerText}>
+                {isForestOfNations
+                  ? `Your disciples are now active in ${countriesCount} nation${countriesCount === 1 ? "" : "s"} — generations shelter and multiply one another.`
+                  : "You've raised a disciple who is now discipling others — you are no longer only growing, you are helping others take root."}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -171,6 +193,19 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 16, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   statDivider: { width: 1, height: 32, backgroundColor: colors.borderBeige },
+  stageBanner: {
+    flexDirection: "row", gap: 10, alignItems: "center",
+    backgroundColor: "rgba(29,158,117,0.08)",
+    borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
+    padding: 12, marginTop: 12,
+  },
+  stageBannerNations: {
+    backgroundColor: "rgba(201,180,138,0.12)",
+    borderColor: "rgba(201,180,138,0.35)",
+  },
+  stageBannerEmoji: { fontSize: 26 },
+  stageBannerTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 2 },
+  stageBannerText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },

@@ -150,12 +150,19 @@ export interface GrowthEvent {
   createdAt: string;
 }
 
+export interface ForestStats {
+  totalDisciples: number;
+  hasDiscipleMaker: boolean;
+  countriesReached: string[];
+}
+
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
   prayers: PrayerRequest[];
   sessions: StudySession[];
   forestNodes: ForestNode[];
+  forestStats: ForestStats;
   fruits: Fruit[];
   missions: Mission[];
   dailyVerse: { ref: string; text: string } | null;
@@ -257,6 +264,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [forestNodes, setForestNodes] = useState<ForestNode[]>([]);
+  const [forestStats, setForestStats] = useState<ForestStats>({
+    totalDisciples: 0,
+    hasDiscipleMaker: false,
+    countriesReached: [],
+  });
   const [fruits, setFruits] = useState<Fruit[]>(MOCK_FRUITS);
   const [missions] = useState<Mission[]>(MOCK_MISSIONS);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
@@ -401,6 +413,85 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  const loadForestNetwork = useCallback(async (userId: string, userNode: ForestNode) => {
+    try {
+      type LinkRow = { mentor_id: string; disciple_id: string };
+      type ProfileRow = { id: string; full_name: string | null; role: string | null; growth_level: number | null; country: string | null };
+
+      const allLinks: LinkRow[] = [];
+      let frontier = [userId];
+      const visitedMentors = new Set<string>();
+      for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
+        const { data } = await supabase
+          .from("p2p_discipleship_links")
+          .select("mentor_id,disciple_id")
+          .eq("active", true)
+          .in("mentor_id", frontier);
+        const rows = (data ?? []) as LinkRow[];
+        frontier.forEach((m) => visitedMentors.add(m));
+        allLinks.push(...rows);
+        frontier = [...new Set(rows.map((r) => r.disciple_id))].filter((id) => !visitedMentors.has(id));
+      }
+
+      const discipleIds = [...new Set(allLinks.map((l) => l.disciple_id))];
+      if (discipleIds.length === 0) {
+        setForestNodes([userNode]);
+        setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
+        return;
+      }
+
+      const { data: profiles } = await supabase
+        .from("p2p_profiles")
+        .select("id,full_name,role,growth_level,country")
+        .in("id", discipleIds);
+      const profileById = new Map(
+        ((profiles ?? []) as ProfileRow[]).map((p) => [p.id, p])
+      );
+      const childrenByMentor = new Map<string, string[]>();
+      allLinks.forEach((l) => {
+        const arr = childrenByMentor.get(l.mentor_id) ?? [];
+        arr.push(l.disciple_id);
+        childrenByMentor.set(l.mentor_id, arr);
+      });
+
+      function buildNode(id: string, depth: number): ForestNode {
+        const p = profileById.get(id);
+        return {
+          id,
+          name: p?.full_name ?? "A disciple",
+          role: p?.role ?? "student",
+          growthLevel: p?.growth_level ?? 0,
+          country: p?.country ?? undefined,
+          depth,
+          children: (childrenByMentor.get(id) ?? []).map((childId) => buildNode(childId, depth + 1)),
+        };
+      }
+
+      const rootWithChildren: ForestNode = {
+        ...userNode,
+        children: (childrenByMentor.get(userId) ?? []).map((id) => buildNode(id, 1)),
+      };
+      setForestNodes([rootWithChildren]);
+
+      const hasDiscipleMaker = rootWithChildren.children.some((c) => c.children.length > 0);
+      const countriesReached = [
+        ...new Set(
+          discipleIds
+            .map((id) => profileById.get(id)?.country)
+            .filter((c): c is string => !!c)
+        ),
+      ];
+      setForestStats({
+        totalDisciples: discipleIds.length,
+        hasDiscipleMaker,
+        countriesReached,
+      });
+    } catch {
+      setForestNodes([userNode]);
+      setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
@@ -447,16 +538,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       setFruits(MOCK_FRUITS);
       if (profile) {
-        setForestNodes([{
+        await loadForestNetwork(profile.id, {
           id: profile.id, name: profile.displayName, role: profile.role,
           growthLevel: profile.growthLevel, country: profile.country, depth: 0,
-          children: [
-            { id: "n1", name: "Thomas A.", role: "disciple", growthLevel: 2, country: "Uganda", depth: 1, children: [] },
-            { id: "n2", name: "Maria G.", role: "seeker", growthLevel: 0, country: "Brazil", depth: 1, children: [
-              { id: "n3", name: "João F.", role: "seeker", growthLevel: 0, country: "Brazil", depth: 2, children: [] },
-            ]},
-          ],
-        }]);
+          children: [],
+        });
       }
     } catch {
       setDailyVerse(DAILY_VERSES[0]);
@@ -464,7 +550,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, profile, loadCurriculum, refreshPendingEvaluations]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, profile, loadCurriculum, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -701,7 +787,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, prayers, sessions, forestNodes, fruits, missions,
+      modules, lessons, prayers, sessions, forestNodes, forestStats, fruits, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest, markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,16 @@ import {
   Platform,
   Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import { getWatchGrowthPlan } from "@/constants/growthVideo";
+import { GrowthVideoModal } from "@/components/GrowthVideoModal";
+import { ForestTransition } from "@/components/ForestTransition";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -30,6 +34,10 @@ export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
+  const params = useLocalSearchParams<{ prevStage?: string }>();
+  const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
+  const [showForestTransition, setShowForestTransition] = useState(false);
+  const autoTriggeredRef = useRef(false);
 
   const growthPoints = profile?.growthLevel ?? MOCK_GROWTH.points;
   const stageIndex = getStageFromPoints(growthPoints);
@@ -44,6 +52,31 @@ export default function LivingTreeScreen() {
   const pointsNeeded = nextStage ? nextPoints - growthPoints : 0;
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  async function handleWatchGrowth(prevStageIndex: number | null = null) {
+    const seenKey = `forest_transition_seen_${profile?.id ?? "anon"}`;
+    let hasSeen = false;
+    try { hasSeen = (await AsyncStorage.getItem(seenKey)) === "true"; } catch {}
+
+    const plan = getWatchGrowthPlan(stageIndex, prevStageIndex, hasSeen);
+    if (plan.type === "segment" || plan.type === "levelup-video") {
+      setVideoPlan({ start: plan.start, end: plan.end });
+    } else if (plan.type === "forest-transition") {
+      setShowForestTransition(true);
+      try { await AsyncStorage.setItem(seenKey, "true"); } catch {}
+    } else {
+      router.push("/(tabs)/forest");
+    }
+  }
+
+  useEffect(() => {
+    if (autoTriggeredRef.current) return;
+    if (params.prevStage === undefined) return;
+    autoTriggeredRef.current = true;
+    const prevStageIndex = Number(params.prevStage);
+    handleWatchGrowth(Number.isFinite(prevStageIndex) ? prevStageIndex : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.prevStage]);
 
   const activities: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
     ...(MOCK_GROWTH.prayersOffered > 0
@@ -139,7 +172,7 @@ export default function LivingTreeScreen() {
           resizeMode="cover"
         />
         {/* Overlay: Watch growth button */}
-        <TouchableOpacity style={styles.watchBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.watchBtn} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
           <Ionicons name="play" size={12} color="#fff" />
           <Text style={styles.watchBtnText}>Watch growth</Text>
         </TouchableOpacity>
@@ -187,6 +220,26 @@ export default function LivingTreeScreen() {
         <Text style={styles.allStagesBtnText}>The Six Stages of Growth</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.primaryGreen} />
       </TouchableOpacity>
+
+      {videoPlan && (
+        <GrowthVideoModal
+          startSec={videoPlan.start}
+          endSec={videoPlan.end}
+          stageName={stage.name}
+          progressPct={progressPct}
+          nextStageName={nextStage?.name ?? null}
+          onClose={() => setVideoPlan(null)}
+        />
+      )}
+
+      {showForestTransition && (
+        <ForestTransition
+          onDone={() => {
+            setShowForestTransition(false);
+            router.push("/(tabs)/forest");
+          }}
+        />
+      )}
     </ScrollView>
   );
 }
