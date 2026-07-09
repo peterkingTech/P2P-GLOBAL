@@ -1,0 +1,17 @@
+Two changes:
+
+1. HIDE Hall of Faith from all navigation (remove nav entry points only, leave code/tables intact for possible later use).
+
+2. Build "Prayer & Testimonies" — one unified feed, replacing the earlier Nation Prayer Wall concept:
+   - New table p2p_prayer_wall_posts: id, user_id, post_type ('request'|'testimony'), nation_code (ISO country code, for flag display — the nation being prayed for, not necessarily the poster's own), body, is_anonymous (boolean), visibility ('global'|'peer_group'), answered_from_post_id (nullable, self-referencing — links a testimony back to the original request it answers), status ('open'|'answered'), created_at.
+   - New table p2p_prayer_wall_reactions: id, post_id, user_id, reaction_type ('praying'|'amen'), created_at.
+   - New table p2p_prayer_wall_comments: id, post_id, user_id, body, created_at.
+   - UI: two tabs, "Recent" (chronological, requests and testimonies interleaved) and "Most Engaged" (sorted by total reaction count, both types together).
+   - Each post shows the nation's flag (from nation_code) prominently.
+   - Requests get a "🙏 Praying" reaction button; testimonies get a "🎉 Amen" reaction button — distinct verbs, both should increment the same underlying Prayer Fruit / servant_score stat (confirm which column the existing Race system actually uses before wiring this).
+   - "Mark as answered" flow on a request: prompts the poster to write a testimony right there, automatically links it via answered_from_post_id, flips the original request's status to 'answered'. Display the linked request when viewing its testimony.
+   - Posting flow: default to global visibility, but let the poster choose peer_group-only, and let them toggle anonymous (name hidden, flag still shown) as an easy, prominent option, not buried in settings.
+   - Do NOT show a leaderboard or ranking of individual users by prayer count — only post-level engagement numbers, never a "who prays most" list.
+   - Comments are open to anyone who can see the post (respecting the same visibility rule as the post itself).
+
+Report back: confirm Hall of Faith is hidden but not deleted, confirm the answered-request-to-testimony linking works with a real test post, and confirm anonymous posting actually hides the name while still showing the flag.

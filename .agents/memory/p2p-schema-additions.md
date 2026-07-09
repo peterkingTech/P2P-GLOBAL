@@ -65,6 +65,10 @@ Confirmed via working `DataContext.tsx` queries (`.select("lesson_id,completed")
 
 `select cron.schedule(...)` fails with `schema "cron" does not exist` unless `create extension if not exists pg_cron;` is run first in the same or a prior migration — the extension being "available" (listed in `pg_available_extensions`) does not mean it's enabled.
 
+## Prayer & Testimonies wall (added 2026-07-09)
+
+New tables `p2p_prayer_wall_posts` (post_type request/testimony, nation_code, is_anonymous, visibility global/peer_group, answered_from_post_id self-FK, status open/answered), `p2p_prayer_wall_reactions` (praying/amen, unique per user+post+type), `p2p_prayer_wall_comments`. All have RLS. "Peer group" visibility is defined by a `p2p_is_peer(a,b)` SQL function (active discipleship link either direction, OR same non-null `church_id`) — there was no existing peer-group concept in the schema, so this was invented for this feature; keep it in mind if peer-group semantics are needed elsewhere. Reacting to a post increments the reactor's `servant_score` by 1 via `p2p_increment_servant_score` RPC (SECURITY DEFINER, since profile UPDATE RLS only allows self-updates and reactions need to touch your own row anyway — but the RPC exists so this pattern can be reused for other score-increment actions without duplicating logic). This coexists with the older, narrower `p2p_prayer_requests` table (used by nothing now) — not migrated/removed since it wasn't requested.
+
 ## Key design rules
 
 - Canonical rows (English) are NEVER modified by translation saves — translation screens write only to `*_translations` tables.

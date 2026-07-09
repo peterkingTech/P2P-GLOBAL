@@ -47,6 +47,38 @@ export interface PrayerRequest {
   hasPrayed?: boolean;
 }
 
+export type PrayerWallPostType = "request" | "testimony";
+export type PrayerWallVisibility = "global" | "peer_group";
+export type PrayerWallReactionType = "praying" | "amen";
+
+export interface PrayerWallPost {
+  id: string;
+  userId: string;
+  userName: string;
+  postType: PrayerWallPostType;
+  nationCode: string | null;
+  body: string;
+  isAnonymous: boolean;
+  visibility: PrayerWallVisibility;
+  answeredFromPostId: string | null;
+  answeredFromPost: { id: string; body: string; userName: string; isAnonymous: boolean } | null;
+  status: "open" | "answered";
+  createdAt: string;
+  prayingCount: number;
+  amenCount: number;
+  myReactions: PrayerWallReactionType[];
+  commentCount: number;
+}
+
+export interface PrayerWallComment {
+  id: string;
+  postId: string;
+  userId: string;
+  userName: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface StudySession {
   id: string;
   title: string;
@@ -176,6 +208,19 @@ interface DataContextValue {
   isLoading: boolean;
   addPrayer: (text: string, nation?: string) => Promise<void>;
   prayForRequest: (id: string) => Promise<void>;
+  getPrayerWallPosts: (sort: "recent" | "engaged") => Promise<PrayerWallPost[]>;
+  createPrayerWallPost: (params: {
+    postType: PrayerWallPostType;
+    nationCode?: string | null;
+    body: string;
+    isAnonymous: boolean;
+    visibility: PrayerWallVisibility;
+    answeredFromPostId?: string | null;
+  }) => Promise<string | null>;
+  reactToPost: (postId: string, reactionType: PrayerWallReactionType) => Promise<string | null>;
+  markPostAnswered: (postId: string) => Promise<string | null>;
+  getComments: (postId: string) => Promise<PrayerWallComment[]>;
+  addComment: (postId: string, body: string) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
@@ -627,6 +672,165 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try { await supabase.rpc("increment_prayer_count", { prayer_id: id }); } catch {}
   }, []);
 
+  const mapPrayerWallRow = useCallback((r: any, myId?: string): PrayerWallPost => {
+    const reactions: Array<{ user_id: string; reaction_type: PrayerWallReactionType }> = r.p2p_prayer_wall_reactions || [];
+    const comments: Array<{ id: string }> = r.p2p_prayer_wall_comments || [];
+    const answeredFrom = r.answered_from_post
+      ? {
+          id: r.answered_from_post.id,
+          body: r.answered_from_post.body,
+          userName: r.answered_from_post.is_anonymous ? "Anonymous" : (r.answered_from_post.p2p_profiles?.full_name || "A believer"),
+          isAnonymous: r.answered_from_post.is_anonymous,
+        }
+      : null;
+    return {
+      id: r.id,
+      userId: r.user_id,
+      userName: r.is_anonymous ? "Anonymous" : (r.p2p_profiles?.full_name || "A believer"),
+      postType: r.post_type,
+      nationCode: r.nation_code,
+      body: r.body,
+      isAnonymous: r.is_anonymous,
+      visibility: r.visibility,
+      answeredFromPostId: r.answered_from_post_id,
+      answeredFromPost: answeredFrom,
+      status: r.status,
+      createdAt: r.created_at,
+      prayingCount: reactions.filter((x) => x.reaction_type === "praying").length,
+      amenCount: reactions.filter((x) => x.reaction_type === "amen").length,
+      myReactions: myId ? reactions.filter((x) => x.user_id === myId).map((x) => x.reaction_type) : [],
+      commentCount: comments.length,
+    };
+  }, []);
+
+  const getPrayerWallPosts = useCallback(async (sort: "recent" | "engaged"): Promise<PrayerWallPost[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_prayer_wall_posts")
+        .select(`
+          *,
+          p2p_profiles ( full_name ),
+          p2p_prayer_wall_reactions ( user_id, reaction_type ),
+          p2p_prayer_wall_comments ( id ),
+          answered_from_post:answered_from_post_id ( id, body, is_anonymous, p2p_profiles ( full_name ) )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      const rows = (data || []).map((r: any) => mapPrayerWallRow(r, profile.id));
+      if (sort === "engaged") {
+        rows.sort((a, b) => (b.prayingCount + b.amenCount + b.commentCount) - (a.prayingCount + a.amenCount + a.commentCount));
+      }
+      return rows;
+    } catch (e) {
+      console.error("getPrayerWallPosts failed", e);
+      return [];
+    }
+  }, [profile, mapPrayerWallRow]);
+
+  const createPrayerWallPost = useCallback(async (params: {
+    postType: PrayerWallPostType;
+    nationCode?: string | null;
+    body: string;
+    isAnonymous: boolean;
+    visibility: PrayerWallVisibility;
+    answeredFromPostId?: string | null;
+  }): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_prayer_wall_posts").insert({
+        user_id: profile.id,
+        post_type: params.postType,
+        nation_code: params.nationCode || null,
+        body: params.body,
+        is_anonymous: params.isAnonymous,
+        visibility: params.visibility,
+        answered_from_post_id: params.answeredFromPostId || null,
+        status: params.postType === "testimony" ? "answered" : "open",
+      });
+      if (error) throw error;
+      if (params.answeredFromPostId) {
+        await supabase.from("p2p_prayer_wall_posts")
+          .update({ status: "answered" })
+          .eq("id", params.answeredFromPostId)
+          .eq("user_id", profile.id);
+      }
+      return null;
+    } catch (e: any) {
+      console.error("createPrayerWallPost failed", e);
+      return e?.message || "Could not create post";
+    }
+  }, [profile]);
+
+  const reactToPost = useCallback(async (postId: string, reactionType: PrayerWallReactionType): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_prayer_wall_reactions").insert({
+        post_id: postId, user_id: profile.id, reaction_type: reactionType,
+      });
+      if (error) {
+        if ((error as any).code === "23505") return null; // already reacted, treat as no-op success
+        throw error;
+      }
+      try {
+        await supabase.rpc("p2p_increment_servant_score", { p_user_id: profile.id, p_amount: 1 });
+      } catch {}
+      return null;
+    } catch (e: any) {
+      console.error("reactToPost failed", e);
+      return e?.message || "Could not react";
+    }
+  }, [profile]);
+
+  const markPostAnswered = useCallback(async (postId: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_prayer_wall_posts")
+        .update({ status: "answered" })
+        .eq("id", postId)
+        .eq("user_id", profile.id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("markPostAnswered failed", e);
+      return e?.message || "Could not update post";
+    }
+  }, [profile]);
+
+  const getComments = useCallback(async (postId: string): Promise<PrayerWallComment[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("p2p_prayer_wall_comments")
+        .select("*, p2p_profiles ( full_name )")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        id: r.id, postId: r.post_id, userId: r.user_id,
+        userName: r.p2p_profiles?.full_name || "A believer",
+        body: r.body, createdAt: r.created_at,
+      }));
+    } catch (e) {
+      console.error("getComments failed", e);
+      return [];
+    }
+  }, []);
+
+  const addComment = useCallback(async (postId: string, body: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_prayer_wall_comments").insert({
+        post_id: postId, user_id: profile.id, body,
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addComment failed", e);
+      return e?.message || "Could not add comment";
+    }
+  }, [profile]);
+
   const markLessonComplete = useCallback(async (lessonId: string) => {
     try { await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true"); } catch {}
     if (profile) {
@@ -847,7 +1051,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     <DataContext.Provider value={{
       modules, lessons, prayers, sessions, forestNodes, forestStats, fruits, missions,
       dailyVerse, pendingEvaluations, isLoading,
-      addPrayer, prayForRequest, markLessonComplete, refreshData,
+      addPrayer, prayForRequest,
+      getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
+      markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
       submitContent, submitAssignment,

@@ -215,7 +215,6 @@ export default function HomeTab() {
           { icon: "leaf", label: "Living Tree", sub: "Track your six stages of growth", route: "/living-tree" },
           { icon: "book", label: "Curriculum", sub: "Browse the full study library", route: "/curriculum" },
           { icon: "flower", label: "Fruit Collection", sub: "See the fruit you've earned", route: "/fruit" },
-          { icon: "trophy", label: "Hall of Faith", sub: "Celebrate faithful disciples", route: "/hall-of-faith" },
           { icon: "person-circle", label: "My Profile", sub: "View your discipleship profile", route: "/profile" },
           ...(profile?.role && profile.role !== "student"
             ? [{ icon: "settings", label: "Admin", sub: "Curriculum manager & registration responses", route: "/admin/curriculum" }]
