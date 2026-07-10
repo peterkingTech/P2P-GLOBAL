@@ -212,6 +212,7 @@ export default function PrayerTab() {
   const insets = useSafeAreaInsets();
   const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered } = useData();
 
+  const [section, setSection] = useState<"wall" | "private">("wall");
   const [tab, setTab] = useState<"recent" | "engaged">("recent");
   const [posts, setPosts] = useState<PrayerWallPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,6 +234,10 @@ export default function PrayerTab() {
   }, [getPrayerWallPosts]);
 
   useEffect(() => { load(tab); }, [tab, load]);
+
+  const visiblePosts = posts.filter((p) =>
+    section === "private" ? p.visibility === "peer_group" : p.visibility === "global"
+  );
 
   async function handleReact(id: string, type: "praying" | "amen") {
     setPosts((prev) => prev.map((p) => p.id === id
@@ -265,6 +270,7 @@ export default function PrayerTab() {
     setAnsweredFromPostId(null);
     setBody("");
     setNationCode("");
+    setVisibility(section === "private" ? "peer_group" : "global");
     setShowForm((s) => !s);
   }
 
@@ -299,6 +305,15 @@ export default function PrayerTab() {
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={openNewPost}>
           <Ionicons name={showForm ? "close" : "add"} size={22} color={colors.upperRoomCream} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.segmentRow}>
+        <TouchableOpacity style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
+          <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>Wall</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
+          <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>Private</Text>
         </TouchableOpacity>
       </View>
 
@@ -396,7 +411,7 @@ export default function PrayerTab() {
         </View>
       ) : (
         <FlatList
-          data={posts}
+          data={visiblePosts}
           keyExtractor={(p) => p.id}
           renderItem={({ item }) => (
             <PostCard item={item} onReact={handleReact} onAnswer={handleAnswer} onTestify={handleTestify} />
@@ -406,7 +421,9 @@ export default function PrayerTab() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="radio-outline" size={40} color={colors.upperRoomBorder} />
-              <Text style={styles.emptyText}>No posts yet. Be the first.</Text>
+              <Text style={styles.emptyText}>
+                {section === "private" ? "No private peer group posts yet." : "No posts yet. Be the first."}
+              </Text>
             </View>
           }
         />
@@ -434,6 +451,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.upperRoomBorder,
     alignItems: "center", justifyContent: "center",
   },
+  segmentRow: {
+    flexDirection: "row", marginHorizontal: 16, marginTop: 12,
+    backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 12,
+    borderWidth: 1, borderColor: colors.upperRoomBorder, padding: 4,
+  },
+  segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
+  segmentBtnActive: { backgroundColor: "rgba(224,164,65,0.18)" },
+  segmentText: { fontSize: 13, fontWeight: "600", color: colors.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
+  segmentTextActive: { color: colors.upperRoomAmber },
   tabRow: {
     flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: colors.upperRoomBorder,

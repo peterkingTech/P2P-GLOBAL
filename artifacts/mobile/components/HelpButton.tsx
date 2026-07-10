@@ -13,7 +13,7 @@ const CRISIS_RESOURCES = [
   { label: "Emergency services", value: "[INSERT LOCAL EMERGENCY NUMBER, e.g. 911 / 999 / 112]" },
 ];
 
-export function HelpButton() {
+export function HelpButton({ variant = "fab" }: { variant?: "fab" | "inline" }) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
   const { submitHelpRequest } = useData();
@@ -33,12 +33,12 @@ export function HelpButton() {
   return (
     <>
       <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + (Platform.OS === "web" ? 24 : 90) }]}
+        style={variant === "fab" ? [styles.fab, { bottom: insets.bottom + (Platform.OS === "web" ? 24 : 90) }] : styles.inlineBtn}
         onPress={handlePress}
         activeOpacity={0.85}
         accessibilityLabel="I need help now"
       >
-        <Ionicons name="alert-circle" size={22} color="#fff" />
+        <Ionicons name="heart" size={variant === "fab" ? 22 : 20} color={variant === "fab" ? "#fff" : "#B91C1C"} />
       </TouchableOpacity>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -79,6 +79,12 @@ export function HelpButton() {
 }
 
 const styles = StyleSheet.create({
+  inlineBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(185,28,28,0.1)",
+    borderWidth: 1, borderColor: "rgba(185,28,28,0.3)",
+    alignItems: "center", justifyContent: "center",
+  },
   fab: {
     position: "absolute",
     right: 16,

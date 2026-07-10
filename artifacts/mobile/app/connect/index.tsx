@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -19,8 +19,9 @@ const MATCH_PATHS = [
     id: "smart",
     icon: "sparkles" as const,
     title: "Smart Match",
-    subtitle: "AI-matched partner based on your gifts, timezone & language",
+    subtitle: "Matched partner based on your gifts & country",
     color: colors.primaryGreen,
+    route: "/connect/smart-match" as const,
   },
   {
     id: "invite",
@@ -28,6 +29,7 @@ const MATCH_PATHS = [
     title: "Invite a Peer",
     subtitle: "Send a study invitation to someone you know",
     color: colors.amber,
+    route: "/connect/invite" as const,
   },
   {
     id: "discover",
@@ -35,6 +37,7 @@ const MATCH_PATHS = [
     title: "Discovery Search",
     subtitle: "Browse available study partners globally",
     color: "#6B5C3D",
+    route: "/connect/discover" as const,
   },
   {
     id: "group",
@@ -42,10 +45,11 @@ const MATCH_PATHS = [
     title: "Join a Group",
     subtitle: "Find a small group or church-based study group",
     color: colors.accentGreen,
+    route: "/connect/groups" as const,
   },
 ];
 
-export default function ConnectTab() {
+export default function ConnectHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sessions } = useData();
@@ -54,90 +58,91 @@ export default function ConnectTab() {
   const liveSessions = sessions.filter((s) => s.isLive);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPad + 20, paddingBottom: insets.bottom + 100 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.sectionTitle}>Find a Study Partner</Text>
-      <Text style={styles.sectionSub}>Choose how you want to connect</Text>
+    <>
+      <Stack.Screen options={{ title: "Connect", headerBackTitle: "Back" }} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: topPad + 20, paddingBottom: insets.bottom + 100 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionTitle}>Find a Study Partner</Text>
+        <Text style={styles.sectionSub}>Choose how you want to connect</Text>
 
-      <View style={styles.pathGrid}>
-        {MATCH_PATHS.map((path) => (
-          <TouchableOpacity
-            key={path.id}
-            style={styles.pathCard}
-            activeOpacity={0.85}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-          >
-            <View style={[styles.pathIconRing, { backgroundColor: `${path.color}18`, borderColor: `${path.color}33` }]}>
-              <Ionicons name={path.icon} size={28} color={path.color} />
-            </View>
-            <Text style={styles.pathTitle}>{path.title}</Text>
-            <Text style={styles.pathSub}>{path.subtitle}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Live Sessions */}
-      {liveSessions.length > 0 && (
-        <>
-          <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Live Now</Text>
-          {liveSessions.map((session) => (
+        <View style={styles.pathGrid}>
+          {MATCH_PATHS.map((path) => (
             <TouchableOpacity
-              key={session.id}
-              style={styles.liveRow}
-              onPress={() => router.push(`/session/${session.id}`)}
+              key={path.id}
+              style={styles.pathCard}
               activeOpacity={0.85}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(path.route);
+              }}
             >
-              <View style={styles.livePulse} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.liveRowTitle}>{session.title}</Text>
-                <Text style={styles.liveRowMeta}>
-                  {session.participantCount} participants · {session.durationMinutes} min
-                </Text>
+              <View style={[styles.pathIconRing, { backgroundColor: `${path.color}18`, borderColor: `${path.color}33` }]}>
+                <Ionicons name={path.icon} size={28} color={path.color} />
               </View>
-              <TouchableOpacity style={styles.joinBtn} onPress={() => router.push(`/session/${session.id}`)}>
-                <Text style={styles.joinBtnText}>Join</Text>
-              </TouchableOpacity>
+              <Text style={styles.pathTitle}>{path.title}</Text>
+              <Text style={styles.pathSub}>{path.subtitle}</Text>
             </TouchableOpacity>
           ))}
-        </>
-      )}
+        </View>
 
-      {/* Peer tips */}
-      <View style={styles.tipCard}>
-        <Ionicons name="information-circle" size={18} color={colors.amber} />
-        <Text style={styles.tipText}>
-          The best study pairs share a language and meet at least once a week. Consistency bears fruit.
-        </Text>
-      </View>
+        {liveSessions.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Live Now</Text>
+            {liveSessions.map((session) => (
+              <TouchableOpacity
+                key={session.id}
+                style={styles.liveRow}
+                onPress={() => router.push(`/session/${session.id}`)}
+                activeOpacity={0.85}
+              >
+                <View style={styles.livePulse} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.liveRowTitle}>{session.title}</Text>
+                  <Text style={styles.liveRowMeta}>
+                    {session.participantCount} participants · {session.durationMinutes} min
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.joinBtn} onPress={() => router.push(`/session/${session.id}`)}>
+                  <Text style={styles.joinBtnText}>Join</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
 
-      {/* Sessions */}
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Upcoming Sessions</Text>
-      {sessions.filter((s) => !s.isLive).map((session) => (
-        <TouchableOpacity
-          key={session.id}
-          style={styles.sessionRow}
-          onPress={() => router.push(`/session/${session.id}`)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.sessionIcon}>
-            <Ionicons name="calendar-outline" size={20} color={colors.accentGreen} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sessionTitle}>{session.title}</Text>
-            <Text style={styles.sessionMeta}>{session.hostName} · {session.durationMinutes} min</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+        <View style={styles.tipCard}>
+          <Ionicons name="information-circle" size={18} color={colors.amber} />
+          <Text style={styles.tipText}>
+            The best study pairs share a language and meet at least once a week. Consistency bears fruit.
+          </Text>
+        </View>
+
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Upcoming Sessions</Text>
+        {sessions.filter((s) => !s.isLive).map((session) => (
+          <TouchableOpacity
+            key={session.id}
+            style={styles.sessionRow}
+            onPress={() => router.push(`/session/${session.id}`)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.sessionIcon}>
+              <Ionicons name="calendar-outline" size={20} color={colors.accentGreen} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sessionTitle}>{session.title}</Text>
+              <Text style={styles.sessionMeta}>{session.hostName} · {session.durationMinutes} min</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </>
   );
 }
 

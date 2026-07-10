@@ -16,7 +16,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
-import { HelpButton } from "@/components/HelpButton";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { getStageFromPoints } from "@/constants/stages";
@@ -87,7 +86,6 @@ function RootLayoutNav() {
       <DataProvider>
         <AuthGate />
         <GrowthCelebrationHost />
-        <HelpButton />
       </DataProvider>
     </AuthProvider>
   );

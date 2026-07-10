@@ -101,6 +101,36 @@ export interface TeamProfile {
   isCrisisResponder: boolean;
 }
 
+export interface DiscoverablePeer {
+  id: string;
+  fullName: string;
+  country: string | null;
+  role: string;
+  gifts: string[];
+}
+
+export interface PeerGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  isMember: boolean;
+}
+
+export interface UserNote {
+  id: string;
+  title: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface UserHighlight {
+  id: string;
+  reference: string;
+  quote: string | null;
+  createdAt: string;
+}
+
 export interface StudySession {
   id: string;
   title: string;
@@ -253,6 +283,17 @@ interface DataContextValue {
   getAllProfiles: () => Promise<TeamProfile[]>;
   getCrisisResponderIds: () => Promise<string[]>;
   setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
+  getDiscoverablePeers: (search?: string) => Promise<DiscoverablePeer[]>;
+  getSmartMatch: () => Promise<DiscoverablePeer | null>;
+  getGroups: () => Promise<PeerGroup[]>;
+  joinGroup: (groupId: string) => Promise<string | null>;
+  leaveGroup: (groupId: string) => Promise<string | null>;
+  getMyNotes: () => Promise<UserNote[]>;
+  addNote: (title: string | null, body: string) => Promise<string | null>;
+  deleteNote: (id: string) => Promise<string | null>;
+  getMyHighlights: () => Promise<UserHighlight[]>;
+  addHighlight: (reference: string, quote: string | null) => Promise<string | null>;
+  deleteHighlight: (id: string) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
@@ -972,6 +1013,185 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const getDiscoverablePeers = useCallback(async (search?: string): Promise<DiscoverablePeer[]> => {
+    if (!profile) return [];
+    try {
+      let query = supabase
+        .from("p2p_profiles")
+        .select("id, full_name, country, role, gifts")
+        .neq("id", profile.id)
+        .order("full_name", { ascending: true })
+        .limit(50);
+      if (search && search.trim()) query = query.ilike("full_name", `%${search.trim()}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map((p: any) => ({
+        id: p.id, fullName: p.full_name || "Unnamed",
+        country: p.country, role: p.role, gifts: p.gifts || [],
+      }));
+    } catch (e) {
+      console.error("getDiscoverablePeers failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const getSmartMatch = useCallback(async (): Promise<DiscoverablePeer | null> => {
+    if (!profile) return null;
+    try {
+      const myGifts: string[] = profile.gifts || [];
+      const { data, error } = await supabase
+        .from("p2p_profiles")
+        .select("id, full_name, country, role, gifts")
+        .neq("id", profile.id)
+        .limit(200);
+      if (error) throw error;
+      const candidates = (data || []) as any[];
+      if (candidates.length === 0) return null;
+      let best = candidates[0];
+      let bestScore = -1;
+      for (const c of candidates) {
+        const gifts: string[] = c.gifts || [];
+        let score = gifts.filter((g) => myGifts.includes(g)).length * 2;
+        if (c.country && c.country === profile.country) score += 1;
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      return {
+        id: best.id, fullName: best.full_name || "Unnamed",
+        country: best.country, role: best.role, gifts: best.gifts || [],
+      };
+    } catch (e) {
+      console.error("getSmartMatch failed", e);
+      return null;
+    }
+  }, [profile]);
+
+  const getGroups = useCallback(async (): Promise<PeerGroup[]> => {
+    if (!profile) return [];
+    try {
+      const [{ data: groupsData, error: groupsErr }, { data: myMemberships, error: memErr }] = await Promise.all([
+        supabase.from("p2p_groups").select("id, name, description"),
+        supabase.from("p2p_group_members").select("group_id").eq("user_id", profile.id),
+      ]);
+      if (groupsErr) throw groupsErr;
+      if (memErr) throw memErr;
+      const myGroupIds = new Set((myMemberships || []).map((m: any) => m.group_id));
+      const counts: Record<string, number> = {};
+      const { data: allMembers } = await supabase.from("p2p_group_members").select("group_id");
+      (allMembers || []).forEach((m: any) => { counts[m.group_id] = (counts[m.group_id] || 0) + 1; });
+      return (groupsData || []).map((g: any) => ({
+        id: g.id, name: g.name || "Unnamed Group", description: g.description,
+        memberCount: counts[g.id] || 0, isMember: myGroupIds.has(g.id),
+      }));
+    } catch (e) {
+      console.error("getGroups failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const joinGroup = useCallback(async (groupId: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_group_members").insert({ group_id: groupId, user_id: profile.id });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("joinGroup failed", e);
+      return e?.message || "Could not join group";
+    }
+  }, [profile]);
+
+  const leaveGroup = useCallback(async (groupId: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_group_members").delete().eq("group_id", groupId).eq("user_id", profile.id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("leaveGroup failed", e);
+      return e?.message || "Could not leave group";
+    }
+  }, [profile]);
+
+  const getMyNotes = useCallback(async (): Promise<UserNote[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_user_notes")
+        .select("id, title, body, created_at")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []).map((n: any) => ({ id: n.id, title: n.title, body: n.body, createdAt: n.created_at }));
+    } catch (e) {
+      console.error("getMyNotes failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const addNote = useCallback(async (title: string | null, body: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_notes").insert({ user_id: profile.id, title, body });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addNote failed", e);
+      return e?.message || "Could not save note";
+    }
+  }, [profile]);
+
+  const deleteNote = useCallback(async (id: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_notes").delete().eq("id", id).eq("user_id", profile.id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("deleteNote failed", e);
+      return e?.message || "Could not delete note";
+    }
+  }, [profile]);
+
+  const getMyHighlights = useCallback(async (): Promise<UserHighlight[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_user_highlights")
+        .select("id, reference, quote, created_at")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []).map((h: any) => ({ id: h.id, reference: h.reference, quote: h.quote, createdAt: h.created_at }));
+    } catch (e) {
+      console.error("getMyHighlights failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const addHighlight = useCallback(async (reference: string, quote: string | null): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_highlights").insert({ user_id: profile.id, reference, quote });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addHighlight failed", e);
+      return e?.message || "Could not save highlight";
+    }
+  }, [profile]);
+
+  const deleteHighlight = useCallback(async (id: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_highlights").delete().eq("id", id).eq("user_id", profile.id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("deleteHighlight failed", e);
+      return e?.message || "Could not delete highlight";
+    }
+  }, [profile]);
+
   const markLessonComplete = useCallback(async (lessonId: string) => {
     try { await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true"); } catch {}
     if (profile) {
@@ -1196,6 +1416,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
       submitHelpRequest, getHelpRequests, updateHelpRequestStatus,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
+      getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
+      getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,

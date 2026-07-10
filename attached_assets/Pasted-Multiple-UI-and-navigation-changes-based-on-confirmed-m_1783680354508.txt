@@ -1,0 +1,35 @@
+Multiple UI and navigation changes, based on confirmed mockups. Two bug fixes first, then the redesign.
+
+BUG FIX 1 — Connect's matching buttons (Mentor Dashboard entry points, Discovery Search, Smart Match, Invite Link, Group Join) are not clickable/not wired up. Diagnose and fix why these buttons don't respond to taps before doing anything else with this feature. Report exactly what was broken (missing onPressed handler, broken route, etc.).
+
+BUG FIX 2 — There is a "You are not alone" crisis-help entry point (heart icon) currently floating/misplaced on the Learn/Module Journey screen. This is NOT a bug to remove — it's a real feature that hasn't been relocated yet. Move it to its correct home: next to the user's name/avatar on the Profile screen (see Profile changes below), always visible there, removed from wherever it's currently floating.
+
+NAVIGATION RESTRUCTURE:
+
+1. Bottom navigation becomes 5 tabs: Home, Learn, Prayer, Discover, Missions. Remove Connect and Forest as separate bottom-nav tabs (both relocate, per below).
+
+2. LEARN tab: add a segmented control at the top ("Core Curriculum" | "Plans"), replacing the current single Module Journey view.
+   - "Core Curriculum" (default): keep all existing sequential module/lesson locking and real progress tracking, but restyle as: a hero card (dark green gradient background) showing "YOUR CORE PROGRAM" label, "Foundations of Christianity" title, "Walk the path, one lesson at a time." subtitle, a progress bar with real percentage and "X of 104 lessons" — below the hero card, a VERTICAL connected-timeline list of modules (circular status indicators connected by a vertical line, matching the existing Module Journey visual style — completed modules show a checkmark, current module shows its number, locked modules show a lock icon, each in its own card showing module title and lesson progress "X of Y lessons").
+   - "Plans" tab: the 8 new curriculum entries (Purity and Lust, Addiction Recovery, Athletes and Sports Ministry, Grief and Loss, Anxiety and Mental Health, Doubt and Deconstruction, Marriage and Singleness, Parenting and Discipling Your Kids) shown as "coming soon" cards (dashed border, lock icon, muted text). Sub-tabs: My Plans, Find Plans, Saved, Completed.
+
+3. LIVING TREE (accessed from Home's More section): add a segmented control at the top ("My Tree" | "Global Forest").
+   - "My Tree" (default): existing Living Tree stage visualization, "Watch your growth" button, and a VERTICAL list of stat rows (not horizontal cards) — Lessons completed, Streak days, Disciples — each as its own row with icon, label, and value.
+   - "Global Forest": the existing Global Forest / world map / heatmap functionality, now living here instead of as a separate tab.
+
+4. PROFILE: restructure to a vertical stack —
+   - Top: avatar, name, "Called in: [gift categories]" (renamed from "Servant in:"), and the "You are not alone" heart icon next to the name (per Bug Fix 2), always visible.
+   - Vertical list of 4 rows: Peers, Peer Groups, Notes, Highlights (each its own full-width row with icon + label + chevron, not a horizontal grid).
+   - Peers and Peer Groups here should use the NOW-FIXED Connect functionality (Bug Fix 1) — Discovery Search, Smart Match, Invite Link, Group Join all live here.
+   - "Your gifts" section: tappable pills showing selected gifts from registration, plus a "+ Add" pill to add more.
+   - If the user is a peer guide to anyone: a "Peer Guide dashboard" row (placeholder name — suggest a better one if you have an idea, otherwise keep this).
+   - If the user is an admin: an "Admin Dashboard" row, conditional per existing currentUserIsAdminProvider logic.
+
+5. PRAYER tab: add a segmented control at the top ("Wall" | "Private").
+   - "Wall": the Prayer & Testimonies feed as previously specced (Recent/Most Engaged sub-tabs, country flags, requests and testimonies together, Praying/Amen reactions, comments, answered-request-links-to-testimony).
+   - "Private": peer-to-peer prayer requests only, between a user and their specific peer guide — no points, no counts, no public visibility. This is the ONLY prayer surface that should never show engagement metrics.
+
+6. DISCOVER tab (new): search bar at top, then topic-based browsing below (Salvation, Holy Spirit, etc. — reuse a topics taxonomy, tagging existing lessons/guided content by topic). Each topic shows counts of videos/audios/teachings available (0 is fine where content doesn't exist yet — do not fabricate placeholder content).
+
+7. MISSIONS tab: repurpose from the old gamified concept into a real content feed — upcoming mission projects/events, partner organizations, with real or clearly-marked-placeholder content (do not fabricate specific partner names/projects if none exist yet — use an empty state instead).
+
+Report back: confirm the Connect bug's root cause and fix, confirm the heart moved correctly to Profile, and give me the final bottom navigation tab list plus screenshots of each restructured screen (Learn, Living Tree, Profile, Prayer) so I can compare against the confirmed mockups before we move on.

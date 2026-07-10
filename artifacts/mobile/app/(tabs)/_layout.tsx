@@ -18,17 +18,13 @@ function NativeTabLayout() {
         <Icon sf={{ default: "book", selected: "book.fill" }} />
         <Label>Learn</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="connect">
-        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-        <Label>Connect</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="forest">
-        <Icon sf={{ default: "tree", selected: "tree.fill" }} />
-        <Label>Forest</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="prayer">
         <Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
         <Label>Prayer</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="discover">
+        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
+        <Label>Discover</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="missions">
         <Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
@@ -46,9 +42,8 @@ function ClassicTabLayout() {
   const TAB_ITEMS = [
     { name: "index", label: "Home", icon: "home" as const, iconActive: "home" as const },
     { name: "learn", label: "Learn", icon: "book-outline" as const, iconActive: "book" as const },
-    { name: "connect", label: "Connect", icon: "people-outline" as const, iconActive: "people" as const },
-    { name: "forest", label: "Forest", icon: "git-branch-outline" as const, iconActive: "git-branch" as const },
     { name: "prayer", label: "Prayer", icon: "radio-outline" as const, iconActive: "radio" as const },
+    { name: "discover", label: "Discover", icon: "compass-outline" as const, iconActive: "compass" as const },
     { name: "missions", label: "Missions", icon: "earth-outline" as const, iconActive: "earth" as const },
   ];
 

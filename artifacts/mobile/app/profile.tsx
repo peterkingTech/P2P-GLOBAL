@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { HelpButton } from "@/components/HelpButton";
 import colors from "@/constants/colors";
 
 const STRUGGLE_CATEGORIES = [
@@ -36,6 +37,15 @@ const GIFT_LABELS: Record<string, string> = {
   giving: "Giving",
   prophecy: "Prophecy",
 };
+
+const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
+
+const PROFILE_ROWS = [
+  { key: "peers", label: "Peers", icon: "people-outline" as const, route: "/connect" as const },
+  { key: "groups", label: "Peer Groups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
+  { key: "notes", label: "Notes", icon: "document-text-outline" as const, route: "/notes" as const },
+  { key: "highlights", label: "Highlights", icon: "bookmark-outline" as const, route: "/highlights" as const },
+];
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -90,14 +100,22 @@ export default function ProfileScreen() {
               {profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
             </Text>
           </View>
-          <Text style={styles.displayName}>{profile?.displayName ?? "Anonymous"}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.displayName}>{profile?.displayName ?? "Anonymous"}</Text>
+            <HelpButton variant="inline" />
+          </View>
           <Text style={styles.email}>{profile?.email ?? ""}</Text>
 
           <View style={styles.locationRow}>
-            {profile?.city && <Text style={styles.locationText}>{profile.city}</Text>}
-            {profile?.city && profile?.country && <Text style={styles.locationText}> · </Text>}
-            {profile?.country && <Text style={styles.locationText}>{profile.country}</Text>}
+            {profile?.role && <Text style={styles.locationText}>Called in: {profile.role.replace(/_/g, " ")}</Text>}
           </View>
+          {(profile?.city || profile?.country) && (
+            <View style={styles.locationRow}>
+              {profile?.city && <Text style={styles.locationText}>{profile.city}</Text>}
+              {profile?.city && profile?.country && <Text style={styles.locationText}> · </Text>}
+              {profile?.country && <Text style={styles.locationText}>{profile.country}</Text>}
+            </View>
+          )}
         </View>
 
         {/* Stats */}
@@ -105,11 +123,6 @@ export default function ProfileScreen() {
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{profile?.growthLevel ?? 0}</Text>
             <Text style={styles.statLabel}>Growth Level</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNum}>{profile?.role ?? "student"}</Text>
-            <Text style={styles.statLabel}>Role</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -123,18 +136,58 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Peers / Groups / Notes / Highlights */}
+        <View style={styles.rowsList}>
+          {PROFILE_ROWS.map((row) => (
+            <TouchableOpacity
+              key={row.key}
+              style={styles.fullRow}
+              activeOpacity={0.8}
+              onPress={() => router.push(row.route)}
+            >
+              <Ionicons name={row.icon} size={20} color={colors.accentGreen} />
+              <Text style={styles.fullRowLabel}>{row.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Spiritual Gifts */}
-        {profile?.gifts && profile.gifts.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Spiritual Gifts</Text>
-            <View style={styles.giftsRow}>
-              {profile.gifts.map((gift) => (
-                <View key={gift} style={styles.giftChip}>
-                  <Text style={styles.giftChipText}>{GIFT_LABELS[gift] ?? gift}</Text>
-                </View>
-              ))}
+        <Text style={styles.sectionTitle}>Spiritual Gifts</Text>
+        <View style={styles.giftsRow}>
+          {(profile?.gifts ?? []).map((gift) => (
+            <View key={gift} style={styles.giftChip}>
+              <Text style={styles.giftChipText}>{GIFT_LABELS[gift] ?? gift}</Text>
             </View>
-          </>
+          ))}
+          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8}>
+            <Ionicons name="add" size={14} color={colors.accentGreen} />
+            <Text style={styles.addGiftChipText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Peer Guide dashboard (conditional) */}
+        {profile?.role === "peer_guide" && (
+          <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
+            <Ionicons name="compass-outline" size={18} color={colors.primaryGreen} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dashboardTitle}>Peer Guide Dashboard</Text>
+              <Text style={styles.dashboardSub}>Manage the disciples and groups you lead</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+          </TouchableOpacity>
+        )}
+
+        {/* Admin dashboard (conditional) */}
+        {profile?.role && ADMIN_ROLES.has(profile.role) && (
+          <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/team")}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryGreen} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
+              <Text style={styles.dashboardSub}>Curriculum, registrations, help requests & team</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+          </TouchableOpacity>
         )}
 
         {/* Settings */}
@@ -287,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center", marginBottom: 12,
   },
   avatarInitial: { fontSize: 32, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   displayName: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   email: { fontSize: 13, color: colors.textMuted, marginTop: 4, fontFamily: "Inter_400Regular" },
   locationRow: { flexDirection: "row", marginTop: 6 },
@@ -302,13 +356,33 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   statDivider: { width: 1, height: 32, backgroundColor: colors.borderBeige },
   sectionTitle: { fontSize: 14, fontWeight: "700", color: colors.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  giftsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 28 },
+  rowsList: { gap: 10, marginBottom: 28 },
+  fullRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: colors.card, borderRadius: 14,
+    borderWidth: 1, borderColor: colors.borderBeige, padding: 14,
+  },
+  fullRowLabel: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Inter_500Medium" },
+  giftsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 28, alignItems: "center" },
   giftChip: {
     backgroundColor: "rgba(29,158,117,0.1)",
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
     borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
   },
   giftChipText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
+  addGiftChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderStyle: "dashed", borderColor: colors.accentGreen,
+  },
+  addGiftChipText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
+  dashboardRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 14,
+    borderWidth: 1, borderColor: "rgba(29,158,117,0.25)", padding: 14, marginBottom: 16,
+  },
+  dashboardTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  dashboardSub: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   settingsList: {
     backgroundColor: colors.card, borderRadius: 14,
     borderWidth: 1, borderColor: colors.borderBeige,
