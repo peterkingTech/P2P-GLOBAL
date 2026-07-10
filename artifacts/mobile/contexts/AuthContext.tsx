@@ -54,6 +54,16 @@ export interface UserProfile {
   isPraying: boolean;
   createdAt: string;
   servantScore: number;
+  bio?: string;
+  notificationsEnabled: boolean;
+  notifyPrayer: boolean;
+  notifyMessages: boolean;
+  notifyGroups: boolean;
+  profileVisibility: "public" | "peers" | "private";
+  appLanguage: string;
+  contentLanguage: string;
+  churchId?: string;
+  region?: string;
 }
 
 interface AuthContextValue {
@@ -88,6 +98,16 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
     servantScore: (row.servant_score as number) ?? 0,
+    bio: row.bio as string | undefined,
+    notificationsEnabled: (row.notifications_enabled as boolean) ?? true,
+    notifyPrayer: (row.notify_prayer as boolean) ?? true,
+    notifyMessages: (row.notify_messages as boolean) ?? true,
+    notifyGroups: (row.notify_groups as boolean) ?? true,
+    profileVisibility: ((row.profile_visibility as string) ?? "peers") as "public" | "peers" | "private",
+    appLanguage: (row.app_language as string) ?? "en",
+    contentLanguage: (row.content_language as string) ?? "en",
+    churchId: row.church_id as string | undefined,
+    region: row.region as string | undefined,
   };
 }
 
@@ -174,6 +194,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.role !== undefined) dbUpdates.role = updates.role;
     if (updates.growthLevel !== undefined) dbUpdates.growth_level = updates.growthLevel;
     if (updates.isPraying !== undefined) dbUpdates.is_praying = updates.isPraying;
+    if (updates.avatarUrl !== undefined) dbUpdates.photo_url = updates.avatarUrl;
+    if (updates.city !== undefined) dbUpdates.city = updates.city;
+    if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
+    if (updates.notificationsEnabled !== undefined) dbUpdates.notifications_enabled = updates.notificationsEnabled;
+    if (updates.notifyPrayer !== undefined) dbUpdates.notify_prayer = updates.notifyPrayer;
+    if (updates.notifyMessages !== undefined) dbUpdates.notify_messages = updates.notifyMessages;
+    if (updates.notifyGroups !== undefined) dbUpdates.notify_groups = updates.notifyGroups;
+    if (updates.profileVisibility !== undefined) dbUpdates.profile_visibility = updates.profileVisibility;
+    if (updates.appLanguage !== undefined) dbUpdates.app_language = updates.appLanguage;
+    if (updates.contentLanguage !== undefined) dbUpdates.content_language = updates.contentLanguage;
 
     const { error } = await supabase
       .from("p2p_profiles")

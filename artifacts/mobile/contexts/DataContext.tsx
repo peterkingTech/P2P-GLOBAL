@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase, useAuth } from "./AuthContext";
@@ -618,8 +619,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const resetAllState = useCallback(() => {
+    setModules([]);
+    setLessons([]);
+    setPrayers([]);
+    setSessions([]);
+    setForestNodes([]);
+    setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
+    setFruits(MOCK_FRUITS);
+    setDailyVerse(null);
+    setPendingEvaluations([]);
+    setToastEvent(null);
+    setCelebrationEvent(null);
+  }, []);
+
+  const lastLoadedUserId = useRef<string | null>(null);
+
   const loadData = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !profile?.id) {
+      resetAllState();
+      lastLoadedUserId.current = null;
+      setIsLoading(false);
+      return;
+    }
+    if (lastLoadedUserId.current !== profile.id) {
+      resetAllState();
+      lastLoadedUserId.current = profile.id;
+    }
     setIsLoading(true);
     try {
       const dayIdx = new Date().getDate() % DAILY_VERSES.length;

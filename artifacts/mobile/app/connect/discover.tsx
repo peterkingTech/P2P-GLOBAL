@@ -1,18 +1,39 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, DiscoverablePeer } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
 export default function Discover() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { supabase } = useAuth();
   const { highlight } = useLocalSearchParams<{ highlight?: string }>();
   const { getDiscoverablePeers } = useData();
   const [peers, setPeers] = useState<DiscoverablePeer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [messaging, setMessaging] = useState<string | null>(null);
+
+  async function handleMessage(peer: DiscoverablePeer) {
+    setMessaging(peer.id);
+    try {
+      const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: peer.id });
+      if (error || !data) {
+        Alert.alert(
+          "Can't message yet",
+          "You can message peers once you share a study group together, or once they've reached out for help."
+        );
+        return;
+      }
+      router.push(`/messages/${data}` as any);
+    } finally {
+      setMessaging(null);
+    }
+  }
 
   const load = useCallback(async (q?: string) => {
     setLoading(true);
@@ -58,6 +79,13 @@ export default function Discover() {
                   <Text style={styles.name}>{item.fullName}</Text>
                   <Text style={styles.meta}>{item.country || "Unknown location"} · {item.role}</Text>
                 </View>
+                <TouchableOpacity style={styles.msgBtn} onPress={() => handleMessage(item)} disabled={messaging === item.id}>
+                  {messaging === item.id ? (
+                    <ActivityIndicator size="small" color={colors.accentGreen} />
+                  ) : (
+                    <Ionicons name="chatbubble-outline" size={18} color={colors.accentGreen} />
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           />
@@ -83,6 +111,7 @@ const styles = StyleSheet.create({
   rowHighlight: { borderColor: colors.primaryGreen, borderWidth: 2 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryGreen, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
+  msgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(29,158,117,0.08)" },
   name: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   empty: { alignItems: "center", gap: 12, marginTop: 60 },

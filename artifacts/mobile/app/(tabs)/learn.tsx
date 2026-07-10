@@ -130,6 +130,7 @@ export default function LearnTab() {
           </View>
         ) : (
           <FlatList
+            key="curriculum-list"
             data={modules}
             keyExtractor={(m) => m.id}
             renderItem={({ item, index }) => (
@@ -159,6 +160,7 @@ export default function LearnTab() {
         )
       ) : (
         <FlatList
+          key="plans-grid"
           data={COMING_SOON_PLANS}
           keyExtractor={(p) => p.key}
           numColumns={2}

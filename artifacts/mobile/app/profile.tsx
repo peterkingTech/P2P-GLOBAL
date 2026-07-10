@@ -41,6 +41,7 @@ const GIFT_LABELS: Record<string, string> = {
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
 
 const PROFILE_ROWS = [
+  { key: "messages", label: "Messages", icon: "chatbubbles-outline" as const, route: "/messages" as const },
   { key: "peers", label: "Peers", icon: "people-outline" as const, route: "/connect" as const },
   { key: "groups", label: "Peer Groups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
   { key: "notes", label: "Notes", icon: "document-text-outline" as const, route: "/notes" as const },
@@ -116,6 +117,7 @@ export default function ProfileScreen() {
               {profile?.country && <Text style={styles.locationText}>{profile.country}</Text>}
             </View>
           )}
+          {profile?.bio ? <Text style={styles.bioText}>{profile.bio}</Text> : null}
         </View>
 
         {/* Stats */}
@@ -199,7 +201,7 @@ export default function ProfileScreen() {
             { icon: "language-outline", label: "Language" },
             { icon: "shield-outline", label: "Privacy" },
           ].map((item) => (
-            <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8}>
+            <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push("/settings")}>
               <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
               <Text style={styles.settingsLabel}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
@@ -343,6 +345,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   displayName: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   email: { fontSize: 13, color: colors.textMuted, marginTop: 4, fontFamily: "Inter_400Regular" },
+  bioText: { fontSize: 13, color: colors.textMid, marginTop: 10, textAlign: "center", lineHeight: 18, fontFamily: "Inter_400Regular", paddingHorizontal: 12 },
   locationRow: { flexDirection: "row", marginTop: 6 },
   locationText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular" },
   statsCard: {
