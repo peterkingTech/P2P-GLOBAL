@@ -94,6 +94,34 @@ export interface HelpRequest {
   createdAt: string;
 }
 
+export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
+export type ModerationContentType = "prayer_post" | "prayer_comment";
+
+export interface ModerationPosterIdentity {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+  totalFlags: number;
+  dismissedCount: number;
+  warnedCount: number;
+  removedCount: number;
+  escalatedCount: number;
+}
+
+export interface ModerationFlag {
+  id: string;
+  contentType: ModerationContentType;
+  contentId: string;
+  authorId: string;
+  reporterId: string | null;
+  reporterName: string | null;
+  reason: string | null;
+  contentSnapshot: string | null;
+  status: ModerationFlagStatus;
+  createdAt: string;
+  poster: ModerationPosterIdentity | null;
+}
+
 export interface TeamProfile {
   id: string;
   fullName: string;
@@ -281,6 +309,9 @@ interface DataContextValue {
   }) => Promise<string | null>;
   getHelpRequests: (filters?: { tier?: HelpRequestTier; status?: HelpRequestStatus }) => Promise<HelpRequest[]>;
   updateHelpRequestStatus: (id: string, status: HelpRequestStatus) => Promise<string | null>;
+  reportContent: (contentType: ModerationContentType, contentId: string, reason: string) => Promise<string | null>;
+  getModerationQueue: (status?: ModerationFlagStatus) => Promise<ModerationFlag[]>;
+  moderateFlag: (flagId: string, action: "dismiss" | "warn" | "remove" | "escalate", note?: string) => Promise<string | null>;
   getAllProfiles: () => Promise<TeamProfile[]>;
   getCrisisResponderIds: () => Promise<string[]>;
   setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
@@ -990,6 +1021,85 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const reportContent = useCallback(async (contentType: ModerationContentType, contentId: string, reason: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.rpc("p2p_report_content", {
+        p_content_type: contentType,
+        p_content_id: contentId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("reportContent failed", e);
+      return e?.message || "Could not submit report";
+    }
+  }, []);
+
+  const getModerationQueue = useCallback(async (status?: ModerationFlagStatus): Promise<ModerationFlag[]> => {
+    try {
+      let query = supabase
+        .from("p2p_content_flags")
+        .select("*, reporter:p2p_profiles!p2p_content_flags_reporter_id_fkey(full_name)")
+        .order("created_at", { ascending: false });
+      if (status) query = query.eq("status", status);
+      else query = query.eq("status", "open");
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rows = data || [];
+      const identities = await Promise.all(
+        rows.map((r: any) => supabase.rpc("p2p_flag_poster_identity", { p_user_id: r.author_id }))
+      );
+
+      return rows.map((r: any, i: number) => {
+        const idRow = identities[i]?.data?.[0];
+        return {
+          id: r.id,
+          contentType: r.content_type,
+          contentId: r.content_id,
+          authorId: r.author_id,
+          reporterId: r.reporter_id,
+          reporterName: r.reporter?.full_name || null,
+          reason: r.reason,
+          contentSnapshot: r.content_snapshot,
+          status: r.status,
+          createdAt: r.created_at,
+          poster: idRow
+            ? {
+                id: idRow.id,
+                fullName: idRow.full_name || "Unnamed",
+                avatarUrl: idRow.avatar_url,
+                totalFlags: Number(idRow.total_flags) || 0,
+                dismissedCount: Number(idRow.dismissed_count) || 0,
+                warnedCount: Number(idRow.warned_count) || 0,
+                removedCount: Number(idRow.removed_count) || 0,
+                escalatedCount: Number(idRow.escalated_count) || 0,
+              }
+            : null,
+        };
+      });
+    } catch (e) {
+      console.error("getModerationQueue failed", e);
+      return [];
+    }
+  }, []);
+
+  const moderateFlag = useCallback(async (flagId: string, action: "dismiss" | "warn" | "remove" | "escalate", note?: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.rpc("p2p_moderate_flag", {
+        p_flag_id: flagId,
+        p_action: action,
+        p_note: note ?? null,
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("moderateFlag failed", e);
+      return e?.message || "Could not complete action";
+    }
+  }, []);
+
   const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
     try {
       const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
@@ -1441,6 +1551,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
       submitHelpRequest, getHelpRequests, updateHelpRequestStatus,
+      reportContent, getModerationQueue, moderateFlag,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,

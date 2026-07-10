@@ -20,10 +20,11 @@ const ADMIN_ROLES = new Set([
 ]);
 
 const NAV_ITEMS = [
-  { label: "Curriculum", path: "/admin/curriculum", icon: "book" as const },
-  { label: "Registrations", path: "/admin/registrations", icon: "people" as const },
-  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const },
-  { label: "Team", path: "/admin/team", icon: "people-circle" as const },
+  { label: "Curriculum", path: "/admin/curriculum", icon: "book" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin"] },
+  { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
+  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin"] },
+  { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin"] },
+  { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin"] },
 ];
 
 export default function AdminLayout() {
@@ -79,7 +80,7 @@ export default function AdminLayout() {
 
         {/* Centre: section tabs */}
         <View style={styles.topBarNav}>
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !profile || item.roles.includes(profile.role)).map((item) => {
             const active = pathname.startsWith(item.path);
             return (
               <TouchableOpacity

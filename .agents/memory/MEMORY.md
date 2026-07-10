@@ -6,3 +6,4 @@
 - [P2P RLS Gaps](p2p-rls-gaps.md) — Many tables have rowsecurity=true but zero policies (silent empty reads, hard-fail writes); check before assuming a table is broken elsewhere.
 - [P2P Growth Video & Forest Transition](p2p-growth-video-forest.md) — video segment/stage mapping, one-time forest transition gating, Forest Builder vs Nations via real data.
 - [P2P Duplicate Curriculum Rows](p2p-duplicate-curriculum.md) — 3 dupe curriculum rows exist; active one = curriculum_id with most modules, matching DataContext logic.
+- [P2P Moderator Scope](p2p-moderation-scope.md) — moderators see only flagged content + minimal poster identity; escalation reuses p2p_help_requests, not a new inbox.

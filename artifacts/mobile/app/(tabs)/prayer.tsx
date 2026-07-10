@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Switch,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -110,11 +111,13 @@ function PostCard({
   onReact,
   onAnswer,
   onTestify,
+  onReport,
 }: {
   item: PrayerWallPost;
   onReact: (id: string, type: "praying" | "amen") => void;
   onAnswer: (id: string) => void;
   onTestify: (post: PrayerWallPost) => void;
+  onReport: (post: PrayerWallPost) => void;
 }) {
   const [showComments, setShowComments] = useState(false);
   const isTestimony = item.postType === "testimony";
@@ -138,6 +141,9 @@ function PostCard({
           </Text>
         </View>
         {isTestimony && <Ionicons name="sparkles" size={18} color={colors.upperRoomAmber} />}
+        <TouchableOpacity style={styles.reportBtn} onPress={() => onReport(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="flag-outline" size={15} color={colors.upperRoomMuted} />
+        </TouchableOpacity>
       </View>
 
       {item.answeredFromPost && (
@@ -210,7 +216,7 @@ function PostCard({
 
 export default function PrayerTab() {
   const insets = useSafeAreaInsets();
-  const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered } = useData();
+  const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, reportContent } = useData();
 
   const [section, setSection] = useState<"wall" | "private">("wall");
   const [tab, setTab] = useState<"recent" | "engaged">("recent");
@@ -255,6 +261,24 @@ export default function PrayerTab() {
   async function handleAnswer(id: string) {
     setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status: "answered" } : p));
     await markPostAnswered(id);
+  }
+
+  function handleReport(post: PrayerWallPost) {
+    Alert.alert(
+      "Report this post?",
+      "Let a moderator know what's wrong. They'll review it — this won't remove the post immediately.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          style: "destructive",
+          onPress: async () => {
+            const err = await reportContent("prayer_post", post.id, "Reported from prayer wall");
+            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          },
+        },
+      ]
+    );
   }
 
   function handleTestify(post: PrayerWallPost) {
@@ -414,7 +438,7 @@ export default function PrayerTab() {
           data={visiblePosts}
           keyExtractor={(p) => p.id}
           renderItem={({ item }) => (
-            <PostCard item={item} onReact={handleReact} onAnswer={handleAnswer} onTestify={handleTestify} />
+            <PostCard item={item} onReact={handleReact} onAnswer={handleAnswer} onTestify={handleTestify} onReport={handleReport} />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
           showsVerticalScrollIndicator={false}
@@ -528,6 +552,7 @@ const styles = StyleSheet.create({
   },
   testimonyCard: { borderColor: "rgba(224,164,65,0.4)" },
   prayerHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
+  reportBtn: { padding: 2 },
   prayerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: "rgba(224,164,65,0.15)",
