@@ -8,7 +8,7 @@ import {
   Image,
   Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
@@ -31,6 +31,7 @@ export default function StagesScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <Stack.Screen options={{ headerShown: false }} />
       {/* Back */}
       <TouchableOpacity style={styles.back} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={20} color={colors.primaryGreen} />

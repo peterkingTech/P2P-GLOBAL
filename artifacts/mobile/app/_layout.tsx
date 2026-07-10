@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -50,7 +50,20 @@ function AuthGate() {
     }
   }, [isAuthenticated, isLoading, segments]);
 
-  return <Slot />;
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: true,
+        headerBackTitleVisible: false,
+        headerTintColor: "#1D9E75",
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="admin" options={{ headerShown: false }} />
+    </Stack>
+  );
 }
 
 function GrowthCelebrationHost() {

@@ -7,3 +7,4 @@
 - [P2P Growth Video & Forest Transition](p2p-growth-video-forest.md) — video segment/stage mapping, one-time forest transition gating, Forest Builder vs Nations via real data.
 - [P2P Duplicate Curriculum Rows](p2p-duplicate-curriculum.md) — 3 dupe curriculum rows exist; active one = curriculum_id with most modules, matching DataContext logic.
 - [P2P Moderator Scope](p2p-moderation-scope.md) — moderators see only flagged content + minimal poster identity; escalation reuses p2p_help_requests, not a new inbox.
+- [P2P Groups RLS Recursion](p2p-groups-rls-recursion.md) — stale un-dropped policies caused 42P17 recursion; profile visibility must be explicitly opened for shared group mates.

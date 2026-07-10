@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -158,6 +158,7 @@ export default function LivingTreeScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <TouchableOpacity style={styles.back} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={20} color={colors.primaryGreen} />
         <Text style={styles.backLabel}>Home</Text>

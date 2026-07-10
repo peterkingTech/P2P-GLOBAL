@@ -144,6 +144,14 @@ export interface PeerGroup {
   description: string | null;
   memberCount: number;
   isMember: boolean;
+  peerGuideId: string | null;
+  isCreator: boolean;
+}
+
+export interface GroupMember {
+  userId: string;
+  fullName: string;
+  role: string;
 }
 
 export interface UserNote {
@@ -320,6 +328,10 @@ interface DataContextValue {
   getGroups: () => Promise<PeerGroup[]>;
   joinGroup: (groupId: string) => Promise<string | null>;
   leaveGroup: (groupId: string) => Promise<string | null>;
+  createGroup: (name: string, description: string | null) => Promise<string | null>;
+  getGroupMembers: (groupId: string) => Promise<GroupMember[]>;
+  addGroupMember: (groupId: string, userId: string) => Promise<string | null>;
+  removeGroupMember: (groupId: string, userId: string) => Promise<string | null>;
   getMyNotes: () => Promise<UserNote[]>;
   addNote: (title: string | null, body: string) => Promise<string | null>;
   deleteNote: (id: string) => Promise<string | null>;
@@ -1205,7 +1217,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (!profile) return [];
     try {
       const [{ data: groupsData, error: groupsErr }, { data: myMemberships, error: memErr }] = await Promise.all([
-        supabase.from("p2p_groups").select("id, name, description"),
+        supabase.from("p2p_groups").select("id, name, description, peer_guide_id"),
         supabase.from("p2p_group_members").select("group_id").eq("user_id", profile.id),
       ]);
       if (groupsErr) throw groupsErr;
@@ -1217,6 +1229,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return (groupsData || []).map((g: any) => ({
         id: g.id, name: g.name || "Unnamed Group", description: g.description,
         memberCount: counts[g.id] || 0, isMember: myGroupIds.has(g.id),
+        peerGuideId: g.peer_guide_id ?? null, isCreator: g.peer_guide_id === profile.id,
       }));
     } catch (e) {
       console.error("getGroups failed", e);
@@ -1247,6 +1260,75 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return e?.message || "Could not leave group";
     }
   }, [profile]);
+
+  const createGroup = useCallback(async (name: string, description: string | null): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    if (!name.trim()) return "Please enter a group name";
+    try {
+      const { data, error } = await supabase
+        .from("p2p_groups")
+        .insert({ name: name.trim(), description: description?.trim() || null, peer_guide_id: profile.id, church_id: profile.churchId ?? null })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const { error: memberErr } = await supabase
+        .from("p2p_group_members")
+        .insert({ group_id: data.id, user_id: profile.id });
+      if (memberErr) throw memberErr;
+      return null;
+    } catch (e: any) {
+      console.error("createGroup failed", e);
+      return e?.message || "Could not create group";
+    }
+  }, [profile]);
+
+  const getGroupMembers = useCallback(async (groupId: string): Promise<GroupMember[]> => {
+    try {
+      const { data: memberRows, error } = await supabase
+        .from("p2p_group_members")
+        .select("user_id")
+        .eq("group_id", groupId);
+      if (error) throw error;
+      const userIds = (memberRows || []).map((m: any) => m.user_id);
+      if (userIds.length === 0) return [];
+      const { data: profileRows, error: profErr } = await supabase
+        .from("p2p_profiles")
+        .select("id, full_name, role")
+        .in("id", userIds);
+      if (profErr) throw profErr;
+      const profileMap = new Map((profileRows || []).map((p: any) => [p.id, p]));
+      return userIds.map((uid: string) => ({
+        userId: uid,
+        fullName: profileMap.get(uid)?.full_name || "Unnamed",
+        role: profileMap.get(uid)?.role || "student",
+      }));
+    } catch (e) {
+      console.error("getGroupMembers failed", e);
+      return [];
+    }
+  }, []);
+
+  const addGroupMember = useCallback(async (groupId: string, userId: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.from("p2p_group_members").insert({ group_id: groupId, user_id: userId });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addGroupMember failed", e);
+      return e?.message || "Could not add peer to group";
+    }
+  }, []);
+
+  const removeGroupMember = useCallback(async (groupId: string, userId: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.from("p2p_group_members").delete().eq("group_id", groupId).eq("user_id", userId);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("removeGroupMember failed", e);
+      return e?.message || "Could not remove peer from group";
+    }
+  }, []);
 
   const getMyNotes = useCallback(async (): Promise<UserNote[]> => {
     if (!profile) return [];
@@ -1554,6 +1636,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       reportContent, getModerationQueue, moderateFlag,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
+      createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
