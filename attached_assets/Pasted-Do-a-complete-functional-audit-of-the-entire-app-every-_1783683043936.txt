@@ -1,0 +1,35 @@
+Do a complete functional audit of the entire app — every screen, every button, every interactive element. For each one, report: does it actually do something when tapped (navigate, save data, trigger an action), or is it non-functional (static UI with no handler, or a handler that errors/does nothing)?
+
+Go screen by screen: Home (Today/Community), Learn (Core Curriculum, Plans), Living Tree (My Tree, Global Forest), Prayer (Wall, Private), Profile (all sections: avatar, bio, Peers, Peer Groups, Notes, Highlights, gifts, settings), Discover, Missions, Admin (all sub-pages), and the full auth flow.
+
+For Settings specifically, check each individually: profile picture upload, location, notifications toggle, language picker, privacy button.
+For Plans specifically: reproduce the actual crash/break and report the exact error.
+
+Do NOT fix anything yet. Just give me a complete, honest status report — a simple table or list of every screen/feature and whether it's fully working, partially working, or non-functional, with the specific reason where you can tell (missing handler, broken route, API error, etc.).
+
+Fix Settings so every control actually works, and add a Bio field to Profile.
+
+Profile picture: upload to Supabase Storage (reuse the pattern from p2p_submissions media uploads if that infrastructure exists), update p2p_profiles with the resulting URL, show the real photo everywhere the avatar currently shows initials.
+Location: editable field, saves to p2p_profiles or p2p_registration_profiles (confirm which is authoritative), actually persists.
+Notifications: real toggle(s) controlling whether p2p_notifications actually get created/delivered for that user — confirm what granularity makes sense (all on/off, or per-category) and implement accordingly.
+Language: confirm this correctly writes to app_language/content_language from the earlier multi-language work — if that work was never actually built, flag it now rather than silently faking a working toggle.
+Privacy: define what this button should actually control (who can see your profile/posts — likely ties to the is_anonymous/visibility options from the Prayer Wall and community features) and make it functional.
+Add a bio text column to p2p_profiles (or registration_profiles), a "About yourself" edit field in Profile, and display it on the profile view.
+Test each one individually: change a setting, reload the app, confirm it persisted. Report which ones actually pass this test.
+
+Plans (within the Learn tab) is reported as broken/crashing. Reproduce the issue, identify the exact root cause (data fetch error, missing table, null reference, routing issue), and report it before fixing. Then fix it, and test by actually navigating into Plans, viewing the "coming soon" topic cards, and confirming no crash across a few real taps.
+
+Build a real messaging system, WhatsApp/Instagram-style: direct 1:1 messages and group chats.
+
+New tables: p2p_conversations (id, type: 'direct'|'group', name (nullable, for groups), created_at), p2p_conversation_members (conversation_id, user_id, joined_at, last_read_at), p2p_messages (id, conversation_id, sender_id, body, media_url (nullable), created_at).
+Use Supabase Realtime (or equivalent) so messages appear live without manual refresh.
+UI: conversation list (last message preview, unread indicator), a chat screen (bubbles, sender-aligned like WhatsApp — your messages right-aligned, others left-aligned), read receipts optional but nice-to-have, typing indicator optional.
+Direct messages: start a conversation from a Peer's profile (from the Peers section) or from an existing discipleship link.
+Group chats: tied to p2p_groups (existing table) — every group automatically has a conversation, members can message the whole group.
+Media: allow image attachments at minimum (reuse Supabase Storage patterns already established), video/audio can follow later.
+Respect existing safety patterns: no messaging with someone you have zero relationship with (no direct-message-a-stranger spam vector) — a conversation can only be initiated between confirmed peers/group members, not arbitrary users.
+Test end-to-end with two real accounts: send a direct message, confirm it arrives live on the other account; create/use a group conversation, confirm multiple members see the same thread.
+
+Using the messaging system from Prompt 4: when an admin/counselor views a p2p_help_requests entry (from the earlier Tier 1/Tier 2 help system), add a "Message them" action that starts or opens a direct conversation with that specific user — reusing p2p_conversations/p2p_messages, not a separate messaging mechanism. This is how an admin actually follows up on someone who reached out struggling, rather than just changing a status field with no real contact.
+
+Test: submit a test "I'm struggling" request, confirm an admin can message that user directly from the Help Requests view, and the user receives it in their normal conversation list. admin should have all available information of users including other admins.

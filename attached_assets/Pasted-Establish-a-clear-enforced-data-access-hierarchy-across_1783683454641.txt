@@ -1,0 +1,15 @@
+Establish a clear, enforced data-access hierarchy across the whole app, based on the real role enum (student, peer_guide, church_leader, regional_admin, moderator, super_admin):
+
+1. SUPER ADMIN: unrestricted read access to ALL user data, including other admins' data (church_leader, regional_admin, moderator accounts) — registrations, profiles, growth metrics, help requests, messages metadata (not necessarily message content unless explicitly needed for moderation), everything. Super admin is the only role that can see across the entire user base without scope restriction.
+
+2. OTHER ADMIN ROLES (church_leader, regional_admin, moderator): restricted to their own scope, NOT the whole user base, and explicitly NEVER able to see other admins' personal data (another admin's profile details, registration answers, growth metrics, etc. — only super_admin sees admin-on-admin data). Define scope per role:
+   - church_leader: only users belonging to their specific church (via whatever church/group relationship already exists in the schema)
+   - regional_admin: only users within their assigned region
+   - moderator: scoped to content moderation needs (community posts, prayer wall posts, help requests) rather than full profile access — confirm with me what specific data a moderator actually needs before granting broad access
+   - None of these three roles should see: other admins' registration data, other admins' personal growth/profile info, or users entirely outside their scope
+
+3. Audit EVERY existing RLS policy and admin screen built so far against this hierarchy — this includes: Registration Responses, Help Requests (crisis/struggling), user management/Analytics, Curriculum Manager (content editing itself can likely stay open to all admin roles, it's user DATA access that needs scoping), and any messaging admin tools. Report which existing policies currently violate this (e.g. any current policy checking `role IN ('church_leader','regional_admin','moderator','super_admin')` identically, giving them all equal access, needs to be split apart).
+
+4. Rewrite the affected RLS policies so scope is enforced at the database level, not just hidden in the UI — a church_leader querying the API directly should be blocked by RLS from ever receiving another church's data or another admin's personal data, not just prevented by which screen the app shows them.
+
+Report back: list every table/policy you changed, and confirm with a real test — create a test church_leader account and a test regional_admin account in different churches/regions, confirm each can only see their own scope's users, and confirm neither can see the other's admin profile data or each other's assigned peers.

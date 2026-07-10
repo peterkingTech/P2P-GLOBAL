@@ -1,0 +1,15 @@
+Critical bug: every new user account that signs up appears to inherit data/state from an existing account (the current/admin test account), instead of starting with a completely fresh profile and zero progress. New users must NEVER see another user's data, progress, tree stage, or profile info.
+
+Diagnose first — check each of these specifically and report which one is the actual cause:
+
+1. HARDCODED USER ID: search the entire codebase for any hardcoded user_id, profile id, or UUID that might be used as a fallback/default instead of the actual authenticated session's user id. Report every instance found, even if not the root cause.
+
+2. SESSION/STATE NOT RESETTING: when a user logs out and a new/different user logs in, is client-side state (React context, cached queries, local storage, in-memory providers) actually cleared? Check whether growth metrics, profile data, lesson progress, or any other user-specific state persists in memory/cache across a logout-then-different-login cycle rather than being refetched fresh for the new session.
+
+3. RLS/QUERY SCOPING: check every query that should be scoped to "the current user" — does it actually use the authenticated session's real user id (e.g., supabase.auth.getUser() or equivalent), or could it be reading a stale/cached/wrong id? Pay particular attention to growth_metrics, lesson_progress, and profile queries specifically, since those are what a new user would see incorrectly inherited.
+
+4. SIGNUP FLOW: when a brand new account is created, confirm a genuinely NEW row is created in p2p_profiles (and p2p_registration_profiles) with that user's own new UUID — not an upsert that could accidentally match/overwrite an existing row, and not a flow that reuses a previous session's row by mistake.
+
+Report back exactly which of these is the actual cause (it may be more than one) with the specific file/line/query involved, before fixing anything.
+
+Then fix it, and verify with a real test: log in as the existing admin/test account, note its current tree stage and lesson progress, log out, create a genuinely brand new account, and confirm the new account shows zero progress, a fresh Dormant Seed / Stage 0 tree, no inherited data whatsoever. Do this test twice with two different new accounts to confirm it's not a fluke.
