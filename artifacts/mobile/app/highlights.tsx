@@ -6,6 +6,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, UserHighlight } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+const HIGHLIGHT_SWATCH: Record<string, string> = {
+  yellow: "#FACC15",
+  green: "#4ADE80",
+  blue: "#60A5FA",
+  pink: "#F472B6",
+  orange: "#FB923C",
+};
+
 export default function Highlights() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -61,6 +69,9 @@ export default function Highlights() {
               >
                 <View style={{ flex: 1 }}>
                   <View style={styles.refRow}>
+                    {!!item.lessonId && (
+                      <View style={[styles.colorDot, { backgroundColor: HIGHLIGHT_SWATCH[item.color ?? "yellow"] ?? HIGHLIGHT_SWATCH.yellow }]} />
+                    )}
                     {!!item.lessonId && <Ionicons name="bookmark" size={12} color={colors.accentGreen} style={{ marginRight: 4 }} />}
                     <Text style={styles.reference}>{item.lessonTitle ?? item.reference}</Text>
                   </View>
@@ -105,6 +116,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 10,
   },
   refRow: { flexDirection: "row", alignItems: "center" },
+  colorDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
   reference: { fontSize: 14, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   quote: { fontSize: 13, color: colors.textMid, marginTop: 4, fontStyle: "italic", fontFamily: "Inter_400Regular", lineHeight: 18 },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6, fontFamily: "Inter_400Regular" },

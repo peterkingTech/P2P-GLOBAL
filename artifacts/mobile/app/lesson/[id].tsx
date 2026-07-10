@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   TextInput,
+  Modal,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -258,6 +259,18 @@ const qStyles = StyleSheet.create({
 });
 
 // ── Tappable highlightable paragraph ──────────────────────────────────────────
+export const HIGHLIGHT_COLORS: { key: string; label: string; swatch: string; bg: string }[] = [
+  { key: "yellow", label: "Yellow", swatch: "#FACC15", bg: "rgba(250,204,21,0.45)" },
+  { key: "green", label: "Green", swatch: "#4ADE80", bg: "rgba(74,222,128,0.4)" },
+  { key: "blue", label: "Blue", swatch: "#60A5FA", bg: "rgba(96,165,250,0.4)" },
+  { key: "pink", label: "Pink", swatch: "#F472B6", bg: "rgba(244,114,182,0.4)" },
+  { key: "orange", label: "Orange", swatch: "#FB923C", bg: "rgba(251,146,60,0.4)" },
+];
+
+export function highlightColorBg(key?: string): string {
+  return HIGHLIGHT_COLORS.find((c) => c.key === key)?.bg ?? HIGHLIGHT_COLORS[0].bg;
+}
+
 function splitSentences(text: string): { text: string; start: number; end: number }[] {
   const parts: { text: string; start: number; end: number }[] = [];
   const regex = /[^.!?]+[.!?]*\s*/g;
@@ -275,25 +288,28 @@ function HighlightableParagraph({
   content,
   highlights,
   onToggle,
+  onLongPressExisting,
 }: {
   sectionId: string;
   lessonId: string;
   content: string;
   highlights: UserHighlight[];
   onToggle: (params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) => void;
+  onLongPressExisting: (highlight: UserHighlight) => void;
 }) {
   const sentences = splitSentences(content);
   return (
     <Text style={styles.bodyPara}>
       {sentences.map((s, idx) => {
-        const isHighlighted = highlights.some(
+        const existing = highlights.find(
           (h) => h.sectionId === sectionId && h.startOffset === s.start && h.endOffset === s.end
         );
         return (
           <Text
             key={idx}
             onPress={() => onToggle({ sectionId, lessonId, text: s.text.trim(), start: s.start, end: s.end })}
-            style={isHighlighted ? styles.sentenceHighlighted : undefined}
+            onLongPress={() => existing && onLongPressExisting(existing)}
+            style={existing ? { backgroundColor: highlightColorBg(existing.color) } : undefined}
           >
             {s.text}
           </Text>
@@ -323,6 +339,10 @@ export default function LessonScreen() {
   const [questionSubs, setQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
   const [assignmentQuestionSubs, setAssignmentQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
   const [highlights, setHighlights] = useState<UserHighlight[]>([]);
+  const [pendingHighlight, setPendingHighlight] = useState<
+    { sectionId: string; lessonId: string; text: string; start: number; end: number } | null
+  >(null);
+  const [editingHighlight, setEditingHighlight] = useState<UserHighlight | null>(null);
 
   const loadHighlights = useCallback(async () => {
     if (!id) return;
@@ -331,15 +351,23 @@ export default function LessonScreen() {
 
   useEffect(() => { loadHighlights(); }, [loadHighlights]);
 
-  async function handleToggleHighlight(params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) {
+  function handleToggleHighlight(params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) {
     const existing = highlights.find(
       (h) => h.sectionId === params.sectionId && h.startOffset === params.start && h.endOffset === params.end
     );
     Haptics.selectionAsync();
     if (existing) {
       setHighlights((prev) => prev.filter((h) => h.id !== existing.id));
-      await deleteHighlight(existing.id);
+      deleteHighlight(existing.id);
     } else {
+      setPendingHighlight(params);
+    }
+  }
+
+  async function handleChooseColor(colorKey: string) {
+    if (pendingHighlight) {
+      const params = pendingHighlight;
+      setPendingHighlight(null);
       const err = await addSectionHighlight({
         lessonId: params.lessonId,
         sectionId: params.sectionId,
@@ -347,8 +375,32 @@ export default function LessonScreen() {
         quote: params.text,
         startOffset: params.start,
         endOffset: params.end,
+        color: colorKey,
       });
       if (!err) loadHighlights();
+    } else if (editingHighlight) {
+      const h = editingHighlight;
+      setEditingHighlight(null);
+      await deleteHighlight(h.id);
+      const err = await addSectionHighlight({
+        lessonId: h.lessonId ?? (id as string),
+        sectionId: h.sectionId ?? "",
+        reference: h.reference,
+        quote: h.quote ?? "",
+        startOffset: h.startOffset ?? 0,
+        endOffset: h.endOffset ?? 0,
+        color: colorKey,
+      });
+      if (!err) loadHighlights();
+    }
+  }
+
+  function handleRemoveHighlight() {
+    if (editingHighlight) {
+      const h = editingHighlight;
+      setEditingHighlight(null);
+      setHighlights((prev) => prev.filter((x) => x.id !== h.id));
+      deleteHighlight(h.id);
     }
   }
 
@@ -459,6 +511,7 @@ export default function LessonScreen() {
                   content={para}
                   highlights={highlights}
                   onToggle={handleToggleHighlight}
+                  onLongPressExisting={(h) => setEditingHighlight(h)}
                 />
               ))}
             </View>
@@ -526,6 +579,44 @@ export default function LessonScreen() {
           )}
         </ScrollView>
       )}
+
+      <Modal
+        visible={!!pendingHighlight || !!editingHighlight}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setPendingHighlight(null); setEditingHighlight(null); }}
+      >
+        <TouchableOpacity
+          style={styles.colorPickerOverlay}
+          activeOpacity={1}
+          onPress={() => { setPendingHighlight(null); setEditingHighlight(null); }}
+        >
+          <View style={styles.colorPickerCard}>
+            <Text style={styles.colorPickerTitle}>
+              {editingHighlight ? "Change highlight color" : "Choose highlight color"}
+            </Text>
+            <View style={styles.colorSwatchRow}>
+              {HIGHLIGHT_COLORS.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[
+                    styles.colorSwatch,
+                    { backgroundColor: c.swatch },
+                    (editingHighlight?.color ?? "yellow") === c.key && styles.colorSwatchSelected,
+                  ]}
+                  onPress={() => handleChooseColor(c.key)}
+                />
+              ))}
+            </View>
+            {editingHighlight && (
+              <TouchableOpacity style={styles.removeHighlightBtn} onPress={handleRemoveHighlight}>
+                <Ionicons name="trash-outline" size={16} color="#B91C1C" />
+                <Text style={styles.removeHighlightBtnText}>Remove highlight</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -556,6 +647,17 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4 },
   bodyPara: { fontSize: 15, color: colors.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 16 },
   sentenceHighlighted: { backgroundColor: "rgba(250,204,21,0.45)" },
+  colorPickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  colorPickerCard: {
+    backgroundColor: colors.lightCream, borderRadius: 20, padding: 20,
+    width: "82%", alignItems: "center",
+  },
+  colorPickerTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 16 },
+  colorSwatchRow: { flexDirection: "row", gap: 14, marginBottom: 6 },
+  colorSwatch: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: "transparent" },
+  colorSwatchSelected: { borderColor: colors.textDark },
+  removeHighlightBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 18 },
+  removeHighlightBtnText: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium" },
   questionsCard: {
     backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
     padding: 16, marginBottom: 28, marginTop: 8,
