@@ -1,0 +1,43 @@
+{
+  "tabs": {
+    "home": "首页",
+    "learn": "学习",
+    "prayer": "祷告",
+    "discover": "发现",
+    "missions": "使命"
+  },
+  "profile": {
+    "title": "我的资料",
+    "messages": "消息",
+    "peers": "同伴",
+    "peerGroups": "学习小组",
+    "notes": "笔记",
+    "highlights": "标注",
+    "growthLevel": "成长等级",
+    "gifts": "恩赐",
+    "servantScore": "服事分数",
+    "spiritualGifts": "属灵恩赐",
+    "add": "添加",
+    "peerGuideDashboard": "同伴引导仪表板",
+    "peerGuideDashboardSub": "管理你带领的门徒和小组",
+    "adminDashboard": "管理仪表板",
+    "adminDashboardSub": "课程、注册、求助请求与团队",
+    "account": "账户",
+    "editProfile": "编辑资料",
+    "notifications": "通知",
+    "language": "语言",
+    "privacy": "隐私",
+    "support": "支持",
+    "imStruggling": "我正在挣扎",
+    "reachOutSub": "私下寻求支持和跟进",
+    "signOut": "退出登录",
+    "calledIn": "呼召于"
+  },
+  "settings": {
+    "title": "设置",
+    "appLanguage": "应用语言",
+    "contentLanguage": "查经语言",
+    "save": "保存",
+    "cancel": "取消"
+  }
+}

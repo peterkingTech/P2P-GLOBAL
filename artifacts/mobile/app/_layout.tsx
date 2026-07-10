@@ -19,6 +19,7 @@ import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { getStageFromPoints } from "@/constants/stages";
+import i18n, { SUPPORTED_LANGUAGES } from "@/lib/i18n";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,9 +30,16 @@ const queryClient = new QueryClient();
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake"]);
 
 function AuthGate() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, profile } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    const lang = profile?.appLanguage;
+    if (lang && SUPPORTED_LANGUAGES.includes(lang as any) && i18n.language !== lang) {
+      i18n.changeLanguage(lang);
+    }
+  }, [profile?.appLanguage]);
 
   useEffect(() => {
     if (isLoading) return;

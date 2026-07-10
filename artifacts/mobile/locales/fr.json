@@ -1,0 +1,43 @@
+{
+  "tabs": {
+    "home": "Accueil",
+    "learn": "Apprendre",
+    "prayer": "Prière",
+    "discover": "Découvrir",
+    "missions": "Missions"
+  },
+  "profile": {
+    "title": "Mon Profil",
+    "messages": "Messages",
+    "peers": "Pairs",
+    "peerGroups": "Groupes d'Étude",
+    "notes": "Notes",
+    "highlights": "Surlignages",
+    "growthLevel": "Niveau de Croissance",
+    "gifts": "Dons",
+    "servantScore": "Score de Service",
+    "spiritualGifts": "Dons Spirituels",
+    "add": "Ajouter",
+    "peerGuideDashboard": "Tableau du Guide",
+    "peerGuideDashboardSub": "Gérez les disciples et groupes que vous dirigez",
+    "adminDashboard": "Tableau Admin",
+    "adminDashboardSub": "Curriculum, inscriptions, demandes d'aide et équipe",
+    "account": "Compte",
+    "editProfile": "Modifier le Profil",
+    "notifications": "Notifications",
+    "language": "Langue",
+    "privacy": "Confidentialité",
+    "support": "Support",
+    "imStruggling": "Je traverse une difficulté",
+    "reachOutSub": "Contactez-nous en privé pour du soutien et un suivi",
+    "signOut": "Se Déconnecter",
+    "calledIn": "Appelé à"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "appLanguage": "Langue de l'application",
+    "contentLanguage": "Langue d'étude biblique",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
+  }
+}

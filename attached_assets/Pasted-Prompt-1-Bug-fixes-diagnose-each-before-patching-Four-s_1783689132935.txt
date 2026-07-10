@@ -1,0 +1,30 @@
+Prompt 1 — Bug fixes (diagnose each before patching)
+Four separate bugs to fix. Diagnose the actual root cause for each before patching — don't guess.
+
+1. PROFILE PICTURE NOT DISPLAYING: photo uploads and saves successfully (confirmed), but doesn't render on the profile screen, and other users' profile pictures aren't visible anywhere either (viewing a peer's profile, peer lists, etc.). Check whether the avatar-rendering component actually reads photo_url/avatar_url from p2p_profiles at all, or if it's hardcoded to always show initials regardless of whether a real photo exists. Fix so every place an avatar renders (own profile, peer lists, peer groups, prayer wall posts, community posts, evaluator/submitter identity, everywhere) checks for and displays the real photo when one exists, falling back to initials only when no photo_url is set.
+
+2. SPIRITUAL GIFTS "ADD" BUTTON NOT WORKING: diagnose why tapping Add in the gifts section does nothing (missing handler, broken modal/sheet, broken write to p2p_user_gifts). Fix and confirm a real gift can be added and persists after reload.
+
+3. APP LANGUAGE NOT WORKING: diagnose whether this is a UI issue (picker doesn't open/respond), a save issue (selection doesn't persist to p2p_profiles.app_language), or a rendering issue (saves fine but i18next isn't actually switching displayed strings). Report which one it is, then fix. Confirm with a real test: switch to a non-default language, reload the app, confirm UI strings actually changed language.
+
+Report back the specific root cause found for each of the three bugs above before considering any of them closed.
+Prompt 2 — Highlights, built properly (this is a real feature, not a bug fix)
+Build real text-highlighting during lesson reading, similar to YouVersion's highlight feature — this doesn't exist yet in working form, build it from scratch.
+
+1. New table p2p_highlights: id, user_id, lesson_id, section_id (nullable — which specific p2p_lesson_sections row, if the highlight is from teaching text, vs. null if from a memory verse), highlighted_text (the actual selected text), color (optional, default one color is fine for v1), created_at.
+2. In the lesson reader, allow the user to select/highlight a portion of the teaching text or memory verse (use whatever text-selection API the framework provides — e.g. long-press to select, then a "Highlight" action appears). On confirming, save a p2p_highlights row with the exact selected text and its source lesson/section.
+3. Once highlighted, that text should render with a visible highlight background color persistently in the lesson (not just during the selection moment) whenever that lesson is reopened.
+4. Build a "Highlights" screen in Profile: a chronological list of every highlight the user has made, each showing the highlighted text, which lesson it came from (tappable to jump back to that lesson), and the date.
+5. This is distinct from the earlier-planned "verse highlighting" on memory verse cards specifically (p2p_verse_highlights, if that was ever built separately) — check if that table exists; if so, either merge it into this new p2p_highlights table (preferred, one system not two) or clearly explain why they should stay separate.
+
+Test end-to-end: highlight a sentence in a real lesson's teaching text, confirm it appears highlighted when reopening that lesson, and confirm it shows correctly in the Profile Highlights list with a working link back to the source lesson.
+Prompt 3 — Expanded skills, dropdown-based
+Expand the registration/profile skills selection beyond the original 6 ministry-focused gift categories to include broader professional/hobby skills, using a searchable dropdown/multi-select rather than a flat checklist (since this list will be long).
+
+1. Add a new, separate skills taxonomy (distinct from the existing p2p_gift_categories/p2p_gift_skills ministry-gift system — this is broader: professional trades, sports, arts, etc.) — new tables p2p_skill_categories and p2p_skills, or extend the existing gift_skills table with a new category type if that's architecturally cleaner (your call, tell me which you chose).
+2. Seed categories/examples across areas like: Sports & Athletics (Footballer, Basketball, Athletics Coach), Music & Arts (Musician, Instrumentalist — specify instrument, Singer, Visual Artist), Professional/Trade (list common professions — Tech, Healthcare, Education, Finance, Trades/Construction, Legal, etc.), and keep this extensible so more can be added later via the admin panel, not hardcoded permanently in app code.
+3. UI: a searchable, multi-select dropdown (type to filter, tap to select multiple) in Profile and during registration — not a long flat scrolling checklist.
+4. Selected skills display as pills on the user's profile, same visual pattern as the existing gifts pills.
+5. This should feed the same "Servant in: / Called in:" profile badge and the Kingdom Service Network search, alongside the ministry gifts, not replace them — a user can have both ministry gifts (Tech & Digital, Care & Wellness, etc.) and specific skills (Footballer, Guitarist) simultaneously.
+
+Report back the final category/skill list you seeded, and confirm the dropdown search/multi-select works with a real test covering at least one skill from each category type.

@@ -14,10 +14,26 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
+import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { HelpButton } from "@/components/HelpButton";
+import { Avatar } from "@/components/Avatar";
+import SkillsMultiSelect from "@/components/SkillsMultiSelect";
+import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
+import "@/lib/i18n";
+
+const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
+  { key: "teaching", label: "Teaching", icon: "school" },
+  { key: "evangelism", label: "Evangelism", icon: "megaphone" },
+  { key: "mercy", label: "Mercy", icon: "heart" },
+  { key: "leadership", label: "Leadership", icon: "trending-up" },
+  { key: "intercession", label: "Intercession", icon: "radio" },
+  { key: "hospitality", label: "Hospitality", icon: "home" },
+  { key: "giving", label: "Giving", icon: "gift" },
+  { key: "prophecy", label: "Prophecy", icon: "eye" },
+];
 
 const STRUGGLE_CATEGORIES = [
   { value: "addiction", label: "Addiction" },
@@ -41,24 +57,48 @@ const GIFT_LABELS: Record<string, string> = {
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
 
 const PROFILE_ROWS = [
-  { key: "messages", label: "Messages", icon: "chatbubbles-outline" as const, route: "/messages" as const },
-  { key: "peers", label: "Peers", icon: "people-outline" as const, route: "/connect" as const },
-  { key: "groups", label: "Peer Groups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
-  { key: "notes", label: "Notes", icon: "document-text-outline" as const, route: "/notes" as const },
-  { key: "highlights", label: "Highlights", icon: "bookmark-outline" as const, route: "/highlights" as const },
+  { key: "messages", labelKey: "profile.messages", icon: "chatbubbles-outline" as const, route: "/messages" as const },
+  { key: "peers", labelKey: "profile.peers", icon: "people-outline" as const, route: "/connect" as const },
+  { key: "groups", labelKey: "profile.peerGroups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
+  { key: "notes", labelKey: "profile.notes", icon: "document-text-outline" as const, route: "/notes" as const },
+  { key: "highlights", labelKey: "profile.highlights", icon: "bookmark-outline" as const, route: "/highlights" as const },
 ];
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, updateProfile } = useAuth();
   const { submitHelpRequest } = useData();
+  const { t } = useTranslation();
 
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const [giftsOpen, setGiftsOpen] = useState(false);
+  const [selectedGifts, setSelectedGifts] = useState<SpiritualGift[]>([]);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [savingGifts, setSavingGifts] = useState(false);
+
+  function openGiftsModal() {
+    setSelectedGifts((profile?.gifts as SpiritualGift[] | undefined) ?? []);
+    setGiftsOpen(true);
+  }
+
+  function toggleGift(gift: SpiritualGift) {
+    setSelectedGifts((prev) =>
+      prev.includes(gift) ? prev.filter((g) => g !== gift) : [...prev, gift]
+    );
+  }
+
+  async function handleSaveGifts() {
+    setSavingGifts(true);
+    const err = await updateProfile({ gifts: selectedGifts });
+    setSavingGifts(false);
+    if (!err) setGiftsOpen(false);
+  }
 
   async function handleSignOut() {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -88,7 +128,7 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <Text style={styles.headerTitle}>{t("profile.title")}</Text>
       </View>
 
       <ScrollView
@@ -97,11 +137,7 @@ export default function ProfileScreen() {
       >
         {/* Avatar & Name */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>
-              {profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
-            </Text>
-          </View>
+          <Avatar photoUrl={profile?.avatarUrl} name={profile?.displayName} size={80} borderWidth={3} style={styles.avatarCircle} />
           <View style={styles.nameRow}>
             <Text style={styles.displayName}>{profile?.displayName ?? "Anonymous"}</Text>
             <HelpButton variant="inline" />
@@ -109,8 +145,16 @@ export default function ProfileScreen() {
           <Text style={styles.email}>{profile?.email ?? ""}</Text>
 
           <View style={styles.locationRow}>
-            {profile?.role && <Text style={styles.locationText}>Called in: {profile.role.replace(/_/g, " ")}</Text>}
+            {profile?.role && <Text style={styles.locationText}>{t("profile.calledIn")}: {profile.role.replace(/_/g, " ")}</Text>}
           </View>
+          {(profile?.skills?.length ?? 0) > 0 && (
+            <View style={styles.locationRow}>
+              <Text style={styles.locationText}>
+                Serving in: {profile!.skills.slice(0, 2).map(skillLabel).join(", ")}
+                {profile!.skills.length > 2 ? ` +${profile!.skills.length - 2}` : ""}
+              </Text>
+            </View>
+          )}
           {(profile?.city || profile?.country) && (
             <View style={styles.locationRow}>
               {profile?.city && <Text style={styles.locationText}>{profile.city}</Text>}
@@ -125,17 +169,17 @@ export default function ProfileScreen() {
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{profile?.growthLevel ?? 0}</Text>
-            <Text style={styles.statLabel}>Growth Level</Text>
+            <Text style={styles.statLabel}>{t("profile.growthLevel")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{profile?.gifts?.length ?? 0}</Text>
-            <Text style={styles.statLabel}>Gifts</Text>
+            <Text style={styles.statLabel}>{t("profile.gifts")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{profile?.servantScore ?? 0}</Text>
-            <Text style={styles.statLabel}>Servant Score</Text>
+            <Text style={styles.statLabel}>{t("profile.servantScore")}</Text>
           </View>
         </View>
 
@@ -149,23 +193,37 @@ export default function ProfileScreen() {
               onPress={() => router.push(row.route)}
             >
               <Ionicons name={row.icon} size={20} color={colors.accentGreen} />
-              <Text style={styles.fullRowLabel}>{row.label}</Text>
+              <Text style={styles.fullRowLabel}>{t(row.labelKey)}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Spiritual Gifts */}
-        <Text style={styles.sectionTitle}>Spiritual Gifts</Text>
+        <Text style={styles.sectionTitle}>{t("profile.spiritualGifts")}</Text>
         <View style={styles.giftsRow}>
           {(profile?.gifts ?? []).map((gift) => (
             <View key={gift} style={styles.giftChip}>
               <Text style={styles.giftChipText}>{GIFT_LABELS[gift] ?? gift}</Text>
             </View>
           ))}
-          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8} onPress={openGiftsModal}>
             <Ionicons name="add" size={14} color={colors.accentGreen} />
-            <Text style={styles.addGiftChipText}>Add</Text>
+            <Text style={styles.addGiftChipText}>{t("profile.add")}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Skills */}
+        <Text style={styles.sectionTitle}>Skills</Text>
+        <View style={styles.giftsRow}>
+          {(profile?.skills ?? []).map((skill) => (
+            <View key={skill} style={styles.giftChip}>
+              <Text style={styles.giftChipText}>{skillLabel(skill)}</Text>
+            </View>
+          ))}
+          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8} onPress={() => setSkillsOpen(true)}>
+            <Ionicons name="add" size={14} color={colors.accentGreen} />
+            <Text style={styles.addGiftChipText}>{t("profile.add")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -174,7 +232,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
             <Ionicons name="compass-outline" size={18} color={colors.primaryGreen} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.dashboardTitle}>Peer Guide Dashboard</Text>
+              <Text style={styles.dashboardTitle}>{t("profile.peerGuideDashboard")}</Text>
               <Text style={styles.dashboardSub}>Manage the disciples and groups you lead</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
@@ -186,7 +244,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/team")}>
             <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryGreen} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
+              <Text style={styles.dashboardTitle}>{t("profile.adminDashboard")}</Text>
               <Text style={styles.dashboardSub}>Curriculum, registrations, help requests & team</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
@@ -194,13 +252,13 @@ export default function ProfileScreen() {
         )}
 
         {/* Settings */}
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle}>{t("profile.account")}</Text>
         <View style={styles.settingsList}>
           {[
-            { icon: "create-outline", label: "Edit Profile" },
-            { icon: "notifications-outline", label: "Notifications" },
-            { icon: "language-outline", label: "Language" },
-            { icon: "shield-outline", label: "Privacy" },
+            { icon: "create-outline", label: t("profile.editProfile") },
+            { icon: "notifications-outline", label: t("profile.notifications") },
+            { icon: "language-outline", label: t("profile.language") },
+            { icon: "shield-outline", label: t("profile.privacy") },
           ].map((item) => (
             <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push("/settings")}>
               <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
@@ -210,11 +268,11 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Support</Text>
+        <Text style={styles.sectionTitle}>{t("profile.support")}</Text>
         <TouchableOpacity style={styles.reachOutBtn} onPress={openReachOut} activeOpacity={0.85}>
           <Ionicons name="hand-left-outline" size={18} color={colors.accentGreen} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.reachOutTitle}>I'm struggling</Text>
+            <Text style={styles.reachOutTitle}>{t("profile.imStruggling")}</Text>
             <Text style={styles.reachOutSub}>Reach out privately for support and follow-up</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
@@ -222,7 +280,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.85}>
           <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.signOutText}>{t("profile.signOut")}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -284,6 +342,63 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={giftsOpen} animationType="slide" transparent onRequestClose={() => setGiftsOpen(false)}>
+        <View style={styles.overlay}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{t("profile.spiritualGifts")}</Text>
+              <TouchableOpacity onPress={() => setGiftsOpen(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.textMid} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.sheetBody}>
+                Select the gifts you believe God has given you.
+              </Text>
+              <View style={styles.giftGrid}>
+                {ALL_GIFTS.map((gift) => {
+                  const selected = selectedGifts.includes(gift.key);
+                  return (
+                    <TouchableOpacity
+                      key={gift.key}
+                      style={[styles.giftCard, selected && styles.giftCardSelected]}
+                      onPress={() => toggleGift(gift.key)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={gift.icon as any}
+                        size={22}
+                        color={selected ? "#fff" : colors.accentGreen}
+                      />
+                      <Text style={[styles.giftCardLabel, selected && styles.giftCardLabelSelected]}>
+                        {gift.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TouchableOpacity style={styles.submitReachOutBtn} onPress={handleSaveGifts} disabled={savingGifts}>
+                {savingGifts ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.submitReachOutText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <SkillsMultiSelect
+        visible={skillsOpen}
+        initialSelected={profile?.skills ?? []}
+        onClose={() => setSkillsOpen(false)}
+        onSave={async (selected) => {
+          await updateProfile({ skills: selected });
+          setSkillsOpen(false);
+        }}
+      />
     </View>
   );
 }
@@ -317,6 +432,15 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: "rgba(29,158,117,0.15)", borderColor: colors.accentGreen },
   categoryChipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   categoryChipTextActive: { color: colors.accentGreen, fontWeight: "600" },
+  giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 8 },
+  giftCard: {
+    width: "47%", flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(29,158,117,0.06)", borderRadius: 12,
+    borderWidth: 1, borderColor: colors.borderBeige, padding: 12,
+  },
+  giftCardSelected: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
+  giftCardLabel: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
+  giftCardLabelSelected: { color: "#fff" },
   noteInput: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
     borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: "top",

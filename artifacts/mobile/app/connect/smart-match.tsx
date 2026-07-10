@@ -4,6 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, DiscoverablePeer } from "@/contexts/DataContext";
+import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 
 export default function SmartMatch() {
@@ -36,9 +37,7 @@ export default function SmartMatch() {
           <ActivityIndicator style={{ marginTop: 40 }} color={colors.primaryGreen} />
         ) : match ? (
           <View style={styles.card}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{match.fullName.charAt(0).toUpperCase()}</Text>
-            </View>
+            <Avatar photoUrl={match.photoUrl} name={match.fullName} size={72} style={styles.avatar} />
             <Text style={styles.name}>{match.fullName}</Text>
             <Text style={styles.meta}>{match.country || "Country not set"} · {match.role}</Text>
             {match.gifts.length > 0 && (

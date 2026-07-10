@@ -50,6 +50,7 @@ export interface UserProfile {
   growthLevel: number;
   role: DiscipleRole;
   gifts: SpiritualGift[];
+  skills: string[];
   mentorId?: string;
   isPraying: boolean;
   createdAt: string;
@@ -94,6 +95,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     growthLevel: (row.growth_level as number) ?? 0,
     role: ((row.role as string) ?? "student") as DiscipleRole,
     gifts: ((row.gifts as string[]) ?? []) as SpiritualGift[],
+    skills: (row.skills as string[]) ?? [],
     mentorId: row.mentor_id as string | undefined,
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
@@ -191,6 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.displayName !== undefined) dbUpdates.full_name = updates.displayName;
     if (updates.country !== undefined) dbUpdates.country = updates.country;
     if (updates.gifts !== undefined) dbUpdates.gifts = updates.gifts;
+    if (updates.skills !== undefined) dbUpdates.skills = updates.skills;
     if (updates.role !== undefined) dbUpdates.role = updates.role;
     if (updates.growthLevel !== undefined) dbUpdates.growth_level = updates.growthLevel;
     if (updates.isPraying !== undefined) dbUpdates.is_praying = updates.isPraying;

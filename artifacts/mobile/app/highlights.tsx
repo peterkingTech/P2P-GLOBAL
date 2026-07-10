@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, UserHighlight } from "@/contexts/DataContext";
@@ -8,6 +8,7 @@ import colors from "@/constants/colors";
 
 export default function Highlights() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { getMyHighlights, addHighlight, deleteHighlight } = useData();
   const [items, setItems] = useState<UserHighlight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,16 +54,23 @@ export default function Highlights() {
               </View>
             }
             renderItem={({ item }) => (
-              <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={item.lessonId ? 0.7 : 1}
+                onPress={() => item.lessonId && router.push({ pathname: "/lesson/[id]", params: { id: item.lessonId } })}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.reference}>{item.reference}</Text>
+                  <View style={styles.refRow}>
+                    {!!item.lessonId && <Ionicons name="bookmark" size={12} color={colors.accentGreen} style={{ marginRight: 4 }} />}
+                    <Text style={styles.reference}>{item.lessonTitle ?? item.reference}</Text>
+                  </View>
                   {!!item.quote && <Text style={styles.quote}>"{item.quote}"</Text>}
                   <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
                 </View>
                 <TouchableOpacity onPress={async () => { await deleteHighlight(item.id); load(); }}>
                   <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             )}
           />
         )}
@@ -96,6 +104,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", gap: 10, backgroundColor: colors.card, borderRadius: 14,
     borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 10,
   },
+  refRow: { flexDirection: "row", alignItems: "center" },
   reference: { fontSize: 14, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   quote: { fontSize: 13, color: colors.textMid, marginTop: 4, fontStyle: "italic", fontFamily: "Inter_400Regular", lineHeight: 18 },
   date: { fontSize: 11, color: colors.textMuted, marginTop: 6, fontFamily: "Inter_400Regular" },

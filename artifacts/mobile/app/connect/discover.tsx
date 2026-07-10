@@ -5,6 +5,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, DiscoverablePeer } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { Avatar } from "@/components/Avatar";
+import SkillsMultiSelect from "@/components/SkillsMultiSelect";
+import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
 
 export default function Discover() {
@@ -17,6 +20,8 @@ export default function Discover() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [messaging, setMessaging] = useState<string | null>(null);
+  const [skillFilter, setSkillFilter] = useState<string[]>([]);
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
 
   async function handleMessage(peer: DiscoverablePeer) {
     setMessaging(peer.id);
@@ -35,13 +40,13 @@ export default function Discover() {
     }
   }
 
-  const load = useCallback(async (q?: string) => {
+  const load = useCallback(async (q?: string, skills?: string[]) => {
     setLoading(true);
-    setPeers(await getDiscoverablePeers(q));
+    setPeers(await getDiscoverablePeers(q, skills));
     setLoading(false);
   }, [getDiscoverablePeers]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(search, skillFilter); }, [skillFilter, load]);
 
   return (
     <>
@@ -55,10 +60,34 @@ export default function Discover() {
             placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
-            onSubmitEditing={() => load(search)}
+            onSubmitEditing={() => load(search, skillFilter)}
             returnKeyType="search"
           />
         </View>
+
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={styles.skillFilterBtn} onPress={() => setSkillPickerOpen(true)}>
+            <Ionicons name="options-outline" size={14} color={colors.accentGreen} />
+            <Text style={styles.skillFilterBtnText}>
+              {skillFilter.length > 0 ? `Skills (${skillFilter.length})` : "Filter by skill"}
+            </Text>
+          </TouchableOpacity>
+          {skillFilter.length > 0 && (
+            <TouchableOpacity onPress={() => setSkillFilter([])}>
+              <Text style={styles.clearFilterText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {skillFilter.length > 0 && (
+          <View style={styles.chipsWrap}>
+            {skillFilter.map((s) => (
+              <View key={s} style={styles.skillChip}>
+                <Text style={styles.skillChipText}>{skillLabel(s)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} color={colors.primaryGreen} />
         ) : (
@@ -74,10 +103,15 @@ export default function Discover() {
             }
             renderItem={({ item }) => (
               <View style={[styles.row, item.id === highlight && styles.rowHighlight]}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text></View>
+                <Avatar photoUrl={item.photoUrl} name={item.fullName} size={44} style={styles.avatar} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{item.fullName}</Text>
                   <Text style={styles.meta}>{item.country || "Unknown location"} · {item.role}</Text>
+                  {item.skills.length > 0 && (
+                    <Text style={styles.skillsMeta} numberOfLines={1}>
+                      {item.skills.slice(0, 3).map(skillLabel).join(", ")}
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity style={styles.msgBtn} onPress={() => handleMessage(item)} disabled={messaging === item.id}>
                   {messaging === item.id ? (
@@ -91,6 +125,16 @@ export default function Discover() {
           />
         )}
       </View>
+
+      <SkillsMultiSelect
+        visible={skillPickerOpen}
+        initialSelected={skillFilter}
+        onClose={() => setSkillPickerOpen(false)}
+        onSave={(selected) => {
+          setSkillFilter(selected);
+          setSkillPickerOpen(false);
+        }}
+      />
     </>
   );
 }
@@ -103,6 +147,21 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, margin: 20, marginBottom: 0,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
+  filterRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginHorizontal: 20, marginTop: 10,
+  },
+  skillFilterBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  skillFilterBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  clearFilterText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginHorizontal: 20, marginTop: 8 },
+  skillChip: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  skillChipText: { fontSize: 11, color: colors.textDark, fontFamily: "Inter_500Medium" },
+  skillsMeta: { fontSize: 11, color: colors.accentGreen, marginTop: 2, fontFamily: "Inter_500Medium" },
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige,

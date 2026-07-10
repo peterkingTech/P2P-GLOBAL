@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData, GroupMember, DiscoverablePeer, PeerGroup } from "@/contexts/DataContext";
+import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 
 export default function GroupDetail() {
@@ -86,7 +87,7 @@ export default function GroupDetail() {
               contentContainerStyle={{ padding: 20, paddingTop: 4, paddingBottom: insets.bottom + 60 }}
               renderItem={({ item }) => (
                 <View style={styles.card}>
-                  <View style={styles.avatar}><Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text></View>
+                  <Avatar photoUrl={item.photoUrl} name={item.fullName} size={40} style={styles.avatar} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name}>{item.fullName}</Text>
                     <Text style={styles.meta}>{item.role}</Text>
@@ -143,7 +144,7 @@ export default function GroupDetail() {
                 const already = memberIds.has(item.id);
                 return (
                   <View style={styles.card}>
-                    <View style={styles.avatar}><Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text></View>
+                    <Avatar photoUrl={item.photoUrl} name={item.fullName} size={40} style={styles.avatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{item.fullName}</Text>
                       <Text style={styles.meta}>{item.country || "Unknown location"} · {item.role}</Text>

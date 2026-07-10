@@ -19,6 +19,7 @@ import {
   Assignment,
   QuestionSubmission,
   SubmissionType,
+  UserHighlight,
 } from "@/contexts/DataContext";
 import AudioRecorder from "@/components/AudioRecorder";
 import VideoRecorder from "@/components/VideoRecorder";
@@ -256,6 +257,52 @@ const qStyles = StyleSheet.create({
   submitBtnText: { color: colors.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });
 
+// ── Tappable highlightable paragraph ──────────────────────────────────────────
+function splitSentences(text: string): { text: string; start: number; end: number }[] {
+  const parts: { text: string; start: number; end: number }[] = [];
+  const regex = /[^.!?]+[.!?]*\s*/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match[0].trim().length === 0) continue;
+    parts.push({ text: match[0], start: match.index, end: match.index + match[0].length });
+  }
+  return parts.length > 0 ? parts : [{ text, start: 0, end: text.length }];
+}
+
+function HighlightableParagraph({
+  sectionId,
+  lessonId,
+  content,
+  highlights,
+  onToggle,
+}: {
+  sectionId: string;
+  lessonId: string;
+  content: string;
+  highlights: UserHighlight[];
+  onToggle: (params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) => void;
+}) {
+  const sentences = splitSentences(content);
+  return (
+    <Text style={styles.bodyPara}>
+      {sentences.map((s, idx) => {
+        const isHighlighted = highlights.some(
+          (h) => h.sectionId === sectionId && h.startOffset === s.start && h.endOffset === s.end
+        );
+        return (
+          <Text
+            key={idx}
+            onPress={() => onToggle({ sectionId, lessonId, text: s.text.trim(), start: s.start, end: s.end })}
+            style={isHighlighted ? styles.sentenceHighlighted : undefined}
+          >
+            {s.text}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -265,6 +312,7 @@ export default function LessonScreen() {
     lessons, markLessonComplete,
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
     getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
+    getHighlightsForLesson, addSectionHighlight, deleteHighlight,
   } = useData();
 
   const [content, setContent] = useState<LessonContent | null>(null);
@@ -274,6 +322,35 @@ export default function LessonScreen() {
   const [assignmentQuestions, setAssignmentQuestions] = useState<{ id: string; question: string }[]>([]);
   const [questionSubs, setQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
   const [assignmentQuestionSubs, setAssignmentQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
+  const [highlights, setHighlights] = useState<UserHighlight[]>([]);
+
+  const loadHighlights = useCallback(async () => {
+    if (!id) return;
+    setHighlights(await getHighlightsForLesson(id));
+  }, [id, getHighlightsForLesson]);
+
+  useEffect(() => { loadHighlights(); }, [loadHighlights]);
+
+  async function handleToggleHighlight(params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) {
+    const existing = highlights.find(
+      (h) => h.sectionId === params.sectionId && h.startOffset === params.start && h.endOffset === params.end
+    );
+    Haptics.selectionAsync();
+    if (existing) {
+      setHighlights((prev) => prev.filter((h) => h.id !== existing.id));
+      await deleteHighlight(existing.id);
+    } else {
+      const err = await addSectionHighlight({
+        lessonId: params.lessonId,
+        sectionId: params.sectionId,
+        reference: content?.title ?? "Lesson",
+        quote: params.text,
+        startOffset: params.start,
+        endOffset: params.end,
+      });
+      if (!err) loadHighlights();
+    }
+  }
 
   const lessonMeta = lessons.find((l) => l.id === id);
   const completed = lessonMeta?.isCompleted ?? false;
@@ -375,7 +452,14 @@ export default function LessonScreen() {
             <View key={section.id}>
               {section.title ? <Text style={styles.sectionHeading}>{section.title}</Text> : null}
               {section.content.split("\n\n").map((para, idx) => (
-                <Text key={idx} style={styles.bodyPara}>{para}</Text>
+                <HighlightableParagraph
+                  key={idx}
+                  sectionId={section.id}
+                  lessonId={id ?? ""}
+                  content={para}
+                  highlights={highlights}
+                  onToggle={handleToggleHighlight}
+                />
               ))}
             </View>
           ))}
@@ -471,6 +555,7 @@ const styles = StyleSheet.create({
   verseRef: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
   sectionHeading: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4 },
   bodyPara: { fontSize: 15, color: colors.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 16 },
+  sentenceHighlighted: { backgroundColor: "rgba(250,204,21,0.45)" },
   questionsCard: {
     backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
     padding: 16, marginBottom: 28, marginTop: 8,

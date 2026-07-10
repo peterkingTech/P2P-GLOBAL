@@ -1,0 +1,43 @@
+{
+  "tabs": {
+    "home": "الرئيسية",
+    "learn": "تعلّم",
+    "prayer": "صلاة",
+    "discover": "اكتشف",
+    "missions": "الإرساليات"
+  },
+  "profile": {
+    "title": "ملفي الشخصي",
+    "messages": "الرسائل",
+    "peers": "الأقران",
+    "peerGroups": "مجموعات الدراسة",
+    "notes": "الملاحظات",
+    "highlights": "التمييزات",
+    "growthLevel": "مستوى النمو",
+    "gifts": "المواهب",
+    "servantScore": "نقاط الخدمة",
+    "spiritualGifts": "المواهب الروحية",
+    "add": "إضافة",
+    "peerGuideDashboard": "لوحة قائد الأقران",
+    "peerGuideDashboardSub": "إدارة التلاميذ والمجموعات التي تقودها",
+    "adminDashboard": "لوحة الإدارة",
+    "adminDashboardSub": "المناهج والتسجيلات وطلبات المساعدة والفريق",
+    "account": "الحساب",
+    "editProfile": "تعديل الملف الشخصي",
+    "notifications": "الإشعارات",
+    "language": "اللغة",
+    "privacy": "الخصوصية",
+    "support": "الدعم",
+    "imStruggling": "أنا أعاني",
+    "reachOutSub": "تواصل بشكل خاص للحصول على الدعم والمتابعة",
+    "signOut": "تسجيل الخروج",
+    "calledIn": "مدعو في"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "appLanguage": "لغة التطبيق",
+    "contentLanguage": "لغة دراسة الكتاب المقدس",
+    "save": "حفظ",
+    "cancel": "إلغاء"
+  }
+}

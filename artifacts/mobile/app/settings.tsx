@@ -17,8 +17,10 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import "@/lib/i18n";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, updateProfile, supabase, user } = useAuth();
+  const { t } = useTranslation();
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
@@ -147,7 +150,7 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t("settings.title")}</Text>
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
@@ -234,17 +237,17 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <Text style={styles.sectionTitle}>Language</Text>
+        <Text style={styles.sectionTitle}>{t("profile.language")}</Text>
         <View style={styles.card}>
           <TouchableOpacity style={styles.linkRow} onPress={() => setLangPickerOpen("app")}>
-            <Text style={styles.fieldLabel}>App language</Text>
+            <Text style={styles.fieldLabel}>{t("settings.appLanguage")}</Text>
             <View style={styles.linkRowRight}>
               <Text style={styles.linkRowValue}>{LANGUAGES.find((l) => l.code === profile?.appLanguage)?.label ?? "English"}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </View>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.linkRow, styles.linkRowLast]} onPress={() => setLangPickerOpen("content")}>
-            <Text style={styles.fieldLabel}>Bible study language</Text>
+            <Text style={styles.fieldLabel}>{t("settings.contentLanguage")}</Text>
             <View style={styles.linkRowRight}>
               <Text style={styles.linkRowValue}>{LANGUAGES.find((l) => l.code === profile?.contentLanguage)?.label ?? "English"}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />

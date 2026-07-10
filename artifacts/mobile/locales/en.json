@@ -1,0 +1,43 @@
+{
+  "tabs": {
+    "home": "Home",
+    "learn": "Learn",
+    "prayer": "Prayer",
+    "discover": "Discover",
+    "missions": "Missions"
+  },
+  "profile": {
+    "title": "My Profile",
+    "messages": "Messages",
+    "peers": "Peers",
+    "peerGroups": "Peer Groups",
+    "notes": "Notes",
+    "highlights": "Highlights",
+    "growthLevel": "Growth Level",
+    "gifts": "Gifts",
+    "servantScore": "Servant Score",
+    "spiritualGifts": "Spiritual Gifts",
+    "add": "Add",
+    "peerGuideDashboard": "Peer Guide Dashboard",
+    "peerGuideDashboardSub": "Manage the disciples and groups you lead",
+    "adminDashboard": "Admin Dashboard",
+    "adminDashboardSub": "Curriculum, registrations, help requests & team",
+    "account": "Account",
+    "editProfile": "Edit Profile",
+    "notifications": "Notifications",
+    "language": "Language",
+    "privacy": "Privacy",
+    "support": "Support",
+    "imStruggling": "I'm struggling",
+    "reachOutSub": "Reach out privately for support and follow-up",
+    "signOut": "Sign Out",
+    "calledIn": "Called in"
+  },
+  "settings": {
+    "title": "Settings",
+    "appLanguage": "App language",
+    "contentLanguage": "Bible study language",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}

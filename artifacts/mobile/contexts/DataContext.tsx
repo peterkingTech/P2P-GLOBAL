@@ -136,6 +136,8 @@ export interface DiscoverablePeer {
   country: string | null;
   role: string;
   gifts: string[];
+  skills: string[];
+  photoUrl: string | null;
 }
 
 export interface PeerGroup {
@@ -152,6 +154,7 @@ export interface GroupMember {
   userId: string;
   fullName: string;
   role: string;
+  photoUrl: string | null;
 }
 
 export interface UserNote {
@@ -166,6 +169,12 @@ export interface UserHighlight {
   reference: string;
   quote: string | null;
   createdAt: string;
+  lessonId?: string | null;
+  lessonTitle?: string | null;
+  sectionId?: string | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  color?: string;
 }
 
 export interface StudySession {
@@ -323,7 +332,7 @@ interface DataContextValue {
   getAllProfiles: () => Promise<TeamProfile[]>;
   getCrisisResponderIds: () => Promise<string[]>;
   setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
-  getDiscoverablePeers: (search?: string) => Promise<DiscoverablePeer[]>;
+  getDiscoverablePeers: (search?: string, skillKeys?: string[]) => Promise<DiscoverablePeer[]>;
   getSmartMatch: () => Promise<DiscoverablePeer | null>;
   getGroups: () => Promise<PeerGroup[]>;
   joinGroup: (groupId: string) => Promise<string | null>;
@@ -338,6 +347,11 @@ interface DataContextValue {
   getMyHighlights: () => Promise<UserHighlight[]>;
   addHighlight: (reference: string, quote: string | null) => Promise<string | null>;
   deleteHighlight: (id: string) => Promise<string | null>;
+  getHighlightsForLesson: (lessonId: string) => Promise<UserHighlight[]>;
+  addSectionHighlight: (params: {
+    lessonId: string; sectionId: string; reference: string; quote: string;
+    startOffset: number; endOffset: number; color?: string;
+  }) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
@@ -1161,21 +1175,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const getDiscoverablePeers = useCallback(async (search?: string): Promise<DiscoverablePeer[]> => {
+  const getDiscoverablePeers = useCallback(async (search?: string, skillKeys?: string[]): Promise<DiscoverablePeer[]> => {
     if (!profile) return [];
     try {
       let query = supabase
         .from("p2p_profiles")
-        .select("id, full_name, country, role, gifts")
+        .select("id, full_name, country, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .order("full_name", { ascending: true })
         .limit(50);
       if (search && search.trim()) query = query.ilike("full_name", `%${search.trim()}%`);
+      if (skillKeys && skillKeys.length > 0) query = query.overlaps("skills", skillKeys);
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((p: any) => ({
         id: p.id, fullName: p.full_name || "Unnamed",
         country: p.country, role: p.role, gifts: p.gifts || [],
+        skills: p.skills || [],
+        photoUrl: p.photo_url || null,
       }));
     } catch (e) {
       console.error("getDiscoverablePeers failed", e);
@@ -1187,9 +1204,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (!profile) return null;
     try {
       const myGifts: string[] = profile.gifts || [];
+      const mySkills: string[] = profile.skills || [];
       const { data, error } = await supabase
         .from("p2p_profiles")
-        .select("id, full_name, country, role, gifts")
+        .select("id, full_name, country, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .limit(200);
       if (error) throw error;
@@ -1199,13 +1217,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       let bestScore = -1;
       for (const c of candidates) {
         const gifts: string[] = c.gifts || [];
+        const skills: string[] = c.skills || [];
         let score = gifts.filter((g) => myGifts.includes(g)).length * 2;
+        score += skills.filter((s) => mySkills.includes(s)).length * 2;
         if (c.country && c.country === profile.country) score += 1;
         if (score > bestScore) { bestScore = score; best = c; }
       }
       return {
         id: best.id, fullName: best.full_name || "Unnamed",
         country: best.country, role: best.role, gifts: best.gifts || [],
+        skills: best.skills || [],
+        photoUrl: best.photo_url || null,
       };
     } catch (e) {
       console.error("getSmartMatch failed", e);
@@ -1293,7 +1315,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (userIds.length === 0) return [];
       const { data: profileRows, error: profErr } = await supabase
         .from("p2p_profiles")
-        .select("id, full_name, role")
+        .select("id, full_name, role, photo_url")
         .in("id", userIds);
       if (profErr) throw profErr;
       const profileMap = new Map((profileRows || []).map((p: any) => [p.id, p]));
@@ -1301,6 +1323,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         userId: uid,
         fullName: profileMap.get(uid)?.full_name || "Unnamed",
         role: profileMap.get(uid)?.role || "student",
+        photoUrl: profileMap.get(uid)?.photo_url || null,
       }));
     } catch (e) {
       console.error("getGroupMembers failed", e);
@@ -1375,11 +1398,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from("p2p_user_highlights")
-        .select("id, reference, quote, created_at")
+        .select("id, reference, quote, created_at, lesson_id, section_id, start_offset, end_offset, color")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []).map((h: any) => ({ id: h.id, reference: h.reference, quote: h.quote, createdAt: h.created_at }));
+      const rows = (data || []) as any[];
+      const lessonIds = Array.from(new Set(rows.map((h) => h.lesson_id).filter(Boolean)));
+      let titleMap = new Map<string, string>();
+      if (lessonIds.length > 0) {
+        const { data: lessonsData } = await supabase.from("p2p_lessons").select("id, title").in("id", lessonIds);
+        titleMap = new Map((lessonsData || []).map((l: any) => [l.id, l.title]));
+      }
+      return rows.map((h) => ({
+        id: h.id,
+        reference: h.reference,
+        quote: h.quote,
+        createdAt: h.created_at,
+        lessonId: h.lesson_id,
+        lessonTitle: h.lesson_id ? titleMap.get(h.lesson_id) ?? null : null,
+        sectionId: h.section_id,
+        startOffset: h.start_offset,
+        endOffset: h.end_offset,
+        color: h.color ?? "yellow",
+      }));
     } catch (e) {
       console.error("getMyHighlights failed", e);
       return [];
@@ -1407,6 +1448,50 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e: any) {
       console.error("deleteHighlight failed", e);
       return e?.message || "Could not delete highlight";
+    }
+  }, [profile]);
+
+  const getHighlightsForLesson = useCallback(async (lessonId: string): Promise<UserHighlight[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_user_highlights")
+        .select("id, reference, quote, created_at, lesson_id, section_id, start_offset, end_offset, color")
+        .eq("user_id", profile.id)
+        .eq("lesson_id", lessonId);
+      if (error) throw error;
+      return (data || []).map((h: any) => ({
+        id: h.id, reference: h.reference, quote: h.quote, createdAt: h.created_at,
+        lessonId: h.lesson_id, sectionId: h.section_id, startOffset: h.start_offset,
+        endOffset: h.end_offset, color: h.color ?? "yellow",
+      }));
+    } catch (e) {
+      console.error("getHighlightsForLesson failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const addSectionHighlight = useCallback(async (params: {
+    lessonId: string; sectionId: string; reference: string; quote: string;
+    startOffset: number; endOffset: number; color?: string;
+  }): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_highlights").insert({
+        user_id: profile.id,
+        lesson_id: params.lessonId,
+        section_id: params.sectionId,
+        reference: params.reference,
+        quote: params.quote,
+        start_offset: params.startOffset,
+        end_offset: params.endOffset,
+        color: params.color ?? "yellow",
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addSectionHighlight failed", e);
+      return e?.message || "Could not save highlight";
     }
   }, [profile]);
 
@@ -1638,6 +1723,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
+      getHighlightsForLesson, addSectionHighlight,
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,

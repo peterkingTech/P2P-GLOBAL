@@ -4,31 +4,34 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import colors from "@/constants/colors";
+import "@/lib/i18n";
 
 function NativeTabLayout() {
+  const { t } = useTranslation();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
+        <Label>{t("tabs.home")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="learn">
         <Icon sf={{ default: "book", selected: "book.fill" }} />
-        <Label>Learn</Label>
+        <Label>{t("tabs.learn")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="prayer">
         <Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
-        <Label>Prayer</Label>
+        <Label>{t("tabs.prayer")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="discover">
         <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>Discover</Label>
+        <Label>{t("tabs.discover")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="missions">
         <Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
-        <Label>Missions</Label>
+        <Label>{t("tabs.missions")}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -38,13 +41,14 @@ function ClassicTabLayout() {
   const colorScheme = useColorScheme();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { t } = useTranslation();
 
   const TAB_ITEMS = [
-    { name: "index", label: "Home", icon: "home" as const, iconActive: "home" as const },
-    { name: "learn", label: "Learn", icon: "book-outline" as const, iconActive: "book" as const },
-    { name: "prayer", label: "Prayer", icon: "radio-outline" as const, iconActive: "radio" as const },
-    { name: "discover", label: "Discover", icon: "compass-outline" as const, iconActive: "compass" as const },
-    { name: "missions", label: "Missions", icon: "earth-outline" as const, iconActive: "earth" as const },
+    { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
+    { name: "learn", label: t("tabs.learn"), icon: "book-outline" as const, iconActive: "book" as const },
+    { name: "prayer", label: t("tabs.prayer"), icon: "radio-outline" as const, iconActive: "radio" as const },
+    { name: "discover", label: t("tabs.discover"), icon: "compass-outline" as const, iconActive: "compass" as const },
+    { name: "missions", label: t("tabs.missions"), icon: "earth-outline" as const, iconActive: "earth" as const },
   ];
 
   return (
