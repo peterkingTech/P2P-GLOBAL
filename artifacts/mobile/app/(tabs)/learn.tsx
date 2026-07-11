@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,23 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, Module } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
-const MODULE_PLACEHOLDER_COLORS = ["#4ADE80","#60A5FA","#F472B6","#FB923C","#A78BFA","#34D399","#FBBF24"];
-function placeholderColor(index: number) { return MODULE_PLACEHOLDER_COLORS[index % MODULE_PLACEHOLDER_COLORS.length]; }
-
-function ModuleThumbnail({ uri, index, size = 48 }: { uri?: string; index: number; size?: number }) {
-  if (uri) {
-    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: 10 }} />;
-  }
-  return (
-    <View style={{ width: size, height: size, borderRadius: 10, backgroundColor: placeholderColor(index), alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" }}>
-        L{index + 1}
-      </Text>
-    </View>
-  );
-}
-
-function ModuleCard({ module, index, onPress }: { module: Module; index: number; onPress: () => void }) {
+function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
   const isStarted = module.completedLessons > 0;
   const isComplete = pct === 100;
@@ -45,12 +28,11 @@ function ModuleCard({ module, index, onPress }: { module: Module; index: number;
       disabled={isLocked}
     >
       <View style={styles.cardLeft}>
-        <ModuleThumbnail uri={module.imageUrl} index={index} size={48} />
-        {(isComplete || isStarted) && (
-          <View style={[styles.thumbBadge, { backgroundColor: isComplete ? colors.accentGreen : colors.amber }]}>
-            <Text style={styles.thumbBadgeText}>L{module.level}</Text>
-          </View>
-        )}
+        <View style={[styles.levelBadge, { backgroundColor: isLocked ? colors.borderBeige : isComplete ? colors.accentGreen : isStarted ? colors.amber : colors.borderBeige }]}>
+          <Text style={[styles.levelText, { color: isComplete || isStarted ? colors.cream : colors.textMuted }]}>
+            L{module.level}
+          </Text>
+        </View>
       </View>
       <View style={styles.cardBody}>
         <Text style={[styles.moduleTitle, isLocked && styles.textLocked]}>{module.title}</Text>
@@ -79,15 +61,15 @@ function ModuleCard({ module, index, onPress }: { module: Module; index: number;
   );
 }
 
-const COMING_SOON_PLANS: { key: string; title: string; desc: string; imageUrl?: string }[] = [
-  { key: "1", title: "40 Days of Prayer", desc: "A guided journey through prayer disciplines." },
-  { key: "2", title: "Marriage & Family", desc: "Building godly homes together." },
-  { key: "3", title: "Faith at Work", desc: "Living out your calling in the workplace." },
-  { key: "4", title: "New Believer's Path", desc: "The first steps of following Jesus." },
-  { key: "5", title: "Spiritual Warfare", desc: "Standing firm against the enemy's schemes." },
-  { key: "6", title: "Old Testament Overview", desc: "Tracing God's story from Genesis to Malachi." },
-  { key: "7", title: "Missions & Outreach", desc: "Carrying the gospel to the nations." },
-  { key: "8", title: "Biblical Generosity", desc: "Stewardship, giving, and contentment." },
+const COMING_SOON_PLANS = [
+  { key: "1", icon: "heart-outline" as const, title: "40 Days of Prayer", desc: "A guided journey through prayer disciplines." },
+  { key: "2", icon: "people-outline" as const, title: "Marriage & Family", desc: "Building godly homes together." },
+  { key: "3", icon: "briefcase-outline" as const, title: "Faith at Work", desc: "Living out your calling in the workplace." },
+  { key: "4", icon: "leaf-outline" as const, title: "New Believer's Path", desc: "The first steps of following Jesus." },
+  { key: "5", icon: "shield-outline" as const, title: "Spiritual Warfare", desc: "Standing firm against the enemy's schemes." },
+  { key: "6", icon: "book-outline" as const, title: "Old Testament Overview", desc: "Tracing God's story from Genesis to Malachi." },
+  { key: "7", icon: "globe-outline" as const, title: "Missions & Outreach", desc: "Carrying the gospel to the nations." },
+  { key: "8", icon: "cash-outline" as const, title: "Biblical Generosity", desc: "Stewardship, giving, and contentment." },
 ];
 
 export default function LearnTab() {
@@ -167,7 +149,6 @@ export default function LearnTab() {
                 </View>
                 <ModuleCard
                   module={item}
-                  index={index}
                   onPress={() => router.push(`/module/${item.id}`)}
                 />
                 <View style={styles.milestoneLine} />
@@ -185,10 +166,12 @@ export default function LearnTab() {
           numColumns={2}
           columnWrapperStyle={{ gap: 12 }}
           contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <View style={styles.planCard}>
-              <ModuleThumbnail uri={item.imageUrl} index={index} size={48} />
-              <Text style={[styles.planTitle, { marginTop: 10 }]}>{item.title}</Text>
+              <View style={styles.planIconWrap}>
+                <Ionicons name={item.icon} size={22} color={colors.accentGreen} />
+              </View>
+              <Text style={styles.planTitle}>{item.title}</Text>
               <Text style={styles.planDesc}>{item.desc}</Text>
               <View style={styles.comingSoonPill}>
                 <Text style={styles.comingSoonText}>Coming Soon</Text>
@@ -270,12 +253,7 @@ const styles = StyleSheet.create({
   },
   cardLocked: { opacity: 0.55 },
   textLocked: { color: colors.textMuted },
-  cardLeft: { position: "relative" },
-  thumbBadge: {
-    position: "absolute", bottom: -4, right: -4,
-    borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1,
-  },
-  thumbBadgeText: { fontSize: 9, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  cardLeft: {},
   levelBadge: {
     width: 36, height: 36, borderRadius: 10,
     alignItems: "center", justifyContent: "center",

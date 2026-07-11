@@ -6,32 +6,12 @@ import {
   FlatList,
   TouchableOpacity,
   Platform,
-  Image,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
-
-const MODULE_PLACEHOLDER_COLORS = ["#4ADE80","#60A5FA","#F472B6","#FB923C","#A78BFA","#34D399","#FBBF24"];
-
-function ModuleThumbnail({ uri, index, size = 48 }: { uri?: string; index: number; size?: number }) {
-  if (uri) {
-    return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: 10 }} />;
-  }
-  return (
-    <View style={{
-      width: size, height: size, borderRadius: 10,
-      backgroundColor: MODULE_PLACEHOLDER_COLORS[index % MODULE_PLACEHOLDER_COLORS.length],
-      alignItems: "center", justifyContent: "center",
-    }}>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" }}>
-        L{index + 1}
-      </Text>
-    </View>
-  );
-}
 
 export default function CurriculumScreen() {
   const insets = useSafeAreaInsets();
@@ -57,7 +37,7 @@ export default function CurriculumScreen() {
       <FlatList
         data={modules}
         keyExtractor={(m) => m.id}
-        renderItem={({ item, index }) => {
+        renderItem={({ item }) => {
           const pct = item.lessonCount > 0 ? (item.completedLessons / item.lessonCount) * 100 : 0;
           const isLocked = item.isLocked;
           return (
@@ -68,17 +48,14 @@ export default function CurriculumScreen() {
               disabled={isLocked}
             >
               <View style={styles.currTop}>
-                <ModuleThumbnail uri={item.imageUrl} index={index} size={48} />
-                <View style={styles.currTopMeta}>
-                  <View style={[styles.levelBadge, isLocked && styles.levelBadgeLocked]}>
-                    <Text style={[styles.levelBadgeText, isLocked && styles.levelBadgeTextLocked]}>Level {item.level}</Text>
-                  </View>
-                  {isLocked ? (
-                    <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
-                  ) : (
-                    <Text style={styles.lessonCount}>{item.lessonCount} lessons</Text>
-                  )}
+                <View style={[styles.levelBadge, isLocked && styles.levelBadgeLocked]}>
+                  <Text style={[styles.levelBadgeText, isLocked && styles.levelBadgeTextLocked]}>Level {item.level}</Text>
                 </View>
+                {isLocked ? (
+                  <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
+                ) : (
+                  <Text style={styles.lessonCount}>{item.lessonCount} lessons</Text>
+                )}
               </View>
               <Text style={[styles.currTitle, isLocked && styles.textLocked]}>{item.title}</Text>
               <Text style={styles.currDesc}>{item.description}</Text>
@@ -128,8 +105,7 @@ const styles = StyleSheet.create({
     padding: 16, marginBottom: 12,
   },
   currCardLocked: { opacity: 0.55 },
-  currTop: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
-  currTopMeta: { flex: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  currTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   levelBadge: {
     backgroundColor: "rgba(29,158,117,0.12)",
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,

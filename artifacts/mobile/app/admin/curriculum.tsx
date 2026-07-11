@@ -11,11 +11,9 @@ import {
   Platform,
   useWindowDimensions,
   Modal,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
@@ -28,7 +26,7 @@ type Curriculum = {
 };
 type Module = {
   id: string; curriculum_id: string; title: string; description: string | null;
-  status: Status; sort_order: number; image_url?: string | null;
+  status: Status; sort_order: number;
 };
 type LessonStub = {
   id: string; module_id: string; title: string; subtitle: string | null;
@@ -783,8 +781,6 @@ function ModuleEditor({
   const [title, setTitle] = useState(isDefaultLang ? module.title : "");
   const [description, setDescription] = useState(isDefaultLang ? (module.description ?? "") : "");
   const [status, setStatus] = useState<Status>(module.status);
-  const [imageUrl, setImageUrl] = useState<string | null>(module.image_url ?? null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -802,43 +798,6 @@ function ModuleEditor({
     }
   }, [module.id, lang, isDefaultLang]);
 
-  async function pickAndUploadPhoto() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo library access to upload a module photo."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-    setUploadingPhoto(true);
-    try {
-      const asset = result.assets[0];
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
-      const path = `modules/${module.id}.${ext}`;
-      const response = await fetch(asset.uri);
-      const arrayBuffer = await response.arrayBuffer();
-      const { error: upErr } = await supabase.storage
-        .from("module-images")
-        .upload(path, arrayBuffer, { contentType: `image/${ext === "jpg" ? "jpeg" : ext}`, upsert: true });
-      if (upErr) { Alert.alert("Upload failed", upErr.message + "\n\nMake sure the 'module-images' storage bucket exists in Supabase with public read access."); return; }
-      const { data: urlData } = supabase.storage.from("module-images").getPublicUrl(path);
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      const { error: dbErr } = await supabase.from("p2p_modules").update({ image_url: publicUrl }).eq("id", module.id);
-      if (dbErr) { Alert.alert("Couldn't save URL", dbErr.message); return; }
-      setImageUrl(publicUrl);
-    } finally {
-      setUploadingPhoto(false);
-    }
-  }
-
-  async function removePhoto() {
-    const { error: dbErr } = await supabase.from("p2p_modules").update({ image_url: null }).eq("id", module.id);
-    if (dbErr) { Alert.alert("Error", dbErr.message); return; }
-    setImageUrl(null);
-  }
-
   async function save() {
     if (!title.trim()) { setError("Title is required."); return; }
     setSaving(true); setError(null);
@@ -851,7 +810,7 @@ function ModuleEditor({
         .select().single();
       setSaving(false);
       if (e) { setError(e.message); return; }
-      onSaved({ ...(data as Module), image_url: imageUrl });
+      onSaved(data as Module);
     } else {
       const { error: e } = await supabase.from("p2p_module_translations").upsert({
         module_id: module.id,
@@ -868,35 +827,6 @@ function ModuleEditor({
   return (
     <View style={styles.editorForm}>
       <EditorHeader icon="folder" label="Module" onDelete={onDelete} />
-
-      {isDefaultLang && (
-        <EditorField label="Module Photo">
-          <View style={styles.photoRow}>
-            {imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.photoThumb} />
-            ) : (
-              <View style={[styles.photoThumb, styles.photoThumbEmpty]}>
-                <Ionicons name="image-outline" size={22} color={colors.textMuted} />
-              </View>
-            )}
-            <View style={styles.photoActions}>
-              <TouchableOpacity style={styles.photoBtn} onPress={pickAndUploadPhoto} disabled={uploadingPhoto}>
-                {uploadingPhoto
-                  ? <ActivityIndicator size="small" color={colors.accentGreen} />
-                  : <><Ionicons name="cloud-upload-outline" size={16} color={colors.accentGreen} /><Text style={styles.photoBtnText}>{imageUrl ? "Replace" : "Upload"}</Text></>
-                }
-              </TouchableOpacity>
-              {imageUrl && (
-                <TouchableOpacity style={[styles.photoBtn, styles.photoBtnDanger]} onPress={removePhoto}>
-                  <Ionicons name="trash-outline" size={16} color="#B91C1C" />
-                  <Text style={[styles.photoBtnText, { color: "#B91C1C" }]}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-          <Text style={styles.photoHint}>Square photo · stored in Supabase "module-images" bucket</Text>
-        </EditorField>
-      )}
 
       {!isDefaultLang && <RefCard label="Original title" value={module.title} />}
 
@@ -1522,20 +1452,6 @@ const styles = StyleSheet.create({
 
   refTagRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   refTag: { fontSize: 13, color: colors.amber, fontFamily: "Inter_600SemiBold" },
-
-  // Photo upload
-  photoRow: { flexDirection: "row", alignItems: "center", gap: 14 },
-  photoThumb: { width: 64, height: 64, borderRadius: 12 },
-  photoThumbEmpty: { backgroundColor: colors.borderBeige, alignItems: "center", justifyContent: "center" },
-  photoActions: { gap: 8 },
-  photoBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6,
-  },
-  photoBtnDanger: { backgroundColor: "rgba(185,28,28,0.08)" },
-  photoBtnText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
-  photoHint: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
 
   // Content section
   contentSection: {
