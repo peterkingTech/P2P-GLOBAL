@@ -473,7 +473,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const curriculumIds = curriculums.map((c: Record<string, unknown>) => c.id as string);
       const { data: allModules } = await supabase
         .from("p2p_modules")
-        .select("id,curriculum_id,title,description,order_index")
+        .select("id,curriculum_id,title,description,order_index,image_url")
         .in("curriculum_id", curriculumIds)
         .order("order_index", { ascending: true });
       if (!allModules || allModules.length === 0) {
@@ -525,6 +525,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           id: moduleId, curriculumId: activeCurriculumId,
           title: m.title as string, description: (m.description as string) ?? "",
           level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
+          imageUrl: (m.image_url as string) ?? undefined,
         });
         let previousLessonComplete = true;
         moduleLessons.forEach((l) => {
