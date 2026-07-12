@@ -3,7 +3,7 @@ import React from "react";
 
 export default function AuthLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+    <Stack screenOptions={{ headerShown: false, animation: "fade", contentStyle: { backgroundColor: "#06110D" } }}>
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />

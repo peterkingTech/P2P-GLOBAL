@@ -187,6 +187,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 36,
+    backgroundColor: colors.darkBg,
   },
   /* Slide 1 big logo */
   logoWrap: {
