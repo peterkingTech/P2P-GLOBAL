@@ -392,18 +392,6 @@ const FALLBACK_MODULES: Module[] = [
   { id: "m1", curriculumId: "", title: "Foundations of Faith", description: "The essentials of Christian discipleship", level: 1, lessonCount: 6, completedLessons: 0, isLocked: false },
 ];
 
-const MOCK_MISSIONS: Mission[] = [
-  { id: "ms1", title: "Pray for the Fulani", nation: "West Africa", population: "38 million", description: "Nomadic pastoralists across the Sahel, one of Africa's largest unreached peoples.", prayerCount: 2847, language: "Fula", religion: "Islam" },
-  { id: "ms2", title: "Light for the Uyghur", nation: "Xinjiang, China", population: "12 million", description: "Living in one of the most surveilled regions on earth, longing for freedom.", prayerCount: 1934, language: "Uyghur", religion: "Islam" },
-  { id: "ms3", title: "The Unreached Pashtun", nation: "Afghanistan/Pakistan", population: "50 million", description: "Bound by Pashtunwali code; few believers exist among them.", prayerCount: 3102, language: "Pashto", religion: "Islam" },
-  { id: "ms4", title: "Reach the Brahmin", nation: "India", population: "60 million", description: "Hindu priests and scholars — intellectuals open to truth, closed to conversion.", prayerCount: 891, language: "Hindi/Sanskrit", religion: "Hinduism" },
-];
-
-const MOCK_FRUITS: Fruit[] = [
-  { id: "f1", name: "First Fruit", description: "Completed your first Bible study session", earnedAt: "2026-06-01", iconName: "leaf" },
-  { id: "f2", name: "Faithful Root", description: "Studied for 7 consecutive days", earnedAt: "2026-06-08", iconName: "git-branch" },
-  { id: "f3", name: "Prayer Warrior", description: "Prayed for 30 different requests", earnedAt: "2026-06-15", iconName: "heart" },
-];
 
 // ── UUID helper (no external dep needed) ─────────────────────────────────────
 function generateUUID(): string {
@@ -453,8 +441,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     hasDiscipleMaker: false,
     countriesReached: [],
   });
-  const [fruits, setFruits] = useState<Fruit[]>(MOCK_FRUITS);
-  const [missions] = useState<Mission[]>(MOCK_MISSIONS);
+  const [fruits, setFruits] = useState<Fruit[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -473,7 +461,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const curriculumIds = curriculums.map((c: Record<string, unknown>) => c.id as string);
       const { data: allModules } = await supabase
         .from("p2p_modules")
-        .select("id,curriculum_id,title,description,order_index")
+        .select("id,curriculum_id,title,description,order_index,image_url")
         .in("curriculum_id", curriculumIds)
         .order("order_index", { ascending: true });
       if (!allModules || allModules.length === 0) {
@@ -525,6 +513,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           id: moduleId, curriculumId: activeCurriculumId,
           title: m.title as string, description: (m.description as string) ?? "",
           level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
+          imageUrl: (m.image_url as string) ?? undefined,
         });
         let previousLessonComplete = true;
         moduleLessons.forEach((l) => {
@@ -683,7 +672,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setSessions([]);
     setForestNodes([]);
     setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
-    setFruits(MOCK_FRUITS);
+    setFruits([]);
     setDailyVerse(null);
     setPendingEvaluations([]);
     setToastEvent(null);
@@ -745,7 +734,34 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         await refreshPendingEvaluations(profile.id);
         await checkGrowthEvents(profile.id);
       }
-      setFruits(MOCK_FRUITS);
+      if (profile?.id) {
+        const { data: fruitsData } = await supabase
+          .from("p2p_user_fruits")
+          .select("id,fruit_name,description,icon_name,earned_at")
+          .eq("user_id", profile.id)
+          .order("earned_at", { ascending: false });
+        setFruits((fruitsData ?? []).map((f: Record<string, unknown>) => ({
+          id: f.id as string,
+          name: (f.fruit_name as string) ?? "",
+          description: (f.description as string) ?? "",
+          earnedAt: (f.earned_at as string) ?? "",
+          iconName: (f.icon_name as string) ?? "leaf",
+        })));
+        const { data: missionsData } = await supabase
+          .from("p2p_missions")
+          .select("id,title,nation,population,description,prayer_count,language,religion")
+          .order("prayer_count", { ascending: false });
+        setMissions((missionsData ?? []).map((m: Record<string, unknown>) => ({
+          id: m.id as string,
+          title: (m.title as string) ?? "",
+          nation: (m.nation as string) ?? "",
+          population: (m.population as string) ?? "",
+          description: (m.description as string) ?? "",
+          prayerCount: (m.prayer_count as number) ?? 0,
+          language: (m.language as string) ?? "",
+          religion: (m.religion as string) ?? "",
+        })));
+      }
       if (profile) {
         await loadForestNetwork(profile.id, {
           id: profile.id, name: profile.displayName, role: profile.role,

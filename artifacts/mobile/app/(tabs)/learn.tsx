@@ -7,12 +7,32 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, Module } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+
+function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
+  const [err, setErr] = useState(false);
+  if (uri && !err) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[styles.thumb, isLocked && styles.thumbLocked]}
+        resizeMode="cover"
+        onError={() => setErr(true)}
+      />
+    );
+  }
+  return (
+    <View style={[styles.thumb, styles.thumbPlaceholder, isLocked && styles.thumbLocked]}>
+      <Ionicons name="book-outline" size={18} color={isLocked ? colors.borderBeige : colors.accentGreen} />
+    </View>
+  );
+}
 
 function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
@@ -28,6 +48,7 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
       disabled={isLocked}
     >
       <View style={styles.cardLeft}>
+        <ModuleThumbnail uri={module.imageUrl} isLocked={isLocked} />
         <View style={[styles.levelBadge, { backgroundColor: isLocked ? colors.borderBeige : isComplete ? colors.accentGreen : isStarted ? colors.amber : colors.borderBeige }]}>
           <Text style={[styles.levelText, { color: isComplete || isStarted ? colors.cream : colors.textMuted }]}>
             L{module.level}
@@ -255,7 +276,10 @@ const styles = StyleSheet.create({
   },
   cardLocked: { opacity: 0.55 },
   textLocked: { color: colors.textMuted },
-  cardLeft: {},
+  cardLeft: { alignItems: "center", gap: 6 },
+  thumb: { width: 48, height: 48, borderRadius: 10 },
+  thumbLocked: { opacity: 0.4 },
+  thumbPlaceholder: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
   levelBadge: {
     width: 36, height: 36, borderRadius: 10,
     alignItems: "center", justifyContent: "center",

@@ -22,12 +22,6 @@ interface ChatMessage {
   time: string;
 }
 
-const MOCK_MESSAGES: ChatMessage[] = [
-  { id: "1", user: "Pastor James", text: "Welcome everyone. Let's open with prayer.", time: "2:01 PM" },
-  { id: "2", user: "Sister Ruth", text: "Lord, open our eyes to your Word today.", time: "2:02 PM" },
-  { id: "3", user: "Thomas", text: "John 15:5 — 'apart from me you can do nothing.' That's the verse for today.", time: "2:04 PM" },
-  { id: "4", user: "Pastor James", text: "Exactly. What does 'abide' mean to you personally?", time: "2:06 PM" },
-];
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,7 +40,7 @@ export default function SessionScreen() {
     scheduledAt: new Date().toISOString(),
   };
 
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
 
   function sendMessage() {
@@ -93,6 +87,12 @@ export default function SessionScreen() {
       </View>
 
       {/* Chat */}
+      {messages.length === 0 && (
+        <View style={styles.emptyChat}>
+          <Ionicons name="chatbubbles-outline" size={36} color={colors.navBorder} />
+          <Text style={styles.emptyChatText}>No messages yet — start the conversation.</Text>
+        </View>
+      )}
       <FlatList
         data={messages}
         keyExtractor={(m) => m.id}
@@ -165,6 +165,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.navBorder,
   },
   verseBarText: { color: colors.amber, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  emptyChat: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingBottom: 40 },
+  emptyChatText: { fontSize: 13, color: colors.navBorder, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 40 },
   msgRow: { flexDirection: "row", gap: 8, marginBottom: 12, alignItems: "flex-end" },
   msgRowOwn: { flexDirection: "row-reverse" },
   msgAvatar: {

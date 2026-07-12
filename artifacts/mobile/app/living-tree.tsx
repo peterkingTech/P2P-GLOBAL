@@ -24,14 +24,6 @@ import { ForestTransition } from "@/components/ForestTransition";
 
 const { width: SW } = Dimensions.get("window");
 
-const MOCK_GROWTH = {
-  points: 4,
-  lessonsCompleted: 1,
-  prayersOffered: 2,
-  sessionsCompleted: 0,
-  disciplesInvited: 0,
-};
-
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
   moderator: colors.brightYellow,
@@ -102,7 +94,7 @@ export default function LivingTreeScreen() {
   const [showForestTransition, setShowForestTransition] = useState(false);
   const autoTriggeredRef = useRef(false);
 
-  const growthPoints = profile?.growthLevel ?? MOCK_GROWTH.points;
+  const growthPoints = profile?.growthLevel ?? 0;
   const stageIndex = getStageFromPoints(growthPoints);
   const stage = STAGES[stageIndex];
   const nextStage = STAGES[stageIndex + 1] ?? null;
@@ -141,11 +133,12 @@ export default function LivingTreeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.prevStage]);
 
+  const { modules } = useData();
+  const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
   const activities: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-    ...(MOCK_GROWTH.prayersOffered > 0 ? [{ icon: "people" as const, label: `${MOCK_GROWTH.prayersOffered} prayers offered` }] : []),
-    ...(MOCK_GROWTH.lessonsCompleted > 0 ? [{ icon: "book" as const, label: `${MOCK_GROWTH.lessonsCompleted} lesson completed` }] : []),
-    ...(MOCK_GROWTH.sessionsCompleted > 0 ? [{ icon: "videocam" as const, label: `${MOCK_GROWTH.sessionsCompleted} sessions shared` }] : []),
-    ...(MOCK_GROWTH.disciplesInvited > 0 ? [{ icon: "person-add" as const, label: `${MOCK_GROWTH.disciplesInvited} disciple invited` }] : []),
+    ...(completedLessons > 0 ? [{ icon: "book" as const, label: `${completedLessons} ${completedLessons === 1 ? "lesson" : "lessons"} completed` }] : []),
+    ...(forestStats.totalDisciples > 0 ? [{ icon: "person-add" as const, label: `${forestStats.totalDisciples} ${forestStats.totalDisciples === 1 ? "disciple" : "disciples"} in your network` }] : []),
+    ...(countriesCount > 0 ? [{ icon: "globe-outline" as const, label: `${countriesCount} ${countriesCount === 1 ? "country" : "countries"} reached` }] : []),
   ];
 
   const totalNodes = forestNodes.reduce((acc, n) => acc + 1 + countDescendants(n), 0);

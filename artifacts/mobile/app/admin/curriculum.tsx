@@ -11,9 +11,11 @@ import {
   Platform,
   useWindowDimensions,
   Modal,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
@@ -26,11 +28,11 @@ type Curriculum = {
 };
 type Module = {
   id: string; curriculum_id: string; title: string; description: string | null;
-  status: Status; sort_order: number;
+  status: Status; order_index: number; image_url?: string | null;
 };
 type LessonStub = {
   id: string; module_id: string; title: string; subtitle: string | null;
-  status: Status; sort_order: number;
+  status: Status; order_index: number;
 };
 type Section = { id?: string; title?: string; content: string; sort_order: number };
 type Scripture = { id?: string; verse_ref: string; verse_text: string; sort_order: number };
@@ -112,10 +114,10 @@ export default function CurriculumManagerScreen() {
     const [{ data: cData }, { data: mData }, { data: lData }, { data: langData }] =
       await Promise.all([
         supabase.from("p2p_curriculums").select("*").order("created_at"),
-        supabase.from("p2p_modules").select("*").order("sort_order"),
+        supabase.from("p2p_modules").select("*").order("order_index"),
         supabase.from("p2p_lessons")
-          .select("id,module_id,title,subtitle,status,sort_order")
-          .order("sort_order"),
+          .select("id,module_id,title,subtitle,status,order_index")
+          .order("order_index"),
         supabase.from("p2p_languages").select("*").order("name"),
       ]);
 
@@ -211,18 +213,18 @@ export default function CurriculumManagerScreen() {
       error = e; if (data) newId = data.id;
     } else if (createModal === "module") {
       const sibs = modulesMap[createParentId] ?? [];
-      const sortOrder = sibs.length ? Math.max(...sibs.map((m) => m.sort_order)) + 1 : 0;
+      const sortOrder = sibs.length ? Math.max(...sibs.map((m) => m.order_index)) + 1 : 0;
       const { data, error: e } = await supabase
         .from("p2p_modules")
-        .insert({ curriculum_id: createParentId, title: createTitle.trim(), status: "draft", sort_order: sortOrder })
+        .insert({ curriculum_id: createParentId, title: createTitle.trim(), status: "draft", order_index: sortOrder })
         .select().single();
       error = e; if (data) newId = data.id;
     } else if (createModal === "lesson") {
       const sibs = lessonsMap[createParentId] ?? [];
-      const sortOrder = sibs.length ? Math.max(...sibs.map((l) => l.sort_order)) + 1 : 0;
+      const sortOrder = sibs.length ? Math.max(...sibs.map((l) => l.order_index)) + 1 : 0;
       const { data, error: e } = await supabase
         .from("p2p_lessons")
-        .insert({ module_id: createParentId, title: createTitle.trim(), status: "draft", sort_order: sortOrder })
+        .insert({ module_id: createParentId, title: createTitle.trim(), status: "draft", order_index: sortOrder })
         .select().single();
       error = e; if (data) newId = data.id;
     }
@@ -269,7 +271,8 @@ export default function CurriculumManagerScreen() {
 
   async function moveItem(
     table: string,
-    items: Array<{ id: string; sort_order: number }>,
+    orderCol: string,
+    items: Array<{ id: string; order_index: number }>,
     id: string,
     dir: "up" | "down",
     parentKey: string,
@@ -283,15 +286,15 @@ export default function CurriculumManagerScreen() {
     const a = items[idx];
     const b = items[swapIdx];
     const newItems = [...items];
-    newItems[idx] = { ...a, sort_order: b.sort_order };
-    newItems[swapIdx] = { ...b, sort_order: a.sort_order };
-    newItems.sort((x, y) => x.sort_order - y.sort_order);
+    newItems[idx] = { ...a, order_index: b.order_index };
+    newItems[swapIdx] = { ...b, order_index: a.order_index };
+    newItems.sort((x, y) => x.order_index - y.order_index);
 
     setMap((prev) => ({ ...prev, [parentKey]: newItems }));
 
     await Promise.all([
-      supabase.from(table).update({ sort_order: b.sort_order }).eq("id", a.id),
-      supabase.from(table).update({ sort_order: a.sort_order }).eq("id", b.id),
+      supabase.from(table).update({ [orderCol]: b.order_index }).eq("id", a.id),
+      supabase.from(table).update({ [orderCol]: a.order_index }).eq("id", b.id),
     ]);
   }
 
@@ -372,10 +375,10 @@ export default function CurriculumManagerScreen() {
                             {m.title}
                           </Text>
                           <View style={styles.reorderBtns}>
-                            <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "up", c.id, setModulesMap)}>
+                            <TouchableOpacity onPress={() => moveItem("p2p_modules", "order_index", mods, m.id, "up", c.id, setModulesMap)}>
                               <Ionicons name="arrow-up" size={12} color={colors.textMuted} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "down", c.id, setModulesMap)}>
+                            <TouchableOpacity onPress={() => moveItem("p2p_modules", "order_index", mods, m.id, "down", c.id, setModulesMap)}>
                               <Ionicons name="arrow-down" size={12} color={colors.textMuted} />
                             </TouchableOpacity>
                           </View>
@@ -404,10 +407,10 @@ export default function CurriculumManagerScreen() {
                                     )}
                                   </View>
                                   <View style={styles.reorderBtns}>
-                                    <TouchableOpacity onPress={() => moveItem("p2p_lessons", lessons, l.id, "up", m.id, setLessonsMap)}>
+                                    <TouchableOpacity onPress={() => moveItem("p2p_lessons", "order_index", lessons, l.id, "up", m.id, setLessonsMap)}>
                                       <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
                                     </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => moveItem("p2p_lessons", lessons, l.id, "down", m.id, setLessonsMap)}>
+                                    <TouchableOpacity onPress={() => moveItem("p2p_lessons", "order_index", lessons, l.id, "down", m.id, setLessonsMap)}>
                                       <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
                                     </TouchableOpacity>
                                   </View>
@@ -781,6 +784,8 @@ function ModuleEditor({
   const [title, setTitle] = useState(isDefaultLang ? module.title : "");
   const [description, setDescription] = useState(isDefaultLang ? (module.description ?? "") : "");
   const [status, setStatus] = useState<Status>(module.status);
+  const [imageUrl, setImageUrl] = useState<string | null>(module.image_url ?? null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -798,6 +803,35 @@ function ModuleEditor({
     }
   }, [module.id, lang, isDefaultLang]);
 
+  async function pickAndUploadImage() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo access to upload a thumbnail."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [4, 3], quality: 0.85,
+    });
+    if (result.canceled || !result.assets.length) return;
+
+    const asset = result.assets[0];
+    setUploading(true);
+    try {
+      const ext = (asset.uri.split(".").pop() ?? "jpg").toLowerCase();
+      const path = `module-thumbnails/${module.id}.${ext}`;
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const { error: upErr } = await supabase.storage
+        .from("Module Title Pictures")
+        .upload(path, blob, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from("Module Title Pictures").getPublicUrl(path);
+      setImageUrl(urlData.publicUrl);
+    } catch (ex: any) {
+      Alert.alert("Upload failed", ex.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function save() {
     if (!title.trim()) { setError("Title is required."); return; }
     setSaving(true); setError(null);
@@ -805,7 +839,7 @@ function ModuleEditor({
     if (isDefaultLang) {
       const { data, error: e } = await supabase
         .from("p2p_modules")
-        .update({ title: title.trim(), description: description.trim() || null, status })
+        .update({ title: title.trim(), description: description.trim() || null, status, image_url: imageUrl })
         .eq("id", module.id)
         .select().single();
       setSaving(false);
@@ -851,6 +885,31 @@ function ModuleEditor({
       {isDefaultLang && (
         <EditorField label="Status">
           <StatusSelector value={status} onChange={setStatus} />
+        </EditorField>
+      )}
+
+      {isDefaultLang && (
+        <EditorField label="Thumbnail Image">
+          {imageUrl ? (
+            <View style={{ gap: 8 }}>
+              <Image source={{ uri: imageUrl }} style={{ width: "100%", height: 120, borderRadius: 10 }} resizeMode="cover" />
+              <TouchableOpacity
+                style={[styles.addBtn, { backgroundColor: "rgba(255,255,255,0.05)" }]}
+                onPress={pickAndUploadImage}
+                disabled={uploading}
+              >
+                {uploading
+                  ? <ActivityIndicator size="small" color={colors.accentGreen} />
+                  : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadImage} disabled={uploading}>
+              {uploading
+                ? <ActivityIndicator size="small" color={colors.accentGreen} />
+                : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload thumbnail</Text></>}
+            </TouchableOpacity>
+          )}
         </EditorField>
       )}
 
@@ -900,10 +959,10 @@ function LessonEditor({
 
     // Always load canonical content for reference / IDs
     const [{ data: sec }, { data: scr }, { data: qs }, { data: asg }] = await Promise.all([
-      supabase.from("p2p_lesson_sections").select("*").eq("lesson_id", lesson.id).order("sort_order"),
-      supabase.from("p2p_scriptures").select("*").eq("lesson_id", lesson.id).order("sort_order"),
-      supabase.from("p2p_reflection_questions").select("*").eq("lesson_id", lesson.id).order("sort_order"),
-      supabase.from("p2p_assignments").select("*").eq("lesson_id", lesson.id).order("sort_order"),
+      supabase.from("p2p_lesson_sections").select("id,lesson_id,title,content,section_order").eq("lesson_id", lesson.id).order("section_order"),
+      supabase.from("p2p_scriptures").select("id,lesson_id,reference,verse,display_order").eq("lesson_id", lesson.id).order("display_order"),
+      supabase.from("p2p_reflection_questions").select("id,lesson_id,question,display_order").eq("lesson_id", lesson.id).order("display_order"),
+      supabase.from("p2p_assignments").select("id,lesson_id,title,instructions,due_after_days").eq("lesson_id", lesson.id).order("id"),
     ]);
 
     const canonSections = (sec ?? []) as Section[];
@@ -911,10 +970,18 @@ function LessonEditor({
     const canonQuestions = (qs ?? []) as Question[];
 
     if (isDefaultLang) {
-      setSections(canonSections);
-      setScriptures(canonScriptures);
-      setQuestions(canonQuestions);
-      setAssignments((asg ?? []) as Assignment[]);
+      setSections(((sec ?? []) as any[]).map((s) => ({
+        id: s.id, sort_order: s.section_order ?? 0, title: s.title ?? "", content: s.content ?? "",
+      })));
+      setScriptures(((scr ?? []) as any[]).map((s) => ({
+        id: s.id, sort_order: s.display_order ?? 0, verse_ref: s.reference ?? "", verse_text: s.verse ?? "",
+      })));
+      setQuestions(((qs ?? []) as any[]).map((q) => ({
+        id: q.id, sort_order: q.display_order ?? 0, question: q.question ?? "",
+      })));
+      setAssignments(((asg ?? []) as any[]).map((a) => ({
+        id: a.id, title: a.title ?? "", instructions: a.instructions ?? "", sort_order: 0,
+      })));
     } else {
       // Load translation data
       const secIds = canonSections.map((s: any) => s.id);
@@ -941,16 +1008,16 @@ function LessonEditor({
       const qMap = Object.fromEntries(((qtrans ?? []) as any[]).map((t) => [t.question_id, t]));
 
       setSections(canonSections.map((s: any) => ({
-        id: s.id, sort_order: s.sort_order,
+        id: s.id, sort_order: s.section_order,
         title: stMap[s.id]?.title ?? "", content: stMap[s.id]?.content ?? "",
       })));
       setScriptures(canonScriptures.map((s: any) => ({
-        id: s.id, sort_order: s.sort_order,
-        verse_ref: s.verse_ref, // ref never translates
+        id: s.id, sort_order: s.display_order,
+        verse_ref: s.reference, // ref never translates
         verse_text: scrMap[s.id]?.verse ?? "",
       })));
       setQuestions(canonQuestions.map((q: any) => ({
-        id: q.id, sort_order: q.sort_order,
+        id: q.id, sort_order: q.display_order,
         question: qMap[q.id]?.question ?? "",
       })));
       setAssignments([]);
@@ -980,28 +1047,28 @@ function LessonEditor({
         await supabase.from("p2p_lesson_sections").delete().eq("lesson_id", lesson.id);
         if (sections.length) {
           await supabase.from("p2p_lesson_sections").insert(
-            sections.map((s, i) => ({ lesson_id: lesson.id, title: s.title || null, content: s.content, sort_order: i }))
+            sections.map((s, i) => ({ lesson_id: lesson.id, title: s.title || null, content: s.content, section_order: i }))
           );
         }
 
         await supabase.from("p2p_scriptures").delete().eq("lesson_id", lesson.id);
         if (scriptures.length) {
           await supabase.from("p2p_scriptures").insert(
-            scriptures.map((s, i) => ({ lesson_id: lesson.id, verse_ref: s.verse_ref, verse_text: s.verse_text, sort_order: i }))
+            scriptures.map((s, i) => ({ lesson_id: lesson.id, reference: s.verse_ref, verse: s.verse_text, display_order: i }))
           );
         }
 
         await supabase.from("p2p_reflection_questions").delete().eq("lesson_id", lesson.id);
         if (questions.length) {
           await supabase.from("p2p_reflection_questions").insert(
-            questions.map((q, i) => ({ lesson_id: lesson.id, question: q.question, sort_order: i }))
+            questions.map((q, i) => ({ lesson_id: lesson.id, question: q.question, display_order: i }))
           );
         }
 
         await supabase.from("p2p_assignments").delete().eq("lesson_id", lesson.id);
         if (assignments.length) {
           await supabase.from("p2p_assignments").insert(
-            assignments.map((a, i) => ({ lesson_id: lesson.id, title: a.title, instructions: a.instructions, sort_order: i }))
+            assignments.map((a) => ({ lesson_id: lesson.id, title: a.title, instructions: a.instructions }))
           );
         }
 
@@ -1116,7 +1183,7 @@ function LessonEditor({
       <ContentSection title="Memory Verse" hint="Scripture reference and verse text.">
         {scriptures.map((s, i) => (
           <View key={i} style={styles.contentItem}>
-            {origContent && <RefCard label="Original verse text" value={(origContent.scriptures[i] as any)?.verse_text ?? ""} />}
+            {origContent && <RefCard label="Original verse text" value={(origContent.scriptures[i] as any)?.verse ?? ""} />}
             {isDefaultLang && (
               <TextInput
                 style={styles.edInput}

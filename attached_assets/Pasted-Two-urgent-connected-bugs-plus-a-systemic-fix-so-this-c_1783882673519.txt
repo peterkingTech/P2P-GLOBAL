@@ -1,0 +1,21 @@
+Two urgent, connected bugs, plus a systemic fix so this class of bug can't keep recurring.
+
+1. STAGE IMAGES: constants/stages.ts STAGE_IMAGES still uses require() on local bundled files (stage-0-seed.png etc.) — the earlier prompt to replace these with the 6 real hosted Supabase URLs was never actually applied to this file. Fix properly: remote images need source={{ uri: '...' }}, not require() — this is a different loading pattern, not just a URL swap. Replace with the 6 real URLs:
+   - Dormant Seed: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Dormant%20Seed.jpg
+   - Sprout: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/sprout.jpg
+   - Young Tree: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Young%20tree.jpg
+   - Fruitful Tree: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Fruitful%20tree.jpg
+   - Forest Builder: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20Builder.jpeg
+   - Forest of Nations: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20of%20nations.jpeg
+   Add a loading placeholder and error fallback for each (network images can fail to load; never show a broken-image icon). Update every place that currently imports STAGE_IMAGES to handle a remote URI correctly.
+
+2. NEW USERS DEFAULT TO SPROUT INSTEAD OF DORMANT SEED: getStageFromPoints() itself is mathematically correct (returns 0/Dormant Seed for points=0) — the bug is that a new user's actual points value passed into it is NOT genuinely 0. Given Sprout's unlockPoints is exactly 4, and MOCK_GROWTH_POINTS = 4 was found hardcoded in app/(tabs)/index.tsx and app/stages.tsx in an earlier audit — confirm whether that mock removal was actually completed. Search the ENTIRE codebase again for the literal value 4 being used as any kind of growth-points fallback/default (not just the named MOCK_GROWTH_POINTS constant — check for other variables/defaults that might independently equal 4). Trace the full real path from a brand new user's signup to whatever growth-points number reaches getStageFromPoints() and confirm it is a genuine, freshly-computed 0, not a fallback.
+
+3. SYSTEMIC FIX — this is the third time mock/stale data has reached a real user, so fix the actual process gap, not just this instance:
+   a. Search the entire codebase one more time for MOCK_, FAKE_, DUMMY_, or any hardcoded numeric/object fallback standing in for real user data, and report a complete list — confirm zero remain after this pass.
+   b. Add a database-level guarantee: a Postgres trigger on p2p_profiles (or wherever a new user's core state is first created) that ensures growth_points/growth_level starts at a genuine 0, and any related tables (groups, chats, fruits, missions-participation) start with zero rows for a new user_id — enforced at the database level, not dependent on client-side code remembering to not show mock data.
+   c. Confirm no new account can ever see another user's or a mock account's groups, chat threads, or messages — a brand new user's conversation list, group memberships, and message history must all be genuinely empty until they take a real action.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT: create a brand new account, confirm it shows Dormant Seed (not Sprout), confirm all 6 stage images load correctly as you view them (test by manually triggering each stage's image in a way you can verify, e.g. via an admin override if one exists, or report if you can't test all 6 without one), and confirm the new account's groups/chats/missions are completely empty.
+
+Report back: the exact root cause of the Sprout-default bug (confirm or correct my hypothesis), confirmation all 6 images load with real URLs (not require()), and the complete list from step 3a.

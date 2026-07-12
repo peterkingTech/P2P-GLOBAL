@@ -11,16 +11,17 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
-
-const MOCK_GROWTH_POINTS = 4;
 
 export default function StagesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const currentStage = getStageFromPoints(MOCK_GROWTH_POINTS);
+  const growthPoints = profile?.growthLevel ?? 0;
+  const currentStage = getStageFromPoints(growthPoints);
 
   return (
     <ScrollView
@@ -109,7 +110,7 @@ export default function StagesScreen() {
                           styles.progressBarFill,
                           {
                             width: `${Math.round(
-                              ((MOCK_GROWTH_POINTS - stage.unlockPoints) /
+                              ((growthPoints - stage.unlockPoints) /
                                 ((STAGES[i + 1]?.unlockPoints ?? stage.unlockPoints) -
                                   stage.unlockPoints)) *
                                 100
@@ -120,7 +121,7 @@ export default function StagesScreen() {
                     </View>
                     {STAGES[i + 1] && (
                       <Text style={styles.pointsNeeded}>
-                        {STAGES[i + 1].unlockPoints - MOCK_GROWTH_POINTS} more growth points to
+                        {STAGES[i + 1].unlockPoints - growthPoints} more growth points to
                         reach {STAGES[i + 1].emoji} {STAGES[i + 1].name}
                       </Text>
                     )}

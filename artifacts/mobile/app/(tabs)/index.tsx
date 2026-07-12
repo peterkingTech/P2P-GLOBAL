@@ -18,8 +18,6 @@ import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 
-const MOCK_GROWTH_POINTS = 4;
-
 export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -32,7 +30,7 @@ export default function HomeTab() {
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const greeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
 
-  const growthPoints = MOCK_GROWTH_POINTS;
+  const growthPoints = profile?.growthLevel ?? 0;
   const stageIndex = getStageFromPoints(growthPoints);
   const stage = STAGES[stageIndex];
   const nextStage = STAGES[stageIndex + 1] ?? null;

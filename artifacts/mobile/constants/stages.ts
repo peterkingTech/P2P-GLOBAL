@@ -1,11 +1,13 @@
-export const STAGE_IMAGES = [
-  require("../assets/images/stages/stage-0-seed.png"),
-  require("../assets/images/stages/stage-1-sprout.png"),
-  require("../assets/images/stages/stage-2-young.png"),
-  require("../assets/images/stages/stage-3-fruitful.png"),
-  require("../assets/images/stages/stage-4-builder.png"),
-  require("../assets/images/stages/stage-5-nations.png"),
-] as const;
+export type StageImageSource = { uri: string };
+
+export const STAGE_IMAGES: StageImageSource[] = [
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Dormant%20Seed.jpg" },
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/sprout.jpg" },
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Young%20tree.jpg" },
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Fruitful%20tree.jpg" },
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20Builder.jpeg" },
+  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20of%20nations.jpeg" },
+];
 
 export interface Stage {
   name: string;

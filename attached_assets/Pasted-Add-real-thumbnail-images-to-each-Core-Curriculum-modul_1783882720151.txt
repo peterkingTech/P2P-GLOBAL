@@ -1,0 +1,24 @@
+Add real thumbnail images to each Core Curriculum module, using the same remote-image pattern fix from the stage-images bug (source={{ uri: '...' }}, NOT require() — these are remote URLs, not bundled local assets, and must be loaded accordingly with proper loading/error states).
+
+Add an image_url column to p2p_modules if not already present (should already exist from earlier work — confirm), and set it for these 12 modules by matching title:
+
+- Module 1 (Your New Identity in Christ): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Identity%20In%20Christ%202.jpeg
+- Module 2 (Knowing God): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Knowing%20God.jpeg
+- Module 3 (The Lordship of Jesus Christ): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/The%20Lordship%20Of%20Jesus%20Christ.jpeg
+- Module 4 (The Holy Spirit and You): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/The%20Holy%20Spirit%20And%20You.jpeg
+- Module 5 (The Bible — God's Word to You): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/The%20Bible%20-%20God's%20Word.jpeg
+- Module 6 (Prayer — Talking with God): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Prayer%20-%20Talking%20With%20God.jpeg
+- Module 7 (The Church — Your New Family): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/The%20Church.jpeg
+- Module 8 (Water Baptism and the Lord's Supper): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Water%20Baptism.jpeg
+- Module 9 (The Christian and Sin): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/The%20Christian%20and%20Sin.jpeg
+- Module 10 (Sharing Your Faith): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Sharing%20Your%20Faith.jpeg
+- Module 11 (Spiritual Disciplines): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Spiritual%20Disciplines.jpeg
+- Module 12 (Living with Eternity in View): https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Module%20Title%20Pictures/Living%20with%20Eternity%20In%20Mind.jpeg
+
+Module 0 (Peer-to-Peer Orientation) has NO image provided yet — use a simple neutral placeholder (not broken/missing-image icon) and flag this back to me as still needing a real image.
+
+Display these in the Core Curriculum module list per the earlier design (48x48px thumbnail beside each module title/status indicator), plus anywhere else module cards appear (e.g. if referenced in Discover or elsewhere).
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE.
+
+Report back a screenshot of the Core Curriculum list showing all 13 modules with their correct thumbnails (or placeholder for Module 0).
