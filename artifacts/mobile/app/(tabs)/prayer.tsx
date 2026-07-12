@@ -22,7 +22,8 @@ import {
   PrayerWallPostType,
   PrayerWallVisibility,
 } from "@/contexts/DataContext";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors } from "@/constants/themes";
 
 function flagEmoji(code?: string | null): string {
   if (!code || code.length !== 2) return "🌍";
@@ -52,6 +53,8 @@ function CommentsPanel({ postId }: { postId: string }) {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,6 +122,8 @@ function PostCard({
   onTestify: (post: PrayerWallPost) => void;
   onReport: (post: PrayerWallPost) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [showComments, setShowComments] = useState(false);
   const isTestimony = item.postType === "testimony";
 
@@ -230,6 +235,8 @@ export default function PrayerTab() {
   const [visibility, setVisibility] = useState<PrayerWallVisibility>("global");
   const [answeredFromPostId, setAnsweredFromPostId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -456,87 +463,88 @@ export default function PrayerTab() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.upperRoomBg },
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.upperRoomBg },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.upperRoomBorder,
+    borderBottomColor: c.upperRoomBorder,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: colors.upperRoomCream, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 12, color: colors.upperRoomMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
+  headerSub: { fontSize: 12, color: c.upperRoomMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   addBtn: {
     width: 38, height: 38, borderRadius: 10,
     backgroundColor: "rgba(224,164,65,0.15)",
-    borderWidth: 1, borderColor: colors.upperRoomBorder,
+    borderWidth: 1, borderColor: c.upperRoomBorder,
     alignItems: "center", justifyContent: "center",
   },
   segmentRow: {
     flexDirection: "row", marginHorizontal: 16, marginTop: 12,
     backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 12,
-    borderWidth: 1, borderColor: colors.upperRoomBorder, padding: 4,
+    borderWidth: 1, borderColor: c.upperRoomBorder, padding: 4,
   },
   segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
   segmentBtnActive: { backgroundColor: "rgba(224,164,65,0.18)" },
-  segmentText: { fontSize: 13, fontWeight: "600", color: colors.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
-  segmentTextActive: { color: colors.upperRoomAmber },
+  segmentText: { fontSize: 13, fontWeight: "600", color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
+  segmentTextActive: { color: c.upperRoomAmber },
   tabRow: {
     flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: colors.upperRoomBorder,
+    borderBottomWidth: 1, borderBottomColor: c.upperRoomBorder,
   },
   tabBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 10,
     alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: colors.upperRoomBorder,
+    borderWidth: 1, borderColor: c.upperRoomBorder,
   },
-  tabBtnActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: colors.upperRoomAmber },
-  tabBtnText: { fontSize: 13, fontWeight: "600", color: colors.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
-  tabBtnTextActive: { color: colors.upperRoomAmber },
+  tabBtnActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: c.upperRoomAmber },
+  tabBtnText: { fontSize: 13, fontWeight: "600", color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
+  tabBtnTextActive: { color: c.upperRoomAmber },
   form: {
     margin: 16,
     padding: 14,
-    backgroundColor: colors.upperRoomCard,
+    backgroundColor: c.upperRoomCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.upperRoomBorder,
+    borderColor: c.upperRoomBorder,
   },
   typeToggleRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   typeToggle: {
     flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.upperRoomBorder,
+    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder,
   },
-  typeToggleActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: colors.upperRoomAmber },
-  typeToggleText: { fontSize: 12, fontWeight: "600", color: colors.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
-  typeToggleTextActive: { color: colors.upperRoomAmber },
+  typeToggleActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: c.upperRoomAmber },
+  typeToggleText: { fontSize: 12, fontWeight: "600", color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
+  typeToggleTextActive: { color: c.upperRoomAmber },
   formInput: {
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1, borderColor: colors.upperRoomBorder,
+    borderWidth: 1, borderColor: c.upperRoomBorder,
     borderRadius: 10, padding: 12,
-    color: colors.upperRoomCream, fontSize: 14,
+    color: c.upperRoomCream, fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
   visibilityRow: { flexDirection: "row", gap: 8, marginTop: 10 },
   visBtn: {
     flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
     paddingVertical: 8, borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.upperRoomBorder,
+    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder,
   },
-  visBtnActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: colors.upperRoomAmber },
-  visBtnText: { fontSize: 12, color: colors.upperRoomMuted, fontFamily: "Inter_500Medium" },
-  visBtnTextActive: { color: colors.upperRoomAmber, fontWeight: "600" },
+  visBtnActive: { backgroundColor: "rgba(224,164,65,0.15)", borderColor: c.upperRoomAmber },
+  visBtnText: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_500Medium" },
+  visBtnTextActive: { color: c.upperRoomAmber, fontWeight: "600" },
   anonRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginTop: 12, padding: 10, borderRadius: 10,
     backgroundColor: "rgba(224,164,65,0.08)", borderWidth: 1, borderColor: "rgba(224,164,65,0.25)",
   },
-  anonLabel: { fontSize: 12, color: colors.upperRoomCream, fontFamily: "Inter_500Medium", flex: 1 },
+  anonLabel: { fontSize: 12, color: c.upperRoomCream, fontFamily: "Inter_500Medium", flex: 1 },
   submitBtn: {
-    backgroundColor: colors.upperRoomAmber,
+    backgroundColor: c.upperRoomAmber,
     borderRadius: 10, height: 44,
     alignItems: "center", justifyContent: "center", marginTop: 12,
   },
@@ -544,10 +552,10 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { paddingHorizontal: 14, paddingTop: 10 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyText: { color: colors.upperRoomMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
+  emptyText: { color: c.upperRoomMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
   prayerCard: {
-    backgroundColor: colors.upperRoomCard,
-    borderRadius: 14, borderWidth: 1, borderColor: colors.upperRoomBorder,
+    backgroundColor: c.upperRoomCard,
+    borderRadius: 14, borderWidth: 1, borderColor: c.upperRoomBorder,
     padding: 14, marginBottom: 10,
   },
   testimonyCard: { borderColor: "rgba(224,164,65,0.4)" },
@@ -556,35 +564,35 @@ const styles = StyleSheet.create({
   prayerAvatar: {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: "rgba(224,164,65,0.15)",
-    borderWidth: 1, borderColor: colors.upperRoomBorder,
+    borderWidth: 1, borderColor: c.upperRoomBorder,
     alignItems: "center", justifyContent: "center",
   },
-  prayerAvatarText: { fontSize: 14, fontWeight: "700", color: colors.upperRoomAmber, fontFamily: "Inter_700Bold" },
-  prayerName: { fontSize: 13, fontWeight: "600", color: colors.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  prayerAvatarText: { fontSize: 14, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
+  prayerName: { fontSize: 13, fontWeight: "600", color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
   flag: { fontSize: 13 },
-  prayerMeta: { fontSize: 11, color: colors.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
+  prayerMeta: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
   answeredFromBox: {
     flexDirection: "row", gap: 6, alignItems: "flex-start",
     backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 8, marginBottom: 8,
   },
-  answeredFromText: { fontSize: 11, color: colors.upperRoomMuted, fontFamily: "Inter_400Regular", flex: 1, fontStyle: "italic" },
-  prayerText: { fontSize: 14, color: colors.upperRoomCream, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 12, opacity: 0.9 },
+  answeredFromText: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", flex: 1, fontStyle: "italic" },
+  prayerText: { fontSize: 14, color: c.upperRoomCream, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 12, opacity: 0.9 },
   actionsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   reactBtn: {
     flexDirection: "row", gap: 6, alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: colors.upperRoomBorder,
+    borderWidth: 1, borderColor: c.upperRoomBorder,
   },
   reactBtnActive: { backgroundColor: "rgba(224,164,65,0.12)", borderColor: "rgba(224,164,65,0.3)" },
-  reactBtnText: { fontSize: 12, color: colors.upperRoomMuted, fontFamily: "Inter_500Medium" },
-  reactBtnTextActive: { color: colors.upperRoomAmber },
+  reactBtnText: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_500Medium" },
+  reactBtnTextActive: { color: c.upperRoomAmber },
   answerRow: { flexDirection: "row", gap: 8, marginTop: 10 },
   answerBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.upperRoomBorder,
+    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder,
   },
-  answerBtnText: { fontSize: 12, fontWeight: "600", color: colors.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  answerBtnText: { fontSize: 12, fontWeight: "600", color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
   testifyBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center",
     backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -594,17 +602,18 @@ const styles = StyleSheet.create({
     marginTop: 10, paddingVertical: 8, borderRadius: 8, alignItems: "center",
     backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
   },
-  testifyBtnText: { fontSize: 12, fontWeight: "600", color: colors.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
-  commentsPanel: { marginTop: 12, borderTopWidth: 1, borderTopColor: colors.upperRoomBorder, paddingTop: 10, gap: 8 },
-  commentEmpty: { fontSize: 12, color: colors.upperRoomMuted, fontFamily: "Inter_400Regular" },
+  testifyBtnText: { fontSize: 12, fontWeight: "600", color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
+  commentsPanel: { marginTop: 12, borderTopWidth: 1, borderTopColor: c.upperRoomBorder, paddingTop: 10, gap: 8 },
+  commentEmpty: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
   commentRow: { gap: 2 },
-  commentName: { fontSize: 11, fontWeight: "600", color: colors.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
-  commentBody: { fontSize: 13, color: colors.upperRoomCream, fontFamily: "Inter_400Regular" },
+  commentName: { fontSize: 11, fontWeight: "600", color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
+  commentBody: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_400Regular" },
   commentInputRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 4 },
   commentInput: {
-    flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.upperRoomBorder,
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: colors.upperRoomCream, fontSize: 13,
+    flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder,
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: c.upperRoomCream, fontSize: 13,
     fontFamily: "Inter_400Regular",
   },
   commentSendBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-});
+  });
+}

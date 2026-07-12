@@ -4,12 +4,40 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors } from "@/constants/themes";
+
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.lightCream },
+    header: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
+    headerTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    headerSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+    list: { padding: 20, gap: 12 },
+    card: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 14,
+    },
+    iconWrap: {
+      width: 42, height: 42, borderRadius: 12,
+      backgroundColor: "rgba(29,158,117,0.1)", alignItems: "center", justifyContent: "center",
+    },
+    cardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    cardSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    countPill: {
+      backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
+    },
+    countText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+  });
+}
 
 export default function DiscoverTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions } = useData();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const [loading, setLoading] = useState(true);
   const [peerCount, setPeerCount] = useState(0);
@@ -34,54 +62,12 @@ export default function DiscoverTab() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const cards = [
-    {
-      key: "peers",
-      icon: "people-outline" as const,
-      title: "Discoverable Peers",
-      count: peerCount,
-      sub: "Believers ready to connect with you",
-      route: "/connect/discover" as const,
-    },
-    {
-      key: "groups",
-      icon: "people-circle-outline" as const,
-      title: "Peer Groups",
-      count: groupCount,
-      sub: "Study groups you can join",
-      route: "/connect/groups" as const,
-    },
-    {
-      key: "smart-match",
-      icon: "sparkles-outline" as const,
-      title: "Smart Match",
-      count: null,
-      sub: "Let us pair you with a study partner",
-      route: "/connect/smart-match" as const,
-    },
-    {
-      key: "wall",
-      icon: "hand-left-outline" as const,
-      title: "Prayer Wall",
-      count: wallCount,
-      sub: "Requests and testimonies across nations",
-      route: "/(tabs)/prayer" as const,
-    },
-    {
-      key: "countries",
-      icon: "earth-outline" as const,
-      title: "Countries Reached",
-      count: forestStats.countriesReached.length,
-      sub: "Nations touched through your network",
-      route: "/living-tree" as const,
-    },
-    {
-      key: "missions",
-      icon: "flag-outline" as const,
-      title: "Missions",
-      count: missions.length,
-      sub: "Unreached peoples to pray for",
-      route: "/(tabs)/missions" as const,
-    },
+    { key: "peers", icon: "people-outline" as const, title: "Discoverable Peers", count: peerCount, sub: "Believers ready to connect with you", route: "/connect/discover" as const },
+    { key: "groups", icon: "people-circle-outline" as const, title: "Peer Groups", count: groupCount, sub: "Study groups you can join", route: "/connect/groups" as const },
+    { key: "smart-match", icon: "sparkles-outline" as const, title: "Smart Match", count: null, sub: "Let us pair you with a study partner", route: "/connect/smart-match" as const },
+    { key: "wall", icon: "hand-left-outline" as const, title: "Prayer Wall", count: wallCount, sub: "Requests and testimonies across nations", route: "/(tabs)/prayer" as const },
+    { key: "countries", icon: "earth-outline" as const, title: "Countries Reached", count: forestStats.countriesReached.length, sub: "Nations touched through your network", route: "/living-tree" as const },
+    { key: "missions", icon: "flag-outline" as const, title: "Missions", count: missions.length, sub: "Unreached peoples to pray for", route: "/(tabs)/missions" as const },
   ];
 
   return (
@@ -119,26 +105,3 @@ export default function DiscoverTab() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightCream },
-  header: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
-  headerTitle: { fontSize: 22, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  list: { padding: 20, gap: 12 },
-  card: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 14,
-  },
-  iconWrap: {
-    width: 42, height: 42, borderRadius: 12,
-    backgroundColor: "rgba(29,158,117,0.1)", alignItems: "center", justifyContent: "center",
-  },
-  cardTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  cardSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  countPill: {
-    backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
-  },
-  countText: { fontSize: 13, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
-});

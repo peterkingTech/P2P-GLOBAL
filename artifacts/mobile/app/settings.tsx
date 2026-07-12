@@ -19,7 +19,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors } from "@/constants/themes";
 import "@/lib/i18n";
 
 const LANGUAGES = [
@@ -42,6 +43,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { profile, updateProfile, supabase, user } = useAuth();
   const { t } = useTranslation();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
@@ -328,6 +331,8 @@ function SettingSwitchRow({
   disabled?: boolean;
   last?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={[styles.switchRow, last && styles.linkRowLast]}>
       <Text style={[styles.fieldLabel, disabled && { opacity: 0.4 }]}>{label}</Text>
@@ -342,78 +347,80 @@ function SettingSwitchRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightCream },
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.lightCream },
   header: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+    borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
   content: { paddingHorizontal: 20, paddingTop: 24 },
   avatarSection: { alignItems: "center", marginBottom: 24 },
   avatarWrap: { position: "relative" },
   avatarCircle: {
     width: 84, height: 84, borderRadius: 42,
     backgroundColor: "rgba(29,158,117,0.15)",
-    borderWidth: 3, borderColor: colors.accentGreen,
+    borderWidth: 3, borderColor: c.accentGreen,
     alignItems: "center", justifyContent: "center",
   },
-  avatarImg: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: colors.accentGreen },
-  avatarInitial: { fontSize: 32, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
+  avatarImg: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: c.accentGreen },
+  avatarInitial: { fontSize: 32, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
   cameraBadge: {
     position: "absolute", bottom: -2, right: -2,
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: colors.accentGreen, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: colors.lightCream,
+    backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: c.lightCream,
   },
-  changePhotoText: { fontSize: 12, color: colors.textMuted, marginTop: 10, fontFamily: "Inter_400Regular" },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: colors.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  changePhotoText: { fontSize: 12, color: c.textMuted, marginTop: 10, fontFamily: "Inter_400Regular" },
+  sectionTitle: { fontSize: 14, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
   card: {
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige,
+    backgroundColor: c.card, borderRadius: 14,
+    borderWidth: 1, borderColor: c.borderBeige,
     padding: 16, marginBottom: 24,
   },
-  fieldLabel: { fontSize: 12, fontWeight: "600", color: colors.textMid, marginBottom: 8, fontFamily: "Inter_600SemiBold" },
+  fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 8, fontFamily: "Inter_600SemiBold" },
   input: {
-    backgroundColor: colors.lightCream, borderWidth: 1, borderColor: colors.borderBeige,
-    borderRadius: 10, padding: 12, color: colors.textDark, fontSize: 14,
+    backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige,
+    borderRadius: 10, padding: 12, color: c.textDark, fontSize: 14,
     fontFamily: "Inter_400Regular", marginBottom: 14,
   },
   multiline: { minHeight: 80, textAlignVertical: "top" },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   useLocationBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 8 },
-  useLocationText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
+  useLocationText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
   saveBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 12, height: 46,
+    backgroundColor: c.accentGreen, borderRadius: 12, height: 46,
     alignItems: "center", justifyContent: "center", marginTop: 4,
   },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   switchRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
   linkRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
   linkRowLast: { borderBottomWidth: 0, paddingBottom: 0 },
   linkRowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  linkRowValue: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  linkRowValue: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: colors.lightCream,
+    backgroundColor: c.lightCream,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, maxHeight: "85%",
   },
   sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
   closeBtn: { padding: 4 },
   optionRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
-  optionLabel: { fontSize: 15, color: colors.textDark, fontFamily: "Inter_500Medium" },
-  optionDesc: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-});
+  optionLabel: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
+  optionDesc: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+  });
+}

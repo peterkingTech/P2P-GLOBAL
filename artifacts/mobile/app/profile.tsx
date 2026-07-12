@@ -17,11 +17,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
 import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
-import colors from "@/constants/colors";
 import "@/lib/i18n";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
@@ -44,14 +45,9 @@ const STRUGGLE_CATEGORIES = [
 ];
 
 const GIFT_LABELS: Record<string, string> = {
-  teaching: "Teaching",
-  evangelism: "Evangelism",
-  mercy: "Mercy",
-  leadership: "Leadership",
-  intercession: "Intercession",
-  hospitality: "Hospitality",
-  giving: "Giving",
-  prophecy: "Prophecy",
+  teaching: "Teaching", evangelism: "Evangelism", mercy: "Mercy",
+  leadership: "Leadership", intercession: "Intercession",
+  hospitality: "Hospitality", giving: "Giving", prophecy: "Prophecy",
 };
 
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
@@ -64,12 +60,158 @@ const PROFILE_ROWS = [
   { key: "highlights", labelKey: "profile.highlights", icon: "bookmark-outline" as const, route: "/highlights" as const },
 ];
 
+const THEME_ORDER: ThemeName[] = ["light", "dark", "sepia", "midnight"];
+
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.lightCream },
+    header: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.borderBeige,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    content: { paddingHorizontal: 20, paddingTop: 24 },
+    avatarSection: { alignItems: "center", marginBottom: 24 },
+    avatarCircle: {
+      width: 80, height: 80, borderRadius: 40,
+      backgroundColor: "rgba(29,158,117,0.15)",
+      borderWidth: 3, borderColor: c.accentGreen,
+      alignItems: "center", justifyContent: "center", marginBottom: 12,
+    },
+    nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    displayName: { fontSize: 20, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    displayNameEmpty: { color: c.textMuted, fontStyle: "italic", fontSize: 16, fontWeight: "400" },
+    email: { fontSize: 13, color: c.textMuted, marginTop: 4, fontFamily: "Inter_400Regular" },
+    bioText: { fontSize: 13, color: c.textMid, marginTop: 10, textAlign: "center", lineHeight: 18, fontFamily: "Inter_400Regular", paddingHorizontal: 12 },
+    locationRow: { flexDirection: "row", marginTop: 6 },
+    locationText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular" },
+    statsCard: {
+      flexDirection: "row", backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige,
+      padding: 16, marginBottom: 28, justifyContent: "space-around", alignItems: "center",
+    },
+    statItem: { alignItems: "center" },
+    statNum: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
+    statLabel: { fontSize: 11, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    statDivider: { width: 1, height: 32, backgroundColor: c.borderBeige },
+    sectionTitle: { fontSize: 14, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+    rowsList: { gap: 10, marginBottom: 28 },
+    fullRow: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 14,
+    },
+    fullRowLabel: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
+    giftsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 28, alignItems: "center" },
+    giftChip: {
+      backgroundColor: "rgba(29,158,117,0.1)",
+      borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
+      borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
+    },
+    giftChipText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_500Medium" },
+    addGiftChip: {
+      flexDirection: "row", alignItems: "center", gap: 4,
+      borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
+      borderWidth: 1, borderStyle: "dashed", borderColor: c.accentGreen,
+    },
+    addGiftChipText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_500Medium" },
+    dashboardRow: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 14,
+      borderWidth: 1, borderColor: "rgba(29,158,117,0.25)", padding: 14, marginBottom: 16,
+    },
+    dashboardTitle: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    dashboardSub: { fontSize: 11, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    settingsList: {
+      backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige,
+      overflow: "hidden", marginBottom: 24,
+    },
+    settingsRow: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      padding: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
+    },
+    settingsLabel: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_400Regular" },
+    reachOutBtn: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige,
+      padding: 14, marginBottom: 24,
+    },
+    reachOutTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    reachOutSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    signOutBtn: {
+      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+      backgroundColor: "rgba(185,28,28,0.08)",
+      borderRadius: 14, borderWidth: 1, borderColor: "rgba(185,28,28,0.2)",
+      height: 48,
+    },
+    signOutText: { fontSize: 15, color: "#B91C1C", fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+    sheet: {
+      backgroundColor: c.lightCream,
+      borderTopLeftRadius: 24, borderTopRightRadius: 24,
+      padding: 20, maxHeight: "85%",
+    },
+    sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+    sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    closeBtn: { padding: 4 },
+    sheetBody: { fontSize: 14, color: c.textMid, lineHeight: 20, marginBottom: 12, fontFamily: "Inter_400Regular" },
+    fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 8, marginTop: 8, fontFamily: "Inter_600SemiBold" },
+    categoryRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+    categoryChip: {
+      paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+      backgroundColor: "rgba(29,158,117,0.06)", borderWidth: 1, borderColor: c.borderBeige,
+    },
+    categoryChipActive: { backgroundColor: "rgba(29,158,117,0.15)", borderColor: c.accentGreen },
+    categoryChipText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
+    categoryChipTextActive: { color: c.accentGreen, fontWeight: "600" },
+    giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 8 },
+    giftCard: {
+      width: "47%", flexDirection: "row", alignItems: "center", gap: 8,
+      backgroundColor: "rgba(29,158,117,0.06)", borderRadius: 12,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 12,
+    },
+    giftCardSelected: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
+    giftCardLabel: { fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
+    giftCardLabelSelected: { color: "#fff" },
+    noteInput: {
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
+      borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: "top",
+      color: c.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
+    },
+    submitReachOutBtn: {
+      backgroundColor: c.accentGreen, borderRadius: 12, height: 46,
+      alignItems: "center", justifyContent: "center", marginTop: 16,
+    },
+    submitReachOutText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
+    // Theme picker
+    themeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 28 },
+    themeOption: {
+      flex: 1, minWidth: "45%", borderRadius: 14, padding: 12,
+      borderWidth: 2, borderColor: "transparent",
+      backgroundColor: c.card,
+      alignItems: "center", gap: 8,
+    },
+    themeOptionActive: { borderColor: c.accentGreen },
+    themeSwatches: { flexDirection: "row", gap: 4 },
+    themeSwatch: { width: 18, height: 18, borderRadius: 9 },
+    themeLabel: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    themeLabelActive: { color: c.accentGreen },
+    themeCheck: { position: "absolute", top: 8, right: 8 },
+  });
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
   const { submitHelpRequest } = useData();
   const { t } = useTranslation();
+  const { colors, theme, setTheme } = useTheme();
+  const styles = makeStyles(colors);
 
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
@@ -145,7 +287,6 @@ export default function ProfileScreen() {
             <HelpButton variant="inline" />
           </View>
           <Text style={styles.email}>{profile?.email ?? ""}</Text>
-
           <View style={styles.locationRow}>
             {profile?.role && <Text style={styles.locationText}>{t("profile.calledIn")}: {profile.role.replace(/_/g, " ")}</Text>}
           </View>
@@ -229,7 +370,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Peer Guide dashboard (conditional) */}
+        {/* Peer Guide dashboard */}
         {profile?.role === "peer_guide" && (
           <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
             <Ionicons name="compass-outline" size={18} color={colors.primaryGreen} />
@@ -241,7 +382,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Admin dashboard (conditional) */}
+        {/* Admin dashboard */}
         {profile?.role && ADMIN_ROLES.has(profile.role) && (
           <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/team")}>
             <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryGreen} />
@@ -253,7 +394,39 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Settings */}
+        {/* ── Appearance (Theme Picker) ── */}
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <View style={styles.themeGrid}>
+          {THEME_ORDER.map((name) => {
+            const meta = THEME_META[name];
+            const isActive = theme === name;
+            const t_colors = THEMES[name];
+            return (
+              <TouchableOpacity
+                key={name}
+                style={[styles.themeOption, isActive && styles.themeOptionActive]}
+                onPress={() => setTheme(name)}
+                activeOpacity={0.8}
+              >
+                {isActive && (
+                  <View style={styles.themeCheck}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />
+                  </View>
+                )}
+                <View style={styles.themeSwatches}>
+                  {meta.preview.map((hex, i) => (
+                    <View key={i} style={[styles.themeSwatch, { backgroundColor: hex }]} />
+                  ))}
+                </View>
+                <Text style={[styles.themeLabel, isActive && styles.themeLabelActive]}>
+                  {meta.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Account */}
         <Text style={styles.sectionTitle}>{t("profile.account")}</Text>
         <View style={styles.settingsList}>
           {[
@@ -286,6 +459,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      {/* Reach Out Modal */}
       <Modal visible={reachOutOpen} animationType="slide" transparent onRequestClose={() => setReachOutOpen(false)}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
@@ -345,6 +519,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Gifts Modal */}
       <Modal visible={giftsOpen} animationType="slide" transparent onRequestClose={() => setGiftsOpen(false)}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
@@ -355,9 +530,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.sheetBody}>
-                Select the gifts you believe God has given you.
-              </Text>
+              <Text style={styles.sheetBody}>Select the gifts you believe God has given you.</Text>
               <View style={styles.giftGrid}>
                 {ALL_GIFTS.map((gift) => {
                   const selected = selectedGifts.includes(gift.key);
@@ -368,11 +541,7 @@ export default function ProfileScreen() {
                       onPress={() => toggleGift(gift.key)}
                       activeOpacity={0.8}
                     >
-                      <Ionicons
-                        name={gift.icon as any}
-                        size={22}
-                        color={selected ? "#fff" : colors.accentGreen}
-                      />
+                      <Ionicons name={gift.icon as any} size={22} color={selected ? "#fff" : colors.accentGreen} />
                       <Text style={[styles.giftCardLabel, selected && styles.giftCardLabelSelected]}>
                         {gift.label}
                       </Text>
@@ -404,131 +573,3 @@ export default function ProfileScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightCream },
-  reachOutBtn: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 14, marginBottom: 24,
-  },
-  reachOutTitle: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
-  reachOutSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.lightCream,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, maxHeight: "85%",
-  },
-  sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  closeBtn: { padding: 4 },
-  sheetBody: { fontSize: 14, color: colors.textMid, lineHeight: 20, marginBottom: 12, fontFamily: "Inter_400Regular" },
-  fieldLabel: { fontSize: 12, fontWeight: "600", color: colors.textMid, marginBottom: 8, marginTop: 8, fontFamily: "Inter_600SemiBold" },
-  categoryRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
-  categoryChip: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
-    backgroundColor: "rgba(29,158,117,0.06)", borderWidth: 1, borderColor: colors.borderBeige,
-  },
-  categoryChipActive: { backgroundColor: "rgba(29,158,117,0.15)", borderColor: colors.accentGreen },
-  categoryChipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  categoryChipTextActive: { color: colors.accentGreen, fontWeight: "600" },
-  giftGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 8 },
-  giftCard: {
-    width: "47%", flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(29,158,117,0.06)", borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderBeige, padding: 12,
-  },
-  giftCardSelected: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
-  giftCardLabel: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
-  giftCardLabelSelected: { color: "#fff" },
-  noteInput: {
-    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
-    borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: "top",
-    color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
-  },
-  submitReachOutBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 12, height: 46,
-    alignItems: "center", justifyContent: "center", marginTop: 16,
-  },
-  submitReachOutText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-  header: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  content: { paddingHorizontal: 20, paddingTop: 24 },
-  avatarSection: { alignItems: "center", marginBottom: 24 },
-  avatarCircle: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: "rgba(29,158,117,0.15)",
-    borderWidth: 3, borderColor: colors.accentGreen,
-    alignItems: "center", justifyContent: "center", marginBottom: 12,
-  },
-  avatarInitial: { fontSize: 32, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  displayName: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  displayNameEmpty: { color: colors.textMuted, fontStyle: "italic", fontSize: 16, fontWeight: "400" },
-  email: { fontSize: 13, color: colors.textMuted, marginTop: 4, fontFamily: "Inter_400Regular" },
-  bioText: { fontSize: 13, color: colors.textMid, marginTop: 10, textAlign: "center", lineHeight: 18, fontFamily: "Inter_400Regular", paddingHorizontal: 12 },
-  locationRow: { flexDirection: "row", marginTop: 6 },
-  locationText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular" },
-  statsCard: {
-    flexDirection: "row",
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 16, marginBottom: 28, justifyContent: "space-around", alignItems: "center",
-  },
-  statItem: { alignItems: "center" },
-  statNum: { fontSize: 16, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
-  statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  statDivider: { width: 1, height: 32, backgroundColor: colors.borderBeige },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: colors.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  rowsList: { gap: 10, marginBottom: 28 },
-  fullRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige, padding: 14,
-  },
-  fullRowLabel: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Inter_500Medium" },
-  giftsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 28, alignItems: "center" },
-  giftChip: {
-    backgroundColor: "rgba(29,158,117,0.1)",
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
-  },
-  giftChipText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
-  addGiftChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderStyle: "dashed", borderColor: colors.accentGreen,
-  },
-  addGiftChipText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
-  dashboardRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 14,
-    borderWidth: 1, borderColor: "rgba(29,158,117,0.25)", padding: 14, marginBottom: 16,
-  },
-  dashboardTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  dashboardSub: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  settingsList: {
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige,
-    overflow: "hidden", marginBottom: 24,
-  },
-  settingsRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    padding: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
-  },
-  settingsLabel: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Inter_400Regular" },
-  signOutBtn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(185,28,28,0.08)",
-    borderRadius: 14, borderWidth: 1, borderColor: "rgba(185,28,28,0.2)",
-    height: 48,
-  },
-  signOutText: { fontSize: 15, color: "#B91C1C", fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-});

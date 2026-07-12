@@ -24,7 +24,8 @@ import {
 } from "@/contexts/DataContext";
 import AudioRecorder from "@/components/AudioRecorder";
 import VideoRecorder from "@/components/VideoRecorder";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors } from "@/constants/themes";
 
 interface LessonContent {
   title: string;
@@ -43,6 +44,8 @@ function TypeTabs({
   onChange: (t: SubmissionType) => void;
   disabled?: boolean;
 }) {
+  const { colors } = useTheme();
+  const tabStyles = makeTabStyles(colors);
   const tabs: { type: SubmissionType; icon: string; label: string }[] = [
     { type: "text", icon: "create-outline", label: "Text" },
     { type: "audio", icon: "mic-outline", label: "Audio" },
@@ -72,19 +75,21 @@ function TypeTabs({
   );
 }
 
-const tabStyles = StyleSheet.create({
+function makeTabStyles(c: AppColors) {
+  return StyleSheet.create({
   row: {
     flexDirection: "row", gap: 6, marginBottom: 12,
   },
   tab: {
     flex: 1, flexDirection: "row", gap: 5, alignItems: "center", justifyContent: "center",
     paddingVertical: 7, borderRadius: 10,
-    backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige,
+    backgroundColor: c.cardBeige, borderWidth: 1, borderColor: c.borderBeige,
   },
-  tabActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
-  label: { fontSize: 12, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
-  labelActive: { color: colors.cream },
-});
+  tabActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
+  label: { fontSize: 12, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
+  labelActive: { color: c.cream },
+  });
+}
 
 // ── Question response card ────────────────────────────────────────────────────
 function QuestionResponseCard({
@@ -103,6 +108,8 @@ function QuestionResponseCard({
   assignmentId?: string;
 }) {
   const { submitContent } = useData();
+  const { colors } = useTheme();
+  const qStyles = makeQStyles(colors);
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<SubmissionType>("text");
   const [text, setText] = useState("");
@@ -217,7 +224,8 @@ function QuestionResponseCard({
   );
 }
 
-const qStyles = StyleSheet.create({
+function makeQStyles(c: AppColors) {
+  return StyleSheet.create({
   wrapper: { marginBottom: 14 },
   questionRow: { flexDirection: "row", gap: 12, marginBottom: 6, alignItems: "flex-start" },
   questionNum: {
@@ -225,8 +233,8 @@ const qStyles = StyleSheet.create({
     backgroundColor: "rgba(29,158,117,0.12)",
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  questionNumText: { fontSize: 11, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
-  questionText: { flex: 1, fontSize: 14, color: colors.textDark, lineHeight: 22, fontFamily: "Inter_400Regular" },
+  questionNumText: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+  questionText: { flex: 1, fontSize: 14, color: c.textDark, lineHeight: 22, fontFamily: "Inter_400Regular" },
   submittedBadge: {
     flexDirection: "row", gap: 5, alignItems: "center",
     marginLeft: 36, marginTop: 2, marginBottom: 2,
@@ -234,29 +242,30 @@ const qStyles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
     alignSelf: "flex-start",
   },
-  submittedText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
+  submittedText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
   shareToggle: {
     flexDirection: "row", gap: 5, alignItems: "center",
     marginLeft: 36, marginTop: 2,
     alignSelf: "flex-start",
   },
-  shareToggleText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular" },
+  shareToggleText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular" },
   inputArea: { marginLeft: 36, marginTop: 8 },
   textInput: {
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
+    borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
     padding: 10, minHeight: 80, textAlignVertical: "top",
-    fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular",
-    marginBottom: 10, backgroundColor: colors.lightCream,
+    fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular",
+    marginBottom: 10, backgroundColor: c.lightCream,
   },
   error: { fontSize: 12, color: "#C0392B", marginBottom: 8, fontFamily: "Inter_400Regular" },
   submitBtn: {
     flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.primaryGreen, borderRadius: 10,
+    backgroundColor: c.primaryGreen, borderRadius: 10,
     paddingVertical: 10, paddingHorizontal: 16,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: colors.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-});
+  submitBtnText: { color: c.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  });
+}
 
 // ── Tappable highlightable paragraph ──────────────────────────────────────────
 export const HIGHLIGHT_COLORS: { key: string; label: string; swatch: string; bg: string }[] = [
@@ -321,6 +330,8 @@ function HighlightableParagraph({
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function LessonScreen() {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -621,71 +632,72 @@ export default function LessonScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightCream },
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.lightCream },
   header: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+    borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
   backBtn: { padding: 4 },
-  headerLabel: { flex: 1, fontSize: 16, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  headerLabel: { flex: 1, fontSize: 16, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
   completedTag: {
     flexDirection: "row", gap: 4, alignItems: "center",
-    backgroundColor: colors.accentGreen, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: c.accentGreen, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
-  completedTagText: { color: colors.cream, fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  completedTagText: { color: c.cream, fontSize: 11, fontFamily: "Inter_600SemiBold" },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: 20, paddingTop: 24 },
-  lessonTitle: { fontSize: 24, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 20 },
+  lessonTitle: { fontSize: 24, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 20 },
   verseCard: {
-    backgroundColor: colors.cardBeige, borderRadius: 16, borderWidth: 1, borderColor: colors.warmBeige,
-    padding: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: colors.amber,
+    backgroundColor: c.cardBeige, borderRadius: 16, borderWidth: 1, borderColor: c.warmBeige,
+    padding: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: c.amber,
   },
-  verseText: { fontSize: 16, fontStyle: "italic", color: colors.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 8 },
-  verseRef: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  sectionHeading: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4 },
-  bodyPara: { fontSize: 15, color: colors.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 16 },
+  verseText: { fontSize: 16, fontStyle: "italic", color: c.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 8 },
+  verseRef: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
+  sectionHeading: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4 },
+  bodyPara: { fontSize: 15, color: c.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 16 },
   sentenceHighlighted: { backgroundColor: "rgba(250,204,21,0.45)" },
   colorPickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   colorPickerCard: {
-    backgroundColor: colors.lightCream, borderRadius: 20, padding: 20,
+    backgroundColor: c.lightCream, borderRadius: 20, padding: 20,
     width: "82%", alignItems: "center",
   },
-  colorPickerTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 16 },
+  colorPickerTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 16 },
   colorSwatchRow: { flexDirection: "row", gap: 14, marginBottom: 6 },
   colorSwatch: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: "transparent" },
-  colorSwatchSelected: { borderColor: colors.textDark },
+  colorSwatchSelected: { borderColor: c.textDark },
   removeHighlightBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 18 },
   removeHighlightBtnText: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium" },
   questionsCard: {
-    backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
+    backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
     padding: 16, marginBottom: 28, marginTop: 8,
   },
   questionsHeader: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 16 },
-  questionsTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  questionsTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
   completeBtn: {
-    backgroundColor: colors.primaryGreen, borderRadius: 14, height: 54,
+    backgroundColor: c.primaryGreen, borderRadius: 14, height: 54,
     flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
   },
   completeBtnDisabled: { opacity: 0.7 },
-  completeBtnText: { color: colors.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  completeBtnText: { color: c.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   completedBanner: {
     backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 14, borderWidth: 1,
     borderColor: "rgba(29,158,117,0.3)", height: 54,
     flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
   },
-  completedBannerText: { color: colors.accentGreen, fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  completedBannerText: { color: c.accentGreen, fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   assignmentCard: {
-    backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
+    backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
     padding: 16, marginBottom: 20,
   },
-  assignmentInstructions: { fontSize: 14, color: colors.textMid, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 14 },
+  assignmentInstructions: { fontSize: 14, color: c.textMid, lineHeight: 22, fontFamily: "Inter_400Regular", marginBottom: 14 },
   assignmentInput: {
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
+    borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
     padding: 12, minHeight: 100, textAlignVertical: "top",
-    fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular",
-    marginBottom: 12, backgroundColor: colors.lightCream,
+    fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular",
+    marginBottom: 12, backgroundColor: c.lightCream,
   },
   submitError: { fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular" },
   revisionBanner: {
@@ -693,5 +705,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(217,164,65,0.12)", borderRadius: 12, borderWidth: 1,
     borderColor: "rgba(217,164,65,0.35)", padding: 12, marginBottom: 12,
   },
-  revisionBannerText: { flex: 1, fontSize: 13, color: colors.textDark, lineHeight: 20, fontFamily: "Inter_400Regular" },
-});
+  revisionBannerText: { flex: 1, fontSize: 13, color: c.textDark, lineHeight: 20, fontFamily: "Inter_400Regular" },
+  });
+}

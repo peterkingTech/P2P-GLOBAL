@@ -9,3 +9,4 @@
 - [P2P Moderator Scope](p2p-moderation-scope.md) — moderators see only flagged content + minimal poster identity; escalation reuses p2p_help_requests, not a new inbox.
 - [P2P Groups RLS Recursion](p2p-groups-rls-recursion.md) — stale un-dropped policies caused 42P17 recursion; profile visibility must be explicitly opened for shared group mates.
 - [P2P Highlights & Skills Taxonomy](p2p-highlights-skills.md) — sentence-tap highlighting via char offsets; skills stored as text[] mirroring gifts pattern.
+- [P2P Theme System](p2p-theme-system.md) — 4-theme system (light/dark/sepia/midnight); makeStyles(c: AppColors) pattern; AsyncStorage key @p2p/theme; partially migrated screens.

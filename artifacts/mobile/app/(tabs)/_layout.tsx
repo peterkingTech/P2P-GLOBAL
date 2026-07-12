@@ -5,8 +5,8 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
-import colors from "@/constants/colors";
+import { Platform, StyleSheet } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
 import "@/lib/i18n";
 
 function NativeTabLayout() {
@@ -38,7 +38,7 @@ function NativeTabLayout() {
 }
 
 function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
+  const { colors } = useTheme();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const { t } = useTranslation();
@@ -71,7 +71,7 @@ function ClassicTabLayout() {
             <BlurView
               intensity={90}
               tint="dark"
-              style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(11,58,46,0.85)" }]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: `${colors.navBg}D9` }]}
             />
           ) : null,
         tabBarLabelStyle: {

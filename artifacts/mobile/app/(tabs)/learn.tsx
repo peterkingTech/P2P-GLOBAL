@@ -13,9 +13,11 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, Module } from "@/contexts/DataContext";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import { AppColors } from "@/constants/themes";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
+  const { colors } = useTheme();
   const [err, setErr] = useState(false);
   if (uri && !err) {
     return (
@@ -35,6 +37,7 @@ function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean })
 }
 
 function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
+  const { colors } = useTheme();
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
   const isStarted = module.completedLessons > 0;
   const isComplete = pct === 100;
@@ -42,7 +45,7 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
 
   return (
     <TouchableOpacity
-      style={[styles.card, isLocked && styles.cardLocked]}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderBeige }, isLocked && styles.cardLocked]}
       onPress={onPress}
       activeOpacity={isLocked ? 1 : 0.85}
       disabled={isLocked}
@@ -56,14 +59,14 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
         </View>
       </View>
       <View style={styles.cardBody}>
-        <Text style={[styles.moduleTitle, isLocked && styles.textLocked]}>{module.title}</Text>
-        <Text style={styles.moduleDesc}>{module.description}</Text>
+        <Text style={[styles.moduleTitle, { color: colors.textDark }, isLocked && { color: colors.textMuted }]}>{module.title}</Text>
+        <Text style={[styles.moduleDesc, { color: colors.textMuted }]}>{module.description}</Text>
         {!isLocked && (
           <View style={styles.progressRow}>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${pct}%` }]} />
+            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
+              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: colors.progressFill }]} />
             </View>
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, { color: colors.textMuted }]}>
               {module.completedLessons}/{module.lessonCount}
             </Text>
           </View>
@@ -93,11 +96,104 @@ const COMING_SOON_PLANS = [
   { key: "8", icon: "cash-outline" as const, title: "Biblical Generosity", desc: "Stewardship, giving, and contentment." },
 ];
 
+function makeStyles(c: AppColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.lightCream },
+    header: {
+      paddingHorizontal: 20,
+      paddingBottom: 16,
+      backgroundColor: c.lightCream,
+      borderBottomWidth: 1,
+      borderBottomColor: c.borderBeige,
+    },
+    headerTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    headerSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular", marginBottom: 16 },
+    segmentRow: {
+      flexDirection: "row", backgroundColor: c.card, borderRadius: 12,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 4, marginBottom: 16,
+    },
+    segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
+    segmentBtnActive: { backgroundColor: c.primaryGreen },
+    segmentText: { fontSize: 13, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
+    segmentTextActive: { color: "#fff" },
+    plansList: { paddingHorizontal: 20, paddingTop: 16 },
+    planCard: {
+      backgroundColor: c.card, borderRadius: 16,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 12,
+      flexDirection: "row", alignItems: "center", gap: 12,
+    },
+    planIconWrap: {
+      width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
+      alignItems: "center", justifyContent: "center", flexShrink: 0,
+    },
+    planCardBody: { flex: 1 },
+    planTitle: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 3 },
+    planDesc: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    comingSoonPill: {
+      backgroundColor: "rgba(201,180,138,0.2)", borderRadius: 8,
+      paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0,
+    },
+    comingSoonText: { fontSize: 10, fontWeight: "700", color: c.amber, fontFamily: "Inter_700Bold" },
+    overallProgress: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+    overallLeft: {},
+    overallLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    overallPct: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
+    overallCircle: {
+      width: 52, height: 52, borderRadius: 26,
+      backgroundColor: "rgba(29,158,117,0.12)",
+      borderWidth: 2, borderColor: c.accentGreen,
+      alignItems: "center", justifyContent: "center",
+    },
+    overallCircleText: { fontSize: 16, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    overallCircleSub: { fontSize: 9, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    overallBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3 },
+    overallBarFill: { height: 6, backgroundColor: c.progressFill, borderRadius: 3 },
+    loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+    list: { paddingHorizontal: 20, paddingTop: 16 },
+    milestoneRow: { alignItems: "flex-start", paddingLeft: 26 },
+    milestoneDot: {
+      width: 20, height: 20, borderRadius: 10,
+      alignItems: "center", justifyContent: "center",
+    },
+    milestoneLine: {
+      width: 2, height: 16,
+      backgroundColor: c.borderBeige,
+      marginLeft: 35,
+    },
+    card: {
+      borderRadius: 16, borderWidth: 1,
+      padding: 14, flexDirection: "row", gap: 12, alignItems: "center",
+      marginBottom: 2,
+    },
+    cardLocked: { opacity: 0.55 },
+    cardLeft: { alignItems: "center", gap: 6 },
+    thumb: { width: 48, height: 48, borderRadius: 10 },
+    thumbLocked: { opacity: 0.4 },
+    thumbPlaceholder: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
+    levelBadge: {
+      width: 36, height: 36, borderRadius: 10,
+      alignItems: "center", justifyContent: "center",
+    },
+    levelText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    cardBody: { flex: 1 },
+    moduleTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+    moduleDesc: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8 },
+    progressRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    progressBg: { flex: 1, height: 4, borderRadius: 2 },
+    progressFill: { height: 4, borderRadius: 2 },
+    progressText: { fontSize: 11, fontFamily: "Inter_400Regular", minWidth: 28 },
+    cardRight: {},
+  });
+}
+
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { modules, isLoading } = useData();
+  const { colors } = useTheme();
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
+
+  const styles = makeStyles(colors);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -138,7 +234,7 @@ export default function LearnTab() {
               </View>
             </View>
             <View style={styles.overallBarBg}>
-              <View style={[styles.overallBarFill, { width: `${overallPct}%` }]} />
+              <View style={[styles.overallBarFill, { width: `${overallPct}%` as any }]} />
             </View>
           </>
         )}
@@ -204,93 +300,3 @@ export default function LearnTab() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightCream },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: colors.lightCream,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderBeige,
-  },
-  headerTitle: { fontSize: 22, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 13, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular", marginBottom: 16 },
-  segmentRow: {
-    flexDirection: "row", backgroundColor: colors.card, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderBeige, padding: 4, marginBottom: 16,
-  },
-  segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
-  segmentBtnActive: { backgroundColor: colors.primaryGreen },
-  segmentText: { fontSize: 13, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
-  segmentTextActive: { color: "#fff" },
-  plansList: { paddingHorizontal: 20, paddingTop: 16 },
-  planCard: {
-    backgroundColor: colors.card, borderRadius: 16,
-    borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", gap: 12,
-  },
-  planIconWrap: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  planCardBody: { flex: 1 },
-  planTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 3 },
-  planDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
-  comingSoonPill: {
-    backgroundColor: "rgba(201,180,138,0.2)", borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0,
-  },
-  comingSoonText: { fontSize: 10, fontWeight: "700", color: colors.amber, fontFamily: "Inter_700Bold" },
-  overallProgress: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  overallLeft: {},
-  overallLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  overallPct: { fontSize: 16, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
-  overallCircle: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: "rgba(29,158,117,0.12)",
-    borderWidth: 2, borderColor: colors.accentGreen,
-    alignItems: "center", justifyContent: "center",
-  },
-  overallCircleText: { fontSize: 16, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
-  overallCircleSub: { fontSize: 9, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  overallBarBg: { height: 6, backgroundColor: colors.progressTrack, borderRadius: 3 },
-  overallBarFill: { height: 6, backgroundColor: colors.progressFill, borderRadius: 3 },
-  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-  list: { paddingHorizontal: 20, paddingTop: 16 },
-  milestoneRow: { alignItems: "flex-start", paddingLeft: 26 },
-  milestoneDot: {
-    width: 20, height: 20, borderRadius: 10,
-    alignItems: "center", justifyContent: "center",
-  },
-  milestoneLine: {
-    width: 2, height: 16,
-    backgroundColor: colors.borderBeige,
-    marginLeft: 35,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 14, flexDirection: "row", gap: 12, alignItems: "center",
-    marginBottom: 2,
-  },
-  cardLocked: { opacity: 0.55 },
-  textLocked: { color: colors.textMuted },
-  cardLeft: { alignItems: "center", gap: 6 },
-  thumb: { width: 48, height: 48, borderRadius: 10 },
-  thumbLocked: { opacity: 0.4 },
-  thumbPlaceholder: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
-  levelBadge: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: "center", justifyContent: "center",
-  },
-  levelText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  cardBody: { flex: 1 },
-  moduleTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
-  moduleDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginBottom: 8 },
-  progressRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  progressBg: { flex: 1, height: 4, backgroundColor: colors.progressTrack, borderRadius: 2 },
-  progressFill: { height: 4, backgroundColor: colors.progressFill, borderRadius: 2 },
-  progressText: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", minWidth: 28 },
-  cardRight: {},
-});
