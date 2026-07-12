@@ -18,6 +18,7 @@ import { AppColors } from "@/constants/themes";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [err, setErr] = useState(false);
   if (uri && !err) {
     return (
@@ -38,6 +39,7 @@ function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean })
 
 function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
   const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
   const isStarted = module.completedLessons > 0;
   const isComplete = pct === 100;
