@@ -160,19 +160,19 @@ export default function LearnTab() {
         )
       ) : (
         <FlatList
-          key="plans-grid"
+          key="plans-list"
           data={COMING_SOON_PLANS}
           keyExtractor={(p) => p.key}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 12 }}
           contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
           renderItem={({ item }) => (
             <View style={styles.planCard}>
               <View style={styles.planIconWrap}>
                 <Ionicons name={item.icon} size={22} color={colors.accentGreen} />
               </View>
-              <Text style={styles.planTitle}>{item.title}</Text>
-              <Text style={styles.planDesc}>{item.desc}</Text>
+              <View style={styles.planCardBody}>
+                <Text style={styles.planTitle}>{item.title}</Text>
+                <Text style={styles.planDesc}>{item.desc}</Text>
+              </View>
               <View style={styles.comingSoonPill}>
                 <Text style={styles.comingSoonText}>Coming Soon</Text>
               </View>
@@ -203,20 +203,22 @@ const styles = StyleSheet.create({
   segmentBtnActive: { backgroundColor: colors.primaryGreen },
   segmentText: { fontSize: 13, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   segmentTextActive: { color: "#fff" },
-  plansList: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
+  plansList: { paddingHorizontal: 20, paddingTop: 16 },
   planCard: {
-    flex: 1, backgroundColor: colors.card, borderRadius: 16,
+    backgroundColor: colors.card, borderRadius: 16,
     borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", gap: 12,
   },
   planIconWrap: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
-    alignItems: "center", justifyContent: "center", marginBottom: 10,
+    width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  planTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  planDesc: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16, marginBottom: 10 },
+  planCardBody: { flex: 1 },
+  planTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 3 },
+  planDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
   comingSoonPill: {
-    alignSelf: "flex-start", backgroundColor: "rgba(201,180,138,0.2)",
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: "rgba(201,180,138,0.2)", borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0,
   },
   comingSoonText: { fontSize: 10, fontWeight: "700", color: colors.amber, fontFamily: "Inter_700Bold" },
   overallProgress: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },

@@ -139,7 +139,9 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           <Avatar photoUrl={profile?.avatarUrl} name={profile?.displayName} size={80} borderWidth={3} style={styles.avatarCircle} />
           <View style={styles.nameRow}>
-            <Text style={styles.displayName}>{profile?.displayName ?? "Anonymous"}</Text>
+            <Text style={[styles.displayName, !profile?.displayName && styles.displayNameEmpty]}>
+              {profile?.displayName || "Add your name"}
+            </Text>
             <HelpButton variant="inline" />
           </View>
           <Text style={styles.email}>{profile?.email ?? ""}</Text>
@@ -469,6 +471,7 @@ const styles = StyleSheet.create({
   avatarInitial: { fontSize: 32, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   displayName: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  displayNameEmpty: { color: colors.textMuted, fontStyle: "italic", fontSize: 16, fontWeight: "400" },
   email: { fontSize: 13, color: colors.textMuted, marginTop: 4, fontFamily: "Inter_400Regular" },
   bioText: { fontSize: 13, color: colors.textMid, marginTop: 10, textAlign: "center", lineHeight: 18, fontFamily: "Inter_400Regular", paddingHorizontal: 12 },
   locationRow: { flexDirection: "row", marginTop: 6 },

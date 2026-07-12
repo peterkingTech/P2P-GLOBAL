@@ -165,13 +165,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return error.message;
 
     if (data.user) {
-      const { error: profileErr } = await supabase.from("p2p_profiles").upsert({
+      const profileRow = {
         id: data.user.id,
         email,
         full_name: name,
         created_at: new Date().toISOString(),
-      });
+      };
+      const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
       if (profileErr) return profileErr.message;
+      // Set the profile immediately so the UI shows the real name before
+      // onAuthStateChange triggers fetchProfile (which may race with the upsert).
+      setProfile(mapProfileRow({ ...profileRow, role: "student", growth_level: 0, gifts: [], skills: [] }));
     }
     return null;
   }, []);

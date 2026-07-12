@@ -22,9 +22,9 @@ const SLIDES = [
   {
     id: "1",
     icon: null, // slide 1 uses the big logo instead of an icon
-    title: "Discipleship Across Nations",
+    title: "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
     subtitle:
-      "Connect with believers worldwide for peer-to-peer Bible study. Grow together, across every border.",
+      "Connect with believers worldwide. Grow together, across every border, every nation.",
   },
   {
     id: "2",
@@ -106,7 +106,10 @@ export default function OnboardingScreen() {
                 />
               </View>
             )}
-            <Text style={styles.title}>{item.title}</Text>
+            <Text style={[styles.title, item.id === "1" && styles.titleHero]}>{item.title}</Text>
+            {item.id === "1" && (
+              <Text style={styles.poweredBy}>Powered by AMEN TECH</Text>
+            )}
             <Text style={styles.subtitle}>{item.subtitle}</Text>
           </View>
         )}
@@ -141,6 +144,20 @@ export default function OnboardingScreen() {
           <Ionicons name="arrow-forward" size={18} color={colors.cream} />
         </TouchableOpacity>
 
+        {current === 0 && (
+          <TouchableOpacity
+            style={styles.discoverBtn}
+            onPress={() => {
+              const next = 1;
+              listRef.current?.scrollToIndex({ index: next, animated: true });
+              setCurrent(next);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="compass-outline" size={16} color={colors.accentGreen} />
+            <Text style={styles.discoverBtnText}>Discover More</Text>
+          </TouchableOpacity>
+        )}
         {current === 0 && (
           <TouchableOpacity
             onPress={() => router.replace("/(auth)/login")}
@@ -206,12 +223,46 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontFamily: "Inter_700Bold",
   },
+  titleHero: {
+    fontSize: 22,
+    letterSpacing: 0.8,
+    color: "#F4EFE4",
+    lineHeight: 30,
+    marginBottom: 8,
+  },
+  poweredBy: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.accentGreen,
+    textAlign: "center",
+    letterSpacing: 1.5,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 20,
+    textTransform: "uppercase",
+  },
   subtitle: {
     fontSize: 15,
     color: colors.textMutedLight,
     textAlign: "center",
     lineHeight: 24,
     fontFamily: "Inter_400Regular",
+  },
+  discoverBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(29,158,117,0.35)",
+    backgroundColor: "rgba(29,158,117,0.08)",
+  },
+  discoverBtnText: {
+    color: colors.accentGreen,
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
   },
   dots: {
     flexDirection: "row",

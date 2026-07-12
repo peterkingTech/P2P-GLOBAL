@@ -1,0 +1,12 @@
+Remove all remaining hardcoded mock data — confirmed still present in these exact locations, not a general sweep, fix these specifically then search for any others of the same pattern:
+
+1. contexts/DataContext.tsx line 395: MOCK_MISSIONS array — replace with a real Supabase query against whatever missions table exists (or should exist — confirm/create p2p_missions if it doesn't exist yet).
+2. contexts/DataContext.tsx line 402: MOCK_FRUITS array, and its use as the initial/fallback state (lines 456, 457, 687, 749) — replace with real data from the actual Fruit/Race system (fruit_points and related tables from earlier work).
+3. app/(tabs)/index.tsx line 21: MOCK_GROWTH_POINTS = 4, hardcoded and used as the Home tab's displayed growth points regardless of the real signed-in user's actual progress. Replace with the real growth metrics query.
+4. app/living-tree.tsx line 27: MOCK_GROWTH object — currently used as a fallback/mixed-in value even alongside some real data (profile?.growthLevel). Remove entirely; every stat shown (prayers offered, lessons completed, sessions shared, disciples invited) must come from real queries, with a proper zero/empty state for a new user, never a fake fallback number.
+5. app/stages.tsx line 17: MOCK_GROWTH_POINTS = 4 (same issue as index.tsx) — this means the Stages screen shows every single user, including brand new ones, as if they have 4 growth points. Fix to use real data.
+6. app/session/[id].tsx line 25: MOCK_MESSAGES array — the session chat currently shows fake canned messages instead of real messages. This needs the real messaging system (if built per earlier prompts) wired in here, or a genuine empty state if messaging isn't ready yet — never fake message content.
+
+After fixing these six, do a final search across the entire codebase for any remaining MOCK_, FAKE_, DUMMY_, or similarly-named hardcoded data constants and report every one found, even if you don't fix all of them in this pass — I want a complete list.
+
+TEST THIS WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE — confirm Home, Living Tree, Stages, and session chat all show real zero/empty states, not the number 4 or any fake content.

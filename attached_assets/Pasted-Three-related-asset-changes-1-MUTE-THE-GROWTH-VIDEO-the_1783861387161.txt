@@ -1,0 +1,21 @@
+Three related asset changes:
+
+1. MUTE THE GROWTH VIDEO: the "Watch your growth" video (constants/growthVideo.ts and wherever it's played) should play with sound OFF — video only, no audio track playing. Set the video player's muted property to true (or equivalent for whatever video component is used).
+
+2. REPLACE GROWTH STAGE IMAGES: constants/stages.ts currently defines the images for each of the 6 growth stages. Replace them with these real hosted images:
+   - Dormant Seed: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Dormant%20Seed.jpg
+   - Sprout: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/sprout.jpg
+   - Young Tree: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Young%20tree.jpg
+   - Fruitful Tree: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Fruitful%20tree.jpg
+   - Forest Builder: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20Builder.jpeg
+   - Forest of Nations: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20of%20nations.jpeg
+   Confirm all 6 stages (in LivingTree.tsx, stages.tsx, and anywhere else these are referenced) now show the correct real image per stage, not the old placeholder art.
+
+3. GLOBAL FOREST SCREEN — add these two real assets, designed thoughtfully, not just dropped in:
+   - Global Forest Image: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Global%20Forest%20Image.jpg
+   - Global Forest Map Video: https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20Map%20Video.png (confirm this is actually a video file despite the .png extension — if it's genuinely a static image, treat it as one; if it's a mislabeled video, handle accordingly)
+   Propose a layout that uses these well (e.g. the image as a header/hero above the real generational/network data, the video as an ambient background or a tappable "see the network" moment) rather than just stacking them above the existing content awkwardly. Show me the layout choice before finalizing if it's a significant departure from the current screen.
+
+TEST THIS WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE.
+
+Report back confirming the video is silent, all 6 stage images are correctly swapped, and the Global Forest screen's new layout with both assets.
