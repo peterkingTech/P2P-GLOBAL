@@ -306,6 +306,8 @@ function HighlightableParagraph({
   onToggle: (params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) => void;
   onLongPressExisting: (highlight: UserHighlight) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const sentences = splitSentences(content);
   return (
     <Text style={styles.bodyPara}>
