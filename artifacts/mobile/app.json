@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "P2P Global Bible Study Network",
-    "slug": "mobile",
+    "slug": "p2p-global-bible-study",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "p2pglobalbiblestudy",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -14,19 +14,29 @@
       "backgroundColor": "#06110D"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.amentech.p2pglobalbiblestudy",
+      "buildNumber": "1"
     },
-    "android": {},
+    "android": {
+      "package": "com.amentech.p2pglobalbiblestudy",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#06110D"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      "expo-router",
       "expo-font",
       "expo-web-browser",
       [
