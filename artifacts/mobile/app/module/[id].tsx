@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +16,40 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+
+type AttributionStyle = "plaque" | "credit-line";
+interface Attribution {
+  style: AttributionStyle;
+  honorLine: string;
+  orgLine: string;
+  socialLine: string;
+  socialUrls?: { youtube?: string; instagram?: string };
+}
+
+const ATTRIBUTION_MAP: Record<string, Attribution> = {
+  "a1b2c3d4-e5f6-7890-abcd-ef1234567890": {
+    style: "plaque",
+    honorLine: "In honor of Dr. Myles Munroe",
+    orgLine: "Bahamas Faith Ministries International · Nassau, The Bahamas",
+    socialLine: "YouTube: @MunroeGlobal  ·  Instagram: @munroeglobal",
+    socialUrls: {
+      youtube: "https://www.youtube.com/@MunroeGlobal",
+      instagram: "https://www.instagram.com/munroeglobal",
+    },
+  },
+};
+
+const VICTORY_CURRICULUM_ID = "c2000000-0000-0000-0000-000000000002";
+const VICTORY_ATTRIBUTION: Attribution = {
+  style: "credit-line",
+  honorLine: "Teaching credit: Pastor Dolapo Lawal",
+  orgLine: "Lead Pastor, Zoe Household Global · Austell, GA / Lagos, Nigeria",
+  socialLine: "@PastorDolapoLawal (YouTube)  ·  @thedolapolawal (Instagram)",
+  socialUrls: {
+    youtube: "https://www.youtube.com/@PastorDolapoLawal",
+    instagram: "https://www.instagram.com/thedolapolawal",
+  },
+};
 
 const HERO_HEIGHT = 230;
 
@@ -25,6 +60,71 @@ interface PlanLesson {
   order: number;
   isCompleted: boolean;
   isLocked: boolean;
+}
+
+function AttributionBlock({ attr }: { attr: Attribution }) {
+  const isPlaque = attr.style === "plaque";
+
+  if (isPlaque) {
+    return (
+      <View style={attrStyles.plaque}>
+        <View style={attrStyles.plaqueInner}>
+          <Text style={attrStyles.plaqueDecor}>✦</Text>
+          <Text style={attrStyles.plaqueHonor}>{attr.honorLine}</Text>
+          <Text style={attrStyles.plaqueOrg}>{attr.orgLine}</Text>
+          <View style={attrStyles.plaqueDivider} />
+          <View style={attrStyles.plaqueHandles}>
+            {attr.socialUrls?.youtube && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(attr.socialUrls!.youtube!)}
+                style={attrStyles.plaqueHandle}
+              >
+                <Ionicons name="logo-youtube" size={14} color="#BA7517" />
+                <Text style={attrStyles.plaqueHandleText}>@MunroeGlobal</Text>
+              </TouchableOpacity>
+            )}
+            {attr.socialUrls?.instagram && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(attr.socialUrls!.instagram!)}
+                style={attrStyles.plaqueHandle}
+              >
+                <Ionicons name="logo-instagram" size={14} color="#BA7517" />
+                <Text style={attrStyles.plaqueHandleText}>@munroeglobal</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={attrStyles.creditLine}>
+      <View style={attrStyles.creditBar} />
+      <Text style={attrStyles.creditHonor}>{attr.honorLine}</Text>
+      <Text style={attrStyles.creditOrg}>{attr.orgLine}</Text>
+      <View style={attrStyles.creditHandles}>
+        {attr.socialUrls?.youtube && (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(attr.socialUrls!.youtube!)}
+            style={attrStyles.creditHandle}
+          >
+            <Ionicons name="logo-youtube" size={12} color={colors.textMuted} />
+            <Text style={attrStyles.creditHandleText}>@PastorDolapoLawal</Text>
+          </TouchableOpacity>
+        )}
+        {attr.socialUrls?.instagram && (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(attr.socialUrls!.instagram!)}
+            style={attrStyles.creditHandle}
+          >
+            <Ionicons name="logo-instagram" size={12} color={colors.textMuted} />
+            <Text style={attrStyles.creditHandleText}>@thedolapolawal</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 }
 
 function HeroImage({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
@@ -121,6 +221,13 @@ export default function ModuleDetailScreen() {
   const isLocked = !isPlan && (coreModule?.isLocked ?? false);
   const isLoading = isPlan && planLoading;
   const levelLabel = isPlan ? "Study Plan" : `Level ${coreModule?.level ?? 1}`;
+
+  const attribution = useMemo<Attribution | null>(() => {
+    if (!isPlan) return null;
+    if (id && ATTRIBUTION_MAP[id]) return ATTRIBUTION_MAP[id];
+    if (plan?.curriculumId === VICTORY_CURRICULUM_ID) return VICTORY_ATTRIBUTION;
+    return null;
+  }, [isPlan, id, plan?.curriculumId]);
 
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -230,6 +337,11 @@ export default function ModuleDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* ── Attribution ── */}
+        {attribution && !isLoading && (
+          <AttributionBlock attr={attribution} />
+        )}
       </ScrollView>
     </View>
   );
@@ -399,4 +511,106 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   lessonTitleLocked: { color: colors.textMuted },
+});
+
+const attrStyles = StyleSheet.create({
+  plaque: {
+    marginHorizontal: 16,
+    marginTop: 28,
+    marginBottom: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "rgba(186,117,23,0.35)",
+    backgroundColor: "rgba(186,117,23,0.06)",
+    overflow: "hidden",
+  },
+  plaqueInner: {
+    padding: 20,
+    alignItems: "center",
+    gap: 4,
+  },
+  plaqueDecor: {
+    fontSize: 16,
+    color: "#BA7517",
+    marginBottom: 6,
+    letterSpacing: 6,
+  },
+  plaqueHonor: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#7A4A0A",
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  plaqueOrg: {
+    fontSize: 12,
+    color: "#9A6010",
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  plaqueDivider: {
+    width: 40,
+    height: 1,
+    backgroundColor: "rgba(186,117,23,0.3)",
+    marginVertical: 10,
+  },
+  plaqueHandles: {
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "center",
+    flexWrap: "wrap",
+  },
+  plaqueHandle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  plaqueHandleText: {
+    fontSize: 12,
+    color: "#BA7517",
+    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
+  },
+
+  creditLine: {
+    marginHorizontal: 16,
+    marginTop: 28,
+    marginBottom: 8,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primaryGreen,
+    gap: 3,
+  },
+  creditBar: { display: "none" },
+  creditHonor: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textDark,
+    fontFamily: "Inter_600SemiBold",
+  },
+  creditOrg: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+  creditHandles: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 6,
+    flexWrap: "wrap",
+  },
+  creditHandle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  creditHandleText: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontFamily: "Inter_400Regular",
+  },
 });
