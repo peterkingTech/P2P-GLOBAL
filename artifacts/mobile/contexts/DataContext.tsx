@@ -443,7 +443,7 @@ async function uploadSubmissionMedia(
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, profile } = useAuth();
+  const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
@@ -469,7 +469,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: allCurriculums } = await supabase
         .from("p2p_curriculums")
-        .select("id,type")
+        .select("*")
         .eq("status", "published");
       const planCurriculums = (allCurriculums ?? []).filter(
         (c: Record<string, unknown>) => (c.type as string) === "plan"
@@ -526,7 +526,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: allCurriculumsRaw } = await supabase
         .from("p2p_curriculums")
-        .select("id,title,status,type")
+        .select("*")
         .eq("status", "published");
       const curriculums = (allCurriculumsRaw ?? []).filter(
         (c: Record<string, unknown>) => (c.type as string) !== "plan"
@@ -759,6 +759,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const lastLoadedUserId = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (authLoading) return;
     if (!isAuthenticated || !profile?.id) {
       resetAllState();
       lastLoadedUserId.current = null;
@@ -855,7 +856,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
