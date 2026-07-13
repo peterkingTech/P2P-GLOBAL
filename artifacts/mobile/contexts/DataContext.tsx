@@ -33,6 +33,7 @@ export interface Plan {
   iconName: string;
   lessonCount: number;
   completedLessons: number;
+  isLocked: boolean;
   imageUrl?: string;
 }
 
@@ -499,7 +500,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
       const lessonsRaw = (planLessons ?? []) as Record<string, unknown>[];
-      const builtPlans: Plan[] = (planModules as Record<string, unknown>[]).map((m) => {
+      const builtPlans: Plan[] = (planModules as Record<string, unknown>[]).map((m, idx) => {
         const mLessons = lessonsRaw.filter((l) => (l.module_id as string) === (m.id as string));
         const lessonCount = mLessons.length;
         const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
@@ -511,9 +512,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           iconName: (m.icon_name as string) ?? "book-outline",
           lessonCount,
           completedLessons,
+          isLocked: false, // set below
           imageUrl: (m.image_url as string) ?? undefined,
         };
       });
+      // Lock plans sequentially — each plan unlocks when the previous is 100% complete
+      for (let i = 0; i < builtPlans.length; i++) {
+        if (i === 0) {
+          builtPlans[i].isLocked = false;
+        } else {
+          const prev = builtPlans[i - 1];
+          builtPlans[i].isLocked = prev.lessonCount === 0 || prev.completedLessons < prev.lessonCount;
+        }
+      }
       setPlans(builtPlans);
     } catch {
       setPlans([]);

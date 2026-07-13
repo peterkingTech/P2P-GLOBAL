@@ -88,35 +88,84 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
   );
 }
 
+function PlanThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
+  const { colors } = useTheme();
+  const [err, setErr] = useState(false);
+  if (uri && !err) {
+    return (
+      <View style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
+        <Image
+          source={{ uri }}
+          style={{ width: 64, height: 64, opacity: isLocked ? 0.4 : 1 }}
+          resizeMode="cover"
+          onError={() => setErr(true)}
+        />
+        {isLocked && (
+          <View style={{
+            position: "absolute", inset: 0, alignItems: "center", justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.25)",
+          }}>
+            <Ionicons name="lock-closed" size={18} color="#fff" />
+          </View>
+        )}
+      </View>
+    );
+  }
+  return (
+    <View style={{
+      width: 64, height: 64, borderRadius: 12, flexShrink: 0,
+      backgroundColor: isLocked ? colors.borderBeige : "rgba(29,158,117,0.08)",
+      alignItems: "center", justifyContent: "center",
+    }}>
+      <Ionicons
+        name={isLocked ? "lock-closed" : "book-outline"}
+        size={22}
+        color={isLocked ? colors.textMuted : colors.accentGreen}
+      />
+    </View>
+  );
+}
+
 function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
-  const isStarted = plan.completedLessons > 0;
   const isComplete = pct === 100;
+  const isLocked = plan.isLocked;
   return (
-    <TouchableOpacity style={styles.planCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.planIconWrap}>
-        <Ionicons name={(plan.iconName || "book-outline") as any} size={22} color={colors.accentGreen} />
-      </View>
+    <TouchableOpacity
+      style={[styles.planCard, isLocked && styles.planCardLocked]}
+      onPress={onPress}
+      activeOpacity={isLocked ? 1 : 0.85}
+      disabled={isLocked}
+    >
+      <PlanThumbnail uri={plan.imageUrl} isLocked={isLocked} />
       <View style={styles.planCardBody}>
-        <Text style={styles.planTitle}>{plan.title}</Text>
-        <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
-        {plan.lessonCount > 0 && (
-          <View style={[styles.progressRow, { marginTop: 6 }]}>
-            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
-              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
-            </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              {plan.completedLessons}/{plan.lessonCount}
-            </Text>
-          </View>
+        <Text style={[styles.planTitle, isLocked && { color: colors.textMuted }]}>{plan.title}</Text>
+        {isLocked ? (
+          <Text style={[styles.planDesc, { fontStyle: "italic" }]}>Complete the previous plan to unlock</Text>
+        ) : (
+          <>
+            <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
+            {plan.lessonCount > 0 && (
+              <View style={[styles.progressRow, { marginTop: 6 }]}>
+                <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
+                  <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
+                </View>
+                <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                  {plan.completedLessons}/{plan.lessonCount}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </View>
-      {isComplete ? (
-        <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
-      ) : (
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      {!isLocked && (
+        isComplete ? (
+          <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
+        ) : (
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        )
       )}
     </TouchableOpacity>
   );
@@ -148,6 +197,7 @@ function makeStyles(c: AppColors) {
       borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 12,
       flexDirection: "row", alignItems: "center", gap: 12,
     },
+    planCardLocked: { opacity: 0.55 },
     planIconWrap: {
       width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
       alignItems: "center", justifyContent: "center", flexShrink: 0,
