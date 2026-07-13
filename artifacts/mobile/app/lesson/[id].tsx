@@ -32,6 +32,7 @@ interface LessonContent {
   sections: { id: string; title: string; content: string }[];
   scriptures: { id: string; reference: string; verse: string }[];
   questions: { id: string; question: string }[];
+  attribution?: string;
 }
 
 // ── Submission type tab selector ──────────────────────────────────────────────
@@ -429,17 +430,20 @@ export default function LessonScreen() {
       try {
         const [{ data: lesson }, { data: sections }, { data: scriptures }, { data: questions }] =
           await Promise.all([
-            supabase.from("p2p_lessons").select("id,title").eq("id", id).maybeSingle(),
+            supabase.from("p2p_lessons").select("id,title,module_id,p2p_modules(attribution_text)").eq("id", id).maybeSingle(),
             supabase.from("p2p_lesson_sections").select("id,title,content,section_order").eq("lesson_id", id).order("section_order", { ascending: true }),
             supabase.from("p2p_scriptures").select("id,reference,verse,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
             supabase.from("p2p_reflection_questions").select("id,question,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
           ]);
         if (!cancelled) {
+          const mod = lesson?.p2p_modules as Record<string, unknown> | null;
+          const attribution = (mod?.attribution_text as string) ?? undefined;
           setContent({
             title: (lesson?.title as string) ?? lessonMeta?.title ?? "Lesson",
             sections: ((sections ?? []) as Record<string, unknown>[]).map((s) => ({ id: s.id as string, title: (s.title as string) ?? "", content: (s.content as string) ?? "" })),
             scriptures: ((scriptures ?? []) as Record<string, unknown>[]).map((s) => ({ id: s.id as string, reference: s.reference as string, verse: s.verse as string })),
             questions: ((questions ?? []) as Record<string, unknown>[]).map((q) => ({ id: q.id as string, question: q.question as string })),
+            attribution,
           });
         }
       } catch {
@@ -590,6 +594,13 @@ export default function LessonScreen() {
               </View>
             )
           )}
+
+          {content.attribution ? (
+            <View style={styles.attributionBlock}>
+              <View style={styles.attributionRule} />
+              <Text style={styles.attributionText}>{content.attribution}</Text>
+            </View>
+          ) : null}
         </ScrollView>
       )}
 
@@ -708,5 +719,11 @@ function makeStyles(c: AppColors) {
     borderColor: "rgba(217,164,65,0.35)", padding: 12, marginBottom: 12,
   },
   revisionBannerText: { flex: 1, fontSize: 13, color: c.textDark, lineHeight: 20, fontFamily: "Inter_400Regular" },
+  attributionBlock: { marginTop: 36, marginBottom: 8 },
+  attributionRule: { height: 1, backgroundColor: c.borderBeige, marginBottom: 20 },
+  attributionText: {
+    fontSize: 12, color: c.textMuted, lineHeight: 20, fontFamily: "Inter_400Regular",
+    fontStyle: "italic", textAlign: "center", paddingHorizontal: 8,
+  },
   });
 }
