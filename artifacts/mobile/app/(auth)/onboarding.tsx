@@ -89,6 +89,8 @@ export default function OnboardingScreen() {
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id}
+        style={{ backgroundColor: colors.darkBg }}
+        contentContainerStyle={{ backgroundColor: colors.darkBg }}
         renderItem={({ item }) => (
           <View style={[styles.slide, { width }]}>
             {item.icon === null ? (
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
   titleHero: {
     fontSize: 22,
     letterSpacing: 0.8,
-    color: "#F4EFE4",
+    color: "#FFFFFF",
     lineHeight: 30,
     marginBottom: 8,
   },
