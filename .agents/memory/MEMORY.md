@@ -9,5 +9,6 @@
 - [P2P Moderator Scope](p2p-moderation-scope.md) — moderators see only flagged content + minimal poster identity; escalation reuses p2p_help_requests, not a new inbox.
 - [P2P Groups RLS Recursion](p2p-groups-rls-recursion.md) — stale un-dropped policies caused 42P17 recursion; profile visibility must be explicitly opened for shared group mates.
 - [P2P Highlights & Skills Taxonomy](p2p-highlights-skills.md) — sentence-tap highlighting via char offsets; skills stored as text[] mirroring gifts pattern.
+- [P2P FK SET NULL Pattern](p2p-fk-set-null.md) — CASCADE→SET NULL migration requires DROP NOT NULL on column first; 9 authored-content FKs fixed; p2p_curriculums.created_by has no FK at all.
 - [P2P Theme System](p2p-theme-system.md) — 4-theme system (light/dark/sepia/midnight); makeStyles(c: AppColors) pattern; AsyncStorage key @p2p/theme; partially migrated screens.
 - [P2P Plans System](p2p-plans-system.md) — Plans reuse p2p_curriculums/modules/lessons hierarchy; type column on curricula distinguishes core vs plan; Plans curriculum ID is fixed UUID b0000000-0000-0000-0000-000000000001.

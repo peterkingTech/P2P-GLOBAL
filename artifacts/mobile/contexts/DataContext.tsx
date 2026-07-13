@@ -111,7 +111,7 @@ export type HelpRequestStatus = "open" | "contacted" | "resolved";
 
 export interface HelpRequest {
   id: string;
-  userId: string;
+  userId: string | null;
   userName: string;
   tier: HelpRequestTier;
   category: string | null;
@@ -138,7 +138,7 @@ export interface ModerationFlag {
   id: string;
   contentType: ModerationContentType;
   contentId: string;
-  authorId: string;
+  authorId: string | null;
   reporterId: string | null;
   reporterName: string | null;
   reason: string | null;
@@ -1219,7 +1219,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       const rows = data || [];
       const identities = await Promise.all(
-        rows.map((r: any) => supabase.rpc("p2p_flag_poster_identity", { p_user_id: r.author_id }))
+        rows.map((r: any) =>
+          r.author_id
+            ? supabase.rpc("p2p_flag_poster_identity", { p_user_id: r.author_id })
+            : Promise.resolve({ data: null, error: null })
+        )
       );
 
       return rows.map((r: any, i: number) => {

@@ -85,7 +85,7 @@ function CommentsPanel({ postId }: { postId: string }) {
       ) : (
         comments.map((c) => (
           <View key={c.id} style={styles.commentRow}>
-            <Text style={styles.commentName}>{c.userName}</Text>
+            <Text style={styles.commentName}>{c.userName || "A believer"}</Text>
             <Text style={styles.commentBody}>{c.body}</Text>
           </View>
         ))
@@ -132,11 +132,11 @@ function PostCard({
     <View style={[styles.prayerCard, isTestimony && styles.testimonyCard]}>
       <View style={styles.prayerHeader}>
         <View style={styles.prayerAvatar}>
-          <Text style={styles.prayerAvatarText}>{item.isAnonymous ? "?" : item.userName.charAt(0)}</Text>
+          <Text style={styles.prayerAvatarText}>{item.isAnonymous ? "?" : (item.userName || "?").charAt(0)}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={styles.prayerName}>{item.userName}</Text>
+            <Text style={styles.prayerName}>{item.userName || "A believer"}</Text>
             <Text style={styles.flag}>{flagEmoji(item.nationCode)}</Text>
             {item.visibility === "peer_group" && (
               <Ionicons name="people" size={12} color={colors.upperRoomMuted} />

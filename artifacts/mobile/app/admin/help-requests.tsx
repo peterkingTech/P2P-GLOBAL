@@ -40,6 +40,10 @@ export default function HelpRequestsScreen() {
   const [statusFilter, setStatusFilter] = useState<HelpRequestStatus | "all">("all");
 
   async function handleMessageThem(req: HelpRequest) {
+    if (!req.userId) {
+      Alert.alert("Account removed", "This user's account no longer exists and cannot be messaged.");
+      return;
+    }
     setMessaging(req.id);
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
@@ -115,7 +119,9 @@ export default function HelpRequestsScreen() {
                 </View>
                 <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
               </View>
-              <Text style={styles.userName}>{item.userName}</Text>
+              <Text style={[styles.userName, !item.userId && { color: colors.textMuted, fontStyle: "italic" }]}>
+                {item.userName || "Creator no longer available"}
+              </Text>
               {item.category && <Text style={styles.category}>Category: {item.category}</Text>}
               {item.note && <Text style={styles.note}>{item.note}</Text>}
               <TouchableOpacity style={[styles.statusBtn, styles[`status_${item.status}` as const]]} onPress={() => cycleStatus(item)}>

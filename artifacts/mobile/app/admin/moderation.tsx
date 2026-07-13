@@ -70,6 +70,10 @@ export default function ModerationQueueScreen() {
   }
 
   async function handleMessagePoster(flag: ModerationFlag) {
+    if (!flag.authorId) {
+      Alert.alert("Account removed", "This user's account no longer exists.");
+      return;
+    }
     setMessaging(flag.id);
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: flag.authorId });
@@ -123,13 +127,15 @@ export default function ModerationQueueScreen() {
               {item.reason && <Text style={styles.reason}>Reason: {item.reason}</Text>}
               {item.reporterName && <Text style={styles.reporter}>Reported by {item.reporterName}</Text>}
 
-              {item.poster && (
+              {item.poster ? (
                 <View style={styles.posterRow}>
                   <View style={styles.posterAvatar}>
-                    <Text style={styles.posterAvatarText}>{item.poster.fullName.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.posterAvatarText}>
+                      {(item.poster.fullName || "?").charAt(0).toUpperCase()}
+                    </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.posterName}>{item.poster.fullName}</Text>
+                    <Text style={styles.posterName}>{item.poster.fullName || "Unnamed"}</Text>
                     <Text style={styles.posterHistory}>
                       {item.poster.totalFlags === 0
                         ? "No prior flags"
@@ -140,16 +146,29 @@ export default function ModerationQueueScreen() {
                   <TouchableOpacity
                     style={styles.msgIconBtn}
                     onPress={() => handleMessagePoster(item)}
-                    disabled={messaging === item.id}
+                    disabled={messaging === item.id || !item.authorId}
                   >
                     {messaging === item.id ? (
                       <ActivityIndicator size="small" color={colors.accentGreen} />
                     ) : (
-                      <Ionicons name="chatbubble-outline" size={16} color={colors.accentGreen} />
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={16}
+                        color={item.authorId ? colors.accentGreen : colors.textMuted}
+                      />
                     )}
                   </TouchableOpacity>
                 </View>
-              )}
+              ) : item.authorId === null ? (
+                <View style={styles.posterRow}>
+                  <View style={[styles.posterAvatar, { backgroundColor: colors.borderBeige }]}>
+                    <Text style={[styles.posterAvatarText, { color: colors.textMuted }]}>?</Text>
+                  </View>
+                  <Text style={[styles.posterHistory, { fontStyle: "italic" }]}>
+                    Creator no longer available
+                  </Text>
+                </View>
+              ) : null}
 
               {item.status === "open" ? (
                 <View style={styles.actionsRow}>

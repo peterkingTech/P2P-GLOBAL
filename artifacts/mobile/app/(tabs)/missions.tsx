@@ -28,7 +28,7 @@ function TestimonyCard({ item }: { item: PrayerWallPost }) {
           <Ionicons name="sparkles" size={14} color={colors.amber} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.cardName}>{item.isAnonymous ? "Anonymous" : item.userName}</Text>
+          <Text style={s.cardName}>{item.isAnonymous ? "Anonymous" : (item.userName || "A believer")}</Text>
           <Text style={s.cardMeta}>{timeAgo(item.createdAt)} · Kingdom Win</Text>
         </View>
       </View>

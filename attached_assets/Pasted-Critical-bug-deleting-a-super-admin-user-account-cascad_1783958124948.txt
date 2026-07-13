@@ -1,0 +1,15 @@
+Critical bug: deleting a super_admin user account cascaded and deleted the entire curriculum and Plans content that user had created. Content must NEVER be deleted as a side effect of deleting the user who created it — ownership and existence are separate concerns.
+
+1. Find every foreign key in the schema where a content table (p2p_curriculums, p2p_modules, p2p_lessons, and likely others — audit the FULL schema, not just these) references p2p_profiles via a created_by/author_id/owner_id-style column, and report its current ON DELETE behavior for each one found.
+
+2. Change every one of these specifically (profile → content ownership references) from CASCADE to SET NULL — so deleting a user sets created_by to null on their content, but the content itself remains completely intact. Add a migration for this.
+
+3. Do NOT change cascade behavior for genuine hierarchical relationships (e.g. deleting a curriculum SHOULD cascade to its own modules/lessons/sections — that's correct and expected, since those don't exist independently of their parent curriculum). Only fix the specific pattern where deleting a PERSON deletes CONTENT they merely authored.
+
+4. Audit the same pattern across every other table with a created_by/submitted_by/reviewed_by-style reference to p2p_profiles — this bug shape may exist elsewhere (e.g. p2p_testimonies, p2p_prayer_wall_posts, p2p_help_requests, admin-authored content generally) and needs the same SET NULL fix wherever a person's departure shouldn't erase what they made or were involved in.
+
+5. Once fixed, test explicitly: create a test admin account, have it create a test curriculum/module/lesson, delete that test admin account, and confirm the curriculum/module/lesson still exist completely intact afterward (with created_by now null or reassigned, per your implementation).
+
+Report back: the complete list of every table/column where this CASCADE-on-profile-deletion pattern was found and fixed, and confirm the recovery test in step 5 passes.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE.
