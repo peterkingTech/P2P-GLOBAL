@@ -97,6 +97,9 @@ export default function CurriculumManagerScreen() {
   const [languages, setLanguages] = useState<Language[]>([]);
   const [selectedLang, setSelectedLang] = useState("en");
 
+  // Tab
+  const [adminTab, setAdminTab] = useState<"curriculum" | "plans">("curriculum");
+
   // Loading
   const [treeLoading, setTreeLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -300,8 +303,118 @@ export default function CurriculumManagerScreen() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const PLANS_CURRICULUM_ID = "b0000000-0000-0000-0000-000000000001";
+  const coreCurricula = curricula.filter((c) => (c as any).type !== "plan");
+  const planModules = modulesMap[PLANS_CURRICULUM_ID] ?? [];
+
   const treePanel = (
     <ScrollView style={styles.treePanel} contentContainerStyle={[styles.treePanelContent, { paddingBottom: insets.bottom + 20 }]}>
+      {/* Tab switcher */}
+      <View style={styles.adminTabRow}>
+        <TouchableOpacity
+          style={[styles.adminTab, adminTab === "curriculum" && styles.adminTabActive]}
+          onPress={() => setAdminTab("curriculum")}
+        >
+          <Ionicons name="book-outline" size={13} color={adminTab === "curriculum" ? "#fff" : colors.textMid} />
+          <Text style={[styles.adminTabText, adminTab === "curriculum" && styles.adminTabTextActive]}>Curriculum</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.adminTab, adminTab === "plans" && styles.adminTabActive]}
+          onPress={() => setAdminTab("plans")}
+        >
+          <Ionicons name="radio-outline" size={13} color={adminTab === "plans" ? "#fff" : colors.textMid} />
+          <Text style={[styles.adminTabText, adminTab === "plans" && styles.adminTabTextActive]}>Plans</Text>
+        </TouchableOpacity>
+      </View>
+
+      {adminTab === "plans" ? (
+        /* ── Plans Panel ── */
+        <View>
+          <View style={styles.treePanelHeader}>
+            <Text style={styles.treePanelTitle}>Study Plans</Text>
+            <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate("module", PLANS_CURRICULUM_ID)}>
+              <Ionicons name="add" size={16} color={colors.accentGreen} />
+              <Text style={styles.addBtnSmallText}>New Plan</Text>
+            </TouchableOpacity>
+          </View>
+          {treeLoading ? (
+            <ActivityIndicator style={{ marginTop: 24 }} color={colors.accentGreen} />
+          ) : planModules.length === 0 ? (
+            <View style={styles.emptyTree}>
+              <Ionicons name="radio-outline" size={32} color={colors.textMuted} />
+              <Text style={styles.emptyTreeText}>No plans yet</Text>
+              <TouchableOpacity style={styles.emptyTreeBtn} onPress={() => openCreate("module", PLANS_CURRICULUM_ID)}>
+                <Text style={styles.emptyTreeBtnText}>Create first plan</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            planModules.map((m) => {
+              const mExpanded = expandedModules.has(m.id);
+              const planLessons = lessonsMap[m.id] ?? [];
+              const mSel = selected?.kind === "module" && selected.item.id === m.id;
+              return (
+                <View key={m.id} style={styles.treeLevel0}>
+                  <TouchableOpacity
+                    style={[styles.treeRow, mSel && styles.treeRowSelected]}
+                    onPress={() => select({ kind: "module", item: m })}
+                    activeOpacity={0.75}
+                  >
+                    <TouchableOpacity onPress={() => toggleModule(PLANS_CURRICULUM_ID, m.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Ionicons name={mExpanded ? "chevron-down" : "chevron-forward"} size={14} color={colors.textMuted} />
+                    </TouchableOpacity>
+                    <Ionicons name={((m as any).icon_name ?? "radio-outline") as any} size={14} color={colors.primaryGreen} style={{ marginRight: 2 }} />
+                    <Text style={[styles.treeLabel, { flex: 1 }, mSel && styles.treeLabelSelected]} numberOfLines={1}>
+                      {m.title}
+                    </Text>
+                    <Text style={[styles.covBadge, { marginRight: 4 }]}>{planLessons.length}L</Text>
+                    <StatusBadge status={m.status} />
+                  </TouchableOpacity>
+
+                  {mExpanded && (
+                    <View style={styles.treeLevel1}>
+                      {planLessons.map((l) => {
+                        const lSel = selected?.kind === "lesson" && selected.item.id === l.id;
+                        const cov = coverageMap[l.id];
+                        return (
+                          <TouchableOpacity
+                            key={l.id}
+                            style={[styles.treeRow, styles.treeRowL, lSel && styles.treeRowSelected]}
+                            onPress={() => select({ kind: "lesson", item: l })}
+                            activeOpacity={0.75}
+                          >
+                            <Ionicons name="document-text" size={12} color={colors.textMuted} style={{ marginRight: 2 }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.treeLabel, { fontSize: 12 }, lSel && styles.treeLabelSelected]} numberOfLines={1}>
+                                {l.title}
+                              </Text>
+                              {cov && <Text style={styles.covBadge}>{cov.label}</Text>}
+                            </View>
+                            <View style={styles.reorderBtns}>
+                              <TouchableOpacity onPress={() => moveItem("p2p_lessons", "order_index", planLessons, l.id, "up", m.id, setLessonsMap)}>
+                                <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={() => moveItem("p2p_lessons", "order_index", planLessons, l.id, "down", m.id, setLessonsMap)}>
+                                <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
+                              </TouchableOpacity>
+                            </View>
+                            <StatusBadge status={l.status} />
+                          </TouchableOpacity>
+                        );
+                      })}
+                      <TouchableOpacity style={styles.addInTreeBtn} onPress={() => openCreate("lesson", m.id)}>
+                        <Ionicons name="add" size={12} color={colors.accentGreen} />
+                        <Text style={styles.addInTreeText}>Add lesson</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+      ) : (
+        /* ── Curriculum Panel ── */
+        <View>
       <View style={styles.treePanelHeader}>
         <Text style={styles.treePanelTitle}>Curriculum Tree</Text>
         <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate("curriculum")}>
@@ -312,7 +425,7 @@ export default function CurriculumManagerScreen() {
 
       {treeLoading ? (
         <ActivityIndicator style={{ marginTop: 24 }} color={colors.accentGreen} />
-      ) : curricula.length === 0 ? (
+      ) : coreCurricula.length === 0 ? (
         <View style={styles.emptyTree}>
           <Ionicons name="book-outline" size={32} color={colors.textMuted} />
           <Text style={styles.emptyTreeText}>No curricula yet</Text>
@@ -321,7 +434,7 @@ export default function CurriculumManagerScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        curricula.map((c) => {
+        coreCurricula.map((c) => {
           const cExpanded = expandedCurricula.has(c.id);
           const mods = modulesMap[c.id] ?? [];
           const isSel = selected?.kind === "curriculum" && selected.item.id === c.id;
@@ -444,6 +557,8 @@ export default function CurriculumManagerScreen() {
             </View>
           );
         })
+      )}
+      </View>
       )}
     </ScrollView>
   );
@@ -1410,6 +1525,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 5,
   },
   addBtnSmallText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+
+  // Admin tab switcher
+  adminTabRow: {
+    flexDirection: "row", gap: 6, marginHorizontal: 12, marginVertical: 10,
+    backgroundColor: colors.cardBeige, borderRadius: 10, padding: 4,
+  },
+  adminTab: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 5, paddingVertical: 7, borderRadius: 8,
+  },
+  adminTabActive: { backgroundColor: colors.primaryGreen },
+  adminTabText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
+  adminTabTextActive: { color: "#fff" },
 
   // Empty state
   emptyTree: { alignItems: "center", paddingTop: 40, gap: 10 },

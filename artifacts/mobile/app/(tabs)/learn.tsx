@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, Module } from "@/contexts/DataContext";
+import { useData, Module, Plan } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
@@ -88,16 +88,39 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
   );
 }
 
-const COMING_SOON_PLANS = [
-  { key: "1", icon: "heart-outline" as const, title: "40 Days of Prayer", desc: "A guided journey through prayer disciplines." },
-  { key: "2", icon: "people-outline" as const, title: "Marriage & Family", desc: "Building godly homes together." },
-  { key: "3", icon: "briefcase-outline" as const, title: "Faith at Work", desc: "Living out your calling in the workplace." },
-  { key: "4", icon: "leaf-outline" as const, title: "New Believer's Path", desc: "The first steps of following Jesus." },
-  { key: "5", icon: "shield-outline" as const, title: "Spiritual Warfare", desc: "Standing firm against the enemy's schemes." },
-  { key: "6", icon: "book-outline" as const, title: "Old Testament Overview", desc: "Tracing God's story from Genesis to Malachi." },
-  { key: "7", icon: "globe-outline" as const, title: "Missions & Outreach", desc: "Carrying the gospel to the nations." },
-  { key: "8", icon: "cash-outline" as const, title: "Biblical Generosity", desc: "Stewardship, giving, and contentment." },
-];
+function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+  const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
+  const isStarted = plan.completedLessons > 0;
+  const isComplete = pct === 100;
+  return (
+    <TouchableOpacity style={styles.planCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.planIconWrap}>
+        <Ionicons name={(plan.iconName || "book-outline") as any} size={22} color={colors.accentGreen} />
+      </View>
+      <View style={styles.planCardBody}>
+        <Text style={styles.planTitle}>{plan.title}</Text>
+        <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
+        {plan.lessonCount > 0 && (
+          <View style={[styles.progressRow, { marginTop: 6 }]}>
+            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
+              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
+            </View>
+            <Text style={[styles.progressText, { color: colors.textMuted }]}>
+              {plan.completedLessons}/{plan.lessonCount}
+            </Text>
+          </View>
+        )}
+      </View>
+      {isComplete ? (
+        <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      )}
+    </TouchableOpacity>
+  );
+}
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -192,7 +215,7 @@ function makeStyles(c: AppColors) {
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { modules, isLoading } = useData();
+  const { modules, isLoading, plans, plansLoading } = useData();
   const { colors } = useTheme();
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
 
@@ -281,26 +304,32 @@ export default function LearnTab() {
           />
         )
       ) : (
-        <FlatList
-          key="plans-list"
-          data={COMING_SOON_PLANS}
-          keyExtractor={(p) => p.key}
-          contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
-          renderItem={({ item }) => (
-            <View style={styles.planCard}>
-              <View style={styles.planIconWrap}>
-                <Ionicons name={item.icon} size={22} color={colors.accentGreen} />
-              </View>
-              <View style={styles.planCardBody}>
-                <Text style={styles.planTitle}>{item.title}</Text>
-                <Text style={styles.planDesc}>{item.desc}</Text>
-              </View>
-              <View style={styles.comingSoonPill}>
-                <Text style={styles.comingSoonText}>Coming Soon</Text>
-              </View>
-            </View>
-          )}
-        />
+        plansLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={colors.accentGreen} />
+          </View>
+        ) : plans.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
+            <Text style={[styles.moduleDesc, { textAlign: "center", marginTop: 12, paddingHorizontal: 40 }]}>
+              No plans available yet. Check back soon!
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            key="plans-list"
+            data={plans}
+            keyExtractor={(p) => p.id}
+            contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <PlanCard
+                plan={item}
+                onPress={() => router.push(`/module/${item.id}`)}
+              />
+            )}
+          />
+        )
       )}
       </View>
     </View>

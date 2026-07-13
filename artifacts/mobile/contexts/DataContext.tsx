@@ -25,6 +25,17 @@ export interface Module {
   imageUrl?: string;
 }
 
+export interface Plan {
+  id: string;
+  curriculumId: string;
+  title: string;
+  description: string;
+  iconName: string;
+  lessonCount: number;
+  completedLessons: number;
+  imageUrl?: string;
+}
+
 export interface Lesson {
   id: string;
   moduleId: string;
@@ -295,6 +306,8 @@ export interface ForestStats {
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
+  plans: Plan[];
+  plansLoading: boolean;
   prayers: PrayerRequest[];
   sessions: StudySession[];
   forestNodes: ForestNode[];
@@ -441,6 +454,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     hasDiscipleMaker: false,
     countriesReached: [],
   });
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [fruits, setFruits] = useState<Fruit[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
@@ -449,12 +464,69 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [toastEvent, setToastEvent] = useState<GrowthEvent | null>(null);
   const [celebrationEvent, setCelebrationEvent] = useState<GrowthEvent | null>(null);
 
+  const loadPlans = useCallback(async (userId?: string) => {
+    setPlansLoading(true);
+    try {
+      const { data: planCurriculums } = await supabase
+        .from("p2p_curriculums")
+        .select("id")
+        .eq("status", "published")
+        .eq("type", "plan");
+      if (!planCurriculums || planCurriculums.length === 0) { setPlans([]); setPlansLoading(false); return; }
+      const curriculumIds = (planCurriculums as Record<string, unknown>[]).map((c) => c.id as string);
+      const { data: planModules } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id,title,description,order_index,image_url,icon_name")
+        .in("curriculum_id", curriculumIds)
+        .eq("status", "published")
+        .order("order_index", { ascending: true });
+      if (!planModules || planModules.length === 0) { setPlans([]); setPlansLoading(false); return; }
+      const moduleIds = (planModules as Record<string, unknown>[]).map((m) => m.id as string);
+      const { data: planLessons } = await supabase
+        .from("p2p_lessons")
+        .select("id,module_id")
+        .in("module_id", moduleIds);
+      let progressByLesson = new Map<string, boolean>();
+      if (userId) {
+        const { data: progressRows } = await supabase
+          .from("p2p_lesson_progress")
+          .select("lesson_id,completed")
+          .eq("user_id", userId);
+        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+          progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+        }
+      }
+      const lessonsRaw = (planLessons ?? []) as Record<string, unknown>[];
+      const builtPlans: Plan[] = (planModules as Record<string, unknown>[]).map((m) => {
+        const mLessons = lessonsRaw.filter((l) => (l.module_id as string) === (m.id as string));
+        const lessonCount = mLessons.length;
+        const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+        return {
+          id: m.id as string,
+          curriculumId: m.curriculum_id as string,
+          title: m.title as string,
+          description: (m.description as string) ?? "",
+          iconName: (m.icon_name as string) ?? "book-outline",
+          lessonCount,
+          completedLessons,
+          imageUrl: (m.image_url as string) ?? undefined,
+        };
+      });
+      setPlans(builtPlans);
+    } catch {
+      setPlans([]);
+    } finally {
+      setPlansLoading(false);
+    }
+  }, []);
+
   const loadCurriculum = useCallback(async (userId?: string) => {
     try {
       const { data: curriculums } = await supabase
         .from("p2p_curriculums")
-        .select("id,title,status")
-        .eq("status", "published");
+        .select("id,title,status,type")
+        .eq("status", "published")
+        .eq("type", "core");
       if (!curriculums || curriculums.length === 0) {
         setModules(FALLBACK_MODULES); setLessons([]); return;
       }
@@ -668,6 +740,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const resetAllState = useCallback(() => {
     setModules([]);
     setLessons([]);
+    setPlans([]);
     setPrayers([]);
     setSessions([]);
     setForestNodes([]);
@@ -729,7 +802,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           { id: "s2", title: "Romans Deep Dive", description: "Justification by faith", scheduledAt: new Date(now.getTime() + 86400000).toISOString(), durationMinutes: 60, participantCount: 2, isLive: false, hostName: "Sister Ruth" },
         ]);
       }
-      await loadCurriculum(profile?.id);
+      await Promise.all([
+        loadCurriculum(profile?.id),
+        loadPlans(profile?.id),
+      ]);
       if (profile?.id) {
         await refreshPendingEvaluations(profile.id);
         await checkGrowthEvents(profile.id);
@@ -775,7 +851,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, profile, loadCurriculum, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1729,7 +1805,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, prayers, sessions, forestNodes, forestStats, fruits, missions,
+      modules, lessons, plans, plansLoading, prayers, sessions, forestNodes, forestStats, fruits, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
