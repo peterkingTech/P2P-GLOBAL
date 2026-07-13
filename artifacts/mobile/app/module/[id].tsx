@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,24 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
+import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
 const HERO_HEIGHT = 230;
+
+interface PlanLesson {
+  id: string;
+  title: string;
+  subtitle: string;
+  order: number;
+  isCompleted: boolean;
+}
 
 function HeroImage({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const [err, setErr] = useState(false);
@@ -28,7 +38,6 @@ function HeroImage({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
       />
     );
   }
-  // Tasteful placeholder — deep-green texture via color + icon
   return (
     <View style={[StyleSheet.absoluteFill, styles.heroPlaceholder]}>
       <Ionicons name="book-outline" size={52} color="rgba(157,225,203,0.25)" />
@@ -40,16 +49,73 @@ export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modules, lessons } = useData();
+  const { modules, lessons, plans, profile } = useData();
 
-  const module = modules.find((m) => m.id === id) ?? modules[0];
-  const moduleLessons = lessons
-    .filter((l) => l.moduleId === module?.id)
-    .sort((a, b) => a.order - b.order);
+  // Detect whether this is a plan module or a core module
+  const coreModule = modules.find((m) => m.id === id);
+  const plan = !coreModule ? plans.find((p) => p.id === id) : undefined;
+  const isPlan = !!plan;
 
-  const completed = moduleLessons.filter((l) => l.isCompleted).length;
-  const pct = moduleLessons.length > 0 ? Math.round((completed / moduleLessons.length) * 100) : 0;
-  const isLocked = module?.isLocked ?? false;
+  // Core module path — use existing global lessons
+  const coreLessons = coreModule
+    ? lessons.filter((l) => l.moduleId === coreModule.id).sort((a, b) => a.order - b.order)
+    : [];
+
+  // Plan path — fetch lessons from Supabase
+  const [planLessons, setPlanLessons] = useState<PlanLesson[]>([]);
+  const [planLoading, setPlanLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isPlan || !id) return;
+    let cancelled = false;
+    async function fetchPlanLessons() {
+      setPlanLoading(true);
+      try {
+        const [{ data: lessonRows }, { data: progressRows }] = await Promise.all([
+          supabase
+            .from("p2p_lessons")
+            .select("id,title,subtitle,order_index")
+            .eq("module_id", id)
+            .eq("status", "published")
+            .order("order_index", { ascending: true }),
+          profile?.id
+            ? supabase
+                .from("p2p_lesson_progress")
+                .select("lesson_id,completed")
+                .eq("user_id", profile.id)
+            : Promise.resolve({ data: [] }),
+        ]);
+        if (cancelled) return;
+        const progressMap = new Map<string, boolean>();
+        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+          progressMap.set(p.lesson_id as string, Boolean(p.completed));
+        }
+        setPlanLessons(
+          ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
+            id: l.id as string,
+            title: l.title as string,
+            subtitle: (l.subtitle as string) ?? "",
+            order: l.order_index as number,
+            isCompleted: progressMap.get(l.id as string) ?? false,
+          }))
+        );
+      } finally {
+        if (!cancelled) setPlanLoading(false);
+      }
+    }
+    fetchPlanLessons();
+    return () => { cancelled = true; };
+  }, [isPlan, id, profile?.id]);
+
+  // Unified display data
+  const displayTitle = isPlan ? plan!.title : (coreModule?.title ?? "Module");
+  const displayDesc = isPlan ? plan!.description : (coreModule?.description ?? "");
+  const displayLessons = isPlan ? planLessons : coreLessons;
+  const completed = displayLessons.filter((l) => l.isCompleted).length;
+  const pct = displayLessons.length > 0 ? Math.round((completed / displayLessons.length) * 100) : 0;
+  const isLocked = !isPlan && (coreModule?.isLocked ?? false);
+  const isLoading = isPlan && planLoading;
+  const levelLabel = isPlan ? "Study Plan" : `Level ${coreModule?.level ?? 1}`;
 
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -63,12 +129,9 @@ export default function ModuleDetailScreen() {
       >
         {/* ── Hero ── */}
         <View style={[styles.hero, { height: HERO_HEIGHT + topOffset }]}>
-          <HeroImage uri={module?.imageUrl} isLocked={isLocked} />
-
-          {/* Dark gradient overlay — top is transparent, bottom is rich dark */}
+          <HeroImage uri={coreModule?.imageUrl} isLocked={isLocked} />
           <View style={styles.heroOverlay} />
 
-          {/* Back button — floating on image */}
           <TouchableOpacity
             style={[styles.backBtn, { top: topOffset + 12 }]}
             onPress={() => router.back()}
@@ -77,21 +140,20 @@ export default function ModuleDetailScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.cream} />
           </TouchableOpacity>
 
-          {/* Level badge + title pinned to bottom of hero */}
           <View style={styles.heroCopy}>
             <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>Level {module?.level ?? 1}</Text>
+              <Text style={styles.levelBadgeText}>{levelLabel}</Text>
             </View>
             <Text style={styles.heroTitle} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {module?.title ?? "Module"}
+              {displayTitle}
             </Text>
           </View>
         </View>
 
         {/* ── Progress / locked banner ── */}
         <View style={styles.metaBlock}>
-          {module?.description ? (
-            <Text style={styles.moduleDesc}>{module.description}</Text>
+          {displayDesc ? (
+            <Text style={styles.moduleDesc}>{displayDesc}</Text>
           ) : null}
 
           {isLocked ? (
@@ -106,7 +168,7 @@ export default function ModuleDetailScreen() {
               <View style={styles.progressHeader}>
                 <Text style={styles.progressLabel}>{pct}% complete</Text>
                 <Text style={styles.progressCount}>
-                  {completed}/{moduleLessons.length} lessons
+                  {completed}/{displayLessons.length} lessons
                 </Text>
               </View>
               <View style={styles.progressBg}>
@@ -119,45 +181,49 @@ export default function ModuleDetailScreen() {
         {/* ── Lessons list ── */}
         <View style={styles.lessonsBlock}>
           <Text style={styles.sectionTitle}>Lessons</Text>
-          <View style={styles.lessonList}>
-            {moduleLessons.map((lesson, idx) => {
-              const locked = lesson.isLocked;
-              return (
-                <TouchableOpacity
-                  key={lesson.id}
-                  style={[styles.lessonRow, locked && styles.lessonRowLocked]}
-                  onPress={() => !locked && router.push(`/lesson/${lesson.id}`)}
-                  activeOpacity={locked ? 1 : 0.8}
-                >
-                  <View style={[
-                    styles.lessonBullet,
-                    lesson.isCompleted && styles.lessonBulletDone,
-                    locked && styles.lessonBulletLocked,
-                  ]}>
-                    {lesson.isCompleted ? (
-                      <Ionicons name="checkmark" size={12} color={colors.cream} />
+          {isLoading ? (
+            <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
+          ) : (
+            <View style={styles.lessonList}>
+              {displayLessons.map((lesson, idx) => {
+                const locked = !isPlan && (lesson as { isLocked?: boolean }).isLocked;
+                return (
+                  <TouchableOpacity
+                    key={lesson.id}
+                    style={[styles.lessonRow, locked && styles.lessonRowLocked]}
+                    onPress={() => !locked && router.push(`/lesson/${lesson.id}`)}
+                    activeOpacity={locked ? 1 : 0.8}
+                  >
+                    <View style={[
+                      styles.lessonBullet,
+                      lesson.isCompleted && styles.lessonBulletDone,
+                      locked && styles.lessonBulletLocked,
+                    ]}>
+                      {lesson.isCompleted ? (
+                        <Ionicons name="checkmark" size={12} color={colors.cream} />
+                      ) : (
+                        <Text style={styles.lessonBulletText}>{idx + 1}</Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.lessonTitle, locked && styles.lessonTitleLocked]}>
+                        {lesson.title}
+                      </Text>
+                    </View>
+                    {locked ? (
+                      <Ionicons name="lock-closed" size={15} color={colors.borderBeige} />
                     ) : (
-                      <Text style={styles.lessonBulletText}>{idx + 1}</Text>
+                      <Ionicons
+                        name="play-circle"
+                        size={20}
+                        color={lesson.isCompleted ? colors.accentGreen : colors.textMuted}
+                      />
                     )}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.lessonTitle, locked && styles.lessonTitleLocked]}>
-                      {lesson.title}
-                    </Text>
-                  </View>
-                  {locked ? (
-                    <Ionicons name="lock-closed" size={15} color={colors.borderBeige} />
-                  ) : (
-                    <Ionicons
-                      name="play-circle"
-                      size={20}
-                      color={lesson.isCompleted ? colors.accentGreen : colors.textMuted}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -167,7 +233,6 @@ export default function ModuleDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.lightCream },
 
-  // Hero
   hero: {
     width: "100%",
     backgroundColor: colors.navBg,
@@ -201,7 +266,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     paddingTop: 60,
-    // Scrim behind the text
     backgroundColor: "rgba(6,17,13,0.58)",
   },
   levelBadge: {
@@ -227,7 +291,6 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
 
-  // Meta block (description + progress)
   metaBlock: {
     paddingHorizontal: 16,
     paddingTop: 18,
@@ -285,7 +348,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
 
-  // Lessons
   lessonsBlock: {
     paddingHorizontal: 16,
     paddingTop: 12,
