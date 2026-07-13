@@ -375,7 +375,13 @@ export default function LearnTab() {
             renderItem={({ item }) => (
               <PlanCard
                 plan={item}
-                onPress={() => router.push(`/module/${item.id}`)}
+                onPress={() => {
+                  if (item.isSingleModule && item.singleModuleId) {
+                    router.push(`/module/${item.singleModuleId}`);
+                  } else {
+                    router.push(`/module/${item.id}`);
+                  }
+                }}
               />
             )}
           />

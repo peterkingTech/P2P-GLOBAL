@@ -13,7 +13,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useData } from "@/contexts/DataContext";
+import { useData, PlanModule } from "@/contexts/DataContext";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
@@ -152,22 +152,31 @@ export default function ModuleDetailScreen() {
   const insets = useSafeAreaInsets();
   const { modules, lessons, plans, profile } = useData();
 
-  // Detect whether this is a plan module or a core module
+  // ── Detection: three possible view modes ────────────────────────────────
+  // 1. Core curriculum module (from global modules array)
   const coreModule = modules.find((m) => m.id === id);
-  const plan = !coreModule ? plans.find((p) => p.id === id) : undefined;
-  const isPlan = !!plan;
+  // 2. Curriculum overview — id is a curriculum id (multi-module plan)
+  const curriculumPlan = !coreModule ? plans.find((p) => p.id === id) : undefined;
+  // 3. Plan module lesson list — id is a module id inside a plan
+  const parentPlan = !coreModule && !curriculumPlan
+    ? plans.find((p) => p.modules.some((m: PlanModule) => m.id === id))
+    : undefined;
+  const planModuleInfo = parentPlan?.modules.find((m: PlanModule) => m.id === id);
+
+  const isCurriculumOverview = !!curriculumPlan;
+  const isPlanLesson = !!planModuleInfo;
 
   // Core module path — use existing global lessons
   const coreLessons = coreModule
     ? lessons.filter((l) => l.moduleId === coreModule.id).sort((a, b) => a.order - b.order)
     : [];
 
-  // Plan path — fetch lessons from Supabase
+  // Plan lesson path — fetch lessons from Supabase (id is a plan module id)
   const [planLessons, setPlanLessons] = useState<PlanLesson[]>([]);
   const [planLoading, setPlanLoading] = useState(false);
 
   useEffect(() => {
-    if (!isPlan || !id) return;
+    if (!isPlanLesson || !id) return;
     let cancelled = false;
     async function fetchPlanLessons() {
       setPlanLoading(true);
@@ -197,9 +206,8 @@ export default function ModuleDetailScreen() {
           subtitle: (l.subtitle as string) ?? "",
           order: l.order_index as number,
           isCompleted: progressMap.get(l.id as string) ?? false,
-          isLocked: false, // set below
+          isLocked: false,
         }));
-        // Sequential lock: first lesson always open; each subsequent locks until previous is done
         for (let i = 1; i < built.length; i++) {
           built[i].isLocked = !built[i - 1].isCompleted;
         }
@@ -210,24 +218,44 @@ export default function ModuleDetailScreen() {
     }
     fetchPlanLessons();
     return () => { cancelled = true; };
-  }, [isPlan, id, profile?.id]);
+  }, [isPlanLesson, id, profile?.id]);
 
   // Unified display data
-  const displayTitle = isPlan ? plan!.title : (coreModule?.title ?? "Module");
-  const displayDesc = isPlan ? plan!.description : (coreModule?.description ?? "");
-  const displayLessons = isPlan ? planLessons : coreLessons;
+  const displayTitle = isCurriculumOverview
+    ? curriculumPlan!.title
+    : isPlanLesson
+      ? (planModuleInfo!.title)
+      : (coreModule?.title ?? "Module");
+  const displayDesc = isCurriculumOverview
+    ? curriculumPlan!.description
+    : isPlanLesson
+      ? (planModuleInfo!.description)
+      : (coreModule?.description ?? "");
+  const displayLessons = isPlanLesson ? planLessons : coreLessons;
   const completed = displayLessons.filter((l) => l.isCompleted).length;
   const pct = displayLessons.length > 0 ? Math.round((completed / displayLessons.length) * 100) : 0;
-  const isLocked = !isPlan && (coreModule?.isLocked ?? false);
-  const isLoading = isPlan && planLoading;
-  const levelLabel = isPlan ? "Study Plan" : `Level ${coreModule?.level ?? 1}`;
+  const isLocked = !isCurriculumOverview && !isPlanLesson && (coreModule?.isLocked ?? false);
+  const isLoading = isPlanLesson && planLoading;
+  const levelLabel = (isCurriculumOverview || isPlanLesson) ? "Study Plan" : `Level ${coreModule?.level ?? 1}`;
+
+  const heroImageUri = isCurriculumOverview
+    ? curriculumPlan!.imageUrl
+    : isPlanLesson
+      ? planModuleInfo!.imageUrl
+      : coreModule?.imageUrl;
 
   const attribution = useMemo<Attribution | null>(() => {
-    if (!isPlan) return null;
-    if (id && ATTRIBUTION_MAP[id]) return ATTRIBUTION_MAP[id];
-    if (plan?.curriculumId === VICTORY_CURRICULUM_ID) return VICTORY_ATTRIBUTION;
+    if (isCurriculumOverview) {
+      if (curriculumPlan?.id === VICTORY_CURRICULUM_ID) return VICTORY_ATTRIBUTION;
+      return null;
+    }
+    if (isPlanLesson) {
+      if (id && ATTRIBUTION_MAP[id]) return ATTRIBUTION_MAP[id];
+      if (parentPlan?.id === VICTORY_CURRICULUM_ID) return VICTORY_ATTRIBUTION;
+      return null;
+    }
     return null;
-  }, [isPlan, id, plan?.curriculumId]);
+  }, [isCurriculumOverview, isPlanLesson, id, curriculumPlan?.id, parentPlan?.id]);
 
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -241,7 +269,7 @@ export default function ModuleDetailScreen() {
       >
         {/* ── Hero ── */}
         <View style={[styles.hero, { height: HERO_HEIGHT + topOffset }]}>
-          <HeroImage uri={isPlan ? plan!.imageUrl : coreModule?.imageUrl} isLocked={isLocked} />
+          <HeroImage uri={heroImageUri} isLocked={isLocked} />
           <View style={styles.heroOverlay} />
 
           <TouchableOpacity
@@ -290,28 +318,30 @@ export default function ModuleDetailScreen() {
           )}
         </View>
 
-        {/* ── Lessons list ── */}
-        <View style={styles.lessonsBlock}>
-          <Text style={styles.sectionTitle}>Lessons</Text>
-          {isLoading ? (
-            <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
-          ) : (
+        {/* ── Curriculum overview: module cards ── */}
+        {isCurriculumOverview ? (
+          <View style={styles.lessonsBlock}>
+            <Text style={styles.sectionTitle}>Modules</Text>
             <View style={styles.lessonList}>
-              {displayLessons.map((lesson, idx) => {
-                const locked = (lesson as { isLocked?: boolean }).isLocked ?? false;
+              {curriculumPlan!.modules.map((mod: PlanModule, idx: number) => {
+                const locked = mod.isLocked;
+                const pctMod = mod.lessonCount > 0
+                  ? Math.round((mod.completedLessons / mod.lessonCount) * 100)
+                  : 0;
+                const done = pctMod === 100;
                 return (
                   <TouchableOpacity
-                    key={lesson.id}
+                    key={mod.id}
                     style={[styles.lessonRow, locked && styles.lessonRowLocked]}
-                    onPress={() => !locked && router.push(`/lesson/${lesson.id}`)}
-                    activeOpacity={locked ? 1 : 0.8}
+                    onPress={() => !locked && router.push(`/module/${mod.id}`)}
+                    activeOpacity={locked ? 1 : 0.85}
                   >
                     <View style={[
                       styles.lessonBullet,
-                      lesson.isCompleted && styles.lessonBulletDone,
+                      done && styles.lessonBulletDone,
                       locked && styles.lessonBulletLocked,
                     ]}>
-                      {lesson.isCompleted ? (
+                      {done ? (
                         <Ionicons name="checkmark" size={12} color={colors.cream} />
                       ) : (
                         <Text style={styles.lessonBulletText}>{idx + 1}</Text>
@@ -319,24 +349,76 @@ export default function ModuleDetailScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.lessonTitle, locked && styles.lessonTitleLocked]}>
-                        {lesson.title}
+                        {mod.title}
                       </Text>
+                      {!locked && (
+                        <Text style={styles.lessonSubCount}>
+                          {mod.completedLessons}/{mod.lessonCount} lessons
+                          {pctMod > 0 && pctMod < 100 ? `  ·  ${pctMod}%` : ""}
+                        </Text>
+                      )}
                     </View>
                     {locked ? (
                       <Ionicons name="lock-closed" size={15} color={colors.borderBeige} />
+                    ) : done ? (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
                     ) : (
-                      <Ionicons
-                        name="play-circle"
-                        size={20}
-                        color={lesson.isCompleted ? colors.accentGreen : colors.textMuted}
-                      />
+                      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                     )}
                   </TouchableOpacity>
                 );
               })}
             </View>
-          )}
-        </View>
+          </View>
+        ) : (
+          /* ── Lessons list ── */
+          <View style={styles.lessonsBlock}>
+            <Text style={styles.sectionTitle}>Lessons</Text>
+            {isLoading ? (
+              <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
+            ) : (
+              <View style={styles.lessonList}>
+                {displayLessons.map((lesson, idx) => {
+                  const locked = (lesson as { isLocked?: boolean }).isLocked ?? false;
+                  return (
+                    <TouchableOpacity
+                      key={lesson.id}
+                      style={[styles.lessonRow, locked && styles.lessonRowLocked]}
+                      onPress={() => !locked && router.push(`/lesson/${lesson.id}`)}
+                      activeOpacity={locked ? 1 : 0.8}
+                    >
+                      <View style={[
+                        styles.lessonBullet,
+                        lesson.isCompleted && styles.lessonBulletDone,
+                        locked && styles.lessonBulletLocked,
+                      ]}>
+                        {lesson.isCompleted ? (
+                          <Ionicons name="checkmark" size={12} color={colors.cream} />
+                        ) : (
+                          <Text style={styles.lessonBulletText}>{idx + 1}</Text>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.lessonTitle, locked && styles.lessonTitleLocked]}>
+                          {lesson.title}
+                        </Text>
+                      </View>
+                      {locked ? (
+                        <Ionicons name="lock-closed" size={15} color={colors.borderBeige} />
+                      ) : (
+                        <Ionicons
+                          name="play-circle"
+                          size={20}
+                          color={lesson.isCompleted ? colors.accentGreen : colors.textMuted}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ── Attribution ── */}
         {attribution && !isLoading && (
@@ -511,6 +593,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   lessonTitleLocked: { color: colors.textMuted },
+  lessonSubCount: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
 });
 
 const attrStyles = StyleSheet.create({

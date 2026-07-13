@@ -25,16 +25,30 @@ export interface Module {
   imageUrl?: string;
 }
 
-export interface Plan {
+export interface PlanModule {
   id: string;
-  curriculumId: string;
   title: string;
+  description: string;
+  lessonCount: number;
+  completedLessons: number;
+  isLocked: boolean;
+  imageUrl?: string;
+  iconName: string;
+}
+
+export interface Plan {
+  id: string;           // curriculum id
+  curriculumId: string; // same as id
+  title: string;        // curriculum title
   description: string;
   iconName: string;
   lessonCount: number;
   completedLessons: number;
   isLocked: boolean;
   imageUrl?: string;
+  modules: PlanModule[];
+  isSingleModule: boolean;
+  singleModuleId?: string;
 }
 
 export interface Lesson {
@@ -500,31 +514,53 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
       const lessonsRaw = (planLessons ?? []) as Record<string, unknown>[];
-      const builtPlans: Plan[] = (planModules as Record<string, unknown>[]).map((m, idx) => {
-        const mLessons = lessonsRaw.filter((l) => (l.module_id as string) === (m.id as string));
-        const lessonCount = mLessons.length;
-        const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+      // Build one Plan per curriculum (not per module)
+      const builtPlans: Plan[] = planCurriculums.map((currRow) => {
+        const c = currRow as Record<string, unknown>;
+        const currModules = ((planModules ?? []) as Record<string, unknown>[])
+          .filter((m) => (m.curriculum_id as string) === (c.id as string))
+          .sort((a, b) => (a.order_index as number) - (b.order_index as number));
+
+        const subModules: PlanModule[] = currModules.map((m) => {
+          const mLessons = lessonsRaw.filter((l) => (l.module_id as string) === (m.id as string));
+          const lessonCount = mLessons.length;
+          const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+          return {
+            id: m.id as string,
+            title: m.title as string,
+            description: (m.description as string) ?? "",
+            lessonCount,
+            completedLessons,
+            isLocked: false,
+            imageUrl: (m.image_url as string) ?? undefined,
+            iconName: (m.icon_name as string) ?? "book-outline",
+          };
+        });
+        // Sequential locking within the curriculum
+        for (let i = 1; i < subModules.length; i++) {
+          const prev = subModules[i - 1];
+          subModules[i].isLocked = prev.lessonCount === 0 || prev.completedLessons < prev.lessonCount;
+        }
+
+        const totalLessons = subModules.reduce((a, m) => a + m.lessonCount, 0);
+        const totalCompleted = subModules.reduce((a, m) => a + m.completedLessons, 0);
+        const isSingleModule = subModules.length === 1;
+
         return {
-          id: m.id as string,
-          curriculumId: m.curriculum_id as string,
-          title: m.title as string,
-          description: (m.description as string) ?? "",
-          iconName: (m.icon_name as string) ?? "book-outline",
-          lessonCount,
-          completedLessons,
-          isLocked: false, // set below
-          imageUrl: (m.image_url as string) ?? undefined,
+          id: c.id as string,
+          curriculumId: c.id as string,
+          title: c.title as string,
+          description: (c.description as string) ?? "",
+          iconName: (currModules[0]?.icon_name as string) ?? "book-outline",
+          lessonCount: totalLessons,
+          completedLessons: totalCompleted,
+          isLocked: false,
+          imageUrl: (currModules[0]?.image_url as string) ?? undefined,
+          modules: subModules,
+          isSingleModule,
+          singleModuleId: isSingleModule ? (currModules[0]?.id as string) : undefined,
         };
       });
-      // Lock plans sequentially — each plan unlocks when the previous is 100% complete
-      for (let i = 0; i < builtPlans.length; i++) {
-        if (i === 0) {
-          builtPlans[i].isLocked = false;
-        } else {
-          const prev = builtPlans[i - 1];
-          builtPlans[i].isLocked = prev.lessonCount === 0 || prev.completedLessons < prev.lessonCount;
-        }
-      }
       setPlans(builtPlans);
     } catch {
       setPlans([]);
