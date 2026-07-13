@@ -11,7 +11,6 @@ import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 const MATCH_PATHS = [
@@ -52,10 +51,7 @@ const MATCH_PATHS = [
 export default function ConnectHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { sessions } = useData();
-
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const liveSessions = sessions.filter((s) => s.isLive);
 
   return (
     <>
@@ -91,31 +87,6 @@ export default function ConnectHub() {
           ))}
         </View>
 
-        {liveSessions.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Live Now</Text>
-            {liveSessions.map((session) => (
-              <TouchableOpacity
-                key={session.id}
-                style={styles.liveRow}
-                onPress={() => router.push(`/session/${session.id}`)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.livePulse} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.liveRowTitle}>{session.title}</Text>
-                  <Text style={styles.liveRowMeta}>
-                    {session.participantCount} participants · {session.durationMinutes} min
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.joinBtn} onPress={() => router.push(`/session/${session.id}`)}>
-                  <Text style={styles.joinBtnText}>Join</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-
         <View style={styles.tipCard}>
           <Ionicons name="information-circle" size={18} color={colors.amber} />
           <Text style={styles.tipText}>
@@ -123,24 +94,6 @@ export default function ConnectHub() {
           </Text>
         </View>
 
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Upcoming Sessions</Text>
-        {sessions.filter((s) => !s.isLive).map((session) => (
-          <TouchableOpacity
-            key={session.id}
-            style={styles.sessionRow}
-            onPress={() => router.push(`/session/${session.id}`)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.sessionIcon}>
-              <Ionicons name="calendar-outline" size={20} color={colors.accentGreen} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sessionTitle}>{session.title}</Text>
-              <Text style={styles.sessionMeta}>{session.hostName} · {session.durationMinutes} min</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        ))}
       </ScrollView>
     </>
   );
@@ -166,35 +119,10 @@ const styles = StyleSheet.create({
   },
   pathTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   pathSub: { fontSize: 11, color: colors.textMuted, lineHeight: 16, fontFamily: "Inter_400Regular" },
-  liveRow: {
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 14, padding: 14,
-    flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10,
-  },
-  livePulse: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FF4444" },
-  liveRowTitle: { fontSize: 14, fontWeight: "600", color: colors.cream, fontFamily: "Inter_600SemiBold" },
-  liveRowMeta: { fontSize: 12, color: colors.lightGreen, opacity: 0.8, fontFamily: "Inter_400Regular" },
-  joinBtn: {
-    backgroundColor: colors.cream,
-    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6,
-  },
-  joinBtnText: { color: colors.primaryGreen, fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   tipCard: {
     backgroundColor: "rgba(186,117,23,0.08)",
     borderRadius: 12, borderWidth: 1, borderColor: "rgba(186,117,23,0.2)",
     padding: 14, flexDirection: "row", gap: 10, alignItems: "flex-start", marginTop: 20,
   },
   tipText: { flex: 1, fontSize: 13, color: colors.textMid, lineHeight: 20, fontFamily: "Inter_400Regular" },
-  sessionRow: {
-    backgroundColor: colors.card, borderRadius: 14,
-    borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10,
-  },
-  sessionIcon: {
-    width: 42, height: 42, borderRadius: 12,
-    backgroundColor: "rgba(29,158,117,0.1)",
-    alignItems: "center", justifyContent: "center",
-  },
-  sessionTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
-  sessionMeta: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

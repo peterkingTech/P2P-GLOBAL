@@ -121,28 +121,6 @@ function makeStyles(c: AppColors) {
     evalTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     evalSub: { fontSize: 12, color: c.textMid, marginTop: 2, fontFamily: "Inter_400Regular" },
 
-    liveCard: {
-      backgroundColor: c.primaryGreen,
-      borderRadius: 14, padding: 14,
-      flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10,
-    },
-    liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FF4444" },
-    liveTitle: { fontSize: 14, fontWeight: "600", color: c.cream, fontFamily: "Inter_600SemiBold" },
-    liveHost: { fontSize: 12, color: c.lightGreen, opacity: 0.8, fontFamily: "Inter_400Regular" },
-
-    sessionCard: {
-      backgroundColor: c.card, borderRadius: 14,
-      borderWidth: 1, borderColor: c.borderBeige,
-      padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20,
-    },
-    sessionIcon: {
-      width: 44, height: 44, borderRadius: 12,
-      backgroundColor: "rgba(29,158,117,0.1)",
-      alignItems: "center", justifyContent: "center",
-    },
-    sessionTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    sessionMeta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-
     sectionTitle: {
       fontSize: 16, fontWeight: "700", color: c.textDark,
       fontFamily: "Inter_700Bold", marginBottom: 12,
@@ -166,7 +144,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, sessions, isLoading, refreshData, pendingEvaluations } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -189,9 +167,6 @@ export default function HomeTab() {
           100
       )
     : 100;
-
-  const liveSession = sessions.find((s) => s.isLive);
-  const nextSession = sessions.find((s) => !s.isLive);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -307,45 +282,6 @@ export default function HomeTab() {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.amber} />
-        </TouchableOpacity>
-      )}
-
-      {/* Live Session Banner */}
-      {liveSession && (
-        <TouchableOpacity
-          style={styles.liveCard}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push(`/session/${liveSession.id}`);
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={styles.liveDot} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.liveTitle}>{liveSession.title}</Text>
-            <Text style={styles.liveHost}>
-              {liveSession.participantCount} members · {liveSession.hostName}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.accentGreen} />
-        </TouchableOpacity>
-      )}
-
-      {/* Next Session */}
-      {nextSession && (
-        <TouchableOpacity
-          style={styles.sessionCard}
-          onPress={() => router.push(`/session/${nextSession.id}`)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.sessionIcon}>
-            <Ionicons name="calendar" size={22} color={colors.accentGreen} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sessionTitle}>{nextSession.title}</Text>
-            <Text style={styles.sessionMeta}>Scheduled · {nextSession.durationMinutes} min</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       )}
 
