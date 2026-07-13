@@ -467,13 +467,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadPlans = useCallback(async (userId?: string) => {
     setPlansLoading(true);
     try {
-      const { data: planCurriculums } = await supabase
+      const { data: allCurriculums } = await supabase
         .from("p2p_curriculums")
-        .select("id")
-        .eq("status", "published")
-        .eq("type", "plan");
-      if (!planCurriculums || planCurriculums.length === 0) { setPlans([]); setPlansLoading(false); return; }
-      const curriculumIds = (planCurriculums as Record<string, unknown>[]).map((c) => c.id as string);
+        .select("id,type")
+        .eq("status", "published");
+      const planCurriculums = (allCurriculums ?? []).filter(
+        (c: Record<string, unknown>) => (c.type as string) === "plan"
+      );
+      if (planCurriculums.length === 0) { setPlans([]); setPlansLoading(false); return; }
+      const curriculumIds = planCurriculums.map((c: Record<string, unknown>) => c.id as string);
       const { data: planModules } = await supabase
         .from("p2p_modules")
         .select("id,curriculum_id,title,description,order_index,image_url,icon_name")
@@ -522,11 +524,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const loadCurriculum = useCallback(async (userId?: string) => {
     try {
-      const { data: curriculums } = await supabase
+      const { data: allCurriculumsRaw } = await supabase
         .from("p2p_curriculums")
         .select("id,title,status,type")
-        .eq("status", "published")
-        .eq("type", "core");
+        .eq("status", "published");
+      const curriculums = (allCurriculumsRaw ?? []).filter(
+        (c: Record<string, unknown>) => (c.type as string) !== "plan"
+      );
       if (!curriculums || curriculums.length === 0) {
         setModules(FALLBACK_MODULES); setLessons([]); return;
       }
