@@ -24,6 +24,7 @@ interface PlanLesson {
   subtitle: string;
   order: number;
   isCompleted: boolean;
+  isLocked: boolean;
 }
 
 function HeroImage({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
@@ -90,15 +91,19 @@ export default function ModuleDetailScreen() {
         for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
           progressMap.set(p.lesson_id as string, Boolean(p.completed));
         }
-        setPlanLessons(
-          ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
-            id: l.id as string,
-            title: l.title as string,
-            subtitle: (l.subtitle as string) ?? "",
-            order: l.order_index as number,
-            isCompleted: progressMap.get(l.id as string) ?? false,
-          }))
-        );
+        const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
+          id: l.id as string,
+          title: l.title as string,
+          subtitle: (l.subtitle as string) ?? "",
+          order: l.order_index as number,
+          isCompleted: progressMap.get(l.id as string) ?? false,
+          isLocked: false, // set below
+        }));
+        // Sequential lock: first lesson always open; each subsequent locks until previous is done
+        for (let i = 1; i < built.length; i++) {
+          built[i].isLocked = !built[i - 1].isCompleted;
+        }
+        setPlanLessons(built);
       } finally {
         if (!cancelled) setPlanLoading(false);
       }
@@ -129,7 +134,7 @@ export default function ModuleDetailScreen() {
       >
         {/* ── Hero ── */}
         <View style={[styles.hero, { height: HERO_HEIGHT + topOffset }]}>
-          <HeroImage uri={coreModule?.imageUrl} isLocked={isLocked} />
+          <HeroImage uri={isPlan ? plan!.imageUrl : coreModule?.imageUrl} isLocked={isLocked} />
           <View style={styles.heroOverlay} />
 
           <TouchableOpacity
@@ -186,7 +191,7 @@ export default function ModuleDetailScreen() {
           ) : (
             <View style={styles.lessonList}>
               {displayLessons.map((lesson, idx) => {
-                const locked = !isPlan && (lesson as { isLocked?: boolean }).isLocked;
+                const locked = (lesson as { isLocked?: boolean }).isLocked ?? false;
                 return (
                   <TouchableOpacity
                     key={lesson.id}
