@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Platform,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,8 +21,6 @@ import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
-
-const { width: SW } = Dimensions.get("window");
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -86,6 +84,7 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
 export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { profile } = useAuth();
   const { forestNodes, forestStats, isLoading } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
@@ -238,7 +237,7 @@ export default function LivingTreeScreen() {
             )}
           </View>
 
-          <View style={styles.photoCard}>
+          <View style={[styles.photoCard, { height: Math.min(screenWidth - 40, 380) }]}>
             <Image source={STAGE_IMAGES[stageIndex]} style={styles.photo} resizeMode="cover" />
             <TouchableOpacity style={styles.watchBtn} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
               <Ionicons name="play" size={12} color="#fff" />
@@ -385,7 +384,7 @@ const styles = StyleSheet.create({
   progressBarFill: { height: 6, backgroundColor: colors.progressFill, borderRadius: 3 },
   pointsHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
-  photoCard: { borderRadius: 16, overflow: "hidden", height: SW - 40, marginBottom: 20, position: "relative" },
+  photoCard: { borderRadius: 16, overflow: "hidden", marginBottom: 20, position: "relative" },
   photo: { width: "100%", height: "100%" },
   watchBtn: {
     position: "absolute", top: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 5,

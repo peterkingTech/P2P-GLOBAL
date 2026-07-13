@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PrayerWallPost } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -82,6 +83,7 @@ export default function MissionsTab() {
   const { getPrayerWallPosts, forestStats, missions } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { isTablet } = useLayout();
   const [testimonies, setTestimonies] = useState<PrayerWallPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +101,7 @@ export default function MissionsTab() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.title}>Missions</Text>
         <Text style={styles.subtitle}>What God is doing through this network</Text>
@@ -144,6 +147,7 @@ export default function MissionsTab() {
           }
         />
       )}
+      </View>
     </View>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
@@ -212,6 +213,7 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
+  const { isTablet } = useLayout();
 
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
@@ -274,7 +276,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Avatar & Name */}

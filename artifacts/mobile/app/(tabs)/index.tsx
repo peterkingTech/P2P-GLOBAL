@@ -18,6 +18,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -169,6 +170,7 @@ export default function HomeTab() {
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
+  const { isTablet } = useLayout();
 
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   const hour = new Date().getHours();
@@ -196,7 +198,7 @@ export default function HomeTab() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }]}
+      contentContainerStyle={[styles.content, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -225,7 +227,7 @@ export default function HomeTab() {
 
       {/* Living Tree photo card */}
       <TouchableOpacity
-        style={styles.treeCard}
+        style={[styles.treeCard, isTablet && { height: 260 }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push("/living-tree");

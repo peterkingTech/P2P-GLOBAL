@@ -13,6 +13,7 @@ import {
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
@@ -237,6 +238,7 @@ export default function PrayerTab() {
   const [submitting, setSubmitting] = useState(false);
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { isTablet } = useLayout();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -329,6 +331,7 @@ export default function PrayerTab() {
 
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: topPad }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <View>
           <Text style={styles.headerTitle}>Prayer & Testimonies</Text>
@@ -459,6 +462,7 @@ export default function PrayerTab() {
           }
         />
       )}
+      </View>
     </KeyboardAvoidingView>
   );
 }

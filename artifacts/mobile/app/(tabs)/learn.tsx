@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, Module } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -196,6 +197,7 @@ export default function LearnTab() {
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
 
   const styles = makeStyles(colors);
+  const { isTablet } = useLayout();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -204,6 +206,7 @@ export default function LearnTab() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.headerTitle}>Learn</Text>
         <Text style={styles.headerSub}>Walk the path, one lesson at a time</Text>
@@ -299,6 +302,7 @@ export default function LearnTab() {
           )}
         />
       )}
+      </View>
     </View>
   );
 }
