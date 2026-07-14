@@ -14,7 +14,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { supabase } from "@/contexts/AuthContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
 import {
   useData,
   Assignment,
@@ -100,6 +100,7 @@ function QuestionResponseCard({
   existingSub,
   kind = "reflection",
   assignmentId,
+  onSubmitted,
 }: {
   question: { id: string; question: string };
   questionIndex: number;
@@ -107,6 +108,7 @@ function QuestionResponseCard({
   existingSub: QuestionSubmission | undefined;
   kind?: "reflection" | "assignment";
   assignmentId?: string;
+  onSubmitted?: () => void;
 }) {
   const { submitContent } = useData();
   const { colors } = useTheme();
@@ -117,6 +119,13 @@ function QuestionResponseCard({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<QuestionSubmission | null>(existingSub ?? null);
   const [error, setError] = useState<string | null>(null);
+
+  // existingSub is refetched (with real evaluation status) after every submit
+  // and can also change from a live realtime update — keep local state in sync
+  // rather than only reading it once at mount.
+  useEffect(() => {
+    setSubmitted(existingSub ?? null);
+  }, [existingSub]);
 
   async function handleTextSubmit() {
     if (!text.trim() || submitting) return;
@@ -133,8 +142,9 @@ function QuestionResponseCard({
     setSubmitting(false);
     if (err) { setError(err); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: "text", textContent: text.trim(), mediaUrl: null, durationSeconds: null, createdAt: new Date().toISOString() });
+    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: "text", textContent: text.trim(), mediaUrl: null, durationSeconds: null, createdAt: new Date().toISOString(), evaluationStatus: "pending" });
     setExpanded(false);
+    onSubmitted?.();
   }
 
   async function handleMediaSubmit(localUri: string, durationSeconds: number) {
@@ -149,11 +159,26 @@ function QuestionResponseCard({
     });
     if (err) { setError(err); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: mode, textContent: null, mediaUrl: "uploaded", durationSeconds, createdAt: new Date().toISOString() });
+    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: mode, textContent: null, mediaUrl: "uploaded", durationSeconds, createdAt: new Date().toISOString(), evaluationStatus: "pending" });
     setExpanded(false);
+    onSubmitted?.();
   }
 
   const typeIcon = (t: SubmissionType) => t === "audio" ? "mic" : t === "video" ? "videocam" : "chatbubble";
+
+  const badgeInfo = (() => {
+    if (kind !== "assignment") {
+      return { icon: submitted ? typeIcon(submitted.submissionType) : "chatbubble", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Responded · tap to update" };
+    }
+    switch (submitted?.evaluationStatus) {
+      case "approved":
+        return { icon: "checkmark-circle", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Approved ✓" };
+      case "needs_revision":
+        return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: "Needs revision · tap to update" };
+      default:
+        return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Submitted — waiting for peer review" };
+    }
+  })();
 
   return (
     <View style={qStyles.wrapper}>
@@ -165,10 +190,18 @@ function QuestionResponseCard({
       </View>
 
       {submitted ? (
-        <TouchableOpacity style={qStyles.submittedBadge} onPress={() => { setSubmitted(null); setExpanded(true); }} activeOpacity={0.7}>
-          <Ionicons name={typeIcon(submitted.submissionType) as any} size={12} color={colors.accentGreen} />
-          <Text style={qStyles.submittedText}>Responded · tap to update</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]} onPress={() => { setSubmitted(null); setExpanded(true); }} activeOpacity={0.7}>
+            <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
+            <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
+          </TouchableOpacity>
+          {kind === "assignment" && submitted.evaluationStatus === "needs_revision" && submitted.feedback ? (
+            <View style={qStyles.revisionBanner}>
+              <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
+              <Text style={qStyles.revisionBannerText}>{submitted.feedback}</Text>
+            </View>
+          ) : null}
+        </>
       ) : (
         <TouchableOpacity
           style={qStyles.shareToggle}
@@ -244,6 +277,13 @@ function makeQStyles(c: AppColors) {
     alignSelf: "flex-start",
   },
   submittedText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
+  revisionBanner: {
+    flexDirection: "row", gap: 8, alignItems: "flex-start",
+    marginLeft: 36, marginTop: 6, marginBottom: 2,
+    backgroundColor: "rgba(192,57,43,0.06)", borderRadius: 10, borderWidth: 1,
+    borderColor: "rgba(192,57,43,0.25)", padding: 10,
+  },
+  revisionBannerText: { flex: 1, fontSize: 12, color: c.textDark, lineHeight: 18, fontFamily: "Inter_400Regular" },
   shareToggle: {
     flexDirection: "row", gap: 5, alignItems: "center",
     marginLeft: 36, marginTop: 2,
@@ -338,6 +378,7 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const {
     lessons, markLessonComplete,
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
@@ -456,30 +497,48 @@ export default function LessonScreen() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Load assignment + question submissions
-  useEffect(() => {
-    let cancelled = false;
-    async function loadSubmissions() {
-      if (!id) return;
-      const [a, qSubs, aQuestions, aQSubs] = await Promise.all([
-        getAssignmentForLesson(id),
-        getQuestionSubmissionsForLesson(id),
-        getAssignmentQuestionsForLesson(id),
-        getAssignmentQuestionSubmissionsForLesson(id),
-      ]);
-      if (cancelled) return;
-      setAssignment(a);
-      setAssignmentQuestions(aQuestions);
-      const map = new Map<string, QuestionSubmission>();
-      for (const s of qSubs) map.set(s.questionId, s);
-      setQuestionSubs(map);
-      const aMap = new Map<string, QuestionSubmission>();
-      for (const s of aQSubs) aMap.set(s.questionId, s);
-      setAssignmentQuestionSubs(aMap);
-    }
-    loadSubmissions();
-    return () => { cancelled = true; };
+  // Load assignment + question submissions. Exposed via useCallback so it can
+  // also be re-run after a fresh submit (to pick up the real evaluation status
+  // the DB trigger just created) and from the realtime subscription below.
+  const loadSubmissions = useCallback(async () => {
+    if (!id) return;
+    const [a, qSubs, aQuestions, aQSubs] = await Promise.all([
+      getAssignmentForLesson(id),
+      getQuestionSubmissionsForLesson(id),
+      getAssignmentQuestionsForLesson(id),
+      getAssignmentQuestionSubmissionsForLesson(id),
+    ]);
+    setAssignment(a);
+    setAssignmentQuestions(aQuestions);
+    const map = new Map<string, QuestionSubmission>();
+    for (const s of qSubs) map.set(s.questionId, s);
+    setQuestionSubs(map);
+    const aMap = new Map<string, QuestionSubmission>();
+    for (const s of aQSubs) aMap.set(s.questionId, s);
+    setAssignmentQuestionSubs(aMap);
   }, [id, getAssignmentForLesson, getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson]);
+
+  useEffect(() => { loadSubmissions(); }, [loadSubmissions]);
+
+  // Live-update the badge if an evaluator resolves this lesson's evaluation
+  // while the learner still has the lesson open — same realtime pattern used
+  // for chat messages, so they see "Approved"/"Needs revision" without having
+  // to back out and reopen the lesson.
+  useEffect(() => {
+    if (!id || !user) return;
+    const channel = supabase
+      .channel(`p2p_lesson_evaluations_${id}_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_lesson_evaluations", filter: `lesson_id=eq.${id}` },
+        (payload) => {
+          const row = payload.new as { submitter_id?: string };
+          if (row.submitter_id === user.id) loadSubmissions();
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, user, loadSubmissions]);
 
   async function handleComplete() {
     if (!id || completing) return;
@@ -567,6 +626,7 @@ export default function LessonScreen() {
                   existingSub={assignmentQuestionSubs.get(q.id)}
                   kind="assignment"
                   assignmentId={assignment.id}
+                  onSubmitted={loadSubmissions}
                 />
               ))}
             </View>
@@ -713,12 +773,6 @@ function makeStyles(c: AppColors) {
     marginBottom: 12, backgroundColor: c.lightCream,
   },
   submitError: { fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular" },
-  revisionBanner: {
-    flexDirection: "row", gap: 8, alignItems: "flex-start",
-    backgroundColor: "rgba(217,164,65,0.12)", borderRadius: 12, borderWidth: 1,
-    borderColor: "rgba(217,164,65,0.35)", padding: 12, marginBottom: 12,
-  },
-  revisionBannerText: { flex: 1, fontSize: 13, color: c.textDark, lineHeight: 20, fontFamily: "Inter_400Regular" },
   attributionBlock: { marginTop: 36, marginBottom: 8 },
   attributionRule: { height: 1, backgroundColor: c.borderBeige, marginBottom: 20 },
   attributionText: {

@@ -380,6 +380,13 @@ export default function ModuleDetailScreen() {
               <View style={styles.lessonList}>
                 {displayLessons.map((lesson, idx) => {
                   const locked = (lesson as { isLocked?: boolean }).isLocked ?? false;
+                  // Only core-curriculum lessons carry evaluationStatus today (see
+                  // Lesson in DataContext) — plan lessons don't use this peer
+                  // evaluation system, so this is undefined for those and the
+                  // row falls back to the existing not-started/done look.
+                  const evalStatus = (lesson as { evaluationStatus?: "pending" | "needs_revision" | null }).evaluationStatus;
+                  const awaitingReview = !lesson.isCompleted && !!evalStatus;
+                  const reviewColor = evalStatus === "needs_revision" ? "#C0392B" : colors.amber;
                   return (
                     <TouchableOpacity
                       key={lesson.id}
@@ -390,10 +397,13 @@ export default function ModuleDetailScreen() {
                       <View style={[
                         styles.lessonBullet,
                         lesson.isCompleted && styles.lessonBulletDone,
+                        awaitingReview && { backgroundColor: reviewColor },
                         locked && styles.lessonBulletLocked,
                       ]}>
                         {lesson.isCompleted ? (
                           <Ionicons name="checkmark" size={12} color={colors.cream} />
+                        ) : awaitingReview ? (
+                          <Ionicons name={evalStatus === "needs_revision" ? "alert" : "time"} size={12} color={colors.cream} />
                         ) : (
                           <Text style={styles.lessonBulletText}>{idx + 1}</Text>
                         )}
@@ -402,9 +412,16 @@ export default function ModuleDetailScreen() {
                         <Text style={[styles.lessonTitle, locked && styles.lessonTitleLocked]}>
                           {lesson.title}
                         </Text>
+                        {awaitingReview && (
+                          <Text style={[styles.lessonSubCount, { color: reviewColor }]}>
+                            {evalStatus === "needs_revision" ? "Needs revision" : "Waiting for peer review"}
+                          </Text>
+                        )}
                       </View>
                       {locked ? (
                         <Ionicons name="lock-closed" size={15} color={colors.borderBeige} />
+                      ) : awaitingReview ? (
+                        <Ionicons name={evalStatus === "needs_revision" ? "alert-circle" : "time-outline"} size={20} color={reviewColor} />
                       ) : (
                         <Ionicons
                           name="play-circle"

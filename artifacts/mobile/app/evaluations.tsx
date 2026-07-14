@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useData, PendingEvaluation } from "@/contexts/DataContext";
+import { useData, PendingEvaluation, MySubmission } from "@/contexts/DataContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
 import MediaPlayer from "@/components/MediaPlayer";
 import colors from "@/constants/colors";
 
@@ -125,10 +126,107 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
   );
 }
 
+function statusInfo(sub: MySubmission): { icon: string; color: string; bg: string; label: string } {
+  if (sub.selfApproved) {
+    return { icon: "checkmark-circle", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Approved (first through this lesson)" };
+  }
+  switch (sub.evaluationStatus) {
+    case "approved":
+      return { icon: "checkmark-circle", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Approved" };
+    case "needs_revision":
+      return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: "Needs revision" };
+    default:
+      return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Waiting for peer review" };
+  }
+}
+
+function MySubmissionCard({ submission }: { submission: MySubmission }) {
+  const router = useRouter();
+  const info = statusInfo(submission);
+  const isMedia = submission.submissionType === "audio" || submission.submissionType === "video";
+
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => router.push(`/lesson/${submission.lessonId}`)}>
+      <View style={styles.cardHeader}>
+        <View style={styles.avatarCircle}>
+          <Ionicons
+            name={submission.submissionType === "audio" ? "mic" : submission.submissionType === "video" ? "videocam" : "create"}
+            size={16}
+            color={colors.accentGreen}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.submitterName}>{submission.lessonTitle}</Text>
+          <Text style={styles.lessonTitle}>{new Date(submission.createdAt).toLocaleDateString()}</Text>
+        </View>
+      </View>
+
+      {isMedia ? (
+        submission.mediaUrl ? (
+          <View style={styles.mediaBox}>
+            <MediaPlayer
+              storagePath={submission.mediaUrl}
+              submissionType={submission.submissionType as "audio" | "video"}
+              durationSeconds={submission.durationSeconds}
+            />
+          </View>
+        ) : null
+      ) : (
+        <View style={styles.contentBox}>
+          <Text style={styles.contentText} numberOfLines={3}>
+            {submission.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}
+          </Text>
+        </View>
+      )}
+
+      <View style={[styles.statusBadge, { backgroundColor: info.bg }]}>
+        <Ionicons name={info.icon as any} size={13} color={info.color} />
+        <Text style={[styles.statusBadgeText, { color: info.color }]}>{info.label}</Text>
+      </View>
+
+      {submission.evaluationStatus === "needs_revision" && submission.feedback ? (
+        <View style={styles.revisionBanner}>
+          <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
+          <Text style={styles.revisionBannerText}>{submission.feedback}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 export default function EvaluationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { pendingEvaluations } = useData();
+  const { user } = useAuth();
+  const { pendingEvaluations, getMySubmissions } = useData();
+  const [tab, setTab] = useState<"toReview" | "mySubmissions">("toReview");
+  const [mySubmissions, setMySubmissions] = useState<MySubmission[]>([]);
+  const [loadingMine, setLoadingMine] = useState(false);
+
+  const loadMySubmissions = useCallback(async () => {
+    setLoadingMine(true);
+    setMySubmissions(await getMySubmissions());
+    setLoadingMine(false);
+  }, [getMySubmissions]);
+
+  useEffect(() => {
+    if (tab === "mySubmissions") loadMySubmissions();
+  }, [tab, loadMySubmissions]);
+
+  // Live-update "My Submissions" the moment an evaluator resolves one, so the
+  // learner sees Approved/Needs revision without pulling to refresh.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`p2p_lesson_evaluations_mine_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
+        () => { if (tab === "mySubmissions") loadMySubmissions(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, tab, loadMySubmissions]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -137,20 +235,55 @@ export default function EvaluationsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Evaluations Waiting for You</Text>
+        <Text style={styles.headerTitle}>Evaluations</Text>
       </View>
 
-      {pendingEvaluations.length === 0 ? (
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === "toReview" && styles.tabBtnActive]}
+          onPress={() => setTab("toReview")}
+        >
+          <Text style={[styles.tabBtnText, tab === "toReview" && styles.tabBtnTextActive]}>
+            To Review{pendingEvaluations.length > 0 ? ` (${pendingEvaluations.length})` : ""}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === "mySubmissions" && styles.tabBtnActive]}
+          onPress={() => setTab("mySubmissions")}
+        >
+          <Text style={[styles.tabBtnText, tab === "mySubmissions" && styles.tabBtnTextActive]}>My Submissions</Text>
+        </TouchableOpacity>
+      </View>
+
+      {tab === "toReview" ? (
+        pendingEvaluations.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="checkmark-done-circle" size={48} color={colors.borderBeige} />
+            <Text style={styles.emptyTitle}>You're all caught up</Text>
+            <Text style={styles.emptySub}>No peer evaluations are waiting for your review right now.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={pendingEvaluations}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <EvaluationCard evaluation={item} />}
+            contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 14 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      ) : loadingMine ? (
+        <View style={styles.emptyState}><ActivityIndicator color={colors.accentGreen} /></View>
+      ) : mySubmissions.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="checkmark-done-circle" size={48} color={colors.borderBeige} />
-          <Text style={styles.emptyTitle}>You're all caught up</Text>
-          <Text style={styles.emptySub}>No peer evaluations are waiting for your review right now.</Text>
+          <Ionicons name="document-text-outline" size={48} color={colors.borderBeige} />
+          <Text style={styles.emptyTitle}>No submissions yet</Text>
+          <Text style={styles.emptySub}>Assignment responses you submit will show up here with their review status.</Text>
         </View>
       ) : (
         <FlatList
-          data={pendingEvaluations}
+          data={mySubmissions}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <EvaluationCard evaluation={item} />}
+          renderItem={({ item }) => <MySubmissionCard submission={item} />}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 14 }}
           showsVerticalScrollIndicator={false}
         />
@@ -168,6 +301,16 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  tabRow: {
+    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+  },
+  tabBtn: {
+    flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10,
+    backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  tabBtnActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
+  tabBtnText: { fontSize: 13, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
+  tabBtnTextActive: { color: colors.cream },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
   emptySub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", lineHeight: 20 },
@@ -204,4 +347,16 @@ const styles = StyleSheet.create({
   reviseBtnText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   approveBtn: { backgroundColor: colors.primaryGreen },
   approveBtnText: { fontSize: 13, fontWeight: "600", color: colors.cream, fontFamily: "Inter_600SemiBold" },
+  statusBadge: {
+    flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "flex-start",
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  statusBadgeText: { fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  revisionBanner: {
+    flexDirection: "row", gap: 8, alignItems: "flex-start",
+    marginTop: 10,
+    backgroundColor: "rgba(192,57,43,0.06)", borderRadius: 10, borderWidth: 1,
+    borderColor: "rgba(192,57,43,0.25)", padding: 10,
+  },
+  revisionBannerText: { flex: 1, fontSize: 12, color: colors.textDark, lineHeight: 18, fontFamily: "Inter_400Regular" },
 });

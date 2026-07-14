@@ -84,6 +84,10 @@ export interface Lesson {
   isCompleted: boolean;
   isLocked: boolean;
   order: number;
+  // Set only when the lesson isn't completed yet but has a submission awaiting
+  // or returned from peer review — lets the module list show a third state
+  // distinct from both "not started" and "done".
+  evaluationStatus?: "pending" | "needs_revision" | null;
 }
 
 export interface PrayerRequest {
@@ -311,6 +315,25 @@ export interface QuestionSubmission {
   mediaUrl: string | null;
   durationSeconds: number | null;
   createdAt: string;
+  // Only ever populated for assignment-kind submissions — reflection
+  // questions are never peer-evaluated (see p2p_assign_evaluator_on_submission).
+  evaluationStatus?: "pending" | "approved" | "needs_revision" | null;
+  feedback?: string | null;
+  selfApproved?: boolean;
+}
+
+export interface MySubmission {
+  id: string;
+  lessonId: string;
+  lessonTitle: string;
+  submissionType: SubmissionType;
+  content: string;
+  mediaUrl: string | null;
+  durationSeconds: number | null;
+  createdAt: string;
+  evaluationStatus: "pending" | "approved" | "needs_revision" | null;
+  feedback: string | null;
+  selfApproved: boolean;
 }
 
 export interface SubmitContentParams {
@@ -414,6 +437,7 @@ interface DataContextValue {
   getQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
   getAssignmentQuestionsForLesson: (lessonId: string) => Promise<AssignmentQuestion[]>;
   getAssignmentQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
+  getMySubmissions: () => Promise<MySubmission[]>;
   submitContent: (params: SubmitContentParams) => Promise<string | null>;
   submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
   refreshPendingEvaluations: () => Promise<void>;
@@ -691,6 +715,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order("order_index", { ascending: true });
       const lessonsRaw = (allLessons ?? []) as Record<string, unknown>[];
       let progressByLesson = new Map<string, boolean>();
+      const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
       if (userId) {
         const { data: progressRows } = await supabase
           .from("p2p_lesson_progress")
@@ -698,6 +723,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .eq("user_id", userId);
         for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
           progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+        }
+
+        // Not-yet-resolved evaluations for this user's own assignment
+        // submissions, so the module list can show "waiting on review" /
+        // "needs revision" as a state distinct from both not-started and done.
+        const { data: myEvals } = await supabase
+          .from("p2p_lesson_evaluations")
+          .select("lesson_id,status")
+          .eq("submitter_id", userId)
+          .in("status", ["pending", "needs_revision"]);
+        for (const e of (myEvals ?? []) as Record<string, unknown>[]) {
+          const lessonId = e.lesson_id as string;
+          const status = e.status as "pending" | "needs_revision";
+          // needs_revision takes priority over pending if a lesson somehow has both.
+          if (status === "needs_revision" || !evalStatusByLesson.has(lessonId)) {
+            evalStatusByLesson.set(lessonId, status);
+          }
         }
       }
       const builtModules: Module[] = [];
@@ -726,6 +768,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             content: (l.subtitle as string) ?? "",
             isCompleted, isLocked: moduleLocked || !previousLessonComplete,
             order: l.order_index as number,
+            evaluationStatus: isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined,
           });
           previousLessonComplete = isCompleted;
         });
@@ -1861,14 +1904,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: false });
       if (error || !data) return [];
       const seen = new Set<string>();
-      return (data as Record<string, unknown>[])
-        .filter((r) => {
-          const qid = r.assignment_question_id as string;
-          if (seen.has(qid)) return false;
-          seen.add(qid);
-          return true;
-        })
-        .map((r) => ({
+      const deduped = (data as Record<string, unknown>[]).filter((r) => {
+        const qid = r.assignment_question_id as string;
+        if (seen.has(qid)) return false;
+        seen.add(qid);
+        return true;
+      });
+
+      // Assignment submissions are peer-evaluated — pull each one's evaluation
+      // status/feedback so the lesson screen can show a real state instead of
+      // a flat "Responded" badge.
+      const submissionIds = deduped.map((r) => r.id as string);
+      const evalBySubmission = new Map<string, Record<string, unknown>>();
+      if (submissionIds.length > 0) {
+        const { data: evals } = await supabase
+          .from("p2p_lesson_evaluations")
+          .select("submission_id,status,feedback,self_approved")
+          .in("submission_id", submissionIds);
+        for (const e of (evals ?? []) as Record<string, unknown>[]) {
+          evalBySubmission.set(e.submission_id as string, e);
+        }
+      }
+
+      return deduped.map((r) => {
+        const ev = evalBySubmission.get(r.id as string);
+        return {
           id: r.id as string,
           questionId: r.assignment_question_id as string,
           submissionType: (r.submission_type as SubmissionType) ?? "text",
@@ -1876,7 +1936,58 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           mediaUrl: (r.media_url as string) ?? null,
           durationSeconds: (r.duration_seconds as number) ?? null,
           createdAt: r.created_at as string,
-        }));
+          evaluationStatus: (ev?.status as QuestionSubmission["evaluationStatus"]) ?? null,
+          feedback: (ev?.feedback as string) ?? null,
+          selfApproved: Boolean(ev?.self_approved),
+        };
+      });
+    } catch { return []; }
+  }, [profile]);
+
+  const getMySubmissions = useCallback(async (): Promise<MySubmission[]> => {
+    if (!profile) return [];
+    try {
+      const { data: subs, error } = await supabase
+        .from("p2p_submissions")
+        .select("id,lesson_id,submission_type,text_content,media_url,duration_seconds,created_at")
+        .eq("user_id", profile.id)
+        .not("assignment_id", "is", null)
+        .order("created_at", { ascending: false });
+      if (error || !subs || subs.length === 0) return [];
+
+      const rows = subs as Record<string, unknown>[];
+      const submissionIds = rows.map((r) => r.id as string);
+      const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
+
+      const [{ data: evals }, { data: lessonsData }] = await Promise.all([
+        supabase.from("p2p_lesson_evaluations")
+          .select("submission_id,status,feedback,self_approved")
+          .in("submission_id", submissionIds),
+        supabase.from("p2p_lessons").select("id,title").in("id", lessonIds),
+      ]);
+      const evalBySubmission = new Map(
+        (evals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e])
+      );
+      const titleByLesson = new Map(
+        (lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"])
+      );
+
+      return rows.map((r) => {
+        const ev = evalBySubmission.get(r.id as string) as Record<string, unknown> | undefined;
+        return {
+          id: r.id as string,
+          lessonId: r.lesson_id as string,
+          lessonTitle: titleByLesson.get(r.lesson_id as string) ?? "Lesson",
+          submissionType: (r.submission_type as SubmissionType) ?? "text",
+          content: (r.text_content as string) ?? "",
+          mediaUrl: (r.media_url as string) ?? null,
+          durationSeconds: (r.duration_seconds as number) ?? null,
+          createdAt: r.created_at as string,
+          evaluationStatus: (ev?.status as MySubmission["evaluationStatus"]) ?? null,
+          feedback: (ev?.feedback as string) ?? null,
+          selfApproved: Boolean(ev?.self_approved),
+        };
+      });
     } catch { return []; }
   }, [profile]);
 
@@ -1956,6 +2067,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       markLessonComplete, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
+      getMySubmissions,
       submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
