@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Platform,
   ActivityIndicator,
@@ -13,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, Module, Plan } from "@/contexts/DataContext";
+import { useData, Module, Plan, PlanV2 } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
@@ -171,6 +172,47 @@ function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
   );
 }
 
+function PlanCardV2({ plan, onPress }: { plan: PlanV2; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+  const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
+  const isComplete = pct === 100;
+  const teacher = plan.teachers[0];
+  return (
+    <TouchableOpacity style={styles.planCard} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.planIconWrap}>
+        <Ionicons name="albums-outline" size={22} color={colors.accentGreen} />
+      </View>
+      <View style={styles.planCardBody}>
+        <Text style={styles.planTitle}>{plan.title}</Text>
+        {plan.tagline ? (
+          <Text style={styles.planDesc} numberOfLines={2}>{plan.tagline}</Text>
+        ) : null}
+        {teacher ? (
+          <Text style={[styles.planDesc, { color: colors.accentGreen, fontSize: 11 }]} numberOfLines={1}>
+            {teacher.name}{teacher.ministryOrChurch ? ` · ${teacher.ministryOrChurch}` : ""}
+          </Text>
+        ) : null}
+        {plan.lessonCount > 0 && (
+          <View style={[styles.progressRow, { marginTop: 6 }]}>
+            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
+              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
+            </View>
+            <Text style={[styles.progressText, { color: colors.textMuted }]}>
+              {plan.completedLessons}/{plan.lessonCount}
+            </Text>
+          </View>
+        )}
+      </View>
+      {isComplete ? (
+        <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -265,7 +307,7 @@ function makeStyles(c: AppColors) {
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { modules, isLoading, plans, plansLoading } = useData();
+  const { modules, isLoading, plans, plansLoading, plansV2, plansV2Loading } = useData();
   const { colors } = useTheme();
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
 
@@ -354,11 +396,11 @@ export default function LearnTab() {
           />
         )
       ) : (
-        plansLoading ? (
+        (plansLoading && plansV2Loading) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={colors.accentGreen} />
           </View>
-        ) : plans.length === 0 ? (
+        ) : (plans.length === 0 && plansV2.length === 0) ? (
           <View style={styles.loadingContainer}>
             <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
             <Text style={[styles.moduleDesc, { textAlign: "center", marginTop: 12, paddingHorizontal: 40 }]}>
@@ -366,14 +408,14 @@ export default function LearnTab() {
             </Text>
           </View>
         ) : (
-          <FlatList
+          <ScrollView
             key="plans-list"
-            data={plans}
-            keyExtractor={(p) => p.id}
             contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
+          >
+            {plans.map(item => (
               <PlanCard
+                key={item.id}
                 plan={item}
                 onPress={() => {
                   if (item.isSingleModule && item.singleModuleId) {
@@ -383,8 +425,15 @@ export default function LearnTab() {
                   }
                 }}
               />
-            )}
-          />
+            ))}
+            {plansV2.map(item => (
+              <PlanCardV2
+                key={item.id}
+                plan={item}
+                onPress={() => router.push(`/plan/${item.id}` as any)}
+              />
+            ))}
+          </ScrollView>
         )
       )}
       </View>
