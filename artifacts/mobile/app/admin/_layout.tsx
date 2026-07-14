@@ -20,7 +20,7 @@ const ADMIN_ROLES = new Set([
 ]);
 
 const NAV_ITEMS = [
-  { label: "Curriculum", path: "/admin/curriculum", icon: "book" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin"] },
+  { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin"] },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
   { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin"] },
   { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin"] },

@@ -1,0 +1,94 @@
+This prompt does three things: (1) defines a real, richer content schema for Plans — replacing the current empty p2p_curriculums-based "coming soon" shells (Purity and Lust, Addiction Recovery, Grief and Loss, etc.) with actual structured lessons sourced from named external teachers, (2) builds ONE unified Content Manager admin hub covering Curriculum, Plans, and Prayer & Testimonies together, instead of separate disconnected admin screens, (3) keeps the existing core 12-module curriculum data model completely untouched.
+
+PART 1 — Plans content schema (new tables, separate from core curriculum tables since the content shape genuinely differs):
+
+p2p_plans
+- id, title, tagline (short one-line description, varies per plan, e.g. "A Plan for the 
+  Peer-to-Peer Global Bible Study Network — 4 modules, 16 lessons"), overview (paragraph), 
+  has_submodules (boolean — some plans are flat lesson lists, others are grouped into modules), 
+  status ('draft'|'published'), created_by (references p2p_profiles, ON DELETE SET NULL — 
+  per our recent fix, never CASCADE), created_at
+
+p2p_plan_source_teachers
+- id, plan_id, name, ministry_or_church, location, youtube_handle (nullable), 
+  instagram_handle (nullable), other_social_handle (nullable)
+
+p2p_plan_modules (only used when a plan's has_submodules = true)
+- id, plan_id, module_number, module_title, order_index
+
+p2p_plan_lessons
+- id, plan_id, module_id (nullable — null if the plan is flat/no submodules), 
+  lesson_code (e.g. "L1.1"), title, order_index,
+  memory_verse_reference, memory_verse_text,
+  definition_title (e.g. "DEFINITION: LUST"), what_is_it (text), 
+  why_heading (string, customizable per lesson), why_text (text), 
+  to_whom (text), notes (text, nullable)
+
+p2p_plan_lesson_progress
+- id, user_id, lesson_id, completed (boolean), completed_at
+
+p2p_plan_teaching_outlines (one per plan)
+- id, plan_id, opening_illustration_title, opening_illustration_text
+
+p2p_plan_teaching_sessions
+- id, outline_id, session_label, summary, order_index
+
+p2p_plan_discussion_questions
+- id, plan_id, question_number, topic, question_text
+
+p2p_plan_reflection_questions (5 per lesson, reuse the same peer-evaluation-gate 
+pattern already built for core curriculum — do NOT build a separate evaluation system)
+- id, lesson_id, question_text, order_index
+
+p2p_plan_assignment_questions (5 per lesson, same peer-evaluation-gate pattern)
+- id, lesson_id, question_text, order_index
+
+Set up RLS on every one of these new tables immediately, not as an afterthought — 
+students get read-only access to published plans, admin roles get write access 
+per the existing role hierarchy (church_leader/regional_admin/moderator/super_admin 
+scoping already established). Confirm this explicitly, given our history of RLS 
+being missed on new tables.
+
+PART 2 — Unified Content Manager (one admin hub, not scattered separate screens):
+
+Restructure the admin area into ONE Content Manager with a consistent left-nav or 
+top-tab structure covering:
+- Core Curriculum (existing Curriculum Manager functionality, unchanged)
+- Plans (new — full CRUD per the schema above: create/edit/delete/publish a plan, 
+  its teaching outline, discussion questions, and each lesson's full content)
+- Prayer & Testimonies (new — admin ability to moderate/feature/remove posts from 
+  p2p_prayer_wall_posts, reusing the existing moderation queue pattern rather than 
+  building a new one)
+
+Every section should share the SAME consistent interaction pattern: a list view, 
+a create/new action, an edit view, a delete action (with confirmation), and a 
+publish/draft status toggle — so an admin learns the pattern once and it applies 
+everywhere, rather than each content type having its own bespoke UI logic.
+
+PART 3 — Public-facing display:
+
+1. The existing "Plans" tab (My Plans / Find Plans / Saved / Completed) now shows 
+   REAL plans instead of "coming soon" placeholders, once an admin publishes one — 
+   this replaces the placeholder shells, it does not create a second Plans section.
+2. Plan detail page renders: tagline, overview, source teacher credit block 
+   (name, ministry/church, location, social handles) prominently — NOT just buried 
+   at the bottom, this is core to honoring the teacher — memory verse, each lesson's 
+   full content (definition/what-is-it/why/to-whom/notes), the teaching outline, 
+   discussion questions, and reflection/assignment questions per lesson, visually 
+   consistent with how core curriculum lessons already render.
+3. Lesson completion for Plans reuses the exact same progress-tracking and 
+   peer-evaluation-gate pattern as core curriculum lessons — do not build a second, 
+   different completion system.
+
+Do NOT touch the existing core 12-module curriculum data model, tables, or UI — 
+this is fully additive.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE 
+REPORTING DONE.
+
+Report back: confirm RLS policies exist and work correctly on every new table 
+(test as both an admin and a regular student account), confirm the Content Manager 
+hub shows all three sections with working create/edit/delete/publish for each, 
+and walk through creating one real test Plan end-to-end (with a fake source teacher, 
+one module, one lesson, one discussion question) to confirm it appears correctly 
+on the existing Plans tab with the teacher credit block displaying properly.

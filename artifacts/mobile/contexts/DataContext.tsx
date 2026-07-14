@@ -51,6 +51,29 @@ export interface Plan {
   singleModuleId?: string;
 }
 
+export interface PlanV2Teacher {
+  id: string;
+  name: string;
+  ministryOrChurch: string;
+  location: string;
+  youtubeHandle?: string;
+  instagramHandle?: string;
+  otherSocialHandle?: string;
+}
+
+export interface PlanV2 {
+  id: string;
+  title: string;
+  tagline: string;
+  overview: string;
+  hasSubmodules: boolean;
+  status: "draft" | "published";
+  lessonCount: number;
+  completedLessons: number;
+  isLocked: boolean;
+  teachers: PlanV2Teacher[];
+}
+
 export interface Lesson {
   id: string;
   moduleId: string;
@@ -323,6 +346,9 @@ interface DataContextValue {
   lessons: Lesson[];
   plans: Plan[];
   plansLoading: boolean;
+  plansV2: PlanV2[];
+  plansV2Loading: boolean;
+  refreshPlansV2: () => void;
   prayers: PrayerRequest[];
   sessions: StudySession[];
   forestNodes: ForestNode[];
@@ -471,6 +497,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [plansV2, setPlansV2] = useState<PlanV2[]>([]);
+  const [plansV2Loading, setPlansV2Loading] = useState(false);
   const [fruits, setFruits] = useState<Fruit[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
@@ -567,6 +595,58 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setPlansLoading(false);
     }
+  }, []);
+
+  const loadPlansV2 = useCallback(async (userId?: string) => {
+    setPlansV2Loading(true);
+    try {
+      const { data: allPlans } = await supabase
+        .from("p2p_plans")
+        .select("id,title,tagline,overview,has_submodules,status")
+        .eq("status", "published")
+        .order("created_at", { ascending: true });
+      if (!allPlans || allPlans.length === 0) { setPlansV2([]); return; }
+      const planIds = (allPlans as Record<string, unknown>[]).map(p => p.id as string);
+      const [{ data: lessons }, { data: teachers }, { data: progressRows }] = await Promise.all([
+        supabase.from("p2p_plan_lessons").select("id,plan_id").in("plan_id", planIds),
+        supabase.from("p2p_plan_source_teachers")
+          .select("id,plan_id,name,ministry_or_church,location,youtube_handle,instagram_handle,other_social_handle")
+          .in("plan_id", planIds),
+        userId
+          ? supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", userId)
+          : Promise.resolve({ data: [] }),
+      ]);
+      const progressMap = new Map<string, boolean>();
+      for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+        progressMap.set(p.lesson_id as string, Boolean(p.completed));
+      }
+      const builtPlans: PlanV2[] = (allPlans as Record<string, unknown>[]).map(plan => {
+        const planLessons = ((lessons ?? []) as Record<string, unknown>[]).filter(l => (l.plan_id as string) === (plan.id as string));
+        const lessonCount = planLessons.length;
+        const completedLessons = planLessons.filter(l => progressMap.get(l.id as string)).length;
+        const planTeachers: PlanV2Teacher[] = ((teachers ?? []) as Record<string, unknown>[])
+          .filter(t => (t.plan_id as string) === (plan.id as string))
+          .map(t => ({
+            id: t.id as string, name: t.name as string,
+            ministryOrChurch: (t.ministry_or_church as string) ?? "",
+            location: (t.location as string) ?? "",
+            youtubeHandle: (t.youtube_handle as string) ?? undefined,
+            instagramHandle: (t.instagram_handle as string) ?? undefined,
+            otherSocialHandle: (t.other_social_handle as string) ?? undefined,
+          }));
+        return {
+          id: plan.id as string, title: plan.title as string,
+          tagline: (plan.tagline as string) ?? "",
+          overview: (plan.overview as string) ?? "",
+          hasSubmodules: Boolean(plan.has_submodules),
+          status: plan.status as "draft" | "published",
+          lessonCount, completedLessons, isLocked: false,
+          teachers: planTeachers,
+        };
+      });
+      setPlansV2(builtPlans);
+    } catch { setPlansV2([]); }
+    finally { setPlansV2Loading(false); }
   }, []);
 
   const loadCurriculum = useCallback(async (userId?: string) => {
@@ -857,6 +937,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         loadCurriculum(profile?.id),
         loadPlans(profile?.id),
+        loadPlansV2(profile?.id),
       ]);
       if (profile?.id) {
         await refreshPendingEvaluations(profile.id);
@@ -903,7 +984,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, loadPlansV2, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1861,7 +1942,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, plans, plansLoading, prayers, sessions, forestNodes, forestStats, fruits, missions,
+      modules, lessons, plans, plansLoading, plansV2, plansV2Loading, refreshPlansV2: loadPlansV2, prayers, sessions, forestNodes, forestStats, fruits, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
