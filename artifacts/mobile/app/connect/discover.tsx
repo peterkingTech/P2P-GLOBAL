@@ -15,7 +15,7 @@ export default function Discover() {
   const router = useRouter();
   const { supabase } = useAuth();
   const { highlight } = useLocalSearchParams<{ highlight?: string }>();
-  const { getDiscoverablePeers } = useData();
+  const { getDiscoverablePeers, reportContent } = useData();
   const [peers, setPeers] = useState<DiscoverablePeer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -23,15 +23,43 @@ export default function Discover() {
   const [skillFilter, setSkillFilter] = useState<string[]>([]);
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
 
+  function handleReport(peer: DiscoverablePeer) {
+    Alert.alert(
+      `Report ${peer.fullName}?`,
+      "Let a moderator know what's wrong with this profile. This won't notify them.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          style: "destructive",
+          onPress: async () => {
+            const err = await reportContent("profile", peer.id, "Reported from discovery");
+            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          },
+        },
+      ]
+    );
+  }
+
   async function handleMessage(peer: DiscoverablePeer) {
     setMessaging(peer.id);
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: peer.id });
       if (error || !data) {
-        Alert.alert(
-          "Can't message yet",
-          "You can message peers once you share a study group together, or once they've reached out for help."
-        );
+        if (error?.message?.includes("age verification required")) {
+          Alert.alert(
+            "Add your date of birth",
+            "Please add your date of birth in Settings before messaging other members.",
+            [{ text: "Go to Settings", onPress: () => router.push("/settings") }, { text: "Cancel", style: "cancel" }]
+          );
+        } else if (error?.message?.includes("adult and minor accounts")) {
+          Alert.alert("Can't message this person", "This conversation isn't available.");
+        } else {
+          Alert.alert(
+            "Can't message yet",
+            "You can message peers once you share a study group together, or once they've reached out for help."
+          );
+        }
         return;
       }
       router.push(`/messages/${data}` as any);
@@ -113,6 +141,9 @@ export default function Discover() {
                     </Text>
                   )}
                 </View>
+                <TouchableOpacity style={styles.reportBtn} onPress={() => handleReport(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.msgBtn} onPress={() => handleMessage(item)} disabled={messaging === item.id}>
                   {messaging === item.id ? (
                     <ActivityIndicator size="small" color={colors.accentGreen} />
@@ -171,6 +202,7 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryGreen, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
   msgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(29,158,117,0.08)" },
+  reportBtn: { padding: 4 },
   name: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   empty: { alignItems: "center", gap: 12, marginTop: 60 },

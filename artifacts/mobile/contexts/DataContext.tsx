@@ -121,7 +121,7 @@ export interface HelpRequest {
 }
 
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
-export type ModerationContentType = "prayer_post" | "prayer_comment";
+export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
 
 export interface ModerationPosterIdentity {
   id: string;

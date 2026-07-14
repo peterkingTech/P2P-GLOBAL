@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,9 +10,27 @@ import colors from "@/constants/colors";
 export default function SmartMatch() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { getSmartMatch } = useData();
+  const { getSmartMatch, reportContent } = useData();
   const [match, setMatch] = useState<DiscoverablePeer | null>(null);
   const [loading, setLoading] = useState(true);
+
+  function handleReport(peer: DiscoverablePeer) {
+    Alert.alert(
+      `Report ${peer.fullName}?`,
+      "Let a moderator know what's wrong with this profile. This won't notify them.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          style: "destructive",
+          onPress: async () => {
+            const err = await reportContent("profile", peer.id, "Reported from smart match");
+            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          },
+        },
+      ]
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +55,9 @@ export default function SmartMatch() {
           <ActivityIndicator style={{ marginTop: 40 }} color={colors.primaryGreen} />
         ) : match ? (
           <View style={styles.card}>
+            <TouchableOpacity style={styles.reportBtn} onPress={() => handleReport(match)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
+            </TouchableOpacity>
             <Avatar photoUrl={match.photoUrl} name={match.fullName} size={72} style={styles.avatar} />
             <Text style={styles.name}>{match.fullName}</Text>
             <Text style={styles.meta}>{match.country || "Country not set"} · {match.role}</Text>
@@ -68,8 +89,9 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: 20, fontFamily: "Inter_400Regular" },
   card: {
     backgroundColor: colors.card, borderRadius: 18, borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 24, alignItems: "center", gap: 6,
+    padding: 24, alignItems: "center", gap: 6, position: "relative",
   },
+  reportBtn: { position: "absolute", top: 14, right: 14, padding: 4, zIndex: 1 },
   avatar: {
     width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primaryGreen,
     alignItems: "center", justifyContent: "center", marginBottom: 8,

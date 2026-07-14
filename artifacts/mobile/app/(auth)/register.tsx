@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate } from "@/lib/dateOfBirth";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -24,6 +25,9 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthYear, setBirthYear] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,9 +36,22 @@ export default function RegisterScreen() {
     if (!email.trim()) { setError("Please enter your email."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
 
+    const month = parseInt(birthMonth, 10);
+    const day = parseInt(birthDay, 10);
+    const year = parseInt(birthYear, 10);
+    if (!isValidCalendarDate(year, month, day)) {
+      setError("Please enter a valid date of birth.");
+      return;
+    }
+    const dob = toISODate(year, month, day);
+    if (ageFromISODate(dob) < MIN_SIGNUP_AGE) {
+      setError(`You must be at least ${MIN_SIGNUP_AGE} years old to create an account.`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    const err = await signUp(email.trim(), password, name.trim());
+    const err = await signUp(email.trim(), password, name.trim(), dob);
     setLoading(false);
     if (err) {
       setError(err);
@@ -123,6 +140,42 @@ export default function RegisterScreen() {
           </View>
         </View>
 
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Date of Birth</Text>
+          <View style={styles.dobRow}>
+            <TextInput
+              style={[styles.input, styles.dobInput]}
+              value={birthMonth}
+              onChangeText={setBirthMonth}
+              placeholder="MM"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <TextInput
+              style={[styles.input, styles.dobInput]}
+              value={birthDay}
+              onChangeText={setBirthDay}
+              placeholder="DD"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <TextInput
+              style={[styles.input, styles.dobInputYear]}
+              value={birthYear}
+              onChangeText={setBirthYear}
+              placeholder="YYYY"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+          </View>
+          <Text style={styles.dobNote}>
+            We ask this to keep the community safe — it's never shown to other users. You must be {MIN_SIGNUP_AGE}+ to join.
+          </Text>
+        </View>
+
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={handleRegister}
@@ -186,6 +239,10 @@ const styles = StyleSheet.create({
   },
   passwordRow: { flexDirection: "row", alignItems: "center" },
   eyeBtn: { position: "absolute", right: 14 },
+  dobRow: { flexDirection: "row", gap: 8 },
+  dobInput: { width: 64, textAlign: "center" },
+  dobInputYear: { width: 84, textAlign: "center" },
+  dobNote: { color: colors.textMuted, fontSize: 12, marginTop: 2, fontFamily: "Inter_400Regular" },
   primaryBtn: {
     backgroundColor: colors.accentGreen,
     borderRadius: 14,

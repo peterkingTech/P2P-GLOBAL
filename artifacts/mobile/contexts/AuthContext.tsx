@@ -55,6 +55,7 @@ export interface UserProfile {
   isPraying: boolean;
   createdAt: string;
   servantScore: number;
+  dateOfBirth?: string;
   bio?: string;
   notificationsEnabled: boolean;
   notifyPrayer: boolean;
@@ -75,7 +76,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string, name: string) => Promise<string | null>;
+  signUp: (email: string, password: string, name: string, dateOfBirth: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<string | null>;
@@ -100,6 +101,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
     servantScore: (row.servant_score as number) ?? 0,
+    dateOfBirth: row.date_of_birth as string | undefined,
     bio: row.bio as string | undefined,
     notificationsEnabled: (row.notifications_enabled as boolean) ?? true,
     notifyPrayer: (row.notify_prayer as boolean) ?? true,
@@ -155,8 +157,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = useCallback(async (
     email: string,
     password: string,
-    name: string
+    name: string,
+    dateOfBirth: string
   ): Promise<string | null> => {
+    if (!dateOfBirth) return "Date of birth is required.";
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -169,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: data.user.id,
         email,
         full_name: name,
+        date_of_birth: dateOfBirth,
         created_at: new Date().toISOString(),
       };
       const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
@@ -211,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.profileVisibility !== undefined) dbUpdates.profile_visibility = updates.profileVisibility;
     if (updates.appLanguage !== undefined) dbUpdates.app_language = updates.appLanguage;
     if (updates.contentLanguage !== undefined) dbUpdates.content_language = updates.contentLanguage;
+    if (updates.dateOfBirth !== undefined) dbUpdates.date_of_birth = updates.dateOfBirth;
 
     const { error } = await supabase
       .from("p2p_profiles")

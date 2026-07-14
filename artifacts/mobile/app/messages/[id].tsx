@@ -9,11 +9,14 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
+import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 import colors from "@/constants/colors";
 
 interface Message {
@@ -30,11 +33,13 @@ export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { supabase, user } = useAuth();
+  const { reportContent } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
   const [title, setTitle] = useState("Conversation");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
@@ -103,18 +108,51 @@ export default function ChatScreen() {
     };
   }, [id, supabase]);
 
+  function handleLongPressMessage(item: Message) {
+    if (item.sender_id === user?.id) return;
+    Alert.alert(
+      item.senderName || "This message",
+      "What would you like to report?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report message",
+          onPress: async () => {
+            const err = await reportContent("message", item.id, "Reported from conversation");
+            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          },
+        },
+        {
+          text: "Report profile",
+          style: "destructive",
+          onPress: async () => {
+            const err = await reportContent("profile", item.sender_id, "Reported from conversation");
+            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          },
+        },
+      ]
+    );
+  }
+
   async function handleSend() {
     const body = text.trim();
     if (!body || !id || !user) return;
     setSending(true);
     setText("");
-    const { error } = await supabase.from("p2p_messages").insert({
-      conversation_id: id,
-      sender_id: user.id,
-      body,
-    });
+    const { data, error } = await supabase
+      .from("p2p_messages")
+      .insert({ conversation_id: id, sender_id: user.id, body })
+      .select("id, flagged_self_harm")
+      .single();
     setSending(false);
-    if (error) setText(body);
+    if (error) {
+      setText(body);
+      Alert.alert("Message not sent", error.message);
+      return;
+    }
+    if (data?.flagged_self_harm) {
+      setShowCrisisModal(true);
+    }
   }
 
   return (
@@ -147,10 +185,14 @@ export default function ChatScreen() {
               const mine = item.sender_id === user?.id;
               return (
                 <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
-                  <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                  <TouchableOpacity
+                    activeOpacity={mine ? 1 : 0.7}
+                    onLongPress={() => handleLongPressMessage(item)}
+                    style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+                  >
                     {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
                     <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.body}</Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               );
             }}
@@ -171,6 +213,12 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <CrisisResourcesModal
+        visible={showCrisisModal}
+        onClose={() => setShowCrisisModal(false)}
+        statusText="A crisis responder from our team has also been notified and will reach out to you directly."
+      />
     </KeyboardAvoidingView>
   );
 }

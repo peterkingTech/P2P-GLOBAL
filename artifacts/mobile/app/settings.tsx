@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate } from "@/lib/dateOfBirth";
 import "@/lib/i18n";
 
 const LANGUAGES = [
@@ -50,6 +51,9 @@ export default function SettingsScreen() {
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [city, setCity] = useState(profile?.city ?? "");
   const [country, setCountry] = useState(profile?.country ?? "");
+  const [dobYear, setDobYear] = useState(profile?.dateOfBirth?.split("-")[0] ?? "");
+  const [dobMonth, setDobMonth] = useState(profile?.dateOfBirth?.split("-")[1] ?? "");
+  const [dobDay, setDobDay] = useState(profile?.dateOfBirth?.split("-")[2] ?? "");
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -120,12 +124,30 @@ export default function SettingsScreen() {
   }
 
   async function handleSaveProfile() {
+    const hasDobInput = dobMonth.trim() || dobDay.trim() || dobYear.trim();
+    let dateOfBirth: string | undefined;
+    if (hasDobInput) {
+      const month = parseInt(dobMonth, 10);
+      const day = parseInt(dobDay, 10);
+      const year = parseInt(dobYear, 10);
+      if (!isValidCalendarDate(year, month, day)) {
+        Alert.alert("Invalid date", "Please enter a valid date of birth.");
+        return;
+      }
+      dateOfBirth = toISODate(year, month, day);
+      if (ageFromISODate(dateOfBirth) < MIN_SIGNUP_AGE) {
+        Alert.alert("Can't save", `You must be at least ${MIN_SIGNUP_AGE} years old to use this app.`);
+        return;
+      }
+    }
+
     setSaving(true);
     const err = await updateProfile({
       displayName: displayName.trim(),
       bio: bio.trim(),
       city: city.trim() || undefined,
       country: country.trim() || undefined,
+      ...(dateOfBirth ? { dateOfBirth } : {}),
     });
     setSaving(false);
     if (err) Alert.alert("Couldn't save", err);
@@ -206,6 +228,18 @@ export default function SettingsScreen() {
           </View>
           <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={colors.textMuted} />
           <TextInput style={[styles.input, { marginTop: 8 }]} value={country} onChangeText={setCountry} placeholder="Country" placeholderTextColor={colors.textMuted} />
+
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Date of Birth</Text>
+          <View style={styles.dobRow}>
+            <TextInput style={[styles.input, styles.dobInput]} value={dobMonth} onChangeText={setDobMonth} placeholder="MM" placeholderTextColor={colors.textMuted} keyboardType="number-pad" maxLength={2} />
+            <TextInput style={[styles.input, styles.dobInput]} value={dobDay} onChangeText={setDobDay} placeholder="DD" placeholderTextColor={colors.textMuted} keyboardType="number-pad" maxLength={2} />
+            <TextInput style={[styles.input, styles.dobInputYear]} value={dobYear} onChangeText={setDobYear} placeholder="YYYY" placeholderTextColor={colors.textMuted} keyboardType="number-pad" maxLength={4} />
+          </View>
+          <Text style={styles.dobNote}>
+            {profile?.dateOfBirth
+              ? "Never shown publicly."
+              : "Required before you can message other members. Never shown publicly."}
+          </Text>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Profile</Text>}
@@ -388,6 +422,10 @@ function makeStyles(c: AppColors) {
     fontFamily: "Inter_400Regular", marginBottom: 14,
   },
   multiline: { minHeight: 80, textAlignVertical: "top" },
+  dobRow: { flexDirection: "row", gap: 8 },
+  dobInput: { width: 64, textAlign: "center" },
+  dobInputYear: { width: 84, textAlign: "center" },
+  dobNote: { fontSize: 11, color: c.textMuted, marginTop: -6, marginBottom: 14, fontFamily: "Inter_400Regular" },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   useLocationBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 8 },
   useLocationText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
