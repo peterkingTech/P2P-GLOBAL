@@ -294,6 +294,10 @@ export interface PendingEvaluation {
   mediaUrl: string | null;
   durationSeconds: number | null;
   assignedAt: string;
+  // Which evaluation gate this came from — core curriculum (p2p_lesson_evaluations)
+  // or Plans (p2p_plan_lesson_evaluations), a separate mirrored system. Needed so
+  // resolveEvaluation() updates the right table.
+  source: "core" | "plan";
 }
 
 export interface SubmissionStatus {
@@ -334,6 +338,18 @@ export interface MySubmission {
   evaluationStatus: "pending" | "approved" | "needs_revision" | null;
   feedback: string | null;
   selfApproved: boolean;
+  // Which system this came from — core curriculum or the separate, mirrored
+  // Plans evaluation gate — so the UI can route taps to the right lesson screen.
+  source: "core" | "plan";
+}
+
+// Plan reflection answers are private, personal-processing content — never
+// peer-evaluated (see migration 026). No evaluation-related fields at all.
+export interface PlanReflectionSubmission {
+  id: string;
+  questionId: string;
+  content: string;
+  createdAt: string;
 }
 
 export interface SubmitContentParams {
@@ -438,13 +454,16 @@ interface DataContextValue {
   getAssignmentQuestionsForLesson: (lessonId: string) => Promise<AssignmentQuestion[]>;
   getAssignmentQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
   getMySubmissions: () => Promise<MySubmission[]>;
+  submitPlanReflection: (params: { lessonId: string; questionId: string; text: string }) => Promise<string | null>;
+  getPlanReflectionSubmissionsForLesson: (lessonId: string) => Promise<PlanReflectionSubmission[]>;
   submitContent: (params: SubmitContentParams) => Promise<string | null>;
   submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
   refreshPendingEvaluations: () => Promise<void>;
   resolveEvaluation: (
     evaluationId: string,
     status: "approved" | "needs_revision",
-    feedback: string
+    feedback: string,
+    source?: "core" | "plan"
   ) => Promise<string | null>;
   toastEvent: GrowthEvent | null;
   celebrationEvent: GrowthEvent | null;
@@ -785,31 +804,43 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const uid = userId ?? profile?.id;
     if (!uid) return;
     try {
-      const { data: evalRows, error } = await supabase
-        .from("p2p_lesson_evaluations")
-        .select("id,submission_id,lesson_id,submitter_id,assigned_at")
-        .eq("evaluator_id", uid)
-        .eq("status", "pending")
-        .order("assigned_at", { ascending: true });
-      if (error || !evalRows || evalRows.length === 0) {
+      const [{ data: evalRows }, { data: planEvalRows }] = await Promise.all([
+        supabase.from("p2p_lesson_evaluations")
+          .select("id,submission_id,lesson_id,submitter_id,assigned_at")
+          .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true }),
+        supabase.from("p2p_plan_lesson_evaluations")
+          .select("id,submission_id,lesson_id,submitter_id,assigned_at")
+          .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true }),
+      ]);
+      const rows = (evalRows ?? []) as Record<string, unknown>[];
+      const planRows = (planEvalRows ?? []) as Record<string, unknown>[];
+      if (rows.length === 0 && planRows.length === 0) {
         setPendingEvaluations([]); return;
       }
-      const rows = evalRows as Record<string, unknown>[];
+
       const submissionIds = Array.from(new Set(rows.map((r) => r.submission_id as string)));
       const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
-      const submitterIds = Array.from(new Set(rows.map((r) => r.submitter_id as string)));
-      const [{ data: subs }, { data: lessonsData }, { data: submitters }] = await Promise.all([
-        supabase.from("p2p_submissions")
-          .select("id,submission_type,text_content,media_url,duration_seconds")
-          .in("id", submissionIds),
-        supabase.from("p2p_lessons").select("id,title").in("id", lessonIds),
+      const planSubmissionIds = Array.from(new Set(planRows.map((r) => r.submission_id as string)));
+      const planLessonIds = Array.from(new Set(planRows.map((r) => r.lesson_id as string)));
+      const submitterIds = Array.from(new Set([...rows, ...planRows].map((r) => r.submitter_id as string)));
+
+      const [{ data: subs }, { data: lessonsData }, { data: planSubs }, { data: planLessonsData }, { data: submitters }] = await Promise.all([
+        submissionIds.length
+          ? supabase.from("p2p_submissions").select("id,submission_type,text_content,media_url,duration_seconds").in("id", submissionIds)
+          : Promise.resolve({ data: [] }),
+        lessonIds.length ? supabase.from("p2p_lessons").select("id,title").in("id", lessonIds) : Promise.resolve({ data: [] }),
+        planSubmissionIds.length
+          ? supabase.from("p2p_plan_assignment_submissions").select("id,content").in("id", planSubmissionIds)
+          : Promise.resolve({ data: [] }),
+        planLessonIds.length ? supabase.from("p2p_plan_lessons").select("id,title").in("id", planLessonIds) : Promise.resolve({ data: [] }),
         supabase.from("p2p_profiles").select("id,full_name").in("id", submitterIds),
       ]);
-      const subById = new Map(
-        (subs ?? []).map((s: Record<string, unknown>) => [s.id as string, s])
-      );
+      const subById = new Map((subs ?? []).map((s: Record<string, unknown>) => [s.id as string, s]));
+      const planSubById = new Map((planSubs ?? []).map((s: Record<string, unknown>) => [s.id as string, s]));
       const titleById = new Map((lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"]));
+      const planTitleById = new Map((planLessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Plan Lesson"]));
       const nameById = new Map((submitters ?? []).map((p: Record<string, unknown>) => [p.id as string, (p.full_name as string) ?? "A fellow disciple"]));
+
       const mapped: PendingEvaluation[] = rows.map((row) => {
         const sub = subById.get(row.submission_id as string) as Record<string, unknown> | undefined;
         return {
@@ -824,9 +855,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           mediaUrl: (sub?.media_url as string) ?? null,
           durationSeconds: (sub?.duration_seconds as number) ?? null,
           assignedAt: row.assigned_at as string,
+          source: "core",
         };
       });
-      setPendingEvaluations(mapped);
+      const mappedPlan: PendingEvaluation[] = planRows.map((row) => {
+        const sub = planSubById.get(row.submission_id as string) as Record<string, unknown> | undefined;
+        return {
+          id: row.id as string,
+          submissionId: row.submission_id as string,
+          lessonId: row.lesson_id as string,
+          lessonTitle: planTitleById.get(row.lesson_id as string) ?? "Plan Lesson",
+          submitterId: row.submitter_id as string,
+          submitterName: nameById.get(row.submitter_id as string) ?? "A fellow disciple",
+          submissionType: "text",
+          content: (sub?.content as string) ?? "",
+          mediaUrl: null,
+          durationSeconds: null,
+          assignedAt: row.assigned_at as string,
+          source: "plan",
+        };
+      });
+
+      setPendingEvaluations(
+        [...mapped, ...mappedPlan].sort((a, b) => new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime())
+      );
     } catch {
       setPendingEvaluations([]);
     }
@@ -1947,32 +1999,40 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getMySubmissions = useCallback(async (): Promise<MySubmission[]> => {
     if (!profile) return [];
     try {
-      const { data: subs, error } = await supabase
-        .from("p2p_submissions")
-        .select("id,lesson_id,submission_type,text_content,media_url,duration_seconds,created_at")
-        .eq("user_id", profile.id)
-        .not("assignment_id", "is", null)
-        .order("created_at", { ascending: false });
-      if (error || !subs || subs.length === 0) return [];
+      const [{ data: subs }, { data: planSubs }] = await Promise.all([
+        supabase.from("p2p_submissions")
+          .select("id,lesson_id,submission_type,text_content,media_url,duration_seconds,created_at")
+          .eq("user_id", profile.id).not("assignment_id", "is", null).order("created_at", { ascending: false }),
+        supabase.from("p2p_plan_assignment_submissions")
+          .select("id,lesson_id,content,created_at")
+          .eq("user_id", profile.id).order("created_at", { ascending: false }),
+      ]);
 
-      const rows = subs as Record<string, unknown>[];
+      const rows = (subs ?? []) as Record<string, unknown>[];
+      const planRows = (planSubs ?? []) as Record<string, unknown>[];
+      if (rows.length === 0 && planRows.length === 0) return [];
+
       const submissionIds = rows.map((r) => r.id as string);
       const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
+      const planSubmissionIds = planRows.map((r) => r.id as string);
+      const planLessonIds = Array.from(new Set(planRows.map((r) => r.lesson_id as string)));
 
-      const [{ data: evals }, { data: lessonsData }] = await Promise.all([
-        supabase.from("p2p_lesson_evaluations")
-          .select("submission_id,status,feedback,self_approved")
-          .in("submission_id", submissionIds),
-        supabase.from("p2p_lessons").select("id,title").in("id", lessonIds),
+      const [{ data: evals }, { data: lessonsData }, { data: planEvals }, { data: planLessonsData }] = await Promise.all([
+        submissionIds.length
+          ? supabase.from("p2p_lesson_evaluations").select("submission_id,status,feedback,self_approved").in("submission_id", submissionIds)
+          : Promise.resolve({ data: [] }),
+        lessonIds.length ? supabase.from("p2p_lessons").select("id,title").in("id", lessonIds) : Promise.resolve({ data: [] }),
+        planSubmissionIds.length
+          ? supabase.from("p2p_plan_lesson_evaluations").select("submission_id,status,feedback,self_approved").in("submission_id", planSubmissionIds)
+          : Promise.resolve({ data: [] }),
+        planLessonIds.length ? supabase.from("p2p_plan_lessons").select("id,title").in("id", planLessonIds) : Promise.resolve({ data: [] }),
       ]);
-      const evalBySubmission = new Map(
-        (evals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e])
-      );
-      const titleByLesson = new Map(
-        (lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"])
-      );
+      const evalBySubmission = new Map((evals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e]));
+      const planEvalBySubmission = new Map((planEvals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e]));
+      const titleByLesson = new Map((lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"]));
+      const planTitleByLesson = new Map((planLessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Plan Lesson"]));
 
-      return rows.map((r) => {
+      const mapped: MySubmission[] = rows.map((r) => {
         const ev = evalBySubmission.get(r.id as string) as Record<string, unknown> | undefined;
         return {
           id: r.id as string,
@@ -1986,8 +2046,74 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           evaluationStatus: (ev?.status as MySubmission["evaluationStatus"]) ?? null,
           feedback: (ev?.feedback as string) ?? null,
           selfApproved: Boolean(ev?.self_approved),
+          source: "core",
         };
       });
+      const mappedPlan: MySubmission[] = planRows.map((r) => {
+        const ev = planEvalBySubmission.get(r.id as string) as Record<string, unknown> | undefined;
+        return {
+          id: r.id as string,
+          lessonId: r.lesson_id as string,
+          lessonTitle: planTitleByLesson.get(r.lesson_id as string) ?? "Plan Lesson",
+          submissionType: "text",
+          content: (r.content as string) ?? "",
+          mediaUrl: null,
+          durationSeconds: null,
+          createdAt: r.created_at as string,
+          evaluationStatus: (ev?.status as MySubmission["evaluationStatus"]) ?? null,
+          feedback: (ev?.feedback as string) ?? null,
+          selfApproved: Boolean(ev?.self_approved),
+          source: "plan",
+        };
+      });
+
+      return [...mapped, ...mappedPlan].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch { return []; }
+  }, [profile]);
+
+  // Plan reflections are private, personal-processing content — see migration
+  // 026. This insert has no evaluation gate/trigger attached at all: no
+  // evaluator is ever assigned, and RLS restricts visibility to the submitter
+  // (and admins) only.
+  const submitPlanReflection = useCallback(async (params: { lessonId: string; questionId: string; text: string }): Promise<string | null> => {
+    if (!profile) return "You must be signed in to submit.";
+    try {
+      const { error } = await supabase.from("p2p_plan_reflection_submissions").insert({
+        lesson_id: params.lessonId,
+        question_id: params.questionId,
+        user_id: profile.id,
+        content: params.text,
+      });
+      return error ? error.message : null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Failed to submit.";
+    }
+  }, [profile]);
+
+  const getPlanReflectionSubmissionsForLesson = useCallback(async (lessonId: string): Promise<PlanReflectionSubmission[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_plan_reflection_submissions")
+        .select("id,question_id,content,created_at")
+        .eq("lesson_id", lessonId)
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false });
+      if (error || !data) return [];
+      const seen = new Set<string>();
+      return (data as Record<string, unknown>[])
+        .filter((r) => {
+          const qid = r.question_id as string;
+          if (seen.has(qid)) return false;
+          seen.add(qid);
+          return true;
+        })
+        .map((r) => ({
+          id: r.id as string,
+          questionId: r.question_id as string,
+          content: (r.content as string) ?? "",
+          createdAt: r.created_at as string,
+        }));
     } catch { return []; }
   }, [profile]);
 
@@ -2033,12 +2159,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const resolveEvaluation = useCallback(async (
     evaluationId: string,
     status: "approved" | "needs_revision",
-    feedback: string
+    feedback: string,
+    source: "core" | "plan" = "core"
   ): Promise<string | null> => {
     if (!profile) return "You must be signed in.";
     try {
+      const table = source === "plan" ? "p2p_plan_lesson_evaluations" : "p2p_lesson_evaluations";
       const { error } = await supabase
-        .from("p2p_lesson_evaluations")
+        .from(table)
         .update({ status, feedback, resolved_at: new Date().toISOString() })
         .eq("id", evaluationId)
         .eq("evaluator_id", profile.id)
@@ -2068,6 +2196,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
       getMySubmissions,
+      submitPlanReflection, getPlanReflectionSubmissionsForLesson,
       submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,

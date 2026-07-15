@@ -28,7 +28,7 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
     if (submitting) return;
     setSubmitting(status);
     setError(null);
-    const err = await resolveEvaluation(evaluation.id, status, feedback.trim());
+    const err = await resolveEvaluation(evaluation.id, status, feedback.trim(), evaluation.source);
     if (err) { setError(err); setSubmitting(null); }
     else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
   }
@@ -146,7 +146,11 @@ function MySubmissionCard({ submission }: { submission: MySubmission }) {
   const isMedia = submission.submissionType === "audio" || submission.submissionType === "video";
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => router.push(`/lesson/${submission.lessonId}`)}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => router.push((submission.source === "plan" ? `/plan/lesson/${submission.lessonId}` : `/lesson/${submission.lessonId}`) as any)}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.avatarCircle}>
           <Ionicons
@@ -213,8 +217,9 @@ export default function EvaluationsScreen() {
     if (tab === "mySubmissions") loadMySubmissions();
   }, [tab, loadMySubmissions]);
 
-  // Live-update "My Submissions" the moment an evaluator resolves one, so the
-  // learner sees Approved/Needs revision without pulling to refresh.
+  // Live-update "My Submissions" the moment an evaluator resolves one — core
+  // curriculum or Plans — so the learner sees Approved/Needs revision without
+  // pulling to refresh.
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -222,6 +227,11 @@ export default function EvaluationsScreen() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
+        () => { if (tab === "mySubmissions") loadMySubmissions(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
         () => { if (tab === "mySubmissions") loadMySubmissions(); }
       )
       .subscribe();

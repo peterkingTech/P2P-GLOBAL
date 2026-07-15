@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
+import { useData, PlanReflectionSubmission } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
@@ -33,7 +34,8 @@ export default function PlanLessonScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { submitPlanReflection, getPlanReflectionSubmissionsForLesson } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -42,8 +44,13 @@ export default function PlanLessonScreen() {
   const [assignmentQs, setAssignmentQs] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [evalStatus, setEvalStatus] = useState<EvalStatus>("none");
+  const [evalFeedback, setEvalFeedback] = useState<string | null>(null);
+  const [reflectionSubs, setReflectionSubs] = useState<Map<string, PlanReflectionSubmission>>(new Map());
+  const [reflectionDrafts, setReflectionDrafts] = useState<Record<string, string>>({});
+  const [reflectionEditing, setReflectionEditing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingReflection, setSubmittingReflection] = useState<string | null>(null);
 
   const loadLesson = useCallback(async () => {
     if (!lessonId) return;
@@ -60,19 +67,18 @@ export default function PlanLessonScreen() {
     setAssignmentQs((aqs ?? []) as Question[]);
 
     if (profile?.id) {
-      const { data: progress } = await supabase
-        .from("p2p_plan_lesson_progress")
-        .select("completed")
-        .eq("user_id", profile.id)
-        .eq("lesson_id", lessonId)
-        .maybeSingle();
+      const [reflectionRows, { data: progress }] = await Promise.all([
+        getPlanReflectionSubmissionsForLesson(lessonId),
+        supabase.from("p2p_plan_lesson_progress").select("completed").eq("user_id", profile.id).eq("lesson_id", lessonId).maybeSingle(),
+      ]);
+      setReflectionSubs(new Map(reflectionRows.map((r) => [r.questionId, r])));
 
       if (progress?.completed) {
         setEvalStatus("approved");
       } else {
         const { data: evalRow } = await supabase
           .from("p2p_plan_lesson_evaluations")
-          .select("status")
+          .select("status,feedback")
           .eq("submitter_id", profile.id)
           .eq("lesson_id", lessonId)
           .order("created_at", { ascending: false })
@@ -81,6 +87,7 @@ export default function PlanLessonScreen() {
 
         if (evalRow) {
           setEvalStatus(evalRow.status === "approved" ? "approved" : evalRow.status === "needs_revision" ? "needs_revision" : "pending_eval");
+          setEvalFeedback((evalRow.feedback as string) ?? null);
         } else {
           const { data: sub } = await supabase
             .from("p2p_plan_assignment_submissions")
@@ -90,13 +97,49 @@ export default function PlanLessonScreen() {
             .limit(1)
             .maybeSingle();
           setEvalStatus(sub ? "submitted" : "none");
+          setEvalFeedback(null);
         }
       }
     }
     setLoading(false);
-  }, [lessonId, profile?.id]);
+  }, [lessonId, profile?.id, getPlanReflectionSubmissionsForLesson]);
 
   useEffect(() => { loadLesson(); }, [loadLesson]);
+
+  // Live-update if an evaluator resolves this lesson's evaluation while the
+  // learner still has it open — same realtime pattern used for core curriculum
+  // (see lesson/[id].tsx) and for chat, since there's no notification inbox UI
+  // anywhere in the app yet to otherwise surface the resolution.
+  useEffect(() => {
+    if (!lessonId || !user) return;
+    const channel = supabase
+      .channel(`p2p_plan_lesson_evaluations_${lessonId}_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `lesson_id=eq.${lessonId}` },
+        (payload) => {
+          const row = payload.new as { submitter_id?: string };
+          if (row.submitter_id === user.id) loadLesson();
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [lessonId, user, loadLesson]);
+
+  async function handleSubmitReflection(questionId: string) {
+    const text = (reflectionDrafts[questionId] ?? "").trim();
+    if (!text || !lessonId) return;
+    setSubmittingReflection(questionId);
+    const err = await submitPlanReflection({ lessonId, questionId, text });
+    setSubmittingReflection(null);
+    if (err) { Alert.alert("Couldn't save", err); return; }
+    setReflectionSubs((prev) => {
+      const next = new Map(prev);
+      next.set(questionId, { id: `local-${Date.now()}`, questionId, content: text, createdAt: new Date().toISOString() });
+      return next;
+    });
+    setReflectionEditing((prev) => { const next = new Set(prev); next.delete(questionId); return next; });
+  }
 
   const submitAssignment = async () => {
     if (!profile || !lesson) return;
@@ -198,16 +241,58 @@ export default function PlanLessonScreen() {
           </View>
         )}
 
-        {/* Reflection questions */}
+        {/* Reflection questions — private, personal-processing content. Never
+            peer-evaluated: saved immediately, visible only to the submitter. */}
         {reflections.length > 0 && (
           <View style={styles.questionsBlock}>
             <Text style={styles.questionsHeading}>Reflection Questions</Text>
-            {reflections.map((q, i) => (
-              <View key={q.id} style={styles.questionRow}>
-                <Text style={styles.questionNumber}>{i + 1}.</Text>
-                <Text style={styles.questionText}>{q.question_text}</Text>
-              </View>
-            ))}
+            <Text style={styles.assignmentNote}>
+              <Ionicons name="lock-closed" size={11} color={colors.textMuted} /> Private — only you can see your answers here.
+            </Text>
+            {reflections.map((q, i) => {
+              const saved = reflectionSubs.get(q.id);
+              const isEditing = reflectionEditing.has(q.id) || !saved;
+              return (
+                <View key={q.id} style={styles.assignmentQ}>
+                  <Text style={styles.questionNumber}>{i + 1}. {q.question_text}</Text>
+                  {isEditing ? (
+                    <>
+                      <TextInput
+                        style={styles.answerInput}
+                        placeholder="Your reflection…"
+                        placeholderTextColor={colors.textMuted}
+                        value={reflectionDrafts[q.id] ?? saved?.content ?? ""}
+                        onChangeText={(v) => setReflectionDrafts((prev) => ({ ...prev, [q.id]: v }))}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitBtn, { marginTop: 8, paddingVertical: 10 }]}
+                        onPress={() => handleSubmitReflection(q.id)}
+                        disabled={submittingReflection === q.id}
+                      >
+                        {submittingReflection === q.id ? <ActivityIndicator color="#fff" size="small" /> : (
+                          <>
+                            <Ionicons name="send" size={14} color="#fff" />
+                            <Text style={styles.submitBtnText}>Save</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.reflectionSavedBadge}
+                      onPress={() => setReflectionEditing((prev) => new Set(prev).add(q.id))}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="checkmark" size={12} color={colors.accentGreen} />
+                      <Text style={styles.reflectionSavedText}>Saved · tap to update</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -264,7 +349,13 @@ export default function PlanLessonScreen() {
         {evalStatus === "needs_revision" && (
           <View style={[styles.statusCard, { borderColor: "#E53E3E" }]}>
             <Ionicons name="refresh-circle-outline" size={20} color="#E53E3E" />
-            <Text style={[styles.statusText, { color: "#E53E3E" }]}>Your evaluator requested revisions. Please re-submit.</Text>
+            <Text style={[styles.statusText, { color: "#E53E3E" }]}>Your evaluator requested revisions.</Text>
+            {evalFeedback ? (
+              <View style={styles.feedbackBox}>
+                <Ionicons name="chatbox-ellipses-outline" size={14} color="#E53E3E" />
+                <Text style={styles.feedbackBoxText}>{evalFeedback}</Text>
+              </View>
+            ) : null}
             <TouchableOpacity style={[styles.submitBtn, { backgroundColor: "#E53E3E", marginTop: 12 }]} onPress={() => setEvalStatus("none")}>
               <Text style={styles.submitBtnText}>Re-submit</Text>
             </TouchableOpacity>
@@ -318,5 +409,17 @@ function makeStyles(c: AppColors) {
 
     statusCard: { flexDirection: "column", alignItems: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5, borderColor: c.amber, padding: 16, marginTop: 12 },
     statusText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, textAlign: "center" },
+    feedbackBox: {
+      flexDirection: "row", gap: 8, alignItems: "flex-start", alignSelf: "stretch",
+      backgroundColor: "rgba(229,62,62,0.06)", borderRadius: 10, borderWidth: 1,
+      borderColor: "rgba(229,62,62,0.25)", padding: 10, marginTop: 4,
+    },
+    feedbackBoxText: { flex: 1, fontSize: 12, color: c.textDark, lineHeight: 18, fontFamily: "Inter_400Regular" },
+    reflectionSavedBadge: {
+      flexDirection: "row", gap: 5, alignItems: "center", marginTop: 6,
+      backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 8,
+      paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start",
+    },
+    reflectionSavedText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
   });
 }
