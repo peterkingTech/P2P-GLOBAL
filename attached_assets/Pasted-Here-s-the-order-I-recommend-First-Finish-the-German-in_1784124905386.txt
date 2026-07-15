@@ -1,0 +1,140 @@
+Here's the order I recommend:
+
+✅ First: Finish the German insertion script (2 minutes)
+
+You've already translated Modules 0–3. Finish the insertion script so those translations are in the database. That way, German users immediately have a working curriculum.
+
+✅ Then: Phase 1 (Language Foundation)
+
+Build the foundation first.
+
+Implement:
+
+languages table (seed all 36 languages)
+user_settings
+app_language
+bible_study_language
+Two language selectors in Settings
+Wire the curriculum to respect bible_study_language
+Keep English as the master language
+Make the existing German translations live immediately
+
+This gives you a fully working multilingual app without waiting for AI.
+
+✅ Then: Phase 2 (UI Internationalization)
+
+Translate the application itself.
+
+Everything from:
+
+Dashboard
+Buttons
+Forms
+Navigation
+Authentication
+Notifications
+Admin
+etc.
+
+using react-i18next.
+
+✅ Then: Phase 3 (AI Translation Engine)
+
+This is where the magic happens.
+
+Instead of your current translation tables becoming obsolete, reuse and migrate them.
+
+I would actually tell the agent to:
+
+Keep all existing translation tables.
+Create the new enterprise translation engine.
+Migrate existing German translations into the new cache.
+Never lose any translated content.
+Continue using German immediately while the AI pipeline is built.
+
+That way you don't throw away the work you've already done.
+
+I would also change one thing in the architecture
+
+I would not store every translated field as a separate row.
+
+Instead, I'd build it like this:
+
+courses
+modules
+lessons
+quizzes
+devotionals
+journals
+
+↓
+
+content_translations
+
+id
+
+content_type
+
+content_id
+
+language_code
+
+title
+
+subtitle
+
+description
+
+body
+
+metadata (JSON)
+
+version
+
+translated_at
+
+status
+
+approved_by
+
+approved_at
+
+This is much cleaner than one row per field.
+
+For example:
+
+Lesson 17
+
+English
+
+↓
+
+One German row
+
+↓
+
+One French row
+
+↓
+
+One Spanish row
+
+instead of
+
+Lesson 17 Title
+
+Lesson 17 Description
+
+Lesson 17 Body
+
+Lesson 17 Summary
+
+Lesson 17 Question
+
+Lesson 17 Answer
+
+...
+
+That would become tens of millions of rows as your platform grows.
+
+A single translation record per lesson is much easier to query, cache, version, edit, and review.

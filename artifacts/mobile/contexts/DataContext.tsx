@@ -692,7 +692,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     finally { setPlansV2Loading(false); }
   }, []);
 
-  const loadCurriculum = useCallback(async (userId?: string) => {
+  const loadCurriculum = useCallback(async (userId?: string, languageCode?: string) => {
     try {
       const { data: allCurriculumsRaw } = await supabase
         .from("p2p_curriculums")
@@ -733,6 +733,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .in("module_id", moduleIds)
         .order("order_index", { ascending: true });
       const lessonsRaw = (allLessons ?? []) as Record<string, unknown>[];
+
+      // Overlay translated titles when a non-English content language is selected
+      const moduleTitleOverrides = new Map<string, string>();
+      const lessonTitleOverrides = new Map<string, string>();
+      if (languageCode && languageCode !== "en" && moduleIds.length > 0) {
+        const lessonIdList = lessonsRaw.map((l) => l.id as string);
+        const [{ data: modTrans }, { data: lessTrans }] = await Promise.all([
+          supabase
+            .from("p2p_module_translations")
+            .select("module_id,title")
+            .in("module_id", moduleIds)
+            .eq("language_code", languageCode),
+          lessonIdList.length
+            ? supabase
+                .from("p2p_lesson_translations")
+                .select("lesson_id,title")
+                .in("lesson_id", lessonIdList)
+                .eq("language_code", languageCode)
+            : Promise.resolve({ data: [] }),
+        ]);
+        for (const mt of (modTrans ?? []) as Record<string, unknown>[]) {
+          if (mt.title) moduleTitleOverrides.set(mt.module_id as string, mt.title as string);
+        }
+        for (const lt of (lessTrans ?? []) as Record<string, unknown>[]) {
+          if (lt.title) lessonTitleOverrides.set(lt.lesson_id as string, lt.title as string);
+        }
+      }
       let progressByLesson = new Map<string, boolean>();
       const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
       if (userId) {
@@ -775,7 +802,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const moduleLocked = !previousModuleComplete;
         builtModules.push({
           id: moduleId, curriculumId: activeCurriculumId,
-          title: m.title as string, description: (m.description as string) ?? "",
+          title: moduleTitleOverrides.get(moduleId) ?? (m.title as string), description: (m.description as string) ?? "",
           level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
           imageUrl: (m.image_url as string) ?? undefined,
         });
@@ -797,7 +824,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             : !prevPassedForUnlock
           );
           builtLessons.push({
-            id: l.id as string, moduleId, title: l.title as string,
+            id: l.id as string, moduleId,
+            title: lessonTitleOverrides.get(l.id as string) ?? (l.title as string),
             content: (l.subtitle as string) ?? "",
             isCompleted, isLocked: isThisLocked,
             order: l.order_index as number,
@@ -1045,7 +1073,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ]);
       }
       await Promise.all([
-        loadCurriculum(profile?.id),
+        loadCurriculum(profile?.id, profile?.contentLanguage ?? "en"),
         loadPlans(profile?.id),
         loadPlansV2(profile?.id),
       ]);
@@ -1843,7 +1871,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           { onConflict: "user_id,lesson_id" }
         );
       } catch {}
-      await loadCurriculum(profile.id);
+      await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
       await checkGrowthEvents(profile.id);
     } else {
       setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, isCompleted: true } : l));

@@ -1,0 +1,379 @@
+P2P GLOBAL – Enterprise Multilingual Translation & Localization System
+
+Implementation Prompt for Replit Agent / Claude Code
+
+Paste this entire document as a single task to your coding agent. It already has access to the P2P GLOBAL repository (TypeScript, PNPM, Supabase, modular architecture, background services). Do not paste it in pieces — the sections depend on each other.
+
+
+0. Ground Rules
+
+
+Do NOT rebuild or replace the existing architecture. Extend it.
+Detect and reuse whatever background job system already exists in the repo (BullMQ, pg-boss, Supabase Edge Functions + cron, etc.). If none exists, implement a lightweight Postgres-backed queue using Supabase tables + a polling worker process, following the existing "background services" pattern already in the codebase.
+Detect and reuse whatever i18n library is already partially wired up (i18next, next-intl, react-intl, formatjs). If none exists, use i18next (i18next, react-i18next, i18next-http-backend, i18next-icu for pluralization) — it is the most mature option for lazy-loaded namespaces + ICU plurals + RTL.
+Every new table, service, and route must follow existing naming conventions, folder structure, and code style in the repo. Look at how existing modules are organized before creating new ones.
+All new Supabase tables must have RLS (Row Level Security) policies consistent with existing tables (admins/service role write, authenticated users read only what they're entitled to).
+Ship this in the phased order in Section 9. Do not attempt everything in one pass — each phase must be functional and non-breaking before moving to the next.
+No regressions: every existing screen, route, and API contract must continue to work exactly as before for English-only usage.
+
+
+
+1. Two Independent Language Settings
+
+Create two separate, independently-persisted settings per user:
+
+SettingControlsStorageapp_languageInterface only: nav, dashboard, auth, settings, community, profile, notifications, messages, buttons, forms, errors, validation, search, dialogs, tooltips, loading states, toasts, empty states, transactional emails, push notifications, admin dashboard, moderator dashboard, analytics, reports, subscription/billing pages — every UI componentuser_settings.app_languagebible_study_languageLearning content only: courses, curriculum, modules, lessons, Bible studies, devotionals, reading plans, Further Studies Plans, AI discipleship conversations, reflection questions, discussion prompts, journals, quizzes, certificates, assignments, course descriptions, learning paths, growth tracking labelsuser_settings.bible_study_language
+
+These must never influence each other. A German-interface user must be able to study in English, Swahili in French, etc.
+
+1.1 Schema
+
+sqlcreate table if not exists user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  app_language text not null default 'en' references languages(code),
+  bible_study_language text not null default 'en' references languages(code),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists languages (
+  code text primary key,              -- 'en', 'es', 'fr', 'de', ... 'pcm'
+  name text not null,                 -- 'English'
+  native_name text not null,          -- 'Deutsch'
+  is_rtl boolean not null default false,
+  is_active boolean not null default true,
+  sort_order int not null default 0
+);
+
+Seed languages with all 36 codes below, is_rtl = true only for ar, he, fa, ur.
+
+1.2 Supported Languages (seed data)
+
+en, es, fr, de, pt, it, nl, pl, ro, el, cs, ru, uk, tr, ar, he, fa, hi, bn, ur, ta, te, mr, zh-CN, zh-TW, ja, ko, th, vi, id, ms, sw, am, ha, yo, ig, pcm
+
+1.3 UI
+
+
+Two dropdowns in Settings, clearly labeled and visually separated (e.g. "App Language" card and "Bible Study Language" card, each with its own description line explaining what it affects).
+On change, persist immediately to user_settings via API (optimistic UI update), and update the relevant provider context (see Section 2 and 3) without a full page reload.
+Both settings must sync across devices for signed-in users (read from Supabase on session load, not just localStorage). Use localStorage only as a pre-auth/guest fallback, synced into Supabase on login.
+
+
+
+2. App Language — UI i18n Architecture
+
+2.1 Structure
+
+/src/i18n/
+  index.ts                # i18next init, language detection, provider
+  namespaces/
+    en/
+      common.json
+      nav.json
+      dashboard.json
+      auth.json
+      settings.json
+      community.json
+      profile.json
+      notifications.json
+      messages.json
+      forms.json
+      errors.json
+      search.json
+      dialogs.json
+      tooltips.json
+      toasts.json
+      empty-states.json
+      admin.json
+      moderator.json
+      analytics.json
+      reports.json
+      subscription.json
+      emails.json
+      push.json
+    es/ ... (mirror structure for every supported language)
+    ...
+
+
+One namespace per functional area, loaded lazily per route via i18next-http-backend (or dynamic import() if bundling statically). Never bundle all languages into the main JS bundle.
+Namespace JSON keys must be flat or shallow-nested, never containing raw sentences with embedded logic — use ICU message format for plurals/variables: "itemCount": "{count, plural, one {# item} other {# items}}".
+
+
+2.2 Hardcoded String Elimination
+
+
+Add eslint-plugin-i18next (or equivalent) to CI lint rules to flag any hardcoded literal string in JSX/TSX outside of t() calls.
+Sweep every existing screen and component; every literal user-facing string must be replaced with a t('namespace:key') call.
+Cover: Navigation, Dashboard, Authentication, Settings, Community, Profile, Notifications, Messages, all Buttons/Forms, Errors/Validation messages, Search, Dialogs/Modals, Tooltips, Loading screens/skeletons, Toasts, Empty states, Admin Dashboard, Moderator Dashboard, Analytics, Reports, Subscription/billing pages.
+
+
+2.3 Emails and Push Notifications
+
+
+Transactional email templates (whatever templating system is currently used — React Email, Handlebars, etc.) must accept a locale parameter and pull subject/body strings from the emails namespace.
+Push notification payloads generated server-side must look up the recipient's app_language before composing the notification text.
+Both must fall back to English if a translated string is missing for that language (never send a blank or broken string).
+
+
+2.4 Provider Wiring
+
+
+Wrap the app root in an I18nProvider that reads app_language from user_settings (or guest default/browser Accept-Language header) and sets document.documentElement.lang and dir (see Section 5) accordingly.
+Changing app_language triggers namespace reload for the current route only — not a full app reload.
+
+
+
+3. Bible Study Language — Content Translation Pipeline
+
+This is the core new subsystem. It is separate from the UI i18n system above and applies to: Courses, Curriculum, Lessons, Modules, Bible Studies, Devotionals, Reading Plans, Further Studies Plans, AI Discipleship conversations, Reflection Questions, Discussion Prompts, Journals, Quizzes, Certificates, Assignments, Course Descriptions, Learning Paths, Growth Tracking labels.
+
+English is the single source of truth. Content is authored once, in English, in the existing content tables. Never manually duplicate English rows per language.
+
+3.1 Schema
+
+sql-- Generic polymorphic translation store for ALL content types
+create table if not exists content_translations (
+  id uuid primary key default gen_random_uuid(),
+  content_type text not null,          -- 'course','module','lesson','devotional',
+                                        -- 'reading_plan','further_study_plan',
+                                        -- 'reflection_question','assignment_question',
+                                        -- 'quiz','certificate','journal_prompt',
+                                        -- 'learning_path','growth_tracking_label'
+  content_id uuid not null,            -- FK to the source English row (polymorphic, no hard FK)
+  field_key text not null,             -- e.g. 'title','body','question_1'..'question_5'
+                                        -- granular so a single edited field doesn't
+                                        -- force a full-lesson re-translation
+  language text not null references languages(code),
+  translated_text text,
+  source_hash text not null,           -- hash of the English source text this was translated from
+  status text not null default 'draft',-- 'draft','under_review','approved','published'
+  is_stale boolean not null default false,
+  translated_by text not null default 'ai', -- 'ai' | user_id of human translator
+  reviewed_by uuid references auth.users(id),
+  ai_provider text,                    -- e.g. 'claude-sonnet-5'
+  ai_cost_usd numeric(10,4),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (content_type, content_id, field_key, language)
+);
+
+create index on content_translations (content_type, content_id, language);
+create index on content_translations (status);
+create index on content_translations (is_stale);
+
+-- Every translatable English source row needs a version hash to detect changes.
+-- Add to existing content tables (courses, modules, lessons, devotionals,
+-- reading_plans, further_study_plans, quizzes, assignments, etc.):
+alter table lessons add column if not exists content_hash text;
+-- (repeat for each translatable table — see Section 3.2)
+
+content_hash = SHA-256 of the concatenated translatable fields of that English row, recomputed on every save. When it changes, every content_translations row for that content_id gets is_stale = true (via trigger or application-layer hook on save) rather than being deleted — the old translation stays servable while re-translation is pending.
+
+3.2 Tables That Need content_hash + Translation Coverage
+
+Apply the same pattern to every existing translatable table: courses, modules, lessons, devotionals, reading_plans, further_study_plans (the Further Studies Plans feature), quizzes / quiz_questions, assignments / assignment_questions, reflection_questions, discussion_prompts, journal_prompts, certificates (certificate copy/template text), learning_paths, growth_tracking_labels.
+
+For lesson-level content with structured sub-fields (memory verse label, teaching sections, reflection questions 1–5, assignment questions 1–5, prayer), translate each field/question independently (field_key = 'reflection_q1', 'reflection_q2', etc.) — this is what makes versioning granular: editing English reflection question 3 only invalidates that one field's translations across all languages, not the whole lesson.
+
+3.3 Translation Queue
+
+sqlcreate table if not exists translation_jobs (
+  id uuid primary key default gen_random_uuid(),
+  content_type text not null,
+  content_id uuid not null,
+  language text not null references languages(code),
+  priority int not null default 5,     -- lower = higher priority
+  status text not null default 'pending', -- pending, processing, completed, failed, retrying
+  attempts int not null default 0,
+  max_attempts int not null default 3,
+  last_error text,
+  source_hash text not null,           -- content_hash at time job was created
+  created_at timestamptz not null default now(),
+  started_at timestamptz,
+  completed_at timestamptz
+);
+
+create index on translation_jobs (status, priority, created_at);
+create index on translation_jobs (content_type, content_id, language);
+
+3.4 Pipeline Flow
+
+
+Publish trigger. When an admin publishes/updates a course, module, lesson, devotional, reading plan, or Further Studies Plan, the save handler:
+
+Recomputes content_hash.
+If changed (or new content): enqueues one translation_jobs row per active language in languages (excluding en), per translatable field, with source_hash set to the new hash. Deduplicate — don't enqueue a job if an identical pending/processing job already exists.
+Returns immediately. Publishing must never block on translation.
+
+
+
+Background workers. A pool of workers (reuse existing background service pattern) poll translation_jobs for status = 'pending' ordered by priority, created_at, claim jobs (status = 'processing', started_at = now()), and process them:
+
+Fetch the English source field text.
+Call the AI translation provider (see 3.6) with a system prompt enforcing theological register, "du/Sie"-equivalent formality per language, and preservation of Scripture references untouched.
+On success: upsert into content_translations (status = 'draft', is_stale = false, source_hash matching), mark job completed.
+On failure: increment attempts; if attempts < max_attempts, set status = 'retrying' and re-enqueue with backoff; else status = 'failed' with last_error populated.
+
+
+
+Serving content. When a user requests content in their bible_study_language:
+
+Look up content_translations for that content_type/content_id/field_key/language where status = 'published' and is_stale = false.
+If found: serve instantly from cache.
+If not found and language ≠ 'en': serve the English fallback immediately (never block the user on translation), and enqueue a high-priority translation_jobs row if one doesn't already exist, so the next user (or the same user next time) gets the cached translation.
+Never translate synchronously in the request path — this is what "hardcoding" was likely doing before and why it didn't scale; keep the read path pure cache-read + fallback.
+
+
+
+
+
+3.5 Versioning
+
+
+content_translations.source_hash vs the live content_hash on the English row is the single source of truth for staleness — no separate version-number column needed, but expose a human-readable version (incrementing integer per content row, stored alongside content_hash) in the admin dashboard for clarity.
+When English content changes, only the changed field_keys get new jobs — untouched fields keep their existing translations and are never re-queued.
+Stale translations remain servable (with an is_stale flag surfaced only to admins) until the new translation completes, so end users never see a content gap.
+
+
+3.6 AI Translation Provider Abstraction
+
+/src/services/translation/
+  provider.ts          # interface: translate(text, sourceLang, targetLang, context): Promise<{text, costUsd}>
+  providers/
+    anthropic.ts        # Claude-based provider (default)
+    openai.ts            # optional fallback provider
+  translateField.ts     # orchestrates: fetch source -> call provider -> hash -> upsert content_translations
+  worker.ts             # queue polling loop, uses existing background service runner
+  enqueue.ts            # called from admin publish handlers
+
+Keep the provider behind an interface so switching or A/B testing providers later doesn't touch calling code.
+
+
+4. Admin Translation Dashboard
+
+New admin-only route (e.g. /admin/translations), following existing Admin Dashboard patterns and auth guards.
+
+4.1 Overview Screen
+
+
+Table/grid of all supported languages with, per language: % of content translated, count completed / in progress / failed, last translated date, queue depth for that language.
+Global queue status widget: pending / processing / completed / failed / retrying counts, live-updating (polling or realtime subscription).
+Optional AI cost column (sum of ai_cost_usd per language, per course).
+
+
+4.2 Per-Course / Per-Lesson View
+
+
+Drill into a course → see every lesson × every language as a status grid (not translated / stale / draft / under review / approved / published).
+Actions per cell: Translate now (enqueue high-priority job), Retry (for failed), Delete cached translation, Force retranslate (re-enqueue even if not stale).
+Bulk action: Translate entire course (enqueues all missing/stale language×field combinations for every lesson in the course).
+
+
+4.3 Human Review Workflow
+
+
+Each content_translations row moves through draft → under_review → approved → published.
+Only published rows are served to end users (Section 3.4's cache lookup filters on status = 'published').
+Reviewer UI: side-by-side English source vs. AI-translated text, inline-editable textarea, "Approve & Publish" / "Request changes" buttons. Edits save back to content_translations.translated_text and set translated_by = <user_id>, ai_provider = null (marks it human-edited) while keeping source_hash so it's still correctly tracked for staleness.
+
+
+4.4 Logs
+
+
+translation_jobs history view, filterable by content type, language, status, date range — this table itself doubles as the audit log; no separate log table needed, just a read-only paginated view over it with joins to show content title.
+
+
+
+5. RTL Support
+
+Applies whenever app_language is ar, he, fa, or ur (per-user, independent of bible_study_language — a user could read Arabic UI while studying English content, or vice versa).
+
+
+Set document.documentElement.dir = 'rtl' / 'ltr' based on app_language's languages.is_rtl flag, not the content language.
+Use CSS logical properties throughout instead of physical ones so RTL flips automatically: margin-inline-start/end not margin-left/right, padding-inline-*, inset-inline-*, text-align: start/end not left/right, border-inline-start.
+If using Tailwind, enable Tailwind's RTL-aware utilities (ms-, me-, ps-, pe- logical spacing classes) and add tailwindcss-rtl or Tailwind v3.3+ logical property support; sweep existing components replacing ml-/mr-/pl-/pr-/left-/right- with logical equivalents.
+Flip: layouts, nav bars, sidebars, drawers, card internal alignment, flex-direction (flex-row → automatically mirrors via dir attribute if using logical CSS; avoid hardcoded row-reverse hacks), icons that imply direction (back/forward chevrons, arrows) — maintain an explicit icon-mirror allowlist since not all icons should flip (e.g., a play button, a checkmark, or a logo should not mirror).
+Do not mirror: numerals, Bible references (e.g. "John 3:16" stays LTR even in Arabic layout — wrap in <span dir="ltr">), URLs, email addresses — wrap these in <bdi> or dir="ltr" spans so they render correctly embedded in RTL text.
+Test animations/page transitions with dir="rtl" — anything using translateX directionally needs a logical-direction-aware sign flip.
+
+
+
+6. Bible Translations (No AI)
+
+Scripture is never AI-translated. This is a hard rule.
+
+
+Integrate licensed Bible text providers (e.g. API.Bible / YouVersion, Digital Bible Platform, Bible.org, or a locally-licensed dataset) — confirm licensing per language/translation before enabling it for that language in languages.
+
+
+sqlcreate table if not exists bible_translations (
+  id uuid primary key default gen_random_uuid(),
+  language text not null references languages(code),
+  translation_code text not null,   -- e.g. 'LUT' (Luther), 'RVR60', 'KJV', 'NIV'
+  translation_name text not null,
+  is_default_for_language boolean not null default false,
+  provider text not null,           -- 'api.bible', 'dbp', 'local'
+  license_notes text
+);
+
+create table if not exists bible_verses_cache (
+  id uuid primary key default gen_random_uuid(),
+  translation_code text not null references bible_translations(translation_code),
+  book text not null,
+  chapter int not null,
+  verse int not null,
+  text text not null,
+  unique (translation_code, book, chapter, verse)
+);
+
+
+Verse references (book/chapter/verse) are stored once, canonically, and are language-agnostic identifiers — only the displayed text swaps per bible_translations lookup for the user's bible_study_language.
+Fallback chain: user's bible_study_language → admin-configured default_bible_translation (global setting) → English KJV/ESV as final fallback. Never show a blank verse.
+Cache fetched verses in bible_verses_cache to avoid repeated provider API calls (respecting the provider's caching terms).
+
+
+
+7. AI Discipleship
+
+
+Every AI discipleship/mentoring/course-assistant conversation reads the user's bible_study_language and includes it in the system prompt: respond only in that language, maintain theological accuracy, and never alter or re-translate Scripture references — pull verse text from bible_verses_cache/bible_translations rather than generating it.
+Validate any Bible reference the AI cites against the canonical book/chapter/verse table before rendering, and substitute in the properly licensed verse text.
+
+
+
+8. Localization Utilities
+
+
+Dates/times: Intl.DateTimeFormat(locale, options), driven by app_language (interface chrome) — timestamps inside translated content follow the same rule since dates are UI, not study content.
+Relative dates: Intl.RelativeTimeFormat(locale).
+Numbers/percentages: Intl.NumberFormat(locale).
+Currency: Intl.NumberFormat(locale, { style: 'currency', currency }) — currency code comes from the subscription/billing system, not from language.
+Plurals: ICU plural rules via i18next-icu, already covered in Section 2.1.
+
+
+
+9. Phased Rollout Order
+
+
+Phase 1 — Schema & Settings. languages, user_settings, seed data, Settings UI for both language dropdowns, I18nProvider wired to app_language (English-only content still, no translation pipeline yet).
+Phase 2 — UI i18n. Namespace extraction, hardcoded-string lint rule, translate all namespaces for at least 2-3 pilot languages (e.g. es, fr, de) to validate the pipeline before scaling to all 36; emails and push notifications wired to app_language.
+Phase 3 — Content Translation Pipeline. content_translations, translation_jobs, content_hash columns on translatable tables, background worker, provider abstraction, publish-time enqueue, cache-first read path with English fallback.
+Phase 4 — Admin Translation Dashboard. Overview, per-course grid, human review workflow, logs.
+Phase 5 — Bible Translations. Licensed provider integration, bible_translations/bible_verses_cache, fallback chain, AI discipleship wiring.
+Phase 6 — RTL & Accessibility. Logical CSS sweep, RTL testing for ar/he/fa/ur, screen reader/keyboard/contrast/dynamic font pass.
+Phase 7 — Scale to all 36 languages for both UI and content, performance pass (lazy loading, caching, bundle size audit).
+
+
+
+10. QA / Acceptance Checklist
+
+Before marking this complete, verify:
+
+
+Every screen (including Admin, Moderator, Analytics, Reports, Subscription) is fully localized — zero hardcoded English strings remain (lint rule passes clean).
+app_language and bible_study_language change fully independently — changing one never affects the other, verified by an explicit manual test matrix (e.g. de/en, fr/sw, ar/en with RTL check).
+Translation caching works: second request for the same content/language is served without triggering a new AI call (verify via translation_jobs not growing on repeat reads).
+Versioning works: editing one English reflection question invalidates only that field's translations across languages, not the whole lesson.
+Background queue works under load: concurrent workers don't double-process the same job (test via FOR UPDATE SKIP LOCKED or equivalent claim pattern), failed jobs retry with backoff up to max_attempts, then land in failed visibly in the admin dashboard.
+RTL layouts render correctly for ar/he/fa/ur: layout mirrors, numbers/Bible references/URLs/emails stay LTR, no clipped or overlapping elements.
+Bible verses are served from the licensed bible_translations source, never from the AI translation pipeline — spot check that content_type = 'bible_verse' never appears in content_translations.
+All existing English-only functionality still works exactly as before — no regressions in course publishing, lesson rendering, quizzes, certificates, or Further Studies Plans.
