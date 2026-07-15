@@ -68,16 +68,28 @@ router.get("/tree", async (_req, res) => {
 
 router.get("/lesson/:id/translation-coverage", async (req, res) => {
   const { id } = req.params;
-  const { data: langs } = await supabase.from("p2p_languages").select("code").eq("is_default", false);
+  const { data: langs } = await supabase.from("p2p_languages").select("code");
   const total = (langs ?? []).length;
 
-  const { data: trans } = await supabase
-    .from("p2p_lesson_translations")
-    .select("language_code")
-    .eq("lesson_id", id);
+  // Check new unified table first, then legacy table
+  const [{ data: newTrans }, { data: legacyTrans }] = await Promise.all([
+    supabase
+      .from("p2p_content_translations")
+      .select("language_code")
+      .eq("content_type", "lesson")
+      .eq("content_id", id),
+    supabase
+      .from("p2p_lesson_translations")
+      .select("language_code")
+      .eq("lesson_id", id),
+  ]);
 
-  const done = new Set((trans ?? []).map((t: any) => t.language_code)).size;
-  return ok(res, { total, done, label: `${done} of ${total + 1} languages` });
+  const done = new Set([
+    ...(newTrans ?? []).map((t: any) => t.language_code),
+    ...(legacyTrans ?? []).map((t: any) => t.language_code),
+  ]).size;
+
+  return ok(res, { total, done, label: `${done} of ${total} languages` });
 });
 
 // ── Curriculum CRUD ───────────────────────────────────────────────────────────

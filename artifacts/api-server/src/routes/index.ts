@@ -10,6 +10,7 @@ import notificationsRouter from "./notifications";
 import adminRouter from "./admin";
 import registrationRouter from "./registration";
 import evaluationsRouter from "./evaluations";
+import translationsRouter from "./translations";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use("/notifications", notificationsRouter);
 router.use("/admin", adminRouter);
 router.use("/admin/evaluations", evaluationsRouter);
 router.use("/registration", registrationRouter);
+router.use("/translations", translationsRouter);
 
 export default router;

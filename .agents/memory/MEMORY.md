@@ -15,3 +15,4 @@
 - [P2P Plans V2 Schema](p2p-plans-v2.md) — Separate p2p_plans table hierarchy (12 tables); PlanV2 type in DataContext; admin at /admin/content; public screens at /plan/[id] and /plan/lesson/[lessonId].
 - [P2P Multilingual Phase 1](p2p-multilingual-phase1.md) — i18n (react-i18next) + content language wiring; languages table SQL migration at artifacts/mobile/db/migrations/002_languages_table.sql.
 - [P2P Progress & Points System](p2p-progress-points.md) — Unlock/approval split, points structure, service_score rename, dashboard screen, and DB migration notes.
+- [P2P Translation Engine](p2p-translation-engine.md) — Unified p2p_content_translations table, OpenAI gpt-4o-mini pipeline, DataContext new-table-first + legacy fallback chain, API routes at /translations.

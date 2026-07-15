@@ -739,25 +739,55 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const lessonTitleOverrides = new Map<string, string>();
       if (languageCode && languageCode !== "en" && moduleIds.length > 0) {
         const lessonIdList = lessonsRaw.map((l) => l.id as string);
+
+        // Primary: query the new unified p2p_content_translations table
+        const allIds = [...moduleIds, ...lessonIdList];
+        const { data: newTrans } = await supabase
+          .from("p2p_content_translations")
+          .select("content_type,content_id,title,subtitle,description,status")
+          .in("content_id", allIds)
+          .eq("language_code", languageCode);
+
+        const newModMap = new Map<string, string>();
+        const newLesMap = new Map<string, string>();
+        for (const row of (newTrans ?? []) as Record<string, unknown>[]) {
+          if (row.title) {
+            if (row.content_type === "module") newModMap.set(row.content_id as string, row.title as string);
+            if (row.content_type === "lesson") newLesMap.set(row.content_id as string, row.title as string);
+          }
+        }
+
+        // Fallback: legacy tables for any IDs not found in the new table
+        const missingModuleIds = moduleIds.filter((id) => !newModMap.has(id));
+        const missingLessonIds = lessonIdList.filter((id) => !newLesMap.has(id));
+
         const [{ data: modTrans }, { data: lessTrans }] = await Promise.all([
-          supabase
-            .from("p2p_module_translations")
-            .select("module_id,title")
-            .in("module_id", moduleIds)
-            .eq("language_code", languageCode),
-          lessonIdList.length
+          missingModuleIds.length
+            ? supabase
+                .from("p2p_module_translations")
+                .select("module_id,title")
+                .in("module_id", missingModuleIds)
+                .eq("language_code", languageCode)
+            : Promise.resolve({ data: [] }),
+          missingLessonIds.length
             ? supabase
                 .from("p2p_lesson_translations")
                 .select("lesson_id,title")
-                .in("lesson_id", lessonIdList)
+                .in("lesson_id", missingLessonIds)
                 .eq("language_code", languageCode)
             : Promise.resolve({ data: [] }),
         ]);
+
+        // Merge: new table wins, legacy is fallback
+        for (const [id, title] of newModMap) moduleTitleOverrides.set(id, title);
+        for (const [id, title] of newLesMap) lessonTitleOverrides.set(id, title);
         for (const mt of (modTrans ?? []) as Record<string, unknown>[]) {
-          if (mt.title) moduleTitleOverrides.set(mt.module_id as string, mt.title as string);
+          if (mt.title && !moduleTitleOverrides.has(mt.module_id as string))
+            moduleTitleOverrides.set(mt.module_id as string, mt.title as string);
         }
         for (const lt of (lessTrans ?? []) as Record<string, unknown>[]) {
-          if (lt.title) lessonTitleOverrides.set(lt.lesson_id as string, lt.title as string);
+          if (lt.title && !lessonTitleOverrides.has(lt.lesson_id as string))
+            lessonTitleOverrides.set(lt.lesson_id as string, lt.title as string);
         }
       }
       let progressByLesson = new Map<string, boolean>();
