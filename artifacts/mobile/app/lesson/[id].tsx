@@ -176,7 +176,7 @@ function QuestionResponseCard({
       case "needs_revision":
         return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: "Needs revision · tap to update" };
       default:
-        return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Submitted — waiting for peer review" };
+        return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Submitted — waiting for peer review and evaluation" };
     }
   })();
 

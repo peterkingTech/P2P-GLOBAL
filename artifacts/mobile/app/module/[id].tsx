@@ -417,7 +417,7 @@ export default function ModuleDetailScreen() {
                         </Text>
                         {awaitingReview && (
                           <Text style={[styles.lessonSubCount, { color: reviewColor }]}>
-                            {evalStatus === "needs_revision" ? "Needs revision" : "Waiting for peer review"}
+                            {evalStatus === "needs_revision" ? "Needs revision" : "Waiting for peer review and evaluation"}
                           </Text>
                         )}
                       </View>

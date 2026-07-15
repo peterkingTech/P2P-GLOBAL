@@ -779,17 +779,32 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
           imageUrl: (m.image_url as string) ?? undefined,
         });
-        let previousLessonComplete = true;
-        moduleLessons.forEach((l) => {
+        // Track two independent unlock signals:
+        // • prevPassedForUnlock — whether the immediately-prior lesson was submitted OR approved
+        //   (used to unlock regular lessons immediately on submission)
+        // • allPrevCompleted — whether every prior lesson is fully approved
+        //   (used to gate the final discussion/review lesson in each module)
+        let prevPassedForUnlock = true;
+        let allPrevCompleted = true;
+        moduleLessons.forEach((l, lessonIdx) => {
           const isCompleted = Boolean(progressByLesson.get(l.id as string));
+          const evalSt = isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined;
+          const passedForUnlock = isCompleted || evalSt === "pending";
+          const isLastLesson = moduleLessons.length > 1 && lessonIdx === moduleLessons.length - 1;
+          const isThisLocked = moduleLocked || (
+            lessonIdx === 0 ? false
+            : isLastLesson ? !allPrevCompleted
+            : !prevPassedForUnlock
+          );
           builtLessons.push({
             id: l.id as string, moduleId, title: l.title as string,
             content: (l.subtitle as string) ?? "",
-            isCompleted, isLocked: moduleLocked || !previousLessonComplete,
+            isCompleted, isLocked: isThisLocked,
             order: l.order_index as number,
-            evaluationStatus: isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined,
+            evaluationStatus: evalSt,
           });
-          previousLessonComplete = isCompleted;
+          prevPassedForUnlock = passedForUnlock;
+          allPrevCompleted = allPrevCompleted && isCompleted;
         });
         previousModuleComplete = moduleComplete;
       });

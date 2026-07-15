@@ -343,7 +343,7 @@ export default function PlanLessonScreen() {
         {evalStatus === "pending_eval" && (
           <View style={styles.statusCard}>
             <Ionicons name="hourglass-outline" size={20} color={colors.amber} />
-            <Text style={styles.statusText}>Your submission is pending peer review. You'll be notified when it's evaluated.</Text>
+            <Text style={styles.statusText}>Your submission is pending peer review and evaluation. You'll be notified when it's evaluated.</Text>
           </View>
         )}
         {evalStatus === "needs_revision" && (

@@ -1,0 +1,32 @@
+Multiple changes to the evaluation and progress system, based on recent decisions. Implement in the order listed, since later parts depend on earlier ones.
+
+1. COPY FIX: Change the lesson status badge text from "Submitted — waiting for peer review" to "Submitted — waiting for peer review and evaluation" everywhere it appears (core curriculum and Plans).
+
+2. SPLIT READING PROGRESS FROM GROWTH CREDIT — this is the core structural change:
+   - On submission (not approval): the NEXT lesson in sequence unlocks immediately, so a learner can keep moving through content without waiting on evaluation.
+   - On approval only: p2p_lesson_progress.completed flips to true, growth_points/wisdom_points are awarded (see point 4), the lesson's checkmark shows, and the module's percentage-complete counter increments. A submitted-but-not-yet-approved lesson must NOT count toward "percentage complete" or toward the Living Tree's growth calculation — it stays visually distinct (amber, not green) until approved.
+   - EXCEPTION: each module's discussion/review lesson stays locked until EVERY regular lesson in that module has been fully APPROVED (not just submitted) — confirm this applies to both core curriculum module-review lessons and any Plans equivalent.
+   - Apply this same split to Plans lessons, matching core curriculum behavior exactly — do not build a second, different implementation.
+
+3. POINTS STRUCTURE — award automatically at the moments below, using wisdom_points and service_score (renamed from servant_score per the separate rename prompt already sent — confirm that rename is complete before this step, since these should write to the correctly-named column):
+   - Core curriculum lesson, approved: 10 wisdom_points
+   - Core curriculum reflection, submitted (private, ungated, awarded instantly since there's no evaluation step): 5 wisdom_points
+   - Plans lesson, approved: 15 wisdom_points
+   - Resolving an evaluation as the evaluator (approve OR needs_revision, either outcome counts — the service is reviewing, not rubber-stamping): 5 service_score
+   - Confirm these are the only current point-award triggers; report back a complete list of every place points are currently awarded in the codebase so we can confirm nothing else is double-counting or missing from this list.
+
+4. EVALUATOR ACCOUNTABILITY — reassignment without penalty:
+   - Confirm the existing 72-hour auto-reassignment mechanism (built earlier for core curriculum) is live and working, and confirm/extend it to cover Plans evaluations too if it doesn't already.
+   - On reassignment: the original evaluator gets ZERO service_score for that instance (they simply don't earn the credit they would have) — do NOT deduct points from their existing balance. This is a forfeiture of unearned credit, not a penalty.
+   - The new evaluator, once assigned and resolved, earns the normal 5 service_score as usual.
+   - Notify the original evaluator that their assignment was reassigned (so they're not confused later if they do eventually check), and notify the new evaluator of their new assignment, same as a normal first assignment.
+
+5. DASHBOARD — one consolidated view (add to Profile, or as its own accessible tab — your call on placement, but it must be genuinely easy to find, not buried) showing, in clearly separated sections:
+   - Submitted (awaiting evaluation) — across both core curriculum and Plans
+   - Needs Revision (action needed from the user) — surfaced prominently, since this requires them to act
+   - Approved / Completed — recent completions
+   - To Review (evaluations assigned to me as evaluator, pending my action) — this may already exist in evaluations.tsx; surface a clear entry point/badge to it from this dashboard rather than duplicating the screen
+   - Saved Plans / In-Progress Plans
+   - Show a simple count badge (e.g. "3 pending your review", "1 needs revision") visible from the main navigation or Profile entry point, not just inside the dashboard itself, so a user knows to check without hunting for it.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE — using at least two fresh accounts (submitter + evaluator), confirm: submitting a lesson unlocks the next one immediately but does NOT increment percentage-complete or award points until approved; the module review lesson stays locked with 4/5 lessons submitted-but-unapproved and unlocks once all 5 are approved; reassignment after a simulated timeout awards zero points to the original evaluator and correctly notifies both parties; and the dashboard accurately reflects real state across both core curriculum and Plans for the test account.

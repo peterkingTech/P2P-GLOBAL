@@ -54,7 +54,8 @@ export interface UserProfile {
   mentorId?: string;
   isPraying: boolean;
   createdAt: string;
-  servantScore: number;
+  serviceScore: number;
+  wisdomPoints: number;
   dateOfBirth?: string;
   bio?: string;
   notificationsEnabled: boolean;
@@ -100,7 +101,8 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     mentorId: row.mentor_id as string | undefined,
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
-    servantScore: (row.servant_score as number) ?? 0,
+    serviceScore: (row.servant_score as number) ?? 0,
+    wisdomPoints: (row.wisdom_points as number) ?? 0,
     dateOfBirth: row.date_of_birth as string | undefined,
     bio: row.bio as string | undefined,
     notificationsEnabled: (row.notifications_enabled as boolean) ?? true,

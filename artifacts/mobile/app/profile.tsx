@@ -323,10 +323,20 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNum}>{profile?.servantScore ?? 0}</Text>
+            <Text style={styles.statNum}>{profile?.serviceScore ?? 0}</Text>
             <Text style={styles.statLabel}>{t("profile.servantScore")}</Text>
           </View>
         </View>
+
+        {/* My Progress Dashboard */}
+        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/progress" as any)}>
+          <Ionicons name="stats-chart-outline" size={18} color={colors.primaryGreen} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dashboardTitle}>My Progress</Text>
+            <Text style={styles.dashboardSub}>Submissions, evaluations &amp; plans in progress</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
 
         {/* Peers / Groups / Notes / Highlights */}
         <View style={styles.rowsList}>

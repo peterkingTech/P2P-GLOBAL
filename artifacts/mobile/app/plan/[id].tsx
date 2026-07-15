@@ -25,6 +25,7 @@ type Module = { id: string; module_number: number; module_title: string; order_i
 type Lesson = {
   id: string; plan_id: string; module_id: string | null; lesson_code: string | null;
   title: string; order_index: number; completed: boolean;
+  evaluationStatus?: "pending" | "needs_revision";
 };
 type OutlineSession = { id: string; session_label: string; summary: string | null; order_index: number };
 type DQ = { id: string; question_number: number | null; topic: string | null; question_text: string; order_index: number };
@@ -74,17 +75,25 @@ export default function PlanDetailScreen() {
     setModules((modulesData ?? []) as Module[]);
     setDqs((dqData ?? []) as DQ[]);
 
-    let rawLessons = ((lessonsData ?? []) as Omit<Lesson, "completed">[]);
+    let rawLessons = ((lessonsData ?? []) as Omit<Lesson, "completed" | "evaluationStatus">[]);
 
     if (profile?.id && rawLessons.length > 0) {
       const lessonIds = rawLessons.map(l => l.id);
-      const { data: progressData } = await supabase
-        .from("p2p_plan_lesson_progress")
-        .select("lesson_id,completed")
-        .eq("user_id", profile.id)
-        .in("lesson_id", lessonIds);
+      const [{ data: progressData }, { data: evalData }] = await Promise.all([
+        supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", profile.id).in("lesson_id", lessonIds),
+        supabase.from("p2p_plan_lesson_evaluations").select("lesson_id,status").eq("submitter_id", profile.id).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
+      ]);
       const completedSet = new Set((progressData ?? []).filter((p: any) => p.completed).map((p: any) => p.lesson_id));
-      setLessons(rawLessons.map(l => ({ ...l, completed: completedSet.has(l.id) })));
+      const evalMap = new Map<string, "pending" | "needs_revision">();
+      for (const e of (evalData ?? []) as any[]) {
+        const st = e.status as "pending" | "needs_revision";
+        if (st === "needs_revision" || !evalMap.has(e.lesson_id)) evalMap.set(e.lesson_id, st);
+      }
+      setLessons(rawLessons.map(l => ({
+        ...l,
+        completed: completedSet.has(l.id),
+        evaluationStatus: completedSet.has(l.id) ? undefined : evalMap.get(l.id),
+      })));
     } else {
       setLessons(rawLessons.map(l => ({ ...l, completed: false })));
     }
@@ -122,10 +131,22 @@ export default function PlanDetailScreen() {
   const completedCount = lessons.filter(l => l.completed).length;
   const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
-  const renderLessons = (lessonList: Lesson[]) =>
-    lessonList.map((lesson, i) => {
-      const prev = lessonList[i - 1];
-      const isLocked = i > 0 && prev && !prev.completed;
+  const renderLessons = (lessonList: Lesson[]) => {
+    let prevPassedForUnlock = true;
+    let allPrevCompleted = true;
+    return lessonList.map((lesson, i) => {
+      const isLastLesson = lessonList.length > 1 && i === lessonList.length - 1;
+      const passedForUnlock = lesson.completed || lesson.evaluationStatus === "pending";
+      const isLocked = i === 0 ? false : isLastLesson ? !allPrevCompleted : !prevPassedForUnlock;
+      const isPendingEval = !lesson.completed && lesson.evaluationStatus === "pending";
+      const isNeedsRevision = !lesson.completed && lesson.evaluationStatus === "needs_revision";
+      const dotColor = lesson.completed
+        ? colors.accentGreen
+        : isLocked ? colors.borderBeige
+        : isNeedsRevision ? "#C0392B"
+        : colors.amber;
+      prevPassedForUnlock = passedForUnlock;
+      allPrevCompleted = allPrevCompleted && lesson.completed;
       return (
         <TouchableOpacity
           key={lesson.id}
@@ -134,17 +155,37 @@ export default function PlanDetailScreen() {
           activeOpacity={isLocked ? 1 : 0.82}
           disabled={isLocked}
         >
-          <View style={[styles.lessonStatusDot, { backgroundColor: lesson.completed ? colors.accentGreen : isLocked ? colors.borderBeige : colors.amber }]}>
-            {lesson.completed ? <Ionicons name="checkmark" size={10} color="#fff" /> : isLocked ? <Ionicons name="lock-closed" size={10} color={colors.textMuted} /> : null}
+          <View style={[styles.lessonStatusDot, { backgroundColor: dotColor }]}>
+            {lesson.completed
+              ? <Ionicons name="checkmark" size={10} color="#fff" />
+              : isLocked ? <Ionicons name="lock-closed" size={10} color={colors.textMuted} />
+              : isPendingEval ? <Ionicons name="time" size={10} color="#fff" />
+              : isNeedsRevision ? <Ionicons name="alert" size={10} color="#fff" />
+              : null}
           </View>
           <View style={{ flex: 1 }}>
             {lesson.lesson_code ? <Text style={styles.lessonCode}>{lesson.lesson_code}</Text> : null}
             <Text style={[styles.lessonTitle, isLocked && { color: colors.textMuted }]}>{lesson.title}</Text>
+            {isPendingEval && (
+              <Text style={{ fontSize: 11, color: colors.amber, fontFamily: "Inter_400Regular", marginTop: 2 }}>
+                Waiting for peer review and evaluation
+              </Text>
+            )}
+            {isNeedsRevision && (
+              <Text style={{ fontSize: 11, color: "#C0392B", fontFamily: "Inter_400Regular", marginTop: 2 }}>
+                Needs revision
+              </Text>
+            )}
           </View>
-          {!isLocked && !lesson.completed && <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />}
+          {!isLocked && !lesson.completed && !isPendingEval && !isNeedsRevision && (
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          )}
+          {isPendingEval && <Ionicons name="time-outline" size={18} color={colors.amber} />}
+          {isNeedsRevision && <Ionicons name="alert-circle" size={18} color="#C0392B" />}
         </TouchableOpacity>
       );
     });
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

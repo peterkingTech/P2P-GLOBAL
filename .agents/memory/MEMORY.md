@@ -13,3 +13,4 @@
 - [P2P Theme System](p2p-theme-system.md) — 4-theme system (light/dark/sepia/midnight); makeStyles(c: AppColors) pattern; AsyncStorage key @p2p/theme; partially migrated screens.
 - [P2P Plans System](p2p-plans-system.md) — Plans reuse p2p_curriculums/modules/lessons hierarchy; type column on curricula distinguishes core vs plan; Plans curriculum ID is fixed UUID b0000000-0000-0000-0000-000000000001.
 - [P2P Plans V2 Schema](p2p-plans-v2.md) — Separate p2p_plans table hierarchy (12 tables); PlanV2 type in DataContext; admin at /admin/content; public screens at /plan/[id] and /plan/lesson/[lessonId].
+- [P2P Progress & Points System](p2p-progress-points.md) — Unlock/approval split, points structure, service_score rename, dashboard screen, and DB migration notes.
