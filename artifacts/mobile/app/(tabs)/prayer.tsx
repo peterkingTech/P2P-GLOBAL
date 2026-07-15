@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
@@ -56,6 +57,7 @@ function CommentsPanel({ postId }: { postId: string }) {
   const [posting, setPosting] = useState(false);
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { t } = useTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,11 +83,11 @@ function CommentsPanel({ postId }: { postId: string }) {
       {loading ? (
         <ActivityIndicator color={colors.upperRoomAmber} size="small" />
       ) : comments.length === 0 ? (
-        <Text style={styles.commentEmpty}>No comments yet.</Text>
+        <Text style={styles.commentEmpty}>{t("prayer.noComments")}</Text>
       ) : (
         comments.map((c) => (
           <View key={c.id} style={styles.commentRow}>
-            <Text style={styles.commentName}>{c.userName || "A believer"}</Text>
+            <Text style={styles.commentName}>{c.userName || t("prayer.aBeliever")}</Text>
             <Text style={styles.commentBody}>{c.body}</Text>
           </View>
         ))
@@ -95,7 +97,7 @@ function CommentsPanel({ postId }: { postId: string }) {
           style={styles.commentInput}
           value={text}
           onChangeText={setText}
-          placeholder="Write a comment..."
+          placeholder={t("prayer.writeComment")}
           placeholderTextColor={colors.upperRoomMuted}
         />
         <TouchableOpacity onPress={submit} disabled={posting || !text.trim()} style={styles.commentSendBtn}>
@@ -125,6 +127,7 @@ function PostCard({
 }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { t } = useTranslation();
   const [showComments, setShowComments] = useState(false);
   const isTestimony = item.postType === "testimony";
 
@@ -136,14 +139,14 @@ function PostCard({
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={styles.prayerName}>{item.userName || "A believer"}</Text>
+            <Text style={styles.prayerName}>{item.userName || t("prayer.aBeliever")}</Text>
             <Text style={styles.flag}>{flagEmoji(item.nationCode)}</Text>
             {item.visibility === "peer_group" && (
               <Ionicons name="people" size={12} color={colors.upperRoomMuted} />
             )}
           </View>
           <Text style={styles.prayerMeta}>
-            {timeAgo(item.createdAt)} · {isTestimony ? "Testimony" : item.status === "answered" ? "Answered" : "Request"}
+            {timeAgo(item.createdAt)} · {isTestimony ? t("prayer.testimony") : item.status === "answered" ? t("prayer.answered") : t("prayer.request")}
           </Text>
         </View>
         {isTestimony && <Ionicons name="sparkles" size={18} color={colors.upperRoomAmber} />}
@@ -156,7 +159,7 @@ function PostCard({
         <View style={styles.answeredFromBox}>
           <Ionicons name="return-down-forward" size={12} color={colors.upperRoomMuted} />
           <Text style={styles.answeredFromText} numberOfLines={2}>
-            In answer to: "{item.answeredFromPost.body}"
+            {t("prayer.inAnswerTo")} "{item.answeredFromPost.body}"
           </Text>
         </View>
       )}
@@ -175,7 +178,7 @@ function PostCard({
         >
           <Ionicons name="hand-left" size={14} color={item.myReactions.includes("praying") ? colors.upperRoomAmber : colors.upperRoomMuted} />
           <Text style={[styles.reactBtnText, item.myReactions.includes("praying") && styles.reactBtnTextActive]}>
-            Praying · {item.prayingCount}
+            {t("prayer.prayingCount", { count: item.prayingCount })}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -189,7 +192,7 @@ function PostCard({
         >
           <Ionicons name="checkmark-circle" size={14} color={item.myReactions.includes("amen") ? colors.upperRoomAmber : colors.upperRoomMuted} />
           <Text style={[styles.reactBtnText, item.myReactions.includes("amen") && styles.reactBtnTextActive]}>
-            Amen · {item.amenCount}
+            {t("prayer.amenCount", { count: item.amenCount })}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.reactBtn} onPress={() => setShowComments((s) => !s)}>
@@ -201,17 +204,17 @@ function PostCard({
       {!isTestimony && item.status === "open" && (
         <View style={styles.answerRow}>
           <TouchableOpacity style={styles.answerBtn} onPress={() => onAnswer(item.id)}>
-            <Text style={styles.answerBtnText}>Mark Answered</Text>
+            <Text style={styles.answerBtnText}>{t("prayer.markAnswered")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.testifyBtn} onPress={() => onTestify(item)}>
-            <Text style={styles.testifyBtnText}>Share Testimony</Text>
+            <Text style={styles.testifyBtnText}>{t("prayer.shareTestimony")}</Text>
           </TouchableOpacity>
         </View>
       )}
       {!isTestimony && item.status === "answered" && (
         <TouchableOpacity style={styles.testifyBtnFull} onPress={() => onTestify(item)}>
           <Ionicons name="sparkles-outline" size={14} color={colors.upperRoomAmber} />
-          <Text style={styles.testifyBtnText}>Share how God answered this</Text>
+          <Text style={styles.testifyBtnText}>{t("prayer.shareHowGodAnswered")}</Text>
         </TouchableOpacity>
       )}
 
@@ -223,6 +226,7 @@ function PostCard({
 export default function PrayerTab() {
   const insets = useSafeAreaInsets();
   const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, reportContent } = useData();
+  const { t } = useTranslation();
 
   const [section, setSection] = useState<"wall" | "private">("wall");
   const [tab, setTab] = useState<"recent" | "engaged">("recent");
@@ -274,16 +278,16 @@ export default function PrayerTab() {
 
   function handleReport(post: PrayerWallPost) {
     Alert.alert(
-      "Report this post?",
-      "Let a moderator know what's wrong. They'll review it — this won't remove the post immediately.",
+      t("prayer.reportTitle"),
+      t("prayer.reportMessage"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("prayer.cancel"), style: "cancel" },
         {
-          text: "Report",
+          text: t("prayer.report"),
           style: "destructive",
           onPress: async () => {
             const err = await reportContent("prayer_post", post.id, "Reported from prayer wall");
-            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+            Alert.alert(err ? t("prayer.couldntSendReport") : t("prayer.reported"), err || t("prayer.reportedMessage"));
           },
         },
       ]
@@ -334,8 +338,8 @@ export default function PrayerTab() {
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <View>
-          <Text style={styles.headerTitle}>Prayer & Testimonies</Text>
-          <Text style={styles.headerSub}>Pray as one body across nations</Text>
+          <Text style={styles.headerTitle}>{t("prayer.title")}</Text>
+          <Text style={styles.headerSub}>{t("prayer.subtitle")}</Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={openNewPost}>
           <Ionicons name={showForm ? "close" : "add"} size={22} color={colors.upperRoomCream} />
@@ -344,19 +348,19 @@ export default function PrayerTab() {
 
       <View style={styles.segmentRow}>
         <TouchableOpacity style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
-          <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>Wall</Text>
+          <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>{t("prayer.wall")}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
-          <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>Private</Text>
+          <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>{t("prayer.private")}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, tab === "recent" && styles.tabBtnActive]} onPress={() => setTab("recent")}>
-          <Text style={[styles.tabBtnText, tab === "recent" && styles.tabBtnTextActive]}>Recent</Text>
+          <Text style={[styles.tabBtnText, tab === "recent" && styles.tabBtnTextActive]}>{t("prayer.recent")}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, tab === "engaged" && styles.tabBtnActive]} onPress={() => setTab("engaged")}>
-          <Text style={[styles.tabBtnText, tab === "engaged" && styles.tabBtnTextActive]}>Most Engaged</Text>
+          <Text style={[styles.tabBtnText, tab === "engaged" && styles.tabBtnTextActive]}>{t("prayer.mostEngaged")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -368,13 +372,13 @@ export default function PrayerTab() {
               onPress={() => setPostType("request")}
               disabled={!!answeredFromPostId}
             >
-              <Text style={[styles.typeToggleText, postType === "request" && styles.typeToggleTextActive]}>Prayer Request</Text>
+              <Text style={[styles.typeToggleText, postType === "request" && styles.typeToggleTextActive]}>{t("prayer.prayerRequest")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeToggle, postType === "testimony" && styles.typeToggleActive]}
               onPress={() => setPostType("testimony")}
             >
-              <Text style={[styles.typeToggleText, postType === "testimony" && styles.typeToggleTextActive]}>Testimony</Text>
+              <Text style={[styles.typeToggleText, postType === "testimony" && styles.typeToggleTextActive]}>{t("prayer.testimony")}</Text>
             </TouchableOpacity>
           </View>
 
@@ -382,7 +386,7 @@ export default function PrayerTab() {
             style={styles.formInput}
             value={body}
             onChangeText={setBody}
-            placeholder={postType === "testimony" ? "Share how God answered..." : "Share your prayer request..."}
+            placeholder={postType === "testimony" ? t("prayer.shareAnsweredPlaceholder") : t("prayer.sharePrayerPlaceholder")}
             placeholderTextColor={colors.upperRoomMuted}
             multiline
             numberOfLines={3}
@@ -391,7 +395,7 @@ export default function PrayerTab() {
             style={[styles.formInput, { marginTop: 8 }]}
             value={nationCode}
             onChangeText={setNationCode}
-            placeholder="Nation code, e.g. US, KE, IN (optional)"
+            placeholder={t("prayer.nationCodePlaceholder")}
             placeholderTextColor={colors.upperRoomMuted}
             autoCapitalize="characters"
             maxLength={2}
@@ -403,21 +407,21 @@ export default function PrayerTab() {
               onPress={() => setVisibility("global")}
             >
               <Ionicons name="earth" size={14} color={visibility === "global" ? colors.upperRoomAmber : colors.upperRoomMuted} />
-              <Text style={[styles.visBtnText, visibility === "global" && styles.visBtnTextActive]}>Global</Text>
+              <Text style={[styles.visBtnText, visibility === "global" && styles.visBtnTextActive]}>{t("prayer.global")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.visBtn, visibility === "peer_group" && styles.visBtnActive]}
               onPress={() => setVisibility("peer_group")}
             >
               <Ionicons name="people" size={14} color={visibility === "peer_group" ? colors.upperRoomAmber : colors.upperRoomMuted} />
-              <Text style={[styles.visBtnText, visibility === "peer_group" && styles.visBtnTextActive]}>My Peer Group</Text>
+              <Text style={[styles.visBtnText, visibility === "peer_group" && styles.visBtnTextActive]}>{t("prayer.myPeerGroup")}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.anonRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="eye-off-outline" size={16} color={colors.upperRoomAmber} />
-              <Text style={styles.anonLabel}>Post anonymously (nation still shown)</Text>
+              <Text style={styles.anonLabel}>{t("prayer.postAnonymously")}</Text>
             </View>
             <Switch
               value={isAnonymous}
@@ -432,7 +436,7 @@ export default function PrayerTab() {
               <ActivityIndicator color="#100B06" size="small" />
             ) : (
               <Text style={styles.submitBtnText}>
-                {postType === "testimony" ? "Share Testimony" : "Submit Request"}
+                {postType === "testimony" ? t("prayer.shareTestimony") : t("prayer.submitRequest")}
               </Text>
             )}
           </TouchableOpacity>
@@ -456,7 +460,7 @@ export default function PrayerTab() {
             <View style={styles.empty}>
               <Ionicons name="radio-outline" size={40} color={colors.upperRoomBorder} />
               <Text style={styles.emptyText}>
-                {section === "private" ? "No private peer group posts yet." : "No posts yet. Be the first."}
+                {section === "private" ? t("prayer.noPrivatePosts") : t("prayer.noPostsYet")}
               </Text>
             </View>
           }

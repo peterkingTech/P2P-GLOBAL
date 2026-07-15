@@ -19,6 +19,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useTranslation } from "react-i18next";
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -149,11 +150,12 @@ export default function HomeTab() {
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
+  const { t } = useTranslation();
 
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   const hour = new Date().getHours();
   const timeGreeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    hour < 12 ? t("home.goodMorning") : hour < 17 ? t("home.goodAfternoon") : t("home.goodEvening");
   const greeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
 
   const growthPoints = profile?.growthLevel ?? 0;
@@ -187,7 +189,7 @@ export default function HomeTab() {
       <View style={styles.greetingRow}>
         <View>
           <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.greetingSub}>Continue your growth</Text>
+          <Text style={styles.greetingSub}>{t("home.continueGrowth")}</Text>
         </View>
         <TouchableOpacity
           style={styles.prayingBtn}
@@ -218,7 +220,7 @@ export default function HomeTab() {
           <Text style={styles.stageOverlayText}>
             {stage.emoji} {stage.name}
           </Text>
-          <Text style={styles.stageOfText}>Stage {stageIndex + 1} of 6</Text>
+          <Text style={styles.stageOfText}>{t("home.stageOf", { stage: stageIndex + 1 })}</Text>
         </View>
         <View style={styles.arrowOverlay}>
           <Ionicons name="chevron-forward" size={16} color="#fff" />
@@ -230,10 +232,10 @@ export default function HomeTab() {
         <View style={styles.progressLabelRow}>
           {nextStage ? (
             <Text style={styles.progressToward}>
-              Growing toward {nextStage.emoji} {nextStage.name}
+              {t("home.growingToward")} {nextStage.emoji} {nextStage.name}
             </Text>
           ) : (
-            <Text style={styles.progressToward}>Forest of Nations reached</Text>
+            <Text style={styles.progressToward}>{t("home.forestReached")}</Text>
           )}
           <Text style={styles.progressPct}>{progressPct}%</Text>
         </View>
@@ -242,7 +244,7 @@ export default function HomeTab() {
         </View>
         {nextStage && (
           <Text style={styles.progressHint}>
-            {nextStage.unlockPoints - growthPoints} more points to {nextStage.name}
+            {t("home.morePoints", { points: nextStage.unlockPoints - growthPoints, name: nextStage.name })}
           </Text>
         )}
       </View>
@@ -252,7 +254,7 @@ export default function HomeTab() {
         <View style={styles.verseCard}>
           <View style={styles.verseHeader}>
             <Ionicons name="bookmark" size={14} color={colors.amber} />
-            <Text style={styles.verseLabel}>Daily Word</Text>
+            <Text style={styles.verseLabel}>{t("home.dailyWord")}</Text>
           </View>
           <Text style={styles.verseText}>"{dailyVerse.text}"</Text>
           <Text style={styles.verseRef}>— {dailyVerse.ref}</Text>
@@ -276,9 +278,9 @@ export default function HomeTab() {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.evalTitle}>Evaluations waiting for you</Text>
+            <Text style={styles.evalTitle}>{t("home.evaluationsWaiting")}</Text>
             <Text style={styles.evalSub}>
-              {pendingEvaluations.length} fellow disciple{pendingEvaluations.length === 1 ? "" : "s"} need your review
+              {t("home.disciplesNeedReview", { count: pendingEvaluations.length })}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.amber} />
@@ -286,16 +288,16 @@ export default function HomeTab() {
       )}
 
       {/* More */}
-      <Text style={styles.sectionTitle}>More</Text>
+      <Text style={styles.sectionTitle}>{t("home.more")}</Text>
       <View style={styles.moreList}>
         {[
-          { icon: "leaf", label: "Living Tree", sub: "Track your six stages of growth", route: "/living-tree" },
-          { icon: "book", label: "Curriculum", sub: "Browse the full study library", route: "/curriculum" },
-          { icon: "flower", label: "Fruit Collection", sub: "See the fruit you've earned", route: "/fruit" },
-          { icon: "stats-chart", label: "My Progress", sub: "Submissions, evaluations & plans", route: "/progress" },
-          { icon: "person-circle", label: "My Profile", sub: "View your discipleship profile", route: "/profile" },
+          { icon: "leaf", label: t("home.livingTree"), sub: t("home.livingTreeSub"), route: "/living-tree" },
+          { icon: "book", label: t("home.curriculum"), sub: t("home.curriculumSub"), route: "/curriculum" },
+          { icon: "flower", label: t("home.fruitCollection"), sub: t("home.fruitCollectionSub"), route: "/fruit" },
+          { icon: "stats-chart", label: t("home.myProgress"), sub: t("home.myProgressSub"), route: "/progress" },
+          { icon: "person-circle", label: t("home.myProfile"), sub: t("home.myProfileSub"), route: "/profile" },
           ...(profile?.role && profile.role !== "student"
-            ? [{ icon: "settings", label: "Admin", sub: "Curriculum manager & registration responses", route: "/admin/curriculum" }]
+            ? [{ icon: "settings", label: t("home.admin"), sub: t("home.adminSub"), route: "/admin/curriculum" }]
             : []),
         ].map((item) => (
           <TouchableOpacity

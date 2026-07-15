@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, PlanModule } from "@/contexts/DataContext";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { useTranslation } from "react-i18next";
 
 type AttributionStyle = "plaque" | "credit-line";
 interface Attribution {
@@ -239,7 +240,8 @@ export default function ModuleDetailScreen() {
   const pct = displayLessons.length > 0 ? Math.round((completed / displayLessons.length) * 100) : 0;
   const isLocked = !isCurriculumOverview && !isPlanLesson && (coreModule?.isLocked ?? false);
   const isLoading = isPlanLesson && planLoading;
-  const levelLabel = (isCurriculumOverview || isPlanLesson) ? "Study Plan" : `Level ${coreModule?.level ?? 1}`;
+  const { t } = useTranslation();
+  const levelLabel = (isCurriculumOverview || isPlanLesson) ? t("module.studyPlan") : t("module.level", { n: coreModule?.level ?? 1 });
 
   const heroImageUri = isCurriculumOverview
     ? curriculumPlan!.imageUrl
@@ -303,15 +305,15 @@ export default function ModuleDetailScreen() {
             <View style={styles.lockedBanner}>
               <Ionicons name="lock-closed" size={15} color={colors.textMuted} />
               <Text style={styles.lockedBannerText}>
-                Finish the previous level to unlock this one
+                {t("module.finishPrevious")}
               </Text>
             </View>
           ) : (
             <View style={styles.progressBlock}>
               <View style={styles.progressHeader}>
-                <Text style={styles.progressLabel}>{pct}% complete</Text>
+                <Text style={styles.progressLabel}>{t("module.pctComplete", { pct })}</Text>
                 <Text style={styles.progressCount}>
-                  {completed}/{displayLessons.length} lessons
+                  {t("module.lessonsOfTotal", { done: completed, total: displayLessons.length })}
                 </Text>
               </View>
               <View style={styles.progressBg}>
@@ -324,7 +326,7 @@ export default function ModuleDetailScreen() {
         {/* ── Curriculum overview: module cards ── */}
         {isCurriculumOverview ? (
           <View style={styles.lessonsBlock}>
-            <Text style={styles.sectionTitle}>Modules</Text>
+            <Text style={styles.sectionTitle}>{t("module.modules")}</Text>
             <View style={styles.lessonList}>
               {curriculumPlan!.modules.map((mod: PlanModule, idx: number) => {
                 const locked = mod.isLocked;
@@ -356,7 +358,7 @@ export default function ModuleDetailScreen() {
                       </Text>
                       {!locked && (
                         <Text style={styles.lessonSubCount}>
-                          {mod.completedLessons}/{mod.lessonCount} lessons
+                          {t("module.lessonsOfTotal", { done: mod.completedLessons, total: mod.lessonCount })}
                           {pctMod > 0 && pctMod < 100 ? `  ·  ${pctMod}%` : ""}
                         </Text>
                       )}
@@ -376,7 +378,7 @@ export default function ModuleDetailScreen() {
         ) : (
           /* ── Lessons list ── */
           <View style={styles.lessonsBlock}>
-            <Text style={styles.sectionTitle}>Lessons</Text>
+            <Text style={styles.sectionTitle}>{t("module.lessons")}</Text>
             {isLoading ? (
               <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
             ) : (
@@ -417,7 +419,7 @@ export default function ModuleDetailScreen() {
                         </Text>
                         {awaitingReview && (
                           <Text style={[styles.lessonSubCount, { color: reviewColor }]}>
-                            {evalStatus === "needs_revision" ? "Needs revision" : "Waiting for peer review and evaluation"}
+                            {evalStatus === "needs_revision" ? t("module.needsRevision") : t("module.waitingPeerReview")}
                           </Text>
                         )}
                       </View>

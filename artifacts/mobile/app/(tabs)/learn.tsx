@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, Module, Plan, PlanV2 } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -144,7 +145,7 @@ function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
       <View style={styles.planCardBody}>
         <Text style={[styles.planTitle, isLocked && { color: colors.textMuted }]}>{plan.title}</Text>
         {isLocked ? (
-          <Text style={[styles.planDesc, { fontStyle: "italic" }]}>Complete the previous plan to unlock</Text>
+          <Text style={[styles.planDesc, { fontStyle: "italic" }]}>{t("learn.unlockPlan")}</Text>
         ) : (
           <>
             <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
@@ -313,6 +314,7 @@ export default function LearnTab() {
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
+  const { t } = useTranslation();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -323,21 +325,21 @@ export default function LearnTab() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
-        <Text style={styles.headerTitle}>Learn</Text>
-        <Text style={styles.headerSub}>Walk the path, one lesson at a time</Text>
+        <Text style={styles.headerTitle}>{t("learn.title")}</Text>
+        <Text style={styles.headerSub}>{t("learn.subtitle")}</Text>
 
         <View style={styles.segmentRow}>
           <TouchableOpacity
             style={[styles.segmentBtn, section === "curriculum" && styles.segmentBtnActive]}
             onPress={() => setSection("curriculum")}
           >
-            <Text style={[styles.segmentText, section === "curriculum" && styles.segmentTextActive]}>Core Curriculum</Text>
+            <Text style={[styles.segmentText, section === "curriculum" && styles.segmentTextActive]}>{t("learn.coreCurriculum")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.segmentBtn, section === "plans" && styles.segmentBtnActive]}
             onPress={() => setSection("plans")}
           >
-            <Text style={[styles.segmentText, section === "plans" && styles.segmentTextActive]}>Plans</Text>
+            <Text style={[styles.segmentText, section === "plans" && styles.segmentTextActive]}>{t("learn.plans")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -345,12 +347,12 @@ export default function LearnTab() {
           <>
             <View style={styles.overallProgress}>
               <View style={styles.overallLeft}>
-                <Text style={styles.overallLabel}>Overall Progress</Text>
-                <Text style={styles.overallPct}>{overallPct}% complete</Text>
+                <Text style={styles.overallLabel}>{t("learn.overallProgress")}</Text>
+                <Text style={styles.overallPct}>{t("learn.pctComplete", { pct: overallPct })}</Text>
               </View>
               <View style={styles.overallCircle}>
                 <Text style={styles.overallCircleText}>{completedLessons}</Text>
-                <Text style={styles.overallCircleSub}>lessons</Text>
+                <Text style={styles.overallCircleSub}>{t("learn.lessons")}</Text>
               </View>
             </View>
             <View style={styles.overallBarBg}>
@@ -404,7 +406,7 @@ export default function LearnTab() {
           <View style={styles.loadingContainer}>
             <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
             <Text style={[styles.moduleDesc, { textAlign: "center", marginTop: 12, paddingHorizontal: 40 }]}>
-              No plans available yet. Check back soon!
+              {t("learn.noPlans")}
             </Text>
           </View>
         ) : (

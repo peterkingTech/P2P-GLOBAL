@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Activit
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -45,6 +46,7 @@ export default function DiscoverTab() {
   const [peerCount, setPeerCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
   const [wallCount, setWallCount] = useState(0);
+  const { t } = useTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,20 +66,20 @@ export default function DiscoverTab() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const cards = [
-    { key: "peers", icon: "people-outline" as const, title: "Discoverable Peers", count: peerCount, sub: "Believers ready to connect with you", route: "/connect/discover" as const },
-    { key: "groups", icon: "people-circle-outline" as const, title: "Peer Groups", count: groupCount, sub: "Study groups you can join", route: "/connect/groups" as const },
-    { key: "smart-match", icon: "sparkles-outline" as const, title: "Smart Match", count: null, sub: "Let us pair you with a study partner", route: "/connect/smart-match" as const },
-    { key: "wall", icon: "hand-left-outline" as const, title: "Prayer Wall", count: wallCount, sub: "Requests and testimonies across nations", route: "/(tabs)/prayer" as const },
-    { key: "countries", icon: "earth-outline" as const, title: "Countries Reached", count: forestStats.countriesReached.length, sub: "Nations touched through your network", route: "/living-tree" as const },
-    { key: "missions", icon: "flag-outline" as const, title: "Missions", count: missions.length, sub: "Unreached peoples to pray for", route: "/(tabs)/missions" as const },
+    { key: "peers", icon: "people-outline" as const, title: t("discover.discoverablePeers"), count: peerCount, sub: t("discover.discoverablePeersSub"), route: "/connect/discover" as const },
+    { key: "groups", icon: "people-circle-outline" as const, title: t("discover.peerGroups"), count: groupCount, sub: t("discover.peerGroupsSub"), route: "/connect/groups" as const },
+    { key: "smart-match", icon: "sparkles-outline" as const, title: t("discover.smartMatch"), count: null, sub: t("discover.smartMatchSub"), route: "/connect/smart-match" as const },
+    { key: "wall", icon: "hand-left-outline" as const, title: t("discover.prayerWall"), count: wallCount, sub: t("discover.prayerWallSub"), route: "/(tabs)/prayer" as const },
+    { key: "countries", icon: "earth-outline" as const, title: t("discover.countriesReached"), count: forestStats.countriesReached.length, sub: t("discover.countriesReachedSub"), route: "/living-tree" as const },
+    { key: "missions", icon: "flag-outline" as const, title: t("discover.missions"), count: missions.length, sub: t("discover.missionsSub"), route: "/(tabs)/missions" as const },
   ];
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
-        <Text style={styles.headerTitle}>Discover</Text>
-        <Text style={styles.headerSub}>Find peers, groups, and ways to connect</Text>
+        <Text style={styles.headerTitle}>{t("discover.title")}</Text>
+        <Text style={styles.headerSub}>{t("discover.subtitle")}</Text>
       </View>
 
       {loading ? (

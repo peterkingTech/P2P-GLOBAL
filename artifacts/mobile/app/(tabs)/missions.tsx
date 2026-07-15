@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PrayerWallPost } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -21,6 +22,7 @@ function timeAgo(iso: string): string {
 function TestimonyCard({ item }: { item: PrayerWallPost }) {
   const { colors } = useTheme();
   const s = makeStyles(colors);
+  const { t } = useTranslation();
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
@@ -28,14 +30,14 @@ function TestimonyCard({ item }: { item: PrayerWallPost }) {
           <Ionicons name="sparkles" size={14} color={colors.amber} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.cardName}>{item.isAnonymous ? "Anonymous" : (item.userName || "A believer")}</Text>
-          <Text style={s.cardMeta}>{timeAgo(item.createdAt)} · Kingdom Win</Text>
+          <Text style={s.cardName}>{item.isAnonymous ? t("missions.anonymous") : (item.userName || t("missions.aBeliever"))}</Text>
+          <Text style={s.cardMeta}>{timeAgo(item.createdAt)} · {t("missions.kingdomWinBadge")}</Text>
         </View>
       </View>
       <Text style={s.cardBody}>{item.body}</Text>
       <View style={s.cardFooter}>
         <Ionicons name="hand-left-outline" size={13} color={colors.textMuted} />
-        <Text style={s.cardFooterText}>{item.prayingCount} praying · {item.amenCount} amen</Text>
+        <Text style={s.cardFooterText}>{t("missions.prayingAmen", { praying: item.prayingCount, amen: item.amenCount })}</Text>
       </View>
     </View>
   );
@@ -84,6 +86,7 @@ export default function MissionsTab() {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
+  const { t } = useTranslation();
   const [testimonies, setTestimonies] = useState<PrayerWallPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,27 +106,27 @@ export default function MissionsTab() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
-        <Text style={styles.title}>Missions</Text>
-        <Text style={styles.subtitle}>What God is doing through this network</Text>
+        <Text style={styles.title}>{t("missions.title")}</Text>
+        <Text style={styles.subtitle}>{t("missions.subtitle")}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statNum}>{countriesCount}</Text>
-            <Text style={styles.statLabel}>Countries Reached</Text>
+            <Text style={styles.statLabel}>{t("missions.countriesReached")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statNum}>{testimonies.length}</Text>
-            <Text style={styles.statLabel}>Kingdom Wins Shared</Text>
+            <Text style={styles.statLabel}>{t("missions.kingdomWinsShared")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
             <Text style={styles.statNum}>{missions.length}</Text>
-            <Text style={styles.statLabel}>Unreached Groups</Text>
+            <Text style={styles.statLabel}>{t("missions.unreachedGroups")}</Text>
           </View>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Kingdom Wins</Text>
+      <Text style={styles.sectionTitle}>{t("missions.kingdomWins")}</Text>
 
       {loading ? (
         <View style={styles.loading}>
@@ -139,10 +142,8 @@ export default function MissionsTab() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="earth-outline" size={44} color={colors.borderBeige} />
-              <Text style={styles.emptyTitle}>No testimonies shared yet</Text>
-              <Text style={styles.emptyText}>
-                When someone shares how God answered a prayer, it will appear here as a Kingdom Win.
-              </Text>
+              <Text style={styles.emptyTitle}>{t("missions.noTestimonies")}</Text>
+              <Text style={styles.emptyText}>{t("missions.noTestimoniesSub")}</Text>
             </View>
           }
         />

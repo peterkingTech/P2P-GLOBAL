@@ -26,6 +26,7 @@ import AudioRecorder from "@/components/AudioRecorder";
 import VideoRecorder from "@/components/VideoRecorder";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { useTranslation } from "react-i18next";
 
 interface LessonContent {
   title: string;
@@ -46,29 +47,30 @@ function TypeTabs({
   disabled?: boolean;
 }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const tabStyles = makeTabStyles(colors);
   const tabs: { type: SubmissionType; icon: string; label: string }[] = [
-    { type: "text", icon: "create-outline", label: "Text" },
-    { type: "audio", icon: "mic-outline", label: "Audio" },
-    { type: "video", icon: "videocam-outline", label: "Video" },
+    { type: "text", icon: "create-outline", label: t("lesson.text") },
+    { type: "audio", icon: "mic-outline", label: t("lesson.audio") },
+    { type: "video", icon: "videocam-outline", label: t("lesson.video") },
   ];
   return (
     <View style={tabStyles.row}>
-      {tabs.map((t) => (
+      {tabs.map((tab) => (
         <TouchableOpacity
-          key={t.type}
-          style={[tabStyles.tab, value === t.type && tabStyles.tabActive]}
-          onPress={() => !disabled && onChange(t.type)}
+          key={tab.type}
+          style={[tabStyles.tab, value === tab.type && tabStyles.tabActive]}
+          onPress={() => !disabled && onChange(tab.type)}
           disabled={disabled}
           activeOpacity={0.75}
         >
           <Ionicons
-            name={t.icon as any}
+            name={tab.icon as any}
             size={14}
-            color={value === t.type ? colors.cream : colors.textMid}
+            color={value === tab.type ? colors.cream : colors.textMid}
           />
-          <Text style={[tabStyles.label, value === t.type && tabStyles.labelActive]}>
-            {t.label}
+          <Text style={[tabStyles.label, value === tab.type && tabStyles.labelActive]}>
+            {tab.label}
           </Text>
         </TouchableOpacity>
       ))}
@@ -112,6 +114,7 @@ function QuestionResponseCard({
 }) {
   const { submitContent } = useData();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const qStyles = makeQStyles(colors);
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<SubmissionType>("text");
@@ -168,15 +171,15 @@ function QuestionResponseCard({
 
   const badgeInfo = (() => {
     if (kind !== "assignment") {
-      return { icon: submitted ? typeIcon(submitted.submissionType) : "chatbubble", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Responded · tap to update" };
+      return { icon: submitted ? typeIcon(submitted.submissionType) : "chatbubble", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: t("lesson.respondedTapToUpdate") };
     }
     switch (submitted?.evaluationStatus) {
       case "approved":
-        return { icon: "checkmark-circle", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: "Approved ✓" };
+        return { icon: "checkmark-circle", color: colors.accentGreen, bg: "rgba(29,158,117,0.08)", label: t("lesson.approved") };
       case "needs_revision":
-        return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: "Needs revision · tap to update" };
+        return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: t("lesson.needsRevisionTap") };
       default:
-        return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Submitted — waiting for peer review and evaluation" };
+        return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: t("lesson.submittedWaiting") };
     }
   })();
 
@@ -209,7 +212,7 @@ function QuestionResponseCard({
           activeOpacity={0.75}
         >
           <Ionicons name={expanded ? "chevron-up" : "chatbubble-outline"} size={13} color={colors.textMid} />
-          <Text style={qStyles.shareToggleText}>{expanded ? "Hide" : "Share your response"}</Text>
+          <Text style={qStyles.shareToggleText}>{expanded ? t("lesson.hide") : t("lesson.shareYourResponse")}</Text>
         </TouchableOpacity>
       )}
 
@@ -221,7 +224,7 @@ function QuestionResponseCard({
               <TextInput
                 style={qStyles.textInput}
                 multiline
-                placeholder="Write your reflection here…"
+                placeholder={t("lesson.writeReflection")}
                 placeholderTextColor={colors.textMuted}
                 value={text}
                 onChangeText={setText}
@@ -236,7 +239,7 @@ function QuestionResponseCard({
                 {submitting ? <ActivityIndicator color={colors.cream} size="small" /> : (
                   <>
                     <Ionicons name="send" size={14} color={colors.cream} />
-                    <Text style={qStyles.submitBtnText}>Share Response</Text>
+                    <Text style={qStyles.submitBtnText}>{t("lesson.shareResponse")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -374,6 +377,7 @@ function HighlightableParagraph({
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function LessonScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = makeStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -554,11 +558,11 @@ export default function LessonScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerLabel}>Lesson</Text>
+        <Text style={styles.headerLabel}>{t("lesson.title")}</Text>
         {completed && (
           <View style={styles.completedTag}>
             <Ionicons name="checkmark" size={12} color={colors.cream} />
-            <Text style={styles.completedTagText}>Done</Text>
+            <Text style={styles.completedTagText}>{t("lesson.done")}</Text>
           </View>
         )}
       </View>
@@ -597,7 +601,7 @@ export default function LessonScreen() {
             <View style={styles.questionsCard}>
               <View style={styles.questionsHeader}>
                 <Ionicons name="people" size={16} color={colors.accentGreen} />
-                <Text style={styles.questionsTitle}>Discussion Questions</Text>
+                <Text style={styles.questionsTitle}>{t("lesson.discussionQuestions")}</Text>
               </View>
               {content.questions.map((q, idx) => (
                 <QuestionResponseCard
@@ -643,14 +647,14 @@ export default function LessonScreen() {
                 {completing ? <ActivityIndicator color={colors.cream} /> : (
                   <>
                     <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
-                    <Text style={styles.completeBtnText}>Mark as Complete</Text>
+                    <Text style={styles.completeBtnText}>{t("lesson.markComplete")}</Text>
                   </>
                 )}
               </TouchableOpacity>
             ) : (
               <View style={styles.completedBanner}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
-                <Text style={styles.completedBannerText}>Lesson completed!</Text>
+                <Text style={styles.completedBannerText}>{t("lesson.lessonCompleted")}</Text>
               </View>
             )
           )}
