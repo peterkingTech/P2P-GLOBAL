@@ -24,18 +24,20 @@ interface Attribution {
   orgLine: string;
   socialLine: string;
   socialUrls?: { youtube?: string; instagram?: string };
+  handles?: { youtube?: string; instagram?: string };
 }
 
 const ATTRIBUTION_MAP: Record<string, Attribution> = {
   "a1b2c3d4-e5f6-7890-abcd-ef1234567890": {
-    style: "plaque",
+    style: "credit-line",
     honorLine: "In honor of Dr. Myles Munroe",
     orgLine: "Bahamas Faith Ministries International · Nassau, The Bahamas",
-    socialLine: "YouTube: @MunroeGlobal  ·  Instagram: @munroeglobal",
+    socialLine: "@MunroeGlobal (YouTube)  ·  @munroeglobal (Instagram)",
     socialUrls: {
       youtube: "https://www.youtube.com/@MunroeGlobal",
       instagram: "https://www.instagram.com/munroeglobal",
     },
+    handles: { youtube: "@MunroeGlobal", instagram: "@munroeglobal" },
   },
 };
 
@@ -49,6 +51,7 @@ const VICTORY_ATTRIBUTION: Attribution = {
     youtube: "https://www.youtube.com/@PastorDolapoLawal",
     instagram: "https://www.instagram.com/thedolapolawal",
   },
+  handles: { youtube: "@PastorDolapoLawal", instagram: "@thedolapolawal" },
 };
 
 const HERO_HEIGHT = 230;
@@ -110,7 +113,7 @@ function AttributionBlock({ attr }: { attr: Attribution }) {
             style={attrStyles.creditHandle}
           >
             <Ionicons name="logo-youtube" size={12} color={colors.textMuted} />
-            <Text style={attrStyles.creditHandleText}>@PastorDolapoLawal</Text>
+            <Text style={attrStyles.creditHandleText}>{attr.handles?.youtube ?? ""}</Text>
           </TouchableOpacity>
         )}
         {attr.socialUrls?.instagram && (
@@ -119,7 +122,7 @@ function AttributionBlock({ attr }: { attr: Attribution }) {
             style={attrStyles.creditHandle}
           >
             <Ionicons name="logo-instagram" size={12} color={colors.textMuted} />
-            <Text style={attrStyles.creditHandleText}>@thedolapolawal</Text>
+            <Text style={attrStyles.creditHandleText}>{attr.handles?.instagram ?? ""}</Text>
           </TouchableOpacity>
         )}
       </View>
