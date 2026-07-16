@@ -1,0 +1,64 @@
+Implementation Prompt for Replit Agent / Claude Code
+
+Paste this as a single task. It continues directly from Phases 1–3, which are already built:
+p2p_languages, p2p_content_translations (with old p2p_lesson_translations/p2p_module_translations kept as fallback), DataContext.contentLanguage, react-i18next with locales/en.json + locales/de.json, api-server/src/lib/translationEngine.ts (OpenAI gpt-4o-mini), and the /api/translations/... routes. Do not rebuild any of that — extend it.
+
+
+⚠️ Required Fix Before Phase 5: Scripture Is Being AI-Translated
+
+Phase 3's lesson translation bundles "title, subtitle, sections, scriptures, and reflection questions into a single translation call" to OpenAI. This breaks a hard rule: Scripture must never be AI-translated. Right now, whatever Bible verse text appears in a lesson is being paraphrased by gpt-4o-mini along with the rest of the lesson copy.
+
+Fix this as the first task of this batch, before building Phase 5's Bible integration on top of it:
+
+
+In translationEngine.ts, remove scriptures (verse text) from the bundled payload sent to OpenAI. Only title, subtitle, sections, and reflection questions should go through the AI pipeline.
+Keep the scripture reference (book/chapter/verse) as plain metadata attached to the lesson — it's language-agnostic and doesn't need translation.
+Scripture display text will be sourced from the new p2p_bible_verses_cache table built in Phase 5 below, not from p2p_content_translations.
+Any already-cached p2p_content_translations rows whose field_key corresponds to scripture text should be purged (DELETE ... WHERE field_key LIKE 'scripture%') so stale AI-paraphrased verses don't linger and get served after Phase 5 ships.
+
+
+
+Phase 4 — Admin Translation Dashboard
+
+4.1 Gap to close first: there is no persistent job/queue state
+
+Right now translation happens via direct API calls (POST /translations/admin/trigger, POST /translations/admin/batch-curriculum with streamed progress) with no row-level record of attempts, failures, or history once the stream ends. The dashboard needs something to read. Add:
+
+sql-- db/migrations/004_translation_jobs.sql
+create table if not exists p2p_translation_jobs (
+  id uuid primary key default gen_random_uuid(),
+  content_type text not null,        -- 'lesson','module','curriculum','section','reflection_question', etc.
+  content_id uuid not null,
+  language text not null references p2p_languages(code),
+  status text not null default 'pending',  -- pending, processing, completed, failed, retrying
+  attempts int not null default 0,
+  max_attempts int not null default 3,
+  last_error text,
+  triggered_by text not null default 'admin', -- 'admin' | 'batch' | user_id
+  ai_provider text default 'gpt-4o-mini',
+  ai_cost_usd numeric(10,4),
+  created_at timestamptz not null default now(),
+  started_at timestamptz,
+  completed_at timestamptz
+);
+create index on p2p_translation_jobs (status, created_at);
+create index on p2p_translation_jobs (content_type, content_id, language);
+
+Update translationEngine.ts so every call (single trigger, batch curriculum, or automatic re-translation) writes a row to p2p_translation_jobs at start (processing) and updates it at the end (completed or failed with last_error, incrementing attempts). This is a logging/tracking layer over the existing engine — it does not change how translation itself works.
+
+If ai_cost_usd isn't already tracked per call from the OpenAI response usage data, add it here (OpenAI returns token usage; compute cost from the gpt-4o-mini per-token rate and store it).
+
+4.2 New/updated API routes
+
+RoutePurposeGET /translations/admin/jobs?status=&language=&content_type=Paginated job history for the log viewGET /translations/admin/coverage (exists)Extend to break down by content type, not just languagePOST /translations/admin/retry/:jobIdRe-enqueue a failed jobDELETE /translations/:type/:id?lang=Delete a cached translation row from p2p_content_translations, forcing re-translation on next triggerPATCH /translations/:type/:idAdmin/reviewer edits translated_text directly and/or changes status (draft → approved / rejected)
+
+4.3 Dashboard screens (new admin route, e.g. /admin/translations)
+
+
+Overview: grid of all active languages × % coverage (from the extended coverage endpoint), plus a live job status summary (pending/processing/failed/retrying counts from p2p_translation_jobs).
+Per-course view: drill into a curriculum → table of every lesson × every language, cell shows status (not translated / draft / approved / rejected / stale). Row actions: Translate now, Retry, Delete cached translation, Force retranslate.
+Bulk action: "Translate entire curriculum" button that calls the existing batch-curriculum route, now also logging each item to p2p_translation_jobs.
+Review screen: side-by-side English source vs. AI translation, editable textarea, Approve / Reject buttons that call the new PATCH route. Only status = 'approved' rows should be served to end users — confirm the GET /translations/:type/:id and DataContext.loadCurriculum read paths filter on status = 'approved', not just "exists." If they currently serve draft rows to users, fix that as part of this phase — that's the review gate the original spec required.
+Job log: paginated table over p2p_translation_jobs with filters, showing last_error for failed rows.
+
+

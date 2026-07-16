@@ -741,12 +741,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const lessonIdList = lessonsRaw.map((l) => l.id as string);
 
         // Primary: query the new unified p2p_content_translations table
+        // End-user path: only serve approved translations (review gate)
         const allIds = [...moduleIds, ...lessonIdList];
         const { data: newTrans } = await supabase
           .from("p2p_content_translations")
           .select("content_type,content_id,title,subtitle,description,status")
           .in("content_id", allIds)
-          .eq("language_code", languageCode);
+          .eq("language_code", languageCode)
+          .eq("status", "approved");
 
         const newModMap = new Map<string, string>();
         const newLesMap = new Map<string, string>();
