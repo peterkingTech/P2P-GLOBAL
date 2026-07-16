@@ -181,21 +181,21 @@ export default function ProgressDashboard() {
                 <Text style={[styles.cardTitle, { color: colors.textDark }]}>
                   {pendingEvaluations.length} peer submission{pendingEvaluations.length === 1 ? "" : "s"} waiting for your review
                 </Text>
-                <Text style={styles.cardSub}>Tap to open the Evaluations screen</Text>
+                <Text style={styles.cardSub}>Tap to open the Peer Review screen</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.amber} />
             </TouchableOpacity>
           </>
         )}
 
-        {/* ── Submitted / Awaiting Evaluation ── */}
-        <Text style={styles.sectionHeader}>Submitted — Awaiting Evaluation</Text>
+        {/* ── Submitted / Awaiting Peer Review ── */}
+        <Text style={styles.sectionHeader}>Submitted — Awaiting Peer Review</Text>
         {loading ? (
           <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 12 }} />
         ) : pending.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="checkmark-done-circle-outline" size={32} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No submissions currently awaiting evaluation</Text>
+            <Text style={styles.emptyText}>No submissions currently awaiting peer review</Text>
           </View>
         ) : pending.map(s => (
           <TouchableOpacity
@@ -209,7 +209,7 @@ export default function ProgressDashboard() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>{s.lessonTitle}</Text>
-              <Text style={styles.cardSub}>{sourceLabel(s.source)} · Pending peer review and evaluation</Text>
+              <Text style={styles.cardSub}>{sourceLabel(s.source)} · Pending peer review</Text>
             </View>
             <Ionicons name="hourglass-outline" size={16} color={colors.amber} />
           </TouchableOpacity>

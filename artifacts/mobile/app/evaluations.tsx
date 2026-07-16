@@ -136,7 +136,7 @@ function statusInfo(sub: MySubmission): { icon: string; color: string; bg: strin
     case "needs_revision":
       return { icon: "alert-circle", color: "#C0392B", bg: "rgba(192,57,43,0.08)", label: "Needs revision" };
     default:
-      return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Waiting for peer review and evaluation" };
+      return { icon: "time-outline", color: colors.amber, bg: "rgba(217,164,65,0.1)", label: "Waiting for peer review" };
   }
 }
 
@@ -245,7 +245,7 @@ export default function EvaluationsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Evaluations</Text>
+        <Text style={styles.headerTitle}>Peer Review</Text>
       </View>
 
       <View style={styles.tabRow}>

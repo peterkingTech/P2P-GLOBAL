@@ -160,9 +160,9 @@ async function fetchFromApiBible(
   apiBibleId: string,
   verseId: string
 ): Promise<string | null> {
-  const apiKey = process.env.API_BIBLE_KEY;
+  const apiKey = process.env.API_Bible ?? process.env.API_BIBLE_KEY;
   if (!apiKey) {
-    console.warn("API_BIBLE_KEY not set — cannot fetch live verse text");
+    console.warn("API_Bible / API_BIBLE_KEY not set — cannot fetch live verse text");
     return null;
   }
 

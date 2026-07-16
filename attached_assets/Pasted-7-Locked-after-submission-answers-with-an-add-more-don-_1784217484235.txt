@@ -1,0 +1,18 @@
+7. Locked-after-submission answers, with an "add more, don't overwrite" pattern — good instinct, and it fits perfectly with point 7's own reasoning (a spiritual growth journal you can revisit):
+Change assignment/reflection answer behavior: once a response is submitted, it becomes READ-ONLY (viewable, not editable) — the user can always look back at what they wrote. If they want to add something new after an approved response, this creates a NEW, separate submission entry (not an edit to the old one), so the full history of "what I said the first time" through "how I'd answer now that I've grown" is preserved and viewable as a timeline, not overwritten. An approved response specifically must never be editable or deletable.
+8. Messaging surfaced in the tab bar, not hidden in Profile:
+Add a Messages entry point directly to the main tab bar (or a clearly visible icon in the top nav, e.g. next to notifications) rather than only reachable through Profile — include an unread-count badge, matching the pattern already used for evaluation pending-counts.
+9. Mission / Calling / Occupation — full replacement for "Called in: Student"
+Your spec is already detailed and complete — I'll pass it through essentially as you wrote it, since it's well-designed, just tightened for direct use as a build prompt:
+Replace the profile's role-based "Called in: [role]" display entirely with three new, separate, editable fields — role stays purely a permissions field, never shown as personal identity again.
+
+1. Add mission (string, max 120 chars), calling (string), occupation (string) to the user profile model, synced across devices via Supabase.
+2. Mission: editable via bottom sheet/dialog offering preset options (Make disciples, Advance God's Kingdom, Build technology for God's Kingdom, Serve the Church, Raise Kingdom leaders, Reach the nations, Equip believers, Glorify Christ through my work, Transform communities, Live for Christ) plus a custom text input option, 120 char max.
+3. Calling: searchable dropdown with predefined options (Apostle, Prophet, Evangelist, Pastor, Teacher, Missionary, Intercessor, Worship Leader, Marketplace Leader, Kingdom Technologist, Entrepreneur, Student, Mentor, Church Worker, Creative, Healthcare Worker, Business Leader, Parent, Other) plus custom option.
+4. Occupation: searchable dropdown (Student, Web Developer, Software Engineer, Mobile Developer, UI/UX Designer, Teacher, Doctor, Nurse, Lawyer, Accountant, Entrepreneur, Pastor, Engineer, Farmer, Musician, Content Creator, Sales, Marketing, Business Owner, Unemployed, Other) plus custom option.
+5. Display all three as clean, consistent cards on the profile (Title/Value/tap-to-edit), matching the existing dark theme + emerald accent + rounded cards aesthetic.
+6. Structure the schema to reasonably support future expansion (multiple callings, mission history, milestones) without needing a rebuild — a simple string per field now is fine, just don't paint into a corner that makes a future array/history table awkward to add.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE — confirm all three fields save, persist across a logout/login cycle, and that role is no longer displayed anywhere as if it were personal identity.
+Suggested order
+Given the severity, I'd send these first: the migration-audit fix (data safety), then #2/#5 together (the completion bug — this is actively giving users wrong information about their own progress), then the language/Bible reconciliation, then the rest roughly in the order you listed them.

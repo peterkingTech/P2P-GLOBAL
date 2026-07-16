@@ -7,6 +7,8 @@ import {
   parseVerseRef,
 } from "../lib/bibleService";
 
+const API_BIBLE_BASE = "https://api.scripture.api.bible/v1";
+
 const router = Router();
 
 function ok(res: any, data: unknown) { return res.json(data); }
@@ -75,6 +77,32 @@ router.get("/translations", async (req, res) => {
     return ok(res, translations);
   } catch (e: any) {
     return err(res, e.message ?? "Lookup failed", 500);
+  }
+});
+
+// ── GET /bible/catalog ────────────────────────────────────────────────────────
+// Admin: fetch every Bible we have access to from API.Bible.
+// Optional ?lang=es to filter by ISO language code.
+
+router.get("/catalog", requireAdmin, async (req, res) => {
+  const apiKey = process.env.API_Bible ?? process.env.API_BIBLE_KEY;
+  if (!apiKey) return err(res, "API_Bible secret is not set", 500);
+
+  const { lang } = req.query as { lang?: string };
+  const url = lang
+    ? `${API_BIBLE_BASE}/bibles?language=${lang}`
+    : `${API_BIBLE_BASE}/bibles`;
+
+  try {
+    const apires = await fetch(url, { headers: { "api-key": apiKey } });
+    if (!apires.ok) {
+      const body = await apires.text().catch(() => "");
+      return err(res, `API.Bible returned ${apires.status}: ${body}`, 502);
+    }
+    const json = await apires.json() as { data?: unknown[] };
+    return ok(res, json.data ?? []);
+  } catch (e: any) {
+    return err(res, e.message ?? "Catalog fetch failed", 500);
   }
 });
 

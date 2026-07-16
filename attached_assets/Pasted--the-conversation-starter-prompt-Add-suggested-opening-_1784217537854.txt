@@ -1,0 +1,20 @@
+ the conversation-starter prompt
+Add suggested opening messages when a user opens a conversation for the first time (zero existing messages in that conversation) — removes the "what do I say first" barrier, especially for a brand new peer match or a new disciple's first message to their peer guide.
+
+1. When a conversation has no prior messages, show a row of tappable suggestion chips above the message input — tapping one fills the input with that text (editable before sending, not auto-sent).
+
+2. A baseline set of safe, universal starters, always available regardless of who's involved:
+   - "Are you new to P2P?"
+   - "How is your Bible study going?"
+   - "How can I pray for you?"
+   - "How's evangelism going for you lately?"
+   - "What's God been teaching you recently?"
+
+3. Optionally personalize a couple of the suggestions based on the OTHER person's spiritual gifts/skills (from p2p_user_gifts) — e.g. if they're tagged "Worship Leader," a suggestion like "What's God been showing you through worship lately?" This is infrastructure-level personalization (picking which topic to surface), not AI generating or writing message content — the actual suggested text should come from a small set of pre-written templates per gift category, not freely AI-generated per conversation.
+
+4. HARD RULE: suggestions must NEVER reference anything private, personal, or sensitive — no mention of registration answers (faith journey stage, prayer/Bible habits specifically as disclosed at signup), growth metrics, past struggles, help-request history, or anything from a person's private data. Suggestions stay in safe, universal, relationship-opening territory only — this is about breaking the ice, not surfacing someone's personal information back at them.
+
+5. Suggestions disappear once the first real message is sent in that conversation — they're a first-message aid only, not a persistent feature cluttering every chat.
+
+TEST WITH A GENUINELY FRESH ACCOUNT, NOT THE EXISTING ADMIN/TEST ACCOUNT, BEFORE REPORTING DONE — confirm suggestions appear only on a genuinely empty conversation, confirm tapping fills (not sends) the input, confirm gift-based personalization pulls only from safe pre-written templates (not freeform AI generation), and confirm suggestions vanish after the first message.
+One thing worth deciding before this ships: should the pre-written templates per gift category be something you write yourself (a fixed list per gift, like the Mission/Calling presets), or do you want me to draft a starter set now covering all 6 gift categories (Care & Wellness, Tech & Digital, Leadership & Admin, Creative & Media, Education, Ministry Gifts) so Claude Code has real content to work with instead of inventing its own?
