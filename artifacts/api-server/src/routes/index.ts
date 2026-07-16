@@ -11,6 +11,7 @@ import adminRouter from "./admin";
 import registrationRouter from "./registration";
 import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
+import bibleRouter from "./bible";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use("/admin", adminRouter);
 router.use("/admin/evaluations", evaluationsRouter);
 router.use("/registration", registrationRouter);
 router.use("/translations", translationsRouter);
+router.use("/bible", bibleRouter);
 
 export default router;

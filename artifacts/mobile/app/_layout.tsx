@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Alert, I18nManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -35,10 +36,32 @@ function AuthGate() {
   const segments = useSegments();
   const router = useRouter();
 
+  const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur"]);
+
   useEffect(() => {
     const lang = profile?.appLanguage;
-    if (lang && SUPPORTED_LANGUAGES.includes(lang as any) && i18n.language !== lang) {
+    if (!lang) return;
+
+    if (SUPPORTED_LANGUAGES.includes(lang as any) && i18n.language !== lang) {
       i18n.changeLanguage(lang);
+    }
+
+    // RTL layout — requires an app reload to take effect in React Native.
+    // I18nManager.isRTL reflects the PREVIOUS session's setting until reload.
+    const shouldBeRTL = RTL_LANGUAGES.has(lang);
+    if (shouldBeRTL !== I18nManager.isRTL) {
+      I18nManager.allowRTL(shouldBeRTL);
+      I18nManager.forceRTL(shouldBeRTL);
+      // Prompt user to restart. On web we can reload immediately.
+      if (Platform.OS === "web") {
+        window.location.reload();
+      } else {
+        Alert.alert(
+          shouldBeRTL ? "Right-to-Left Layout" : "Left-to-Right Layout",
+          "The app layout direction has changed. Please restart the app to apply the new direction.",
+          [{ text: "OK" }]
+        );
+      }
     }
   }, [profile?.appLanguage]);
 

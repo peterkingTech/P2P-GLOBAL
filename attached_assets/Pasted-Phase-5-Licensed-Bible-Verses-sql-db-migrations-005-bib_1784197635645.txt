@@ -1,0 +1,85 @@
+Phase 5 — Licensed Bible Verses
+
+sql-- db/migrations/005_bible_translations.sql
+create table if not exists p2p_bible_translations (
+  id uuid primary key default gen_random_uuid(),
+  language text not null references p2p_languages(code),
+  translation_code text not null,     -- 'LUT' (Luther, German), 'KJV', 'RVR60', etc.
+  translation_name text not null,
+  is_default_for_language boolean not null default false,
+  provider text not null,             -- 'api.bible' | 'dbp' | 'local'
+  license_notes text
+);
+
+create table if not exists p2p_bible_verses_cache (
+  id uuid primary key default gen_random_uuid(),
+  translation_code text not null references p2p_bible_translations(translation_code),
+  book text not null,
+  chapter int not null,
+  verse int not null,
+  text text not null,
+  fetched_at timestamptz not null default now(),
+  unique (translation_code, book, chapter, verse)
+);
+
+
+Integrate a licensed Bible text provider (API.Bible, Digital Bible Platform, or a locally licensed dataset). Confirm licensing per language/translation before enabling it in p2p_bible_translations — do not enable a language row until licensing is confirmed for that translation.
+Seed p2p_bible_translations starting with English (KJV or your admin's chosen default) and German (Luther), matching what's already live.
+Build a lookup service: given a scripture reference (book/chapter/verse, already stored as metadata per the Required Fix above) and the user's contentLanguage, fetch from p2p_bible_verses_cache; on cache miss, call the provider API, store the result, then serve it. This mirrors the existing "cache-first, fetch-on-miss" pattern already used for lesson translations.
+Fallback chain: user's contentLanguage → admin-configured default Bible translation → English KJV as last resort. Never render a blank verse.
+Update LessonDetailScreen (and wherever scripture text renders) to pull from this lookup service instead of from p2p_content_translations.
+
+
+
+Phase 6 — RTL (Expo / React Native specific)
+
+This is a React Native app, not a web app — RTL here works differently than CSS logical properties:
+
+
+Use I18nManager from react-native: I18nManager.forceRTL(true/false) and I18nManager.allowRTL(true). Toggling this requires an app reload (Updates.reloadAsync() in Expo, or prompt the user to restart) — RN does not re-layout live like web dir attribute flips do. Show a "Restart to apply" prompt when a user switches to/from an RTL app_language.
+Set RTL based on app_language (UI language), independent of contentLanguage — consistent with how the two settings are already kept separate in DataContext.
+Use RN's built-in logical style props instead of physical ones across components: marginStart/marginEnd instead of marginLeft/marginRight, paddingStart/paddingEnd, start/end instead of left/right in absolute positioning. flexDirection: 'row' auto-mirrors under I18nManager.isRTL; avoid manual row-reverse overrides that would double-flip.
+Sweep the 5 tab screens, ModuleDetailScreen, LessonDetailScreen, and shared components (headers, cards, list items) replacing physical style props with logical ones.
+Maintain an icon-mirror allowlist: back/forward chevrons and directional arrows should flip; icons like checkmarks, play buttons, or the app logo should not — flip these explicitly with transform: [{ scaleX: -1 }] only where semantically correct.
+Wrap non-mirrored content in explicit LTR containers: numerals, scripture references (e.g. "John 3:16"), URLs, email addresses should render LTR even inside an RTL screen.
+Test on at least Arabic and Hebrew (ar, he) end-to-end: tab bar order, lesson screen layout, settings screen, and the language picker itself.
+
+
+
+Phase 7 — Scale to All 36 Languages
+
+7.1 Seed remaining languages
+
+p2p_languages currently has English and German only. Seed the rest:
+
+es, fr, pt, it, nl, pl, ro, el, cs, ru, uk, tr, ar, he, fa, hi, bn, ur, ta, te, mr,
+zh-CN, zh-TW, ja, ko, th, vi, id, ms, sw, am, ha, yo, ig, pcm
+
+Mark is_rtl = true only for ar, he, fa, ur. Keep new languages is_active = false until their content batch-translation and UI locale file are both ready, so they don't appear as selectable half-finished.
+
+7.2 Content translation
+
+Use the existing batch-curriculum route (now logging to p2p_translation_jobs per Phase 4) to translate the full curriculum into each new language. Run these sequentially or with modest concurrency, respecting OpenAI rate limits — don't fire all 34 remaining languages at once. Track cost via ai_cost_usd and check it against budget before running the full set; gpt-4o-mini is cheap but 34 languages × full curriculum × reflection/assignment questions adds up — get a cost estimate from a single language's ai_cost_usd total first and multiply.
+
+Route every new language's output through the Phase 4 review queue (draft by default) — do not flip is_active = true for a language until someone has at least spot-checked a sample of its approved translations, especially for languages with less AI translation reliability (e.g. Yoruba, Igbo, Nigerian Pidgin, Amharic) where quality should be verified by a native/theologically-informed reviewer, not just approved in bulk.
+
+7.3 UI locale files
+
+locales/en.json and locales/de.json are hand/AI-populated already; the other 34 need the same treatment but through a separate process from the content pipeline — these are static UI strings (button labels, nav, errors), not Bible content, so:
+
+
+Write a one-off script (scripts/translate-locales.ts) that reads locales/en.json, calls the same OpenAI translation engine (UI strings are fine to AI-translate — the "no AI for Scripture" rule is about Bible verse text only, not interface copy) per target language, and writes locales/<code>.json.
+Have a human spot-check each generated locale file for at least the top-level nav/button strings before enabling that language in the app, since a wrong button label is more visible/embarrassing than a slightly-off lesson paraphrase.
+
+
+7.4 Performance
+
+
+Confirm Metro bundles all 36 locale JSON files into the app bundle (React Native doesn't lazy-load JS chunks over the network the way a web app does) — check bundle size impact; if it's material, consider splitting locale files into per-namespace files (as originally scoped) and loading only the active language's file via dynamic import(), which Metro supports.
+p2p_content_translations reads should already be cache-first from Phase 3 — confirm this holds at scale (spot-check that opening the same lesson twice in the same language doesn't re-trigger translationEngine.ts).
+
+
+
+Order
+
+Do the Required Fix (scripture out of the AI pipeline) → Phase 4 → Phase 5 → Phase 6 → Phase 7. Don't start seeding 34 more languages (7.1) until Phase 4's review gate is actually enforced (4.3) — otherwise you're mass-producing unreviewed AI content with no gate stopping it from reaching users.

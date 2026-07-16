@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import VideoRecorder from "@/components/VideoRecorder";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { useTranslation } from "react-i18next";
+import { fetchBatchVerseText, VerseResult } from "@/lib/bibleClient";
 
 interface LessonContent {
   title: string;
@@ -388,6 +389,7 @@ export default function LessonScreen() {
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
     getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
     getHighlightsForLesson, addSectionHighlight, deleteHighlight,
+    contentLanguage,
   } = useData();
 
   const [content, setContent] = useState<LessonContent | null>(null);
@@ -398,6 +400,10 @@ export default function LessonScreen() {
   const [questionSubs, setQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
   const [assignmentQuestionSubs, setAssignmentQuestionSubs] = useState<Map<string, QuestionSubmission>>(new Map());
   const [highlights, setHighlights] = useState<UserHighlight[]>([]);
+  // Translated verse texts keyed by scripture row id (loaded after content)
+  const [verseTexts, setVerseTexts] = useState<Map<string, VerseResult>>(new Map());
+  const versesFetchedForLang = useRef<string | null>(null);
+
   const [pendingHighlight, setPendingHighlight] = useState<
     { sectionId: string; lessonId: string; text: string; start: number; end: number } | null
   >(null);
@@ -409,6 +415,26 @@ export default function LessonScreen() {
   }, [id, getHighlightsForLesson]);
 
   useEffect(() => { loadHighlights(); }, [loadHighlights]);
+
+  // Fetch translated verse text when scriptures load or language changes.
+  // English is served directly from p2p_scriptures (no API call needed).
+  useEffect(() => {
+    const scriptures = content?.scriptures;
+    if (!scriptures?.length || !contentLanguage || contentLanguage === "en") {
+      setVerseTexts(new Map());
+      versesFetchedForLang.current = null;
+      return;
+    }
+    // Skip if already fetched for this language + lesson
+    const fetchKey = `${id}:${contentLanguage}`;
+    if (versesFetchedForLang.current === fetchKey) return;
+    versesFetchedForLang.current = fetchKey;
+
+    fetchBatchVerseText(
+      scriptures.map((s) => ({ id: s.id, ref: s.reference })),
+      contentLanguage
+    ).then((map) => setVerseTexts(map)).catch(() => {/* keep stored text */});
+  }, [content?.scriptures, contentLanguage, id]);
 
   function handleToggleHighlight(params: { sectionId: string; lessonId: string; text: string; start: number; end: number }) {
     const existing = highlights.find(
@@ -573,12 +599,20 @@ export default function LessonScreen() {
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           <Text style={styles.lessonTitle}>{content.title}</Text>
 
-          {content.scriptures.map((s) => (
-            <View key={s.id} style={styles.verseCard}>
-              <Text style={styles.verseText}>"{s.verse}"</Text>
-              <Text style={styles.verseRef}>— {s.reference}</Text>
-            </View>
-          ))}
+          {content.scriptures.map((s) => {
+            const fetched = verseTexts.get(s.id);
+            const displayText = fetched?.text ?? s.verse;
+            const translationCode = fetched?.translationCode;
+            return (
+              <View key={s.id} style={styles.verseCard}>
+                <Text style={styles.verseText}>"{displayText}"</Text>
+                <Text style={styles.verseRef}>
+                  — {s.reference}
+                  {translationCode ? ` (${translationCode})` : ""}
+                </Text>
+              </View>
+            );
+          })}
 
           {content.sections.map((section) => (
             <View key={section.id}>

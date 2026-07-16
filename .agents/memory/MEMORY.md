@@ -13,6 +13,8 @@
 - [P2P Theme System](p2p-theme-system.md) — 4-theme system (light/dark/sepia/midnight); makeStyles(c: AppColors) pattern; AsyncStorage key @p2p/theme; partially migrated screens.
 - [P2P Plans System](p2p-plans-system.md) — Plans reuse p2p_curriculums/modules/lessons hierarchy; type column on curricula distinguishes core vs plan; Plans curriculum ID is fixed UUID b0000000-0000-0000-0000-000000000001.
 - [P2P Plans V2 Schema](p2p-plans-v2.md) — Separate p2p_plans table hierarchy (12 tables); PlanV2 type in DataContext; admin at /admin/content; public screens at /plan/[id] and /plan/lesson/[lessonId].
+- [P2P Bible System](p2p-bible-system.md) — Phase 5 Bible verse lookup; api_bible_id placeholders must be verified; API_BIBLE_KEY secret needed; fallback chain target→KJV.
+- [P2P RTL I18n](p2p-rtl-i18n.md) — I18nManager in AuthGate; restart-on-toggle; style sweep (logical props) still needed across 7 screens.
 - [P2P Multilingual Phase 1](p2p-multilingual-phase1.md) — i18n (react-i18next) + content language wiring; languages table SQL migration at artifacts/mobile/db/migrations/002_languages_table.sql.
 - [P2P Progress & Points System](p2p-progress-points.md) — Unlock/approval split, points structure, service_score rename, dashboard screen, and DB migration notes.
 - [P2P Translation Engine](p2p-translation-engine.md) — Unified p2p_content_translations table, OpenAI gpt-4o-mini pipeline, DataContext new-table-first + legacy fallback chain, API routes at /translations.
