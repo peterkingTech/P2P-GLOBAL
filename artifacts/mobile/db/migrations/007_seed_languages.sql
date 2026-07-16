@@ -1,6 +1,6 @@
 -- Migration 007: Seed all 36 supported languages
 -- Run in Supabase Dashboard → SQL Editor → New query
--- Depends on: 002_languages_table.sql (p2p_languages must exist)
+-- Depends on: 006_languages_schema_upgrade.sql (name_en, name_native, flag_emoji, is_rtl, is_active must exist)
 --
 -- New languages are seeded with is_active = false.
 -- Flip is_active = true only after:
@@ -9,62 +9,77 @@
 --   3. The locale file (locales/<code>.json) has been spot-checked
 --
 -- RTL languages: ar, he, fa, ur — is_rtl = true
+--
+-- ON CONFLICT behaviour:
+--   name_en / name_native / flag_emoji / is_rtl are updated (schema data — keep fresh).
+--   is_active is NOT updated — preserves any admin-enabled status from a previous run.
 
 INSERT INTO p2p_languages
-  (code, name_en, name_native, flag_emoji, is_rtl, is_active)
+  (code, name, name_en, name_native, flag_emoji, is_rtl, is_active)
 VALUES
   -- European (Latin script)
-  ('es', 'Spanish',       'Español',       '🇪🇸', false, false),
-  ('fr', 'French',        'Français',      '🇫🇷', false, false),
-  ('pt', 'Portuguese',    'Português',     '🇧🇷', false, false),
-  ('it', 'Italian',       'Italiano',      '🇮🇹', false, false),
-  ('nl', 'Dutch',         'Nederlands',    '🇳🇱', false, false),
-  ('pl', 'Polish',        'Polski',        '🇵🇱', false, false),
-  ('ro', 'Romanian',      'Română',        '🇷🇴', false, false),
-  ('el', 'Greek',         'Ελληνικά',      '🇬🇷', false, false),
-  ('cs', 'Czech',         'Čeština',       '🇨🇿', false, false),
+  ('es', 'Spanish',              'Spanish',              'Español',           '🇪🇸', false, false),
+  ('fr', 'French',               'French',               'Français',          '🇫🇷', false, false),
+  ('pt', 'Portuguese',           'Portuguese',           'Português',         '🇧🇷', false, false),
+  ('it', 'Italian',              'Italian',              'Italiano',          '🇮🇹', false, false),
+  ('nl', 'Dutch',                'Dutch',                'Nederlands',        '🇳🇱', false, false),
+  ('pl', 'Polish',               'Polish',               'Polski',            '🇵🇱', false, false),
+  ('ro', 'Romanian',             'Romanian',             'Română',            '🇷🇴', false, false),
+  ('el', 'Greek',                'Greek',                'Ελληνικά',          '🇬🇷', false, false),
+  ('cs', 'Czech',                'Czech',                'Čeština',           '🇨🇿', false, false),
 
   -- Cyrillic / East European
-  ('ru', 'Russian',       'Русский',       '🇷🇺', false, false),
-  ('uk', 'Ukrainian',     'Українська',    '🇺🇦', false, false),
+  ('ru', 'Russian',              'Russian',              'Русский',           '🇷🇺', false, false),
+  ('uk', 'Ukrainian',            'Ukrainian',            'Українська',        '🇺🇦', false, false),
 
-  -- Middle East / RTL
-  ('tr', 'Turkish',       'Türkçe',        '🇹🇷', false, false),
-  ('ar', 'Arabic',        'العربية',       '🇸🇦', true,  false),
-  ('he', 'Hebrew',        'עברית',         '🇮🇱', true,  false),
-  ('fa', 'Persian',       'فارسی',         '🇮🇷', true,  false),
+  -- Middle East
+  ('tr', 'Turkish',              'Turkish',              'Türkçe',            '🇹🇷', false, false),
+  ('ar', 'Arabic',               'Arabic',               'العربية',           '🇸🇦', true,  false),
+  ('he', 'Hebrew',               'Hebrew',               'עברית',             '🇮🇱', true,  false),
+  ('fa', 'Persian',              'Persian',              'فارسی',             '🇮🇷', true,  false),
 
   -- South Asia
-  ('hi', 'Hindi',         'हिन्दी',         '🇮🇳', false, false),
-  ('bn', 'Bengali',       'বাংলা',          '🇧🇩', false, false),
-  ('ur', 'Urdu',          'اردو',           '🇵🇰', true,  false),
-  ('ta', 'Tamil',         'தமிழ்',          '🇮🇳', false, false),
-  ('te', 'Telugu',        'తెలుగు',         '🇮🇳', false, false),
-  ('mr', 'Marathi',       'मराठी',          '🇮🇳', false, false),
+  ('hi', 'Hindi',                'Hindi',                'हिन्दी',             '🇮🇳', false, false),
+  ('bn', 'Bengali',              'Bengali',              'বাংলা',              '🇧🇩', false, false),
+  ('ur', 'Urdu',                 'Urdu',                 'اردو',              '🇵🇰', true,  false),
+  ('ta', 'Tamil',                'Tamil',                'தமிழ்',              '🇮🇳', false, false),
+  ('te', 'Telugu',               'Telugu',               'తెలుగు',             '🇮🇳', false, false),
+  ('mr', 'Marathi',              'Marathi',              'मराठी',              '🇮🇳', false, false),
 
   -- East Asia
-  ('zh', 'Chinese (Simplified)', '中文(简体)', '🇨🇳', false, false),
-  ('zh-TW', 'Chinese (Traditional)', '中文(繁體)', '🇹🇼', false, false),
-  ('ja', 'Japanese',      '日本語',         '🇯🇵', false, false),
-  ('ko', 'Korean',        '한국어',         '🇰🇷', false, false),
+  ('zh', 'Chinese (Simplified)', 'Chinese (Simplified)', '中文(简体)',          '🇨🇳', false, false),
+  ('zh-TW','Chinese (Traditional)','Chinese (Traditional)','中文(繁體)',        '🇹🇼', false, false),
+  ('ja', 'Japanese',             'Japanese',             '日本語',              '🇯🇵', false, false),
+  ('ko', 'Korean',               'Korean',               '한국어',              '🇰🇷', false, false),
 
   -- Southeast Asia
-  ('th', 'Thai',          'ภาษาไทย',        '🇹🇭', false, false),
-  ('vi', 'Vietnamese',    'Tiếng Việt',    '🇻🇳', false, false),
-  ('id', 'Indonesian',    'Bahasa Indonesia','🇮🇩',false, false),
-  ('ms', 'Malay',         'Bahasa Melayu', '🇲🇾', false, false),
+  ('th', 'Thai',                 'Thai',                 'ภาษาไทย',            '🇹🇭', false, false),
+  ('vi', 'Vietnamese',           'Vietnamese',           'Tiếng Việt',        '🇻🇳', false, false),
+  ('id', 'Indonesian',           'Indonesian',           'Bahasa Indonesia',   '🇮🇩', false, false),
+  ('ms', 'Malay',                'Malay',                'Bahasa Melayu',     '🇲🇾', false, false),
 
   -- Africa
-  ('sw', 'Swahili',       'Kiswahili',     '🇰🇪', false, false),
-  ('am', 'Amharic',       'አማርኛ',          '🇪🇹', false, false),
-  ('ha', 'Hausa',         'Hausa',         '🇳🇬', false, false),
-  ('yo', 'Yoruba',        'Yorùbá',        '🇳🇬', false, false),
-  ('ig', 'Igbo',          'Igbo',          '🇳🇬', false, false),
-  ('pcm','Nigerian Pidgin','Naijá',        '🇳🇬', false, false)
+  ('sw', 'Swahili',              'Swahili',              'Kiswahili',         '🇰🇪', false, false),
+  ('am', 'Amharic',              'Amharic',              'አማርኛ',              '🇪🇹', false, false),
+  ('ha', 'Hausa',                'Hausa',                'Hausa',             '🇳🇬', false, false),
+  ('yo', 'Yoruba',               'Yoruba',               'Yorùbá',            '🇳🇬', false, false),
+  ('ig', 'Igbo',                 'Igbo',                 'Igbo',              '🇳🇬', false, false),
+  ('pcm','Nigerian Pidgin',      'Nigerian Pidgin',      'Naijá',             '🇳🇬', false, false)
 
 ON CONFLICT (code) DO UPDATE SET
-  name_en       = EXCLUDED.name_en,
-  name_native   = EXCLUDED.name_native,
-  flag_emoji    = EXCLUDED.flag_emoji,
-  is_rtl        = EXCLUDED.is_rtl;
--- Note: is_active is NOT updated on conflict — preserves existing active status.
+  name        = EXCLUDED.name,
+  name_en     = EXCLUDED.name_en,
+  name_native = EXCLUDED.name_native,
+  flag_emoji  = EXCLUDED.flag_emoji,
+  is_rtl      = EXCLUDED.is_rtl;
+  -- is_active intentionally NOT updated — preserves admin-enabled status.
+
+-- ── Verify ────────────────────────────────────────────────────────────────────
+-- SELECT code, name_en, flag_emoji, is_rtl, is_active
+-- FROM p2p_languages
+-- ORDER BY is_active DESC, code;
+--
+-- Expected: en + de with is_active=true, all others false.
+-- After spot-checking translations + locale files, run:
+--   UPDATE p2p_languages SET is_active = true WHERE code = 'fr';
+-- (repeat per language as each one clears review)
