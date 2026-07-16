@@ -1895,18 +1895,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [profile]);
 
   const markLessonComplete = useCallback(async (lessonId: string) => {
+    // Optimistic update first so the UI reacts immediately regardless of DB latency.
+    setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, isCompleted: true } : l));
     try { await AsyncStorage.setItem(`lesson_complete_${lessonId}`, "true"); } catch {}
     if (profile) {
       try {
-        await supabase.from("p2p_lesson_progress").upsert(
+        const { error } = await supabase.from("p2p_lesson_progress").upsert(
           { user_id: profile.id, lesson_id: lessonId, completed: true, progress_percent: 100, updated_at: new Date().toISOString() },
           { onConflict: "user_id,lesson_id" }
         );
-      } catch {}
+        if (error) console.error("markLessonComplete upsert:", error.message);
+      } catch (e) { console.error("markLessonComplete failed:", e); }
       await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
       await checkGrowthEvents(profile.id);
-    } else {
-      setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, isCompleted: true } : l));
     }
   }, [profile, loadCurriculum, checkGrowthEvents]);
 

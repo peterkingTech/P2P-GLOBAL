@@ -37,6 +37,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [title, setTitle] = useState("Conversation");
   const [text, setText] = useState("");
+  const [startersVisible, setStartersVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showCrisisModal, setShowCrisisModal] = useState(false);
@@ -134,9 +135,17 @@ export default function ChatScreen() {
     );
   }
 
+  const STARTERS = [
+    "👋 How are you doing?",
+    "🙏 Praying for you!",
+    "📖 What are you studying in the Word?",
+    "✝️ Share a verse with me",
+  ];
+
   async function handleSend() {
     const body = text.trim();
     if (!body || !id || !user) return;
+    setStartersVisible(false);
     setSending(true);
     setText("");
     const { data, error } = await supabase
@@ -199,6 +208,21 @@ export default function ChatScreen() {
           />
         )}
 
+        {!loading && messages.length === 0 && startersVisible && (
+          <View style={styles.startersRow}>
+            {STARTERS.map((chip) => (
+              <TouchableOpacity
+                key={chip}
+                style={styles.starterChip}
+                onPress={() => { setText(chip); setStartersVisible(false); }}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.starterChipText}>{chip}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
           <TextInput
             style={styles.input}
@@ -241,6 +265,17 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 11, fontWeight: "600", color: colors.accentGreen, marginBottom: 2, fontFamily: "Inter_600SemiBold" },
   bubbleText: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
   bubbleTextMine: { color: "#fff" },
+  startersRow: {
+    flexDirection: "row", flexWrap: "wrap", gap: 8,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+    borderTopWidth: 1, borderTopColor: colors.borderBeige,
+  },
+  starterChip: {
+    backgroundColor: "rgba(29,158,117,0.08)",
+    borderWidth: 1, borderColor: "rgba(29,158,117,0.3)",
+    borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8,
+  },
+  starterChipText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
   inputRow: {
     flexDirection: "row", alignItems: "flex-end", gap: 8,
     paddingHorizontal: 16, paddingTop: 10,

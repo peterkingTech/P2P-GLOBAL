@@ -8,20 +8,35 @@ import {
   FlatList,
   Image,
   Platform,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import i18next from "i18next";
 import colors from "@/constants/colors";
 
 const { width } = Dimensions.get("window");
 
 const LOGO = require("@/assets/images/logo.png");
 
+const LANGUAGES = [
+  { code: "en", label: "English", flag: "🇺🇸" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "pt", label: "Português", flag: "🇧🇷" },
+  { code: "ar", label: "العربية", flag: "🇸🇦" },
+  { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
+  { code: "sw", label: "Kiswahili", flag: "🇰🇪" },
+];
+
 const SLIDES = [
   {
     id: "1",
-    icon: null, // slide 1 uses the big logo instead of an icon
+    icon: null,
     title: "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
     subtitle:
       "Connect with believers worldwide. Grow together, across every border, every nation.",
@@ -53,9 +68,22 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [current, setCurrent] = useState(0);
+  const [langPickerOpen, setLangPickerOpen] = useState(false);
+  const [selectedLang, setSelectedLang] = useState(
+    LANGUAGES.find((l) => l.code === (i18next.language?.slice(0, 2) ?? "en")) ?? LANGUAGES[0]
+  );
   const listRef = useRef<FlatList>(null);
 
   const isLast = current === SLIDES.length - 1;
+
+  async function selectLanguage(lang: typeof LANGUAGES[0]) {
+    setSelectedLang(lang);
+    setLangPickerOpen(false);
+    try {
+      await AsyncStorage.setItem("@p2p/appLanguage", lang.code);
+      await i18next.changeLanguage(lang.code);
+    } catch {}
+  }
 
   function goNext() {
     if (isLast) {
@@ -74,12 +102,23 @@ export default function OnboardingScreen() {
         { paddingTop: insets.top + (Platform.OS === "web" ? 20 : 0) },
       ]}
     >
-      {/* Small logo watermark shown on slides 2–4 */}
-      {current > 0 && (
-        <View style={styles.headerLogo}>
-          <Image source={LOGO} style={styles.headerLogoImg} />
-        </View>
-      )}
+      {/* Language picker button — always visible */}
+      <View style={styles.langRow}>
+        {current > 0 && (
+          <View style={styles.headerLogo}>
+            <Image source={LOGO} style={styles.headerLogoImg} />
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.langBtn}
+          onPress={() => setLangPickerOpen(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.langBtnFlag}>{selectedLang.flag}</Text>
+          <Text style={styles.langBtnLabel}>{selectedLang.label}</Text>
+          <Ionicons name="chevron-down" size={12} color={colors.accentGreen} />
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         ref={listRef}
@@ -94,12 +133,10 @@ export default function OnboardingScreen() {
         renderItem={({ item }) => (
           <View style={[styles.slide, { width }]}>
             {item.icon === null ? (
-              /* Slide 1 — big official logo */
               <View style={styles.logoWrap}>
                 <Image source={LOGO} style={styles.logoImg} />
               </View>
             ) : (
-              /* Slides 2–4 — Ionicon in branded ring */
               <View style={styles.iconRing}>
                 <Ionicons
                   name={item.icon}
@@ -124,10 +161,7 @@ export default function OnboardingScreen() {
             key={i}
             style={[
               styles.dot,
-              {
-                backgroundColor:
-                  i === current ? colors.accentGreen : colors.navBorder,
-              },
+              { backgroundColor: i === current ? colors.accentGreen : colors.navBorder },
             ]}
           />
         ))}
@@ -169,21 +203,86 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Language picker sheet */}
+      <Modal
+        visible={langPickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLangPickerOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setLangPickerOpen(false)}
+        >
+          <View
+            style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Select Language</Text>
+              <TouchableOpacity onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.textMutedLight} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.langOption,
+                    selectedLang.code === lang.code && styles.langOptionActive,
+                  ]}
+                  onPress={() => selectLanguage(lang)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.langOptionFlag}>{lang.flag}</Text>
+                  <Text style={[
+                    styles.langOptionLabel,
+                    selectedLang.code === lang.code && styles.langOptionLabelActive,
+                  ]}>
+                    {lang.label}
+                  </Text>
+                  {selectedLang.code === lang.code && (
+                    <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.darkBg },
-  headerLogo: {
+  langRow: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingBottom: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+    minHeight: 48,
   },
-  headerLogoImg: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+  headerLogo: { alignItems: "center" },
+  headerLogoImg: { width: 40, height: 40, borderRadius: 8 },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(29,158,117,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(29,158,117,0.3)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: "auto",
   },
+  langBtnFlag: { fontSize: 15 },
+  langBtnLabel: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
   slide: {
     flex: 1,
     alignItems: "center",
@@ -191,7 +290,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     backgroundColor: colors.darkBg,
   },
-  /* Slide 1 big logo */
   logoWrap: {
     marginBottom: 36,
     shadowColor: colors.accentGreen,
@@ -200,100 +298,83 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
-  logoImg: {
-    width: 140,
-    height: 140,
-    borderRadius: 32,
-  },
-  /* Slides 2–4 icon ring */
+  logoImg: { width: 140, height: 140, borderRadius: 32 },
   iconRing: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 110, height: 110, borderRadius: 55,
     backgroundColor: "rgba(29,158,117,0.12)",
-    borderWidth: 1.5,
-    borderColor: "rgba(29,158,117,0.3)",
-    alignItems: "center",
-    justifyContent: "center",
+    borderWidth: 1.5, borderColor: "rgba(29,158,117,0.3)",
+    alignItems: "center", justifyContent: "center",
     marginBottom: 36,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: colors.cream,
-    textAlign: "center",
-    marginBottom: 16,
-    lineHeight: 34,
+    fontSize: 26, fontWeight: "700", color: colors.cream,
+    textAlign: "center", marginBottom: 16, lineHeight: 34,
     fontFamily: "Inter_700Bold",
   },
   titleHero: {
-    fontSize: 22,
-    letterSpacing: 0.8,
-    color: "#FFFFFF",
-    lineHeight: 30,
-    marginBottom: 8,
+    fontSize: 22, letterSpacing: 0.8, color: "#FFFFFF",
+    lineHeight: 30, marginBottom: 8,
   },
   poweredBy: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.accentGreen,
-    textAlign: "center",
-    letterSpacing: 1.5,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 20,
+    fontSize: 11, fontWeight: "600", color: colors.accentGreen,
+    textAlign: "center", letterSpacing: 1.5,
+    fontFamily: "Inter_600SemiBold", marginBottom: 20,
     textTransform: "uppercase",
   },
   subtitle: {
-    fontSize: 15,
-    color: colors.textMutedLight,
-    textAlign: "center",
-    lineHeight: 24,
+    fontSize: 15, color: colors.textMutedLight,
+    textAlign: "center", lineHeight: 24,
     fontFamily: "Inter_400Regular",
   },
   discoverBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(29,158,117,0.35)",
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 12, borderRadius: 12,
+    borderWidth: 1, borderColor: "rgba(29,158,117,0.35)",
     backgroundColor: "rgba(29,158,117,0.08)",
   },
   discoverBtnText: {
-    color: colors.accentGreen,
-    fontSize: 15,
-    fontWeight: "600",
+    color: colors.accentGreen, fontSize: 15, fontWeight: "600",
     fontFamily: "Inter_600SemiBold",
   },
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 32,
-  },
+  dots: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 32 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   footer: { paddingHorizontal: 24, gap: 14 },
   btn: {
-    backgroundColor: colors.accentGreen,
-    borderRadius: 14,
-    height: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   btnText: {
-    color: colors.cream,
-    fontSize: 16,
-    fontWeight: "600",
+    color: colors.cream, fontSize: 16, fontWeight: "600",
     fontFamily: "Inter_600SemiBold",
   },
   skipBtn: { alignItems: "center", paddingVertical: 8 },
-  skipText: {
-    color: colors.lightGreen,
-    fontSize: 14,
+  skipText: { color: colors.lightGreen, fontSize: 14, fontFamily: "Inter_400Regular" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: colors.darkBg,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, maxHeight: "75%",
+    borderTopWidth: 1, borderTopColor: "rgba(29,158,117,0.2)",
+  },
+  sheetHeader: {
+    flexDirection: "row", alignItems: "center",
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    flex: 1, fontSize: 17, fontWeight: "700", color: colors.cream,
+    fontFamily: "Inter_700Bold",
+  },
+  closeBtn: { padding: 4 },
+  langOption: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 14, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+  langOptionActive: { },
+  langOptionFlag: { fontSize: 22, width: 32, textAlign: "center" },
+  langOptionLabel: {
+    flex: 1, fontSize: 15, color: colors.textMutedLight,
     fontFamily: "Inter_400Regular",
   },
+  langOptionLabelActive: { color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 });

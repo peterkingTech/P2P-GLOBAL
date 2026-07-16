@@ -67,6 +67,9 @@ export interface UserProfile {
   contentLanguage: string;
   churchId?: string;
   region?: string;
+  mission?: string;
+  calling?: string;
+  occupation?: string;
 }
 
 interface AuthContextValue {
@@ -114,6 +117,9 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     contentLanguage: (row.content_language as string) ?? "en",
     churchId: row.church_id as string | undefined,
     region: row.region as string | undefined,
+    mission: row.mission as string | undefined,
+    calling: row.calling as string | undefined,
+    occupation: row.occupation as string | undefined,
   };
 }
 
@@ -219,6 +225,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.appLanguage !== undefined) dbUpdates.app_language = updates.appLanguage;
     if (updates.contentLanguage !== undefined) dbUpdates.content_language = updates.contentLanguage;
     if (updates.dateOfBirth !== undefined) dbUpdates.date_of_birth = updates.dateOfBirth;
+    if (updates.mission !== undefined) dbUpdates.mission = updates.mission;
+    if (updates.calling !== undefined) dbUpdates.calling = updates.calling;
+    if (updates.occupation !== undefined) dbUpdates.occupation = updates.occupation;
 
     const { error } = await supabase
       .from("p2p_profiles")

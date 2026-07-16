@@ -25,9 +25,9 @@ function NativeTabLayout() {
         <Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
         <Label>{t("tabs.prayer")}</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="discover">
-        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>{t("tabs.discover")}</Label>
+      <NativeTabs.Trigger name="messages">
+        <Icon sf={{ default: "message", selected: "message.fill" }} />
+        <Label>{t("tabs.messages")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="missions">
         <Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
@@ -47,7 +47,7 @@ function ClassicTabLayout() {
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
     { name: "learn", label: t("tabs.learn"), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "prayer", label: t("tabs.prayer"), icon: "radio-outline" as const, iconActive: "radio" as const },
-    { name: "discover", label: t("tabs.discover"), icon: "compass-outline" as const, iconActive: "compass" as const },
+    { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
     { name: "missions", label: t("tabs.missions"), icon: "earth-outline" as const, iconActive: "earth" as const },
   ];
 

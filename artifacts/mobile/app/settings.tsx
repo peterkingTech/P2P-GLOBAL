@@ -52,6 +52,9 @@ export default function SettingsScreen() {
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [city, setCity] = useState(profile?.city ?? "");
   const [country, setCountry] = useState(profile?.country ?? "");
+  const [mission, setMission] = useState(profile?.mission ?? "");
+  const [calling, setCalling] = useState(profile?.calling ?? "");
+  const [occupation, setOccupation] = useState(profile?.occupation ?? "");
   const [dobYear, setDobYear] = useState(profile?.dateOfBirth?.split("-")[0] ?? "");
   const [dobMonth, setDobMonth] = useState(profile?.dateOfBirth?.split("-")[1] ?? "");
   const [dobDay, setDobDay] = useState(profile?.dateOfBirth?.split("-")[2] ?? "");
@@ -148,6 +151,9 @@ export default function SettingsScreen() {
       bio: bio.trim(),
       city: city.trim() || undefined,
       country: country.trim() || undefined,
+      mission: mission.trim() || undefined,
+      calling: calling.trim() || undefined,
+      occupation: occupation.trim() || undefined,
       ...(dateOfBirth ? { dateOfBirth } : {}),
     });
     setSaving(false);
@@ -212,6 +218,36 @@ export default function SettingsScreen() {
             multiline
             numberOfLines={4}
             maxLength={280}
+          />
+
+          <Text style={styles.fieldLabel}>Mission</Text>
+          <TextInput
+            style={styles.input}
+            value={mission}
+            onChangeText={setMission}
+            placeholder="What mission are you called to?"
+            placeholderTextColor={colors.textMuted}
+            maxLength={120}
+          />
+
+          <Text style={styles.fieldLabel}>Calling</Text>
+          <TextInput
+            style={styles.input}
+            value={calling}
+            onChangeText={setCalling}
+            placeholder="e.g. Evangelist, Teacher, Intercessor…"
+            placeholderTextColor={colors.textMuted}
+            maxLength={80}
+          />
+
+          <Text style={styles.fieldLabel}>Occupation</Text>
+          <TextInput
+            style={styles.input}
+            value={occupation}
+            onChangeText={setOccupation}
+            placeholder="Your vocation or work"
+            placeholderTextColor={colors.textMuted}
+            maxLength={80}
           />
 
           <View style={styles.rowBetween}>

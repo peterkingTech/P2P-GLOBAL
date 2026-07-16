@@ -195,10 +195,21 @@ function QuestionResponseCard({
 
       {submitted ? (
         <>
-          <TouchableOpacity style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]} onPress={() => { setSubmitted(null); setExpanded(true); }} activeOpacity={0.7}>
-            <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
-            <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
-          </TouchableOpacity>
+          {kind === "assignment" && submitted.evaluationStatus === "needs_revision" ? (
+            <TouchableOpacity
+              style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]}
+              onPress={() => { setSubmitted(null); setExpanded(true); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
+              <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]}>
+              <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
+              <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
+            </View>
+          )}
           {kind === "assignment" && submitted.evaluationStatus === "needs_revision" && submitted.feedback ? (
             <View style={qStyles.revisionBanner}>
               <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
