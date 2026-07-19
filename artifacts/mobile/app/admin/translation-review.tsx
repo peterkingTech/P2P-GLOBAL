@@ -26,6 +26,7 @@ type EnglishSource = {
 const TYPE_LABELS: Record<string, string> = {
   curriculum: "Curriculum", module: "Module", lesson: "Lesson",
   section: "Section", question: "Question", scripture: "Scripture",
+  plan: "Plan", plan_module: "Plan Module", plan_lesson: "Plan Lesson",
 };
 
 const LANG_NAMES: Record<string, string> = {
@@ -59,6 +60,18 @@ async function fetchEnglishSource(contentType: string, contentId: string): Promi
         questions: (questions ?? []).map((q: any) => q.question as string),
       };
     }
+    case "plan": {
+      const { data } = await supabase.from("p2p_plans").select("title,tagline,overview").eq("id", contentId).maybeSingle();
+      return data ? { title: data.title, subtitle: data.tagline, description: data.overview } : null;
+    }
+    case "plan_module": {
+      const { data } = await supabase.from("p2p_plan_modules").select("module_title").eq("id", contentId).maybeSingle();
+      return data ? { title: data.module_title } : null;
+    }
+    case "plan_lesson": {
+      const { data } = await supabase.from("p2p_plan_lessons").select("title").eq("id", contentId).maybeSingle();
+      return data ? { title: data.title } : null;
+    }
     default:
       return null;
   }
@@ -77,6 +90,7 @@ export default function TranslationReviewScreen() {
   const [englishSrc, setEnglishSrc] = useState<EnglishSource | null>(null);
   const [srcLoading, setSrcLoading] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
+  const [editedTagline, setEditedTagline] = useState("");
   const [editedDesc, setEditedDesc] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -98,7 +112,13 @@ export default function TranslationReviewScreen() {
   async function openReview(row: DraftRow) {
     setReviewing(row);
     setEditedTitle(row.title ?? "");
-    setEditedDesc(row.description ?? row.subtitle ?? "");
+    if (row.content_type === "plan") {
+      setEditedTagline(row.subtitle ?? "");
+      setEditedDesc(row.description ?? "");
+    } else {
+      setEditedTagline("");
+      setEditedDesc(row.description ?? row.subtitle ?? "");
+    }
     setEnglishSrc(null);
     setSrcLoading(true);
     try {
@@ -115,7 +135,10 @@ export default function TranslationReviewScreen() {
     try {
       const update: Record<string, unknown> = { status };
       if (editedTitle !== reviewing.title) update.title = editedTitle;
-      if (reviewing.content_type === "module" || reviewing.content_type === "curriculum") {
+      if (reviewing.content_type === "plan") {
+        if (editedTagline !== (reviewing.subtitle ?? "")) update.subtitle = editedTagline;
+        if (editedDesc !== reviewing.description) update.description = editedDesc;
+      } else if (reviewing.content_type === "module" || reviewing.content_type === "curriculum") {
         if (editedDesc !== reviewing.description) update.description = editedDesc;
       } else {
         if (editedDesc !== reviewing.subtitle) update.subtitle = editedDesc;
@@ -164,7 +187,7 @@ export default function TranslationReviewScreen() {
           </TouchableOpacity>
         ))}
         <View style={styles.chipDivider} />
-        {["all", "curriculum", "module", "lesson"].map((t) => (
+        {["all", "curriculum", "module", "lesson", "plan", "plan_module", "plan_lesson"].map((t) => (
           <TouchableOpacity key={t} style={[styles.chip, filterType === t && styles.chipActive]} onPress={() => setFilterType(t)}>
             <Text style={[styles.chipText, filterType === t && styles.chipTextActive]}>
               {t === "all" ? "All Types" : TYPE_LABELS[t] ?? t}
@@ -263,8 +286,20 @@ export default function TranslationReviewScreen() {
                     placeholder="Title"
                     multiline
                   />
+                  {reviewing?.content_type === "plan" && (
+                    <>
+                      <Text style={styles.editLabel}>Tagline</Text>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editedTagline}
+                        onChangeText={setEditedTagline}
+                        placeholder="Tagline"
+                        multiline
+                      />
+                    </>
+                  )}
                   <Text style={styles.editLabel}>
-                    {reviewing?.content_type === "lesson" ? "Subtitle" : "Description"}
+                    {reviewing?.content_type === "plan" ? "Overview" : reviewing?.content_type === "lesson" ? "Subtitle" : "Description"}
                   </Text>
                   <TextInput
                     style={[styles.editInput, { minHeight: 80 }]}

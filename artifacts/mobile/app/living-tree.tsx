@@ -134,6 +134,7 @@ export default function LivingTreeScreen() {
 
   const { modules } = useData();
   const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
+  const countriesCount = forestStats.countriesReached.length;
   const activities: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
     ...(completedLessons > 0 ? [{ icon: "book" as const, label: `${completedLessons} ${completedLessons === 1 ? "lesson" : "lessons"} completed` }] : []),
     ...(forestStats.totalDisciples > 0 ? [{ icon: "person-add" as const, label: `${forestStats.totalDisciples} ${forestStats.totalDisciples === 1 ? "disciple" : "disciples"} in your network` }] : []),
@@ -146,7 +147,6 @@ export default function LivingTreeScreen() {
   }
   const isForestBuilder = stageIndex === 4;
   const isForestOfNations = stageIndex >= 5;
-  const countriesCount = forestStats.countriesReached.length;
 
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>

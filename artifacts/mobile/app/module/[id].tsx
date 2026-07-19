@@ -14,7 +14,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PlanModule } from "@/contexts/DataContext";
-import { supabase } from "@/contexts/AuthContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { useTranslation } from "react-i18next";
 
@@ -155,7 +155,8 @@ export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modules, lessons, plans, profile } = useData();
+  const { modules, lessons, plans } = useData();
+  const { profile } = useAuth();
 
   // ── Detection: three possible view modes ────────────────────────────────
   // 1. Core curriculum module (from global modules array)

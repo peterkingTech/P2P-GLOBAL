@@ -177,13 +177,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return error.message;
 
     if (data.user) {
-      const profileRow = {
+      const onboardingLanguage = await AsyncStorage.getItem("@p2p/appLanguage");
+      const profileRow: Record<string, unknown> = {
         id: data.user.id,
         email,
         full_name: name,
         date_of_birth: dateOfBirth,
         created_at: new Date().toISOString(),
       };
+      if (onboardingLanguage) profileRow.app_language = onboardingLanguage;
       const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
       if (profileErr) return profileErr.message;
       // Set the profile immediately so the UI shows the real name before

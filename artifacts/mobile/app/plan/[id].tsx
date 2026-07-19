@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Linking,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
@@ -70,15 +70,53 @@ export default function PlanDetailScreen() {
       supabase.from("p2p_plan_discussion_questions").select("id,question_number,topic,question_text,order_index").eq("plan_id", id).order("order_index"),
     ]);
 
-    setPlan(planData as Plan | null);
+    // Overlay translated plan/module/lesson titles when a non-English content
+    // language is selected — same two-pass pattern as loadCurriculum()/loadPlansV2().
+    // End-user path: only serve approved translations (review gate).
+    let overlaidPlan = planData as Plan | null;
+    const modulesRaw = (modulesData ?? []) as Module[];
+    const lessonsRaw = (lessonsData ?? []) as Omit<Lesson, "completed" | "evaluationStatus">[];
+    const languageCode = profile?.contentLanguage;
+    if (languageCode && languageCode !== "en") {
+      const moduleIds = modulesRaw.map((m) => m.id);
+      const lessonIds = lessonsRaw.map((l) => l.id);
+      const allIds = [id, ...moduleIds, ...lessonIds].filter(Boolean) as string[];
+      const { data: planTrans } = await supabase
+        .from("p2p_content_translations")
+        .select("content_type,content_id,title,subtitle,description")
+        .in("content_type", ["plan", "plan_module", "plan_lesson"])
+        .in("content_id", allIds)
+        .eq("language_code", languageCode)
+        .eq("status", "approved");
+
+      const planOverride = (planTrans ?? []).find((r: any) => r.content_type === "plan" && r.content_id === id) as any;
+      if (planOverride && overlaidPlan) {
+        overlaidPlan = {
+          ...overlaidPlan,
+          title: planOverride.title ?? overlaidPlan.title,
+          tagline: planOverride.subtitle ?? overlaidPlan.tagline,
+          overview: planOverride.description ?? overlaidPlan.overview,
+        };
+      }
+
+      const moduleTitleOverrides = new Map<string, string>();
+      const lessonTitleOverrides = new Map<string, string>();
+      for (const row of (planTrans ?? []) as Record<string, unknown>[]) {
+        if (!row.title) continue;
+        if (row.content_type === "plan_module") moduleTitleOverrides.set(row.content_id as string, row.title as string);
+        if (row.content_type === "plan_lesson") lessonTitleOverrides.set(row.content_id as string, row.title as string);
+      }
+      for (const m of modulesRaw) m.module_title = moduleTitleOverrides.get(m.id) ?? m.module_title;
+      for (const l of lessonsRaw) l.title = lessonTitleOverrides.get(l.id) ?? l.title;
+    }
+
+    setPlan(overlaidPlan);
     setTeachers((teachersData ?? []) as Teacher[]);
-    setModules((modulesData ?? []) as Module[]);
+    setModules(modulesRaw);
     setDqs((dqData ?? []) as DQ[]);
 
-    let rawLessons = ((lessonsData ?? []) as Omit<Lesson, "completed" | "evaluationStatus">[]);
-
-    if (profile?.id && rawLessons.length > 0) {
-      const lessonIds = rawLessons.map(l => l.id);
+    if (profile?.id && lessonsRaw.length > 0) {
+      const lessonIds = lessonsRaw.map(l => l.id);
       const [{ data: progressData }, { data: evalData }] = await Promise.all([
         supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", profile.id).in("lesson_id", lessonIds),
         supabase.from("p2p_plan_lesson_evaluations").select("lesson_id,status").eq("submitter_id", profile.id).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
@@ -89,13 +127,13 @@ export default function PlanDetailScreen() {
         const st = e.status as "pending" | "needs_revision";
         if (st === "needs_revision" || !evalMap.has(e.lesson_id)) evalMap.set(e.lesson_id, st);
       }
-      setLessons(rawLessons.map(l => ({
+      setLessons(lessonsRaw.map(l => ({
         ...l,
         completed: completedSet.has(l.id),
         evaluationStatus: completedSet.has(l.id) ? undefined : evalMap.get(l.id),
       })));
     } else {
-      setLessons(rawLessons.map(l => ({ ...l, completed: false })));
+      setLessons(lessonsRaw.map(l => ({ ...l, completed: false })));
     }
 
     if (outlineData) {
@@ -109,7 +147,9 @@ export default function PlanDetailScreen() {
     setLoading(false);
   }, [id, profile?.id]);
 
-  useEffect(() => { loadPlan(); }, [loadPlan]);
+  // Refetch on every focus, not just mount — returning from a lesson screen
+  // after submitting must show the new pending/unlock state immediately.
+  useFocusEffect(useCallback(() => { loadPlan(); }, [loadPlan]));
 
   if (loading) {
     return (
@@ -128,15 +168,20 @@ export default function PlanDetailScreen() {
   }
 
   const totalLessons = lessons.length;
-  // Count submitted (pending review) lessons toward progress — no waiting on peer approval.
-  const completedCount = lessons.filter(l => l.completed || l.evaluationStatus === "pending").length;
+  const completedCount = lessons.filter(l => l.completed).length;
   const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
-  const renderLessons = (lessonList: Lesson[]) => {
+  const renderLessons = (lessonList: Lesson[], moduleLocked: boolean) => {
     let prevPassedForUnlock = true;
+    let allPrevCompleted = true;
     return lessonList.map((lesson, i) => {
+      // Same convention as core curriculum: only a lesson seeded with
+      // order_index >= 999 is a Discussion & Review lesson requiring full
+      // approval of everything before it. Position in the list is not a
+      // review marker — a normal last lesson unlocks on prior submission.
+      const isReviewLesson = (lesson.order_index ?? 0) >= 999;
       const passedForUnlock = lesson.completed || lesson.evaluationStatus === "pending";
-      const isLocked = i === 0 ? false : !prevPassedForUnlock;
+      const isLocked = moduleLocked || (i === 0 ? false : isReviewLesson ? !allPrevCompleted : !prevPassedForUnlock);
       const isPendingEval = !lesson.completed && lesson.evaluationStatus === "pending";
       const isNeedsRevision = !lesson.completed && lesson.evaluationStatus === "needs_revision";
       const dotColor = lesson.completed
@@ -145,6 +190,7 @@ export default function PlanDetailScreen() {
         : isNeedsRevision ? "#C0392B"
         : colors.amber;
       prevPassedForUnlock = passedForUnlock;
+      allPrevCompleted = allPrevCompleted && lesson.completed;
       return (
         <TouchableOpacity
           key={lesson.id}
@@ -256,17 +302,30 @@ export default function PlanDetailScreen() {
         <View style={styles.lessonsBlock}>
           <Text style={styles.sectionHeading}>Lessons</Text>
           {plan.has_submodules && modules.length > 0 ? (
-            modules.map(m => {
-              const modLessons = lessons.filter(l => l.module_id === m.id);
-              return (
-                <View key={m.id} style={styles.moduleBlock}>
-                  <Text style={styles.moduleName}>Module {m.module_number}: {m.module_title}</Text>
-                  {renderLessons(modLessons)}
-                </View>
-              );
-            })
+            (() => {
+              // A module unlocks only once the ENTIRE previous module is
+              // complete — same rule as core curriculum's loadCurriculum().
+              // previousModuleComplete carries across the .map() so a
+              // module's first lesson doesn't default-unlock in isolation.
+              let previousModuleComplete = true;
+              return modules.map(m => {
+                const modLessons = lessons.filter(l => l.module_id === m.id);
+                const moduleLocked = !previousModuleComplete;
+                const moduleComplete = modLessons.length > 0 && modLessons.every(l => l.completed);
+                previousModuleComplete = moduleComplete;
+                return (
+                  <View key={m.id} style={styles.moduleBlock}>
+                    <View style={styles.moduleNameRow}>
+                      <Text style={styles.moduleName}>Module {m.module_number}: {m.module_title}</Text>
+                      {moduleLocked && <Ionicons name="lock-closed" size={14} color={colors.textMuted} />}
+                    </View>
+                    {renderLessons(modLessons, moduleLocked)}
+                  </View>
+                );
+              });
+            })()
           ) : (
-            renderLessons(lessons.filter(l => !l.module_id || !plan.has_submodules))
+            renderLessons(lessons.filter(l => !l.module_id || !plan.has_submodules), false)
           )}
         </View>
 
@@ -344,7 +403,8 @@ function makeStyles(c: AppColors) {
 
     lessonsBlock: { marginTop: 24 },
     moduleBlock: { marginBottom: 20 },
-    moduleName: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+    moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
+    moduleName: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
 
     lessonRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 8 },
     lessonRowDone: { borderColor: "rgba(29,158,117,0.25)", backgroundColor: "rgba(29,158,117,0.04)" },

@@ -394,14 +394,14 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const {
     lessons, markLessonComplete,
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
     getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
     getHighlightsForLesson, addSectionHighlight, deleteHighlight,
-    contentLanguage,
   } = useData();
+  const contentLanguage = authProfile?.contentLanguage ?? "en";
 
   const [content, setContent] = useState<LessonContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -518,7 +518,7 @@ export default function LessonScreen() {
             supabase.from("p2p_reflection_questions").select("id,question,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
           ]);
         if (!cancelled) {
-          const mod = lesson?.p2p_modules as Record<string, unknown> | null;
+          const mod = lesson?.p2p_modules as unknown as Record<string, unknown> | null;
           const attribution = (mod?.attribution_text as string) ?? undefined;
           setContent({
             title: (lesson?.title as string) ?? lessonMeta?.title ?? "Lesson",

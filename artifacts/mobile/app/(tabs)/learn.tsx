@@ -43,8 +43,10 @@ function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean })
 function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const submitted = module.submittedLessons ?? module.completedLessons;
   const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
-  const isStarted = module.completedLessons > 0;
+  const submittedPct = module.lessonCount > 0 ? (submitted / module.lessonCount) * 100 : 0;
+  const isStarted = submitted > 0;
   const isComplete = pct === 100;
   const isLocked = module.isLocked;
 
@@ -67,14 +69,23 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
         <Text style={[styles.moduleTitle, { color: colors.textDark }, isLocked && { color: colors.textMuted }]}>{module.title}</Text>
         <Text style={[styles.moduleDesc, { color: colors.textMuted }]}>{module.description}</Text>
         {!isLocked && (
-          <View style={styles.progressRow}>
-            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
-              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: colors.progressFill }]} />
+          <>
+            <View style={styles.progressRow}>
+              {/* Two-layer bar: amber = submitted, green overlay = approved */}
+              <View style={[styles.progressBg, { backgroundColor: colors.progressTrack, position: "relative", overflow: "hidden" }]}>
+                <View style={[styles.progressFill, { position: "absolute", left: 0, top: 0, width: `${submittedPct}%` as any, backgroundColor: colors.amber, opacity: 0.55 }]} />
+                <View style={[styles.progressFill, { position: "absolute", left: 0, top: 0, width: `${pct}%` as any, backgroundColor: colors.progressFill }]} />
+              </View>
+              <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                {submitted}/{module.lessonCount}
+              </Text>
             </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              {module.completedLessons}/{module.lessonCount}
-            </Text>
-          </View>
+            {submitted > module.completedLessons && (
+              <Text style={[styles.progressSubText, { color: colors.textMuted }]}>
+                {module.completedLessons} approved · {submitted - module.completedLessons} awaiting review
+              </Text>
+            )}
+          </>
         )}
       </View>
       <View style={styles.cardRight}>
@@ -131,6 +142,7 @@ function PlanThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
 function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { t } = useTranslation();
   const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
   const isComplete = pct === 100;
   const isLocked = plan.isLocked;
@@ -225,7 +237,12 @@ function makeStyles(c: AppColors) {
       borderBottomColor: c.borderBeige,
     },
     headerTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    headerSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular", marginBottom: 16 },
+    sectionSubtitleBlock: { marginTop: 4, marginBottom: 16 },
+    sectionSubtitleText: { fontSize: 13, color: c.textMuted, lineHeight: 20, fontFamily: "Inter_400Regular" },
+    sectionSubtitleQuote: {
+      fontSize: 13, color: c.textMid, lineHeight: 20, fontFamily: "Inter_400Regular",
+      fontStyle: "italic", marginTop: 10,
+    },
     segmentRow: {
       flexDirection: "row", backgroundColor: c.card, borderRadius: 12,
       borderWidth: 1, borderColor: c.borderBeige, padding: 4, marginBottom: 16,
@@ -257,6 +274,7 @@ function makeStyles(c: AppColors) {
     overallLeft: {},
     overallLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
     overallPct: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
+    overallApproved: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", marginTop: 2 },
     overallCircle: {
       width: 52, height: 52, borderRadius: 26,
       backgroundColor: "rgba(29,158,117,0.12)",
@@ -265,8 +283,9 @@ function makeStyles(c: AppColors) {
     },
     overallCircleText: { fontSize: 16, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     overallCircleSub: { fontSize: 9, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    overallBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3 },
-    overallBarFill: { height: 6, backgroundColor: c.progressFill, borderRadius: 3 },
+    overallBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3, position: "relative", overflow: "hidden" },
+    overallBarSubmitted: { position: "absolute", left: 0, top: 0, height: 6, backgroundColor: c.amber, borderRadius: 3, opacity: 0.55 },
+    overallBarFill: { position: "absolute", left: 0, top: 0, height: 6, backgroundColor: c.progressFill, borderRadius: 3 },
     loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
     list: { paddingHorizontal: 20, paddingTop: 16 },
     milestoneRow: { alignItems: "flex-start", paddingLeft: 26 },
@@ -301,6 +320,7 @@ function makeStyles(c: AppColors) {
     progressBg: { flex: 1, height: 4, borderRadius: 2 },
     progressFill: { height: 4, borderRadius: 2 },
     progressText: { fontSize: 11, fontFamily: "Inter_400Regular", minWidth: 28 },
+    progressSubText: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 3 },
     cardRight: {},
   });
 }
@@ -319,14 +339,26 @@ export default function LearnTab() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
   const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
+  const submittedLessons = modules.reduce((a, m) => a + (m.submittedLessons ?? m.completedLessons), 0);
   const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  const submittedPct = totalLessons > 0 ? Math.round((submittedLessons / totalLessons) * 100) : 0;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.headerTitle}>{t("learn.title")}</Text>
-        <Text style={styles.headerSub}>{t("learn.subtitle")}</Text>
+        {section === "curriculum" ? (
+          <View style={styles.sectionSubtitleBlock}>
+            <Text style={styles.sectionSubtitleText}>{t("learn.coreCurriculumSubtitle")}</Text>
+            <Text style={styles.sectionSubtitleQuote}>{t("learn.coreCurriculumSubtitleQuote")}</Text>
+          </View>
+        ) : (
+          <View style={styles.sectionSubtitleBlock}>
+            <Text style={styles.sectionSubtitleText}>{t("learn.plansSubtitle")}</Text>
+            <Text style={styles.sectionSubtitleQuote}>{t("learn.plansSubtitleQuote")}</Text>
+          </View>
+        )}
 
         <View style={styles.segmentRow}>
           <TouchableOpacity
@@ -348,14 +380,22 @@ export default function LearnTab() {
             <View style={styles.overallProgress}>
               <View style={styles.overallLeft}>
                 <Text style={styles.overallLabel}>{t("learn.overallProgress")}</Text>
-                <Text style={styles.overallPct}>{t("learn.pctComplete", { pct: overallPct })}</Text>
+                <Text style={styles.overallPct}>
+                  {t("learn.lessonsSubmitted", { submitted: submittedLessons, total: totalLessons })}
+                </Text>
+                <Text style={styles.overallApproved}>
+                  {t("learn.lessonsApproved", { approved: completedLessons, total: totalLessons })}
+                </Text>
               </View>
               <View style={styles.overallCircle}>
-                <Text style={styles.overallCircleText}>{completedLessons}</Text>
-                <Text style={styles.overallCircleSub}>{t("learn.lessons")}</Text>
+                <Text style={styles.overallCircleText}>{submittedLessons}</Text>
+                <Text style={styles.overallCircleSub}>{t("learn.submitted")}</Text>
               </View>
             </View>
+            {/* Two-layer bar: amber = submitted, green overlay = approved.
+                Growth credit still only counts approved. */}
             <View style={styles.overallBarBg}>
+              <View style={[styles.overallBarSubmitted, { width: `${submittedPct}%` as any }]} />
               <View style={[styles.overallBarFill, { width: `${overallPct}%` as any }]} />
             </View>
           </>

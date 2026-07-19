@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -13,16 +14,53 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useData, PendingEvaluation, MySubmission } from "@/contexts/DataContext";
+import { useData, PendingEvaluation, MySubmission, SubmitterEvaluationContext } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import MediaPlayer from "@/components/MediaPlayer";
 import colors from "@/constants/colors";
 
+// Compact context card for the reviewer — just enough to evaluate the
+// submission fairly (who they are, how far along they are, momentum).
+// Deliberately excludes registration/spiritual-background intake, other
+// reflections/submissions, help-request history, and any other private
+// profile field — same restraint as moderator access (getAllProfiles()).
+function SubmitterContextCard({ context }: { context: SubmitterEvaluationContext }) {
+  return (
+    <View style={styles.submitterContextCard}>
+      {context.photoUrl ? (
+        <Image source={{ uri: context.photoUrl }} style={styles.contextAvatar} />
+      ) : (
+        <View style={[styles.contextAvatar, styles.contextAvatarFallback]}>
+          <Ionicons name="person" size={18} color={colors.accentGreen} />
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.contextName}>{context.fullName}</Text>
+        <View style={styles.contextMetaRow}>
+          <Text style={styles.contextMeta}>{context.growthStageEmoji} {context.growthStageName}</Text>
+          <Text style={styles.contextMetaDot}>·</Text>
+          <Text style={styles.contextMeta}>🔥 {context.streakDays}d streak</Text>
+        </View>
+        {context.contextLabel ? <Text style={styles.contextLabel}>{context.contextLabel}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
 function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
-  const { resolveEvaluation } = useData();
+  const { resolveEvaluation, getSubmitterEvaluationContext } = useData();
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState<"approved" | "needs_revision" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitterContext, setSubmitterContext] = useState<SubmitterEvaluationContext | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSubmitterEvaluationContext(evaluation.id, evaluation.source).then((ctx) => {
+      if (!cancelled) setSubmitterContext(ctx);
+    });
+    return () => { cancelled = true; };
+  }, [evaluation.id, evaluation.source, getSubmitterEvaluationContext]);
 
   async function handleResolve(status: "approved" | "needs_revision") {
     if (submitting) return;
@@ -37,6 +75,7 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
 
   return (
     <View style={styles.card}>
+      {submitterContext && <SubmitterContextCard context={submitterContext} />}
       <View style={styles.cardHeader}>
         <View style={styles.avatarCircle}>
           <Ionicons name="person" size={16} color={colors.accentGreen} />
@@ -198,12 +237,16 @@ function MySubmissionCard({ submission }: { submission: MySubmission }) {
   );
 }
 
+function isSubmissionApproved(sub: MySubmission): boolean {
+  return sub.selfApproved || sub.evaluationStatus === "approved";
+}
+
 export default function EvaluationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const { pendingEvaluations, getMySubmissions } = useData();
-  const [tab, setTab] = useState<"toReview" | "mySubmissions">("toReview");
+  const [tab, setTab] = useState<"toReview" | "submitted" | "approved">("toReview");
   const [mySubmissions, setMySubmissions] = useState<MySubmission[]>([]);
   const [loadingMine, setLoadingMine] = useState(false);
 
@@ -214,12 +257,15 @@ export default function EvaluationsScreen() {
   }, [getMySubmissions]);
 
   useEffect(() => {
-    if (tab === "mySubmissions") loadMySubmissions();
+    if (tab !== "toReview") loadMySubmissions();
   }, [tab, loadMySubmissions]);
 
-  // Live-update "My Submissions" the moment an evaluator resolves one — core
-  // curriculum or Plans — so the learner sees Approved/Needs revision without
-  // pulling to refresh.
+  const submittedSubmissions = mySubmissions.filter((s) => !isSubmissionApproved(s));
+  const approvedSubmissions = mySubmissions.filter(isSubmissionApproved);
+
+  // Live-update "Submitted"/"Recently Approved" the moment an evaluator
+  // resolves one — core curriculum or Plans — so the learner sees
+  // Approved/Needs revision without pulling to refresh.
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -227,12 +273,12 @@ export default function EvaluationsScreen() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
-        () => { if (tab === "mySubmissions") loadMySubmissions(); }
+        () => { if (tab !== "toReview") loadMySubmissions(); }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
-        () => { if (tab === "mySubmissions") loadMySubmissions(); }
+        () => { if (tab !== "toReview") loadMySubmissions(); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -253,15 +299,25 @@ export default function EvaluationsScreen() {
           style={[styles.tabBtn, tab === "toReview" && styles.tabBtnActive]}
           onPress={() => setTab("toReview")}
         >
-          <Text style={[styles.tabBtnText, tab === "toReview" && styles.tabBtnTextActive]}>
+          <Text style={[styles.tabBtnText, tab === "toReview" && styles.tabBtnTextActive]} numberOfLines={2}>
             To Review{pendingEvaluations.length > 0 ? ` (${pendingEvaluations.length})` : ""}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabBtn, tab === "mySubmissions" && styles.tabBtnActive]}
-          onPress={() => setTab("mySubmissions")}
+          style={[styles.tabBtn, tab === "submitted" && styles.tabBtnActive]}
+          onPress={() => setTab("submitted")}
         >
-          <Text style={[styles.tabBtnText, tab === "mySubmissions" && styles.tabBtnTextActive]}>My Submissions</Text>
+          <Text style={[styles.tabBtnText, tab === "submitted" && styles.tabBtnTextActive]} numberOfLines={2}>
+            Submitted — Awaiting Approval{submittedSubmissions.length > 0 ? ` (${submittedSubmissions.length})` : ""}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === "approved" && styles.tabBtnActive]}
+          onPress={() => setTab("approved")}
+        >
+          <Text style={[styles.tabBtnText, tab === "approved" && styles.tabBtnTextActive]} numberOfLines={2}>
+            Recently Approved
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -283,15 +339,31 @@ export default function EvaluationsScreen() {
         )
       ) : loadingMine ? (
         <View style={styles.emptyState}><ActivityIndicator color={colors.accentGreen} /></View>
-      ) : mySubmissions.length === 0 ? (
+      ) : tab === "submitted" ? (
+        submittedSubmissions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-text-outline" size={48} color={colors.borderBeige} />
+            <Text style={styles.emptyTitle}>Nothing awaiting approval</Text>
+            <Text style={styles.emptySub}>Assignment responses you submit will show up here until a peer evaluator resolves them.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={submittedSubmissions}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <MySubmissionCard submission={item} />}
+            contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 14 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      ) : approvedSubmissions.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="document-text-outline" size={48} color={colors.borderBeige} />
-          <Text style={styles.emptyTitle}>No submissions yet</Text>
-          <Text style={styles.emptySub}>Assignment responses you submit will show up here with their review status.</Text>
+          <Ionicons name="checkmark-done-circle" size={48} color={colors.borderBeige} />
+          <Text style={styles.emptyTitle}>No approved submissions yet</Text>
+          <Text style={styles.emptySub}>Submissions a peer evaluator approves will show up here.</Text>
         </View>
       ) : (
         <FlatList
-          data={mySubmissions}
+          data={approvedSubmissions}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <MySubmissionCard submission={item} />}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 14 }}
@@ -312,19 +384,31 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   tabRow: {
-    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+    flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
   },
   tabBtn: {
-    flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10,
+    flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 9, paddingHorizontal: 4, borderRadius: 10, minHeight: 44,
     backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige,
   },
   tabBtnActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
-  tabBtnText: { fontSize: 13, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
+  tabBtnText: { fontSize: 11, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   tabBtnTextActive: { color: colors.cream },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
   emptySub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", lineHeight: 20 },
   card: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 16 },
+  submitterContextCard: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: colors.cardBeige, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige,
+    padding: 10, marginBottom: 12,
+  },
+  contextAvatar: { width: 40, height: 40, borderRadius: 20 },
+  contextAvatarFallback: { backgroundColor: "rgba(29,158,117,0.12)", alignItems: "center", justifyContent: "center" },
+  contextName: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  contextMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  contextMeta: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular" },
+  contextMetaDot: { fontSize: 12, color: colors.textMuted },
+  contextLabel: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
   avatarCircle: {
     width: 36, height: 36, borderRadius: 18,

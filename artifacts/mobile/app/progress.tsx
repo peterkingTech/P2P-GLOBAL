@@ -12,7 +12,8 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { useData, MySubmission } from "@/contexts/DataContext";
+import { useData, Plan, PlanV2 } from "@/contexts/DataContext";
+import { supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
@@ -31,47 +32,12 @@ function makeStyles(c: AppColors) {
 
     sectionHeader: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 10, marginTop: 24 },
 
-    card: {
-      backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
-      padding: 14, marginBottom: 10,
-      flexDirection: "row", alignItems: "center", gap: 12,
-    },
-    cardUrgent: { borderColor: "#C0392B", backgroundColor: "rgba(192,57,43,0.04)" },
-    cardPending: { borderColor: "rgba(217,164,65,0.4)", backgroundColor: "rgba(217,164,65,0.05)" },
-    cardApproved: { borderColor: "rgba(29,158,117,0.3)", backgroundColor: "rgba(29,158,117,0.04)" },
-
-    iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    iconBoxUrgent: { backgroundColor: "rgba(192,57,43,0.12)" },
-    iconBoxPending: { backgroundColor: "rgba(217,164,65,0.12)" },
-    iconBoxApproved: { backgroundColor: "rgba(29,158,117,0.12)" },
-    iconBoxBlue: { backgroundColor: "rgba(52,152,219,0.12)" },
-
-    cardTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    cardSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-    cardFeedback: {
-      fontSize: 12, color: "#C0392B", fontFamily: "Inter_400Regular",
-      marginTop: 6, fontStyle: "italic",
-    },
-
-    badge: {
-      backgroundColor: "#C0392B", borderRadius: 10, minWidth: 22, height: 22,
-      paddingHorizontal: 6, alignItems: "center", justifyContent: "center",
-    },
-    badgeAmber: { backgroundColor: c.amber },
-    badgeGreen: { backgroundColor: c.accentGreen },
-    badgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
-    reviewCard: {
-      backgroundColor: "rgba(224,164,65,0.1)", borderRadius: 14,
-      borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
-      padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10,
-    },
-
     planCard: {
       backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
       padding: 14, marginBottom: 10,
     },
     planTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    planCurrent: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", marginTop: 4 },
     planBar: { height: 4, backgroundColor: c.progressTrack, borderRadius: 2, marginTop: 8 },
     planBarFill: { height: 4, backgroundColor: c.accentGreen, borderRadius: 2 },
     planProgress: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
@@ -81,41 +47,100 @@ function makeStyles(c: AppColors) {
   });
 }
 
-function sourceLabel(s: MySubmission["source"]): string {
-  return s === "plan" ? "Plan" : "Core Curriculum";
+// ── Legacy (type='plan' curriculum) in-progress card — resolves current
+// module + lesson name from the already-loaded modules array (no extra fetch). ──
+function LegacyPlanCard({ plan, styles, router }: { plan: Plan; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
+  const currentModule = plan.modules.find(m => !m.isLocked && m.completedLessons < m.lessonCount) ?? plan.modules[0];
+  const pct = plan.lessonCount > 0 ? Math.round((plan.completedLessons / plan.lessonCount) * 100) : 0;
+  return (
+    <TouchableOpacity
+      style={styles.planCard}
+      onPress={() => router.push(`/module/${plan.singleModuleId ?? plan.id}` as any)}
+      activeOpacity={0.82}
+    >
+      <Text style={styles.planTitle}>{plan.title}</Text>
+      {currentModule && (
+        <Text style={styles.planCurrent}>
+          Current: {currentModule.title} ({currentModule.completedLessons}/{currentModule.lessonCount} lessons)
+        </Text>
+      )}
+      <View style={styles.planBar}>
+        <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
+      </View>
+      <Text style={styles.planProgress}>{plan.completedLessons}/{plan.lessonCount} lessons approved · {pct}%</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── p2p_plans-based (plansV2) in-progress card — plansV2 only carries
+// plan-level counts, so this resolves the current module/lesson name with a
+// small local fetch, the same pattern app/plan/[id].tsx already uses. ──
+function PlanV2Card({ plan, userId, styles, router }: { plan: PlanV2; userId: string; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
+  const [current, setCurrent] = useState<{ moduleTitle: string; lessonTitle: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [{ data: lessons }, { data: modules }, { data: progress }] = await Promise.all([
+        supabase.from("p2p_plan_lessons").select("id,module_id,title,order_index").eq("plan_id", plan.id).order("order_index"),
+        supabase.from("p2p_plan_modules").select("id,module_title,order_index").eq("plan_id", plan.id).order("order_index"),
+        supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", userId),
+      ]);
+      if (cancelled) return;
+      const completedSet = new Set((progress ?? []).filter((p: any) => p.completed).map((p: any) => p.lesson_id));
+      const nextLesson = (lessons ?? []).find((l: any) => !completedSet.has(l.id));
+      if (nextLesson) {
+        const mod = (modules ?? []).find((m: any) => m.id === nextLesson.module_id);
+        setCurrent({ moduleTitle: mod?.module_title ?? "", lessonTitle: nextLesson.title });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [plan.id, userId]);
+
+  const pct = plan.lessonCount > 0 ? Math.round((plan.completedLessons / plan.lessonCount) * 100) : 0;
+  return (
+    <TouchableOpacity
+      style={styles.planCard}
+      onPress={() => router.push(`/plan/${plan.id}` as any)}
+      activeOpacity={0.82}
+    >
+      <Text style={styles.planTitle}>{plan.title}</Text>
+      {current && (
+        <Text style={styles.planCurrent}>
+          {current.moduleTitle ? `${current.moduleTitle} — ` : ""}{current.lessonTitle}
+        </Text>
+      )}
+      <View style={styles.planBar}>
+        <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
+      </View>
+      <Text style={styles.planProgress}>{plan.completedLessons}/{plan.lessonCount} lessons approved · {pct}%</Text>
+    </TouchableOpacity>
+  );
 }
 
 export default function ProgressDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { getMySubmissions, pendingEvaluations, plans, plansV2 } = useData();
+  const { modules, lessons, plans, plansV2 } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
-  const [submissions, setSubmissions] = useState<MySubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const subs = await getMySubmissions();
-      setSubmissions(subs);
-    } finally {
-      setLoading(false);
-    }
-  }, [getMySubmissions]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const needsRevision = submissions.filter(s => s.evaluationStatus === "needs_revision");
-  const pending = submissions.filter(s => s.evaluationStatus === "pending");
-  const approved = submissions.filter(s => s.evaluationStatus === "approved" || s.selfApproved).slice(0, 10);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const onRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   const plansInProgress = plans.filter(p => p.completedLessons > 0 && p.completedLessons < p.lessonCount);
   const plansV2InProgress = plansV2.filter(p => p.completedLessons > 0 && p.completedLessons < p.lessonCount);
 
-  const totalActionNeeded = needsRevision.length + pendingEvaluations.length;
+  // Core curriculum: the first lesson that's neither completed nor locked is
+  // "current" — everything before it is done, this is what the user should
+  // work on next.
+  const currentCoreLesson = lessons.find(l => !l.isCompleted && !l.isLocked);
+  const currentCoreModule = currentCoreLesson ? modules.find(m => m.id === currentCoreLesson.moduleId) : null;
+  const coreCompletedLessons = lessons.filter(l => l.isCompleted).length;
+  const coreHasStarted = coreCompletedLessons > 0 || Boolean(currentCoreLesson);
+
+  const nothingToShow = plansInProgress.length === 0 && plansV2InProgress.length === 0 && !currentCoreModule;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -125,114 +150,29 @@ export default function ProgressDashboard() {
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Progress</Text>
-        {totalActionNeeded > 0 && (
-          <View style={[styles.badge, { marginLeft: "auto" }]}>
-            <Text style={styles.badgeText}>{totalActionNeeded}</Text>
-          </View>
-        )}
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accentGreen} />}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={colors.accentGreen} />}
       >
-        {/* ── Needs Revision (action needed) ── */}
-        {needsRevision.length > 0 && (
+        {/* ── Core Curriculum In Progress ── */}
+        {currentCoreModule && currentCoreLesson && (
           <>
-            <Text style={styles.sectionHeader}>⚠ Needs Revision</Text>
-            {needsRevision.map(s => (
-              <TouchableOpacity
-                key={s.id}
-                style={[styles.card, styles.cardUrgent]}
-                onPress={() => router.push((s.source === "plan" ? `/plan/lesson/${s.lessonId}` : `/lesson/${s.lessonId}`) as any)}
-                activeOpacity={0.82}
-              >
-                <View style={[styles.iconBox, styles.iconBoxUrgent]}>
-                  <Ionicons name="alert-circle" size={18} color="#C0392B" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{s.lessonTitle}</Text>
-                  <Text style={styles.cardSub}>{sourceLabel(s.source)} · Tap to revise and resubmit</Text>
-                  {s.feedback ? <Text style={styles.cardFeedback}>"{s.feedback}"</Text> : null}
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#C0392B" />
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-
-        {/* ── To Review (evaluations assigned to me) ── */}
-        {pendingEvaluations.length > 0 && (
-          <>
-            <Text style={styles.sectionHeader}>To Review — Assigned to You</Text>
+            <Text style={styles.sectionHeader}>Core Curriculum In Progress</Text>
             <TouchableOpacity
-              style={styles.reviewCard}
-              onPress={() => router.push("/evaluations" as any)}
-              activeOpacity={0.85}
+              style={styles.planCard}
+              onPress={() => router.push(`/module/${currentCoreModule.id}` as any)}
+              activeOpacity={0.82}
             >
-              <View style={{ position: "relative" }}>
-                <Ionicons name="people-circle" size={28} color={colors.upperRoomAmber} />
-                <View style={[styles.badge, { position: "absolute", top: -6, right: -8 }]}>
-                  <Text style={styles.badgeText}>{pendingEvaluations.length}</Text>
-                </View>
+              <Text style={styles.planTitle}>{currentCoreModule.title}</Text>
+              <Text style={styles.planCurrent}>Current lesson: {currentCoreLesson.title}</Text>
+              <View style={styles.planBar}>
+                <View style={[styles.planBarFill, { width: `${lessons.length > 0 ? Math.round((coreCompletedLessons / lessons.length) * 100) : 0}%` as any }]} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.textDark }]}>
-                  {pendingEvaluations.length} peer submission{pendingEvaluations.length === 1 ? "" : "s"} waiting for your review
-                </Text>
-                <Text style={styles.cardSub}>Tap to open the Peer Review screen</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.amber} />
+              <Text style={styles.planProgress}>{coreCompletedLessons}/{lessons.length} lessons approved</Text>
             </TouchableOpacity>
-          </>
-        )}
-
-        {/* ── Submitted / Awaiting Peer Review ── */}
-        <Text style={styles.sectionHeader}>Submitted — Awaiting Peer Review</Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 12 }} />
-        ) : pending.length === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons name="checkmark-done-circle-outline" size={32} color={colors.textMuted} />
-            <Text style={styles.emptyText}>No submissions currently awaiting peer review</Text>
-          </View>
-        ) : pending.map(s => (
-          <TouchableOpacity
-            key={s.id}
-            style={[styles.card, styles.cardPending]}
-            onPress={() => router.push((s.source === "plan" ? `/plan/lesson/${s.lessonId}` : `/lesson/${s.lessonId}`) as any)}
-            activeOpacity={0.82}
-          >
-            <View style={[styles.iconBox, styles.iconBoxPending]}>
-              <Ionicons name="time-outline" size={18} color={colors.amber} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>{s.lessonTitle}</Text>
-              <Text style={styles.cardSub}>{sourceLabel(s.source)} · Pending peer review</Text>
-            </View>
-            <Ionicons name="hourglass-outline" size={16} color={colors.amber} />
-          </TouchableOpacity>
-        ))}
-
-        {/* ── Recent Approvals ── */}
-        {approved.length > 0 && (
-          <>
-            <Text style={styles.sectionHeader}>Recently Approved</Text>
-            {approved.map(s => (
-              <View key={s.id} style={[styles.card, styles.cardApproved]}>
-                <View style={[styles.iconBox, styles.iconBoxApproved]}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{s.lessonTitle}</Text>
-                  <Text style={styles.cardSub}>
-                    {sourceLabel(s.source)}
-                    {s.selfApproved ? " · Approved (first through this lesson)" : " · Approved ✓"}
-                  </Text>
-                </View>
-              </View>
-            ))}
           </>
         )}
 
@@ -240,48 +180,24 @@ export default function ProgressDashboard() {
         {(plansInProgress.length > 0 || plansV2InProgress.length > 0) && (
           <>
             <Text style={styles.sectionHeader}>Plans In Progress</Text>
-            {plansInProgress.map(p => {
-              const pct = p.lessonCount > 0 ? Math.round((p.completedLessons / p.lessonCount) * 100) : 0;
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={styles.planCard}
-                  onPress={() => router.push(`/module/${p.singleModuleId ?? p.id}` as any)}
-                  activeOpacity={0.82}
-                >
-                  <Text style={styles.planTitle}>{p.title}</Text>
-                  <View style={styles.planBar}>
-                    <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
-                  </View>
-                  <Text style={styles.planProgress}>{p.completedLessons}/{p.lessonCount} lessons approved · {pct}%</Text>
-                </TouchableOpacity>
-              );
-            })}
-            {plansV2InProgress.map(p => {
-              const pct = p.lessonCount > 0 ? Math.round((p.completedLessons / p.lessonCount) * 100) : 0;
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={styles.planCard}
-                  onPress={() => router.push(`/plan/${p.id}` as any)}
-                  activeOpacity={0.82}
-                >
-                  <Text style={styles.planTitle}>{p.title}</Text>
-                  <View style={styles.planBar}>
-                    <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
-                  </View>
-                  <Text style={styles.planProgress}>{p.completedLessons}/{p.lessonCount} lessons approved · {pct}%</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {plansInProgress.map(p => (
+              <LegacyPlanCard key={p.id} plan={p} styles={styles} router={router} />
+            ))}
+            {profile?.id && plansV2InProgress.map(p => (
+              <PlanV2Card key={p.id} plan={p} userId={profile.id} styles={styles} router={router} />
+            ))}
           </>
         )}
 
-        {/* Empty state when nothing is happening */}
-        {!loading && needsRevision.length === 0 && pending.length === 0 && approved.length === 0 && pendingEvaluations.length === 0 && plansInProgress.length === 0 && plansV2InProgress.length === 0 && (
+        {/* Empty state when nothing is in progress */}
+        {nothingToShow && (
           <View style={[styles.empty, { marginTop: 40 }]}>
             <Ionicons name="leaf-outline" size={48} color={colors.textMuted} />
-            <Text style={styles.emptyText}>Nothing to show yet.{"\n"}Start a lesson to track your progress here.</Text>
+            <Text style={styles.emptyText}>
+              {coreHasStarted
+                ? "Nothing in progress right now.\nStart a plan or continue your curriculum to track it here."
+                : "Nothing to show yet.\nStart a lesson to track your progress here."}
+            </Text>
           </View>
         )}
       </ScrollView>

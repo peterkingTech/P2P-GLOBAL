@@ -22,8 +22,12 @@ const ANON_KEY =
   process.env.SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ta3FrYXNuaWFrY25tZmN3cnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4ODM5MzYsImV4cCI6MjA5ODQ1OTkzNn0.093jpH0sX9gAcCBirXunIL0i1qNm6jzIZm8JqwVnIxM";
 
+// Same fix as lib/translationEngine.ts — supabaseRead must bypass RLS to
+// read curriculum/module/lesson rows; the bare anon key (no user session,
+// role `anon`) cannot satisfy p2p_curriculums' authenticated-only SELECT
+// policies, so every lookup failed regardless of status.
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
-const supabaseRead  = createClient(SUPABASE_URL, ANON_KEY);
+const supabaseRead  = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
 function ok(res: any, data: unknown) { return res.json(data); }
 function err(res: any, msg: string, status = 500) {

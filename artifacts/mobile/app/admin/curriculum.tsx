@@ -105,7 +105,7 @@ export default function CurriculumManagerScreen() {
   const [saving, setSaving] = useState(false);
 
   // Create-new modal
-  const [createModal, setCreateModal] = useState<null | "curriculum" | "module" | "lesson">(null);
+  const [createModal, setCreateModal] = useState<null | "curriculum" | "plan" | "module" | "lesson">(null);
   const [createParentId, setCreateParentId] = useState<string>("");
   const [createTitle, setCreateTitle] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
@@ -195,7 +195,7 @@ export default function CurriculumManagerScreen() {
 
   // ── Create ─────────────────────────────────────────────────────────────────
 
-  function openCreate(kind: "curriculum" | "module" | "lesson", parentId = "") {
+  function openCreate(kind: "curriculum" | "plan" | "module" | "lesson", parentId = "") {
     setCreateModal(kind);
     setCreateParentId(parentId);
     setCreateTitle("");
@@ -212,6 +212,15 @@ export default function CurriculumManagerScreen() {
       const { data, error: e } = await supabase
         .from("p2p_curriculums")
         .insert({ title: createTitle.trim(), status: "draft" })
+        .select().single();
+      error = e; if (data) newId = data.id;
+    } else if (createModal === "plan") {
+      // A plan is a p2p_curriculums row with type='plan' — same table as
+      // core curriculum, distinguished only by type. Drafts stay hidden
+      // from users (loadPlans filters status='published').
+      const { data, error: e } = await supabase
+        .from("p2p_curriculums")
+        .insert({ title: createTitle.trim(), status: "draft", type: "plan" })
         .select().single();
       error = e; if (data) newId = data.id;
     } else if (createModal === "module") {
@@ -239,7 +248,7 @@ export default function CurriculumManagerScreen() {
     await loadTree();
 
     // Auto-expand parent and select new item
-    if (createModal === "curriculum") {
+    if (createModal === "curriculum" || createModal === "plan") {
       setExpandedCurricula((p) => new Set([...p, newId]));
     } else if (createModal === "module") {
       setExpandedCurricula((p) => new Set([...p, createParentId]));
@@ -251,23 +260,43 @@ export default function CurriculumManagerScreen() {
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
+  // Alert.alert is a no-op on react-native-web, so the confirm dialog (and
+  // any error alert) must go through window.confirm/window.alert on web —
+  // otherwise the Delete button silently does nothing in the web admin.
+  function showAdminError(title: string, message: string) {
+    if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+    else Alert.alert(title, message);
+  }
+
   function confirmDelete(kind: string, id: string, table: string) {
-    Alert.alert(
-      `Delete ${kind}?`,
-      "This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await supabase.from(table).delete().eq("id", id);
-            setSelected(null);
-            loadTree();
-          },
-        },
-      ]
-    );
+    const doDelete = async () => {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) {
+        // Surface the real failure (e.g. FK 23503 when modules still
+        // reference a curriculum) instead of closing as if it worked.
+        showAdminError(
+          `Could not delete ${kind}`,
+          error.code === "23503"
+            ? `This ${kind} still has content inside it (${error.details ?? "referenced rows"}). Delete its contents first, then delete the ${kind}.`
+            : error.message
+        );
+        return;
+      }
+      setSelected(null);
+      loadTree();
+    };
+    if (Platform.OS === "web") {
+      if (window.confirm(`Delete ${kind}?\n\nThis cannot be undone.`)) doDelete();
+    } else {
+      Alert.alert(
+        `Delete ${kind}?`,
+        "This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: doDelete },
+        ]
+      );
+    }
   }
 
   // ── Reorder ────────────────────────────────────────────────────────────────
@@ -303,9 +332,10 @@ export default function CurriculumManagerScreen() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const PLANS_CURRICULUM_ID = "b0000000-0000-0000-0000-000000000001";
   const coreCurricula = curricula.filter((c) => (c as any).type !== "plan");
-  const planModules = modulesMap[PLANS_CURRICULUM_ID] ?? [];
+  // Every plan-type curriculum, not a single hardcoded ID — plans created
+  // outside this UI (e.g. Victory Over Lustful Thoughts) must appear too.
+  const planCurricula = curricula.filter((c) => (c as any).type === "plan");
 
   const treePanel = (
     <ScrollView style={styles.treePanel} contentContainerStyle={[styles.treePanelContent, { paddingBottom: insets.bottom + 20 }]}>
@@ -332,23 +362,39 @@ export default function CurriculumManagerScreen() {
         <View>
           <View style={styles.treePanelHeader}>
             <Text style={styles.treePanelTitle}>Study Plans</Text>
-            <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate("module", PLANS_CURRICULUM_ID)}>
+            <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate("plan")}>
               <Ionicons name="add" size={16} color={colors.accentGreen} />
               <Text style={styles.addBtnSmallText}>New Plan</Text>
             </TouchableOpacity>
           </View>
           {treeLoading ? (
             <ActivityIndicator style={{ marginTop: 24 }} color={colors.accentGreen} />
-          ) : planModules.length === 0 ? (
+          ) : planCurricula.length === 0 ? (
             <View style={styles.emptyTree}>
               <Ionicons name="radio-outline" size={32} color={colors.textMuted} />
               <Text style={styles.emptyTreeText}>No plans yet</Text>
-              <TouchableOpacity style={styles.emptyTreeBtn} onPress={() => openCreate("module", PLANS_CURRICULUM_ID)}>
+              <TouchableOpacity style={styles.emptyTreeBtn} onPress={() => openCreate("plan")}>
                 <Text style={styles.emptyTreeBtnText}>Create first plan</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            planModules.map((m) => {
+            planCurricula.map((pc) => {
+              const pcSel = selected?.kind === "curriculum" && selected.item.id === pc.id;
+              const pcModules = modulesMap[pc.id] ?? [];
+              return (
+              <View key={pc.id}>
+                <TouchableOpacity
+                  style={[styles.treeRow, pcSel && styles.treeRowSelected]}
+                  onPress={() => select({ kind: "curriculum", item: pc })}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="radio-outline" size={14} color={colors.primaryGreen} style={{ marginRight: 2 }} />
+                  <Text style={[styles.treeLabel, { flex: 1, fontWeight: "700" }, pcSel && styles.treeLabelSelected]} numberOfLines={1}>
+                    {pc.title}
+                  </Text>
+                  <StatusBadge status={pc.status} />
+                </TouchableOpacity>
+                {pcModules.map((m) => {
               const mExpanded = expandedModules.has(m.id);
               const planLessons = lessonsMap[m.id] ?? [];
               const mSel = selected?.kind === "module" && selected.item.id === m.id;
@@ -359,7 +405,7 @@ export default function CurriculumManagerScreen() {
                     onPress={() => select({ kind: "module", item: m })}
                     activeOpacity={0.75}
                   >
-                    <TouchableOpacity onPress={() => toggleModule(PLANS_CURRICULUM_ID, m.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <TouchableOpacity onPress={() => toggleModule(pc.id, m.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name={mExpanded ? "chevron-down" : "chevron-forward"} size={14} color={colors.textMuted} />
                     </TouchableOpacity>
                     <Ionicons name={((m as any).icon_name ?? "radio-outline") as any} size={14} color={colors.primaryGreen} style={{ marginRight: 2 }} />
@@ -408,6 +454,13 @@ export default function CurriculumManagerScreen() {
                     </View>
                   )}
                 </View>
+              );
+                })}
+                <TouchableOpacity style={[styles.addInTreeBtn, { marginLeft: 12 }]} onPress={() => openCreate("module", pc.id)}>
+                  <Ionicons name="add" size={12} color={colors.accentGreen} />
+                  <Text style={styles.addInTreeText}>Add module to this plan</Text>
+                </TouchableOpacity>
+              </View>
               );
             })
           )}
@@ -572,6 +625,7 @@ export default function CurriculumManagerScreen() {
       onLangChange={setSelectedLang}
       onSaved={(updated) => {
         // Optimistically update tree labels
+        if (!updated) return;
         if (updated.kind === "curriculum") {
           setCurricula((p) => p.map((c) => c.id === updated.item.id ? { ...c, ...updated.item } : c));
           setSelected(updated);
@@ -1080,9 +1134,9 @@ function LessonEditor({
       supabase.from("p2p_assignments").select("id,lesson_id,title,instructions,due_after_days").eq("lesson_id", lesson.id).order("id"),
     ]);
 
-    const canonSections = (sec ?? []) as Section[];
-    const canonScriptures = (scr ?? []) as Scripture[];
-    const canonQuestions = (qs ?? []) as Question[];
+    const canonSections = (sec ?? []) as unknown as Section[];
+    const canonScriptures = (scr ?? []) as unknown as Scripture[];
+    const canonQuestions = (qs ?? []) as unknown as Question[];
 
     if (isDefaultLang) {
       setSections(((sec ?? []) as any[]).map((s) => ({
@@ -1671,6 +1725,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, marginTop: 4,
   },
   addItemText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
+
+  addBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1, borderColor: colors.borderBeige,
+    paddingHorizontal: 14, marginTop: 4,
+  },
+  addBtnText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   removeBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
   removeBtnText: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium" },

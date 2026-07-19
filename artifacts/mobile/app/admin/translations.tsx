@@ -125,9 +125,21 @@ export default function TranslationsDashboard() {
       const text = await res.text();
       // Parse SSE response
       const lastDataLine = text.split("\n").filter(l => l.startsWith("data:")).pop();
-      const lastData = lastDataLine ? JSON.parse(lastDataLine.slice(5).trim()) : {};
+      // A response with no SSE data lines means the request never reached the
+      // translation API (e.g. the static web server or SPA fallback answered
+      // instead of the api-server — EXPO_PUBLIC_API_URL not configured).
+      // Without this check that garbage parsed to {} and displayed
+      // "Done: undefined translated, undefined skipped, undefined failed".
+      if (!lastDataLine) {
+        throw new Error(
+          `Translation API not reachable at ${apiUrl} (HTTP ${res.status}, ${res.headers.get("content-type") ?? "unknown type"}). ` +
+          `Check that the api-server is running and EXPO_PUBLIC_API_URL points at it (including its /api prefix).`
+        );
+      }
+      const lastData = JSON.parse(lastDataLine.slice(5).trim());
       if (lastData.error) throw new Error(lastData.error);
       const s = lastData.stats ?? lastData;
+      if (typeof s.done !== "number") throw new Error(`Unexpected API response: ${lastDataLine.slice(0, 200)}`);
       setBatchProgress(`Done: ${s.done} translated, ${s.skipped} skipped, ${s.failed} failed`);
       await load();
     } catch (e: any) {

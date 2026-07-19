@@ -292,7 +292,7 @@ export default function HomeTab() {
       <View style={styles.moreList}>
         {[
           { icon: "leaf", label: t("home.livingTree"), sub: t("home.livingTreeSub"), route: "/living-tree" },
-          { icon: "book", label: t("home.curriculum"), sub: t("home.curriculumSub"), route: "/curriculum" },
+          { icon: "people", label: t("home.peerReview"), sub: t("home.peerReviewSub"), route: "/evaluations" },
           { icon: "flower", label: t("home.fruitCollection"), sub: t("home.fruitCollectionSub"), route: "/fruit" },
           { icon: "stats-chart", label: t("home.myProgress"), sub: t("home.myProgressSub"), route: "/progress" },
           { icon: "person-circle", label: t("home.myProfile"), sub: t("home.myProfileSub"), route: "/profile" },

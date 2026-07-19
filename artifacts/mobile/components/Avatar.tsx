@@ -24,7 +24,7 @@ export function Avatar({ photoUrl, name, size = 40, style, borderWidth = 0 }: Av
     return (
       <Image
         source={{ uri: photoUrl }}
-        style={[styles.image, containerStyle, style]}
+        style={[styles.image, containerStyle as any, style]}
       />
     );
   }

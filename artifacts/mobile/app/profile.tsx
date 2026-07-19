@@ -54,7 +54,6 @@ const GIFT_LABELS: Record<string, string> = {
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
 
 const PROFILE_ROWS = [
-  { key: "messages", labelKey: "profile.messages", icon: "chatbubbles-outline" as const, route: "/messages" as const },
   { key: "peers", labelKey: "profile.peers", icon: "people-outline" as const, route: "/connect" as const },
   { key: "groups", labelKey: "profile.peerGroups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
   { key: "notes", labelKey: "profile.notes", icon: "document-text-outline" as const, route: "/notes" as const },

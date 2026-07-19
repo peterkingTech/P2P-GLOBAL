@@ -86,7 +86,6 @@ function AuthGate() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerBackTitleVisible: false,
         headerTintColor: "#1D9E75",
         headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
       }}

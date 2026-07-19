@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase, useAuth } from "./AuthContext";
+import { STAGES, getStageFromPoints } from "@/constants/stages";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,9 @@ export interface Module {
   level: number;
   lessonCount: number;
   completedLessons: number;
+  // Lessons with any submission on record (pending, needs_revision, or
+  // approved). Display-only — growth credit still counts completedLessons.
+  submittedLessons?: number;
   isLocked: boolean;
   imageUrl?: string;
 }
@@ -300,6 +304,22 @@ export interface PendingEvaluation {
   source: "core" | "plan";
 }
 
+// Deliberately narrow: name, avatar, growth stage, streak, and this
+// submission's in-curriculum/plan position — enough to give an evaluator real
+// context without exposing registration/spiritual-background intake
+// (p2p_registration_profiles), other reflections/submissions, help-request
+// history, or any other private profile field. Same restraint already
+// applied to getAllProfiles()/moderator access.
+export interface SubmitterEvaluationContext {
+  submitterId: string;
+  fullName: string;
+  photoUrl: string | null;
+  growthStageName: string;
+  growthStageEmoji: string;
+  streakDays: number;
+  contextLabel: string;
+}
+
 export interface SubmissionStatus {
   submissionId: string;
   submissionType: SubmissionType;
@@ -465,6 +485,7 @@ interface DataContextValue {
     feedback: string,
     source?: "core" | "plan"
   ) => Promise<string | null>;
+  getSubmitterEvaluationContext: (evaluationId: string, source?: "core" | "plan") => Promise<SubmitterEvaluationContext | null>;
   toastEvent: GrowthEvent | null;
   celebrationEvent: GrowthEvent | null;
   dismissToastEvent: () => void;
@@ -640,7 +661,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loadPlansV2 = useCallback(async (userId?: string) => {
+  const loadPlansV2 = useCallback(async (userId?: string, languageCode?: string) => {
     setPlansV2Loading(true);
     try {
       const { data: allPlans } = await supabase
@@ -650,6 +671,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: true });
       if (!allPlans || allPlans.length === 0) { setPlansV2([]); return; }
       const planIds = (allPlans as Record<string, unknown>[]).map(p => p.id as string);
+
+      // Overlay translated title/tagline/overview when a non-English content
+      // language is selected — same pattern as loadCurriculum()'s overlay,
+      // via the unified p2p_content_translations table (content_type='plan').
+      // End-user path: only serve approved translations (review gate).
+      const planTitleOverrides = new Map<string, string>();
+      const planTaglineOverrides = new Map<string, string>();
+      const planOverviewOverrides = new Map<string, string>();
+      if (languageCode && languageCode !== "en" && planIds.length > 0) {
+        const { data: planTrans } = await supabase
+          .from("p2p_content_translations")
+          .select("content_id,title,subtitle,description")
+          .eq("content_type", "plan")
+          .in("content_id", planIds)
+          .eq("language_code", languageCode)
+          .eq("status", "approved");
+        for (const row of (planTrans ?? []) as Record<string, unknown>[]) {
+          const id = row.content_id as string;
+          if (row.title) planTitleOverrides.set(id, row.title as string);
+          if (row.subtitle) planTaglineOverrides.set(id, row.subtitle as string);
+          if (row.description) planOverviewOverrides.set(id, row.description as string);
+        }
+      }
+
       const [{ data: lessons }, { data: teachers }, { data: progressRows }] = await Promise.all([
         supabase.from("p2p_plan_lessons").select("id,plan_id").in("plan_id", planIds),
         supabase.from("p2p_plan_source_teachers")
@@ -677,10 +722,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             instagramHandle: (t.instagram_handle as string) ?? undefined,
             otherSocialHandle: (t.other_social_handle as string) ?? undefined,
           }));
+        const planId = plan.id as string;
         return {
-          id: plan.id as string, title: plan.title as string,
-          tagline: (plan.tagline as string) ?? "",
-          overview: (plan.overview as string) ?? "",
+          id: planId, title: planTitleOverrides.get(planId) ?? (plan.title as string),
+          tagline: planTaglineOverrides.get(planId) ?? ((plan.tagline as string) ?? ""),
+          overview: planOverviewOverrides.get(planId) ?? ((plan.overview as string) ?? ""),
           hasSubmodules: Boolean(plan.has_submodules),
           status: plan.status as "draft" | "published",
           lessonCount, completedLessons, isLocked: false,
@@ -829,31 +875,38 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .filter((l) => (l.module_id as string) === moduleId)
           .sort((a, b) => (a.order_index as number) - (b.order_index as number));
         const lessonCount = moduleLessons.length;
-        // Count a lesson toward progress as soon as the user has submitted it
-        // (pending peer review) — not just when it is fully approved.
-        const completedLessons = moduleLessons.filter((l) => {
-          const done = Boolean(progressByLesson.get(l.id as string));
-          const evalSt = evalStatusByLesson.get(l.id as string);
-          return done || evalSt === "pending";
-        }).length;
+        const completedLessons = moduleLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+        const submittedLessons = moduleLessons.filter((l) =>
+          progressByLesson.get(l.id as string) || evalStatusByLesson.has(l.id as string)
+        ).length;
         const moduleComplete = lessonCount > 0 && completedLessons === lessonCount;
         const moduleLocked = !previousModuleComplete;
         builtModules.push({
           id: moduleId, curriculumId: activeCurriculumId,
           title: moduleTitleOverrides.get(moduleId) ?? (m.title as string), description: (m.description as string) ?? "",
-          level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
+          level: moduleIdx + 1, lessonCount, completedLessons, submittedLessons, isLocked: moduleLocked,
           imageUrl: (m.image_url as string) ?? undefined,
         });
-        // prevPassedForUnlock — tracks whether the immediately-prior lesson was
-        // submitted OR approved.  Used to unlock every lesson (including the last)
-        // as soon as the previous one is submitted — no waiting on peer review.
+        // Track two independent unlock signals:
+        // • prevPassedForUnlock — whether the immediately-prior lesson was submitted OR approved
+        //   (used to unlock regular lessons immediately on submission)
+        // • allPrevCompleted — whether every prior lesson is fully approved
+        //   (used to gate the module's Discussion & Review lesson)
         let prevPassedForUnlock = true;
+        let allPrevCompleted = true;
         moduleLessons.forEach((l, lessonIdx) => {
           const isCompleted = Boolean(progressByLesson.get(l.id as string));
           const evalSt = isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined;
           const passedForUnlock = isCompleted || evalSt === "pending";
+          // A module's "Discussion & Review" lesson is seeded with
+          // order_index 999 — that data convention, not list position, is
+          // what marks it. Modules without one (e.g. Module 0) have a normal
+          // content lesson last, which must unlock like any other lesson.
+          const isReviewLesson = (l.order_index as number) >= 999;
           const isThisLocked = moduleLocked || (
-            lessonIdx === 0 ? false : !prevPassedForUnlock
+            lessonIdx === 0 ? false
+            : isReviewLesson ? !allPrevCompleted
+            : !prevPassedForUnlock
           );
           builtLessons.push({
             id: l.id as string, moduleId,
@@ -864,6 +917,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             evaluationStatus: evalSt,
           });
           prevPassedForUnlock = passedForUnlock;
+          allPrevCompleted = allPrevCompleted && isCompleted;
         });
         previousModuleComplete = moduleComplete;
       });
@@ -1072,7 +1126,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setDailyVerse(DAILY_VERSES[dayIdx]);
       const [prayersRes, sessionsRes] = await Promise.all([
         supabase.from("p2p_prayer_requests").select("*").order("created_at", { ascending: false }).limit(30),
-        supabase.from("p2p_sessions").select("*").order("scheduled_at", { ascending: true }).limit(10),
+        supabase.from("p2p_sessions").select("*").order("scheduled_time", { ascending: true }).limit(10),
       ]);
       if (prayersRes.data && prayersRes.data.length > 0) {
         setPrayers(prayersRes.data.map((p: Record<string, unknown>) => ({
@@ -1092,7 +1146,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (sessionsRes.data && sessionsRes.data.length > 0) {
         setSessions(sessionsRes.data.map((s: Record<string, unknown>) => ({
           id: s.id as string, title: s.title as string, description: s.description as string | undefined,
-          scheduledAt: s.scheduled_at as string, durationMinutes: (s.duration_minutes ?? 45) as number,
+          scheduledAt: s.scheduled_time as string, durationMinutes: (s.duration_minutes ?? 45) as number,
           participantCount: (s.participant_count ?? 0) as number, isLive: (s.is_live ?? false) as boolean,
           hostName: (s.host_name ?? "Unknown") as string,
         })));
@@ -1106,7 +1160,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         loadCurriculum(profile?.id, profile?.contentLanguage ?? "en"),
         loadPlans(profile?.id),
-        loadPlansV2(profile?.id),
+        loadPlansV2(profile?.id, profile?.contentLanguage ?? "en"),
       ]);
       if (profile?.id) {
         await refreshPendingEvaluations(profile.id);
@@ -1156,6 +1210,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, loadPlansV2, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Curriculum/Plans unlock state is only computed from `modules`/`lessons`/`plans`,
+  // which loadData() populates once per login and never refetches. A peer evaluator
+  // approving a submission on their own device flips p2p_lesson_progress.completed
+  // (or the Plans equivalent) server-side, but this submitter's cached state never
+  // hears about it, so the "next lesson unlocked" UI stays stale until a manual
+  // pull-to-refresh or full app reload. Subscribe to the submitter's own evaluation
+  // rows so an approval/needs_revision resolution refetches the state that actually
+  // drives lock computation.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const contentLanguage = profile.contentLanguage ?? "en";
+    // event "*": INSERT covers a new evaluation being created on submission
+    // (submitted counts + next-lesson unlock), UPDATE covers an evaluator
+    // resolving it (approved counts + review-lesson/module unlocks).
+    const channel = supabase
+      .channel(`p2p_unlock_sync_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${userId}` },
+        () => { loadCurriculum(userId, contentLanguage); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `submitter_id=eq.${userId}` },
+        () => { loadPlansV2(userId, contentLanguage); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id, profile?.contentLanguage, loadCurriculum, loadPlansV2]);
 
   const checkGrowthEvents = useCallback(async (userId: string) => {
     try {
@@ -2221,11 +2306,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // Covers the self-approval edge case (no evaluator available yet), where
       // the evaluation — and any resulting growth event — is created synchronously.
       await checkGrowthEvents(profile.id);
+      // The submitted/unlock state shown on Learn, module and progress screens
+      // is computed inside loadCurriculum from evaluation rows — without this
+      // refetch, a submission shows 0 submitted and keeps the next lesson
+      // locked until a manual refresh/app reload.
+      await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : "Failed to submit.";
     }
-  }, [profile, checkGrowthEvents]);
+  }, [profile, checkGrowthEvents, loadCurriculum]);
 
   const submitAssignment = useCallback(async (assignmentId: string, lessonId: string, content: string): Promise<string | null> => {
     return submitContent({ lessonId, assignmentId, type: "text", text: content });
@@ -2254,6 +2344,47 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  // Fetches a compact submitter profile for the "To Review" screen via the
+  // p2p_get_submitter_evaluation_context RPC (migration 030). p2p_profiles
+  // RLS ("profiles_select_scoped") only lets a user read another profile if
+  // they share a group, are admin, or lead that person's church/region — an
+  // assigned evaluator who happens not to share a group with the submitter
+  // would otherwise get nothing back. The RPC is SECURITY DEFINER and opens
+  // exactly one narrow path instead: it checks the caller is genuinely the
+  // evaluator on that specific p2p_lesson_evaluations / p2p_plan_lesson_evaluations
+  // row, and if so returns only name/avatar/growth-level/streak/context-label
+  // — never registration/spiritual intake, other submissions, or help-request
+  // history. Mirrors identically for core curriculum and Plans.
+  const getSubmitterEvaluationContext = useCallback(async (
+    evaluationId: string,
+    source: "core" | "plan" = "core"
+  ): Promise<SubmitterEvaluationContext | null> => {
+    if (!profile) return null;
+    try {
+      const { data, error } = await supabase.rpc("p2p_get_submitter_evaluation_context", {
+        p_evaluation_id: evaluationId,
+        p_source: source,
+      });
+      if (error) throw error;
+      const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+      if (!row) return null;
+
+      const stage = STAGES[getStageFromPoints((row.growth_level as number) ?? 0)];
+      return {
+        submitterId: row.submitter_id as string,
+        fullName: (row.full_name as string) ?? "Unnamed",
+        photoUrl: (row.photo_url as string) ?? null,
+        growthStageName: stage.name,
+        growthStageEmoji: stage.emoji,
+        streakDays: (row.streak_days as number) ?? 0,
+        contextLabel: (row.context_label as string) ?? "",
+      };
+    } catch (e) {
+      console.error("getSubmitterEvaluationContext failed", e);
+      return null;
+    }
+  }, [profile]);
+
   return (
     <DataContext.Provider value={{
       modules, lessons, plans, plansLoading, plansV2, plansV2Loading, refreshPlansV2: loadPlansV2, prayers, sessions, forestNodes, forestStats, fruits, missions,
@@ -2273,7 +2404,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getMySubmissions,
       submitPlanReflection, getPlanReflectionSubmissionsForLesson,
       submitContent, submitAssignment,
-      refreshPendingEvaluations, resolveEvaluation,
+      refreshPendingEvaluations, resolveEvaluation, getSubmitterEvaluationContext,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
     }}>
       {children}
