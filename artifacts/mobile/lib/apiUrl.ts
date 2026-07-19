@@ -1,15 +1,20 @@
 /**
- * Returns the base URL of the API server.
- * In Expo web (Replit dev): derives from window.location.origin + /api-server
- * In native: reads EXPO_PUBLIC_API_URL env var
+ * Returns the base URL of the API server (no trailing slash).
+ *
+ * Resolution order:
+ * 1. EXPO_PUBLIC_API_URL  — explicit override (required for native Expo Go / production)
+ * 2. EXPO_PUBLIC_DOMAIN   — injected by the Replit workflow from $REPLIT_DEV_DOMAIN;
+ *                           gives us the correct picard.replit.dev host at dev time
+ * 3. Empty string         — callers guard against this with early returns
  */
 export function getApiUrl(): string {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
   }
-  if (typeof window !== "undefined" && window.location) {
-    // Expo web on Replit — API server is at /api-server on the same dev domain
-    return `${window.location.origin}/api-server`;
+  // Replit dev: EXPO_PUBLIC_DOMAIN = $REPLIT_DEV_DOMAIN (the picard host, not the expo host).
+  // The api-server mounts all routes at /api.
+  if (process.env.EXPO_PUBLIC_DOMAIN) {
+    return `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
   }
   return "";
 }

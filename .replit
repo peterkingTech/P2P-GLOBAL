@@ -21,3 +21,8 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["u-root-cmds"]
+
+[userenv]
+
+[userenv.development]
+EXPO_PUBLIC_API_URL = "https://da8e3f13-8b53-4390-afdc-2f35a0291e28-00-1m8yb5gd0pptd.picard.replit.dev/api"
