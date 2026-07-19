@@ -466,6 +466,7 @@ interface DataContextValue {
     startOffset: number; endOffset: number; color?: string;
   }) => Promise<string | null>;
   markLessonComplete: (lessonId: string) => Promise<void>;
+  refreshCurriculumData: () => Promise<void>;
   refreshData: () => Promise<void>;
   getAssignmentForLesson: (lessonId: string) => Promise<Assignment | null>;
   getMySubmission: (lessonId: string) => Promise<{ id: string; content: string } | null>;
@@ -1997,6 +1998,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(() => loadData(), [loadData]);
 
+  const refreshCurriculumData = useCallback(async () => {
+    if (!profile?.id) return;
+    await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
+  }, [profile?.id, profile?.contentLanguage, loadCurriculum]);
+
   const getAssignmentForLesson = useCallback(async (lessonId: string): Promise<Assignment | null> => {
     try {
       const { data, error } = await supabase
@@ -2398,7 +2404,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       getHighlightsForLesson, addSectionHighlight,
-      markLessonComplete, refreshData,
+      markLessonComplete, refreshCurriculumData, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
       getMySubmissions,

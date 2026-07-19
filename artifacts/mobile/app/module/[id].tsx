@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Linking,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PlanModule } from "@/contexts/DataContext";
@@ -155,7 +155,7 @@ export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modules, lessons, plans } = useData();
+  const { modules, lessons, plans, refreshCurriculumData } = useData();
   const { profile } = useAuth();
 
   // ── Detection: three possible view modes ────────────────────────────────
@@ -181,68 +181,77 @@ export default function ModuleDetailScreen() {
   const [planLessons, setPlanLessons] = useState<PlanLesson[]>([]);
   const [planLoading, setPlanLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchPlanLessons = useCallback(async () => {
     if (!isPlanLesson || !id) return;
-    let cancelled = false;
-    async function fetchPlanLessons() {
-      setPlanLoading(true);
-      try {
-        const [{ data: lessonRows }, { data: progressRows }, { data: evalRows }] = await Promise.all([
-          supabase
-            .from("p2p_lessons")
-            .select("id,title,subtitle,order_index")
-            .eq("module_id", id)
-            .eq("status", "published")
-            .order("order_index", { ascending: true }),
-          profile?.id
-            ? supabase
-                .from("p2p_lesson_progress")
-                .select("lesson_id,completed")
-                .eq("user_id", profile.id)
-            : Promise.resolve({ data: [] }),
-          profile?.id
-            ? supabase
-                .from("p2p_lesson_evaluations")
-                .select("lesson_id,status")
-                .eq("submitter_id", profile.id)
-                .in("status", ["pending", "needs_revision"])
-            : Promise.resolve({ data: [] }),
-        ]);
-        if (cancelled) return;
-        const progressMap = new Map<string, boolean>();
-        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
-          progressMap.set(p.lesson_id as string, Boolean(p.completed));
-        }
-        const evalMap = new Map<string, "pending" | "needs_revision">();
-        for (const e of (evalRows ?? []) as Record<string, unknown>[]) {
-          const st = e.status as "pending" | "needs_revision";
-          if (st === "needs_revision" || !evalMap.has(e.lesson_id as string))
-            evalMap.set(e.lesson_id as string, st);
-        }
-        const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
-          id: l.id as string,
-          title: l.title as string,
-          subtitle: (l.subtitle as string) ?? "",
-          order: l.order_index as number,
-          isCompleted: progressMap.get(l.id as string) ?? false,
-          isLocked: false,
-          evaluationStatus: progressMap.get(l.id as string) ? undefined : evalMap.get(l.id as string),
-        }));
-        // Unlock the next lesson as soon as the previous is submitted (pending)
-        // or approved — no waiting on peer review to continue learning.
-        for (let i = 1; i < built.length; i++) {
-          const prev = built[i - 1];
-          const prevPassed = prev.isCompleted || prev.evaluationStatus === "pending";
-          built[i].isLocked = !prevPassed;
-        }
-        setPlanLessons(built);
-      } finally {
-        if (!cancelled) setPlanLoading(false);
+    setPlanLoading(true);
+    try {
+      const [{ data: lessonRows }, { data: progressRows }, { data: evalRows }] = await Promise.all([
+        supabase
+          .from("p2p_lessons")
+          .select("id,title,subtitle,order_index")
+          .eq("module_id", id)
+          .eq("status", "published")
+          .order("order_index", { ascending: true }),
+        profile?.id
+          ? supabase
+              .from("p2p_lesson_progress")
+              .select("lesson_id,completed")
+              .eq("user_id", profile.id)
+          : Promise.resolve({ data: [] }),
+        profile?.id
+          ? supabase
+              .from("p2p_lesson_evaluations")
+              .select("lesson_id,status")
+              .eq("submitter_id", profile.id)
+              .in("status", ["pending", "needs_revision"])
+          : Promise.resolve({ data: [] }),
+      ]);
+      const progressMap = new Map<string, boolean>();
+      for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+        progressMap.set(p.lesson_id as string, Boolean(p.completed));
       }
+      const evalMap = new Map<string, "pending" | "needs_revision">();
+      for (const e of (evalRows ?? []) as Record<string, unknown>[]) {
+        const st = e.status as "pending" | "needs_revision";
+        if (st === "needs_revision" || !evalMap.has(e.lesson_id as string))
+          evalMap.set(e.lesson_id as string, st);
+      }
+      const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
+        id: l.id as string,
+        title: l.title as string,
+        subtitle: (l.subtitle as string) ?? "",
+        order: l.order_index as number,
+        isCompleted: progressMap.get(l.id as string) ?? false,
+        isLocked: false,
+        evaluationStatus: progressMap.get(l.id as string) ? undefined : evalMap.get(l.id as string),
+      }));
+      // Unlock the next lesson as soon as the previous is submitted (pending)
+      // or approved — no waiting on peer review to continue learning.
+      for (let i = 1; i < built.length; i++) {
+        const prev = built[i - 1];
+        const prevPassed = prev.isCompleted || prev.evaluationStatus === "pending";
+        built[i].isLocked = !prevPassed;
+      }
+      setPlanLessons(built);
+    } finally {
+      setPlanLoading(false);
     }
-    fetchPlanLessons();
-    return () => { cancelled = true; };
   }, [isPlanLesson, id, profile?.id]);
+
+  // Refetch plan-lesson eval status on every focus — returning from a lesson
+  // after submission/approval must immediately show the updated unlock state.
+  useFocusEffect(useCallback(() => {
+    fetchPlanLessons();
+  }, [fetchPlanLessons]));
+
+  // Refresh core curriculum lock state on every focus — covers the case where
+  // an evaluator approved a submission while the user had the app backgrounded
+  // and the realtime event was missed (OS suspended the network connection).
+  useFocusEffect(useCallback(() => {
+    if (!isPlanLesson) {
+      refreshCurriculumData();
+    }
+  }, [isPlanLesson, refreshCurriculumData]));
 
   // Unified display data
   const displayTitle = isCurriculumOverview
