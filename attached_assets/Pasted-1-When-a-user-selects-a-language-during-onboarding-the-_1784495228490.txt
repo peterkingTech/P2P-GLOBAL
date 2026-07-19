@@ -1,0 +1,29 @@
+1. When a user selects a language during onboarding, the app should translate EVERYTHING from that point forward — every screen, every button, every label, including the app's own name/branding ("Peer-to-Peer Global Bible Study Network") wherever it's displayed as UI text, not just isolated pieces of content.
+
+1. Confirm the onboarding language selection actually persists correctly to the user's app_language (this was previously fixed — re-verify it still works on current code with a genuinely fresh account).
+2. Audit the ENTIRE app for hardcoded English strings that bypass the i18next translation system — not just a sample of screens, all of them. Report a complete list of every screen/component still using raw hardcoded text instead of t("key") calls.
+3. Specifically confirm: does the app's own name/title render through the translation system anywhere it appears as UI chrome (splash screen, headers, etc.), or is it hardcoded in every instance? If hardcoded everywhere, that's expected for a proper noun/brand name — confirm with me which instances (if any) should actually be translated vs. kept as a consistent brand name across all languages.
+
+Report back the complete list of untranslated screens/strings found, before fixing — I want to see the real scope before more patching.
+
+2. The App Language and Content/Bible Study Language pickers currently show only 7 languages, but p2p_languages has 37 seeded. Make ALL 37 selectable in both pickers — this app is global, users should see every language we support, not just the ones with complete content yet.
+
+For any language WITHOUT complete UI strings (locales/ file) or content translations yet: it must still be selectable, but clearly show as "Partial" or "Coming Soon" next to its name in the picker (do not silently fall back to English with no explanation — be honest with the user about what's actually translated yet). Confirm the fallback-to-English behavior still works correctly and gracefully for anything not yet translated in a selected language, exactly as already built for content — apply the same standard to UI strings.
+
+Report back the full list of all 37 languages with their current real status (Complete / Partial / Coming Soon) so we have an honest, accurate picture — not just "all languages now show up."
+
+3. Bible verses still do not translate when a user's content language changes. Diagnose fresh, with real evidence — do not assume the cause is the same as any previous Bible-related bug already fixed.
+
+1. Confirm directly: for a language OTHER than English or German, does p2p_bible_translations have a real, confirmed (is_licensed_confirmed=true) translation registered at all? Query it and report actual rows.
+2. If a translation IS registered, trace getVerseText() for that language and report exactly where it fails or falls back incorrectly.
+3. If NO translation is registered for most languages (likely, since this was flagged as an open gap before), this isn't a bug — it's missing content/registration work. Report clearly which languages have zero Bible coverage so we know the real scope of what's needed, versus which (if any) have a translation registered but still fail to display, which WOULD be a real bug.
+
+Report back a clear table: language, has translation registered (yes/no), actually displays correctly (yes/no/not applicable).
+
+4. Two related things:
+
+1. PROGRESS BAR: the module/curriculum progress bar still does not reliably reflect real submitted/approved counts — re-verify the dual-display fix (submitted count + approved count) from earlier is actually working correctly across ALL modules and Plans, not just the one previously tested. Test across at least 3 different modules and at least one Plan, with a genuinely fresh account, and report the actual numbers shown at each step against the real database state.
+
+2. UNLOCK DESIGN — restating this explicitly as the required behavior, to confirm current code matches it exactly: when a user finishes a lesson and submits ALL of its reflections and assignments, the NEXT lesson (or next module, if this was the last lesson in a module) must unlock IMMEDIATELY — even though the just-finished lesson still awaits peer review/evaluation. Learning must never be blocked waiting on someone else's evaluation. Only the following should remain gated on approval, never on submission: growth points, tree stage progress, and the "approved" checkmark/status. Confirm this is precisely how the current code behaves, across both core curriculum and Plans, with a real fresh-account test showing: submit lesson → next lesson immediately accessible → progress bar shows real submitted count → approval still pending → points not yet awarded.
+
+Report back real test results for both parts, with actual before/after evidence, not a description.

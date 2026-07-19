@@ -829,7 +829,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .filter((l) => (l.module_id as string) === moduleId)
           .sort((a, b) => (a.order_index as number) - (b.order_index as number));
         const lessonCount = moduleLessons.length;
-        const completedLessons = moduleLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+        // Count a lesson toward progress as soon as the user has submitted it
+        // (pending peer review) — not just when it is fully approved.
+        const completedLessons = moduleLessons.filter((l) => {
+          const done = Boolean(progressByLesson.get(l.id as string));
+          const evalSt = evalStatusByLesson.get(l.id as string);
+          return done || evalSt === "pending";
+        }).length;
         const moduleComplete = lessonCount > 0 && completedLessons === lessonCount;
         const moduleLocked = !previousModuleComplete;
         builtModules.push({
@@ -838,22 +844,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           level: moduleIdx + 1, lessonCount, completedLessons, isLocked: moduleLocked,
           imageUrl: (m.image_url as string) ?? undefined,
         });
-        // Track two independent unlock signals:
-        // • prevPassedForUnlock — whether the immediately-prior lesson was submitted OR approved
-        //   (used to unlock regular lessons immediately on submission)
-        // • allPrevCompleted — whether every prior lesson is fully approved
-        //   (used to gate the final discussion/review lesson in each module)
+        // prevPassedForUnlock — tracks whether the immediately-prior lesson was
+        // submitted OR approved.  Used to unlock every lesson (including the last)
+        // as soon as the previous one is submitted — no waiting on peer review.
         let prevPassedForUnlock = true;
-        let allPrevCompleted = true;
         moduleLessons.forEach((l, lessonIdx) => {
           const isCompleted = Boolean(progressByLesson.get(l.id as string));
           const evalSt = isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined;
           const passedForUnlock = isCompleted || evalSt === "pending";
-          const isLastLesson = moduleLessons.length > 1 && lessonIdx === moduleLessons.length - 1;
           const isThisLocked = moduleLocked || (
-            lessonIdx === 0 ? false
-            : isLastLesson ? !allPrevCompleted
-            : !prevPassedForUnlock
+            lessonIdx === 0 ? false : !prevPassedForUnlock
           );
           builtLessons.push({
             id: l.id as string, moduleId,
@@ -864,7 +864,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             evaluationStatus: evalSt,
           });
           prevPassedForUnlock = passedForUnlock;
-          allPrevCompleted = allPrevCompleted && isCompleted;
         });
         previousModuleComplete = moduleComplete;
       });

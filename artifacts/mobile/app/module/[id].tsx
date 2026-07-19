@@ -64,6 +64,7 @@ interface PlanLesson {
   order: number;
   isCompleted: boolean;
   isLocked: boolean;
+  evaluationStatus?: "pending" | "needs_revision";
 }
 
 function AttributionBlock({ attr }: { attr: Attribution }) {
@@ -185,7 +186,7 @@ export default function ModuleDetailScreen() {
     async function fetchPlanLessons() {
       setPlanLoading(true);
       try {
-        const [{ data: lessonRows }, { data: progressRows }] = await Promise.all([
+        const [{ data: lessonRows }, { data: progressRows }, { data: evalRows }] = await Promise.all([
           supabase
             .from("p2p_lessons")
             .select("id,title,subtitle,order_index")
@@ -198,11 +199,24 @@ export default function ModuleDetailScreen() {
                 .select("lesson_id,completed")
                 .eq("user_id", profile.id)
             : Promise.resolve({ data: [] }),
+          profile?.id
+            ? supabase
+                .from("p2p_lesson_evaluations")
+                .select("lesson_id,status")
+                .eq("submitter_id", profile.id)
+                .in("status", ["pending", "needs_revision"])
+            : Promise.resolve({ data: [] }),
         ]);
         if (cancelled) return;
         const progressMap = new Map<string, boolean>();
         for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
           progressMap.set(p.lesson_id as string, Boolean(p.completed));
+        }
+        const evalMap = new Map<string, "pending" | "needs_revision">();
+        for (const e of (evalRows ?? []) as Record<string, unknown>[]) {
+          const st = e.status as "pending" | "needs_revision";
+          if (st === "needs_revision" || !evalMap.has(e.lesson_id as string))
+            evalMap.set(e.lesson_id as string, st);
         }
         const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
           id: l.id as string,
@@ -211,9 +225,14 @@ export default function ModuleDetailScreen() {
           order: l.order_index as number,
           isCompleted: progressMap.get(l.id as string) ?? false,
           isLocked: false,
+          evaluationStatus: progressMap.get(l.id as string) ? undefined : evalMap.get(l.id as string),
         }));
+        // Unlock the next lesson as soon as the previous is submitted (pending)
+        // or approved — no waiting on peer review to continue learning.
         for (let i = 1; i < built.length; i++) {
-          built[i].isLocked = !built[i - 1].isCompleted;
+          const prev = built[i - 1];
+          const prevPassed = prev.isCompleted || prev.evaluationStatus === "pending";
+          built[i].isLocked = !prevPassed;
         }
         setPlanLessons(built);
       } finally {
@@ -236,7 +255,13 @@ export default function ModuleDetailScreen() {
       ? (planModuleInfo!.description)
       : (coreModule?.description ?? "");
   const displayLessons = isPlanLesson ? planLessons : coreLessons;
-  const completed = displayLessons.filter((l) => l.isCompleted).length;
+  // Count submitted (pending review) lessons toward the progress bar — same
+  // rule as unlock: a submitted lesson counts as done for progress purposes.
+  const completed = displayLessons.filter((l) => {
+    if (l.isCompleted) return true;
+    const evalSt = (l as { evaluationStatus?: string }).evaluationStatus;
+    return evalSt === "pending";
+  }).length;
   const pct = displayLessons.length > 0 ? Math.round((completed / displayLessons.length) * 100) : 0;
   const isLocked = !isCurriculumOverview && !isPlanLesson && (coreModule?.isLocked ?? false);
   const isLoading = isPlanLesson && planLoading;

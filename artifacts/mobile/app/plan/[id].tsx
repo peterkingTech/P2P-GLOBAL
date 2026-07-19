@@ -128,16 +128,15 @@ export default function PlanDetailScreen() {
   }
 
   const totalLessons = lessons.length;
-  const completedCount = lessons.filter(l => l.completed).length;
+  // Count submitted (pending review) lessons toward progress — no waiting on peer approval.
+  const completedCount = lessons.filter(l => l.completed || l.evaluationStatus === "pending").length;
   const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   const renderLessons = (lessonList: Lesson[]) => {
     let prevPassedForUnlock = true;
-    let allPrevCompleted = true;
     return lessonList.map((lesson, i) => {
-      const isLastLesson = lessonList.length > 1 && i === lessonList.length - 1;
       const passedForUnlock = lesson.completed || lesson.evaluationStatus === "pending";
-      const isLocked = i === 0 ? false : isLastLesson ? !allPrevCompleted : !prevPassedForUnlock;
+      const isLocked = i === 0 ? false : !prevPassedForUnlock;
       const isPendingEval = !lesson.completed && lesson.evaluationStatus === "pending";
       const isNeedsRevision = !lesson.completed && lesson.evaluationStatus === "needs_revision";
       const dotColor = lesson.completed
@@ -146,7 +145,6 @@ export default function PlanDetailScreen() {
         : isNeedsRevision ? "#C0392B"
         : colors.amber;
       prevPassedForUnlock = passedForUnlock;
-      allPrevCompleted = allPrevCompleted && lesson.completed;
       return (
         <TouchableOpacity
           key={lesson.id}
