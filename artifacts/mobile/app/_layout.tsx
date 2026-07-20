@@ -48,14 +48,13 @@ function AuthGate() {
 
     // RTL layout — requires an app reload to take effect in React Native.
     // I18nManager.isRTL reflects the PREVIOUS session's setting until reload.
-    const shouldBeRTL = RTL_LANGUAGES.has(lang);
-    if (shouldBeRTL !== I18nManager.isRTL) {
-      I18nManager.allowRTL(shouldBeRTL);
-      I18nManager.forceRTL(shouldBeRTL);
-      // Prompt user to restart. On web we can reload immediately.
-      if (Platform.OS === "web") {
-        window.location.reload();
-      } else {
+    // On web, I18nManager has no effect on layout direction (CSS handles it),
+    // so skip this block entirely to prevent an infinite reload loop.
+    if (Platform.OS !== "web") {
+      const shouldBeRTL = RTL_LANGUAGES.has(lang);
+      if (shouldBeRTL !== I18nManager.isRTL) {
+        I18nManager.allowRTL(shouldBeRTL);
+        I18nManager.forceRTL(shouldBeRTL);
         Alert.alert(
           shouldBeRTL ? "Right-to-Left Layout" : "Left-to-Right Layout",
           "The app layout direction has changed. Please restart the app to apply the new direction.",
