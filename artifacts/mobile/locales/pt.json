@@ -39,5 +39,21 @@
     "contentLanguage": "Idioma de estudo bíblico",
     "save": "Salvar",
     "cancel": "Cancelar"
+  },
+  "onboarding": {
+    "slide1Title": "REDE GLOBAL DE ESTUDO\nBÍBLICO PEER-TO-PEER",
+    "slide1Sub": "Conecte-se com crentes de todo o mundo. Cresça juntos, além de todas as fronteiras e nações.",
+    "poweredBy": "Powered by AMEN TECH",
+    "slide2Title": "Veja sua árvore crescer",
+    "slide2Sub": "Cada sessão de estudo, cada oração, cada amizade adiciona frutos à sua Árvore Viva — uma imagem da sua jornada espiritual.",
+    "slide3Title": "Encontre seu parceiro de estudo",
+    "slide3Sub": "A correspondência inteligente conecta você a um par que compartilha seu idioma, fuso horário e estação espiritual.",
+    "slide4Title": "O Cenáculo",
+    "slide4Sub": "Participe de salas de oração ao vivo, publique no mural de oração nacional e interceda pelos povos não alcançados.",
+    "continue": "Continuar",
+    "getStarted": "Começar",
+    "discoverMore": "Descobrir mais",
+    "alreadyHaveAccount": "Já tenho uma conta",
+    "selectLanguage": "Selecionar idioma"
   }
 }

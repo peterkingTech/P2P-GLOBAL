@@ -34,6 +34,22 @@
     "signOut": "Abmelden",
     "calledIn": "Berufen"
   },
+  "onboarding": {
+    "slide1Title": "GLOBALES PEER-TO-PEER\nBIBELSTUDIUM-NETZWERK",
+    "slide1Sub": "Verbinde dich mit Gläubigen weltweit. Wachse gemeinsam, über jede Grenze und Nation hinaus.",
+    "poweredBy": "Powered by AMEN TECH",
+    "slide2Title": "Sieh deinen Baum wachsen",
+    "slide2Sub": "Jede Bibelstunde, jedes Gebet, jede Freundschaft bringt Frucht an deinen Lebendigen Baum — ein Bild deiner geistlichen Reise.",
+    "slide3Title": "Finde deinen Lernpartner",
+    "slide3Sub": "Intelligentes Matching verbindet dich mit einem Partner, der deine Sprache, Zeitzone und geistliche Saison teilt.",
+    "slide4Title": "Das Obere Zimmer",
+    "slide4Sub": "Nimm an Live-Gebetsräumen teil, schreibe an die nationale Gebetswand und bete für unerreichte Völker.",
+    "continue": "Weiter",
+    "getStarted": "Loslegen",
+    "discoverMore": "Mehr entdecken",
+    "alreadyHaveAccount": "Ich habe bereits ein Konto",
+    "selectLanguage": "Sprache auswählen"
+  },
   "settings": {
     "title": "Einstellungen",
     "appLanguage": "App-Sprache",

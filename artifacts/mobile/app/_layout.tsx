@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
@@ -147,6 +148,15 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Restore saved app language from AsyncStorage on every launch
+  useEffect(() => {
+    AsyncStorage.getItem("@p2p/appLanguage").then((saved) => {
+      if (saved && SUPPORTED_LANGUAGES.includes(saved as any) && i18n.language !== saved) {
+        i18n.changeLanguage(saved);
+      }
+    }).catch(() => {});
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 

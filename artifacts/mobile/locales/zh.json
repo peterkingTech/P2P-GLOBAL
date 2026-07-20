@@ -39,5 +39,21 @@
     "contentLanguage": "查经语言",
     "save": "保存",
     "cancel": "取消"
+  },
+  "onboarding": {
+    "slide1Title": "点对点全球\n圣经学习网络",
+    "slide1Sub": "与全球的信徒相连。一起成长，跨越每一个边界，每一个国家。",
+    "poweredBy": "由 AMEN TECH 驱动",
+    "slide2Title": "看你的树生长",
+    "slide2Sub": "每次学习、每次祷告、每段友谊都为你的生命树增添果实——它描绘了你的属灵旅程。",
+    "slide3Title": "找到你的学习伙伴",
+    "slide3Sub": "智能匹配将您与分享您的语言、时区和属灵季节的同伴联系起来。",
+    "slide4Title": "上房间",
+    "slide4Sub": "加入现场祷告室，在全国祷告墙上发布，并为地球上未得之民代祷。",
+    "continue": "继续",
+    "getStarted": "开始",
+    "discoverMore": "了解更多",
+    "alreadyHaveAccount": "我已经有账户",
+    "selectLanguage": "选择语言"
   }
 }

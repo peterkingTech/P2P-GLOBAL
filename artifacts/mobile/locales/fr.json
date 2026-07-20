@@ -39,5 +39,21 @@
     "contentLanguage": "Langue d'étude biblique",
     "save": "Enregistrer",
     "cancel": "Annuler"
+  },
+  "onboarding": {
+    "slide1Title": "RÉSEAU MONDIAL D'ÉTUDE\nBIBLIQUE PAIR-À-PAIR",
+    "slide1Sub": "Connectez-vous avec des croyants du monde entier. Grandissez ensemble, au-delà de toutes les frontières.",
+    "poweredBy": "Powered by AMEN TECH",
+    "slide2Title": "Regardez votre arbre grandir",
+    "slide2Sub": "Chaque session d'étude, chaque prière, chaque amitié ajoute des fruits à votre Arbre Vivant — une image de votre parcours spirituel.",
+    "slide3Title": "Trouvez votre partenaire d'étude",
+    "slide3Sub": "La mise en relation intelligente vous connecte avec un pair partageant votre langue, fuseau horaire et saison spirituelle.",
+    "slide4Title": "Le Cénacle",
+    "slide4Sub": "Rejoignez des salles de prière en direct, publiez sur le mur de prière national et intercédez pour les peuples non atteints.",
+    "continue": "Continuer",
+    "getStarted": "Commencer",
+    "discoverMore": "En savoir plus",
+    "alreadyHaveAccount": "J'ai déjà un compte",
+    "selectLanguage": "Sélectionner la langue"
   }
 }

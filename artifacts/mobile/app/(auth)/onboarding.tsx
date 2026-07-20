@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "react-i18next";
 import i18next from "i18next";
 import colors from "@/constants/colors";
 
@@ -28,45 +29,16 @@ const LANGUAGES = [
   { code: "es", label: "Español", flag: "🇪🇸" },
   { code: "fr", label: "Français", flag: "🇫🇷" },
   { code: "pt", label: "Português", flag: "🇧🇷" },
+  { code: "zh", label: "中文", flag: "🇨🇳" },
   { code: "ar", label: "العربية", flag: "🇸🇦" },
   { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
   { code: "sw", label: "Kiswahili", flag: "🇰🇪" },
 ];
 
-const SLIDES = [
-  {
-    id: "1",
-    icon: null,
-    title: "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    subtitle:
-      "Connect with believers worldwide. Grow together, across every border, every nation.",
-  },
-  {
-    id: "2",
-    icon: "git-branch" as const,
-    title: "Watch Your Tree Grow",
-    subtitle:
-      "Every study session, every prayer, every friendship adds fruit to your Living Tree — a picture of your spiritual journey.",
-  },
-  {
-    id: "3",
-    icon: "people" as const,
-    title: "Find Your Study Partner",
-    subtitle:
-      "Smart matching connects you with a peer who shares your language, time zone, and spiritual season.",
-  },
-  {
-    id: "4",
-    icon: "radio" as const,
-    title: "The Upper Room",
-    subtitle:
-      "Join live prayer rooms, post to the nation prayer wall, and intercede for the unreached peoples of the earth.",
-  },
-];
-
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState(
@@ -74,7 +46,34 @@ export default function OnboardingScreen() {
   );
   const listRef = useRef<FlatList>(null);
 
-  const isLast = current === SLIDES.length - 1;
+  const isLast = current === 3;
+
+  const SLIDES = [
+    {
+      id: "1",
+      icon: null as null,
+      title: t("onboarding.slide1Title"),
+      subtitle: t("onboarding.slide1Sub"),
+    },
+    {
+      id: "2",
+      icon: "git-branch" as const,
+      title: t("onboarding.slide2Title"),
+      subtitle: t("onboarding.slide2Sub"),
+    },
+    {
+      id: "3",
+      icon: "people" as const,
+      title: t("onboarding.slide3Title"),
+      subtitle: t("onboarding.slide3Sub"),
+    },
+    {
+      id: "4",
+      icon: "radio" as const,
+      title: t("onboarding.slide4Title"),
+      subtitle: t("onboarding.slide4Sub"),
+    },
+  ];
 
   async function selectLanguage(lang: typeof LANGUAGES[0]) {
     setSelectedLang(lang);
@@ -147,7 +146,7 @@ export default function OnboardingScreen() {
             )}
             <Text style={[styles.title, item.id === "1" && styles.titleHero]}>{item.title}</Text>
             {item.id === "1" && (
-              <Text style={styles.poweredBy}>Powered by AMEN TECH</Text>
+              <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
             )}
             <Text style={styles.subtitle}>{item.subtitle}</Text>
           </View>
@@ -175,7 +174,7 @@ export default function OnboardingScreen() {
           activeOpacity={0.85}
         >
           <Text style={styles.btnText}>
-            {isLast ? "Get Started" : "Continue"}
+            {isLast ? t("onboarding.getStarted") : t("onboarding.continue")}
           </Text>
           <Ionicons name="arrow-forward" size={18} color={colors.cream} />
         </TouchableOpacity>
@@ -191,7 +190,7 @@ export default function OnboardingScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="compass-outline" size={16} color={colors.accentGreen} />
-            <Text style={styles.discoverBtnText}>Discover More</Text>
+            <Text style={styles.discoverBtnText}>{t("onboarding.discoverMore")}</Text>
           </TouchableOpacity>
         )}
         {current === 0 && (
@@ -199,7 +198,7 @@ export default function OnboardingScreen() {
             onPress={() => router.replace("/(auth)/login")}
             style={styles.skipBtn}
           >
-            <Text style={styles.skipText}>I already have an account</Text>
+            <Text style={styles.skipText}>{t("onboarding.alreadyHaveAccount")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -221,7 +220,7 @@ export default function OnboardingScreen() {
             onStartShouldSetResponder={() => true}
           >
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Select Language</Text>
+              <Text style={styles.sheetTitle}>{t("onboarding.selectLanguage")}</Text>
               <TouchableOpacity onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMutedLight} />
               </TouchableOpacity>

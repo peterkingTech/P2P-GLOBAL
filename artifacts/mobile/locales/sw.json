@@ -1,0 +1,60 @@
+{
+  "tabs": {
+    "home": "Nyumbani",
+    "learn": "Jifunza",
+    "prayer": "Sala",
+    "messages": "Ujumbe",
+    "discover": "Gundua",
+    "missions": "Misheni"
+  },
+  "profile": {
+    "title": "Wasifu Wangu",
+    "messages": "Ujumbe",
+    "peers": "Wenzangu",
+    "peerGroups": "Vikundi vya Masomo",
+    "notes": "Maelezo",
+    "highlights": "Alama",
+    "growthLevel": "Kiwango cha Ukuaji",
+    "gifts": "Vipawa",
+    "servantScore": "Alama za Huduma",
+    "spiritualGifts": "Vipawa vya Kiroho",
+    "add": "Ongeza",
+    "peerGuideDashboard": "Dashibodi ya Mwongozo",
+    "peerGuideDashboardSub": "Simamia wanafunzi na vikundi unavyoongoza",
+    "adminDashboard": "Dashibodi ya Msimamizi",
+    "adminDashboardSub": "Mtaala, usajili, maombi ya msaada na timu",
+    "account": "Akaunti",
+    "editProfile": "Hariri Wasifu",
+    "notifications": "Arifa",
+    "language": "Lugha",
+    "privacy": "Faragha",
+    "support": "Msaada",
+    "imStruggling": "Ninajitahidi",
+    "reachOutSub": "Wasiliana kwa siri kupata msaada na ufuatiliaji",
+    "signOut": "Toka",
+    "calledIn": "Aliyeitwa"
+  },
+  "settings": {
+    "title": "Mipangilio",
+    "appLanguage": "Lugha ya programu",
+    "contentLanguage": "Lugha ya masomo ya Biblia",
+    "save": "Hifadhi",
+    "cancel": "Ghairi"
+  },
+  "onboarding": {
+    "slide1Title": "MTANDAO WA KIMATAIFA\nWA KUSOMA BIBLIA PEER-TO-PEER",
+    "slide1Sub": "Unganika na waumini duniani kote. Kukua pamoja, kupita kila mpaka, kila taifa.",
+    "poweredBy": "Inayoendeshwa na AMEN TECH",
+    "slide2Title": "Tazama Mti Wako Ukikua",
+    "slide2Sub": "Kila kipindi cha masomo, kila sala, kila urafiki huongeza matunda kwa Mti Wako Ulio Hai — picha ya safari yako ya kiroho.",
+    "slide3Title": "Tafuta Mwenzako wa Masomo",
+    "slide3Sub": "Uoanishaji wa akili unakuunganisha na mwenzako anayeshiriki lugha yako, saa za eneo na msimu wako wa kiroho.",
+    "slide4Title": "Chumba cha Juu",
+    "slide4Sub": "Jiunge na vyumba vya sala moja kwa moja, chapisha kwenye ukuta wa sala wa kitaifa, na uombee mataifa ambayo haijafikiwa.",
+    "continue": "Endelea",
+    "getStarted": "Anza",
+    "discoverMore": "Gundua Zaidi",
+    "alreadyHaveAccount": "Nina akaunti tayari",
+    "selectLanguage": "Chagua Lugha"
+  }
+}

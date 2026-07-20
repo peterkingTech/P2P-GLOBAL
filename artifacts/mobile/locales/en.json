@@ -41,6 +41,22 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "onboarding": {
+    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
+    "slide1Sub": "Connect with believers worldwide. Grow together, across every border, every nation.",
+    "poweredBy": "Powered by AMEN TECH",
+    "slide2Title": "Watch Your Tree Grow",
+    "slide2Sub": "Every study session, every prayer, every friendship adds fruit to your Living Tree — a picture of your spiritual journey.",
+    "slide3Title": "Find Your Study Partner",
+    "slide3Sub": "Smart matching connects you with a peer who shares your language, time zone, and spiritual season.",
+    "slide4Title": "The Upper Room",
+    "slide4Sub": "Join live prayer rooms, post to the nation prayer wall, and intercede for the unreached peoples of the earth.",
+    "continue": "Continue",
+    "getStarted": "Get Started",
+    "discoverMore": "Discover More",
+    "alreadyHaveAccount": "I already have an account",
+    "selectLanguage": "Select Language"
+  },
   "home": {
     "goodMorning": "Good morning",
     "goodAfternoon": "Good afternoon",

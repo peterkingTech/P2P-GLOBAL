@@ -7,8 +7,10 @@ import fr from "@/locales/fr.json";
 import pt from "@/locales/pt.json";
 import zh from "@/locales/zh.json";
 import ar from "@/locales/ar.json";
+import hi from "@/locales/hi.json";
+import sw from "@/locales/sw.json";
 
-export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "pt", "zh", "ar"] as const;
+export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "pt", "zh", "ar", "hi", "sw"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 i18n.use(initReactI18next).init({
@@ -21,6 +23,8 @@ i18n.use(initReactI18next).init({
     pt: { translation: pt },
     zh: { translation: zh },
     ar: { translation: ar },
+    hi: { translation: hi },
+    sw: { translation: sw },
   },
   lng: "en",
   fallbackLng: "en",
