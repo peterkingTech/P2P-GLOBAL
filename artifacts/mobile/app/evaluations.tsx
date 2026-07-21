@@ -67,8 +67,12 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
     setSubmitting(status);
     setError(null);
     const err = await resolveEvaluation(evaluation.id, status, feedback.trim(), evaluation.source);
-    if (err) { setError(err); setSubmitting(null); }
-    else { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
+    // Reset on both outcomes — on success the card is about to unmount as this
+    // evaluation drops out of pendingEvaluations, but leaving `submitting` set
+    // left the button permanently disabled for any render that happens first.
+    setSubmitting(null);
+    if (err) setError(err);
+    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   const isMedia = evaluation.submissionType === "audio" || evaluation.submissionType === "video";
@@ -101,6 +105,10 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
           </Text>
         </View>
       </View>
+
+      {evaluation.questionText && (
+        <Text style={styles.questionLabel}>{evaluation.questionText}</Text>
+      )}
 
       {isMedia && evaluation.mediaUrl ? (
         <View style={styles.mediaBox}>
@@ -422,6 +430,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderBeige,
   },
   typeBadgeText: { fontSize: 11, color: colors.textMid, fontFamily: "Inter_500Medium" },
+  questionLabel: {
+    fontSize: 12, color: colors.textMuted, fontStyle: "italic",
+    fontFamily: "Inter_400Regular", marginBottom: 8, lineHeight: 18,
+  },
   mediaBox: { marginBottom: 12 },
   contentBox: {
     backgroundColor: colors.cardBeige, borderRadius: 12, borderWidth: 1, borderColor: colors.warmBeige,

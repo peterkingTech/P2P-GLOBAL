@@ -298,6 +298,11 @@ export interface PendingEvaluation {
   mediaUrl: string | null;
   durationSeconds: number | null;
   assignedAt: string;
+  // The original assignment question this answer responds to — core
+  // curriculum only (Plans submissions already embed "Q: ...\nA: ..." pairs
+  // directly in `content`, see submitAssignment() in plan/lesson/[lessonId].tsx).
+  // Null when the lesson's assignment has no discrete questions.
+  questionText: string | null;
   // Which evaluation gate this came from — core curriculum (p2p_lesson_evaluations)
   // or Plans (p2p_plan_lesson_evaluations), a separate mirrored system. Needed so
   // resolveEvaluation() updates the right table.
@@ -840,14 +845,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
       let progressByLesson = new Map<string, boolean>();
+      // Authoritative "all questions submitted" / "all questions approved"
+      // signal, set server-side by p2p_lesson_progress_recompute() (031) —
+      // replaces the old, buggy inference from "does ANY evaluation for this
+      // lesson exist" (see below), which fired on the first submitted/
+      // approved question rather than the last one.
+      const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
       const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
       if (userId) {
         const { data: progressRows } = await supabase
           .from("p2p_lesson_progress")
-          .select("lesson_id,completed")
+          .select("lesson_id,completed,status")
           .eq("user_id", userId);
         for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
           progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+          statusByLesson.set(p.lesson_id as string, (p.status as "not_started" | "submitted" | "completed") ?? "not_started");
         }
 
         // Not-yet-resolved evaluations for this user's own assignment
@@ -877,9 +889,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .sort((a, b) => (a.order_index as number) - (b.order_index as number));
         const lessonCount = moduleLessons.length;
         const completedLessons = moduleLessons.filter((l) => progressByLesson.get(l.id as string)).length;
-        const submittedLessons = moduleLessons.filter((l) =>
-          progressByLesson.get(l.id as string) || evalStatusByLesson.has(l.id as string)
-        ).length;
+        // "Submitted" = every assignment question for the lesson has been
+        // answered (status transitions to 'submitted' only once ALL are in —
+        // see p2p_lesson_progress_recompute), not merely "at least one
+        // question has a pending evaluation somewhere."
+        const submittedLessons = moduleLessons.filter((l) => {
+          const st = statusByLesson.get(l.id as string);
+          return st === "submitted" || st === "completed";
+        }).length;
         const moduleComplete = lessonCount > 0 && completedLessons === lessonCount;
         const moduleLocked = !previousModuleComplete;
         builtModules.push({
@@ -897,8 +914,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         let allPrevCompleted = true;
         moduleLessons.forEach((l, lessonIdx) => {
           const isCompleted = Boolean(progressByLesson.get(l.id as string));
-          const evalSt = isCompleted ? undefined : evalStatusByLesson.get(l.id as string) ?? undefined;
-          const passedForUnlock = isCompleted || evalSt === "pending";
+          const lessonStatus = statusByLesson.get(l.id as string) ?? "not_started";
+          // needs_revision always surfaces (a learner needs to know to fix
+          // it); otherwise show "awaiting review" only once every question
+          // has genuinely been submitted, not just the first one.
+          const evalSt = isCompleted
+            ? undefined
+            : evalStatusByLesson.get(l.id as string) === "needs_revision"
+              ? "needs_revision"
+              : lessonStatus === "submitted" ? "pending" : undefined;
+          // Layer 1 (submission gate): the next lesson unlocks once every
+          // question in this one has been submitted — approval isn't required.
+          const passedForUnlock = isCompleted || lessonStatus === "submitted";
           // A module's "Discussion & Review" lesson is seeded with
           // order_index 999 — that data convention, not list position, is
           // what marks it. Modules without one (e.g. Module 0) have a normal
@@ -955,7 +982,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       const [{ data: subs }, { data: lessonsData }, { data: planSubs }, { data: planLessonsData }, { data: submitters }] = await Promise.all([
         submissionIds.length
-          ? supabase.from("p2p_submissions").select("id,submission_type,text_content,media_url,duration_seconds").in("id", submissionIds)
+          ? supabase.from("p2p_submissions").select("id,submission_type,text_content,media_url,duration_seconds,assignment_question_id").in("id", submissionIds)
           : Promise.resolve({ data: [] }),
         lessonIds.length ? supabase.from("p2p_lessons").select("id,title").in("id", lessonIds) : Promise.resolve({ data: [] }),
         planSubmissionIds.length
@@ -970,8 +997,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const planTitleById = new Map((planLessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Plan Lesson"]));
       const nameById = new Map((submitters ?? []).map((p: Record<string, unknown>) => [p.id as string, (p.full_name as string) ?? "A fellow disciple"]));
 
+      // Original assignment-question text, so the reviewer sees what was
+      // actually asked, not just the learner's answer.
+      const assignmentQuestionIds = Array.from(new Set(
+        (subs ?? [])
+          .map((s: Record<string, unknown>) => s.assignment_question_id as string | null)
+          .filter((v): v is string => Boolean(v))
+      ));
+      const { data: assignmentQs } = assignmentQuestionIds.length
+        ? await supabase.from("p2p_assignment_questions").select("id,question").in("id", assignmentQuestionIds)
+        : { data: [] };
+      const questionTextById = new Map((assignmentQs ?? []).map((q: Record<string, unknown>) => [q.id as string, q.question as string]));
+
       const mapped: PendingEvaluation[] = rows.map((row) => {
         const sub = subById.get(row.submission_id as string) as Record<string, unknown> | undefined;
+        const questionId = sub?.assignment_question_id as string | null | undefined;
         return {
           id: row.id as string,
           submissionId: row.submission_id as string,
@@ -984,6 +1024,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           mediaUrl: (sub?.media_url as string) ?? null,
           durationSeconds: (sub?.duration_seconds as number) ?? null,
           assignedAt: row.assigned_at as string,
+          questionText: questionId ? questionTextById.get(questionId) ?? null : null,
           source: "core",
         };
       });
@@ -1001,6 +1042,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           mediaUrl: null,
           durationSeconds: null,
           assignedAt: row.assigned_at as string,
+          // Plan submissions already embed "Q: ...\nA: ..." pairs directly in
+          // `content` (see submitAssignment() in plan/lesson/[lessonId].tsx),
+          // so there's no separate question to surface here.
+          questionText: null,
           source: "plan",
         };
       });

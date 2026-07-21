@@ -195,7 +195,7 @@ export default function ModuleDetailScreen() {
         profile?.id
           ? supabase
               .from("p2p_lesson_progress")
-              .select("lesson_id,completed")
+              .select("lesson_id,completed,status")
               .eq("user_id", profile.id)
           : Promise.resolve({ data: [] }),
         profile?.id
@@ -207,8 +207,13 @@ export default function ModuleDetailScreen() {
           : Promise.resolve({ data: [] }),
       ]);
       const progressMap = new Map<string, boolean>();
+      // Authoritative "all questions submitted"/"all approved" signal from
+      // p2p_lesson_progress_recompute() (031) — see the same fix in
+      // DataContext.loadCurriculum for the full rationale.
+      const statusMap = new Map<string, "not_started" | "submitted" | "completed">();
       for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
         progressMap.set(p.lesson_id as string, Boolean(p.completed));
+        statusMap.set(p.lesson_id as string, (p.status as "not_started" | "submitted" | "completed") ?? "not_started");
       }
       const evalMap = new Map<string, "pending" | "needs_revision">();
       for (const e of (evalRows ?? []) as Record<string, unknown>[]) {
@@ -216,20 +221,30 @@ export default function ModuleDetailScreen() {
         if (st === "needs_revision" || !evalMap.has(e.lesson_id as string))
           evalMap.set(e.lesson_id as string, st);
       }
-      const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => ({
-        id: l.id as string,
-        title: l.title as string,
-        subtitle: (l.subtitle as string) ?? "",
-        order: l.order_index as number,
-        isCompleted: progressMap.get(l.id as string) ?? false,
-        isLocked: false,
-        evaluationStatus: progressMap.get(l.id as string) ? undefined : evalMap.get(l.id as string),
-      }));
-      // Unlock the next lesson as soon as the previous is submitted (pending)
-      // or approved — no waiting on peer review to continue learning.
+      const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => {
+        const lessonId = l.id as string;
+        const isCompleted = progressMap.get(lessonId) ?? false;
+        const lessonStatus = statusMap.get(lessonId) ?? "not_started";
+        const evalSt: "pending" | "needs_revision" | undefined = evalMap.get(lessonId) === "needs_revision"
+          ? "needs_revision"
+          : lessonStatus === "submitted" ? "pending" : undefined;
+        return {
+          id: lessonId,
+          title: l.title as string,
+          subtitle: (l.subtitle as string) ?? "",
+          order: l.order_index as number,
+          isCompleted,
+          isLocked: false,
+          evaluationStatus: isCompleted ? undefined : evalSt,
+        };
+      });
+      // Layer 1: unlock the next lesson once the previous one is fully
+      // submitted (every assignment question answered) — approval isn't
+      // required yet. Matches p2p_lesson_progress.status = 'submitted'.
       for (let i = 1; i < built.length; i++) {
         const prev = built[i - 1];
-        const prevPassed = prev.isCompleted || prev.evaluationStatus === "pending";
+        const prevStatus = statusMap.get(prev.id) ?? "not_started";
+        const prevPassed = prev.isCompleted || prevStatus === "submitted";
         built[i].isLocked = !prevPassed;
       }
       setPlanLessons(built);
