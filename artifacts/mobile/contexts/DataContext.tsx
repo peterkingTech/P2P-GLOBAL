@@ -255,12 +255,37 @@ export interface ForestNode {
   children: ForestNode[];
 }
 
-export interface Fruit {
-  id: string;
+// A catalog row describes every possible fruit, earned or not — the display
+// screen merges this with a user's earned rows and progress rows to render
+// the full "My Fruits" journey (see app/fruit.tsx and app/fruit/[fruitKey].tsx).
+export interface FruitCatalogEntry {
+  fruitKey: string;
   name: string;
   description: string;
-  earnedAt: string;
-  iconName: string;
+  category: "personal_growth" | "community" | "multiplication" | "faithfulness" | "kingdom_influence" | "special" | "legendary";
+  verificationLevel: "system" | "peer" | "mentor";
+  rarity: "common" | "rare" | "epic" | "legendary";
+  icon: string;
+  themeVerse: string | null;
+  themeVerseText: string | null;
+  biblicalMeaning: string | null;
+  unlockConditionDescription: string | null;
+  isHidden: boolean;
+  displayOrder: number | null;
+}
+
+export interface EarnedFruit {
+  fruitKey: string;
+  awardedAt: string;
+  awardedBy: "system" | "peer" | "mentor" | "admin";
+  evidence: Record<string, unknown>;
+  evidenceSummary: string | null;
+}
+
+export interface FruitProgressEntry {
+  fruitKey: string;
+  currentCount: number;
+  requiredCount: number;
 }
 
 export interface Mission {
@@ -417,7 +442,10 @@ interface DataContextValue {
   sessions: StudySession[];
   forestNodes: ForestNode[];
   forestStats: ForestStats;
-  fruits: Fruit[];
+  fruitCatalog: FruitCatalogEntry[];
+  userFruits: EarnedFruit[];
+  fruitProgress: FruitProgressEntry[];
+  fruitCount: number;
   missions: Mission[];
   dailyVerse: { ref: string; text: string } | null;
   pendingEvaluations: PendingEvaluation[];
@@ -569,7 +597,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [plansLoading, setPlansLoading] = useState(false);
   const [plansV2, setPlansV2] = useState<PlanV2[]>([]);
   const [plansV2Loading, setPlansV2Loading] = useState(false);
-  const [fruits, setFruits] = useState<Fruit[]>([]);
+  const [fruitCatalog, setFruitCatalog] = useState<FruitCatalogEntry[]>([]);
+  const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
+  const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -1145,7 +1175,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setSessions([]);
     setForestNodes([]);
     setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
-    setFruits([]);
+    setFruitCatalog([]);
+    setUserFruits([]);
+    setFruitProgress([]);
     setDailyVerse(null);
     setPendingEvaluations([]);
     setToastEvent(null);
@@ -1212,18 +1244,53 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         await refreshPendingEvaluations(profile.id);
         await checkGrowthEvents(profile.id);
       }
+      {
+        // Catalog is public (RLS: any authenticated user) so it loads
+        // regardless of whether profile is set yet.
+        const { data: catalogData } = await supabase
+          .from("p2p_fruits_catalog")
+          .select("fruit_key,name,description,category,verification_level,rarity,icon,theme_verse,theme_verse_text,biblical_meaning,unlock_condition_description,is_hidden,display_order")
+          .eq("is_active", true)
+          .order("display_order", { ascending: true });
+        setFruitCatalog((catalogData ?? []).map((f: Record<string, unknown>) => ({
+          fruitKey: f.fruit_key as string,
+          name: f.name as string,
+          description: f.description as string,
+          category: f.category as FruitCatalogEntry["category"],
+          verificationLevel: f.verification_level as FruitCatalogEntry["verificationLevel"],
+          rarity: f.rarity as FruitCatalogEntry["rarity"],
+          icon: f.icon as string,
+          themeVerse: (f.theme_verse as string) ?? null,
+          themeVerseText: (f.theme_verse_text as string) ?? null,
+          biblicalMeaning: (f.biblical_meaning as string) ?? null,
+          unlockConditionDescription: (f.unlock_condition_description as string) ?? null,
+          isHidden: Boolean(f.is_hidden),
+          displayOrder: (f.display_order as number) ?? null,
+        })));
+      }
       if (profile?.id) {
-        const { data: fruitsData } = await supabase
-          .from("p2p_user_fruits")
-          .select("id,fruit_name,description,icon_name,earned_at")
-          .eq("user_id", profile.id)
-          .order("earned_at", { ascending: false });
-        setFruits((fruitsData ?? []).map((f: Record<string, unknown>) => ({
-          id: f.id as string,
-          name: (f.fruit_name as string) ?? "",
-          description: (f.description as string) ?? "",
-          earnedAt: (f.earned_at as string) ?? "",
-          iconName: (f.icon_name as string) ?? "leaf",
+        const [{ data: fruitsData }, { data: progressData }] = await Promise.all([
+          supabase
+            .from("p2p_user_fruits")
+            .select("fruit_key,awarded_at,awarded_by,evidence,evidence_summary")
+            .eq("user_id", profile.id)
+            .order("awarded_at", { ascending: false }),
+          supabase
+            .from("p2p_fruit_progress")
+            .select("fruit_key,current_count,required_count")
+            .eq("user_id", profile.id),
+        ]);
+        setUserFruits((fruitsData ?? []).map((f: Record<string, unknown>) => ({
+          fruitKey: f.fruit_key as string,
+          awardedAt: f.awarded_at as string,
+          awardedBy: f.awarded_by as EarnedFruit["awardedBy"],
+          evidence: (f.evidence as Record<string, unknown>) ?? {},
+          evidenceSummary: (f.evidence_summary as string) ?? null,
+        })));
+        setFruitProgress((progressData ?? []).map((p: Record<string, unknown>) => ({
+          fruitKey: p.fruit_key as string,
+          currentCount: (p.current_count as number) ?? 0,
+          requiredCount: (p.required_count as number) ?? 0,
         })));
         const { data: missionsData } = await supabase
           .from("p2p_missions")
@@ -2438,7 +2505,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, plans, plansLoading, plansV2, plansV2Loading, refreshPlansV2: loadPlansV2, prayers, sessions, forestNodes, forestStats, fruits, missions,
+      modules, lessons, plans, plansLoading, plansV2, plansV2Loading, refreshPlansV2: loadPlansV2, prayers, sessions, forestNodes, forestStats,
+      fruitCatalog, userFruits, fruitProgress, fruitCount: userFruits.length, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
