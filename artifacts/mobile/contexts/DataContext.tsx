@@ -288,6 +288,18 @@ export interface FruitProgressEntry {
   requiredCount: number;
 }
 
+// One queued celebration moment — built the instant a new p2p_user_fruits
+// row is seen over realtime, merging the award row with its catalog display
+// info (and, for mentor-awarded fruits, the mentee's first name).
+export interface FruitCelebration {
+  fruitKey: string;
+  name: string;
+  icon: string;
+  themeVerse: string | null;
+  evidenceSummary: string | null;
+  menteeName: string | null;
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -524,6 +536,8 @@ interface DataContextValue {
   celebrationEvent: GrowthEvent | null;
   dismissToastEvent: () => void;
   dismissCelebrationEvent: () => void;
+  fruitCelebrationQueue: FruitCelebration[];
+  dismissCurrentFruitCelebration: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -600,6 +614,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [fruitCatalog, setFruitCatalog] = useState<FruitCatalogEntry[]>([]);
   const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
+  const [fruitCelebrationQueue, setFruitCelebrationQueue] = useState<FruitCelebration[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -1354,6 +1369,69 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile?.id, profile?.contentLanguage, loadCurriculum, loadPlansV2]);
+
+  // Fruit celebration — fires the instant the award engine (migration 033)
+  // inserts a new p2p_user_fruits row for this user. Queued rather than
+  // shown immediately: a single event (e.g. finishing a module) can award
+  // several fruits at once, and they should celebrate one at a time, not
+  // stack on top of each other.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const channel = supabase
+      .channel(`p2p_fruit_celebration_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_user_fruits", filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const fruitKey = row.fruit_key as string;
+
+          let catalogEntry = fruitCatalog.find((f) => f.fruitKey === fruitKey);
+          if (!catalogEntry) {
+            const { data } = await supabase
+              .from("p2p_fruits_catalog")
+              .select("fruit_key,name,icon,theme_verse")
+              .eq("fruit_key", fruitKey)
+              .maybeSingle();
+            if (data) {
+              catalogEntry = {
+                fruitKey: data.fruit_key, name: data.name, icon: data.icon,
+                themeVerse: data.theme_verse ?? null,
+              } as FruitCatalogEntry;
+            }
+          }
+          if (!catalogEntry) return;
+
+          let menteeName: string | null = null;
+          if (row.source_type === "mentor_action" && row.source_id) {
+            const { data: menteeProfile } = await supabase
+              .from("p2p_profiles").select("full_name").eq("id", row.source_id as string).maybeSingle();
+            menteeName = (menteeProfile?.full_name as string)?.split(" ")[0] ?? null;
+          }
+
+          const celebration: FruitCelebration = {
+            fruitKey,
+            name: catalogEntry.name,
+            icon: catalogEntry.icon,
+            themeVerse: catalogEntry.themeVerse,
+            evidenceSummary: (row.evidence_summary as string) ?? null,
+            menteeName,
+          };
+          setFruitCelebrationQueue((prev) => [...prev, celebration]);
+          setUserFruits((prev) => [
+            { fruitKey, awardedAt: row.awarded_at as string, awardedBy: row.awarded_by as EarnedFruit["awardedBy"], evidence: (row.evidence as Record<string, unknown>) ?? {}, evidenceSummary: (row.evidence_summary as string) ?? null },
+            ...prev,
+          ]);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id, fruitCatalog]);
+
+  const dismissCurrentFruitCelebration = useCallback(() => {
+    setFruitCelebrationQueue((prev) => prev.slice(1));
+  }, []);
 
   const checkGrowthEvents = useCallback(async (userId: string) => {
     try {
@@ -2525,6 +2603,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation, getSubmitterEvaluationContext,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
+      fruitCelebrationQueue, dismissCurrentFruitCelebration,
     }}>
       {children}
     </DataContext.Provider>

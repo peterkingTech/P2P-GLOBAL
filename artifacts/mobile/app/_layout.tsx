@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
+import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -98,8 +99,12 @@ function AuthGate() {
 }
 
 function GrowthCelebrationHost() {
-  const { toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent } = useData();
+  const { toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent, fruitCelebrationQueue, dismissCurrentFruitCelebration } = useData();
   const router = useRouter();
+
+  // Fruit celebrations take priority over the growth toast/module modal —
+  // they're queued one at a time (see DataContext), so only ever one shows.
+  const currentFruitCelebration = fruitCelebrationQueue[0] ?? null;
 
   return (
     <>
@@ -118,6 +123,16 @@ function GrowthCelebrationHost() {
             });
           }}
           onDismiss={dismissCelebrationEvent}
+        />
+      )}
+      {currentFruitCelebration && (
+        <FruitCelebrationModal
+          celebration={currentFruitCelebration}
+          onViewFruits={() => {
+            dismissCurrentFruitCelebration();
+            router.push("/fruit");
+          }}
+          onContinue={dismissCurrentFruitCelebration}
         />
       )}
     </>

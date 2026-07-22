@@ -1,0 +1,11 @@
+-- 034: Enable Postgres Realtime replication for p2p_user_fruits.
+--
+-- Same bug pattern discovered and fixed in migration 028 for
+-- p2p_lesson_evaluations: DataContext.tsx subscribes to postgres_changes
+-- INSERT on p2p_user_fruits to trigger the fruit celebration modal the
+-- instant the award engine grants a new fruit, but only tables explicitly
+-- added to the supabase_realtime publication ever emit those events.
+-- Confirmed via direct query before this migration: p2p_user_fruits was not
+-- in the publication, so the celebration subscription would have silently
+-- never fired.
+ALTER PUBLICATION supabase_realtime ADD TABLE public.p2p_user_fruits;
