@@ -295,6 +295,7 @@ export default function HomeTab() {
           { icon: "people", label: t("home.peerReview"), sub: t("home.peerReviewSub"), route: "/evaluations" },
           { icon: "flower", label: t("home.fruitCollection"), sub: t("home.fruitCollectionSub"), route: "/fruit" },
           { icon: "stats-chart", label: t("home.myProgress"), sub: t("home.myProgressSub"), route: "/progress" },
+          { icon: "trending-up", label: t("home.kingdomImpact"), sub: t("home.kingdomImpactSub"), route: "/dashboard" },
           { icon: "person-circle", label: t("home.myProfile"), sub: t("home.myProfileSub"), route: "/profile" },
           ...(profile?.role && profile.role !== "student"
             ? [{ icon: "settings", label: t("home.admin"), sub: t("home.adminSub"), route: "/admin/curriculum" }]
