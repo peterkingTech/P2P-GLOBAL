@@ -124,6 +124,11 @@ function makeStyles(c: AppColors) {
     },
     dashboardTitle: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     dashboardSub: { fontSize: 11, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    confirmationBadge: {
+      backgroundColor: "#C0392B", borderRadius: 9, minWidth: 18, height: 18,
+      alignItems: "center", justifyContent: "center", paddingHorizontal: 4, marginRight: 4,
+    },
+    confirmationBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold" },
     settingsList: {
       backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige,
@@ -208,7 +213,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest } = useData();
+  const { submitHelpRequest, pendingConfirmationCount } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
@@ -334,6 +339,21 @@ export default function ProfileScreen() {
             <Text style={styles.dashboardTitle}>My Progress</Text>
             <Text style={styles.dashboardSub}>Submissions, evaluations &amp; plans in progress</Text>
           </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
+
+        {/* Pending Confirmations */}
+        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/confirmations" as any)}>
+          <Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primaryGreen} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dashboardTitle}>Pending Confirmations</Text>
+            <Text style={styles.dashboardSub}>Confirm encouragement, prayer &amp; peer sessions</Text>
+          </View>
+          {pendingConfirmationCount > 0 && (
+            <View style={styles.confirmationBadge}>
+              <Text style={styles.confirmationBadgeText}>{pendingConfirmationCount}</Text>
+            </View>
+          )}
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
         </TouchableOpacity>
 

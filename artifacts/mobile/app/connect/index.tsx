@@ -11,6 +11,7 @@ import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 const MATCH_PATHS = [
@@ -51,6 +52,7 @@ const MATCH_PATHS = [
 export default function ConnectHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { pendingConfirmationCount } = useData();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   return (
@@ -85,6 +87,26 @@ export default function ConnectHub() {
               <Text style={styles.pathSub}>{path.subtitle}</Text>
             </TouchableOpacity>
           ))}
+
+          <TouchableOpacity
+            style={styles.pathCard}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/confirmations" as any);
+            }}
+          >
+            <View style={[styles.pathIconRing, { backgroundColor: `${colors.primaryGreen}18`, borderColor: `${colors.primaryGreen}33` }]}>
+              <Ionicons name="checkmark-done-circle" size={28} color={colors.primaryGreen} />
+              {pendingConfirmationCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingConfirmationCount}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.pathTitle}>Pending Confirmations</Text>
+            <Text style={styles.pathSub}>Confirm real encouragement, prayer, and peer sessions</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.tipCard}>
@@ -117,6 +139,12 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     marginBottom: 4,
   },
+  badge: {
+    position: "absolute", top: -4, right: -4,
+    backgroundColor: "#C0392B", borderRadius: 9, minWidth: 18, height: 18,
+    alignItems: "center", justifyContent: "center", paddingHorizontal: 4,
+  },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold" },
   pathTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   pathSub: { fontSize: 11, color: colors.textMuted, lineHeight: 16, fontFamily: "Inter_400Regular" },
   tipCard: {

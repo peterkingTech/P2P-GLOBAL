@@ -1,9 +1,16 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
+
+interface ConfirmedEncouragement {
+  id: string;
+  confirmerName: string;
+  confirmedAt: string;
+}
 
 const dark = {
   bg: "#081611",
@@ -39,11 +46,39 @@ export default function FruitDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { fruitCatalog, userFruits, fruitProgress } = useData();
+  const { profile } = useAuth();
 
   const fruit = fruitCatalog.find((f) => f.fruitKey === fruitKey);
   const earned = userFruits.find((f) => f.fruitKey === fruitKey) ?? null;
   const progress = fruitProgress.find((p) => p.fruitKey === fruitKey) ?? null;
   const isHiddenAndUnearned = fruit?.isHidden && !earned;
+
+  // The Encouragement Fruit specifically shows who confirmed it and when —
+  // every other progress-tracked fruit just shows the bare count.
+  const [confirmedEncouragements, setConfirmedEncouragements] = useState<ConfirmedEncouragement[]>([]);
+  useEffect(() => {
+    if (fruitKey !== "encouragement_fruit" || !profile?.id) return;
+    (async () => {
+      const { data: rows } = await supabase
+        .from("p2p_peer_confirmations")
+        .select("id,confirmer_user_id,confirmed_at")
+        .eq("actor_user_id", profile.id)
+        .eq("confirmation_type", "encouragement")
+        .eq("confirmation_status", "confirmed")
+        .order("confirmed_at", { ascending: false });
+      if (!rows || rows.length === 0) { setConfirmedEncouragements([]); return; }
+      const confirmerIds = Array.from(new Set(rows.map((r) => r.confirmer_user_id as string)));
+      const { data: confirmers } = await supabase.rpc("p2p_get_confirmer_profiles", { p_confirmer_ids: confirmerIds });
+      const nameById = new Map<string, string>(
+        ((confirmers ?? []) as Record<string, unknown>[]).map((c) => [c.id as string, c.full_name as string])
+      );
+      setConfirmedEncouragements(rows.map((r) => ({
+        id: r.id as string,
+        confirmerName: nameById.get(r.confirmer_user_id as string) ?? "A fellow disciple",
+        confirmedAt: r.confirmed_at as string,
+      })));
+    })();
+  }, [fruitKey, profile?.id]);
 
   const relatedFruits = useMemo(() => {
     if (!fruit) return [];
@@ -130,9 +165,24 @@ export default function FruitDetailScreen() {
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${Math.min(100, (progress.currentCount / progress.requiredCount) * 100)}%` }]} />
                 </View>
-                <Text style={styles.blockBody}>{progress.currentCount} of {progress.requiredCount}</Text>
+                <Text style={styles.blockBody}>{progress.currentCount} of {progress.requiredCount} confirmed</Text>
               </View>
             ) : null}
+
+            {fruit.fruitKey === "encouragement_fruit" && confirmedEncouragements.length > 0 && (
+              <View style={styles.block}>
+                <Text style={styles.blockTitle}>Confirmed By</Text>
+                {confirmedEncouragements.map((c) => (
+                  <View key={c.id} style={styles.confirmedRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={dark.green} />
+                    <Text style={styles.confirmedName}>{c.confirmerName}</Text>
+                    <Text style={styles.confirmedDate}>
+                      {new Date(c.confirmedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <View style={styles.block}>
               <Text style={styles.blockTitle}>A Prayer for This</Text>
@@ -200,6 +250,10 @@ const styles = StyleSheet.create({
 
   progressTrack: { height: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden", marginBottom: 8 },
   progressFill: { height: "100%", backgroundColor: dark.green, borderRadius: 3 },
+
+  confirmedRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  confirmedName: { flex: 1, fontSize: 13, color: dark.cream, fontFamily: "Inter_500Medium" },
+  confirmedDate: { fontSize: 11, color: dark.textFaint, fontFamily: "Inter_400Regular" },
 
   relatedRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: dark.border },
   relatedIcon: { fontSize: 18 },

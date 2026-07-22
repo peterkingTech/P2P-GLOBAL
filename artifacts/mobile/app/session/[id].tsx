@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,29 @@ import {
   FlatList,
   TextInput,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData } from "@/contexts/DataContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+
+// The REAL p2p_sessions row — distinct from DataContext's `sessions` array,
+// which reads a mismatched set of columns (participant_count, is_live,
+// host_name) that don't exist on this table. This table's actual shape is
+// a genuine 1:1 mentor/participant peer session, which is what the peer
+// confirmation system (migration 036) hooks into on completion.
+interface RealSessionRow {
+  id: string;
+  title: string;
+  mentor_id: string | null;
+  participant_id: string | null;
+  status: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -42,6 +58,41 @@ export default function SessionScreen() {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+
+  const { user } = useAuth();
+  const [realSession, setRealSession] = useState<RealSessionRow | null>(null);
+  const [completing, setCompleting] = useState(false);
+
+  const loadRealSession = useCallback(async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("p2p_sessions")
+      .select("id,title,mentor_id,participant_id,status")
+      .eq("id", id)
+      .maybeSingle();
+    setRealSession((data as RealSessionRow) ?? null);
+  }, [id]);
+
+  useEffect(() => { loadRealSession(); }, [loadRealSession]);
+
+  const isParticipant = !!user && !!realSession && (realSession.mentor_id === user.id || realSession.participant_id === user.id);
+  const isCompleted = realSession?.status === "completed";
+
+  async function handleMarkComplete() {
+    if (!realSession || completing) return;
+    setCompleting(true);
+    const { error } = await supabase
+      .from("p2p_sessions")
+      .update({ status: "completed", ended_at: new Date().toISOString() })
+      .eq("id", realSession.id);
+    setCompleting(false);
+    if (error) {
+      Alert.alert("Couldn't mark complete", error.message);
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await loadRealSession();
+  }
 
   function sendMessage() {
     if (!input.trim()) return;
@@ -85,6 +136,29 @@ export default function SessionScreen() {
         <Ionicons name="bookmark" size={13} color={colors.amber} />
         <Text style={styles.verseBarText}>John 15:5</Text>
       </View>
+
+      {/* Mark session complete — this is what actually fires the Fellowship
+          confirmation request (and, if participants are from different
+          countries, the Unity fruit) for both people in this session. */}
+      {isParticipant && (
+        isCompleted ? (
+          <View style={styles.completeBanner}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />
+            <Text style={styles.completeBannerText}>Session marked complete</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.completeBtn} onPress={handleMarkComplete} disabled={completing} activeOpacity={0.85}>
+            {completing ? (
+              <ActivityIndicator color={colors.cream} size="small" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-done" size={16} color={colors.cream} />
+                <Text style={styles.completeBtnText}>Mark Session Complete</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )
+      )}
 
       {/* Chat */}
       {messages.length === 0 && (
@@ -158,6 +232,18 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
   },
   leaveBtnText: { color: "#FCA5A5", fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  completeBtn: {
+    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.accentGreen, marginHorizontal: 16, marginTop: 10,
+    borderRadius: 10, paddingVertical: 10,
+  },
+  completeBtnText: { color: colors.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  completeBanner: {
+    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(29,158,117,0.1)", marginHorizontal: 16, marginTop: 10,
+    borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: "rgba(29,158,117,0.3)",
+  },
+  completeBannerText: { color: colors.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   verseBar: {
     flexDirection: "row", gap: 6, alignItems: "center",
     paddingHorizontal: 16, paddingVertical: 8,

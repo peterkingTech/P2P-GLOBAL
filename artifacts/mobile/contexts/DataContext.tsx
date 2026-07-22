@@ -300,6 +300,22 @@ export interface FruitCelebration {
   menteeName: string | null;
 }
 
+export type PeerConfirmationType = "encouragement" | "compassion" | "service" | "fellowship" | "unity" | "global";
+
+// A pending confirmation the current user needs to action — someone else's
+// real action (feedback, prayer, session, mentoring) that only THIS user can
+// vouch actually happened/helped. One tap either way; no essay required.
+export interface PendingPeerConfirmation {
+  id: string;
+  confirmationType: PeerConfirmationType;
+  actorId: string;
+  actorName: string;
+  actorPhotoUrl: string | null;
+  contextSummary: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -538,6 +554,10 @@ interface DataContextValue {
   dismissCelebrationEvent: () => void;
   fruitCelebrationQueue: FruitCelebration[];
   dismissCurrentFruitCelebration: () => void;
+  pendingConfirmations: PendingPeerConfirmation[];
+  pendingConfirmationCount: number;
+  confirmPeer: (confirmationId: string) => Promise<string | null>;
+  declinePeer: (confirmationId: string) => Promise<string | null>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -615,6 +635,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
   const [fruitCelebrationQueue, setFruitCelebrationQueue] = useState<FruitCelebration[]>([]);
+  const [pendingConfirmations, setPendingConfirmations] = useState<PendingPeerConfirmation[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -1000,6 +1021,123 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setModules(FALLBACK_MODULES); setLessons([]);
     }
   }, []);
+
+  // Pending peer confirmations — real actions (encouraging feedback, prayer,
+  // a completed peer session, mentoring help) that only the RECIPIENT can
+  // vouch actually happened. Created entirely by DB triggers (migration 036)
+  // on tables the app already writes to — nothing here originates a
+  // confirmation, this just reads and actions them.
+  const loadPendingConfirmations = useCallback(async () => {
+    if (!profile?.id) { setPendingConfirmations([]); return; }
+    try {
+      const { data: rows } = await supabase
+        .from("p2p_peer_confirmations")
+        .select("id,confirmation_type,actor_user_id,source_type,source_id,created_at,expires_at")
+        .eq("confirmer_user_id", profile.id)
+        .eq("confirmation_status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (!rows || rows.length === 0) { setPendingConfirmations([]); return; }
+
+      const actorIds = Array.from(new Set(rows.map((r) => r.actor_user_id as string)));
+      const evalIds = rows.filter((r) => r.source_type === "evaluation_feedback").map((r) => r.source_id as string);
+      const reactionIds = rows.filter((r) => r.source_type === "prayer").map((r) => r.source_id as string);
+      const sessionIds = rows.filter((r) => r.source_type === "session").map((r) => r.source_id as string);
+
+      const [{ data: actors }, { data: evalRows }, { data: reactionRows }, { data: sessionRows }] = await Promise.all([
+        supabase.rpc("p2p_get_confirmation_actor_profiles", { p_actor_ids: actorIds }),
+        evalIds.length ? supabase.from("p2p_lesson_evaluations").select("id,lesson_id,feedback").in("id", evalIds) : Promise.resolve({ data: [] }),
+        reactionIds.length ? supabase.from("p2p_prayer_wall_reactions").select("id,post_id").in("id", reactionIds) : Promise.resolve({ data: [] }),
+        sessionIds.length ? supabase.from("p2p_sessions").select("id,title").in("id", sessionIds) : Promise.resolve({ data: [] }),
+      ]);
+      const actorById = new Map((actors ?? []).map((a: Record<string, unknown>) => [a.id as string, a]));
+
+      const lessonIds = Array.from(new Set((evalRows ?? []).map((e: Record<string, unknown>) => e.lesson_id as string)));
+      const { data: lessons } = lessonIds.length
+        ? await supabase.from("p2p_lessons").select("id,title").in("id", lessonIds)
+        : { data: [] };
+      const lessonTitleById = new Map((lessons ?? []).map((l: Record<string, unknown>) => [l.id as string, l.title as string]));
+      const evalById = new Map((evalRows ?? []).map((e: Record<string, unknown>) => [e.id as string, e]));
+
+      const postIds = Array.from(new Set((reactionRows ?? []).map((r: Record<string, unknown>) => r.post_id as string)));
+      const { data: posts } = postIds.length
+        ? await supabase.from("p2p_prayer_wall_posts").select("id,body").in("id", postIds)
+        : { data: [] };
+      const postBodyById = new Map((posts ?? []).map((p: Record<string, unknown>) => [p.id as string, p.body as string]));
+      const reactionById = new Map((reactionRows ?? []).map((r: Record<string, unknown>) => [r.id as string, r]));
+      const sessionTitleById = new Map((sessionRows ?? []).map((s: Record<string, unknown>) => [s.id as string, s.title as string]));
+
+      const truncate = (text: string, n: number) => (text.length > n ? `${text.slice(0, n)}…` : text);
+
+      const mapped: PendingPeerConfirmation[] = rows.map((r) => {
+        const actor = actorById.get(r.actor_user_id as string) as Record<string, unknown> | undefined;
+        let contextSummary: string | null = null;
+        if (r.source_type === "evaluation_feedback") {
+          const e = evalById.get(r.source_id as string) as Record<string, unknown> | undefined;
+          const title = e ? lessonTitleById.get(e.lesson_id as string) ?? "a lesson" : "a lesson";
+          const feedback = (e?.feedback as string) ?? "";
+          contextSummary = feedback ? `${title} — "${truncate(feedback, 80)}"` : title;
+        } else if (r.source_type === "prayer") {
+          const reaction = reactionById.get(r.source_id as string) as Record<string, unknown> | undefined;
+          const body = reaction ? postBodyById.get(reaction.post_id as string) : null;
+          contextSummary = body ? `"${truncate(body, 80)}"` : null;
+        } else if (r.source_type === "session") {
+          contextSummary = sessionTitleById.get(r.source_id as string) ?? null;
+        }
+        return {
+          id: r.id as string,
+          confirmationType: r.confirmation_type as PeerConfirmationType,
+          actorId: r.actor_user_id as string,
+          actorName: (actor?.full_name as string) ?? "A fellow disciple",
+          actorPhotoUrl: (actor?.photo_url as string) ?? null,
+          contextSummary,
+          createdAt: r.created_at as string,
+          expiresAt: (r.expires_at as string) ?? null,
+        };
+      });
+      setPendingConfirmations(mapped);
+    } catch {
+      setPendingConfirmations([]);
+    }
+  }, [profile?.id]);
+
+  const confirmPeer = useCallback(async (confirmationId: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.rpc("p2p_process_confirmation", { p_confirmation_id: confirmationId });
+      if (error) return error.message;
+      setPendingConfirmations((prev) => prev.filter((c) => c.id !== confirmationId));
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Could not confirm.";
+    }
+  }, []);
+
+  const declinePeer = useCallback(async (confirmationId: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.rpc("p2p_decline_confirmation", { p_confirmation_id: confirmationId });
+      if (error) return error.message;
+      setPendingConfirmations((prev) => prev.filter((c) => c.id !== confirmationId));
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Could not decline.";
+    }
+  }, []);
+
+  useEffect(() => { loadPendingConfirmations(); }, [loadPendingConfirmations]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const channel = supabase
+      .channel(`p2p_peer_confirmations_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "p2p_peer_confirmations", filter: `confirmer_user_id=eq.${userId}` },
+        () => { loadPendingConfirmations(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id, loadPendingConfirmations]);
 
   const refreshPendingEvaluations = useCallback(async (userId?: string) => {
     const uid = userId ?? profile?.id;
@@ -2604,6 +2742,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       refreshPendingEvaluations, resolveEvaluation, getSubmitterEvaluationContext,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
       fruitCelebrationQueue, dismissCurrentFruitCelebration,
+      pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
     }}>
       {children}
     </DataContext.Provider>
