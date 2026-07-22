@@ -176,7 +176,7 @@ router.post("/admin/trigger", requireAdmin, async (req, res) => {
 // POST /api/translations/admin/retry/:jobId
 
 router.post("/admin/retry/:jobId", requireAdmin, async (req, res) => {
-  const { jobId } = req.params;
+  const jobId = String(req.params.jobId);
   try {
     const result = await retryJob(jobId);
     return ok(res, result);
