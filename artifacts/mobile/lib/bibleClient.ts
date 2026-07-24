@@ -108,3 +108,50 @@ export async function fetchBatchVerseText(
 export function clearVerseCache(): void {
   sessionCache.clear();
 }
+
+/**
+ * Admin scripture-lookup: fetch verse text for a reference in ANY language,
+ * including English. Unlike fetchVerseText (which exists to translate text
+ * that's already stored in English), this is for populating a brand-new
+ * scripture/memory_verse block from just a typed reference.
+ */
+export async function lookupVerseForAdmin(
+  ref: string,
+  lang: string = "en"
+): Promise<VerseResult | null> {
+  if (!ref?.trim()) return null;
+
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return null;
+
+  try {
+    const res = await fetch(
+      `${apiUrl}/bible/verse?ref=${encodeURIComponent(ref)}&lang=${encodeURIComponent(lang)}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as VerseResult;
+  } catch {
+    return null;
+  }
+}
+
+export interface BibleTranslationOption {
+  translation_code: string;
+  provider: string;
+}
+
+/** List available translations for a language (for the translation-selector in scripture blocks) */
+export async function listBibleTranslations(lang: string = "en"): Promise<BibleTranslationOption[]> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return [];
+  try {
+    const res = await fetch(`${apiUrl}/bible/translations?lang=${encodeURIComponent(lang)}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as BibleTranslationOption[];
+  } catch {
+    return [];
+  }
+}

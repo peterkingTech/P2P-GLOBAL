@@ -60,7 +60,9 @@
     "expo-av": "^16.0.8",
     "expo-camera": "^17.0.10",
     "expo-clipboard": "^8.0.8",
+    "expo-document-picker": "^14.0.8",
     "i18next": "^26.3.5",
-    "react-i18next": "^17.0.8"
+    "react-i18next": "^17.0.8",
+    "react-native-draggable-flatlist": "^4.0.3"
   }
 }
