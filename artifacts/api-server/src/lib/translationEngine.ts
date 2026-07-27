@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL =
@@ -20,20 +20,22 @@ const ANON_KEY =
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 const supabaseRead  = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
-function getOpenAI(): OpenAI {
-  const apiKey = process.env.P2P_Global_Bible_Study_Network_OPEN_AI;
-  if (!apiKey) throw new Error("P2P_Global_Bible_Study_Network_OPEN_AI secret is not set");
-  return new OpenAI({ apiKey });
+const TRANSLATION_MODEL = "claude-haiku-4-5-20251001";
+
+function getAnthropic(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY secret is not set");
+  return new Anthropic({ apiKey });
 }
 
-// gpt-4o-mini pricing (USD per token)
-const COST_PER_INPUT_TOKEN  = 0.15 / 1_000_000;
-const COST_PER_OUTPUT_TOKEN = 0.60 / 1_000_000;
+// claude-haiku-4-5 pricing (USD per token)
+const COST_PER_INPUT_TOKEN  = 1.00 / 1_000_000;
+const COST_PER_OUTPUT_TOKEN = 5.00 / 1_000_000;
 
-function calcCost(usage: { prompt_tokens: number; completion_tokens: number }): number {
+function calcCost(usage: { input_tokens: number; output_tokens: number }): number {
   return Math.round(
-    (usage.prompt_tokens * COST_PER_INPUT_TOKEN +
-     usage.completion_tokens * COST_PER_OUTPUT_TOKEN) * 10_000
+    (usage.input_tokens * COST_PER_INPUT_TOKEN +
+     usage.output_tokens * COST_PER_OUTPUT_TOKEN) * 10_000
   ) / 10_000;
 }
 
@@ -70,6 +72,62 @@ interface SourceFields {
 //     Only verse_ref (book/chapter/verse citation) is included as metadata.
 //     Translated verse text is sourced from p2p_bible_verses_cache (Phase 5).
 
+interface LessonBlockRow {
+  id: string;
+  block_type: string;
+  content: Record<string, any>;
+  order_index: number;
+}
+
+// Maps the block-editor content model (p2p_lesson_blocks) onto the same flat
+// translatable field names the old flat-content model used, so downstream
+// storage/consumption doesn't need to know which model produced them.
+//
+// memory_verse is deliberately treated like scripture (skipped) rather than
+// translated: it holds the same licensed Bible verse text as a scripture
+// block, just under a different block_type — the same rule that already
+// applies to p2p_scriptures.verse_text below applies here.
+function buildTranslatableFromBlocks(blocks: LessonBlockRow[]): Record<string, unknown> {
+  const textParts: string[] = [];
+  const discussionQuestions: string[] = [];
+  const lifeAssignmentParts: string[] = [];
+  let checkpoint = "";
+
+  for (const b of blocks) {
+    const c = b.content ?? {};
+    switch (b.block_type) {
+      case "heading":
+      case "paragraph":
+      case "key_point":
+      case "callout":
+      case "quote":
+        if (c.text) textParts.push(String(c.text));
+        break;
+      case "reflection_question":
+        if (c.question) discussionQuestions.push(String(c.question));
+        break;
+      case "assignment":
+        if (c.title) lifeAssignmentParts.push(String(c.title));
+        if (c.instructions) lifeAssignmentParts.push(String(c.instructions));
+        break;
+      case "checkpoint":
+        if (c.text) checkpoint = String(c.text);
+        break;
+      // scripture, memory_verse: skipped — licensed verse text is never sent to the AI.
+      // image, video_link, audio_link, divider: skipped — nothing translatable.
+      default:
+        break;
+    }
+  }
+
+  return {
+    content: textParts.join("\n\n"),
+    discussion_questions: discussionQuestions.join("\n"),
+    life_assignment: lifeAssignmentParts.join("\n\n"),
+    checkpoint,
+  };
+}
+
 async function fetchEnglishSource(
   contentType: ContentType,
   contentId: string
@@ -103,7 +161,17 @@ async function fetchEnglishSource(
         .maybeSingle();
       if (!lesson) return null;
 
-      // Fetch sections + scripture refs + questions — but NOT verse text
+      const { data: blocks } = await supabaseRead
+        .from("p2p_lesson_blocks")
+        .select("id,block_type,content,order_index")
+        .eq("lesson_id", contentId)
+        .order("order_index");
+
+      if (blocks && blocks.length > 0) {
+        return { title: lesson.title, subtitle: lesson.subtitle, metadata: buildTranslatableFromBlocks(blocks) };
+      }
+
+      // Fallback for lessons with no blocks yet (pre-block-editor content).
       const [{ data: sections }, { data: scriptures }, { data: questions }] =
         await Promise.all([
           supabaseRead
@@ -154,32 +222,30 @@ async function callAI(
   targetLang: string
 ): Promise<{ result: TranslationResult; cost_usd: number }> {
   const langName = LANGUAGE_NAMES[targetLang] ?? targetLang;
-  const openai = getOpenAI();
+  const anthropic = getAnthropic();
 
-  const systemPrompt = `You are a professional Bible study content translator for the P2P Global Bible Study Network (AMEN TECH).
+  const systemPrompt = `You are translating content for a peer-to-peer Bible discipleship platform. All theological terms must be translated accurately and with cultural sensitivity. Preserve the meaning, tone, and spiritual weight of the original text. Do not paraphrase — translate faithfully.
+
 Translate the following Christian discipleship content from English to ${langName}.
 
 Rules:
 - Preserve scripture references (e.g. "John 3:16") exactly as-is — they are language-agnostic identifiers
 - Do NOT translate or include verse text — scripture passages are handled by a separate Bible translation system
-- Preserve theological terms appropriately for ${langName}-speaking believers
 - Translate study questions, section headings, and descriptive content faithfully
 - Keep the same tone: warm, encouraging, and biblically grounded
-- Return ONLY a valid JSON object with the same keys as the input — no markdown, no explanation`;
+- Return ONLY a valid JSON object with the same keys as the input — no markdown, no explanation, no code fences`;
 
   const userPrompt = `Translate this ${contentType} content to ${langName}:\n\n${JSON.stringify(source, null, 2)}`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
+  const response = await anthropic.messages.create({
+    model: TRANSLATION_MODEL,
     max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
   });
 
-  const raw = response.choices[0]?.message?.content ?? "{}";
+  const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+  const raw = (textBlock?.text ?? "{}").trim().replace(/^```(?:json)?\n?|\n?```$/g, "");
   const cost_usd = response.usage ? calcCost(response.usage) : 0;
   return { result: JSON.parse(raw) as TranslationResult, cost_usd };
 }
@@ -201,7 +267,7 @@ async function createJob(
       status: "processing",
       attempts: 1,
       triggered_by: triggeredBy,
-      ai_provider: "gpt-4o-mini",
+      ai_provider: TRANSLATION_MODEL,
       started_at: new Date().toISOString(),
     })
     .select("id")
