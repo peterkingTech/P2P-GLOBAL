@@ -227,6 +227,91 @@ interface TranslationResult extends SourceFields {
   metadata?: Record<string, unknown>;
 }
 
+// Fixed schema for curriculum/module translations and for lessons that went
+// through buildTranslatableFromBlocks() above (flat string fields only).
+// Constraining the response to this schema makes the API guarantee
+// syntactically valid JSON (grammar-constrained decoding) — Claude Haiku 4.5
+// supports structured outputs. The legacy fallback lesson shape (arrays of
+// raw p2p_lesson_sections/p2p_scriptures/p2p_reflection_questions rows, keyed
+// by DB id) is too heterogeneous for a fixed schema, so it returns null here
+// and falls back to sanitizeJsonText() below instead.
+function buildOutputSchema(contentType: ContentType, source: SourceFields): Record<string, unknown> | null {
+  if (contentType === "curriculum" || contentType === "module") {
+    return {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      additionalProperties: false,
+    };
+  }
+
+  if (contentType === "lesson") {
+    const metaKeys = Object.keys(source.metadata ?? {});
+    const isBlockShape = ["content", "discussion_questions", "life_assignment", "checkpoint"]
+      .some((k) => metaKeys.includes(k));
+    if (isBlockShape) {
+      return {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          subtitle: { type: "string" },
+          metadata: {
+            type: "object",
+            properties: {
+              content: { type: "string" },
+              discussion_questions: { type: "string" },
+              life_assignment: { type: "string" },
+              checkpoint: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+        },
+        additionalProperties: false,
+      };
+    }
+  }
+
+  return null;
+}
+
+// Repairs the most common ways Claude's JSON output breaks strict JSON.parse:
+// a literal (unescaped) newline/tab inside a string value, or a backslash
+// followed by a character that isn't a valid JSON escape (seen with
+// non-Latin scripts, e.g. a bare "\র" or "\누"). Only used as a fallback when
+// output_config.format isn't available (see buildOutputSchema) or when
+// JSON.parse on the raw text already failed.
+function sanitizeJsonText(raw: string): string {
+  const validEscapes = new Set(['"', "\\", "/", "b", "f", "n", "r", "t", "u"]);
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inString) {
+      if (ch === "\\") {
+        const next = raw[i + 1];
+        if (next !== undefined && validEscapes.has(next)) {
+          out += ch + next;
+          i++;
+        } else {
+          out += "\\\\"; // stray backslash — escape it so it's treated literally
+        }
+        continue;
+      }
+      if (ch === '"') { inString = false; out += ch; continue; }
+      if (ch === "\n") { out += "\\n"; continue; }
+      if (ch === "\r") { out += "\\r"; continue; }
+      if (ch === "\t") { out += "\\t"; continue; }
+      out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
 async function callAI(
   contentType: ContentType,
   source: SourceFields,
@@ -244,21 +329,33 @@ Rules:
 - Do NOT translate or include verse text — scripture passages are handled by a separate Bible translation system
 - Translate study questions, section headings, and descriptive content faithfully
 - Keep the same tone: warm, encouraging, and biblically grounded
-- Return ONLY a valid JSON object with the same keys as the input — no markdown, no explanation, no code fences`;
+- Return ONLY a valid JSON object with the same keys as the input — no markdown, no explanation, no code fences
+- Every string value must itself be valid JSON: escape newlines as \\n and backslashes as \\\\`;
 
   const userPrompt = `Translate this ${contentType} content to ${langName}:\n\n${JSON.stringify(source, null, 2)}`;
+
+  const schema = buildOutputSchema(contentType, source);
 
   const response = await anthropic.messages.create({
     model: TRANSLATION_MODEL,
     max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
+    ...(schema ? { output_config: { format: { type: "json_schema" as const, schema } } } : {}),
   });
 
   const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
   const raw = (textBlock?.text ?? "{}").trim().replace(/^```(?:json)?\n?|\n?```$/g, "");
   const cost_usd = response.usage ? calcCost(response.usage) : 0;
-  return { result: JSON.parse(raw) as TranslationResult, cost_usd };
+
+  let result: TranslationResult;
+  try {
+    result = JSON.parse(raw) as TranslationResult;
+  } catch {
+    result = JSON.parse(sanitizeJsonText(raw)) as TranslationResult;
+  }
+
+  return { result, cost_usd };
 }
 
 // ── Job tracking ───────────────────────────────────────────────────────────────
