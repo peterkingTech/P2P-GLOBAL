@@ -39,32 +39,6 @@ const VALID_TYPES = new Set([
   "scripture","question","assignment","quiz","devotional","journal",
 ]);
 
-// ── Public: fetch a single approved translation ───────────────────────────────
-// GET /api/translations/:contentType/:contentId?lang=de&auto=true
-
-router.get("/:contentType/:contentId", async (req, res) => {
-  const { contentType, contentId } = req.params;
-  const { lang = "en", auto = "false" } = req.query as Record<string, string>;
-
-  if (!VALID_TYPES.has(contentType)) return err(res, `Unknown content type: ${contentType}`, 400);
-  if (lang === "en") return ok(res, null);
-
-  try {
-    // Public endpoint: approved translations only
-    let translation = await getTranslation(contentType as ContentType, contentId, lang, false);
-
-    if (!translation && auto === "true") {
-      // Trigger AI — result will be draft (not yet approved), so not returned here
-      translateAndStore(contentType as ContentType, contentId, lang, { triggeredBy: "auto" })
-        .catch((e) => console.warn("Auto-translate failed:", e.message));
-    }
-
-    return ok(res, translation ?? null);
-  } catch (e: any) {
-    return err(res, e.message ?? "Translation lookup failed");
-  }
-});
-
 // ── Public: batch fetch approved translations ─────────────────────────────────
 // POST /api/translations/batch { contentType, contentIds, lang }
 
@@ -84,70 +58,6 @@ router.post("/batch", async (req, res) => {
   } catch (e: any) {
     return err(res, e.message ?? "Batch lookup failed");
   }
-});
-
-// ── Admin: delete a cached translation (force re-translate next trigger) ──────
-// DELETE /api/translations/:contentType/:contentId?lang=de
-
-router.delete("/:contentType/:contentId", requireAdmin, async (req, res) => {
-  const { contentType, contentId } = req.params;
-  const { lang } = req.query as { lang?: string };
-
-  if (!lang) return err(res, "lang query param is required", 400);
-
-  const { error } = await supabaseAdmin
-    .from("p2p_content_translations")
-    .delete()
-    .eq("content_type", contentType)
-    .eq("content_id", contentId)
-    .eq("language_code", lang);
-
-  if (error) return err(res, error.message);
-  return ok(res, { deleted: true });
-});
-
-// ── Admin: edit + approve/reject a translation ────────────────────────────────
-// PATCH /api/translations/:contentType/:contentId
-// Body: { lang, title?, subtitle?, description?, body?, metadata?, status? }
-
-router.patch("/:contentType/:contentId", requireAdmin, async (req, res) => {
-  const { contentType, contentId } = req.params;
-  const { lang, title, subtitle, description, body, metadata, status } = req.body as {
-    lang: string; title?: string; subtitle?: string; description?: string;
-    body?: string; metadata?: Record<string, unknown>; status?: string;
-  };
-
-  if (!lang) return err(res, "lang is required", 400);
-
-  const allowed = new Set(["draft", "approved", "rejected"]);
-  if (status && !allowed.has(status)) return err(res, `Invalid status: ${status}`, 400);
-
-  const update: Record<string, unknown> = {};
-  if (title !== undefined) update.title = title;
-  if (subtitle !== undefined) update.subtitle = subtitle;
-  if (description !== undefined) update.description = description;
-  if (body !== undefined) update.body = body;
-  if (metadata !== undefined) update.metadata = metadata;
-  if (status !== undefined) {
-    update.status = status;
-    if (status === "approved") {
-      update.approved_at = new Date().toISOString();
-    }
-  }
-
-  if (!Object.keys(update).length) return err(res, "No fields to update", 400);
-
-  const { data, error } = await supabaseAdmin
-    .from("p2p_content_translations")
-    .update(update)
-    .eq("content_type", contentType)
-    .eq("content_id", contentId)
-    .eq("language_code", lang)
-    .select()
-    .single();
-
-  if (error) return err(res, error.message);
-  return ok(res, data);
 });
 
 // ── Admin: trigger AI translation for a single item ───────────────────────────
@@ -250,6 +160,101 @@ router.get("/admin/coverage", requireAdmin, async (req, res) => {
   } catch (e: any) {
     return err(res, e.message ?? "Coverage check failed");
   }
+});
+
+// ── Public: fetch a single approved translation ───────────────────────────────
+// GET /api/translations/:contentType/:contentId?lang=de&auto=true
+//
+// Registered AFTER all literal-path routes above (/batch, /admin/*) —
+// otherwise Express matches this parameterized pattern first for any GET
+// (e.g. GET /admin/coverage would bind contentType="admin",
+// contentId="coverage" here and 400 before ever reaching the real route).
+
+router.get("/:contentType/:contentId", async (req, res) => {
+  const { contentType, contentId } = req.params;
+  const { lang = "en", auto = "false" } = req.query as Record<string, string>;
+
+  if (!VALID_TYPES.has(contentType)) return err(res, `Unknown content type: ${contentType}`, 400);
+  if (lang === "en") return ok(res, null);
+
+  try {
+    // Public endpoint: approved translations only
+    let translation = await getTranslation(contentType as ContentType, contentId, lang, false);
+
+    if (!translation && auto === "true") {
+      // Trigger AI — result will be draft (not yet approved), so not returned here
+      translateAndStore(contentType as ContentType, contentId, lang, { triggeredBy: "auto" })
+        .catch((e) => console.warn("Auto-translate failed:", e.message));
+    }
+
+    return ok(res, translation ?? null);
+  } catch (e: any) {
+    return err(res, e.message ?? "Translation lookup failed");
+  }
+});
+
+// ── Admin: delete a cached translation (force re-translate next trigger) ──────
+// DELETE /api/translations/:contentType/:contentId?lang=de
+
+router.delete("/:contentType/:contentId", requireAdmin, async (req, res) => {
+  const { contentType, contentId } = req.params;
+  const { lang } = req.query as { lang?: string };
+
+  if (!lang) return err(res, "lang query param is required", 400);
+
+  const { error } = await supabaseAdmin
+    .from("p2p_content_translations")
+    .delete()
+    .eq("content_type", contentType)
+    .eq("content_id", contentId)
+    .eq("language_code", lang);
+
+  if (error) return err(res, error.message);
+  return ok(res, { deleted: true });
+});
+
+// ── Admin: edit + approve/reject a translation ────────────────────────────────
+// PATCH /api/translations/:contentType/:contentId
+// Body: { lang, title?, subtitle?, description?, body?, metadata?, status? }
+
+router.patch("/:contentType/:contentId", requireAdmin, async (req, res) => {
+  const { contentType, contentId } = req.params;
+  const { lang, title, subtitle, description, body, metadata, status } = req.body as {
+    lang: string; title?: string; subtitle?: string; description?: string;
+    body?: string; metadata?: Record<string, unknown>; status?: string;
+  };
+
+  if (!lang) return err(res, "lang is required", 400);
+
+  const allowed = new Set(["draft", "approved", "rejected"]);
+  if (status && !allowed.has(status)) return err(res, `Invalid status: ${status}`, 400);
+
+  const update: Record<string, unknown> = {};
+  if (title !== undefined) update.title = title;
+  if (subtitle !== undefined) update.subtitle = subtitle;
+  if (description !== undefined) update.description = description;
+  if (body !== undefined) update.body = body;
+  if (metadata !== undefined) update.metadata = metadata;
+  if (status !== undefined) {
+    update.status = status;
+    if (status === "approved") {
+      update.approved_at = new Date().toISOString();
+    }
+  }
+
+  if (!Object.keys(update).length) return err(res, "No fields to update", 400);
+
+  const { data, error } = await supabaseAdmin
+    .from("p2p_content_translations")
+    .update(update)
+    .eq("content_type", contentType)
+    .eq("content_id", contentId)
+    .eq("language_code", lang)
+    .select()
+    .single();
+
+  if (error) return err(res, error.message);
+  return ok(res, data);
 });
 
 export default router;

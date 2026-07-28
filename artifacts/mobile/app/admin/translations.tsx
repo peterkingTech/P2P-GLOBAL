@@ -48,11 +48,14 @@ export default function TranslationsDashboard() {
   const [batchCurriculum, setBatchCurriculum] = useState("");
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState<string | null>(null);
+  const [curriculaError, setCurriculaError] = useState<string | null>(null);
+  const [languagesError, setLanguagesError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLanguagesError(null);
     try {
-      const [{ data: langs }, { data: mods }, { data: lessons }, { data: trans }, { data: jobs }, { data: drafts }] =
+      const [{ data: langs, error: langsErr }, { data: mods }, { data: lessons }, { data: trans }, { data: jobs }, { data: drafts }] =
         await Promise.all([
           supabase.from("p2p_languages").select("code,name_en,flag_emoji").neq("code", "en").order("name_en"),
           supabase.from("p2p_modules").select("id", { count: "exact", head: true }),
@@ -61,6 +64,10 @@ export default function TranslationsDashboard() {
           supabase.from("p2p_translation_jobs").select("status"),
           supabase.from("p2p_content_translations").select("id", { count: "exact", head: true }).eq("status", "draft"),
         ]);
+
+      if (langsErr) {
+        setLanguagesError("Could not load languages");
+      }
 
       const totalMods = (mods as any)?.count ?? 0;
       const totalLess = (lessons as any)?.count ?? 0;
@@ -105,7 +112,16 @@ export default function TranslationsDashboard() {
   // Load curricula for batch modal
   useEffect(() => {
     if (!batchModal) return;
-    supabase.from("p2p_curriculums").select("id,title").then(({ data }) => {
+    // Reset state left over from a previous open of this modal (e.g. an
+    // error from an earlier failed attempt) so it doesn't appear to show
+    // an error before the user has done anything this time.
+    setBatchProgress(null);
+    setCurriculaError(null);
+    supabase.from("p2p_curriculums").select("id,title").then(({ data, error }) => {
+      if (error) {
+        setCurriculaError("Could not load curricula — check API connection");
+        return;
+      }
       setCurricula((data ?? []) as { id: string; title: string }[]);
     });
   }, [batchModal]);
@@ -114,14 +130,22 @@ export default function TranslationsDashboard() {
     if (!batchCurriculum || !batchLang) return Alert.alert("Select both curriculum and language");
     setBatchRunning(true);
     setBatchProgress("Starting…");
+    const apiUrl = getApiUrl();
     try {
       const token = await getAuthToken();
-      const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/translations/admin/batch-curriculum`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ curriculumId: batchCurriculum, lang: batchLang }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${apiUrl}/translations/admin/batch-curriculum`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ curriculumId: batchCurriculum, lang: batchLang }),
+        });
+      } catch {
+        // A thrown fetch (as opposed to a non-2xx response) means the
+        // request never reached any server — network-level failure, not
+        // an API error. Surface the URL we tried so it's actionable.
+        throw new Error(`Could not reach the API server at ${apiUrl}. Is it running?`);
+      }
       const text = await res.text();
       // Parse SSE response
       const lastDataLine = text.split("\n").filter(l => l.startsWith("data:")).pop();
@@ -255,34 +279,46 @@ export default function TranslationsDashboard() {
             <Text style={styles.modalTitle}>Translate Curriculum</Text>
 
             <Text style={styles.modalLabel}>Curriculum</Text>
-            <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-              {curricula.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[styles.pickerItem, batchCurriculum === c.id && styles.pickerItemActive]}
-                  onPress={() => setBatchCurriculum(c.id)}
-                >
-                  <Text style={[styles.pickerItemText, batchCurriculum === c.id && styles.pickerItemTextActive]}>
-                    {c.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {curriculaError ? (
+              <View style={styles.progressBox}>
+                <Text style={styles.progressText}>{curriculaError}</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
+                {curricula.map((c) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[styles.pickerItem, batchCurriculum === c.id && styles.pickerItemActive]}
+                    onPress={() => setBatchCurriculum(c.id)}
+                  >
+                    <Text style={[styles.pickerItemText, batchCurriculum === c.id && styles.pickerItemTextActive]}>
+                      {c.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
 
             <Text style={styles.modalLabel}>Target Language</Text>
-            <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-              {languages.map((l) => (
-                <TouchableOpacity
-                  key={l.code}
-                  style={[styles.pickerItem, batchLang === l.code && styles.pickerItemActive]}
-                  onPress={() => setBatchLang(l.code)}
-                >
-                  <Text style={[styles.pickerItemText, batchLang === l.code && styles.pickerItemTextActive]}>
-                    {l.flag_emoji} {l.name_en}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {languagesError ? (
+              <View style={styles.progressBox}>
+                <Text style={styles.progressText}>{languagesError}</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
+                {languages.map((l) => (
+                  <TouchableOpacity
+                    key={l.code}
+                    style={[styles.pickerItem, batchLang === l.code && styles.pickerItemActive]}
+                    onPress={() => setBatchLang(l.code)}
+                  >
+                    <Text style={[styles.pickerItemText, batchLang === l.code && styles.pickerItemTextActive]}>
+                      {l.flag_emoji} {l.name_en}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
 
             {batchProgress ? (
               <View style={styles.progressBox}>
