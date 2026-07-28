@@ -58,13 +58,24 @@ export type ContentType =
   | "section" | "scripture" | "question"
   | "assignment" | "quiz" | "devotional" | "journal";
 
-interface SourceFields {
+export interface SourceFields {
   title?: string | null;
   subtitle?: string | null;
   description?: string | null;
   body?: string | null;
   /** Only translatable fields go here — never scripture verse text */
   metadata?: Record<string, unknown>;
+}
+
+/** True if a source has anything actually worth sending to the AI. */
+export function hasTranslatableContent(source: SourceFields | null): boolean {
+  if (!source) return false;
+  if (source.title?.trim() || source.subtitle?.trim() || source.description?.trim() || source.body?.trim()) return true;
+  return Object.values(source.metadata ?? {}).some((v) => {
+    if (typeof v === "string") return v.trim().length > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    return false;
+  });
 }
 
 // ── Source content fetchers ────────────────────────────────────────────────────
@@ -128,7 +139,7 @@ function buildTranslatableFromBlocks(blocks: LessonBlockRow[]): Record<string, u
   };
 }
 
-async function fetchEnglishSource(
+export async function fetchEnglishSource(
   contentType: ContentType,
   contentId: string
 ): Promise<SourceFields | null> {
