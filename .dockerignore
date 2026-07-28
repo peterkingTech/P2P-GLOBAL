@@ -1,0 +1,22 @@
+# Docker build context exclusions — this repo is a pnpm monorepo, so the
+# build context for artifacts/api-server/Dockerfile is the repo ROOT.
+# Excluding these keeps the upload small and avoids shipping stale/
+# platform-specific artifacts (e.g. Windows-installed node_modules) into
+# the Linux build stage.
+
+node_modules
+**/node_modules
+.git
+.expo
+**/.expo
+static-build
+**/static-build
+.cache
+.local
+*.tsbuildinfo
+
+# Not needed to build/run the api-server — excluding keeps context small.
+artifacts/mobile/android
+artifacts/mobile/ios
+artifacts/mockup-sandbox
+attached_assets
