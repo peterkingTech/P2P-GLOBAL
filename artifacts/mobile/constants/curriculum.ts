@@ -102,7 +102,7 @@ export const CURRICULUM: CurriculumModule[] = [
             id: "session-structure",
             title: "Session Structure",
             content:
-              "Every lesson follows the same seven-step structure: (1) Open in Prayer — ask the Holy Spirit to teach both of you. (2) Memory Verse — read it together and try to say it from memory. (3) Read the Lesson — read together or take turns. (4) Discussion Questions — work through them honestly, both sharing. (5) Life Assignment — read and commit together. (6) Checkpoint — can you explain the main idea in your own words? (7) Close in Prayer — pray for each other's specific need.\n\nTiming is decided by the peers. There is no set length — your relationship determines the pace.",
+              "Every lesson follows the same seven-step structure: (1) Open in Prayer — ask the Holy Spirit to teach both of you. (2) Memory Verse — read it together and try to say it from memory. (3) Read the Lesson — read together or take turns. (4) Personal Reflections — work through them honestly, both sharing. (5) Life Assignment — read and commit together. (6) Checkpoint — can you explain the main idea in your own words? (7) Close in Prayer — pray for each other's specific need.\n\nTiming is decided by the peers. There is no set length — your relationship determines the pace.",
           },
           {
             id: "multiplication",
@@ -135,7 +135,7 @@ export const CURRICULUM: CurriculumModule[] = [
             id: "what-a-guide-is",
             title: "What a Peer Guide Is",
             content:
-              "A Peer Guide is NOT a pastor, expert, or authority figure. A Peer Guide is simply someone who has completed the lesson and is willing to walk through it with another person. Your job is to ask the discussion questions — not to lecture. Share your honest experience — not a polished performance. Pray at the start and end of every session. Follow up between sessions with a simple check-in message.",
+              "A Peer Guide is NOT a pastor, expert, or authority figure. A Peer Guide is simply someone who has completed the lesson and is willing to walk through it with another person. Your job is to ask the personal reflection questions — not to lecture. Share your honest experience — not a polished performance. Pray at the start and end of every session. Follow up between sessions with a simple check-in message.",
           },
           {
             id: "what-a-guide-is-not",

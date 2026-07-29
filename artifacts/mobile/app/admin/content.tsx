@@ -538,7 +538,7 @@ function PlansSection() {
     setShowDQModal(false);
   };
   const deleteDQ = (dq: DQRow) => {
-    Alert.alert("Delete", "Remove this discussion question?", [
+    Alert.alert("Delete", "Remove this personal reflection?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
         await supabase.from("p2p_plan_discussion_questions").delete().eq("id", dq.id);
@@ -830,14 +830,14 @@ function PlansSection() {
         </ScrollView>
       )}
 
-      {/* Discussion Questions tab */}
+      {/* Personal Reflections tab */}
       {planInnerTab === "questions" && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <TouchableOpacity style={s.addBtn} onPress={openAddDQ}>
             <Ionicons name="add" size={20} color="#fff" />
-            <Text style={s.addBtnText}>Add Discussion Question</Text>
+            <Text style={s.addBtnText}>Add Personal Reflection</Text>
           </TouchableOpacity>
-          {dqs.length === 0 && <Text style={s.emptyText}>No discussion questions yet.</Text>}
+          {dqs.length === 0 && <Text style={s.emptyText}>No personal reflections yet.</Text>}
           {dqs.map((dq, i) => (
             <View key={dq.id} style={s.rowCard}>
               <View style={{ flex: 1 }}>
@@ -937,7 +937,7 @@ function PlansSection() {
       </Modal>
 
       {/* DQ modal */}
-      <FormModal visible={showDQModal} title={editingDQ ? "Edit Question" : "Add Discussion Question"} onClose={() => setShowDQModal(false)} onSave={saveDQ} saving={saving}>
+      <FormModal visible={showDQModal} title={editingDQ ? "Edit Question" : "Add Personal Reflection"} onClose={() => setShowDQModal(false)} onSave={saveDQ} saving={saving}>
         <Field label="Question Number" value={dqForm.question_number !== null ? String(dqForm.question_number) : ""} onChangeText={v => setDqForm(f => ({ ...f, question_number: parseInt(v) || null }))} keyboardType="number-pad" />
         <Field label="Topic" value={dqForm.topic} onChangeText={v => setDqForm(f => ({ ...f, topic: v }))} placeholder="e.g. Accountability" />
         <Field label="Question *" value={dqForm.question_text} onChangeText={v => setDqForm(f => ({ ...f, question_text: v }))} multiline />

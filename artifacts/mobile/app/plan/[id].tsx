@@ -353,7 +353,7 @@ export default function PlanDetailScreen() {
         {dqs.length > 0 && (
           <View style={styles.collapseBlock}>
             <TouchableOpacity style={styles.collapseHeader} onPress={() => setDqsOpen(o => !o)}>
-              <Text style={styles.sectionHeading}>Discussion Questions</Text>
+              <Text style={styles.sectionHeading}>Personal Reflections</Text>
               <Ionicons name={dqsOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
             </TouchableOpacity>
             {dqsOpen && (

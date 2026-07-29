@@ -273,7 +273,7 @@
     "writeReflection": "Write your reflection here…",
     "markComplete": "Mark as Complete",
     "lessonCompleted": "Lesson completed!",
-    "discussionQuestions": "Discussion Questions",
+    "discussionQuestions": "Personal Reflections",
     "highlight": "Highlight",
     "removeHighlight": "Remove Highlight",
     "pickColor": "Pick a color to save this quote to your profile.",
@@ -427,7 +427,7 @@
     "overview": "Overview",
     "lessons": "Lessons",
     "teachingOutline": "Teaching Outline",
-    "discussionQuestions": "Discussion Questions"
+    "discussionQuestions": "Personal Reflections"
   },
   "admin": {
     "panelTitle": "Admin Panel",
@@ -467,8 +467,8 @@
     "referencePlaceholder": "Reference (e.g. John 3:16)",
     "remove": "Remove",
     "addVerse": "Add verse",
-    "discussionQuestions": "Discussion Questions",
-    "discussionQuestionsHint": "Repeatable list of reflection or discussion questions.",
+    "discussionQuestions": "Personal Reflections",
+    "discussionQuestionsHint": "Repeatable list of personal reflection questions.",
     "addQuestion": "Add question",
     "assignmentTitlePlaceholder": "Assignment title",
     "instructionsPlaceholder": "Instructions…",
