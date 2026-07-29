@@ -156,6 +156,11 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
       detached: false,
       cwd: projectRoot,
       env,
+      // On Windows, `pnpm` resolves to a .cmd shim — spawn() can't exec that
+      // directly without a shell (ENOENT), unlike on POSIX where it's a
+      // regular executable. shell:true is a no-op on POSIX, so this is safe
+      // cross-platform.
+      shell: process.platform === 'win32',
     },
   );
 
@@ -188,8 +193,13 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
 
 async function downloadFile(url, outputPath) {
   const controller = new AbortController();
-  const fiveMinMS = 5 * 60 * 1_000;
-  const timeoutId = setTimeout(() => controller.abort(), fiveMinMS);
+  // A cold production bundle transform on this machine (Windows, large pnpm
+  // monorepo) reliably runs past the original 5-minute limit — same category
+  // of slowness as metro-file-map's watch-mode crawl (see the 240s->900s
+  // patch to Watcher.js's MAX_WAIT_TIME). 15 min gives real cold builds room
+  // to finish instead of aborting right as they're about to.
+  const timeoutMS = 15 * 60 * 1_000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMS);
 
   try {
     console.log(`Downloading: ${url}`);
@@ -214,7 +224,7 @@ async function downloadFile(url, outputPath) {
     }
 
     if (error.name === 'AbortError') {
-      throw new Error(`Download timeout after 5m: ${url}`);
+      throw new Error(`Download timeout after ${timeoutMS / 60_000}m: ${url}`);
     }
     throw error;
   } finally {
