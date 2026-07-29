@@ -858,15 +858,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (languageCode && languageCode !== "en" && moduleIds.length > 0) {
         const lessonIdList = lessonsRaw.map((l) => l.id as string);
 
-        // Primary: query the new unified p2p_content_translations table
-        // End-user path: only serve approved translations (review gate)
+        // Primary: query the new unified p2p_content_translations table.
+        // No status filter — on-demand translations (see curriculum.ts's
+        // GET /lessons/:lessonId) are generated automatically and cached
+        // permanently at status 'draft'; there's no separate human-approval
+        // step in that flow, so gating on 'approved' here would mean a
+        // freshly-generated title never actually shows up in this list.
         const allIds = [...moduleIds, ...lessonIdList];
         const { data: newTrans } = await supabase
           .from("p2p_content_translations")
           .select("content_type,content_id,title,subtitle,description,status")
           .in("content_id", allIds)
-          .eq("language_code", languageCode)
-          .eq("status", "approved");
+          .eq("language_code", languageCode);
 
         const newModMap = new Map<string, string>();
         const newLesMap = new Map<string, string>();

@@ -28,6 +28,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { useTranslation } from "react-i18next";
 import { fetchBatchVerseText, VerseResult } from "@/lib/bibleClient";
+import { getApiUrl } from "@/lib/apiUrl";
+import { getLanguageName } from "@/lib/languageNames";
 
 interface LessonContent {
   title: string;
@@ -414,6 +416,11 @@ export default function LessonScreen() {
   // Translated verse texts keyed by scripture row id (loaded after content)
   const [verseTexts, setVerseTexts] = useState<Map<string, VerseResult>>(new Map());
   const versesFetchedForLang = useRef<string | null>(null);
+  // Shown only while an on-demand translation is actively being generated
+  // (not for a cache hit, which swaps in before this would ever appear —
+  // see the delay in the translation-fetch effect below).
+  const [translationBanner, setTranslationBanner] = useState<string | null>(null);
+  const translationFetchedFor = useRef<string | null>(null);
 
   const [pendingHighlight, setPendingHighlight] = useState<
     { sectionId: string; lessonId: string; text: string; start: number; end: number } | null
@@ -538,6 +545,53 @@ export default function LessonScreen() {
     return () => { cancelled = true; };
   }, [id]);
 
+  // On-demand lesson translation, permanently cached server-side. English is
+  // already showing (loaded above) by the time this runs, so failure or a
+  // slow AI call never blocks reading the lesson — this only ever upgrades
+  // the display in place.
+  useEffect(() => {
+    if (!id || !contentLanguage || contentLanguage === "en") {
+      setTranslationBanner(null);
+      return;
+    }
+    const fetchKey = `${id}:${contentLanguage}`;
+    if (translationFetchedFor.current === fetchKey) return;
+    translationFetchedFor.current = fetchKey;
+
+    let cancelled = false;
+    // A cache hit typically resolves fast enough that this never fires —
+    // the banner is only for the slower "generating for the first time" path.
+    const bannerTimer = setTimeout(() => {
+      if (!cancelled) setTranslationBanner(`Preparing this lesson in ${getLanguageName(contentLanguage)}...`);
+    }, 500);
+
+    (async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const res = await fetch(`${apiUrl}/lessons/${id}?language=${contentLanguage}`);
+        const data = await res.json();
+        if (cancelled || !data?.translation_available) return;
+        setContent((prev) => prev ? {
+          ...prev,
+          title: (data.title as string) ?? prev.title,
+          sections: ((data.sections ?? []) as Record<string, unknown>[]).map((s) => ({
+            id: s.id as string, title: (s.title as string) ?? "", content: (s.content as string) ?? "",
+          })),
+          questions: ((data.questions ?? []) as Record<string, unknown>[]).map((q) => ({
+            id: q.id as string, question: q.question as string,
+          })),
+        } : prev);
+      } catch {
+        // Network-level failure — silently keep showing English, no error surfaced.
+      } finally {
+        clearTimeout(bannerTimer);
+        if (!cancelled) setTranslationBanner(null);
+      }
+    })();
+
+    return () => { cancelled = true; clearTimeout(bannerTimer); };
+  }, [id, contentLanguage]);
+
   // Load assignment + question submissions. Exposed via useCallback so it can
   // also be re-run after a fresh submit (to pick up the real evaluation status
   // the DB trigger just created) and from the realtime subscription below.
@@ -608,6 +662,13 @@ export default function LessonScreen() {
         <View style={styles.loadingContainer}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+          {translationBanner ? (
+            <View style={styles.translationBanner}>
+              <ActivityIndicator size="small" color={colors.accentGreen} />
+              <Text style={styles.translationBannerText}>{translationBanner}</Text>
+            </View>
+          ) : null}
+
           <Text style={styles.lessonTitle}>{content.title}</Text>
 
           {content.scriptures.map((s) => {
@@ -771,6 +832,12 @@ function makeStyles(c: AppColors) {
   completedTagText: { color: c.cream, fontSize: 11, fontFamily: "Inter_600SemiBold" },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: 20, paddingTop: 24 },
+  translationBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: c.cardBeige, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
+  },
+  translationBannerText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", flex: 1 },
   lessonTitle: { fontSize: 24, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 20 },
   verseCard: {
     backgroundColor: c.cardBeige, borderRadius: 16, borderWidth: 1, borderColor: c.warmBeige,

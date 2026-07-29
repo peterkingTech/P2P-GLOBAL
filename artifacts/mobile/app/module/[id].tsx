@@ -221,6 +221,27 @@ export default function ModuleDetailScreen() {
         if (st === "needs_revision" || !evalMap.has(e.lesson_id as string))
           evalMap.set(e.lesson_id as string, st);
       }
+
+      // Cached lesson-title translations only — never trigger a translation
+      // just to show a title (see curriculum.ts's on-demand endpoint, which
+      // only fires when the lesson itself is opened). No status filter:
+      // on-demand translations are cached at status 'draft' with no separate
+      // approval step (same reasoning as DataContext.loadCurriculum).
+      const titleOverrides = new Map<string, string>();
+      const contentLanguage = profile?.contentLanguage;
+      const lessonIds = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => l.id as string);
+      if (contentLanguage && contentLanguage !== "en" && lessonIds.length > 0) {
+        const { data: titleTrans } = await supabase
+          .from("p2p_content_translations")
+          .select("content_id,title")
+          .eq("content_type", "lesson")
+          .in("content_id", lessonIds)
+          .eq("language_code", contentLanguage);
+        for (const row of (titleTrans ?? []) as Record<string, unknown>[]) {
+          if (row.title) titleOverrides.set(row.content_id as string, row.title as string);
+        }
+      }
+
       const built = ((lessonRows ?? []) as Record<string, unknown>[]).map((l) => {
         const lessonId = l.id as string;
         const isCompleted = progressMap.get(lessonId) ?? false;
@@ -230,7 +251,7 @@ export default function ModuleDetailScreen() {
           : lessonStatus === "submitted" ? "pending" : undefined;
         return {
           id: lessonId,
-          title: l.title as string,
+          title: titleOverrides.get(lessonId) ?? (l.title as string),
           subtitle: (l.subtitle as string) ?? "",
           order: l.order_index as number,
           isCompleted,

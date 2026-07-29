@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, Modal, FlatList,
+  ActivityIndicator, Alert, Modal, TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -42,14 +42,18 @@ export default function TranslationsDashboard() {
   const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const [batchModal, setBatchModal] = useState(false);
-  const [curricula, setCurricula] = useState<Array<{ id: string; title: string }>>([]);
-  const [batchLang, setBatchLang] = useState("");
-  const [batchCurriculum, setBatchCurriculum] = useState("");
-  const [batchRunning, setBatchRunning] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<string | null>(null);
-  const [curriculaError, setCurriculaError] = useState<string | null>(null);
   const [languagesError, setLanguagesError] = useState<string | null>(null);
+
+  // Single-lesson manual trigger — the bulk "Translate Curriculum" batch job
+  // is gone (translations now happen automatically, on-demand, per lesson
+  // request; see curriculum.ts's GET /lessons/:lessonId). This modal is kept
+  // only as a manual escape hatch, e.g. to pre-warm the cache for a specific
+  // lesson/language pair.
+  const [triggerModal, setTriggerModal] = useState(false);
+  const [triggerLessonId, setTriggerLessonId] = useState("");
+  const [triggerLang, setTriggerLang] = useState("");
+  const [triggerRunning, setTriggerRunning] = useState(false);
+  const [triggerResult, setTriggerResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,36 +113,26 @@ export default function TranslationsDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load curricula for batch modal
   useEffect(() => {
-    if (!batchModal) return;
-    // Reset state left over from a previous open of this modal (e.g. an
-    // error from an earlier failed attempt) so it doesn't appear to show
-    // an error before the user has done anything this time.
-    setBatchProgress(null);
-    setCurriculaError(null);
-    supabase.from("p2p_curriculums").select("id,title").then(({ data, error }) => {
-      if (error) {
-        setCurriculaError("Could not load curricula — check API connection");
-        return;
-      }
-      setCurricula((data ?? []) as { id: string; title: string }[]);
-    });
-  }, [batchModal]);
+    if (!triggerModal) return;
+    // Reset state left over from a previous open (e.g. a prior result/error)
+    // so it doesn't appear to show a result before this attempt has run.
+    setTriggerResult(null);
+  }, [triggerModal]);
 
-  async function runBatchTranslation() {
-    if (!batchCurriculum || !batchLang) return Alert.alert("Select both curriculum and language");
-    setBatchRunning(true);
-    setBatchProgress("Starting…");
+  async function runSingleLessonTrigger() {
+    if (!triggerLessonId.trim() || !triggerLang) return Alert.alert("Enter a lesson ID and select a language");
+    setTriggerRunning(true);
+    setTriggerResult("Translating…");
     const apiUrl = getApiUrl();
     try {
       const token = await getAuthToken();
       let res: Response;
       try {
-        res = await fetch(`${apiUrl}/translations/admin/batch-curriculum`, {
+        res = await fetch(`${apiUrl}/translations/admin/trigger`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ curriculumId: batchCurriculum, lang: batchLang }),
+          body: JSON.stringify({ contentType: "lesson", contentId: triggerLessonId.trim(), lang: triggerLang, force: true }),
         });
       } catch {
         // A thrown fetch (as opposed to a non-2xx response) means the
@@ -146,30 +140,14 @@ export default function TranslationsDashboard() {
         // an API error. Surface the URL we tried so it's actionable.
         throw new Error(`Could not reach the API server at ${apiUrl}. Is it running?`);
       }
-      const text = await res.text();
-      // Parse SSE response
-      const lastDataLine = text.split("\n").filter(l => l.startsWith("data:")).pop();
-      // A response with no SSE data lines means the request never reached the
-      // translation API (e.g. the static web server or SPA fallback answered
-      // instead of the api-server — EXPO_PUBLIC_API_URL not configured).
-      // Without this check that garbage parsed to {} and displayed
-      // "Done: undefined translated, undefined skipped, undefined failed".
-      if (!lastDataLine) {
-        throw new Error(
-          `Translation API not reachable at ${apiUrl} (HTTP ${res.status}, ${res.headers.get("content-type") ?? "unknown type"}). ` +
-          `Check that the api-server is running and EXPO_PUBLIC_API_URL points at it (including its /api prefix).`
-        );
-      }
-      const lastData = JSON.parse(lastDataLine.slice(5).trim());
-      if (lastData.error) throw new Error(lastData.error);
-      const s = lastData.stats ?? lastData;
-      if (typeof s.done !== "number") throw new Error(`Unexpected API response: ${lastDataLine.slice(0, 200)}`);
-      setBatchProgress(`Done: ${s.done} translated, ${s.skipped} skipped, ${s.failed} failed`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `Request failed (HTTP ${res.status})`);
+      setTriggerResult(`Done — translation cached for this lesson in ${triggerLang}.`);
       await load();
     } catch (e: any) {
-      setBatchProgress(`Error: ${e.message}`);
+      setTriggerResult(`Error: ${e.message}`);
     } finally {
-      setBatchRunning(false);
+      setTriggerRunning(false);
     }
   }
 
@@ -218,11 +196,19 @@ export default function TranslationsDashboard() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnSecondary]}
-          onPress={() => setBatchModal(true)}
+          onPress={() => setTriggerModal(true)}
         >
           <Ionicons name="flash" size={15} color={colors.primaryGreen} />
-          <Text style={[styles.actionBtnText, { color: colors.primaryGreen }]}>Translate Curriculum</Text>
+          <Text style={[styles.actionBtnText, { color: colors.primaryGreen }]}>Translate a Lesson</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* ── On-demand translation notice ── */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle-outline" size={16} color={colors.primaryGreen} />
+        <Text style={styles.infoBannerText}>
+          Translations are now generated automatically when users request lessons in their language and cached permanently. No manual translation runs are needed.
+        </Text>
       </View>
 
       {/* ── Language coverage grid ── */}
@@ -256,8 +242,8 @@ export default function TranslationsDashboard() {
               <TouchableOpacity
                 style={[styles.tableCell, styles.tableCellAction, styles.translateBtn]}
                 onPress={() => {
-                  setBatchLang(lang.code);
-                  setBatchModal(true);
+                  setTriggerLang(lang.code);
+                  setTriggerModal(true);
                 }}
               >
                 <Ionicons name="flash" size={12} color={colors.primaryGreen} />
@@ -272,32 +258,25 @@ export default function TranslationsDashboard() {
         )}
       </View>
 
-      {/* ── Batch translate modal ── */}
-      <Modal visible={batchModal} transparent animationType="fade">
+      {/* ── Single-lesson manual translate modal ── */}
+      <Modal visible={triggerModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Translate Curriculum</Text>
+            <Text style={styles.modalTitle}>Translate a Lesson</Text>
+            <Text style={styles.modalSubtitle}>
+              Manual escape hatch only — lessons translate automatically when a user opens them in their language.
+            </Text>
 
-            <Text style={styles.modalLabel}>Curriculum</Text>
-            {curriculaError ? (
-              <View style={styles.progressBox}>
-                <Text style={styles.progressText}>{curriculaError}</Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
-                {curricula.map((c) => (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[styles.pickerItem, batchCurriculum === c.id && styles.pickerItemActive]}
-                    onPress={() => setBatchCurriculum(c.id)}
-                  >
-                    <Text style={[styles.pickerItemText, batchCurriculum === c.id && styles.pickerItemTextActive]}>
-                      {c.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
+            <Text style={styles.modalLabel}>Lesson ID</Text>
+            <TextInput
+              style={styles.textInput}
+              value={triggerLessonId}
+              onChangeText={setTriggerLessonId}
+              placeholder="Paste the lesson's UUID"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
 
             <Text style={styles.modalLabel}>Target Language</Text>
             {languagesError ? (
@@ -309,10 +288,10 @@ export default function TranslationsDashboard() {
                 {languages.map((l) => (
                   <TouchableOpacity
                     key={l.code}
-                    style={[styles.pickerItem, batchLang === l.code && styles.pickerItemActive]}
-                    onPress={() => setBatchLang(l.code)}
+                    style={[styles.pickerItem, triggerLang === l.code && styles.pickerItemActive]}
+                    onPress={() => setTriggerLang(l.code)}
                   >
-                    <Text style={[styles.pickerItemText, batchLang === l.code && styles.pickerItemTextActive]}>
+                    <Text style={[styles.pickerItemText, triggerLang === l.code && styles.pickerItemTextActive]}>
                       {l.flag_emoji} {l.name_en}
                     </Text>
                   </TouchableOpacity>
@@ -320,26 +299,26 @@ export default function TranslationsDashboard() {
               </ScrollView>
             )}
 
-            {batchProgress ? (
+            {triggerResult ? (
               <View style={styles.progressBox}>
-                <Text style={styles.progressText}>{batchProgress}</Text>
+                <Text style={styles.progressText}>{triggerResult}</Text>
               </View>
             ) : null}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalBtnSecondary]}
-                onPress={() => { setBatchModal(false); setBatchProgress(null); setBatchCurriculum(""); }}
-                disabled={batchRunning}
+                onPress={() => { setTriggerModal(false); setTriggerResult(null); setTriggerLessonId(""); }}
+                disabled={triggerRunning}
               >
                 <Text style={[styles.modalBtnText, { color: "#666" }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnPrimary, batchRunning && styles.modalBtnDisabled]}
-                onPress={runBatchTranslation}
-                disabled={batchRunning}
+                style={[styles.modalBtn, styles.modalBtnPrimary, triggerRunning && styles.modalBtnDisabled]}
+                onPress={runSingleLessonTrigger}
+                disabled={triggerRunning}
               >
-                {batchRunning
+                {triggerRunning
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <Text style={styles.modalBtnText}>Translate</Text>}
               </TouchableOpacity>
@@ -408,6 +387,13 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
+  infoBanner: {
+    flexDirection: "row", gap: 8, alignItems: "flex-start",
+    backgroundColor: colors.primaryGreen + "11", borderRadius: 10, borderWidth: 1,
+    borderColor: colors.primaryGreen + "33", padding: 12, marginBottom: 20,
+  },
+  infoBannerText: { flex: 1, fontSize: 12, color: "#444", lineHeight: 18, fontFamily: "Inter_400Regular" },
+
   sectionTitle: { fontSize: 15, fontWeight: "700", color: "#333", marginBottom: 8, fontFamily: "Inter_700Bold" },
 
   table: { backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", marginBottom: 24 },
@@ -431,7 +417,12 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 24 },
   modalBox: { backgroundColor: "#fff", borderRadius: 16, padding: 20, gap: 10 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: "#222", fontFamily: "Inter_700Bold", marginBottom: 4 },
+  modalSubtitle: { fontSize: 12, color: "#888", fontFamily: "Inter_400Regular", marginBottom: 4 },
   modalLabel: { fontSize: 13, color: "#555", fontFamily: "Inter_600SemiBold" },
+  textInput: {
+    borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 8,
+    padding: 10, fontSize: 13, color: "#333", fontFamily: "Inter_400Regular",
+  },
   pickerScroll: { maxHeight: 140, borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 8 },
   pickerItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
   pickerItemActive: { backgroundColor: colors.primaryGreen + "22" },
