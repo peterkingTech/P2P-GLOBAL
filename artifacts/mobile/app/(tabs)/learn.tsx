@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,8 +16,10 @@ import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, Module, Plan, PlanV2 } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { getApiUrl } from "@/lib/apiUrl";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
@@ -330,11 +332,44 @@ export default function LearnTab() {
   const router = useRouter();
   const { modules, isLoading, plans, plansLoading, plansV2, plansV2Loading } = useData();
   const { colors } = useTheme();
+  const { profile } = useAuth();
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
+  // On-demand plan title/tagline translations for the PlansV2 list — keyed
+  // by plan id. Populated in the background (batched via Promise.all, never
+  // one request per plan); English always shows first and this only ever
+  // upgrades the display in place. See translations.ts's GET /translations/plan/:planId.
+  const [planV2Translations, setPlanV2Translations] = useState<Map<string, { title: string; tagline: string | null }>>(new Map());
+  const translationsFetchedFor = useRef<string | null>(null);
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
   const { t } = useTranslation();
+
+  const contentLanguage = profile?.contentLanguage;
+  useEffect(() => {
+    if (!contentLanguage || contentLanguage === "en" || plansV2.length === 0) return;
+    const fetchKey = `${contentLanguage}:${plansV2.map((p) => p.id).sort().join(",")}`;
+    if (translationsFetchedFor.current === fetchKey) return;
+    translationsFetchedFor.current = fetchKey;
+
+    const apiUrl = getApiUrl();
+    Promise.all(
+      plansV2.map((p) =>
+        fetch(`${apiUrl}/translations/plan/${p.id}?language=${contentLanguage}`)
+          .then((res) => res.json())
+          .then((data) => ({ id: p.id, data }))
+          .catch(() => null)
+      )
+    ).then((results) => {
+      const map = new Map<string, { title: string; tagline: string | null }>();
+      for (const r of results) {
+        if (r?.data?.translation_available && r.data.title) {
+          map.set(r.id, { title: r.data.title, tagline: r.data.subtitle ?? null });
+        }
+      }
+      if (map.size > 0) setPlanV2Translations(map);
+    });
+  }, [contentLanguage, plansV2]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -468,13 +503,19 @@ export default function LearnTab() {
                 }}
               />
             ))}
-            {plansV2.map(item => (
-              <PlanCardV2
-                key={item.id}
-                plan={item}
-                onPress={() => router.push(`/plan/${item.id}` as any)}
-              />
-            ))}
+            {plansV2.map(item => {
+              const override = planV2Translations.get(item.id);
+              const displayPlan = override
+                ? { ...item, title: override.title, tagline: override.tagline ?? item.tagline }
+                : item;
+              return (
+                <PlanCardV2
+                  key={item.id}
+                  plan={displayPlan}
+                  onPress={() => router.push(`/plan/${item.id}` as any)}
+                />
+              );
+            })}
           </ScrollView>
         )
       )}

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import { getTranslation, translateAndStore, type StoredTranslation } from "../lib/translationEngine";
+import { getTranslation, translateAndStore, withTimeout, type StoredTranslation } from "../lib/translationEngine";
 
 const router = Router();
 
@@ -19,18 +19,6 @@ const ANON_KEY =
 // tables (authenticated-only SELECT policies), so lesson content reads need
 // a service-role client.
 const supabaseRead = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
-
-// AI translation must never make the user wait indefinitely for a lesson —
-// if the Anthropic call hasn't finished within 25s, fall back to English.
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Translation timed out")), ms);
-    promise.then(
-      (v) => { clearTimeout(timer); resolve(v); },
-      (e) => { clearTimeout(timer); reject(e); }
-    );
-  });
-}
 
 interface LessonContentBase {
   id: unknown;

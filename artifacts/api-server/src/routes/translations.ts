@@ -7,6 +7,11 @@ import {
   batchTranslateCurriculum,
   getCoverage,
   retryJob,
+  fetchPlanEnglishSource,
+  fetchPlanModuleEnglishSource,
+  translatePlan,
+  translatePlanModule,
+  withTimeout,
   type ContentType,
 } from "../lib/translationEngine";
 import { createClient } from "@supabase/supabase-js";
@@ -37,6 +42,7 @@ function err(res: any, msg: string, status = 500) {
 const VALID_TYPES = new Set([
   "curriculum","module","lesson","section",
   "scripture","question","assignment","quiz","devotional","journal",
+  "plan","plan_module",
 ]);
 
 // ── Public: batch fetch approved translations ─────────────────────────────────
@@ -57,6 +63,95 @@ router.post("/batch", async (req, res) => {
     return ok(res, Object.fromEntries(map));
   } catch (e: any) {
     return err(res, e.message ?? "Batch lookup failed");
+  }
+});
+
+// ── Public: on-demand plan translation (permanent cache) ──────────────────────
+// GET /translations/plan/:planId?language=xx
+//
+// Registered as a literal path BEFORE the generic /:contentType/:contentId
+// route below — otherwise Express would match GET /plan/abc against that
+// parameterized route first (contentType="plan", contentId="abc") and 400,
+// same class of bug fixed earlier for /admin/coverage vs /:contentType/:contentId.
+
+router.get("/plan/:planId", async (req, res) => {
+  const { planId } = req.params;
+  const language = ((req.query.language as string) || "en").trim();
+
+  const base = await fetchPlanEnglishSource(planId);
+  if (!base) return err(res, "Plan not found", 404);
+
+  if (language === "en") {
+    return ok(res, { title: base.title, description: base.description, subtitle: base.subtitle });
+  }
+
+  try {
+    // adminMode=true — on-demand translations have no separate human-review
+    // step, same reasoning as curriculum.ts's GET /lessons/:lessonId.
+    const cached = await getTranslation("plan", planId, language, true);
+    if (cached) {
+      return ok(res, {
+        title: cached.title ?? base.title,
+        description: cached.description ?? base.description,
+        subtitle: cached.subtitle ?? base.subtitle,
+        translation_available: true,
+        served_from_cache: true,
+      });
+    }
+
+    const fresh = await withTimeout(translatePlan(planId, language), 25_000);
+    return ok(res, {
+      title: fresh.title ?? base.title,
+      description: fresh.description ?? base.description,
+      subtitle: fresh.subtitle ?? base.subtitle,
+      translation_available: true,
+      served_from_cache: false,
+    });
+  } catch (e: any) {
+    return ok(res, {
+      title: base.title, description: base.description, subtitle: base.subtitle,
+      translation_available: false, translation_error: e.message ?? "Translation failed",
+    });
+  }
+});
+
+// ── Public: on-demand plan-module translation (permanent cache) ──────────────
+// GET /translations/plan-module/:moduleId?language=xx
+
+router.get("/plan-module/:moduleId", async (req, res) => {
+  const { moduleId } = req.params;
+  const language = ((req.query.language as string) || "en").trim();
+
+  const base = await fetchPlanModuleEnglishSource(moduleId);
+  if (!base) return err(res, "Plan module not found", 404);
+
+  if (language === "en") {
+    return ok(res, { title: base.title, description: base.description ?? null });
+  }
+
+  try {
+    const cached = await getTranslation("plan_module", moduleId, language, true);
+    if (cached) {
+      return ok(res, {
+        title: cached.title ?? base.title,
+        description: cached.description ?? base.description ?? null,
+        translation_available: true,
+        served_from_cache: true,
+      });
+    }
+
+    const fresh = await withTimeout(translatePlanModule(moduleId, language), 25_000);
+    return ok(res, {
+      title: fresh.title ?? base.title,
+      description: fresh.description ?? base.description ?? null,
+      translation_available: true,
+      served_from_cache: false,
+    });
+  } catch (e: any) {
+    return ok(res, {
+      title: base.title, description: base.description ?? null,
+      translation_available: false, translation_error: e.message ?? "Translation failed",
+    });
   }
 });
 

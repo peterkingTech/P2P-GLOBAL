@@ -39,6 +39,19 @@ function calcCost(usage: { input_tokens: number; output_tokens: number }): numbe
   ) / 10_000;
 }
 
+// AI translation must never make a caller wait indefinitely — on-demand
+// routes (curriculum.ts's GET /lessons/:id, translations.ts's GET /plan/:id
+// and /plan-module/:id) all fall back to English if this fires.
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Translation timed out")), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); }
+    );
+  });
+}
+
 // ── Language names ─────────────────────────────────────────────────────────────
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -56,7 +69,8 @@ const LANGUAGE_NAMES: Record<string, string> = {
 export type ContentType =
   | "curriculum" | "module" | "lesson"
   | "section" | "scripture" | "question"
-  | "assignment" | "quiz" | "devotional" | "journal";
+  | "assignment" | "quiz" | "devotional" | "journal"
+  | "plan" | "plan_module";
 
 export interface SourceFields {
   title?: string | null;
@@ -139,11 +153,43 @@ function buildTranslatableFromBlocks(blocks: LessonBlockRow[]): Record<string, u
   };
 }
 
+// p2p_plans: title/tagline/overview — same field-name mapping already used
+// by the mobile app's existing (pre-this-feature) cache overlay in
+// plan/[id].tsx: tagline->subtitle, overview->description.
+export async function fetchPlanEnglishSource(planId: string): Promise<SourceFields | null> {
+  const { data } = await supabaseRead
+    .from("p2p_plans")
+    .select("title,tagline,overview")
+    .eq("id", planId)
+    .maybeSingle();
+  if (!data) return null;
+  return { title: data.title, subtitle: data.tagline, description: data.overview };
+}
+
+// p2p_plan_modules only has a module_title column (see migration
+// 018_plans_schema.sql) — no description field exists on this table, so
+// there is nothing to translate for that part of the shape.
+export async function fetchPlanModuleEnglishSource(moduleId: string): Promise<SourceFields | null> {
+  const { data } = await supabaseRead
+    .from("p2p_plan_modules")
+    .select("module_title")
+    .eq("id", moduleId)
+    .maybeSingle();
+  if (!data) return null;
+  return { title: data.module_title, description: null };
+}
+
 export async function fetchEnglishSource(
   contentType: ContentType,
   contentId: string
 ): Promise<SourceFields | null> {
   switch (contentType) {
+    case "plan":
+      return fetchPlanEnglishSource(contentId);
+
+    case "plan_module":
+      return fetchPlanModuleEnglishSource(contentId);
+
     case "curriculum": {
       const { data } = await supabaseRead
         .from("p2p_curriculums")
@@ -242,6 +288,28 @@ function buildOutputSchema(contentType: ContentType, source: SourceFields): Reco
       properties: {
         title: { type: "string" },
         description: { type: "string" },
+      },
+      additionalProperties: false,
+    };
+  }
+
+  if (contentType === "plan") {
+    return {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        subtitle: { type: "string" },
+        description: { type: "string" },
+      },
+      additionalProperties: false,
+    };
+  }
+
+  if (contentType === "plan_module") {
+    return {
+      type: "object",
+      properties: {
+        title: { type: "string" },
       },
       additionalProperties: false,
     };
@@ -530,6 +598,18 @@ export async function translateAndStore(
     await failJob(jobId, err.message ?? "Unknown error");
     throw err;
   }
+}
+
+/** Translate and cache a plan's title/tagline/overview. Thin wrapper over
+ * translateAndStore for API-discoverability — identical cache-check /
+ * translate-if-missing / store / return behavior as the lesson path. */
+export async function translatePlan(planId: string, languageCode: string): Promise<StoredTranslation> {
+  return translateAndStore("plan", planId, languageCode, { triggeredBy: "on-demand" });
+}
+
+/** Translate and cache a plan module's title. */
+export async function translatePlanModule(moduleId: string, languageCode: string): Promise<StoredTranslation> {
+  return translateAndStore("plan_module", moduleId, languageCode, { triggeredBy: "on-demand" });
 }
 
 /** Retry a failed job by re-running translation */

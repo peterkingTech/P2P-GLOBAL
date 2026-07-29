@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { getApiUrl } from "@/lib/apiUrl";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,53 @@ type DQ = { id: string; question_number: number | null; topic: string | null; qu
 type Plan = {
   id: string; title: string; tagline: string | null; overview: string | null; has_submodules: boolean; status: string;
 };
+
+// Fire-and-forget: fetches on-demand plan + module translations in parallel
+// and merges them in via functional state updates once each resolves, so it
+// works correctly regardless of what else has updated `plan`/`modules` in
+// the meantime. Any failure (network, timeout, translation error) is
+// swallowed — English stays displayed, no error surfaced to the user.
+function fetchAndApplyPlanTranslations(
+  planId: string,
+  moduleIds: string[],
+  language: string,
+  setPlan: React.Dispatch<React.SetStateAction<Plan | null>>,
+  setModules: React.Dispatch<React.SetStateAction<Module[]>>
+) {
+  const apiUrl = getApiUrl();
+
+  fetch(`${apiUrl}/translations/plan/${planId}?language=${language}`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data?.translation_available) return;
+      setPlan((prev) => prev ? {
+        ...prev,
+        title: data.title ?? prev.title,
+        tagline: data.subtitle ?? prev.tagline,
+        overview: data.description ?? prev.overview,
+      } : prev);
+    })
+    .catch(() => { /* keep English */ });
+
+  Promise.all(
+    moduleIds.map((moduleId) =>
+      fetch(`${apiUrl}/translations/plan-module/${moduleId}?language=${language}`)
+        .then((res) => res.json())
+        .then((data) => ({ moduleId, data }))
+        .catch(() => null)
+    )
+  ).then((results) => {
+    const titleByModuleId = new Map<string, string>();
+    for (const r of results) {
+      if (r?.data?.translation_available && r.data.title) titleByModuleId.set(r.moduleId, r.data.title);
+    }
+    if (titleByModuleId.size === 0) return;
+    setModules((prev) => prev.map((m) => ({
+      ...m,
+      module_title: titleByModuleId.get(m.id) ?? m.module_title,
+    })));
+  });
+}
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -70,50 +118,44 @@ export default function PlanDetailScreen() {
       supabase.from("p2p_plan_discussion_questions").select("id,question_number,topic,question_text,order_index").eq("plan_id", id).order("order_index"),
     ]);
 
-    // Overlay translated plan/module/lesson titles when a non-English content
-    // language is selected — same two-pass pattern as loadCurriculum()/loadPlansV2().
-    // End-user path: only serve approved translations (review gate).
-    let overlaidPlan = planData as Plan | null;
+    const planData_ = planData as Plan | null;
     const modulesRaw = (modulesData ?? []) as Module[];
     const lessonsRaw = (lessonsData ?? []) as Omit<Lesson, "completed" | "evaluationStatus">[];
     const languageCode = profile?.contentLanguage;
-    if (languageCode && languageCode !== "en") {
-      const moduleIds = modulesRaw.map((m) => m.id);
+
+    // Lesson titles: cache-only overlay (no on-demand generation — out of
+    // scope here, matches "already working" lesson-content translation being
+    // a separate system). No status filter: on-demand-generated translations
+    // are cached at status 'draft' with no separate approval step.
+    if (languageCode && languageCode !== "en" && lessonsRaw.length > 0) {
       const lessonIds = lessonsRaw.map((l) => l.id);
-      const allIds = [id, ...moduleIds, ...lessonIds].filter(Boolean) as string[];
-      const { data: planTrans } = await supabase
+      const { data: lessonTrans } = await supabase
         .from("p2p_content_translations")
-        .select("content_type,content_id,title,subtitle,description")
-        .in("content_type", ["plan", "plan_module", "plan_lesson"])
-        .in("content_id", allIds)
-        .eq("language_code", languageCode)
-        .eq("status", "approved");
-
-      const planOverride = (planTrans ?? []).find((r: any) => r.content_type === "plan" && r.content_id === id) as any;
-      if (planOverride && overlaidPlan) {
-        overlaidPlan = {
-          ...overlaidPlan,
-          title: planOverride.title ?? overlaidPlan.title,
-          tagline: planOverride.subtitle ?? overlaidPlan.tagline,
-          overview: planOverride.description ?? overlaidPlan.overview,
-        };
-      }
-
-      const moduleTitleOverrides = new Map<string, string>();
+        .select("content_id,title")
+        .eq("content_type", "plan_lesson")
+        .in("content_id", lessonIds)
+        .eq("language_code", languageCode);
       const lessonTitleOverrides = new Map<string, string>();
-      for (const row of (planTrans ?? []) as Record<string, unknown>[]) {
-        if (!row.title) continue;
-        if (row.content_type === "plan_module") moduleTitleOverrides.set(row.content_id as string, row.title as string);
-        if (row.content_type === "plan_lesson") lessonTitleOverrides.set(row.content_id as string, row.title as string);
+      for (const row of (lessonTrans ?? []) as Record<string, unknown>[]) {
+        if (row.title) lessonTitleOverrides.set(row.content_id as string, row.title as string);
       }
-      for (const m of modulesRaw) m.module_title = moduleTitleOverrides.get(m.id) ?? m.module_title;
       for (const l of lessonsRaw) l.title = lessonTitleOverrides.get(l.id) ?? l.title;
     }
 
-    setPlan(overlaidPlan);
+    setPlan(planData_);
     setTeachers((teachersData ?? []) as Teacher[]);
     setModules(modulesRaw);
     setDqs((dqData ?? []) as DQ[]);
+
+    // Plan title/tagline/overview + module titles: on-demand translation,
+    // permanently cached server-side (see translations.ts's GET
+    // /translations/plan/:planId and /plan-module/:moduleId). English is
+    // already showing (state set above) — this only ever upgrades the
+    // display in place, silently, with no loading state of its own. Teacher
+    // name/socials/location are never touched here — those stay English.
+    if (languageCode && languageCode !== "en" && planData_) {
+      fetchAndApplyPlanTranslations(planData_.id, modulesRaw.map((m) => m.id), languageCode, setPlan, setModules);
+    }
 
     if (profile?.id && lessonsRaw.length > 0) {
       const lessonIds = lessonsRaw.map(l => l.id);
