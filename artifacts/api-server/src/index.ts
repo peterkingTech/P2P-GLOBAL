@@ -1,6 +1,16 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
+// Translation calls fail silently into an English fallback (see
+// curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
+// otherwise go unnoticed until a user happens to trigger a translation.
+// This just makes that state visible in the deploy logs at startup.
+if (process.env.ANTHROPIC_API_KEY) {
+  logger.info("ANTHROPIC_API_KEY is set — translation engine ready");
+} else {
+  logger.warn("ANTHROPIC_API_KEY is not set — all translations will fall back to English");
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
