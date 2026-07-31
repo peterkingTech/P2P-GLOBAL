@@ -249,7 +249,7 @@ router.get("/lessons/:lessonId", async (req, res) => {
 // separate p2p_plans/p2p_plan_modules/p2p_plan_lessons system this used to
 // mean was dropped in that migration; there is no second system anymore.
 
-function mapPlan(row: Record<string, unknown>, moduleCount = 0, lessonCount = 0) {
+function mapPlan(row: Record<string, unknown>, moduleCount = 0, lessonCount = 0, fallbackImageUrl: string | null = null) {
   return {
     id: row.id,
     title: row.title,
@@ -257,8 +257,12 @@ function mapPlan(row: Record<string, unknown>, moduleCount = 0, lessonCount = 0)
     subtitle: row.subtitle ?? null,
     // p2p_curriculums' real image column is `cover_image` (not
     // `cover_image_url` — that name belongs to p2p_modules, which is a
-    // separate, already-existing column there).
-    coverImageUrl: row.cover_image ?? null,
+    // separate, already-existing column there). `cover_image` itself has
+    // never actually been set for the pre-existing plans (Victory, Media
+    // Mandate) — their real cover art was seeded onto each module's legacy
+    // `image_url` column instead, so fall back to that until an admin sets
+    // a dedicated plan-level cover image.
+    coverImageUrl: (row.cover_image as string | null) ?? fallbackImageUrl,
     thumbnailUrl: row.thumbnail_url ?? null,
     colorTheme: row.color_theme ?? "#1D9E75",
     tags: row.tags ?? [],
@@ -284,7 +288,10 @@ function mapPlanModule(row: Record<string, unknown>) {
     curriculumId: row.curriculum_id ?? null,
     title: row.title,
     description: row.description ?? null,
-    coverImageUrl: row.cover_image_url ?? null,
+    // Same legacy-column fallback as mapPlan() above — `cover_image_url`
+    // (new) is unset for existing modules; their real thumbnail lives on
+    // the pre-existing `image_url` column.
+    coverImageUrl: (row.cover_image_url as string | null) ?? (row.image_url as string | null) ?? null,
     colorTheme: row.color_theme ?? null,
     sortOrder: row.order_index ?? 0,
     status: row.status,
@@ -316,8 +323,12 @@ router.get("/plans", async (_req, res) => {
 
   const planIds = (plans ?? []).map((p) => p.id as string);
   const { data: modules } = planIds.length
-    ? await supabaseRead.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds)
-    : { data: [] as { id: string; curriculum_id: string }[] };
+    ? await supabaseRead
+        .from("p2p_modules")
+        .select("id,curriculum_id,image_url,order_index")
+        .in("curriculum_id", planIds)
+        .order("order_index", { ascending: true })
+    : { data: [] as { id: string; curriculum_id: string; image_url: string | null; order_index: number }[] };
   const moduleIds = (modules ?? []).map((m) => m.id as string);
   const { data: lessons } = moduleIds.length
     ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
@@ -325,10 +336,14 @@ router.get("/plans", async (_req, res) => {
 
   const moduleCountByPlan = new Map<string, number>();
   const moduleToPlanId = new Map<string, string>();
+  const fallbackImageByPlan = new Map<string, string>();
   for (const m of (modules ?? []) as Record<string, unknown>[]) {
     const planId = m.curriculum_id as string;
     moduleCountByPlan.set(planId, (moduleCountByPlan.get(planId) ?? 0) + 1);
     moduleToPlanId.set(m.id as string, planId);
+    // Ordered ascending above, so the first module seen per plan is its
+    // earliest one — same "first module's image" fallback as the detail route.
+    if (!fallbackImageByPlan.has(planId) && m.image_url) fallbackImageByPlan.set(planId, m.image_url as string);
   }
   const lessonCountByPlan = new Map<string, number>();
   for (const l of (lessons ?? []) as Record<string, unknown>[]) {
@@ -337,7 +352,12 @@ router.get("/plans", async (_req, res) => {
   }
 
   return res.json(
-    (plans ?? []).map((p) => mapPlan(p as Record<string, unknown>, moduleCountByPlan.get(p.id as string) ?? 0, lessonCountByPlan.get(p.id as string) ?? 0))
+    (plans ?? []).map((p) => mapPlan(
+      p as Record<string, unknown>,
+      moduleCountByPlan.get(p.id as string) ?? 0,
+      lessonCountByPlan.get(p.id as string) ?? 0,
+      fallbackImageByPlan.get(p.id as string) ?? null
+    ))
   );
 });
 
@@ -379,9 +399,13 @@ router.get("/plans/:planId", async (req, res) => {
     lessons: lessonsByModule.get(m.id as string) ?? [],
   }));
   const totalLessons = mappedModules.reduce((a, m) => a + m.lessons.length, 0);
+  // modules is already ordered by order_index ascending, so its first
+  // entry's image is the same "first module's image" fallback used in
+  // GET /plans above.
+  const fallbackImageUrl = (modules ?? [])[0]?.image_url as string | undefined ?? null;
 
   return res.json({
-    ...mapPlan(plan as Record<string, unknown>, mappedModules.length, totalLessons),
+    ...mapPlan(plan as Record<string, unknown>, mappedModules.length, totalLessons, fallbackImageUrl),
     modules: mappedModules,
   });
 });
