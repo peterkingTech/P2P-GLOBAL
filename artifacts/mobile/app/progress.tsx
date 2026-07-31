@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/contexts/AuthContext";
-import { useData, Plan, PlanV2 } from "@/contexts/DataContext";
-import { supabase } from "@/contexts/AuthContext";
+import { useData, Plan } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
@@ -47,57 +44,10 @@ function makeStyles(c: AppColors) {
   });
 }
 
-// ── Legacy (type='plan' curriculum) in-progress card — resolves current
-// module + lesson name from the already-loaded modules array (no extra fetch). ──
-function LegacyPlanCard({ plan, styles, router }: { plan: Plan; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
-  const currentModule = plan.modules.find(m => !m.isLocked && m.completedLessons < m.lessonCount) ?? plan.modules[0];
-  const pct = plan.lessonCount > 0 ? Math.round((plan.completedLessons / plan.lessonCount) * 100) : 0;
-  return (
-    <TouchableOpacity
-      style={styles.planCard}
-      onPress={() => router.push(`/module/${plan.singleModuleId ?? plan.id}` as any)}
-      activeOpacity={0.82}
-    >
-      <Text style={styles.planTitle}>{plan.title}</Text>
-      {currentModule && (
-        <Text style={styles.planCurrent}>
-          Current: {currentModule.title} ({currentModule.completedLessons}/{currentModule.lessonCount} lessons)
-        </Text>
-      )}
-      <View style={styles.planBar}>
-        <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
-      </View>
-      <Text style={styles.planProgress}>{plan.completedLessons}/{plan.lessonCount} lessons approved · {pct}%</Text>
-    </TouchableOpacity>
-  );
-}
-
-// ── p2p_plans-based (plansV2) in-progress card — plansV2 only carries
-// plan-level counts, so this resolves the current module/lesson name with a
-// small local fetch, the same pattern app/plan/[id].tsx already uses. ──
-function PlanV2Card({ plan, userId, styles, router }: { plan: PlanV2; userId: string; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
-  const [current, setCurrent] = useState<{ moduleTitle: string; lessonTitle: string } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [{ data: lessons }, { data: modules }, { data: progress }] = await Promise.all([
-        supabase.from("p2p_plan_lessons").select("id,module_id,title,order_index").eq("plan_id", plan.id).order("order_index"),
-        supabase.from("p2p_plan_modules").select("id,module_title,order_index").eq("plan_id", plan.id).order("order_index"),
-        supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", userId),
-      ]);
-      if (cancelled) return;
-      const completedSet = new Set((progress ?? []).filter((p: any) => p.completed).map((p: any) => p.lesson_id));
-      const nextLesson = (lessons ?? []).find((l: any) => !completedSet.has(l.id));
-      if (nextLesson) {
-        const mod = (modules ?? []).find((m: any) => m.id === nextLesson.module_id);
-        setCurrent({ moduleTitle: mod?.module_title ?? "", lessonTitle: nextLesson.title });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [plan.id, userId]);
-
-  const pct = plan.lessonCount > 0 ? Math.round((plan.completedLessons / plan.lessonCount) * 100) : 0;
+// ── Unified plan-in-progress card — all plans (p2p_curriculums type='plan')
+// now share one schema and one progress source (DataContext.getPlanProgress),
+// so there is no more legacy/v2 split here. ──
+function PlanProgressCard({ plan, progress, styles, router }: { plan: Plan; progress: number; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
   return (
     <TouchableOpacity
       style={styles.planCard}
@@ -105,15 +55,10 @@ function PlanV2Card({ plan, userId, styles, router }: { plan: PlanV2; userId: st
       activeOpacity={0.82}
     >
       <Text style={styles.planTitle}>{plan.title}</Text>
-      {current && (
-        <Text style={styles.planCurrent}>
-          {current.moduleTitle ? `${current.moduleTitle} — ` : ""}{current.lessonTitle}
-        </Text>
-      )}
       <View style={styles.planBar}>
-        <View style={[styles.planBarFill, { width: `${pct}%` as any }]} />
+        <View style={[styles.planBarFill, { width: `${progress}%` as any }]} />
       </View>
-      <Text style={styles.planProgress}>{plan.completedLessons}/{plan.lessonCount} lessons approved · {pct}%</Text>
+      <Text style={styles.planProgress}>{progress}% complete</Text>
     </TouchableOpacity>
   );
 }
@@ -121,16 +66,17 @@ function PlanV2Card({ plan, userId, styles, router }: { plan: PlanV2; userId: st
 export default function ProgressDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile } = useAuth();
-  const { modules, lessons, plans, plansV2 } = useData();
+  const { modules, lessons, plans, getPlanProgress } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
   const [refreshKey, setRefreshKey] = useState(0);
   const onRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
-  const plansInProgress = plans.filter(p => p.completedLessons > 0 && p.completedLessons < p.lessonCount);
-  const plansV2InProgress = plansV2.filter(p => p.completedLessons > 0 && p.completedLessons < p.lessonCount);
+  const plansInProgress = plans.filter(p => {
+    const progress = getPlanProgress(p.id);
+    return progress > 0 && progress < 100;
+  });
 
   // Core curriculum: the first lesson that's neither completed nor locked is
   // "current" — everything before it is done, this is what the user should
@@ -140,7 +86,7 @@ export default function ProgressDashboard() {
   const coreCompletedLessons = lessons.filter(l => l.isCompleted).length;
   const coreHasStarted = coreCompletedLessons > 0 || Boolean(currentCoreLesson);
 
-  const nothingToShow = plansInProgress.length === 0 && plansV2InProgress.length === 0 && !currentCoreModule;
+  const nothingToShow = plansInProgress.length === 0 && !currentCoreModule;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -177,14 +123,11 @@ export default function ProgressDashboard() {
         )}
 
         {/* ── Plans In Progress ── */}
-        {(plansInProgress.length > 0 || plansV2InProgress.length > 0) && (
+        {plansInProgress.length > 0 && (
           <>
             <Text style={styles.sectionHeader}>Plans In Progress</Text>
             {plansInProgress.map(p => (
-              <LegacyPlanCard key={p.id} plan={p} styles={styles} router={router} />
-            ))}
-            {profile?.id && plansV2InProgress.map(p => (
-              <PlanV2Card key={p.id} plan={p} userId={profile.id} styles={styles} router={router} />
+              <PlanProgressCard key={p.id} plan={p} progress={getPlanProgress(p.id)} styles={styles} router={router} />
             ))}
           </>
         )}

@@ -193,11 +193,11 @@ export async function fetchEnglishSource(
     case "curriculum": {
       const { data } = await supabaseRead
         .from("p2p_curriculums")
-        .select("title,description")
+        .select("title,description,subtitle")
         .eq("id", contentId)
         .maybeSingle();
       if (!data) return null;
-      return { title: data.title, description: data.description };
+      return { title: data.title, description: data.description, subtitle: data.subtitle };
     }
 
     case "module": {
@@ -282,7 +282,19 @@ interface TranslationResult extends SourceFields {
 // by DB id) is too heterogeneous for a fixed schema, so it returns null here
 // and falls back to sanitizeJsonText() below instead.
 function buildOutputSchema(contentType: ContentType, source: SourceFields): Record<string, unknown> | null {
-  if (contentType === "curriculum" || contentType === "module") {
+  if (contentType === "curriculum") {
+    return {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        subtitle: { type: "string" },
+      },
+      additionalProperties: false,
+    };
+  }
+
+  if (contentType === "module") {
     return {
       type: "object",
       properties: {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { requireAdmin } from "../middleware/adminAuth";
 import { getTranslation, translateAndStore, withTimeout, type StoredTranslation } from "../lib/translationEngine";
 
 const router = Router();
@@ -240,6 +241,288 @@ router.get("/lessons/:lessonId", async (req, res) => {
   } catch (e: any) {
     return res.json({ ...base, translation_available: false, translation_error: e.message ?? "Translation failed" });
   }
+});
+
+// ── Unified Plans API ─────────────────────────────────────────────────────────
+// Plans are p2p_curriculums rows with type='plan' — the SAME modules/lessons
+// tables as core curriculum (see migration 041_unify_plans_system.sql). The
+// separate p2p_plans/p2p_plan_modules/p2p_plan_lessons system this used to
+// mean was dropped in that migration; there is no second system anymore.
+
+function mapPlan(row: Record<string, unknown>, moduleCount = 0, lessonCount = 0) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    subtitle: row.subtitle ?? null,
+    // p2p_curriculums' real image column is `cover_image` (not
+    // `cover_image_url` — that name belongs to p2p_modules, which is a
+    // separate, already-existing column there).
+    coverImageUrl: row.cover_image ?? null,
+    thumbnailUrl: row.thumbnail_url ?? null,
+    colorTheme: row.color_theme ?? "#1D9E75",
+    tags: row.tags ?? [],
+    isFeatured: row.is_featured ?? false,
+    difficultyLevel: row.difficulty_level ?? "beginner",
+    estimatedWeeks: row.estimated_weeks ?? null,
+    teachingCreditName: row.teaching_credit_name ?? null,
+    teachingCreditRole: row.teaching_credit_role ?? null,
+    teachingCreditChurch: row.teaching_credit_church ?? null,
+    teachingCreditLocation: row.teaching_credit_location ?? null,
+    teachingCreditYoutube: row.teaching_credit_youtube ?? null,
+    teachingCreditInstagram: row.teaching_credit_instagram ?? null,
+    status: row.status,
+    displayOrder: row.display_order ?? null,
+    moduleCount,
+    lessonCount,
+  };
+}
+
+function mapPlanModule(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    curriculumId: row.curriculum_id ?? null,
+    title: row.title,
+    description: row.description ?? null,
+    coverImageUrl: row.cover_image_url ?? null,
+    colorTheme: row.color_theme ?? null,
+    sortOrder: row.order_index ?? 0,
+    status: row.status,
+  };
+}
+
+function mapPlanLesson(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    moduleId: row.module_id ?? null,
+    title: row.title,
+    subtitle: row.subtitle ?? null,
+    sortOrder: row.order_index ?? 0,
+    status: row.status,
+  };
+}
+
+// GET /plans — list all published plans
+router.get("/plans", async (_req, res) => {
+  const { data: plans, error } = await supabaseRead
+    .from("p2p_curriculums")
+    .select("*")
+    .eq("type", "plan")
+    .eq("status", "published")
+    .order("is_featured", { ascending: false })
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const planIds = (plans ?? []).map((p) => p.id as string);
+  const { data: modules } = planIds.length
+    ? await supabaseRead.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds)
+    : { data: [] as { id: string; curriculum_id: string }[] };
+  const moduleIds = (modules ?? []).map((m) => m.id as string);
+  const { data: lessons } = moduleIds.length
+    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
+    : { data: [] as { id: string; module_id: string }[] };
+
+  const moduleCountByPlan = new Map<string, number>();
+  const moduleToPlanId = new Map<string, string>();
+  for (const m of (modules ?? []) as Record<string, unknown>[]) {
+    const planId = m.curriculum_id as string;
+    moduleCountByPlan.set(planId, (moduleCountByPlan.get(planId) ?? 0) + 1);
+    moduleToPlanId.set(m.id as string, planId);
+  }
+  const lessonCountByPlan = new Map<string, number>();
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const planId = moduleToPlanId.get(l.module_id as string);
+    if (planId) lessonCountByPlan.set(planId, (lessonCountByPlan.get(planId) ?? 0) + 1);
+  }
+
+  return res.json(
+    (plans ?? []).map((p) => mapPlan(p as Record<string, unknown>, moduleCountByPlan.get(p.id as string) ?? 0, lessonCountByPlan.get(p.id as string) ?? 0))
+  );
+});
+
+// GET /plans/:planId — a single plan with all modules and lessons
+router.get("/plans/:planId", async (req, res) => {
+  const { planId } = req.params;
+  const { data: plan } = await supabaseRead
+    .from("p2p_curriculums")
+    .select("*")
+    .eq("id", planId)
+    .eq("type", "plan")
+    .maybeSingle();
+  if (!plan) return res.status(404).json({ error: "Plan not found" });
+
+  const { data: modules } = await supabaseRead
+    .from("p2p_modules")
+    .select("*")
+    .eq("curriculum_id", planId)
+    .order("order_index", { ascending: true });
+  const moduleIds = (modules ?? []).map((m) => m.id as string);
+  const { data: lessons } = moduleIds.length
+    ? await supabaseRead
+        .from("p2p_lessons")
+        .select("id,module_id,title,subtitle,order_index,status")
+        .in("module_id", moduleIds)
+        .order("order_index", { ascending: true })
+    : { data: [] as Record<string, unknown>[] };
+
+  const lessonsByModule = new Map<string, ReturnType<typeof mapPlanLesson>[]>();
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const moduleId = l.module_id as string;
+    const arr = lessonsByModule.get(moduleId) ?? [];
+    arr.push(mapPlanLesson(l));
+    lessonsByModule.set(moduleId, arr);
+  }
+
+  const mappedModules = (modules ?? []).map((m) => ({
+    ...mapPlanModule(m as Record<string, unknown>),
+    lessons: lessonsByModule.get(m.id as string) ?? [],
+  }));
+  const totalLessons = mappedModules.reduce((a, m) => a + m.lessons.length, 0);
+
+  return res.json({
+    ...mapPlan(plan as Record<string, unknown>, mappedModules.length, totalLessons),
+    modules: mappedModules,
+  });
+});
+
+// GET /plans/:planId/progress/:userId
+router.get("/plans/:planId/progress/:userId", async (req, res) => {
+  const { planId, userId } = req.params;
+
+  const { data: modules } = await supabaseRead.from("p2p_modules").select("id").eq("curriculum_id", planId);
+  const moduleIds = (modules ?? []).map((m) => m.id as string);
+  if (!moduleIds.length) return res.json({ percent: 0, completedLessons: 0, totalLessons: 0, modules: [] });
+
+  const { data: lessons } = await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds);
+  const lessonIds = (lessons ?? []).map((l) => l.id as string);
+  const { data: progress } = lessonIds.length
+    ? await supabaseRead.from("p2p_lesson_progress").select("lesson_id,completed").eq("user_id", userId).in("lesson_id", lessonIds)
+    : { data: [] as { lesson_id: string; completed: boolean }[] };
+
+  const completedSet = new Set((progress ?? []).filter((p) => p.completed).map((p) => p.lesson_id as string));
+  const lessonIdsByModule = new Map<string, string[]>();
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const moduleId = l.module_id as string;
+    const arr = lessonIdsByModule.get(moduleId) ?? [];
+    arr.push(l.id as string);
+    lessonIdsByModule.set(moduleId, arr);
+  }
+
+  const moduleStatus = moduleIds.map((moduleId) => {
+    const ids = lessonIdsByModule.get(moduleId) ?? [];
+    const completedCount = ids.filter((id) => completedSet.has(id)).length;
+    return { moduleId, lessonCount: ids.length, completedCount, isComplete: ids.length > 0 && completedCount === ids.length };
+  });
+
+  const totalLessons = lessonIds.length;
+  const completedLessons = completedSet.size;
+  const percent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+  return res.json({ percent, completedLessons, totalLessons, modules: moduleStatus });
+});
+
+// ── Admin: Plans CRUD ──────────────────────────────────────────────────────────
+
+const PLAN_FIELD_MAP: Record<string, string> = {
+  title: "title", description: "description", subtitle: "subtitle",
+  coverImageUrl: "cover_image", thumbnailUrl: "thumbnail_url", colorTheme: "color_theme",
+  tags: "tags", isFeatured: "is_featured", difficultyLevel: "difficulty_level",
+  estimatedWeeks: "estimated_weeks", teachingCreditName: "teaching_credit_name",
+  teachingCreditRole: "teaching_credit_role", teachingCreditChurch: "teaching_credit_church",
+  teachingCreditLocation: "teaching_credit_location", teachingCreditYoutube: "teaching_credit_youtube",
+  teachingCreditInstagram: "teaching_credit_instagram", status: "status", displayOrder: "display_order",
+};
+
+// Admin writes use supabaseRead (service-role, despite the name — same
+// client already used for reads above) rather than the plain anon-key
+// `supabase` import: p2p_curriculums/p2p_modules/p2p_lessons RLS write
+// policies require auth.uid() to satisfy p2p_is_admin(), which an anon-key
+// client with no forwarded user session can never do — same fix already
+// applied to translationEngine.ts/translations.ts for the same reason.
+
+// POST /admin/plans — create
+router.post("/admin/plans", requireAdmin, async (req, res) => {
+  const { title, description } = req.body as { title?: string; description?: string };
+  if (!title || !title.trim()) return res.status(400).json({ error: "title is required" });
+
+  const { data, error } = await supabaseRead
+    .from("p2p_curriculums")
+    .insert({ title: title.trim(), description: description?.trim() || null, type: "plan", status: "draft" })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(mapPlan(data as Record<string, unknown>));
+});
+
+// PUT /admin/plans/:planId — update (any field, including teaching credit)
+router.put("/admin/plans/:planId", requireAdmin, async (req, res) => {
+  const { planId } = req.params;
+  const body = req.body as Record<string, unknown>;
+
+  const update: Record<string, unknown> = {};
+  for (const [field, column] of Object.entries(PLAN_FIELD_MAP)) {
+    if (body[field] !== undefined) update[column] = body[field];
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: "No fields to update" });
+
+  const { data, error } = await supabaseRead
+    .from("p2p_curriculums")
+    .update(update)
+    .eq("id", planId)
+    .eq("type", "plan")
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(mapPlan(data as Record<string, unknown>));
+});
+
+// DELETE /admin/plans/:planId — soft delete (status='archived'), never hard delete
+router.delete("/admin/plans/:planId", requireAdmin, async (req, res) => {
+  const { planId } = req.params;
+  const { error } = await supabaseRead
+    .from("p2p_curriculums")
+    .update({ status: "archived" })
+    .eq("id", planId)
+    .eq("type", "plan");
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ archived: true });
+});
+
+// POST /admin/plans/:planId/modules — add a module to a plan
+router.post("/admin/plans/:planId/modules", requireAdmin, async (req, res) => {
+  const { planId } = req.params;
+  const { title, description } = req.body as { title?: string; description?: string };
+  if (!title || !title.trim()) return res.status(400).json({ error: "title is required" });
+
+  const { data: sibs } = await supabaseRead.from("p2p_modules").select("order_index").eq("curriculum_id", planId);
+  const orderIndex = (sibs ?? []).length ? Math.max(...(sibs as { order_index: number }[]).map((s) => s.order_index)) + 1 : 0;
+
+  const { data, error } = await supabaseRead
+    .from("p2p_modules")
+    .insert({ curriculum_id: planId, title: title.trim(), description: description?.trim() || null, status: "draft", order_index: orderIndex })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(mapPlanModule(data as Record<string, unknown>));
+});
+
+// POST /admin/plans/:planId/modules/:moduleId/lessons — add a lesson
+router.post("/admin/plans/:planId/modules/:moduleId/lessons", requireAdmin, async (req, res) => {
+  const { moduleId } = req.params;
+  const { title } = req.body as { title?: string };
+  if (!title || !title.trim()) return res.status(400).json({ error: "title is required" });
+
+  const { data: sibs } = await supabaseRead.from("p2p_lessons").select("order_index").eq("module_id", moduleId);
+  const orderIndex = (sibs ?? []).length ? Math.max(...(sibs as { order_index: number }[]).map((s) => s.order_index)) + 1 : 0;
+
+  const { data, error } = await supabaseRead
+    .from("p2p_lessons")
+    .insert({ module_id: moduleId, title: title.trim(), status: "draft", order_index: orderIndex })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(mapPlanLesson(data as Record<string, unknown>));
 });
 
 export default router;

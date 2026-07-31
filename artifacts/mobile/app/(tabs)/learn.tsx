@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -15,11 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, Module, Plan, PlanV2 } from "@/contexts/DataContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useData, Module, Plan } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { getApiUrl } from "@/lib/apiUrl";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
@@ -103,119 +101,51 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
   );
 }
 
-function PlanThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
-  const { colors } = useTheme();
-  const [err, setErr] = useState(false);
-  if (uri && !err) {
-    return (
-      <View style={{ width: 64, height: 64, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-        <Image
-          source={{ uri }}
-          style={{ width: 64, height: 64, opacity: isLocked ? 0.4 : 1 }}
-          resizeMode="cover"
-          onError={() => setErr(true)}
-        />
-        {isLocked && (
-          <View style={{
-            position: "absolute", inset: 0, alignItems: "center", justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.25)",
-          }}>
-            <Ionicons name="lock-closed" size={18} color="#fff" />
-          </View>
-        )}
-      </View>
-    );
-  }
-  return (
-    <View style={{
-      width: 64, height: 64, borderRadius: 12, flexShrink: 0,
-      backgroundColor: isLocked ? colors.borderBeige : "rgba(29,158,117,0.08)",
-      alignItems: "center", justifyContent: "center",
-    }}>
-      <Ionicons
-        name={isLocked ? "lock-closed" : "book-outline"}
-        size={22}
-        color={isLocked ? colors.textMuted : colors.accentGreen}
-      />
-    </View>
-  );
-}
-
-function PlanCard({ plan, onPress }: { plan: Plan; onPress: () => void }) {
+// Unified plan card — a Plan is a p2p_curriculums row (type='plan') now, see
+// migration 041_unify_plans_system.sql. Title/description arrive already
+// translated (DataContext.loadPlans does the on-demand translation), and
+// progress is looked up via getPlanProgress rather than carried on the
+// object itself, since it depends on the current user.
+function PlanCard({ plan, progress, onPress }: { plan: Plan; progress: number; onPress: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const { t } = useTranslation();
-  const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
-  const isComplete = pct === 100;
-  const isLocked = plan.isLocked;
-  return (
-    <TouchableOpacity
-      style={[styles.planCard, isLocked && styles.planCardLocked]}
-      onPress={onPress}
-      activeOpacity={isLocked ? 1 : 0.85}
-      disabled={isLocked}
-    >
-      <PlanThumbnail uri={plan.imageUrl} isLocked={isLocked} />
-      <View style={styles.planCardBody}>
-        <Text style={[styles.planTitle, isLocked && { color: colors.textMuted }]}>{plan.title}</Text>
-        {isLocked ? (
-          <Text style={[styles.planDesc, { fontStyle: "italic" }]}>{t("learn.unlockPlan")}</Text>
-        ) : (
-          <>
-            <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
-            {plan.lessonCount > 0 && (
-              <View style={[styles.progressRow, { marginTop: 6 }]}>
-                <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
-                  <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
-                </View>
-                <Text style={[styles.progressText, { color: colors.textMuted }]}>
-                  {plan.completedLessons}/{plan.lessonCount}
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-      </View>
-      {!isLocked && (
-        isComplete ? (
-          <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
-        ) : (
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        )
-      )}
-    </TouchableOpacity>
-  );
-}
-
-function PlanCardV2({ plan, onPress }: { plan: PlanV2; onPress: () => void }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const pct = plan.lessonCount > 0 ? (plan.completedLessons / plan.lessonCount) * 100 : 0;
-  const isComplete = pct === 100;
-  const teacher = plan.teachers[0];
+  const [imgErr, setImgErr] = useState(false);
+  const isComplete = progress === 100;
+  const hasProgress = plan.lessonCount > 0 && progress > 0;
   return (
     <TouchableOpacity style={styles.planCard} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.planIconWrap}>
-        <Ionicons name="albums-outline" size={22} color={colors.accentGreen} />
-      </View>
+      {plan.coverImageUrl && !imgErr ? (
+        <Image source={{ uri: plan.coverImageUrl }} style={styles.planThumb} resizeMode="cover" onError={() => setImgErr(true)} />
+      ) : (
+        <View style={[styles.planThumb, styles.planThumbPlaceholder, { backgroundColor: `${plan.colorTheme}1A` }]}>
+          <Ionicons name="book-outline" size={22} color={plan.colorTheme} />
+        </View>
+      )}
       <View style={styles.planCardBody}>
-        <Text style={styles.planTitle}>{plan.title}</Text>
-        {plan.tagline ? (
-          <Text style={styles.planDesc} numberOfLines={2}>{plan.tagline}</Text>
-        ) : null}
-        {teacher ? (
-          <Text style={[styles.planDesc, { color: colors.accentGreen, fontSize: 11 }]} numberOfLines={1}>
-            {teacher.name}{teacher.ministryOrChurch ? ` · ${teacher.ministryOrChurch}` : ""}
+        <View style={styles.planTitleRow}>
+          <Text style={styles.planTitle} numberOfLines={1}>{plan.title}</Text>
+          {plan.isFeatured && (
+            <View style={styles.featuredPill}>
+              <Ionicons name="star" size={9} color="#fff" />
+              <Text style={styles.featuredPillText}>Featured</Text>
+            </View>
+          )}
+        </View>
+        {plan.description ? <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text> : null}
+        <View style={styles.planMetaRow}>
+          <View style={[styles.difficultyBadge, { borderColor: plan.colorTheme }]}>
+            <Text style={[styles.difficultyBadgeText, { color: plan.colorTheme }]}>{plan.difficultyLevel}</Text>
+          </View>
+          <Text style={styles.planMetaText}>
+            {plan.moduleCount} module{plan.moduleCount === 1 ? "" : "s"} · {plan.lessonCount} lesson{plan.lessonCount === 1 ? "" : "s"}
           </Text>
-        ) : null}
-        {plan.lessonCount > 0 && (
+        </View>
+        {hasProgress && (
           <View style={[styles.progressRow, { marginTop: 6 }]}>
             <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
-              <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
+              <View style={[styles.progressFill, { width: `${progress}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
             </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              {plan.completedLessons}/{plan.lessonCount}
-            </Text>
+            <Text style={[styles.progressText, { color: colors.textMuted }]}>{progress}%</Text>
           </View>
         )}
       </View>
@@ -265,8 +195,20 @@ function makeStyles(c: AppColors) {
       alignItems: "center", justifyContent: "center", flexShrink: 0,
     },
     planCardBody: { flex: 1 },
-    planTitle: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 3 },
+    planThumb: { width: 56, height: 56, borderRadius: 12, flexShrink: 0 },
+    planThumbPlaceholder: { alignItems: "center", justifyContent: "center" },
+    planTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
+    planTitle: { flex: 1, fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    featuredPill: {
+      flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.amber,
+      borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0,
+    },
+    featuredPillText: { fontSize: 9, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     planDesc: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    planMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+    difficultyBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+    difficultyBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
+    planMetaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     comingSoonPill: {
       backgroundColor: "rgba(201,180,138,0.2)", borderRadius: 8,
       paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0,
@@ -330,46 +272,16 @@ function makeStyles(c: AppColors) {
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { modules, isLoading, plans, plansLoading, plansV2, plansV2Loading } = useData();
+  // Title/description arrive already translated — DataContext.loadPlans
+  // does the on-demand translation fetch itself (parallel, English fallback
+  // always), so there's nothing left for this screen to fetch.
+  const { modules, isLoading, plans, plansLoading, getPlanProgress } = useData();
   const { colors } = useTheme();
-  const { profile } = useAuth();
   const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
-  // On-demand plan title/tagline translations for the PlansV2 list — keyed
-  // by plan id. Populated in the background (batched via Promise.all, never
-  // one request per plan); English always shows first and this only ever
-  // upgrades the display in place. See translations.ts's GET /translations/plan/:planId.
-  const [planV2Translations, setPlanV2Translations] = useState<Map<string, { title: string; tagline: string | null }>>(new Map());
-  const translationsFetchedFor = useRef<string | null>(null);
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
   const { t } = useTranslation();
-
-  const contentLanguage = profile?.contentLanguage;
-  useEffect(() => {
-    if (!contentLanguage || contentLanguage === "en" || plansV2.length === 0) return;
-    const fetchKey = `${contentLanguage}:${plansV2.map((p) => p.id).sort().join(",")}`;
-    if (translationsFetchedFor.current === fetchKey) return;
-    translationsFetchedFor.current = fetchKey;
-
-    const apiUrl = getApiUrl();
-    Promise.all(
-      plansV2.map((p) =>
-        fetch(`${apiUrl}/translations/plan/${p.id}?language=${contentLanguage}`)
-          .then((res) => res.json())
-          .then((data) => ({ id: p.id, data }))
-          .catch(() => null)
-      )
-    ).then((results) => {
-      const map = new Map<string, { title: string; tagline: string | null }>();
-      for (const r of results) {
-        if (r?.data?.translation_available && r.data.title) {
-          map.set(r.id, { title: r.data.title, tagline: r.data.subtitle ?? null });
-        }
-      }
-      if (map.size > 0) setPlanV2Translations(map);
-    });
-  }, [contentLanguage, plansV2]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -473,11 +385,11 @@ export default function LearnTab() {
           />
         )
       ) : (
-        (plansLoading && plansV2Loading) ? (
+        plansLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={colors.accentGreen} />
           </View>
-        ) : (plans.length === 0 && plansV2.length === 0) ? (
+        ) : plans.length === 0 ? (
           <View style={styles.loadingContainer}>
             <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
             <Text style={[styles.moduleDesc, { textAlign: "center", marginTop: 12, paddingHorizontal: 40 }]}>
@@ -490,32 +402,14 @@ export default function LearnTab() {
             contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
             showsVerticalScrollIndicator={false}
           >
-            {plans.map(item => (
+            {plans.map((item) => (
               <PlanCard
                 key={item.id}
                 plan={item}
-                onPress={() => {
-                  if (item.isSingleModule && item.singleModuleId) {
-                    router.push(`/module/${item.singleModuleId}`);
-                  } else {
-                    router.push(`/module/${item.id}`);
-                  }
-                }}
+                progress={getPlanProgress(item.id)}
+                onPress={() => router.push(`/plan/${item.id}` as any)}
               />
             ))}
-            {plansV2.map(item => {
-              const override = planV2Translations.get(item.id);
-              const displayPlan = override
-                ? { ...item, title: override.title, tagline: override.tagline ?? item.tagline }
-                : item;
-              return (
-                <PlanCardV2
-                  key={item.id}
-                  plan={displayPlan}
-                  onPress={() => router.push(`/plan/${item.id}` as any)}
-                />
-              );
-            })}
           </ScrollView>
         )
       )}

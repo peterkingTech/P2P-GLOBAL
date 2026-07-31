@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,190 +7,100 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase, useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+const COVER_HEIGHT = 200;
 
-type Teacher = {
-  id: string; name: string; ministry_or_church: string | null; location: string | null;
-  youtube_handle: string | null; instagram_handle: string | null; other_social_handle: string | null;
+// ── Types (unified schema — a plan is a p2p_curriculums row with type='plan',
+// modules/lessons are the same p2p_modules/p2p_lessons tables core curriculum
+// uses) ─────────────────────────────────────────────────────────────────────
+type PlanLessonDetail = { id: string; moduleId: string | null; title: string; subtitle: string | null; sortOrder: number; status: string };
+type PlanModuleDetail = { id: string; title: string; description: string | null; coverImageUrl: string | null; colorTheme: string | null; sortOrder: number; status: string; lessons: PlanLessonDetail[] };
+type PlanDetail = {
+  id: string; title: string; description: string | null; subtitle: string | null;
+  coverImageUrl: string | null; colorTheme: string; difficultyLevel: string; estimatedWeeks: number | null;
+  teachingCreditName: string | null; teachingCreditRole: string | null; teachingCreditChurch: string | null;
+  teachingCreditLocation: string | null; teachingCreditYoutube: string | null; teachingCreditInstagram: string | null;
+  modules: PlanModuleDetail[];
 };
-type Module = { id: string; module_number: number; module_title: string; order_index: number };
-type Lesson = {
-  id: string; plan_id: string; module_id: string | null; lesson_code: string | null;
-  title: string; order_index: number; completed: boolean;
-  evaluationStatus?: "pending" | "needs_revision";
-};
-type OutlineSession = { id: string; session_label: string; summary: string | null; order_index: number };
-type DQ = { id: string; question_number: number | null; topic: string | null; question_text: string; order_index: number };
-type Plan = {
-  id: string; title: string; tagline: string | null; overview: string | null; has_submodules: boolean; status: string;
-};
-
-// Fire-and-forget: fetches on-demand plan + module translations in parallel
-// and merges them in via functional state updates once each resolves, so it
-// works correctly regardless of what else has updated `plan`/`modules` in
-// the meantime. Any failure (network, timeout, translation error) is
-// swallowed — English stays displayed, no error surfaced to the user.
-function fetchAndApplyPlanTranslations(
-  planId: string,
-  moduleIds: string[],
-  language: string,
-  setPlan: React.Dispatch<React.SetStateAction<Plan | null>>,
-  setModules: React.Dispatch<React.SetStateAction<Module[]>>
-) {
-  const apiUrl = getApiUrl();
-
-  fetch(`${apiUrl}/translations/plan/${planId}?language=${language}`)
-    .then((res) => res.json())
-    .then((data) => {
-      if (!data?.translation_available) return;
-      setPlan((prev) => prev ? {
-        ...prev,
-        title: data.title ?? prev.title,
-        tagline: data.subtitle ?? prev.tagline,
-        overview: data.description ?? prev.overview,
-      } : prev);
-    })
-    .catch(() => { /* keep English */ });
-
-  Promise.all(
-    moduleIds.map((moduleId) =>
-      fetch(`${apiUrl}/translations/plan-module/${moduleId}?language=${language}`)
-        .then((res) => res.json())
-        .then((data) => ({ moduleId, data }))
-        .catch(() => null)
-    )
-  ).then((results) => {
-    const titleByModuleId = new Map<string, string>();
-    for (const r of results) {
-      if (r?.data?.translation_available && r.data.title) titleByModuleId.set(r.moduleId, r.data.title);
-    }
-    if (titleByModuleId.size === 0) return;
-    setModules((prev) => prev.map((m) => ({
-      ...m,
-      module_title: titleByModuleId.get(m.id) ?? m.module_title,
-    })));
-  });
-}
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
+  const { getPlanProgress } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [sessions, setSessions] = useState<OutlineSession[]>([]);
-  const [dqs, setDqs] = useState<DQ[]>([]);
+  const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [outlineOpen, setOutlineOpen] = useState(false);
-  const [dqsOpen, setDqsOpen] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
 
   const loadPlan = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const [
-      { data: planData },
-      { data: teachersData },
-      { data: modulesData },
-      { data: lessonsData },
-      { data: outlineData },
-      { data: dqData },
-    ] = await Promise.all([
-      supabase.from("p2p_plans").select("id,title,tagline,overview,has_submodules,status").eq("id", id).single(),
-      supabase.from("p2p_plan_source_teachers").select("*").eq("plan_id", id),
-      supabase.from("p2p_plan_modules").select("id,module_number,module_title,order_index").eq("plan_id", id).order("order_index"),
-      supabase.from("p2p_plan_lessons").select("id,plan_id,module_id,lesson_code,title,order_index").eq("plan_id", id).order("order_index"),
-      supabase.from("p2p_plan_teaching_outlines").select("id").eq("plan_id", id).maybeSingle(),
-      supabase.from("p2p_plan_discussion_questions").select("id,question_number,topic,question_text,order_index").eq("plan_id", id).order("order_index"),
-    ]);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/plans/${id}`);
+      if (!res.ok) { setPlan(null); return; }
+      const data = (await res.json()) as PlanDetail;
+      setPlan(data);
 
-    const planData_ = planData as Plan | null;
-    const modulesRaw = (modulesData ?? []) as Module[];
-    const lessonsRaw = (lessonsData ?? []) as Omit<Lesson, "completed" | "evaluationStatus">[];
-    const languageCode = profile?.contentLanguage;
+      // On-demand translation, English already showing — this silently
+      // upgrades title/description/subtitle and module titles in place once
+      // resolved. Teaching credit fields are never translated (name/role/
+      // church/location are proper nouns / fixed English labels).
+      const language = profile?.contentLanguage;
+      if (language && language !== "en") {
+        fetch(`${apiUrl}/translations/curriculum/${data.id}?language=${language}`)
+          .then((r) => r.json())
+          .then((t) => {
+            if (!t?.translation_available) return;
+            setPlan((prev) => prev ? {
+              ...prev,
+              title: t.title ?? prev.title,
+              description: t.description ?? prev.description,
+              subtitle: t.subtitle ?? prev.subtitle,
+            } : prev);
+          })
+          .catch(() => { /* keep English */ });
 
-    // Lesson titles: cache-only overlay (no on-demand generation — out of
-    // scope here, matches "already working" lesson-content translation being
-    // a separate system). No status filter: on-demand-generated translations
-    // are cached at status 'draft' with no separate approval step.
-    if (languageCode && languageCode !== "en" && lessonsRaw.length > 0) {
-      const lessonIds = lessonsRaw.map((l) => l.id);
-      const { data: lessonTrans } = await supabase
-        .from("p2p_content_translations")
-        .select("content_id,title")
-        .eq("content_type", "plan_lesson")
-        .in("content_id", lessonIds)
-        .eq("language_code", languageCode);
-      const lessonTitleOverrides = new Map<string, string>();
-      for (const row of (lessonTrans ?? []) as Record<string, unknown>[]) {
-        if (row.title) lessonTitleOverrides.set(row.content_id as string, row.title as string);
+        Promise.all(
+          data.modules.map((m) =>
+            fetch(`${apiUrl}/translations/module/${m.id}?language=${language}`)
+              .then((r) => r.json())
+              .then((t) => ({ moduleId: m.id, t }))
+              .catch(() => null)
+          )
+        ).then((results) => {
+          const titleByModuleId = new Map<string, string>();
+          for (const r of results) {
+            if (r?.t?.translation_available && r.t.title) titleByModuleId.set(r.moduleId, r.t.title);
+          }
+          if (titleByModuleId.size === 0) return;
+          setPlan((prev) => prev ? {
+            ...prev,
+            modules: prev.modules.map((m) => ({ ...m, title: titleByModuleId.get(m.id) ?? m.title })),
+          } : prev);
+        });
       }
-      for (const l of lessonsRaw) l.title = lessonTitleOverrides.get(l.id) ?? l.title;
+    } finally {
+      setLoading(false);
     }
+  }, [id, profile?.contentLanguage]);
 
-    setPlan(planData_);
-    setTeachers((teachersData ?? []) as Teacher[]);
-    setModules(modulesRaw);
-    setDqs((dqData ?? []) as DQ[]);
-
-    // Plan title/tagline/overview + module titles: on-demand translation,
-    // permanently cached server-side (see translations.ts's GET
-    // /translations/plan/:planId and /plan-module/:moduleId). English is
-    // already showing (state set above) — this only ever upgrades the
-    // display in place, silently, with no loading state of its own. Teacher
-    // name/socials/location are never touched here — those stay English.
-    if (languageCode && languageCode !== "en" && planData_) {
-      fetchAndApplyPlanTranslations(planData_.id, modulesRaw.map((m) => m.id), languageCode, setPlan, setModules);
-    }
-
-    if (profile?.id && lessonsRaw.length > 0) {
-      const lessonIds = lessonsRaw.map(l => l.id);
-      const [{ data: progressData }, { data: evalData }] = await Promise.all([
-        supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", profile.id).in("lesson_id", lessonIds),
-        supabase.from("p2p_plan_lesson_evaluations").select("lesson_id,status").eq("submitter_id", profile.id).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
-      ]);
-      const completedSet = new Set((progressData ?? []).filter((p: any) => p.completed).map((p: any) => p.lesson_id));
-      const evalMap = new Map<string, "pending" | "needs_revision">();
-      for (const e of (evalData ?? []) as any[]) {
-        const st = e.status as "pending" | "needs_revision";
-        if (st === "needs_revision" || !evalMap.has(e.lesson_id)) evalMap.set(e.lesson_id, st);
-      }
-      setLessons(lessonsRaw.map(l => ({
-        ...l,
-        completed: completedSet.has(l.id),
-        evaluationStatus: completedSet.has(l.id) ? undefined : evalMap.get(l.id),
-      })));
-    } else {
-      setLessons(lessonsRaw.map(l => ({ ...l, completed: false })));
-    }
-
-    if (outlineData) {
-      const { data: sessionsData } = await supabase
-        .from("p2p_plan_teaching_sessions")
-        .select("id,session_label,summary,order_index")
-        .eq("outline_id", (outlineData as any).id)
-        .order("order_index");
-      setSessions((sessionsData ?? []) as OutlineSession[]);
-    }
-    setLoading(false);
-  }, [id, profile?.id]);
-
-  // Refetch on every focus, not just mount — returning from a lesson screen
-  // after submitting must show the new pending/unlock state immediately.
+  // Refetch on every focus — returning from a lesson after submitting should
+  // reflect the new progress percentage immediately.
   useFocusEffect(useCallback(() => { loadPlan(); }, [loadPlan]));
 
   if (loading) {
@@ -209,73 +119,13 @@ export default function PlanDetailScreen() {
     );
   }
 
-  const totalLessons = lessons.length;
-  const completedCount = lessons.filter(l => l.completed).length;
-  const pct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-
-  const renderLessons = (lessonList: Lesson[], moduleLocked: boolean) => {
-    let prevPassedForUnlock = true;
-    let allPrevCompleted = true;
-    return lessonList.map((lesson, i) => {
-      // Same convention as core curriculum: only a lesson seeded with
-      // order_index >= 999 is a Discussion & Review lesson requiring full
-      // approval of everything before it. Position in the list is not a
-      // review marker — a normal last lesson unlocks on prior submission.
-      const isReviewLesson = (lesson.order_index ?? 0) >= 999;
-      const passedForUnlock = lesson.completed || lesson.evaluationStatus === "pending";
-      const isLocked = moduleLocked || (i === 0 ? false : isReviewLesson ? !allPrevCompleted : !prevPassedForUnlock);
-      const isPendingEval = !lesson.completed && lesson.evaluationStatus === "pending";
-      const isNeedsRevision = !lesson.completed && lesson.evaluationStatus === "needs_revision";
-      const dotColor = lesson.completed
-        ? colors.accentGreen
-        : isLocked ? colors.borderBeige
-        : isNeedsRevision ? "#C0392B"
-        : colors.amber;
-      prevPassedForUnlock = passedForUnlock;
-      allPrevCompleted = allPrevCompleted && lesson.completed;
-      return (
-        <TouchableOpacity
-          key={lesson.id}
-          style={[styles.lessonRow, lesson.completed && styles.lessonRowDone, isLocked && styles.lessonRowLocked]}
-          onPress={() => !isLocked && router.push(`/plan/lesson/${lesson.id}` as any)}
-          activeOpacity={isLocked ? 1 : 0.82}
-          disabled={isLocked}
-        >
-          <View style={[styles.lessonStatusDot, { backgroundColor: dotColor }]}>
-            {lesson.completed
-              ? <Ionicons name="checkmark" size={10} color="#fff" />
-              : isLocked ? <Ionicons name="lock-closed" size={10} color={colors.textMuted} />
-              : isPendingEval ? <Ionicons name="time" size={10} color="#fff" />
-              : isNeedsRevision ? <Ionicons name="alert" size={10} color="#fff" />
-              : null}
-          </View>
-          <View style={{ flex: 1 }}>
-            {lesson.lesson_code ? <Text style={styles.lessonCode}>{lesson.lesson_code}</Text> : null}
-            <Text style={[styles.lessonTitle, isLocked && { color: colors.textMuted }]}>{lesson.title}</Text>
-            {isPendingEval && (
-              <Text style={{ fontSize: 11, color: colors.amber, fontFamily: "Inter_400Regular", marginTop: 2 }}>
-                Waiting for peer review and evaluation
-              </Text>
-            )}
-            {isNeedsRevision && (
-              <Text style={{ fontSize: 11, color: "#C0392B", fontFamily: "Inter_400Regular", marginTop: 2 }}>
-                Needs revision
-              </Text>
-            )}
-          </View>
-          {!isLocked && !lesson.completed && !isPendingEval && !isNeedsRevision && (
-            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          )}
-          {isPendingEval && <Ionicons name="time-outline" size={18} color={colors.amber} />}
-          {isNeedsRevision && <Ionicons name="alert-circle" size={18} color="#C0392B" />}
-        </TouchableOpacity>
-      );
-    });
-  };
+  const progress = getPlanProgress(plan.id);
+  const totalLessons = plan.modules.reduce((a, m) => a + m.lessons.length, 0);
+  const hasStarted = totalLessons > 0 && progress > 0;
+  const hasTeachingCredit = !!plan.teachingCreditName;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header bar */}
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
@@ -284,132 +134,115 @@ export default function PlanDetailScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        {/* Title + tagline */}
-        <Text style={styles.planTitle}>{plan.title}</Text>
-        {plan.tagline ? <Text style={styles.planTagline}>{plan.tagline}</Text> : null}
-
-        {/* Progress bar */}
-        {totalLessons > 0 && (
-          <View style={styles.progressBlock}>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${pct}%` as any }]} />
-            </View>
-            <Text style={styles.progressLabel}>{completedCount}/{totalLessons} lessons · {pct}%</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        {plan.coverImageUrl && !imgErr ? (
+          <Image
+            source={{ uri: plan.coverImageUrl }}
+            style={styles.cover}
+            resizeMode="cover"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <View style={[styles.cover, styles.coverPlaceholder, { backgroundColor: `${plan.colorTheme}1A` }]}>
+            <Ionicons name="book-outline" size={44} color={plan.colorTheme} />
           </View>
         )}
 
-        {/* Teacher credit block — prominent */}
-        {teachers.length > 0 && (
-          <View style={styles.teacherBlock}>
-            <Text style={styles.teacherBlockHeading}>
-              <Ionicons name="person-circle-outline" size={14} color={colors.accentGreen} /> SOURCE TEACHER{teachers.length > 1 ? "S" : ""}
-            </Text>
-            {teachers.map(t => (
-              <View key={t.id} style={styles.teacherCard}>
-                <Text style={styles.teacherName}>{t.name}</Text>
-                {t.ministry_or_church ? <Text style={styles.teacherDetail}>{t.ministry_or_church}</Text> : null}
-                {t.location ? <Text style={styles.teacherDetail}>{t.location}</Text> : null}
-                <View style={styles.teacherSocials}>
-                  {t.youtube_handle ? (
-                    <TouchableOpacity style={styles.socialBtn} onPress={() => Linking.openURL(`https://youtube.com/${t.youtube_handle}`)}>
-                      <Ionicons name="logo-youtube" size={14} color="#FF0000" />
-                      <Text style={styles.socialHandle}>{t.youtube_handle}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {t.instagram_handle ? (
-                    <TouchableOpacity style={styles.socialBtn} onPress={() => Linking.openURL(`https://instagram.com/${t.instagram_handle?.replace("@", "")}`)}>
-                      <Ionicons name="logo-instagram" size={14} color="#C13584" />
-                      <Text style={styles.socialHandle}>@{t.instagram_handle?.replace("@", "")}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {t.other_social_handle ? (
-                    <Text style={[styles.socialHandle, { color: colors.textMuted }]}>{t.other_social_handle}</Text>
-                  ) : null}
+        <View style={styles.scroll}>
+          <Text style={styles.planTitle}>{plan.title}</Text>
+          {plan.subtitle ? <Text style={styles.planTagline}>{plan.subtitle}</Text> : null}
+
+          <View style={styles.metaRow}>
+            <View style={[styles.difficultyBadge, { borderColor: plan.colorTheme }]}>
+              <Text style={[styles.difficultyBadgeText, { color: plan.colorTheme }]}>{plan.difficultyLevel}</Text>
+            </View>
+            {plan.estimatedWeeks ? (
+              <Text style={styles.metaText}>{plan.estimatedWeeks} week{plan.estimatedWeeks === 1 ? "" : "s"}</Text>
+            ) : null}
+          </View>
+
+          {hasStarted && (
+            <View style={styles.progressBlock}>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${progress}%` as any, backgroundColor: plan.colorTheme }]} />
+              </View>
+              <Text style={styles.progressLabel}>{progress}% complete</Text>
+            </View>
+          )}
+
+          {plan.description ? (
+            <View style={styles.overviewBlock}>
+              <Text style={styles.sectionHeading}>Overview</Text>
+              <Text style={styles.overviewText}>{plan.description}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.lessonsBlock}>
+            <Text style={styles.sectionHeading}>Modules</Text>
+            {plan.modules.map((m, idx) => (
+              <View key={m.id} style={styles.moduleCard}>
+                <View style={styles.moduleNameRow}>
+                  <View style={[styles.moduleBadge, { backgroundColor: plan.colorTheme }]}>
+                    <Text style={styles.moduleBadgeText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={styles.moduleName} numberOfLines={2}>{m.title}</Text>
+                  <Text style={styles.moduleLessonCount}>
+                    {m.lessons.length} lesson{m.lessons.length === 1 ? "" : "s"}
+                  </Text>
                 </View>
+                {m.lessons.map((lesson) => (
+                  <TouchableOpacity
+                    key={lesson.id}
+                    style={styles.lessonRow}
+                    onPress={() => router.push(`/lesson/${lesson.id}` as any)}
+                    activeOpacity={0.82}
+                  >
+                    <Ionicons name="play-circle-outline" size={18} color={colors.textMuted} />
+                    <Text style={styles.lessonTitle} numberOfLines={1}>{lesson.title}</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
               </View>
             ))}
           </View>
-        )}
 
-        {/* Overview */}
-        {plan.overview ? (
-          <View style={styles.overviewBlock}>
-            <Text style={styles.sectionHeading}>Overview</Text>
-            <Text style={styles.overviewText}>{plan.overview}</Text>
-          </View>
-        ) : null}
-
-        {/* Lessons */}
-        <View style={styles.lessonsBlock}>
-          <Text style={styles.sectionHeading}>Lessons</Text>
-          {plan.has_submodules && modules.length > 0 ? (
-            (() => {
-              // A module unlocks only once the ENTIRE previous module is
-              // complete — same rule as core curriculum's loadCurriculum().
-              // previousModuleComplete carries across the .map() so a
-              // module's first lesson doesn't default-unlock in isolation.
-              let previousModuleComplete = true;
-              return modules.map(m => {
-                const modLessons = lessons.filter(l => l.module_id === m.id);
-                const moduleLocked = !previousModuleComplete;
-                const moduleComplete = modLessons.length > 0 && modLessons.every(l => l.completed);
-                previousModuleComplete = moduleComplete;
-                return (
-                  <View key={m.id} style={styles.moduleBlock}>
-                    <View style={styles.moduleNameRow}>
-                      <Text style={styles.moduleName}>Module {m.module_number}: {m.module_title}</Text>
-                      {moduleLocked && <Ionicons name="lock-closed" size={14} color={colors.textMuted} />}
-                    </View>
-                    {renderLessons(modLessons, moduleLocked)}
-                  </View>
-                );
-              });
-            })()
-          ) : (
-            renderLessons(lessons.filter(l => !l.module_id || !plan.has_submodules), false)
+          {hasTeachingCredit && (
+            <View style={styles.teacherBlock}>
+              <Text style={styles.teacherBlockHeading}>
+                <Ionicons name="person-circle-outline" size={14} color={colors.accentGreen} /> TEACHING CREDIT
+              </Text>
+              <Text style={styles.teacherName}>Teaching credit: {plan.teachingCreditName}</Text>
+              {(plan.teachingCreditRole || plan.teachingCreditChurch) ? (
+                <Text style={styles.teacherDetail}>
+                  {[plan.teachingCreditRole, plan.teachingCreditChurch].filter(Boolean).join(", ")}
+                </Text>
+              ) : null}
+              {plan.teachingCreditLocation ? <Text style={styles.teacherDetail}>{plan.teachingCreditLocation}</Text> : null}
+              {(plan.teachingCreditYoutube || plan.teachingCreditInstagram) && (
+                <View style={styles.teacherSocials}>
+                  {plan.teachingCreditYoutube ? (
+                    <TouchableOpacity
+                      style={styles.socialBtn}
+                      onPress={() => Linking.openURL(plan.teachingCreditYoutube!.startsWith("http") ? plan.teachingCreditYoutube! : `https://youtube.com/${plan.teachingCreditYoutube}`)}
+                    >
+                      <Ionicons name="logo-youtube" size={14} color="#FF0000" />
+                      <Text style={styles.socialHandle}>{plan.teachingCreditYoutube}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {plan.teachingCreditInstagram ? (
+                    <TouchableOpacity
+                      style={styles.socialBtn}
+                      onPress={() => Linking.openURL(plan.teachingCreditInstagram!.startsWith("http") ? plan.teachingCreditInstagram! : `https://instagram.com/${plan.teachingCreditInstagram!.replace("@", "")}`)}
+                    >
+                      <Ionicons name="logo-instagram" size={14} color="#C13584" />
+                      <Text style={styles.socialHandle}>{plan.teachingCreditInstagram}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+            </View>
           )}
         </View>
-
-        {/* Teaching outline — collapsible */}
-        {sessions.length > 0 && (
-          <View style={styles.collapseBlock}>
-            <TouchableOpacity style={styles.collapseHeader} onPress={() => setOutlineOpen(o => !o)}>
-              <Text style={styles.sectionHeading}>Teaching Outline</Text>
-              <Ionicons name={outlineOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-            {outlineOpen && (
-              <View style={styles.collapseBody}>
-                {sessions.map(se => (
-                  <View key={se.id} style={styles.sessionRow}>
-                    <Text style={styles.sessionLabel}>{se.session_label}</Text>
-                    {se.summary ? <Text style={styles.sessionSummary}>{se.summary}</Text> : null}
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Discussion questions — collapsible */}
-        {dqs.length > 0 && (
-          <View style={styles.collapseBlock}>
-            <TouchableOpacity style={styles.collapseHeader} onPress={() => setDqsOpen(o => !o)}>
-              <Text style={styles.sectionHeading}>Personal Reflections</Text>
-              <Ionicons name={dqsOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-            {dqsOpen && (
-              <View style={styles.collapseBody}>
-                {dqs.map((dq, i) => (
-                  <View key={dq.id} style={styles.dqRow}>
-                    <Text style={styles.dqNum}>{dq.question_number ?? i + 1}{dq.topic ? ` — ${dq.topic}` : ""}</Text>
-                    <Text style={styles.dqText}>{dq.question_text}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -421,48 +254,45 @@ function makeStyles(c: AppColors) {
     headerBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: c.lightCream, borderBottomWidth: 1, borderBottomColor: c.borderBeige, gap: 12 },
     headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     scroll: { paddingHorizontal: 20, paddingTop: 20 },
+    errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
+
+    cover: { width: "100%", height: COVER_HEIGHT },
+    coverPlaceholder: { alignItems: "center", justifyContent: "center" },
+
     planTitle: { fontSize: 24, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 30 },
     planTagline: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 6, lineHeight: 20 },
-    errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
+
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
+    difficultyBadge: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+    difficultyBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
+    metaText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
     progressBlock: { marginTop: 16 },
     progressBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3, overflow: "hidden" },
-    progressBarFill: { height: 6, backgroundColor: c.accentGreen, borderRadius: 3 },
+    progressBarFill: { height: 6, borderRadius: 3 },
     progressLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
-
-    teacherBlock: { marginTop: 20, backgroundColor: "rgba(29,158,117,0.06)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.2)", padding: 16 },
-    teacherBlockHeading: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginBottom: 12, textTransform: "uppercase" },
-    teacherCard: { marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "rgba(29,158,117,0.12)" },
-    teacherName: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    teacherDetail: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-    teacherSocials: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
-    socialBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: c.borderBeige },
-    socialHandle: { fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
 
     overviewBlock: { marginTop: 20 },
     sectionHeading: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.6 },
     overviewText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 22 },
 
     lessonsBlock: { marginTop: 24 },
-    moduleBlock: { marginBottom: 20 },
-    moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-    moduleName: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
+    moduleCard: { marginBottom: 18 },
+    moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+    moduleBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    moduleBadgeText: { fontSize: 11, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+    moduleName: { flex: 1, fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    moduleLessonCount: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
-    lessonRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 8 },
-    lessonRowDone: { borderColor: "rgba(29,158,117,0.25)", backgroundColor: "rgba(29,158,117,0.04)" },
-    lessonRowLocked: { opacity: 0.5 },
-    lessonStatusDot: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-    lessonCode: { fontSize: 10, fontWeight: "700", color: c.amber, fontFamily: "Inter_700Bold", marginBottom: 1 },
-    lessonTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    lessonRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, padding: 12, marginBottom: 8 },
+    lessonTitle: { flex: 1, fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
 
-    collapseBlock: { marginTop: 20, borderTopWidth: 1, borderTopColor: c.borderBeige, paddingTop: 16 },
-    collapseHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    collapseBody: { marginTop: 12 },
-    sessionRow: { marginBottom: 12 },
-    sessionLabel: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    sessionSummary: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 19, marginTop: 2 },
-    dqRow: { marginBottom: 14 },
-    dqNum: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginBottom: 3, textTransform: "uppercase" },
-    dqText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 20 },
+    teacherBlock: { marginTop: 20, marginBottom: 4, backgroundColor: "rgba(29,158,117,0.06)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.2)", padding: 16 },
+    teacherBlockHeading: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginBottom: 10, textTransform: "uppercase" },
+    teacherName: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    teacherDetail: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+    teacherSocials: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
+    socialBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: c.borderBeige },
+    socialHandle: { fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
   });
 }

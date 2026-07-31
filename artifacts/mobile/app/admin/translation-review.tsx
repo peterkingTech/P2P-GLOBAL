@@ -26,7 +26,6 @@ type EnglishSource = {
 const TYPE_LABELS: Record<string, string> = {
   curriculum: "Curriculum", module: "Module", lesson: "Lesson",
   section: "Section", question: "Question", scripture: "Scripture",
-  plan: "Plan", plan_module: "Plan Module", plan_lesson: "Plan Lesson",
 };
 
 const LANG_NAMES: Record<string, string> = {
@@ -59,18 +58,6 @@ async function fetchEnglishSource(contentType: string, contentId: string): Promi
         sections: (sections ?? []) as { title: string; content: string }[],
         questions: (questions ?? []).map((q: any) => q.question as string),
       };
-    }
-    case "plan": {
-      const { data } = await supabase.from("p2p_plans").select("title,tagline,overview").eq("id", contentId).maybeSingle();
-      return data ? { title: data.title, subtitle: data.tagline, description: data.overview } : null;
-    }
-    case "plan_module": {
-      const { data } = await supabase.from("p2p_plan_modules").select("module_title").eq("id", contentId).maybeSingle();
-      return data ? { title: data.module_title } : null;
-    }
-    case "plan_lesson": {
-      const { data } = await supabase.from("p2p_plan_lessons").select("title").eq("id", contentId).maybeSingle();
-      return data ? { title: data.title } : null;
     }
     default:
       return null;
@@ -187,7 +174,7 @@ export default function TranslationReviewScreen() {
           </TouchableOpacity>
         ))}
         <View style={styles.chipDivider} />
-        {["all", "curriculum", "module", "lesson", "plan", "plan_module", "plan_lesson"].map((t) => (
+        {["all", "curriculum", "module", "lesson"].map((t) => (
           <TouchableOpacity key={t} style={[styles.chip, filterType === t && styles.chipActive]} onPress={() => setFilterType(t)}>
             <Text style={[styles.chipText, filterType === t && styles.chipTextActive]}>
               {t === "all" ? "All Types" : TYPE_LABELS[t] ?? t}

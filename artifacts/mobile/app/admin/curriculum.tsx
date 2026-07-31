@@ -17,6 +17,19 @@ type LessonStatus = "draft" | "review" | "published" | "archived";
 
 type Curriculum = {
   id: string; title: string; description: string | null; status: Status; created_at: string; type?: string;
+  subtitle?: string | null;
+  cover_image?: string | null;
+  color_theme?: string | null;
+  tags?: string[] | null;
+  is_featured?: boolean;
+  difficulty_level?: string | null;
+  estimated_weeks?: number | null;
+  teaching_credit_name?: string | null;
+  teaching_credit_role?: string | null;
+  teaching_credit_church?: string | null;
+  teaching_credit_location?: string | null;
+  teaching_credit_youtube?: string | null;
+  teaching_credit_instagram?: string | null;
 };
 type Module = {
   id: string; curriculum_id: string; title: string; description: string | null;
@@ -507,20 +520,105 @@ export default function CurriculumManagerScreen() {
 
 // ── Curriculum Editor ─────────────────────────────────────────────────────────
 
+const DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced"] as const;
+
 function CurriculumEditor({
   curriculum, languages, onSaved, onDelete,
 }: { curriculum: Curriculum; languages: Language[]; onSaved: (c: Curriculum) => void; onDelete: () => void }) {
+  const isPlan = curriculum.type === "plan";
+
   const [title, setTitle] = useState(curriculum.title);
   const [description, setDescription] = useState(curriculum.description ?? "");
   const [status, setStatus] = useState<Status>(curriculum.status);
+
+  // Plan-only fields
+  const [subtitle, setSubtitle] = useState(curriculum.subtitle ?? "");
+  const [coverImage, setCoverImage] = useState<string | null>(curriculum.cover_image ?? null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [colorTheme, setColorTheme] = useState(curriculum.color_theme ?? MODULE_COLOR_PALETTE[0]);
+  const [difficultyLevel, setDifficultyLevel] = useState(curriculum.difficulty_level ?? "beginner");
+  const [estimatedWeeks, setEstimatedWeeks] = useState(curriculum.estimated_weeks ? String(curriculum.estimated_weeks) : "");
+  const [isFeatured, setIsFeatured] = useState(curriculum.is_featured ?? false);
+  const [tagsInput, setTagsInput] = useState((curriculum.tags ?? []).join(", "));
+  const [creditName, setCreditName] = useState(curriculum.teaching_credit_name ?? "");
+  const [creditRole, setCreditRole] = useState(curriculum.teaching_credit_role ?? "");
+  const [creditChurch, setCreditChurch] = useState(curriculum.teaching_credit_church ?? "");
+  const [creditLocation, setCreditLocation] = useState(curriculum.teaching_credit_location ?? "");
+  const [creditYoutube, setCreditYoutube] = useState(curriculum.teaching_credit_youtube ?? "");
+  const [creditInstagram, setCreditInstagram] = useState(curriculum.teaching_credit_instagram ?? "");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTitle(curriculum.title);
+    setDescription(curriculum.description ?? "");
+    setStatus(curriculum.status);
+    setSubtitle(curriculum.subtitle ?? "");
+    setCoverImage(curriculum.cover_image ?? null);
+    setColorTheme(curriculum.color_theme ?? MODULE_COLOR_PALETTE[0]);
+    setDifficultyLevel(curriculum.difficulty_level ?? "beginner");
+    setEstimatedWeeks(curriculum.estimated_weeks ? String(curriculum.estimated_weeks) : "");
+    setIsFeatured(curriculum.is_featured ?? false);
+    setTagsInput((curriculum.tags ?? []).join(", "));
+    setCreditName(curriculum.teaching_credit_name ?? "");
+    setCreditRole(curriculum.teaching_credit_role ?? "");
+    setCreditChurch(curriculum.teaching_credit_church ?? "");
+    setCreditLocation(curriculum.teaching_credit_location ?? "");
+    setCreditYoutube(curriculum.teaching_credit_youtube ?? "");
+    setCreditInstagram(curriculum.teaching_credit_instagram ?? "");
+    setError(null);
+  }, [curriculum.id]);
+
+  async function pickAndUploadCover() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo access to upload a cover image."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.85 });
+    if (result.canceled || !result.assets.length) return;
+
+    const asset = result.assets[0];
+    setUploadingCover(true);
+    try {
+      const ext = (asset.uri.split(".").pop() ?? "jpg").toLowerCase();
+      const path = `plan-covers/${curriculum.id}.${ext}`;
+      const blob = await (await fetch(asset.uri)).blob();
+      const { error: upErr } = await supabase.storage.from("curriculum-media").upload(path, blob, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from("curriculum-media").getPublicUrl(path);
+      setCoverImage(urlData.publicUrl);
+    } catch (ex: any) {
+      Alert.alert("Upload failed", ex.message);
+    } finally {
+      setUploadingCover(false);
+    }
+  }
 
   async function save() {
     if (!title.trim()) { setError("Title is required."); return; }
     setSaving(true); setError(null);
+
+    const update: Record<string, unknown> = { title: title.trim(), description: description.trim() || null, status };
+    if (isPlan) {
+      const weeks = parseInt(estimatedWeeks, 10);
+      Object.assign(update, {
+        subtitle: subtitle.trim() || null,
+        cover_image: coverImage,
+        color_theme: colorTheme,
+        difficulty_level: difficultyLevel,
+        estimated_weeks: Number.isFinite(weeks) && estimatedWeeks.trim() ? weeks : null,
+        is_featured: isFeatured,
+        tags: tagsInput.trim() ? tagsInput.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        teaching_credit_name: creditName.trim() || null,
+        teaching_credit_role: creditRole.trim() || null,
+        teaching_credit_church: creditChurch.trim() || null,
+        teaching_credit_location: creditLocation.trim() || null,
+        teaching_credit_youtube: creditYoutube.trim() || null,
+        teaching_credit_instagram: creditInstagram.trim() || null,
+      });
+    }
+
     const { data, error: e } = await supabase.from("p2p_curriculums")
-      .update({ title: title.trim(), description: description.trim() || null, status })
+      .update(update)
       .eq("id", curriculum.id).select().single();
     setSaving(false);
     if (e) { setError(e.message); return; }
@@ -529,13 +627,101 @@ function CurriculumEditor({
 
   return (
     <View style={styles.editorForm}>
-      <EditorHeader icon="book" label="Curriculum" onDelete={onDelete} />
+      <EditorHeader icon={isPlan ? "radio" : "book"} label={isPlan ? "Plan" : "Curriculum"} onDelete={onDelete} />
       <EditorField label="Title *">
-        <TextInput style={styles.edInput} value={title} onChangeText={setTitle} placeholder="Curriculum title" placeholderTextColor={colors.textMuted} />
+        <TextInput style={styles.edInput} value={title} onChangeText={setTitle} placeholder={isPlan ? "Plan title" : "Curriculum title"} placeholderTextColor={colors.textMuted} />
       </EditorField>
+
+      {isPlan && (
+        <EditorField label="Subtitle">
+          <TextInput style={styles.edInput} value={subtitle} onChangeText={setSubtitle} placeholder="Short tagline" placeholderTextColor={colors.textMuted} />
+        </EditorField>
+      )}
+
       <EditorField label="Description">
         <TextInput style={[styles.edInput, { minHeight: 80 }]} value={description} onChangeText={setDescription} placeholder="Short description" placeholderTextColor={colors.textMuted} multiline textAlignVertical="top" />
       </EditorField>
+
+      {isPlan && (
+        <>
+          <EditorField label="Cover Image">
+            {coverImage ? (
+              <View style={{ gap: 8 }}>
+                <Image source={{ uri: coverImage }} style={{ width: "100%", height: 130, borderRadius: 10 }} resizeMode="cover" />
+                <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
+                  {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
+                {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload cover image</Text></>}
+              </TouchableOpacity>
+            )}
+          </EditorField>
+
+          <EditorField label="Color Theme">
+            <View style={styles.colorRow}>
+              {MODULE_COLOR_PALETTE.map((clr) => (
+                <TouchableOpacity
+                  key={clr}
+                  style={[styles.colorSwatch, { backgroundColor: clr }, colorTheme === clr && styles.colorSwatchSelected]}
+                  onPress={() => setColorTheme(clr)}
+                >
+                  {colorTheme === clr && <Ionicons name="checkmark" size={14} color="#fff" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </EditorField>
+
+          <EditorField label="Difficulty Level">
+            <View style={styles.statusRow}>
+              {DIFFICULTY_LEVELS.map((lvl) => (
+                <TouchableOpacity key={lvl} style={[styles.statusOpt, difficultyLevel === lvl && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]} onPress={() => setDifficultyLevel(lvl)}>
+                  <Text style={[styles.statusOptText, difficultyLevel === lvl && { color: "#fff" }]}>{lvl.charAt(0).toUpperCase() + lvl.slice(1)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </EditorField>
+
+          <EditorField label="Estimated Weeks">
+            <TextInput style={styles.edInput} value={estimatedWeeks} onChangeText={setEstimatedWeeks} placeholder="e.g. 6" placeholderTextColor={colors.textMuted} keyboardType="number-pad" />
+          </EditorField>
+
+          <EditorField label="Tags (comma separated)">
+            <TextInput style={styles.edInput} value={tagsInput} onChangeText={setTagsInput} placeholder="purity, relationships, men" placeholderTextColor={colors.textMuted} />
+          </EditorField>
+
+          <TouchableOpacity style={styles.toggleRow} onPress={() => setIsFeatured((v) => !v)}>
+            <View style={[styles.toggleTrack, isFeatured && styles.toggleTrackOn]}>
+              <View style={[styles.toggleThumb, isFeatured && styles.toggleThumbOn]} />
+            </View>
+            <Text style={styles.editorFieldLabel}>Featured plan</Text>
+          </TouchableOpacity>
+
+          <View style={styles.creditSection}>
+            <Text style={styles.creditSectionTitle}>Teaching Credit</Text>
+            <EditorField label="Name">
+              <TextInput style={styles.edInput} value={creditName} onChangeText={setCreditName} placeholder="e.g. Pastor Jane Doe" placeholderTextColor={colors.textMuted} />
+            </EditorField>
+            <EditorField label="Role">
+              <TextInput style={styles.edInput} value={creditRole} onChangeText={setCreditRole} placeholder="e.g. Lead Pastor" placeholderTextColor={colors.textMuted} />
+            </EditorField>
+            <EditorField label="Church">
+              <TextInput style={styles.edInput} value={creditChurch} onChangeText={setCreditChurch} placeholder="e.g. Zoe Household Global" placeholderTextColor={colors.textMuted} />
+            </EditorField>
+            <EditorField label="Location">
+              <TextInput style={styles.edInput} value={creditLocation} onChangeText={setCreditLocation} placeholder="e.g. Lagos, Nigeria" placeholderTextColor={colors.textMuted} />
+            </EditorField>
+            <EditorField label="YouTube handle">
+              <TextInput style={styles.edInput} value={creditYoutube} onChangeText={setCreditYoutube} placeholder="@handle" placeholderTextColor={colors.textMuted} autoCapitalize="none" />
+            </EditorField>
+            <EditorField label="Instagram handle">
+              <TextInput style={styles.edInput} value={creditInstagram} onChangeText={setCreditInstagram} placeholder="@handle" placeholderTextColor={colors.textMuted} autoCapitalize="none" />
+            </EditorField>
+          </View>
+        </>
+      )}
+
       <EditorField label="Status">
         <StatusSelector value={status} onChange={setStatus} />
       </EditorField>
@@ -743,6 +929,19 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: "row", gap: 8 },
   statusOpt: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.borderBeige },
   statusOptText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
+
+  colorRow: { flexDirection: "row", gap: 10 },
+  colorSwatch: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "transparent" },
+  colorSwatchSelected: { borderColor: colors.textDark },
+
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  toggleTrack: { width: 42, height: 24, borderRadius: 12, backgroundColor: colors.borderBeige, padding: 2, justifyContent: "center" },
+  toggleTrackOn: { backgroundColor: colors.accentGreen },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
+  toggleThumbOn: { transform: [{ translateX: 18 }] },
+
+  creditSection: { gap: 16, marginTop: 4, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderBeige },
+  creditSectionTitle: { fontSize: 13, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
 
   addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige, paddingHorizontal: 14, marginTop: 4 },
   addBtnText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },

@@ -7,6 +7,7 @@ import {
   batchTranslateCurriculum,
   getCoverage,
   retryJob,
+  fetchEnglishSource,
   fetchPlanEnglishSource,
   fetchPlanModuleEnglishSource,
   translatePlan,
@@ -150,6 +151,92 @@ router.get("/plan-module/:moduleId", async (req, res) => {
   } catch (e: any) {
     return ok(res, {
       title: base.title, description: base.description ?? null,
+      translation_available: false, translation_error: e.message ?? "Translation failed",
+    });
+  }
+});
+
+// ── Public: on-demand curriculum translation (permanent cache) ───────────────
+// GET /translations/curriculum/:curriculumId?language=xx
+//
+// Covers both core curriculum AND plan-type curriculum rows — a plan IS a
+// p2p_curriculums row post-unification (migration 041), so this same
+// endpoint serves DataContext's unified loadPlans() too.
+
+router.get("/curriculum/:curriculumId", async (req, res) => {
+  const { curriculumId } = req.params;
+  const language = ((req.query.language as string) || "en").trim();
+
+  const base = await fetchEnglishSource("curriculum", curriculumId);
+  if (!base) return err(res, "Curriculum not found", 404);
+
+  if (language === "en") {
+    return ok(res, { title: base.title, description: base.description, subtitle: base.subtitle });
+  }
+
+  try {
+    const cached = await getTranslation("curriculum", curriculumId, language, true);
+    if (cached) {
+      return ok(res, {
+        title: cached.title ?? base.title,
+        description: cached.description ?? base.description,
+        subtitle: cached.subtitle ?? base.subtitle,
+        translation_available: true,
+        served_from_cache: true,
+      });
+    }
+
+    const fresh = await withTimeout(translateAndStore("curriculum", curriculumId, language, { triggeredBy: "on-demand" }), 25_000);
+    return ok(res, {
+      title: fresh.title ?? base.title,
+      description: fresh.description ?? base.description,
+      subtitle: fresh.subtitle ?? base.subtitle,
+      translation_available: true,
+      served_from_cache: false,
+    });
+  } catch (e: any) {
+    return ok(res, {
+      title: base.title, description: base.description, subtitle: base.subtitle,
+      translation_available: false, translation_error: e.message ?? "Translation failed",
+    });
+  }
+});
+
+// ── Public: on-demand module translation (permanent cache) ───────────────────
+// GET /translations/module/:moduleId?language=xx
+
+router.get("/module/:moduleId", async (req, res) => {
+  const { moduleId } = req.params;
+  const language = ((req.query.language as string) || "en").trim();
+
+  const base = await fetchEnglishSource("module", moduleId);
+  if (!base) return err(res, "Module not found", 404);
+
+  if (language === "en") {
+    return ok(res, { title: base.title, description: base.description });
+  }
+
+  try {
+    const cached = await getTranslation("module", moduleId, language, true);
+    if (cached) {
+      return ok(res, {
+        title: cached.title ?? base.title,
+        description: cached.description ?? base.description,
+        translation_available: true,
+        served_from_cache: true,
+      });
+    }
+
+    const fresh = await withTimeout(translateAndStore("module", moduleId, language, { triggeredBy: "on-demand" }), 25_000);
+    return ok(res, {
+      title: fresh.title ?? base.title,
+      description: fresh.description ?? base.description,
+      translation_available: true,
+      served_from_cache: false,
+    });
+  } catch (e: any) {
+    return ok(res, {
+      title: base.title, description: base.description,
       translation_available: false, translation_error: e.message ?? "Translation failed",
     });
   }

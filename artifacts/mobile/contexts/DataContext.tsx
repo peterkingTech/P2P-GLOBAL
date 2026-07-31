@@ -9,6 +9,7 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase, useAuth } from "./AuthContext";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
+import { getApiUrl } from "@/lib/apiUrl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,53 +30,31 @@ export interface Module {
   imageUrl?: string;
 }
 
-export interface PlanModule {
-  id: string;
-  title: string;
-  description: string;
-  lessonCount: number;
-  completedLessons: number;
-  isLocked: boolean;
-  imageUrl?: string;
-  iconName: string;
-}
-
+// Unified plans system — a Plan IS a p2p_curriculums row (type='plan'), the
+// same table/API as core curriculum (see migration 041_unify_plans_system.sql
+// and curriculum.ts's GET /plans). There is no second table/system anymore.
 export interface Plan {
-  id: string;           // curriculum id
-  curriculumId: string; // same as id
-  title: string;        // curriculum title
-  description: string;
-  iconName: string;
-  lessonCount: number;
-  completedLessons: number;
-  isLocked: boolean;
-  imageUrl?: string;
-  modules: PlanModule[];
-  isSingleModule: boolean;
-  singleModuleId?: string;
-}
-
-export interface PlanV2Teacher {
-  id: string;
-  name: string;
-  ministryOrChurch: string;
-  location: string;
-  youtubeHandle?: string;
-  instagramHandle?: string;
-  otherSocialHandle?: string;
-}
-
-export interface PlanV2 {
   id: string;
   title: string;
-  tagline: string;
-  overview: string;
-  hasSubmodules: boolean;
-  status: "draft" | "published";
+  description: string | null;
+  subtitle: string | null;
+  coverImageUrl: string | null;
+  thumbnailUrl: string | null;
+  colorTheme: string;
+  tags: string[];
+  isFeatured: boolean;
+  difficultyLevel: string;
+  estimatedWeeks: number | null;
+  teachingCreditName: string | null;
+  teachingCreditRole: string | null;
+  teachingCreditChurch: string | null;
+  teachingCreditLocation: string | null;
+  teachingCreditYoutube: string | null;
+  teachingCreditInstagram: string | null;
+  status: string;
+  displayOrder: number | null;
+  moduleCount: number;
   lessonCount: number;
-  completedLessons: number;
-  isLocked: boolean;
-  teachers: PlanV2Teacher[];
 }
 
 export interface Lesson {
@@ -351,14 +330,13 @@ export interface PendingEvaluation {
   mediaUrl: string | null;
   durationSeconds: number | null;
   assignedAt: string;
-  // The original assignment question this answer responds to — core
-  // curriculum only (Plans submissions already embed "Q: ...\nA: ..." pairs
-  // directly in `content`, see submitAssignment() in plan/lesson/[lessonId].tsx).
-  // Null when the lesson's assignment has no discrete questions.
+  // The original assignment question this answer responds to. Null when the
+  // lesson's assignment has no discrete questions.
   questionText: string | null;
-  // Which evaluation gate this came from — core curriculum (p2p_lesson_evaluations)
-  // or Plans (p2p_plan_lesson_evaluations), a separate mirrored system. Needed so
-  // resolveEvaluation() updates the right table.
+  // Historical: Plans used to have a separate mirrored evaluation gate
+  // (p2p_plan_lesson_evaluations). Migration 041 unified Plans into
+  // p2p_curriculums, so every submission now goes through the same
+  // p2p_lesson_evaluations table and this is always "core".
   source: "core" | "plan";
 }
 
@@ -421,15 +399,6 @@ export interface MySubmission {
   source: "core" | "plan";
 }
 
-// Plan reflection answers are private, personal-processing content — never
-// peer-evaluated (see migration 026). No evaluation-related fields at all.
-export interface PlanReflectionSubmission {
-  id: string;
-  questionId: string;
-  content: string;
-  createdAt: string;
-}
-
 export interface SubmitContentParams {
   lessonId: string;
   assignmentId?: string | null;
@@ -462,10 +431,11 @@ interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
   plans: Plan[];
+  featuredPlans: Plan[];
   plansLoading: boolean;
-  plansV2: PlanV2[];
-  plansV2Loading: boolean;
-  refreshPlansV2: () => void;
+  loadPlans: () => Promise<void>;
+  getPlanById: (planId: string) => Plan | undefined;
+  getPlanProgress: (planId: string) => number;
   prayers: PrayerRequest[];
   sessions: StudySession[];
   forestNodes: ForestNode[];
@@ -536,18 +506,15 @@ interface DataContextValue {
   getAssignmentQuestionsForLesson: (lessonId: string) => Promise<AssignmentQuestion[]>;
   getAssignmentQuestionSubmissionsForLesson: (lessonId: string) => Promise<QuestionSubmission[]>;
   getMySubmissions: () => Promise<MySubmission[]>;
-  submitPlanReflection: (params: { lessonId: string; questionId: string; text: string }) => Promise<string | null>;
-  getPlanReflectionSubmissionsForLesson: (lessonId: string) => Promise<PlanReflectionSubmission[]>;
   submitContent: (params: SubmitContentParams) => Promise<string | null>;
   submitAssignment: (assignmentId: string, lessonId: string, content: string) => Promise<string | null>;
   refreshPendingEvaluations: () => Promise<void>;
   resolveEvaluation: (
     evaluationId: string,
     status: "approved" | "needs_revision",
-    feedback: string,
-    source?: "core" | "plan"
+    feedback: string
   ) => Promise<string | null>;
-  getSubmitterEvaluationContext: (evaluationId: string, source?: "core" | "plan") => Promise<SubmitterEvaluationContext | null>;
+  getSubmitterEvaluationContext: (evaluationId: string) => Promise<SubmitterEvaluationContext | null>;
   toastEvent: GrowthEvent | null;
   celebrationEvent: GrowthEvent | null;
   dismissToastEvent: () => void;
@@ -629,8 +596,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
-  const [plansV2, setPlansV2] = useState<PlanV2[]>([]);
-  const [plansV2Loading, setPlansV2Loading] = useState(false);
+  // 0-100 completion percentage per plan id — computed from the same
+  // p2p_lesson_progress table core curriculum uses (plans ARE p2p_curriculums
+  // rows now, see migration 041_unify_plans_system.sql), not a separate table.
+  const [planProgress, setPlanProgress] = useState<Map<string, number>>(new Map());
   const [fruitCatalog, setFruitCatalog] = useState<FruitCatalogEntry[]>([]);
   const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
@@ -643,172 +612,118 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [toastEvent, setToastEvent] = useState<GrowthEvent | null>(null);
   const [celebrationEvent, setCelebrationEvent] = useState<GrowthEvent | null>(null);
 
-  const loadPlans = useCallback(async (userId?: string) => {
+  // Unified plans loader — a Plan IS a p2p_curriculums row (type='plan'), the
+  // same table the old p2p_plans/p2p_plan_modules/p2p_plan_lessons system
+  // used to duplicate (see migration 041_unify_plans_system.sql). Fetches
+  // from curriculum.ts's GET /plans rather than reading p2p_curriculums
+  // directly, since that endpoint already does the module/lesson counting.
+  const loadPlans = useCallback(async (userId?: string, languageCode?: string) => {
     setPlansLoading(true);
     try {
-      const { data: allCurriculums } = await supabase
-        .from("p2p_curriculums")
-        .select("*")
-        .eq("status", "published");
-      const planCurriculums = (allCurriculums ?? []).filter(
-        (c: Record<string, unknown>) => (c.type as string) === "plan"
-      );
-      if (planCurriculums.length === 0) { setPlans([]); setPlansLoading(false); return; }
-      const curriculumIds = planCurriculums.map((c: Record<string, unknown>) => c.id as string);
-      const { data: planModules } = await supabase
-        .from("p2p_modules")
-        .select("id,curriculum_id,title,description,order_index,image_url,icon_name")
-        .in("curriculum_id", curriculumIds)
-        .eq("status", "published")
-        .order("order_index", { ascending: true });
-      if (!planModules || planModules.length === 0) { setPlans([]); setPlansLoading(false); return; }
-      const moduleIds = (planModules as Record<string, unknown>[]).map((m) => m.id as string);
-      const { data: planLessons } = await supabase
-        .from("p2p_lessons")
-        .select("id,module_id")
-        .in("module_id", moduleIds);
-      let progressByLesson = new Map<string, boolean>();
-      if (userId) {
-        const { data: progressRows } = await supabase
-          .from("p2p_lesson_progress")
-          .select("lesson_id,completed")
-          .eq("user_id", userId);
-        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
-          progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
-        }
-      }
-      const lessonsRaw = (planLessons ?? []) as Record<string, unknown>[];
-      // Build one Plan per curriculum (not per module)
-      const builtPlans: Plan[] = planCurriculums.map((currRow) => {
-        const c = currRow as Record<string, unknown>;
-        const currModules = ((planModules ?? []) as Record<string, unknown>[])
-          .filter((m) => (m.curriculum_id as string) === (c.id as string))
-          .sort((a, b) => (a.order_index as number) - (b.order_index as number));
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/plans`);
+      const data = await res.json();
+      let builtPlans: Plan[] = Array.isArray(data)
+        ? data.map((p: Record<string, unknown>) => ({
+            id: p.id as string,
+            title: p.title as string,
+            description: (p.description as string) ?? null,
+            subtitle: (p.subtitle as string) ?? null,
+            coverImageUrl: (p.coverImageUrl as string) ?? null,
+            thumbnailUrl: (p.thumbnailUrl as string) ?? null,
+            colorTheme: (p.colorTheme as string) ?? "#1D9E75",
+            tags: (p.tags as string[]) ?? [],
+            isFeatured: Boolean(p.isFeatured),
+            difficultyLevel: (p.difficultyLevel as string) ?? "beginner",
+            estimatedWeeks: (p.estimatedWeeks as number) ?? null,
+            teachingCreditName: (p.teachingCreditName as string) ?? null,
+            teachingCreditRole: (p.teachingCreditRole as string) ?? null,
+            teachingCreditChurch: (p.teachingCreditChurch as string) ?? null,
+            teachingCreditLocation: (p.teachingCreditLocation as string) ?? null,
+            teachingCreditYoutube: (p.teachingCreditYoutube as string) ?? null,
+            teachingCreditInstagram: (p.teachingCreditInstagram as string) ?? null,
+            status: (p.status as string) ?? "published",
+            displayOrder: (p.displayOrder as number) ?? null,
+            moduleCount: (p.moduleCount as number) ?? 0,
+            lessonCount: (p.lessonCount as number) ?? 0,
+          }))
+        : [];
 
-        const subModules: PlanModule[] = currModules.map((m) => {
-          const mLessons = lessonsRaw.filter((l) => (l.module_id as string) === (m.id as string));
-          const lessonCount = mLessons.length;
-          const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+      // Progress — direct Supabase against the same p2p_modules/p2p_lessons/
+      // p2p_lesson_progress tables core curriculum already reads this way.
+      // No separate progress table exists for plans anymore.
+      if (userId && builtPlans.length > 0) {
+        const planIds = builtPlans.map((p) => p.id);
+        const { data: planModules } = await supabase
+          .from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds);
+        const moduleToPlanId = new Map<string, string>();
+        for (const m of (planModules ?? []) as Record<string, unknown>[]) {
+          moduleToPlanId.set(m.id as string, m.curriculum_id as string);
+        }
+        const moduleIds = Array.from(moduleToPlanId.keys());
+        const { data: planLessons } = moduleIds.length
+          ? await supabase.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
+          : { data: [] as Record<string, unknown>[] };
+        const lessonIds = (planLessons ?? []).map((l: Record<string, unknown>) => l.id as string);
+        const { data: progressRows } = lessonIds.length
+          ? await supabase.from("p2p_lesson_progress").select("lesson_id,completed").eq("user_id", userId).in("lesson_id", lessonIds)
+          : { data: [] as Record<string, unknown>[] };
+        const completedSet = new Set(
+          ((progressRows ?? []) as Record<string, unknown>[]).filter((p) => p.completed).map((p) => p.lesson_id as string)
+        );
+        const totalByPlan = new Map<string, number>();
+        const completedByPlan = new Map<string, number>();
+        for (const l of (planLessons ?? []) as Record<string, unknown>[]) {
+          const planId = moduleToPlanId.get(l.module_id as string);
+          if (!planId) continue;
+          totalByPlan.set(planId, (totalByPlan.get(planId) ?? 0) + 1);
+          if (completedSet.has(l.id as string)) completedByPlan.set(planId, (completedByPlan.get(planId) ?? 0) + 1);
+        }
+        const progressMap = new Map<string, number>();
+        for (const p of builtPlans) {
+          const total = totalByPlan.get(p.id) ?? 0;
+          const done = completedByPlan.get(p.id) ?? 0;
+          progressMap.set(p.id, total > 0 ? Math.round((done / total) * 100) : 0);
+        }
+        setPlanProgress(progressMap);
+      } else {
+        setPlanProgress(new Map());
+      }
+
+      // On-demand title/description/subtitle translation, permanently cached
+      // server-side — parallel via Promise.all, never sequential, English
+      // fallback always (see translations.ts's GET /translations/curriculum/:id).
+      if (languageCode && languageCode !== "en" && builtPlans.length > 0) {
+        const results = await Promise.all(
+          builtPlans.map((p) =>
+            fetch(`${apiUrl}/translations/curriculum/${p.id}?language=${languageCode}`)
+              .then((r) => r.json())
+              .catch(() => null)
+          )
+        );
+        builtPlans = builtPlans.map((p, i) => {
+          const t = results[i];
+          if (!t?.translation_available) return p;
           return {
-            id: m.id as string,
-            title: m.title as string,
-            description: (m.description as string) ?? "",
-            lessonCount,
-            completedLessons,
-            isLocked: false,
-            imageUrl: (m.image_url as string) ?? undefined,
-            iconName: (m.icon_name as string) ?? "book-outline",
+            ...p,
+            title: t.title ?? p.title,
+            description: t.description ?? p.description,
+            subtitle: t.subtitle ?? p.subtitle,
           };
         });
-        // Sequential locking within the curriculum
-        for (let i = 1; i < subModules.length; i++) {
-          const prev = subModules[i - 1];
-          subModules[i].isLocked = prev.lessonCount === 0 || prev.completedLessons < prev.lessonCount;
-        }
+      }
 
-        const totalLessons = subModules.reduce((a, m) => a + m.lessonCount, 0);
-        const totalCompleted = subModules.reduce((a, m) => a + m.completedLessons, 0);
-        const isSingleModule = subModules.length === 1;
-
-        return {
-          id: c.id as string,
-          curriculumId: c.id as string,
-          title: c.title as string,
-          description: (c.description as string) ?? "",
-          iconName: (currModules[0]?.icon_name as string) ?? "book-outline",
-          lessonCount: totalLessons,
-          completedLessons: totalCompleted,
-          isLocked: false,
-          imageUrl: (currModules[0]?.image_url as string) ?? undefined,
-          modules: subModules,
-          isSingleModule,
-          singleModuleId: isSingleModule ? (currModules[0]?.id as string) : undefined,
-        };
-      });
       setPlans(builtPlans);
     } catch {
       setPlans([]);
+      setPlanProgress(new Map());
     } finally {
       setPlansLoading(false);
     }
   }, []);
 
-  const loadPlansV2 = useCallback(async (userId?: string, languageCode?: string) => {
-    setPlansV2Loading(true);
-    try {
-      const { data: allPlans } = await supabase
-        .from("p2p_plans")
-        .select("id,title,tagline,overview,has_submodules,status")
-        .eq("status", "published")
-        .order("created_at", { ascending: true });
-      if (!allPlans || allPlans.length === 0) { setPlansV2([]); return; }
-      const planIds = (allPlans as Record<string, unknown>[]).map(p => p.id as string);
-
-      // Overlay translated title/tagline/overview when a non-English content
-      // language is selected — same pattern as loadCurriculum()'s overlay,
-      // via the unified p2p_content_translations table (content_type='plan').
-      // End-user path: only serve approved translations (review gate).
-      const planTitleOverrides = new Map<string, string>();
-      const planTaglineOverrides = new Map<string, string>();
-      const planOverviewOverrides = new Map<string, string>();
-      if (languageCode && languageCode !== "en" && planIds.length > 0) {
-        const { data: planTrans } = await supabase
-          .from("p2p_content_translations")
-          .select("content_id,title,subtitle,description")
-          .eq("content_type", "plan")
-          .in("content_id", planIds)
-          .eq("language_code", languageCode)
-          .eq("status", "approved");
-        for (const row of (planTrans ?? []) as Record<string, unknown>[]) {
-          const id = row.content_id as string;
-          if (row.title) planTitleOverrides.set(id, row.title as string);
-          if (row.subtitle) planTaglineOverrides.set(id, row.subtitle as string);
-          if (row.description) planOverviewOverrides.set(id, row.description as string);
-        }
-      }
-
-      const [{ data: lessons }, { data: teachers }, { data: progressRows }] = await Promise.all([
-        supabase.from("p2p_plan_lessons").select("id,plan_id").in("plan_id", planIds),
-        supabase.from("p2p_plan_source_teachers")
-          .select("id,plan_id,name,ministry_or_church,location,youtube_handle,instagram_handle,other_social_handle")
-          .in("plan_id", planIds),
-        userId
-          ? supabase.from("p2p_plan_lesson_progress").select("lesson_id,completed").eq("user_id", userId)
-          : Promise.resolve({ data: [] }),
-      ]);
-      const progressMap = new Map<string, boolean>();
-      for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
-        progressMap.set(p.lesson_id as string, Boolean(p.completed));
-      }
-      const builtPlans: PlanV2[] = (allPlans as Record<string, unknown>[]).map(plan => {
-        const planLessons = ((lessons ?? []) as Record<string, unknown>[]).filter(l => (l.plan_id as string) === (plan.id as string));
-        const lessonCount = planLessons.length;
-        const completedLessons = planLessons.filter(l => progressMap.get(l.id as string)).length;
-        const planTeachers: PlanV2Teacher[] = ((teachers ?? []) as Record<string, unknown>[])
-          .filter(t => (t.plan_id as string) === (plan.id as string))
-          .map(t => ({
-            id: t.id as string, name: t.name as string,
-            ministryOrChurch: (t.ministry_or_church as string) ?? "",
-            location: (t.location as string) ?? "",
-            youtubeHandle: (t.youtube_handle as string) ?? undefined,
-            instagramHandle: (t.instagram_handle as string) ?? undefined,
-            otherSocialHandle: (t.other_social_handle as string) ?? undefined,
-          }));
-        const planId = plan.id as string;
-        return {
-          id: planId, title: planTitleOverrides.get(planId) ?? (plan.title as string),
-          tagline: planTaglineOverrides.get(planId) ?? ((plan.tagline as string) ?? ""),
-          overview: planOverviewOverrides.get(planId) ?? ((plan.overview as string) ?? ""),
-          hasSubmodules: Boolean(plan.has_submodules),
-          status: plan.status as "draft" | "published",
-          lessonCount, completedLessons, isLocked: false,
-          teachers: planTeachers,
-        };
-      });
-      setPlansV2(builtPlans);
-    } catch { setPlansV2([]); }
-    finally { setPlansV2Loading(false); }
-  }, []);
+  const getPlanById = useCallback((planId: string) => plans.find((p) => p.id === planId), [plans]);
+  const getPlanProgress = useCallback((planId: string) => planProgress.get(planId) ?? 0, [planProgress]);
 
   const loadCurriculum = useCallback(async (userId?: string, languageCode?: string) => {
     try {
@@ -1142,45 +1057,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.id, loadPendingConfirmations]);
 
+  // Plans are p2p_curriculums rows now (migration 041_unify_plans_system.sql)
+  // — their lessons use the SAME p2p_lesson_evaluations/p2p_submissions
+  // pipeline as core curriculum, so there's no more separate "plan" source
+  // to fetch or merge here.
   const refreshPendingEvaluations = useCallback(async (userId?: string) => {
     const uid = userId ?? profile?.id;
     if (!uid) return;
     try {
-      const [{ data: evalRows }, { data: planEvalRows }] = await Promise.all([
-        supabase.from("p2p_lesson_evaluations")
-          .select("id,submission_id,lesson_id,submitter_id,assigned_at")
-          .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true }),
-        supabase.from("p2p_plan_lesson_evaluations")
-          .select("id,submission_id,lesson_id,submitter_id,assigned_at")
-          .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true }),
-      ]);
+      const { data: evalRows } = await supabase.from("p2p_lesson_evaluations")
+        .select("id,submission_id,lesson_id,submitter_id,assigned_at")
+        .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true });
       const rows = (evalRows ?? []) as Record<string, unknown>[];
-      const planRows = (planEvalRows ?? []) as Record<string, unknown>[];
-      if (rows.length === 0 && planRows.length === 0) {
+      if (rows.length === 0) {
         setPendingEvaluations([]); return;
       }
 
       const submissionIds = Array.from(new Set(rows.map((r) => r.submission_id as string)));
       const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
-      const planSubmissionIds = Array.from(new Set(planRows.map((r) => r.submission_id as string)));
-      const planLessonIds = Array.from(new Set(planRows.map((r) => r.lesson_id as string)));
-      const submitterIds = Array.from(new Set([...rows, ...planRows].map((r) => r.submitter_id as string)));
+      const submitterIds = Array.from(new Set(rows.map((r) => r.submitter_id as string)));
 
-      const [{ data: subs }, { data: lessonsData }, { data: planSubs }, { data: planLessonsData }, { data: submitters }] = await Promise.all([
+      const [{ data: subs }, { data: lessonsData }, { data: submitters }] = await Promise.all([
         submissionIds.length
           ? supabase.from("p2p_submissions").select("id,submission_type,text_content,media_url,duration_seconds,assignment_question_id").in("id", submissionIds)
           : Promise.resolve({ data: [] }),
         lessonIds.length ? supabase.from("p2p_lessons").select("id,title").in("id", lessonIds) : Promise.resolve({ data: [] }),
-        planSubmissionIds.length
-          ? supabase.from("p2p_plan_assignment_submissions").select("id,content").in("id", planSubmissionIds)
-          : Promise.resolve({ data: [] }),
-        planLessonIds.length ? supabase.from("p2p_plan_lessons").select("id,title").in("id", planLessonIds) : Promise.resolve({ data: [] }),
         supabase.from("p2p_profiles").select("id,full_name").in("id", submitterIds),
       ]);
       const subById = new Map((subs ?? []).map((s: Record<string, unknown>) => [s.id as string, s]));
-      const planSubById = new Map((planSubs ?? []).map((s: Record<string, unknown>) => [s.id as string, s]));
       const titleById = new Map((lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"]));
-      const planTitleById = new Map((planLessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Plan Lesson"]));
       const nameById = new Map((submitters ?? []).map((p: Record<string, unknown>) => [p.id as string, (p.full_name as string) ?? "A fellow disciple"]));
 
       // Original assignment-question text, so the reviewer sees what was
@@ -1214,30 +1119,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           source: "core",
         };
       });
-      const mappedPlan: PendingEvaluation[] = planRows.map((row) => {
-        const sub = planSubById.get(row.submission_id as string) as Record<string, unknown> | undefined;
-        return {
-          id: row.id as string,
-          submissionId: row.submission_id as string,
-          lessonId: row.lesson_id as string,
-          lessonTitle: planTitleById.get(row.lesson_id as string) ?? "Plan Lesson",
-          submitterId: row.submitter_id as string,
-          submitterName: nameById.get(row.submitter_id as string) ?? "A fellow disciple",
-          submissionType: "text",
-          content: (sub?.content as string) ?? "",
-          mediaUrl: null,
-          durationSeconds: null,
-          assignedAt: row.assigned_at as string,
-          // Plan submissions already embed "Q: ...\nA: ..." pairs directly in
-          // `content` (see submitAssignment() in plan/lesson/[lessonId].tsx),
-          // so there's no separate question to surface here.
-          questionText: null,
-          source: "plan",
-        };
-      });
 
       setPendingEvaluations(
-        [...mapped, ...mappedPlan].sort((a, b) => new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime())
+        mapped.sort((a, b) => new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime())
       );
     } catch {
       setPendingEvaluations([]);
@@ -1393,8 +1277,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       await Promise.all([
         loadCurriculum(profile?.id, profile?.contentLanguage ?? "en"),
-        loadPlans(profile?.id),
-        loadPlansV2(profile?.id, profile?.contentLanguage ?? "en"),
+        loadPlans(profile?.id, profile?.contentLanguage ?? "en"),
       ]);
       if (profile?.id) {
         await refreshPendingEvaluations(profile.id);
@@ -1476,7 +1359,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, loadPlansV2, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1495,21 +1378,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     // event "*": INSERT covers a new evaluation being created on submission
     // (submitted counts + next-lesson unlock), UPDATE covers an evaluator
     // resolving it (approved counts + review-lesson/module unlocks).
+    // Plans are p2p_curriculums rows now (migration 041_unify_plans_system.sql)
+    // — a plan's lessons share the SAME p2p_lesson_evaluations table core
+    // curriculum uses, so this one subscription covers both; there is no
+    // more separate p2p_plan_lesson_evaluations table to listen on.
     const channel = supabase
       .channel(`p2p_unlock_sync_${userId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${userId}` },
-        () => { loadCurriculum(userId, contentLanguage); }
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `submitter_id=eq.${userId}` },
-        () => { loadPlansV2(userId, contentLanguage); }
+        () => { loadCurriculum(userId, contentLanguage); loadPlans(userId, contentLanguage); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.id, profile?.contentLanguage, loadCurriculum, loadPlansV2]);
+  }, [profile?.id, profile?.contentLanguage, loadCurriculum, loadPlans]);
 
   // Fruit celebration — fires the instant the award engine (migration 033)
   // inserts a new p2p_user_fruits row for this user. Queued rather than
@@ -2493,41 +2375,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch { return []; }
   }, [profile]);
 
+  // Plans are p2p_curriculums rows now (migration 041_unify_plans_system.sql)
+  // — their assignment submissions use the SAME p2p_submissions/
+  // p2p_lesson_evaluations tables as core curriculum, so there's no more
+  // separate "plan" source to fetch or merge here.
   const getMySubmissions = useCallback(async (): Promise<MySubmission[]> => {
     if (!profile) return [];
     try {
-      const [{ data: subs }, { data: planSubs }] = await Promise.all([
-        supabase.from("p2p_submissions")
-          .select("id,lesson_id,submission_type,text_content,media_url,duration_seconds,created_at")
-          .eq("user_id", profile.id).not("assignment_id", "is", null).order("created_at", { ascending: false }),
-        supabase.from("p2p_plan_assignment_submissions")
-          .select("id,lesson_id,content,created_at")
-          .eq("user_id", profile.id).order("created_at", { ascending: false }),
-      ]);
+      const { data: subs } = await supabase.from("p2p_submissions")
+        .select("id,lesson_id,submission_type,text_content,media_url,duration_seconds,created_at")
+        .eq("user_id", profile.id).not("assignment_id", "is", null).order("created_at", { ascending: false });
 
       const rows = (subs ?? []) as Record<string, unknown>[];
-      const planRows = (planSubs ?? []) as Record<string, unknown>[];
-      if (rows.length === 0 && planRows.length === 0) return [];
+      if (rows.length === 0) return [];
 
       const submissionIds = rows.map((r) => r.id as string);
       const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id as string)));
-      const planSubmissionIds = planRows.map((r) => r.id as string);
-      const planLessonIds = Array.from(new Set(planRows.map((r) => r.lesson_id as string)));
 
-      const [{ data: evals }, { data: lessonsData }, { data: planEvals }, { data: planLessonsData }] = await Promise.all([
+      const [{ data: evals }, { data: lessonsData }] = await Promise.all([
         submissionIds.length
           ? supabase.from("p2p_lesson_evaluations").select("submission_id,status,feedback,self_approved").in("submission_id", submissionIds)
           : Promise.resolve({ data: [] }),
         lessonIds.length ? supabase.from("p2p_lessons").select("id,title").in("id", lessonIds) : Promise.resolve({ data: [] }),
-        planSubmissionIds.length
-          ? supabase.from("p2p_plan_lesson_evaluations").select("submission_id,status,feedback,self_approved").in("submission_id", planSubmissionIds)
-          : Promise.resolve({ data: [] }),
-        planLessonIds.length ? supabase.from("p2p_plan_lessons").select("id,title").in("id", planLessonIds) : Promise.resolve({ data: [] }),
       ]);
       const evalBySubmission = new Map((evals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e]));
-      const planEvalBySubmission = new Map((planEvals ?? []).map((e: Record<string, unknown>) => [e.submission_id as string, e]));
       const titleByLesson = new Map((lessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Lesson"]));
-      const planTitleByLesson = new Map((planLessonsData ?? []).map((l: Record<string, unknown>) => [l.id as string, (l.title as string) ?? "Plan Lesson"]));
 
       const mapped: MySubmission[] = rows.map((r) => {
         const ev = evalBySubmission.get(r.id as string) as Record<string, unknown> | undefined;
@@ -2546,71 +2418,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           source: "core",
         };
       });
-      const mappedPlan: MySubmission[] = planRows.map((r) => {
-        const ev = planEvalBySubmission.get(r.id as string) as Record<string, unknown> | undefined;
-        return {
-          id: r.id as string,
-          lessonId: r.lesson_id as string,
-          lessonTitle: planTitleByLesson.get(r.lesson_id as string) ?? "Plan Lesson",
-          submissionType: "text",
-          content: (r.content as string) ?? "",
-          mediaUrl: null,
-          durationSeconds: null,
-          createdAt: r.created_at as string,
-          evaluationStatus: (ev?.status as MySubmission["evaluationStatus"]) ?? null,
-          feedback: (ev?.feedback as string) ?? null,
-          selfApproved: Boolean(ev?.self_approved),
-          source: "plan",
-        };
-      });
 
-      return [...mapped, ...mappedPlan].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } catch { return []; }
-  }, [profile]);
-
-  // Plan reflections are private, personal-processing content — see migration
-  // 026. This insert has no evaluation gate/trigger attached at all: no
-  // evaluator is ever assigned, and RLS restricts visibility to the submitter
-  // (and admins) only.
-  const submitPlanReflection = useCallback(async (params: { lessonId: string; questionId: string; text: string }): Promise<string | null> => {
-    if (!profile) return "You must be signed in to submit.";
-    try {
-      const { error } = await supabase.from("p2p_plan_reflection_submissions").insert({
-        lesson_id: params.lessonId,
-        question_id: params.questionId,
-        user_id: profile.id,
-        content: params.text,
-      });
-      return error ? error.message : null;
-    } catch (e) {
-      return e instanceof Error ? e.message : "Failed to submit.";
-    }
-  }, [profile]);
-
-  const getPlanReflectionSubmissionsForLesson = useCallback(async (lessonId: string): Promise<PlanReflectionSubmission[]> => {
-    if (!profile) return [];
-    try {
-      const { data, error } = await supabase
-        .from("p2p_plan_reflection_submissions")
-        .select("id,question_id,content,created_at")
-        .eq("lesson_id", lessonId)
-        .eq("user_id", profile.id)
-        .order("created_at", { ascending: false });
-      if (error || !data) return [];
-      const seen = new Set<string>();
-      return (data as Record<string, unknown>[])
-        .filter((r) => {
-          const qid = r.question_id as string;
-          if (seen.has(qid)) return false;
-          seen.add(qid);
-          return true;
-        })
-        .map((r) => ({
-          id: r.id as string,
-          questionId: r.question_id as string,
-          content: (r.content as string) ?? "",
-          createdAt: r.created_at as string,
-        }));
+      return mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch { return []; }
   }, [profile]);
 
@@ -2658,17 +2467,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return submitContent({ lessonId, assignmentId, type: "text", text: content });
   }, [submitContent]);
 
+  // Plans are p2p_curriculums rows now (migration 041_unify_plans_system.sql)
+  // — their evaluations live in the SAME p2p_lesson_evaluations table core
+  // curriculum uses, so there's no more separate "plan" source table to
+  // route to. p2p_get_submitter_evaluation_context's p_source defaults to
+  // 'core', which is now the only value this ever calls it with.
   const resolveEvaluation = useCallback(async (
     evaluationId: string,
     status: "approved" | "needs_revision",
-    feedback: string,
-    source: "core" | "plan" = "core"
+    feedback: string
   ): Promise<string | null> => {
     if (!profile) return "You must be signed in.";
     try {
-      const table = source === "plan" ? "p2p_plan_lesson_evaluations" : "p2p_lesson_evaluations";
       const { error } = await supabase
-        .from(table)
+        .from("p2p_lesson_evaluations")
         .update({ status, feedback, resolved_at: new Date().toISOString() })
         .eq("id", evaluationId)
         .eq("evaluator_id", profile.id)
@@ -2688,19 +2500,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // assigned evaluator who happens not to share a group with the submitter
   // would otherwise get nothing back. The RPC is SECURITY DEFINER and opens
   // exactly one narrow path instead: it checks the caller is genuinely the
-  // evaluator on that specific p2p_lesson_evaluations / p2p_plan_lesson_evaluations
-  // row, and if so returns only name/avatar/growth-level/streak/context-label
-  // — never registration/spiritual intake, other submissions, or help-request
-  // history. Mirrors identically for core curriculum and Plans.
+  // evaluator on that specific p2p_lesson_evaluations row, and if so returns
+  // only name/avatar/growth-level/streak/context-label — never registration/
+  // spiritual intake, other submissions, or help-request history.
   const getSubmitterEvaluationContext = useCallback(async (
-    evaluationId: string,
-    source: "core" | "plan" = "core"
+    evaluationId: string
   ): Promise<SubmitterEvaluationContext | null> => {
     if (!profile) return null;
     try {
       const { data, error } = await supabase.rpc("p2p_get_submitter_evaluation_context", {
         p_evaluation_id: evaluationId,
-        p_source: source,
       });
       if (error) throw error;
       const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
@@ -2722,9 +2531,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  const featuredPlans = plans.filter((p) => p.isFeatured);
+
   return (
     <DataContext.Provider value={{
-      modules, lessons, plans, plansLoading, plansV2, plansV2Loading, refreshPlansV2: loadPlansV2, prayers, sessions, forestNodes, forestStats,
+      modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress, prayers, sessions, forestNodes, forestStats,
       fruitCatalog, userFruits, fruitProgress, fruitCount: userFruits.length, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,
@@ -2740,7 +2551,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
       getMySubmissions,
-      submitPlanReflection, getPlanReflectionSubmissionsForLesson,
       submitContent, submitAssignment,
       refreshPendingEvaluations, resolveEvaluation, getSubmitterEvaluationContext,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,

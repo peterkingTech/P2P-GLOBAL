@@ -56,17 +56,17 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
 
   useEffect(() => {
     let cancelled = false;
-    getSubmitterEvaluationContext(evaluation.id, evaluation.source).then((ctx) => {
+    getSubmitterEvaluationContext(evaluation.id).then((ctx) => {
       if (!cancelled) setSubmitterContext(ctx);
     });
     return () => { cancelled = true; };
-  }, [evaluation.id, evaluation.source, getSubmitterEvaluationContext]);
+  }, [evaluation.id, getSubmitterEvaluationContext]);
 
   async function handleResolve(status: "approved" | "needs_revision") {
     if (submitting) return;
     setSubmitting(status);
     setError(null);
-    const err = await resolveEvaluation(evaluation.id, status, feedback.trim(), evaluation.source);
+    const err = await resolveEvaluation(evaluation.id, status, feedback.trim());
     // Reset on both outcomes — on success the card is about to unmount as this
     // evaluation drops out of pendingEvaluations, but leaving `submitting` set
     // left the button permanently disabled for any render that happens first.
@@ -196,7 +196,7 @@ function MySubmissionCard({ submission }: { submission: MySubmission }) {
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.85}
-      onPress={() => router.push((submission.source === "plan" ? `/plan/lesson/${submission.lessonId}` : `/lesson/${submission.lessonId}`) as any)}
+      onPress={() => router.push(`/lesson/${submission.lessonId}` as any)}
     >
       <View style={styles.cardHeader}>
         <View style={styles.avatarCircle}>
@@ -272,8 +272,8 @@ export default function EvaluationsScreen() {
   const approvedSubmissions = mySubmissions.filter(isSubmissionApproved);
 
   // Live-update "Submitted"/"Recently Approved" the moment an evaluator
-  // resolves one — core curriculum or Plans — so the learner sees
-  // Approved/Needs revision without pulling to refresh.
+  // resolves one, so the learner sees Approved/Needs revision without
+  // pulling to refresh. Plans now share this same table post-unification.
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -281,11 +281,6 @@ export default function EvaluationsScreen() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "p2p_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
-        () => { if (tab !== "toReview") loadMySubmissions(); }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "p2p_plan_lesson_evaluations", filter: `submitter_id=eq.${user.id}` },
         () => { if (tab !== "toReview") loadMySubmissions(); }
       )
       .subscribe();
