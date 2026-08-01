@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,14 @@ import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
+import {
+  useData,
+  KINGDOM_SCHOOL_STATUS_LABELS,
+  getModuleProgressCounts,
+  getFoundationProgress,
+  getKingdomSchoolStatus,
+  getFoundationCompletionDate,
+} from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
@@ -117,6 +124,18 @@ function makeStyles(c: AppColors) {
       borderWidth: 1, borderStyle: "dashed", borderColor: c.accentGreen,
     },
     addGiftChipText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_500Medium" },
+    ksCard: {
+      backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 14, marginBottom: 16,
+    },
+    ksHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+    ksHeading: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
+    ksPill: { backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+    ksPillGold: { backgroundColor: "rgba(224,164,65,0.18)" },
+    ksPillText: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    ksPillTextGold: { color: c.upperRoomAmber },
+    ksLine: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    ksSubLine: { fontSize: 12, color: c.textMuted, marginTop: 3, fontFamily: "Inter_400Regular" },
     dashboardRow: {
       flexDirection: "row", alignItems: "center", gap: 12,
       backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 14,
@@ -213,11 +232,24 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, pendingConfirmationCount } = useData();
+  const { submitHelpRequest, pendingConfirmationCount, modules } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
+
+  const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
+  const foundationPct = getFoundationProgress(modulesCompleted, totalModules);
+  // See the same note in learn.tsx/index.tsx — no persistent mentee tracking
+  // exists yet, so this is always false.
+  const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
+  const isFoundationDone = kingdomSchoolStatus === "foundation_complete" || kingdomSchoolStatus === "guiding_others";
+
+  const [completionDate, setCompletionDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (!profile?.id || !isFoundationDone) { setCompletionDate(null); return; }
+    getFoundationCompletionDate(profile.id).then(setCompletionDate);
+  }, [profile?.id, isFoundationDone]);
 
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
@@ -331,6 +363,26 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>{t("profile.servantScore")}</Text>
           </View>
         </View>
+
+        {/* Kingdom School */}
+        <TouchableOpacity style={styles.ksCard} activeOpacity={0.85} onPress={() => router.push("/(tabs)/learn" as any)}>
+          <View style={styles.ksHeaderRow}>
+            <Text style={styles.ksHeading}>Kingdom School</Text>
+            <View style={[styles.ksPill, isFoundationDone && styles.ksPillGold]}>
+              <Text style={[styles.ksPillText, isFoundationDone && styles.ksPillTextGold]}>
+                {KINGDOM_SCHOOL_STATUS_LABELS[kingdomSchoolStatus]}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.ksLine}>Kingdom School Foundation — {foundationPct}% Complete</Text>
+          <Text style={styles.ksSubLine}>{modulesCompleted} of {totalModules} modules</Text>
+          {isFoundationDone && (
+            <Text style={styles.ksSubLine}>
+              {kingdomSchoolStatus === "guiding_others" ? "Foundation Complete · Guiding Others" : "Foundation Complete"}
+              {completionDate ? ` · ${new Date(completionDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}` : ""}
+            </Text>
+          )}
+        </TouchableOpacity>
 
         {/* My Progress Dashboard */}
         <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/progress" as any)}>

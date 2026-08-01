@@ -1,7 +1,7 @@
 {
   "tabs": {
     "home": "Home",
-    "learn": "Learn",
+    "learn": "Kingdom School",
     "prayer": "Prayer",
     "messages": "Messages",
     "discover": "Discover",
@@ -170,7 +170,7 @@
     "adminSub": "Curriculum manager & registration responses"
   },
   "learn": {
-    "title": "Learn",
+    "title": "Kingdom School",
     "coreCurriculumSubtitle": "The P2P Core Curriculum is the foundational discipleship journey of the P2P Global Bible Study Network — prayerfully developed under the guidance of the Holy Spirit, and firmly anchored in the authority of Scripture. It exists to establish believers in Christ, form them toward spiritual maturity, and raise disciple-makers who carry Kingdom influence into every sphere of society.",
     "coreCurriculumSubtitleQuote": "Founded on God's Word. Guided by the Holy Spirit. Built to make disciples.",
     "plansSubtitle": "Every P2P Study Plan is rooted in the authority of God's Word and prayerfully developed to equip believers for Christ-centered discipleship. Inspired by the faithful teachings of trusted pastors, teachers, evangelists, and Christian leaders, each plan transforms biblical truth into an original learning journey that encourages spiritual maturity, practical obedience, and Kingdom influence.",
@@ -184,7 +184,18 @@
     "lessonsApproved": "{{approved}} of {{total}} approved",
     "submitted": "submitted",
     "noPlans": "No plans available yet. Check back soon!",
-    "unlockPlan": "Complete the previous plan to unlock"
+    "unlockPlan": "Complete the previous plan to unlock",
+    "foundationHeader": "Kingdom School Foundation",
+    "foundationSubtitle": "Your discipleship journey — {{modules}} modules, {{lessons}} lessons",
+    "foundationPctComplete": "{{pct}}% Complete",
+    "continueBtn": "Continue",
+    "currentModule": "Current Module",
+    "allModules": "All Modules",
+    "upcoming": "Upcoming",
+    "completeLabel": "Complete",
+    "electivesHeader": "Kingdom School Electives",
+    "electivesSubtitle": "Focused studies for every season of life",
+    "findElectives": "Find Electives"
   },
   "prayer": {
     "title": "Prayer & Testimonies",

@@ -12,14 +12,109 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
+import {
+  useData,
+  KingdomSchoolStatus,
+  KINGDOM_SCHOOL_STATUS_LABELS,
+  getModuleProgressCounts,
+  getFoundationProgress,
+  getKingdomSchoolStatus,
+} from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
+
+function ProgressRing({ pct, size = 56, strokeWidth = 6, color, track }: { pct: number; size?: number; strokeWidth?: number; color: string; track: string }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.min(100, Math.max(0, pct)) / 100);
+  return (
+    <Svg width={size} height={size}>
+      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={track} strokeWidth={strokeWidth} fill="none" />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        rotation={-90}
+        origin={`${size / 2}, ${size / 2}`}
+      />
+    </Svg>
+  );
+}
+
+function KingdomSchoolCard({ status, pct, onPress }: { status: KingdomSchoolStatus; pct: number; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+  const isFull = status === "foundation_complete" || status === "guiding_others";
+
+  return (
+    <TouchableOpacity style={styles.ksCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.ksHeaderRow}>
+        <Text style={styles.ksHeading}>Kingdom School</Text>
+        <View style={[styles.ksPill, isFull && styles.ksPillGold]}>
+          <Text style={[styles.ksPillText, isFull && styles.ksPillTextGold]}>{KINGDOM_SCHOOL_STATUS_LABELS[status]}</Text>
+        </View>
+      </View>
+
+      {status === "exploring" && (
+        <View style={styles.ksBodyRow}>
+          <Text style={styles.ksTitle}>Begin your Kingdom School journey</Text>
+          <View style={styles.ksBtn}>
+            <Text style={styles.ksBtnText}>Start</Text>
+          </View>
+        </View>
+      )}
+
+      {status === "enrolled" && (
+        <View style={styles.ksBodyRow}>
+          <Text style={styles.ksTitle}>You have begun — keep going</Text>
+          <View style={styles.ksBtn}>
+            <Text style={styles.ksBtnText}>Continue</Text>
+          </View>
+        </View>
+      )}
+
+      {status === "in_progress" && (
+        <View style={styles.ksBodyRow}>
+          <View style={styles.ksRingWrap}>
+            <ProgressRing pct={pct} color={colors.accentGreen} track={colors.progressTrack} />
+            <View style={styles.ksRingCenter}>
+              <Text style={styles.ksRingPct}>{pct}%</Text>
+            </View>
+          </View>
+          <Text style={styles.ksTitle}>Keep building your foundation</Text>
+        </View>
+      )}
+
+      {isFull && (
+        <View style={styles.ksBodyRow}>
+          <View style={styles.ksTreeRing}>
+            <Ionicons name="leaf" size={24} color="#fff" />
+            {status === "guiding_others" && (
+              <View style={styles.ksBranchBadge}>
+                <Ionicons name="git-branch" size={10} color="#fff" />
+              </View>
+            )}
+          </View>
+          <Text style={styles.ksTitle}>
+            {status === "guiding_others" ? "Foundation Complete · Guiding Others" : "Foundation Complete"}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -106,6 +201,33 @@ function makeStyles(c: AppColors) {
     },
     verseRef: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
 
+    ksCard: {
+      backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 16, marginBottom: 16,
+    },
+    ksHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+    ksHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
+    ksPill: { backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+    ksPillGold: { backgroundColor: "rgba(224,164,65,0.18)" },
+    ksPillText: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    ksPillTextGold: { color: c.upperRoomAmber },
+    ksBodyRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+    ksTitle: { flex: 1, fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    ksBtn: { backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10 },
+    ksBtnText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+    ksRingWrap: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
+    ksRingCenter: { position: "absolute", alignItems: "center", justifyContent: "center" },
+    ksRingPct: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    ksTreeRing: {
+      width: 48, height: 48, borderRadius: 24, backgroundColor: c.upperRoomAmber,
+      alignItems: "center", justifyContent: "center", position: "relative",
+    },
+    ksBranchBadge: {
+      position: "absolute", bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9,
+      backgroundColor: c.primaryGreen, borderWidth: 2, borderColor: c.card,
+      alignItems: "center", justifyContent: "center",
+    },
+
     evalCard: {
       backgroundColor: "rgba(224,164,65,0.1)",
       borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -145,12 +267,19 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
   const { t } = useTranslation();
+
+  const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
+  const foundationPct = getFoundationProgress(modulesCompleted, totalModules);
+  // No persistent "active mentee" relationship exists yet — see the same
+  // note in learn.tsx; always false until a real peer-guide/mentee tracking
+  // system is built.
+  const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
 
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   const hour = new Date().getHours();
@@ -248,6 +377,16 @@ export default function HomeTab() {
           </Text>
         )}
       </View>
+
+      {/* Kingdom School status */}
+      <KingdomSchoolCard
+        status={kingdomSchoolStatus}
+        pct={foundationPct}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push("/(tabs)/learn");
+        }}
+      />
 
       {/* Daily Verse */}
       {dailyVerse && (

@@ -57,6 +57,81 @@ export interface Plan {
   lessonCount: number;
 }
 
+// ── Kingdom School status (Core Curriculum rebrand) ─────────────────────────
+// Pure, stateless — callers pass in whatever counts they already have from
+// `modules` rather than this file computing them, since the same numbers are
+// needed in different shapes on Home, Learn, and Profile.
+export type KingdomSchoolStatus =
+  | "exploring"
+  | "enrolled"
+  | "in_progress"
+  | "foundation_complete"
+  | "guiding_others";
+
+export function getKingdomSchoolStatus(
+  modulesStarted: number,
+  modulesCompleted: number,
+  totalModules: number,
+  hasActiveMentee: boolean
+): KingdomSchoolStatus {
+  if (totalModules > 0 && modulesCompleted === totalModules) {
+    return hasActiveMentee ? "guiding_others" : "foundation_complete";
+  }
+  if (modulesCompleted >= 1) return "in_progress";
+  if (modulesStarted >= 1) return "enrolled";
+  return "exploring";
+}
+
+export function getFoundationProgress(modulesCompleted: number, totalModules: number): number {
+  if (totalModules <= 0) return 0;
+  return Math.round((modulesCompleted / totalModules) * 100);
+}
+
+export const KINGDOM_SCHOOL_STATUS_LABELS: Record<KingdomSchoolStatus, string> = {
+  exploring: "Exploring",
+  enrolled: "Enrolled",
+  in_progress: "In Progress",
+  foundation_complete: "Foundation Complete",
+  guiding_others: "Guiding Others",
+};
+
+// Derives modulesStarted/modulesCompleted from the Module[] shape everywhere
+// else in the app already has, so Home/Learn/Profile don't each reimplement
+// the same "what counts as started/completed" rule.
+export function getModuleProgressCounts(modules: Module[]): {
+  modulesStarted: number;
+  modulesCompleted: number;
+  totalModules: number;
+} {
+  const modulesCompleted = modules.filter(
+    (m) => m.lessonCount > 0 && m.completedLessons === m.lessonCount
+  ).length;
+  const modulesStarted = modules.filter(
+    (m) => (m.submittedLessons ?? m.completedLessons) > 0
+  ).length;
+  return { modulesStarted, modulesCompleted, totalModules: modules.length };
+}
+
+// AsyncStorage-backed "have we already celebrated this" flag — Prompt 1
+// explicitly rules out new DB tables/columns for this rebrand, so the
+// Foundation completion date and first-time-reached flag live on-device.
+const FOUNDATION_COMPLETION_KEY_PREFIX = "kingdomSchoolFoundationCompletedAt:";
+
+export async function getFoundationCompletionDate(userId: string): Promise<string | null> {
+  return AsyncStorage.getItem(`${FOUNDATION_COMPLETION_KEY_PREFIX}${userId}`);
+}
+
+export async function recordFoundationCompletion(
+  userId: string
+): Promise<{ date: string; isFirstTime: boolean }> {
+  const key = `${FOUNDATION_COMPLETION_KEY_PREFIX}${userId}`;
+  const existing = await AsyncStorage.getItem(key);
+  if (existing) return { date: existing, isFirstTime: false };
+  const date = new Date().toISOString();
+  await AsyncStorage.setItem(key, date);
+  return { date, isFirstTime: true };
+}
+
 export interface Lesson {
   id: string;
   moduleId: string;

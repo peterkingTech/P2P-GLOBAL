@@ -51,6 +51,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to auto-fill your city and country."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to save your Kingdom School completion card to your photos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save your Kingdom School completion card to your photos."
+        }
       ]
     ],
     "experiments": {

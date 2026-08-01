@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   ScrollView,
   TouchableOpacity,
   Platform,
@@ -15,9 +14,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, Module, Plan } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  useData,
+  Module,
+  Plan,
+  getModuleProgressCounts,
+  getFoundationProgress,
+  getKingdomSchoolStatus,
+  recordFoundationCompletion,
+} from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import CompletionCard from "@/components/CompletionCard";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
@@ -40,7 +49,7 @@ function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean })
   );
 }
 
-function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }) {
+function ModuleCard({ module, isCurrent, onPress }: { module: Module; isCurrent: boolean; onPress: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const submitted = module.submittedLessons ?? module.completedLessons;
@@ -52,7 +61,12 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderBeige }, isLocked && styles.cardLocked]}
+      style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.borderBeige },
+        isLocked && styles.cardLocked,
+        isCurrent && { borderColor: colors.accentGreen, borderWidth: 2, backgroundColor: `${colors.accentGreen}0D` },
+      ]}
       onPress={onPress}
       activeOpacity={isLocked ? 1 : 0.85}
       disabled={isLocked}
@@ -66,7 +80,14 @@ function ModuleCard({ module, onPress }: { module: Module; onPress: () => void }
         </View>
       </View>
       <View style={styles.cardBody}>
-        <Text style={[styles.moduleTitle, { color: colors.textDark }, isLocked && { color: colors.textMuted }]}>{module.title}</Text>
+        <View style={styles.moduleTitleRow}>
+          <Text style={[styles.moduleTitle, { color: colors.textDark }, isLocked && { color: colors.textMuted }]}>{module.title}</Text>
+          {isCurrent && (
+            <View style={styles.currentPill}>
+              <Text style={styles.currentPillText}>Current</Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.moduleDesc, { color: colors.textMuted }]}>{module.description}</Text>
         {!isLocked && (
           <>
@@ -161,39 +182,43 @@ function PlanCard({ plan, progress, onPress }: { plan: Plan; progress: number; o
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
-    header: {
-      paddingHorizontal: 20,
-      paddingBottom: 16,
-      backgroundColor: c.lightCream,
-      borderBottomWidth: 1,
-      borderBottomColor: c.borderBeige,
+    scroll: { paddingBottom: 100 },
+
+    sectionBlock: { paddingHorizontal: 20, paddingTop: 24 },
+    sectionHeaderRow: { marginBottom: 4 },
+    sectionHeaderTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    sectionHeaderSubtitle: { fontSize: 13, color: c.textMuted, marginTop: 4, lineHeight: 19, fontFamily: "Inter_400Regular" },
+
+    foundationProgressBlock: { marginTop: 18, marginBottom: 4 },
+    foundationProgressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+    foundationProgressPct: { fontSize: 15, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    foundationBarBg: { height: 8, backgroundColor: c.progressTrack, borderRadius: 4, overflow: "hidden" },
+    foundationBarFill: { height: 8, backgroundColor: c.accentGreen, borderRadius: 4 },
+
+    continueCard: {
+      marginTop: 18,
+      backgroundColor: c.primaryGreen, borderRadius: 16,
+      padding: 16, flexDirection: "row", alignItems: "center", gap: 12,
     },
-    headerTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    sectionSubtitleBlock: { marginTop: 4, marginBottom: 16 },
-    sectionSubtitleText: { fontSize: 13, color: c.textMuted, lineHeight: 20, fontFamily: "Inter_400Regular" },
-    sectionSubtitleQuote: {
-      fontSize: 13, color: c.textMid, lineHeight: 20, fontFamily: "Inter_400Regular",
-      fontStyle: "italic", marginTop: 10,
+    continueLabel: { fontSize: 11, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+    continueTitle: { fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
+    continueBtn: {
+      backgroundColor: "#fff", borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 9,
+      flexDirection: "row", alignItems: "center", gap: 4,
     },
-    segmentRow: {
-      flexDirection: "row", backgroundColor: c.card, borderRadius: 12,
-      borderWidth: 1, borderColor: c.borderBeige, padding: 4, marginBottom: 16,
-    },
-    segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: "center" },
-    segmentBtnActive: { backgroundColor: c.primaryGreen },
-    segmentText: { fontSize: 13, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    segmentTextActive: { color: "#fff" },
-    plansList: { paddingHorizontal: 20, paddingTop: 16 },
+    continueBtnText: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
+
+    allModulesHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 24, marginBottom: 12 },
+    modulesList: { gap: 8 },
+
+    plansList: { gap: 12, marginTop: 16 },
     planCard: {
       backgroundColor: c.card, borderRadius: 16,
-      borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 12,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 14,
       flexDirection: "row", alignItems: "center", gap: 12,
     },
     planCardLocked: { opacity: 0.55 },
-    planIconWrap: {
-      width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.1)",
-      alignItems: "center", justifyContent: "center", flexShrink: 0,
-    },
     planCardBody: { flex: 1 },
     planThumb: { width: 56, height: 56, borderRadius: 12, flexShrink: 0 },
     planThumbPlaceholder: { alignItems: "center", justifyContent: "center" },
@@ -209,43 +234,19 @@ function makeStyles(c: AppColors) {
     difficultyBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
     difficultyBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
     planMetaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    comingSoonPill: {
-      backgroundColor: "rgba(201,180,138,0.2)", borderRadius: 8,
-      paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0,
+
+    findElectivesBtn: {
+      marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+      backgroundColor: c.card, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 14,
+      paddingVertical: 13,
     },
-    comingSoonText: { fontSize: 10, fontWeight: "700", color: c.amber, fontFamily: "Inter_700Bold" },
-    overallProgress: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-    overallLeft: {},
-    overallLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    overallPct: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
-    overallApproved: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", marginTop: 2 },
-    overallCircle: {
-      width: 52, height: 52, borderRadius: 26,
-      backgroundColor: "rgba(29,158,117,0.12)",
-      borderWidth: 2, borderColor: c.accentGreen,
-      alignItems: "center", justifyContent: "center",
-    },
-    overallCircleText: { fontSize: 16, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    overallCircleSub: { fontSize: 9, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    overallBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3, position: "relative", overflow: "hidden" },
-    overallBarSubmitted: { position: "absolute", left: 0, top: 0, height: 6, backgroundColor: c.amber, borderRadius: 3, opacity: 0.55 },
-    overallBarFill: { position: "absolute", left: 0, top: 0, height: 6, backgroundColor: c.progressFill, borderRadius: 3 },
-    loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-    list: { paddingHorizontal: 20, paddingTop: 16 },
-    milestoneRow: { alignItems: "flex-start", paddingLeft: 26 },
-    milestoneDot: {
-      width: 20, height: 20, borderRadius: 10,
-      alignItems: "center", justifyContent: "center",
-    },
-    milestoneLine: {
-      width: 2, height: 16,
-      backgroundColor: c.borderBeige,
-      marginLeft: 35,
-    },
+    findElectivesBtnText: { fontSize: 14, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+
+    loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 },
+
     card: {
       borderRadius: 16, borderWidth: 1,
       padding: 14, flexDirection: "row", gap: 12, alignItems: "center",
-      marginBottom: 2,
     },
     cardLocked: { opacity: 0.55 },
     cardLeft: { alignItems: "center", gap: 6 },
@@ -258,7 +259,10 @@ function makeStyles(c: AppColors) {
     },
     levelText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
     cardBody: { flex: 1 },
-    moduleTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+    moduleTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+    moduleTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    currentPill: { backgroundColor: c.accentGreen, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+    currentPillText: { fontSize: 9, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", textTransform: "uppercase" },
     moduleDesc: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8 },
     progressRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     progressBg: { flex: 1, height: 4, borderRadius: 2 },
@@ -272,148 +276,147 @@ function makeStyles(c: AppColors) {
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { profile } = useAuth();
   // Title/description arrive already translated — DataContext.loadPlans
   // does the on-demand translation fetch itself (parallel, English fallback
   // always), so there's nothing left for this screen to fetch.
   const { modules, isLoading, plans, plansLoading, getPlanProgress } = useData();
   const { colors } = useTheme();
-  const [section, setSection] = useState<"curriculum" | "plans">("curriculum");
 
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
   const { t } = useTranslation();
 
+  const [completionCard, setCompletionCard] = useState<{ date: string } | null>(null);
+
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
-  const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
-  const submittedLessons = modules.reduce((a, m) => a + (m.submittedLessons ?? m.completedLessons), 0);
-  const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-  const submittedPct = totalLessons > 0 ? Math.round((submittedLessons / totalLessons) * 100) : 0;
+
+  const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
+  const foundationPct = getFoundationProgress(modulesCompleted, totalModules);
+  // No persistent "active mentee" relationship exists in this codebase yet —
+  // Prompt 1 explicitly rules out DB changes for this rebrand, so this is
+  // always false until a real peer-guide/mentee tracking system exists.
+  const hasActiveMentee = false;
+  const status = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, hasActiveMentee);
+
+  const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? null;
+
+  // Celebrate reaching Foundation completion exactly once per user, on-device
+  // (no DB column for this — see recordFoundationCompletion's own comment).
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (status !== "foundation_complete" && status !== "guiding_others") return;
+    recordFoundationCompletion(profile.id).then(({ date, isFirstTime }) => {
+      if (isFirstTime) setCompletionCard({ date });
+    });
+  }, [status, profile?.id]);
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
-      <View style={[styles.header, { paddingTop: 20 }]}>
-        <Text style={styles.headerTitle}>{t("learn.title")}</Text>
-        {section === "curriculum" ? (
-          <View style={styles.sectionSubtitleBlock}>
-            <Text style={styles.sectionSubtitleText}>{t("learn.coreCurriculumSubtitle")}</Text>
-            <Text style={styles.sectionSubtitleQuote}>{t("learn.coreCurriculumSubtitleQuote")}</Text>
-          </View>
-        ) : (
-          <View style={styles.sectionSubtitleBlock}>
-            <Text style={styles.sectionSubtitleText}>{t("learn.plansSubtitle")}</Text>
-            <Text style={styles.sectionSubtitleQuote}>{t("learn.plansSubtitleQuote")}</Text>
-          </View>
-        )}
+      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" } : { flex: 1 }}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          {/* ── Section 1: Foundation ── */}
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeaderTitle}>{t("learn.foundationHeader")}</Text>
+              <Text style={styles.sectionHeaderSubtitle}>
+                {t("learn.foundationSubtitle", { modules: totalModules, lessons: totalLessons })}
+              </Text>
+            </View>
 
-        <View style={styles.segmentRow}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, section === "curriculum" && styles.segmentBtnActive]}
-            onPress={() => setSection("curriculum")}
-          >
-            <Text style={[styles.segmentText, section === "curriculum" && styles.segmentTextActive]}>{t("learn.coreCurriculum")}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, section === "plans" && styles.segmentBtnActive]}
-            onPress={() => setSection("plans")}
-          >
-            <Text style={[styles.segmentText, section === "plans" && styles.segmentTextActive]}>{t("learn.plans")}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {section === "curriculum" && (
-          <>
-            <View style={styles.overallProgress}>
-              <View style={styles.overallLeft}>
-                <Text style={styles.overallLabel}>{t("learn.overallProgress")}</Text>
-                <Text style={styles.overallPct}>
-                  {t("learn.lessonsSubmitted", { submitted: submittedLessons, total: totalLessons })}
-                </Text>
-                <Text style={styles.overallApproved}>
-                  {t("learn.lessonsApproved", { approved: completedLessons, total: totalLessons })}
-                </Text>
+            <View style={styles.foundationProgressBlock}>
+              <View style={styles.foundationProgressRow}>
+                <Text style={styles.foundationProgressPct}>{t("learn.foundationPctComplete", { pct: foundationPct })}</Text>
               </View>
-              <View style={styles.overallCircle}>
-                <Text style={styles.overallCircleText}>{submittedLessons}</Text>
-                <Text style={styles.overallCircleSub}>{t("learn.submitted")}</Text>
+              <View style={styles.foundationBarBg}>
+                <View style={[styles.foundationBarFill, { width: `${foundationPct}%` as any }]} />
               </View>
             </View>
-            {/* Two-layer bar: amber = submitted, green overlay = approved.
-                Growth credit still only counts approved. */}
-            <View style={styles.overallBarBg}>
-              <View style={[styles.overallBarSubmitted, { width: `${submittedPct}%` as any }]} />
-              <View style={[styles.overallBarFill, { width: `${overallPct}%` as any }]} />
-            </View>
-          </>
-        )}
-      </View>
 
-      {section === "curriculum" ? (
-        isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={colors.accentGreen} />
-          </View>
-        ) : (
-          <FlatList
-            key="curriculum-list"
-            data={modules}
-            keyExtractor={(m) => m.id}
-            renderItem={({ item, index }) => (
-              <View>
-                {index === 0 && <View style={styles.milestoneLine} />}
-                <View style={styles.milestoneRow}>
-                  <View style={[styles.milestoneDot, {
-                    backgroundColor: item.completedLessons === item.lessonCount
-                      ? colors.accentGreen
-                      : item.completedLessons > 0 ? colors.amber : colors.borderBeige
-                  }]}>
-                    {item.completedLessons === item.lessonCount && (
-                      <Ionicons name="checkmark" size={10} color={colors.cream} />
-                    )}
-                  </View>
+            {currentModule && (
+              <TouchableOpacity
+                style={styles.continueCard}
+                activeOpacity={0.9}
+                onPress={() => router.push(`/module/${currentModule.id}`)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.continueLabel}>{t("learn.currentModule")}</Text>
+                  <Text style={styles.continueTitle} numberOfLines={1}>{currentModule.title}</Text>
                 </View>
-                <ModuleCard
-                  module={item}
-                  onPress={() => router.push(`/module/${item.id}`)}
-                />
-                <View style={styles.milestoneLine} />
+                <View style={styles.continueBtn}>
+                  <Text style={styles.continueBtnText}>{t("learn.continueBtn")}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={colors.primaryGreen} />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.allModulesHeading}>{t("learn.allModules")}</Text>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={colors.accentGreen} />
+              </View>
+            ) : (
+              <View style={styles.modulesList}>
+                {modules.map((item) => (
+                  <ModuleCard
+                    key={item.id}
+                    module={item}
+                    isCurrent={currentModule?.id === item.id}
+                    onPress={() => router.push(`/module/${item.id}`)}
+                  />
+                ))}
               </View>
             )}
-            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      ) : (
-        plansLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={colors.accentGreen} />
           </View>
-        ) : plans.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
-            <Text style={[styles.moduleDesc, { textAlign: "center", marginTop: 12, paddingHorizontal: 40 }]}>
-              {t("learn.noPlans")}
-            </Text>
+
+          {/* ── Section 2: Electives ── */}
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeaderTitle}>{t("learn.electivesHeader")}</Text>
+              <Text style={styles.sectionHeaderSubtitle}>{t("learn.electivesSubtitle")}</Text>
+            </View>
+
+            {plansLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={colors.accentGreen} />
+              </View>
+            ) : plans.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
+                <Text style={[styles.sectionHeaderSubtitle, { textAlign: "center", marginTop: 12 }]}>
+                  {t("learn.noPlans")}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.plansList}>
+                {plans.map((item) => (
+                  <PlanCard
+                    key={item.id}
+                    plan={item}
+                    progress={getPlanProgress(item.id)}
+                    onPress={() => router.push(`/plan/${item.id}` as any)}
+                  />
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.findElectivesBtn} activeOpacity={0.85} onPress={() => router.push("/plans" as any)}>
+              <Ionicons name="search" size={16} color={colors.accentGreen} />
+              <Text style={styles.findElectivesBtnText}>{t("learn.findElectives")}</Text>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <ScrollView
-            key="plans-list"
-            contentContainerStyle={[styles.plansList, { paddingBottom: insets.bottom + 100 }]}
-            showsVerticalScrollIndicator={false}
-          >
-            {plans.map((item) => (
-              <PlanCard
-                key={item.id}
-                plan={item}
-                progress={getPlanProgress(item.id)}
-                onPress={() => router.push(`/plan/${item.id}` as any)}
-              />
-            ))}
-          </ScrollView>
-        )
-      )}
+        </ScrollView>
       </View>
+
+      {completionCard && profile && (
+        <CompletionCard
+          visible
+          firstName={profile.displayName?.split(" ")[0] ?? "Friend"}
+          completionDate={completionCard.date}
+          onClose={() => setCompletionCard(null)}
+        />
+      )}
     </View>
   );
 }
