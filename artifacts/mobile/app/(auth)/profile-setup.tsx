@@ -43,7 +43,10 @@ export default function ProfileSetupScreen() {
     setLoading(true);
     await updateProfile({ gifts: selectedGifts });
     setLoading(false);
-    router.replace("/(tabs)");
+    // Optional goal-setting step before entering the main app — see
+    // plans/pre-plan-questions.tsx's "general mode". Clearly skippable from
+    // there; answers land in p2p_user_goals either way.
+    router.replace(`/plans/pre-plan-questions?returnTo=${encodeURIComponent("/(tabs)")}` as any);
   }
 
   return (

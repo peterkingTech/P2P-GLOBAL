@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData, Plan } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
@@ -336,6 +336,21 @@ export default function PlansHubScreen() {
     }
   }, [profile?.id]);
 
+  // Enroll — first time through, route via the pre-plan goal questions
+  // (Prompt 3); once a p2p_plan_enrollments row already exists, skip
+  // straight to the plan itself.
+  const goToPlanOrQuestions = useCallback(async (planId: string) => {
+    if (!profile?.id) { router.push(`/plan/${planId}` as any); return; }
+    const { data } = await supabase
+      .from("p2p_plan_enrollments")
+      .select("id")
+      .eq("user_id", profile.id)
+      .eq("plan_id", planId)
+      .maybeSingle();
+    if (data) router.push(`/plan/${planId}` as any);
+    else router.push(`/plans/pre-plan-questions?planId=${planId}` as any);
+  }, [profile?.id, router]);
+
   const loadSaved = useCallback(async () => {
     if (!profile?.id) return;
     setSavedLoading(true);
@@ -543,7 +558,7 @@ export default function PlansHubScreen() {
                   isSaved={savedIds.has(p.id)}
                   onToggleSave={() => toggleSave(p.id)}
                   primaryLabel="Enroll"
-                  onPrimary={() => router.push(`/plan/${p.id}` as any)}
+                  onPrimary={() => goToPlanOrQuestions(p.id)}
                   onPress={() => router.push(`/plan/${p.id}` as any)}
                 />
               ))
@@ -566,7 +581,7 @@ export default function PlansHubScreen() {
                     isSaved={savedIds.has(p.id)}
                     onToggleSave={() => toggleSave(p.id)}
                     primaryLabel="Enroll"
-                    onPrimary={() => router.push(`/plan/${p.id}` as any)}
+                    onPrimary={() => goToPlanOrQuestions(p.id)}
                     onPress={() => router.push(`/plan/${p.id}` as any)}
                   />
                 ))
@@ -589,7 +604,7 @@ export default function PlansHubScreen() {
                           isSaved={savedIds.has(p.id)}
                           onToggleSave={() => toggleSave(p.id)}
                           primaryLabel="Enroll"
-                          onPrimary={() => router.push(`/plan/${p.id}` as any)}
+                          onPrimary={() => goToPlanOrQuestions(p.id)}
                           onPress={() => router.push(`/plan/${p.id}` as any)}
                         />
                       </View>
@@ -626,7 +641,7 @@ export default function PlansHubScreen() {
                   isSaved={savedIds.has(p.id)}
                   onToggleSave={() => toggleSave(p.id)}
                   primaryLabel="Enroll"
-                  onPrimary={() => router.push(`/plan/${p.id}` as any)}
+                  onPrimary={() => goToPlanOrQuestions(p.id)}
                   onPress={() => router.push(`/plan/${p.id}` as any)}
                 />
               ))}

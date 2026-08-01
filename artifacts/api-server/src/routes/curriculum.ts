@@ -642,6 +642,116 @@ router.get("/plans/completed/:userId", async (req, res) => {
   return res.json(ordered);
 });
 
+// ── Recommendation engine ────────────────────────────────────────────────────
+// Scoring weights. Goal/life-stage/life-situation/topic matching is done
+// against plan.tags (and title/description as a broader fallback) since
+// today's schema has no dedicated goal/life-stage taxonomy columns on
+// p2p_curriculums — tags is the same freeform field the Plans hub's "Browse
+// by Category" already treats as a loose taxonomy (see plans/index.tsx).
+const REC_GOAL_WEIGHT = 10;
+const REC_LIFE_STAGE_WEIGHT = 6;
+const REC_LIFE_SITUATION_WEIGHT = 6;
+const REC_TOPIC_WEIGHT = 4;
+const REC_DURATION_WEIGHT = 3;
+const REC_FOUNDATION_WEIGHT = 1;
+
+// Weekly time availability -> preferred plan length, for the duration-match signal.
+const WEEKLY_TIME_TO_WEEKS: Record<string, (weeks: number | null) => boolean> = {
+  under_1h: (w) => !!w && w <= 3,
+  "1_2h": (w) => !!w && w >= 2 && w <= 6,
+  "3_5h": (w) => !!w && w >= 4 && w <= 10,
+  unlimited: () => true,
+};
+
+function textIncludesAny(haystack: string, needles: string[]): boolean {
+  const h = haystack.toLowerCase();
+  return needles.some((n) => n.trim() && h.includes(n.toLowerCase().trim()));
+}
+
+// GET /plans/recommended/:userId — top 6 scored recommendations with reasons
+router.get("/plans/recommended/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  const [{ data: goalsRow }, progressMap] = await Promise.all([
+    supabaseRead.from("p2p_user_goals").select("*").eq("user_id", userId).maybeSingle(),
+    getUserPlanProgressMap(userId),
+  ]);
+
+  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").eq("status", "published");
+  const candidates = (plans ?? []).filter((p) => {
+    const progress = progressMap.get(p.id as string);
+    if (!progress) return true;
+    // Exclude anything already completed or currently in progress — this
+    // feed is for discovering something new, not re-surfacing active work.
+    // "Do Again" on a completed plan is a separate, explicit user action
+    // from the Completed tab, not something the recommendation feed offers.
+    return progress.totalLessons === 0 || (progress.percent < 100 && progress.completedLessons === 0);
+  });
+
+  const goals: string[] = (goalsRow?.goals as string[] | undefined) ?? [];
+  const topicInterests: string[] = (goalsRow?.topic_interests as string[] | undefined) ?? [];
+  const lifeStage: string | null = goalsRow?.life_stage ?? null;
+  const lifeSituation: string | null = goalsRow?.life_situation ?? null;
+  const weeklyTime: string | null = goalsRow?.weekly_time ?? null;
+  const foundationDifficulty = (() => {
+    // Low-weight signal: someone deep into the Foundation core curriculum is
+    // nudged toward intermediate/advanced electives; someone just starting
+    // is nudged toward beginner ones. Best-effort, not a hard filter.
+    const completedFoundationModules = Array.from(progressMap.values()).filter((p) => p.percent === 100).length;
+    return completedFoundationModules >= 6 ? "advanced" : completedFoundationModules >= 2 ? "intermediate" : "beginner";
+  })();
+
+  const scored = candidates.map((p) => {
+    const record = p as Record<string, unknown>;
+    const tags = ((record.tags as string[]) ?? []).map((t) => t.toLowerCase());
+    const searchable = [record.title as string, record.description as string, ...tags].filter(Boolean).join(" ");
+    let score = 0;
+    const matchedReasons: { weight: number; text: string }[] = [];
+
+    if (goals.length && textIncludesAny(searchable, goals)) {
+      score += REC_GOAL_WEIGHT;
+      matchedReasons.push({ weight: REC_GOAL_WEIGHT, text: "Matches your goals" });
+    }
+    if (lifeStage && textIncludesAny(searchable, [lifeStage.replace(/_/g, " ")])) {
+      score += REC_LIFE_STAGE_WEIGHT;
+      matchedReasons.push({ weight: REC_LIFE_STAGE_WEIGHT, text: "Great for your life stage" });
+    }
+    if (lifeSituation && textIncludesAny(searchable, [lifeSituation.replace(/_/g, " ")])) {
+      score += REC_LIFE_SITUATION_WEIGHT;
+      matchedReasons.push({ weight: REC_LIFE_SITUATION_WEIGHT, text: "Popular with people in similar situations" });
+    }
+    if (topicInterests.length && textIncludesAny(searchable, topicInterests)) {
+      score += REC_TOPIC_WEIGHT;
+      matchedReasons.push({ weight: REC_TOPIC_WEIGHT, text: "Matches your interests" });
+    }
+    if (weeklyTime && WEEKLY_TIME_TO_WEEKS[weeklyTime]?.(record.estimated_weeks as number | null)) {
+      score += REC_DURATION_WEIGHT;
+      matchedReasons.push({ weight: REC_DURATION_WEIGHT, text: "Fits the time you have each week" });
+    }
+    if (record.difficulty_level === foundationDifficulty) {
+      score += REC_FOUNDATION_WEIGHT;
+      matchedReasons.push({ weight: REC_FOUNDATION_WEIGHT, text: "A good next step for where you are" });
+    }
+    if (record.is_featured) score += 0.5; // tie-breaker only, matches the featured-placeholder used before goals exist
+
+    const bestReason = matchedReasons.sort((a, b) => b.weight - a.weight)[0];
+    return { plan: record, score, reason: bestReason?.text ?? "Featured on Kingdom School" };
+  });
+
+  const top6 = scored
+    .filter((s) => s.score > 0 || !goalsRow) // if no goals set yet, fall back to featured/all order below
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+
+  const planIds = top6.map((s) => s.plan.id as string);
+  const counts = await getPlanModuleLessonCounts(planIds);
+  const result = top6.map((s) => ({
+    ...mapPlan(s.plan, counts.moduleCountByPlan.get(s.plan.id as string) ?? 0, counts.lessonCountByPlan.get(s.plan.id as string) ?? 0, counts.fallbackImageByPlan.get(s.plan.id as string) ?? null),
+    matchReason: s.reason,
+  }));
+  return res.json(result);
+});
+
 // ── Admin: Plans CRUD ──────────────────────────────────────────────────────────
 
 const PLAN_FIELD_MAP: Record<string, string> = {
