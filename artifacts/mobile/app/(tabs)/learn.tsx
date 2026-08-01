@@ -235,12 +235,19 @@ function makeStyles(c: AppColors) {
     difficultyBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
     planMetaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
+    electivesBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
     findElectivesBtn: {
-      marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
       backgroundColor: c.card, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 14,
       paddingVertical: 13,
     },
     findElectivesBtnText: { fontSize: 14, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    myPlansBtn: {
+      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14,
+      paddingVertical: 13,
+    },
+    myPlansBtnText: { fontSize: 14, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold" },
 
     loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 },
 
@@ -401,10 +408,16 @@ export default function LearnTab() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.findElectivesBtn} activeOpacity={0.85} onPress={() => router.push("/plans" as any)}>
-              <Ionicons name="search" size={16} color={colors.accentGreen} />
-              <Text style={styles.findElectivesBtnText}>{t("learn.findElectives")}</Text>
-            </TouchableOpacity>
+            <View style={styles.electivesBtnRow}>
+              <TouchableOpacity style={styles.myPlansBtn} activeOpacity={0.85} onPress={() => router.push("/plans?tab=my" as any)}>
+                <Ionicons name="list-outline" size={16} color={colors.textMid} />
+                <Text style={styles.myPlansBtnText}>My Plans</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.findElectivesBtn} activeOpacity={0.85} onPress={() => router.push("/plans?tab=find" as any)}>
+                <Ionicons name="search" size={16} color={colors.accentGreen} />
+                <Text style={styles.findElectivesBtnText}>{t("learn.findElectives")}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </View>

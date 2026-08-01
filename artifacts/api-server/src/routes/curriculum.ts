@@ -446,6 +446,202 @@ router.get("/plans/:planId/progress/:userId", async (req, res) => {
   return res.json({ percent, completedLessons, totalLessons, modules: moduleStatus });
 });
 
+// ── Saved / Active / Completed plans ──────────────────────────────────────────
+// No requireAdmin/JWT here — same trust model GET /plans/:planId/progress/:userId
+// above already uses in this file: userId is a trusted path/body param, not
+// derived from a bearer token. The mobile client only ever calls these with
+// the current signed-in user's own id.
+
+// POST /plans/:planId/save — bookmark a plan for later
+router.post("/plans/:planId/save", async (req, res) => {
+  const { planId } = req.params;
+  const { userId } = req.body as { userId?: string };
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { error } = await supabaseRead
+    .from("p2p_plan_saves")
+    .upsert({ user_id: userId, plan_id: planId }, { onConflict: "user_id,plan_id", ignoreDuplicates: true });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ saved: true });
+});
+
+// DELETE /plans/:planId/save — remove a bookmark
+router.delete("/plans/:planId/save", async (req, res) => {
+  const { planId } = req.params;
+  const userId = (req.query.userId as string) || (req.body as { userId?: string })?.userId;
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { error } = await supabaseRead
+    .from("p2p_plan_saves")
+    .delete()
+    .eq("user_id", userId)
+    .eq("plan_id", planId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ saved: false });
+});
+
+// GET /plans/saved/:userId — bookmarked plans, most recently saved first
+router.get("/plans/saved/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data: saves } = await supabaseRead
+    .from("p2p_plan_saves")
+    .select("plan_id,saved_at")
+    .eq("user_id", userId)
+    .order("saved_at", { ascending: false });
+  const planIds = (saves ?? []).map((s) => s.plan_id as string);
+  if (!planIds.length) return res.json([]);
+
+  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", planIds);
+  const savedAtByPlan = new Map((saves ?? []).map((s) => [s.plan_id as string, s.saved_at as string]));
+  const counts = await getPlanModuleLessonCounts(planIds);
+
+  const ordered = planIds
+    .map((id) => (plans ?? []).find((p) => p.id === id))
+    .filter((p): p is Record<string, unknown> => !!p)
+    .map((p) => ({
+      ...mapPlan(p, counts.moduleCountByPlan.get(p.id as string) ?? 0, counts.lessonCountByPlan.get(p.id as string) ?? 0, counts.fallbackImageByPlan.get(p.id as string) ?? null),
+      savedAt: savedAtByPlan.get(p.id as string) ?? null,
+    }));
+  return res.json(ordered);
+});
+
+// Shared helper: module/lesson counts + first-module cover image fallback for
+// a set of plan ids — same computation GET /plans (list) already does, pulled
+// out so the saved/active/completed endpoints below can reuse it.
+async function getPlanModuleLessonCounts(planIds: string[]) {
+  const moduleCountByPlan = new Map<string, number>();
+  const lessonCountByPlan = new Map<string, number>();
+  const fallbackImageByPlan = new Map<string, string>();
+  const moduleToPlanId = new Map<string, string>();
+  if (!planIds.length) return { moduleCountByPlan, lessonCountByPlan, fallbackImageByPlan, moduleToPlanId };
+
+  const { data: modules } = await supabaseRead
+    .from("p2p_modules")
+    .select("id,curriculum_id,image_url,order_index")
+    .in("curriculum_id", planIds)
+    .order("order_index", { ascending: true });
+  for (const m of (modules ?? []) as Record<string, unknown>[]) {
+    const planId = m.curriculum_id as string;
+    moduleCountByPlan.set(planId, (moduleCountByPlan.get(planId) ?? 0) + 1);
+    moduleToPlanId.set(m.id as string, planId);
+    if (!fallbackImageByPlan.has(planId) && m.image_url) fallbackImageByPlan.set(planId, m.image_url as string);
+  }
+  const moduleIds = Array.from(moduleToPlanId.keys());
+  const { data: lessons } = moduleIds.length
+    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
+    : { data: [] as { id: string; module_id: string }[] };
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const planId = moduleToPlanId.get(l.module_id as string);
+    if (planId) lessonCountByPlan.set(planId, (lessonCountByPlan.get(planId) ?? 0) + 1);
+  }
+  return { moduleCountByPlan, lessonCountByPlan, fallbackImageByPlan, moduleToPlanId };
+}
+
+// Shared helper: per-plan completion percent + last lesson-progress activity
+// timestamp for every published plan, for a given user. Same percent-complete
+// math as GET /plans/:planId/progress/:userId, just computed across all plans
+// in one pass instead of one plan at a time.
+async function getUserPlanProgressMap(userId: string) {
+  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("id").eq("type", "plan").eq("status", "published");
+  const planIds = (plans ?? []).map((p) => p.id as string);
+  const result = new Map<string, { percent: number; completedLessons: number; totalLessons: number; lastActivityAt: string | null }>();
+  if (!planIds.length) return result;
+
+  const { data: modules } = await supabaseRead.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds);
+  const moduleToPlanId = new Map<string, string>();
+  for (const m of (modules ?? []) as Record<string, unknown>[]) moduleToPlanId.set(m.id as string, m.curriculum_id as string);
+  const moduleIds = Array.from(moduleToPlanId.keys());
+
+  const { data: lessons } = moduleIds.length
+    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
+    : { data: [] as { id: string; module_id: string }[] };
+  const lessonToPlanId = new Map<string, string>();
+  const totalLessonsByPlan = new Map<string, number>();
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const planId = moduleToPlanId.get(l.module_id as string);
+    if (!planId) continue;
+    lessonToPlanId.set(l.id as string, planId);
+    totalLessonsByPlan.set(planId, (totalLessonsByPlan.get(planId) ?? 0) + 1);
+  }
+  const lessonIds = Array.from(lessonToPlanId.keys());
+
+  const { data: progress } = lessonIds.length
+    ? await supabaseRead.from("p2p_lesson_progress").select("lesson_id,completed,updated_at").eq("user_id", userId).in("lesson_id", lessonIds)
+    : { data: [] as { lesson_id: string; completed: boolean; updated_at: string | null }[] };
+
+  const completedByPlan = new Map<string, number>();
+  const lastActivityByPlan = new Map<string, string>();
+  for (const p of (progress ?? []) as Record<string, unknown>[]) {
+    const planId = lessonToPlanId.get(p.lesson_id as string);
+    if (!planId) continue;
+    if (p.completed) completedByPlan.set(planId, (completedByPlan.get(planId) ?? 0) + 1);
+    const updatedAt = p.updated_at as string | null;
+    if (updatedAt && (!lastActivityByPlan.has(planId) || updatedAt > lastActivityByPlan.get(planId)!)) {
+      lastActivityByPlan.set(planId, updatedAt);
+    }
+  }
+
+  for (const planId of planIds) {
+    const totalLessons = totalLessonsByPlan.get(planId) ?? 0;
+    const completedLessons = completedByPlan.get(planId) ?? 0;
+    const percent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    result.set(planId, { percent, completedLessons, totalLessons, lastActivityAt: lastActivityByPlan.get(planId) ?? null });
+  }
+  return result;
+}
+
+// GET /plans/active/:userId — plans currently in progress (0% < percent < 100%),
+// most recently active first
+router.get("/plans/active/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const progressMap = await getUserPlanProgressMap(userId);
+  const activePlanIds = Array.from(progressMap.entries())
+    .filter(([, p]) => p.completedLessons > 0 && p.percent < 100)
+    .sort(([, a], [, b]) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
+    .map(([planId]) => planId);
+  if (!activePlanIds.length) return res.json([]);
+
+  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", activePlanIds);
+  const counts = await getPlanModuleLessonCounts(activePlanIds);
+  const ordered = activePlanIds
+    .map((id) => (plans ?? []).find((p) => p.id === id))
+    .filter((p): p is Record<string, unknown> => !!p)
+    .map((p) => {
+      const progress = progressMap.get(p.id as string)!;
+      return {
+        ...mapPlan(p, counts.moduleCountByPlan.get(p.id as string) ?? 0, counts.lessonCountByPlan.get(p.id as string) ?? 0, counts.fallbackImageByPlan.get(p.id as string) ?? null),
+        progressPercent: progress.percent,
+        lastActivityAt: progress.lastActivityAt,
+      };
+    });
+  return res.json(ordered);
+});
+
+// GET /plans/completed/:userId — plans finished (100%)
+router.get("/plans/completed/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const progressMap = await getUserPlanProgressMap(userId);
+  const completedPlanIds = Array.from(progressMap.entries())
+    .filter(([, p]) => p.totalLessons > 0 && p.percent === 100)
+    .sort(([, a], [, b]) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
+    .map(([planId]) => planId);
+  if (!completedPlanIds.length) return res.json([]);
+
+  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", completedPlanIds);
+  const counts = await getPlanModuleLessonCounts(completedPlanIds);
+  const ordered = completedPlanIds
+    .map((id) => (plans ?? []).find((p) => p.id === id))
+    .filter((p): p is Record<string, unknown> => !!p)
+    .map((p) => {
+      const progress = progressMap.get(p.id as string)!;
+      return {
+        ...mapPlan(p, counts.moduleCountByPlan.get(p.id as string) ?? 0, counts.lessonCountByPlan.get(p.id as string) ?? 0, counts.fallbackImageByPlan.get(p.id as string) ?? null),
+        completedAt: progress.lastActivityAt,
+      };
+    });
+  return res.json(ordered);
+});
+
 // ── Admin: Plans CRUD ──────────────────────────────────────────────────────────
 
 const PLAN_FIELD_MAP: Record<string, string> = {
