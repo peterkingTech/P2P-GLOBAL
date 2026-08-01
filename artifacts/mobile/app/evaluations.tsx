@@ -18,6 +18,96 @@ import { useData, PendingEvaluation, MySubmission, SubmitterEvaluationContext } 
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import MediaPlayer from "@/components/MediaPlayer";
 import colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/apiUrl";
+
+interface CirclePendingEvaluation {
+  submissionId: string;
+  submitterId: string;
+  submitterName: string;
+  lessonId: string;
+  content: string;
+  evaluationsSoFar: number;
+  circleId: string;
+  circleName: string;
+}
+
+function CircleEvaluationCard({ evaluation, onResolved }: { evaluation: CirclePendingEvaluation; onResolved: (submissionId: string) => void }) {
+  const { profile } = useAuth();
+  const [feedback, setFeedback] = useState("");
+  const [submitting, setSubmitting] = useState<"approved" | "needs_revision" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleResolve(decision: "approved" | "needs_revision") {
+    if (submitting || !profile?.id) return;
+    setSubmitting(decision);
+    setError(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/circles/${evaluation.circleId}/evaluations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionId: evaluation.submissionId,
+          evaluatorId: profile.id,
+          submitterId: evaluation.submitterId,
+          lessonId: evaluation.lessonId,
+          decision,
+          feedback: feedback.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error ?? "Could not submit evaluation");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onResolved(evaluation.submissionId);
+    } catch (e: any) {
+      setError(e.message ?? "Something went wrong");
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.circleBadgeRow}>
+        <Ionicons name="people-circle-outline" size={14} color={colors.accentGreen} />
+        <Text style={styles.circleBadgeText}>{evaluation.circleName}</Text>
+        <View style={styles.consensusPill}>
+          <Text style={styles.consensusPillText}>{evaluation.evaluationsSoFar} of 2 evaluations so far</Text>
+        </View>
+      </View>
+      <View style={styles.cardHeader}>
+        <View style={styles.avatarCircle}>
+          <Ionicons name="person" size={16} color={colors.accentGreen} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.submitterName}>{evaluation.submitterName}</Text>
+        </View>
+      </View>
+      <View style={styles.contentBox}>
+        <Text style={styles.contentText}>{evaluation.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}</Text>
+      </View>
+      <TextInput
+        style={styles.feedbackInput}
+        multiline
+        placeholder="Optional feedback for this disciple..."
+        placeholderTextColor={colors.textMuted}
+        value={feedback}
+        onChangeText={setFeedback}
+      />
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={[styles.actionBtn, styles.reviseBtn]} onPress={() => handleResolve("needs_revision")} disabled={submitting !== null} activeOpacity={0.85}>
+          {submitting === "needs_revision" ? <ActivityIndicator color={colors.textDark} size="small" /> : (
+            <><Ionicons name="refresh" size={16} color={colors.textDark} /><Text style={styles.reviseBtnText}>Ask for Revision</Text></>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionBtn, styles.approveBtn]} onPress={() => handleResolve("approved")} disabled={submitting !== null} activeOpacity={0.85}>
+          {submitting === "approved" ? <ActivityIndicator color={colors.cream} size="small" /> : (
+            <><Ionicons name="checkmark" size={16} color={colors.cream} /><Text style={styles.approveBtnText}>Approve</Text></>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 // Compact context card for the reviewer — just enough to evaluate the
 // submission fairly (who they are, how far along they are, momentum).
@@ -252,11 +342,44 @@ function isSubmissionApproved(sub: MySubmission): boolean {
 export default function EvaluationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { pendingEvaluations, getMySubmissions } = useData();
   const [tab, setTab] = useState<"toReview" | "submitted" | "approved">("toReview");
   const [mySubmissions, setMySubmissions] = useState<MySubmission[]>([]);
   const [loadingMine, setLoadingMine] = useState(false);
+  const [circleEvals, setCircleEvals] = useState<CirclePendingEvaluation[]>([]);
+
+  const loadCircleEvals = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const apiUrl = getApiUrl();
+      const allRes = await fetch(`${apiUrl}/circles?status=active,forming`);
+      const all = (await allRes.json()) as { id: string; name: string }[];
+      const details = await Promise.all(
+        (Array.isArray(all) ? all : []).map((c) => fetch(`${apiUrl}/circles/${c.id}`).then((r) => r.json()).catch(() => null))
+      );
+      const myCircles = details.filter(
+        (d) => d && Array.isArray(d.members) && d.members.some((m: { userId: string }) => m.userId === profile.id)
+      );
+      const pendingLists = await Promise.all(
+        myCircles.map((c: any) =>
+          fetch(`${apiUrl}/circles/${c.id}/evaluations/pending?userId=${profile.id}`)
+            .then((r) => r.json())
+            .then((items: any[]) => (Array.isArray(items) ? items.map((i) => ({ ...i, circleId: c.id, circleName: c.name })) : []))
+            .catch(() => [])
+        )
+      );
+      setCircleEvals(pendingLists.flat());
+    } catch {
+      setCircleEvals([]);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => { loadCircleEvals(); }, [loadCircleEvals]);
+
+  function handleCircleEvalResolved(submissionId: string) {
+    setCircleEvals((prev) => prev.filter((e) => e.submissionId !== submissionId));
+  }
 
   const loadMySubmissions = useCallback(async () => {
     setLoadingMine(true);
@@ -303,7 +426,7 @@ export default function EvaluationsScreen() {
           onPress={() => setTab("toReview")}
         >
           <Text style={[styles.tabBtnText, tab === "toReview" && styles.tabBtnTextActive]} numberOfLines={2}>
-            To Review{pendingEvaluations.length > 0 ? ` (${pendingEvaluations.length})` : ""}
+            To Review{(pendingEvaluations.length + circleEvals.length) > 0 ? ` (${pendingEvaluations.length + circleEvals.length})` : ""}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -325,7 +448,7 @@ export default function EvaluationsScreen() {
       </View>
 
       {tab === "toReview" ? (
-        pendingEvaluations.length === 0 ? (
+        pendingEvaluations.length === 0 && circleEvals.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-done-circle" size={48} color={colors.borderBeige} />
             <Text style={styles.emptyTitle}>You're all caught up</Text>
@@ -333,9 +456,18 @@ export default function EvaluationsScreen() {
           </View>
         ) : (
           <FlatList
-            data={pendingEvaluations}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <EvaluationCard evaluation={item} />}
+            data={[
+              ...pendingEvaluations.map((e) => ({ kind: "solo" as const, item: e })),
+              ...circleEvals.map((e) => ({ kind: "circle" as const, item: e })),
+            ]}
+            keyExtractor={(row) => (row.kind === "solo" ? row.item.id : row.item.submissionId)}
+            renderItem={({ item: row }) =>
+              row.kind === "solo" ? (
+                <EvaluationCard evaluation={row.item} />
+              ) : (
+                <CircleEvaluationCard evaluation={row.item} onResolved={handleCircleEvalResolved} />
+              )
+            }
             contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 14 }}
             showsVerticalScrollIndicator={false}
           />
@@ -460,4 +592,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(192,57,43,0.25)", padding: 10,
   },
   revisionBannerText: { flex: 1, fontSize: 12, color: colors.textDark, lineHeight: 18, fontFamily: "Inter_400Regular" },
+  circleBadgeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  circleBadgeText: { fontSize: 12, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
+  consensusPill: { marginLeft: "auto", backgroundColor: colors.cardBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  consensusPillText: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_500Medium" },
 });

@@ -8,6 +8,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { getApiUrl } from "@/lib/apiUrl";
+
+interface DiscoverCircleSummary {
+  id: string;
+  name: string;
+  memberCount: number;
+  maxMembers: number;
+  leaderName: string;
+  isFeatured: boolean;
+}
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -31,6 +41,19 @@ function makeStyles(c: AppColors) {
       backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
     },
     countText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+
+    sectionHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10, marginTop: 4 },
+    circleCard: {
+      backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 14, marginBottom: 10,
+    },
+    circleCardName: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    circleCardMeta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
+    circlesActionsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+    circlePrimaryBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.accentGreen, borderRadius: 12, paddingVertical: 11 },
+    circlePrimaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    circleSecondaryBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 11 },
+    circleSecondaryBtnText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }
 
@@ -46,6 +69,7 @@ export default function DiscoverTab() {
   const [peerCount, setPeerCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
   const [wallCount, setWallCount] = useState(0);
+  const [circles, setCircles] = useState<DiscoverCircleSummary[]>([]);
   const { t } = useTranslation();
 
   const load = useCallback(async () => {
@@ -58,6 +82,14 @@ export default function DiscoverTab() {
     setPeerCount(peers.length);
     setGroupCount(groups.length);
     setWallCount(posts.length);
+    try {
+      const res = await fetch(`${getApiUrl()}/circles?status=forming,active`);
+      const data = (await res.json()) as DiscoverCircleSummary[];
+      const sorted = Array.isArray(data) ? [...data].sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)) : [];
+      setCircles(sorted.slice(0, 4));
+    } catch {
+      setCircles([]);
+    }
     setLoading(false);
   }, [getDiscoverablePeers, getGroups, getPrayerWallPosts]);
 
@@ -103,6 +135,24 @@ export default function DiscoverTab() {
                 </View>
               )}
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+            </TouchableOpacity>
+          ))}
+
+          <Text style={styles.sectionHeading}>Peer Circles</Text>
+          <View style={styles.circlesActionsRow}>
+            <TouchableOpacity style={styles.circlePrimaryBtn} onPress={() => router.push("/circles/create" as any)}>
+              <Ionicons name="add-circle-outline" size={15} color="#fff" />
+              <Text style={styles.circlePrimaryBtnText}>Start a Circle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.circleSecondaryBtn} onPress={() => router.push("/circles/discover" as any)}>
+              <Ionicons name="search" size={15} color={colors.accentGreen} />
+              <Text style={styles.circleSecondaryBtnText}>Find a Circle</Text>
+            </TouchableOpacity>
+          </View>
+          {circles.map((c) => (
+            <TouchableOpacity key={c.id} style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push(`/circles/${c.id}` as any)}>
+              <Text style={styles.circleCardName}>{c.name}</Text>
+              <Text style={styles.circleCardMeta}>Led by {c.leaderName} · {c.memberCount}/{c.maxMembers} members</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
