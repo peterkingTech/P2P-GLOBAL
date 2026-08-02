@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   Platform,
@@ -11,7 +11,9 @@ import {
   Switch,
   KeyboardAvoidingView,
   Alert,
+  Modal,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
@@ -24,8 +26,27 @@ import {
   PrayerWallPostType,
   PrayerWallVisibility,
 } from "@/contexts/DataContext";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+
+interface LibraryPrayer {
+  id: string;
+  category: string;
+  title: string;
+  prayer_text: string;
+  scripture_reference: string | null;
+  scripture_text: string | null;
+}
+interface JournalEntryPreview { id: string; prayer_text: string; category: string | null; is_answered: boolean; created_at: string }
+interface ConfessionSummary { confession_lines: { declaration: string }[]; morning_notification: boolean; notification_time: string | null }
+
+const LIBRARY_CATEGORIES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "grace_mercy", label: "Grace and Mercy", icon: "heart-outline" },
+  { key: "favour", label: "Favour", icon: "sunny-outline" },
+  { key: "healing", label: "Healing", icon: "medkit-outline" },
+  { key: "confession", label: "Confessions and Declarations", icon: "megaphone-outline" },
+];
 
 function flagEmoji(code?: string | null): string {
   if (!code || code.length !== 2) return "🌍";
@@ -225,13 +246,16 @@ function PostCard({
 
 export default function PrayerTab() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { profile } = useAuth();
   const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, reportContent } = useData();
   const { t } = useTranslation();
 
+  // ── Community Prayer wall state (unchanged behavior) ──
   const [section, setSection] = useState<"wall" | "private">("wall");
   const [tab, setTab] = useState<"recent" | "engaged">("recent");
   const [posts, setPosts] = useState<PrayerWallPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [wallLoading, setWallLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [postType, setPostType] = useState<PrayerWallPostType>("request");
   const [body, setBody] = useState("");
@@ -240,19 +264,41 @@ export default function PrayerTab() {
   const [visibility, setVisibility] = useState<PrayerWallVisibility>("global");
   const [answeredFromPostId, setAnsweredFromPostId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // ── New sections state ──
+  const [journalPreview, setJournalPreview] = useState<JournalEntryPreview[]>([]);
+  const [library, setLibrary] = useState<LibraryPrayer[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activePrayer, setActivePrayer] = useState<LibraryPrayer | null>(null);
+  const [confession, setConfession] = useState<ConfessionSummary | null>(null);
+
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const load = useCallback(async (which: "recent" | "engaged") => {
-    setLoading(true);
+  const loadWall = useCallback(async (which: "recent" | "engaged") => {
+    setWallLoading(true);
     setPosts(await getPrayerWallPosts(which));
-    setLoading(false);
+    setWallLoading(false);
   }, [getPrayerWallPosts]);
 
-  useEffect(() => { load(tab); }, [tab, load]);
+  useEffect(() => { loadWall(tab); }, [tab, loadWall]);
+
+  const loadExtras = useCallback(async () => {
+    if (!profile?.id) return;
+    const [{ data: journal }, { data: lib }, { data: conf }] = await Promise.all([
+      supabase.from("p2p_prayer_journal").select("id,prayer_text,category,is_answered,created_at").eq("user_id", profile.id).order("created_at", { ascending: false }).limit(3),
+      supabase.from("p2p_prayer_library").select("*").eq("is_active", true).order("display_order"),
+      supabase.from("p2p_personal_confessions").select("confession_lines,morning_notification,notification_time").eq("user_id", profile.id).maybeSingle(),
+    ]);
+    setJournalPreview((journal ?? []) as JournalEntryPreview[]);
+    setLibrary((lib ?? []) as LibraryPrayer[]);
+    setConfession((conf as ConfessionSummary) ?? null);
+  }, [profile?.id]);
+
+  useEffect(() => { loadExtras(); }, [loadExtras]);
 
   const visiblePosts = posts.filter((p) =>
     section === "private" ? p.visibility === "peer_group" : p.visibility === "global"
@@ -329,144 +375,268 @@ export default function PrayerTab() {
       setAnsweredFromPostId(null);
       setShowForm(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await load(tab);
+      await loadWall(tab);
     }
   }
+
+  async function logPrayerAction(prayer: LibraryPrayer) {
+    if (!profile?.id) return;
+    await supabase.from("p2p_prayer_journal").insert({ user_id: profile.id, prayer_text: prayer.prayer_text, category: prayer.category });
+    Alert.alert("Logged", "Added to your prayer journal.");
+    loadExtras();
+  }
+
+  const categoryPrayers = activeCategory ? library.filter((p) => p.category === activeCategory) : [];
 
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: topPad }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
-      <View style={[styles.header, { paddingTop: 20 }]}>
-        <View>
-          <Text style={styles.headerTitle}>{t("prayer.title")}</Text>
-          <Text style={styles.headerSub}>{t("prayer.subtitle")}</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
+        <View style={[styles.header, { paddingTop: 20 }]}>
+          <View>
+            <Text style={styles.headerTitle}>{t("prayer.title")}</Text>
+            <Text style={styles.headerSub}>{t("prayer.subtitle")}</Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openNewPost}>
-          <Ionicons name={showForm ? "close" : "add"} size={22} color={colors.upperRoomCream} />
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.segmentRow}>
-        <TouchableOpacity style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
-          <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>{t("prayer.wall")}</Text>
+        {/* ── Section 1: The Sinner's Prayer ── */}
+        <TouchableOpacity style={styles.sinnersPrayerCard} activeOpacity={0.9} onPress={() => router.push("/prayer/sinners-prayer" as any)}>
+          <View style={styles.sinnersPrayerIconWrap}>
+            <Ionicons name="sparkles" size={22} color={colors.upperRoomAmber} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sinnersPrayerTitle}>Begin with Jesus</Text>
+            <Text style={styles.sinnersPrayerSub}>A prayer of commitment and surrender</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.upperRoomMuted} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
-          <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>{t("prayer.private")}</Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.tabRow}>
-        <TouchableOpacity style={[styles.tabBtn, tab === "recent" && styles.tabBtnActive]} onPress={() => setTab("recent")}>
-          <Text style={[styles.tabBtnText, tab === "recent" && styles.tabBtnTextActive]}>{t("prayer.recent")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, tab === "engaged" && styles.tabBtnActive]} onPress={() => setTab("engaged")}>
-          <Text style={[styles.tabBtnText, tab === "engaged" && styles.tabBtnTextActive]}>{t("prayer.mostEngaged")}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {showForm && (
-        <View style={styles.form}>
-          <View style={styles.typeToggleRow}>
-            <TouchableOpacity
-              style={[styles.typeToggle, postType === "request" && styles.typeToggleActive]}
-              onPress={() => setPostType("request")}
-              disabled={!!answeredFromPostId}
-            >
-              <Text style={[styles.typeToggleText, postType === "request" && styles.typeToggleTextActive]}>{t("prayer.prayerRequest")}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeToggle, postType === "testimony" && styles.typeToggleActive]}
-              onPress={() => setPostType("testimony")}
-            >
-              <Text style={[styles.typeToggleText, postType === "testimony" && styles.typeToggleTextActive]}>{t("prayer.testimony")}</Text>
+        {/* ── Section 2: My Prayer Journal ── */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeading}>My Prayer Journal</Text>
+            <TouchableOpacity onPress={() => router.push("/prayer/journal" as any)}>
+              <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-
-          <TextInput
-            style={styles.formInput}
-            value={body}
-            onChangeText={setBody}
-            placeholder={postType === "testimony" ? t("prayer.shareAnsweredPlaceholder") : t("prayer.sharePrayerPlaceholder")}
-            placeholderTextColor={colors.upperRoomMuted}
-            multiline
-            numberOfLines={3}
-          />
-          <TextInput
-            style={[styles.formInput, { marginTop: 8 }]}
-            value={nationCode}
-            onChangeText={setNationCode}
-            placeholder={t("prayer.nationCodePlaceholder")}
-            placeholderTextColor={colors.upperRoomMuted}
-            autoCapitalize="characters"
-            maxLength={2}
-          />
-
-          <View style={styles.visibilityRow}>
-            <TouchableOpacity
-              style={[styles.visBtn, visibility === "global" && styles.visBtnActive]}
-              onPress={() => setVisibility("global")}
-            >
-              <Ionicons name="earth" size={14} color={visibility === "global" ? colors.upperRoomAmber : colors.upperRoomMuted} />
-              <Text style={[styles.visBtnText, visibility === "global" && styles.visBtnTextActive]}>{t("prayer.global")}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.visBtn, visibility === "peer_group" && styles.visBtnActive]}
-              onPress={() => setVisibility("peer_group")}
-            >
-              <Ionicons name="people" size={14} color={visibility === "peer_group" ? colors.upperRoomAmber : colors.upperRoomMuted} />
-              <Text style={[styles.visBtnText, visibility === "peer_group" && styles.visBtnTextActive]}>{t("prayer.myPeerGroup")}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.anonRow}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="eye-off-outline" size={16} color={colors.upperRoomAmber} />
-              <Text style={styles.anonLabel}>{t("prayer.postAnonymously")}</Text>
-            </View>
-            <Switch
-              value={isAnonymous}
-              onValueChange={setIsAnonymous}
-              trackColor={{ false: colors.upperRoomBorder, true: colors.upperRoomAmber }}
-              thumbColor={colors.upperRoomCream}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
-            {submitting ? (
-              <ActivityIndicator color="#100B06" size="small" />
-            ) : (
-              <Text style={styles.submitBtnText}>
-                {postType === "testimony" ? t("prayer.shareTestimony") : t("prayer.submitRequest")}
-              </Text>
-            )}
+          {journalPreview.length === 0 ? (
+            <Text style={styles.mutedText}>No prayers logged yet.</Text>
+          ) : (
+            journalPreview.map((e) => (
+              <View key={e.id} style={styles.journalPreviewRow}>
+                {e.is_answered && <Ionicons name="checkmark-circle" size={14} color={colors.upperRoomAmber} />}
+                <Text style={styles.journalPreviewText} numberOfLines={1}>{e.prayer_text}</Text>
+              </View>
+            ))
+          )}
+          <TouchableOpacity style={styles.writeBtn} onPress={() => router.push("/prayer/journal" as any)}>
+            <Ionicons name="create-outline" size={15} color={colors.upperRoomAmber} />
+            <Text style={styles.writeBtnText}>Write a Prayer</Text>
           </TouchableOpacity>
         </View>
-      )}
 
-      {loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator color={colors.upperRoomAmber} />
-        </View>
-      ) : (
-        <FlatList
-          data={visiblePosts}
-          keyExtractor={(p) => p.id}
-          renderItem={({ item }) => (
-            <PostCard item={item} onReact={handleReact} onAnswer={handleAnswer} onTestify={handleTestify} onReport={handleReport} />
+        {/* ── Section 3: Prayer Library ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>Prayer Library</Text>
+          {activeCategory ? (
+            <>
+              <TouchableOpacity style={styles.backRow} onPress={() => setActiveCategory(null)}>
+                <Ionicons name="chevron-back" size={16} color={colors.upperRoomAmber} />
+                <Text style={styles.backRowText}>Categories</Text>
+              </TouchableOpacity>
+              {categoryPrayers.map((p) => (
+                <TouchableOpacity key={p.id} style={styles.libraryRow} onPress={() => setActivePrayer(p)}>
+                  <Text style={styles.libraryRowTitle}>{p.title}</Text>
+                  {p.scripture_reference ? <Text style={styles.libraryRowRef}>{p.scripture_reference}</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </>
+          ) : (
+            <View style={styles.libraryGrid}>
+              {LIBRARY_CATEGORIES.map((c) => (
+                <TouchableOpacity key={c.key} style={styles.libraryCard} onPress={() => setActiveCategory(c.key)}>
+                  <Ionicons name={c.icon} size={22} color={colors.upperRoomAmber} />
+                  <Text style={styles.libraryCardLabel}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
+        </View>
+
+        {/* ── Section 4: My Confessions ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>My Confessions</Text>
+          {confession?.confession_lines?.length ? (
+            <View style={styles.confessionCard}>
+              {confession.confession_lines.slice(0, 3).map((l, i) => (
+                <Text key={i} style={styles.confessionLine} numberOfLines={1}>{l.declaration}</Text>
+              ))}
+              <Text style={styles.mutedText}>
+                {confession.morning_notification ? `Morning reminder set${confession.notification_time ? ` · ${confession.notification_time.slice(0, 5)}` : ""}` : "No morning reminder set"}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.mutedText}>You haven't built a personal confession yet.</Text>
+          )}
+          <TouchableOpacity style={styles.writeBtn} onPress={() => router.push("/prayer/build-confession" as any)}>
+            <Ionicons name="hammer-outline" size={15} color={colors.upperRoomAmber} />
+            <Text style={styles.writeBtnText}>Build My Confession</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Section 5: Community Prayer (existing wall, unchanged) ── */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.communityHeaderRow}>
+            <Text style={styles.sectionHeading}>Community Prayer</Text>
+            <TouchableOpacity style={styles.addBtn} onPress={openNewPost}>
+              <Ionicons name={showForm ? "close" : "add"} size={20} color={colors.upperRoomCream} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.segmentRow}>
+            <TouchableOpacity style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
+              <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>{t("prayer.wall")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
+              <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>{t("prayer.private")}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.tabRow}>
+            <TouchableOpacity style={[styles.tabBtn, tab === "recent" && styles.tabBtnActive]} onPress={() => setTab("recent")}>
+              <Text style={[styles.tabBtnText, tab === "recent" && styles.tabBtnTextActive]}>{t("prayer.recent")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tabBtn, tab === "engaged" && styles.tabBtnActive]} onPress={() => setTab("engaged")}>
+              <Text style={[styles.tabBtnText, tab === "engaged" && styles.tabBtnTextActive]}>{t("prayer.mostEngaged")}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {showForm && (
+            <View style={styles.form}>
+              <View style={styles.typeToggleRow}>
+                <TouchableOpacity
+                  style={[styles.typeToggle, postType === "request" && styles.typeToggleActive]}
+                  onPress={() => setPostType("request")}
+                  disabled={!!answeredFromPostId}
+                >
+                  <Text style={[styles.typeToggleText, postType === "request" && styles.typeToggleTextActive]}>{t("prayer.prayerRequest")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeToggle, postType === "testimony" && styles.typeToggleActive]}
+                  onPress={() => setPostType("testimony")}
+                >
+                  <Text style={[styles.typeToggleText, postType === "testimony" && styles.typeToggleTextActive]}>{t("prayer.testimony")}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TextInput
+                style={styles.formInput}
+                value={body}
+                onChangeText={setBody}
+                placeholder={postType === "testimony" ? t("prayer.shareAnsweredPlaceholder") : t("prayer.sharePrayerPlaceholder")}
+                placeholderTextColor={colors.upperRoomMuted}
+                multiline
+                numberOfLines={3}
+              />
+              <TextInput
+                style={[styles.formInput, { marginTop: 8 }]}
+                value={nationCode}
+                onChangeText={setNationCode}
+                placeholder={t("prayer.nationCodePlaceholder")}
+                placeholderTextColor={colors.upperRoomMuted}
+                autoCapitalize="characters"
+                maxLength={2}
+              />
+
+              <View style={styles.visibilityRow}>
+                <TouchableOpacity
+                  style={[styles.visBtn, visibility === "global" && styles.visBtnActive]}
+                  onPress={() => setVisibility("global")}
+                >
+                  <Ionicons name="earth" size={14} color={visibility === "global" ? colors.upperRoomAmber : colors.upperRoomMuted} />
+                  <Text style={[styles.visBtnText, visibility === "global" && styles.visBtnTextActive]}>{t("prayer.global")}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.visBtn, visibility === "peer_group" && styles.visBtnActive]}
+                  onPress={() => setVisibility("peer_group")}
+                >
+                  <Ionicons name="people" size={14} color={visibility === "peer_group" ? colors.upperRoomAmber : colors.upperRoomMuted} />
+                  <Text style={[styles.visBtnText, visibility === "peer_group" && styles.visBtnTextActive]}>{t("prayer.myPeerGroup")}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.anonRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="eye-off-outline" size={16} color={colors.upperRoomAmber} />
+                  <Text style={styles.anonLabel}>{t("prayer.postAnonymously")}</Text>
+                </View>
+                <Switch
+                  value={isAnonymous}
+                  onValueChange={setIsAnonymous}
+                  trackColor={{ false: colors.upperRoomBorder, true: colors.upperRoomAmber }}
+                  thumbColor={colors.upperRoomCream}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
+                {submitting ? (
+                  <ActivityIndicator color="#100B06" size="small" />
+                ) : (
+                  <Text style={styles.submitBtnText}>
+                    {postType === "testimony" ? t("prayer.shareTestimony") : t("prayer.submitRequest")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {wallLoading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator color={colors.upperRoomAmber} />
+            </View>
+          ) : visiblePosts.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="radio-outline" size={40} color={colors.upperRoomBorder} />
               <Text style={styles.emptyText}>
                 {section === "private" ? t("prayer.noPrivatePosts") : t("prayer.noPostsYet")}
               </Text>
             </View>
-          }
-        />
-      )}
+          ) : (
+            <View style={{ gap: 10 }}>
+              {visiblePosts.map((item) => (
+                <PostCard key={item.id} item={item} onReact={handleReact} onAnswer={handleAnswer} onTestify={handleTestify} onReport={handleReport} />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
       </View>
+
+      {/* Prayer detail modal (Prayer Library) */}
+      <Modal visible={!!activePrayer} animationType="slide" transparent onRequestClose={() => setActivePrayer(null)}>
+        <View style={styles.prayerModalOverlay}>
+          <View style={styles.prayerModalBox}>
+            <View style={styles.prayerModalHeader}>
+              <Text style={styles.prayerModalTitle}>{activePrayer?.title}</Text>
+              <TouchableOpacity onPress={() => setActivePrayer(null)}>
+                <Ionicons name="close" size={22} color={colors.upperRoomCream} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {activePrayer?.scripture_reference ? <Text style={styles.prayerModalRef}>{activePrayer.scripture_reference}</Text> : null}
+              <Text style={styles.prayerModalText}>{activePrayer?.prayer_text}</Text>
+              <View style={styles.prayerModalActionsRow}>
+                <TouchableOpacity style={styles.prayThisBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>
+                  <Text style={styles.prayThisBtnText}>Pray This</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveMineBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>
+                  <Text style={styles.saveMineBtnText}>Save to My Prayers</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -485,6 +655,40 @@ function makeStyles(c: AppColors) {
   },
   headerTitle: { fontSize: 20, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
   headerSub: { fontSize: 12, color: c.upperRoomMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+
+  sinnersPrayerCard: {
+    flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 16, marginTop: 16,
+    backgroundColor: "rgba(224,164,65,0.1)", borderWidth: 1.5, borderColor: "rgba(224,164,65,0.35)",
+    borderRadius: 16, padding: 16,
+  },
+  sinnersPrayerIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(224,164,65,0.18)", alignItems: "center", justifyContent: "center" },
+  sinnersPrayerTitle: { fontSize: 15, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
+  sinnersPrayerSub: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+  sectionBlock: { paddingHorizontal: 16, marginTop: 24 },
+  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  sectionHeading: { fontSize: 13, fontWeight: "700", color: c.upperRoomMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
+  viewAllText: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
+  mutedText: { fontSize: 13, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
+
+  journalPreviewRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 12, marginBottom: 8 },
+  journalPreviewText: { flex: 1, fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_400Regular" },
+  writeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,164,65,0.35)", borderRadius: 12, paddingVertical: 11, marginTop: 4 },
+  writeBtnText: { fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
+
+  libraryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  libraryCard: { width: "47%", backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 14, padding: 16, gap: 8, alignItems: "flex-start" },
+  libraryCardLabel: { fontSize: 13, fontWeight: "600", color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 10 },
+  backRowText: { fontSize: 13, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
+  libraryRow: { backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 12, padding: 14, marginBottom: 8 },
+  libraryRowTitle: { fontSize: 14, fontWeight: "600", color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  libraryRowRef: { fontSize: 11, color: c.upperRoomAmber, fontFamily: "Inter_400Regular", marginTop: 3 },
+
+  confessionCard: { backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 14, padding: 14, marginBottom: 10, gap: 6 },
+  confessionLine: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_400Regular" },
+
+  communityHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   addBtn: {
     width: 38, height: 38, borderRadius: 10,
     backgroundColor: "rgba(224,164,65,0.15)",
@@ -492,7 +696,7 @@ function makeStyles(c: AppColors) {
     alignItems: "center", justifyContent: "center",
   },
   segmentRow: {
-    flexDirection: "row", marginHorizontal: 16, marginTop: 12,
+    flexDirection: "row", marginTop: 4, marginBottom: 12,
     backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 12,
     borderWidth: 1, borderColor: c.upperRoomBorder, padding: 4,
   },
@@ -501,8 +705,7 @@ function makeStyles(c: AppColors) {
   segmentText: { fontSize: 13, fontWeight: "600", color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
   segmentTextActive: { color: c.upperRoomAmber },
   tabRow: {
-    flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: c.upperRoomBorder,
+    flexDirection: "row", gap: 10, paddingVertical: 4, marginBottom: 12,
   },
   tabBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 10,
@@ -514,7 +717,7 @@ function makeStyles(c: AppColors) {
   tabBtnText: { fontSize: 13, fontWeight: "600", color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
   tabBtnTextActive: { color: c.upperRoomAmber },
   form: {
-    margin: 16,
+    marginBottom: 16,
     padding: 14,
     backgroundColor: c.upperRoomCard,
     borderRadius: 14,
@@ -557,14 +760,13 @@ function makeStyles(c: AppColors) {
     alignItems: "center", justifyContent: "center", marginTop: 12,
   },
   submitBtnText: { color: "#100B06", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  list: { paddingHorizontal: 14, paddingTop: 10 },
-  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
+  loading: { alignItems: "center", justifyContent: "center", paddingVertical: 40 },
+  empty: { alignItems: "center", paddingTop: 30, paddingBottom: 20, gap: 12 },
   emptyText: { color: c.upperRoomMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
   prayerCard: {
     backgroundColor: c.upperRoomCard,
     borderRadius: 14, borderWidth: 1, borderColor: c.upperRoomBorder,
-    padding: 14, marginBottom: 10,
+    padding: 14,
   },
   testimonyCard: { borderColor: "rgba(224,164,65,0.4)" },
   prayerHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
@@ -623,5 +825,17 @@ function makeStyles(c: AppColors) {
     fontFamily: "Inter_400Regular",
   },
   commentSendBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+
+  prayerModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  prayerModalBox: { backgroundColor: c.upperRoomBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%", borderWidth: 1, borderColor: c.upperRoomBorder },
+  prayerModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  prayerModalTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
+  prayerModalRef: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold", marginBottom: 10 },
+  prayerModalText: { fontSize: 15, color: c.upperRoomCream, fontFamily: "Inter_400Regular", lineHeight: 24 },
+  prayerModalActionsRow: { flexDirection: "row", gap: 10, marginTop: 20 },
+  prayThisBtn: { flex: 1, backgroundColor: c.upperRoomAmber, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  prayThisBtnText: { fontSize: 14, fontWeight: "700", color: "#100B06", fontFamily: "Inter_700Bold" },
+  saveMineBtn: { flex: 1, borderWidth: 1, borderColor: "rgba(224,164,65,0.4)", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  saveMineBtnText: { fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
   });
 }
