@@ -649,11 +649,32 @@ router.get("/plans/completed/:userId", async (req, res) => {
 // p2p_curriculums — tags is the same freeform field the Plans hub's "Browse
 // by Category" already treats as a loose taxonomy (see plans/index.tsx).
 const REC_GOAL_WEIGHT = 10;
-const REC_LIFE_STAGE_WEIGHT = 6;
-const REC_LIFE_SITUATION_WEIGHT = 6;
+const REC_LIFE_STAGE_WEIGHT = 5;
+const REC_LIFE_SITUATION_WEIGHT = 5;
 const REC_TOPIC_WEIGHT = 4;
 const REC_DURATION_WEIGHT = 3;
+const REC_FORMAT_WEIGHT = 2;
 const REC_FOUNDATION_WEIGHT = 1;
+const REC_AGE_WEIGHT = 1;
+
+// Learning format preference -> the same tag keywords formatBadgeFromTags()
+// (plans/index.tsx) looks for, so "recommended format" scoring and the
+// visible format badge stay in sync.
+const FORMAT_PREFERENCE_TAGS: Record<string, string[]> = {
+  peer_guide: ["peer-guide", "peer_guide"],
+  group_circle: ["group", "group-circle"],
+  solo: ["solo"],
+};
+
+// Age range -> difficulty nudge. There is no per-plan age-targeting metadata
+// in this schema, so this is a deliberately soft, honest heuristic (younger
+// ranges lean toward beginner content, older ranges toward more advanced) —
+// it only ever adds a small amount of score, never filters anything out.
+const AGE_RANGE_DIFFICULTY_HINT: Record<string, string> = {
+  "13-17": "beginner",
+  "18-24": "beginner",
+  "55+": "advanced",
+};
 
 // Weekly time availability -> preferred plan length, for the duration-match signal.
 const WEEKLY_TIME_TO_WEEKS: Record<string, (weeks: number | null) => boolean> = {
@@ -693,6 +714,9 @@ router.get("/plans/recommended/:userId", async (req, res) => {
   const lifeStage: string | null = goalsRow?.life_stage ?? null;
   const lifeSituation: string | null = goalsRow?.life_situation ?? null;
   const weeklyTime: string | null = goalsRow?.weekly_time ?? null;
+  const learningFormat: string | null = goalsRow?.learning_format ?? null;
+  const ageRange: string | null = goalsRow?.age_range ?? null;
+  const ageDifficultyHint = ageRange ? AGE_RANGE_DIFFICULTY_HINT[ageRange] ?? null : null;
   const foundationDifficulty = (() => {
     // Low-weight signal: someone deep into the Foundation core curriculum is
     // nudged toward intermediate/advanced electives; someone just starting
@@ -732,10 +756,22 @@ router.get("/plans/recommended/:userId", async (req, res) => {
       score += REC_FOUNDATION_WEIGHT;
       matchedReasons.push({ weight: REC_FOUNDATION_WEIGHT, text: "A good next step for where you are" });
     }
+    const formatMatches = learningFormat && FORMAT_PREFERENCE_TAGS[learningFormat]
+      ? FORMAT_PREFERENCE_TAGS[learningFormat].some((tag) => tags.includes(tag))
+      : false;
+    if (formatMatches) {
+      score += REC_FORMAT_WEIGHT;
+      matchedReasons.push({ weight: REC_FORMAT_WEIGHT, text: "Matches how you like to learn" });
+    }
+    // Age range never filters anything — it only ever nudges score slightly
+    // toward a difficulty level, per Prompt 6 ("low weight... never filters").
+    if (ageDifficultyHint && record.difficulty_level === ageDifficultyHint) {
+      score += REC_AGE_WEIGHT;
+    }
     if (record.is_featured) score += 0.5; // tie-breaker only, matches the featured-placeholder used before goals exist
 
     const bestReason = matchedReasons.sort((a, b) => b.weight - a.weight)[0];
-    return { plan: record, score, reason: bestReason?.text ?? "Featured on Kingdom School" };
+    return { plan: record, score, reason: bestReason?.text ?? "Featured on Kingdom School", matchesPreferredFormat: formatMatches };
   });
 
   const top6 = scored
@@ -748,6 +784,7 @@ router.get("/plans/recommended/:userId", async (req, res) => {
   const result = top6.map((s) => ({
     ...mapPlan(s.plan, counts.moduleCountByPlan.get(s.plan.id as string) ?? 0, counts.lessonCountByPlan.get(s.plan.id as string) ?? 0, counts.fallbackImageByPlan.get(s.plan.id as string) ?? null),
     matchReason: s.reason,
+    matchesPreferredFormat: s.matchesPreferredFormat,
   }));
   return res.json(result);
 });

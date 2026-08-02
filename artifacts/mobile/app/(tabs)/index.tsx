@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
-import { useAuth } from "@/contexts/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import {
   useData,
   KingdomSchoolStatus,
@@ -23,6 +24,7 @@ import {
   getFoundationProgress,
   getKingdomSchoolStatus,
 } from "@/contexts/DataContext";
+import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
@@ -113,6 +115,44 @@ function KingdomSchoolCard({ status, pct, onPress }: { status: KingdomSchoolStat
         </View>
       )}
     </TouchableOpacity>
+  );
+}
+
+interface FirstRecommendation {
+  id: string;
+  title: string;
+  coverImageUrl: string | null;
+  colorTheme: string;
+}
+
+// One-time "based on your goals" card — shown once after onboarding
+// (Prompt 6), dismissed via AsyncStorage flag once the user starts the
+// plan or taps "Not now", never shown again after that.
+function FirstRecommendationCard({ rec, onStart, onSeeAll, onDismiss, colors }: {
+  rec: FirstRecommendation; onStart: () => void; onSeeAll: () => void; onDismiss: () => void; colors: any;
+}) {
+  const styles = makeStyles(colors);
+  return (
+    <View style={styles.recCard}>
+      <TouchableOpacity style={styles.recDismissBtn} onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="close" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
+      <Text style={styles.recEyebrow}>Based on your goals, we recommend starting with:</Text>
+      <View style={styles.recBodyRow}>
+        <View style={[styles.recThumb, { backgroundColor: `${rec.colorTheme}1A` }]}>
+          <Ionicons name="book-outline" size={20} color={rec.colorTheme} />
+        </View>
+        <Text style={styles.recTitle} numberOfLines={2}>{rec.title}</Text>
+      </View>
+      <View style={styles.recActionsRow}>
+        <TouchableOpacity style={styles.recStartBtn} onPress={onStart}>
+          <Text style={styles.recStartBtnText}>Start this Elective</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onSeeAll}>
+          <Text style={styles.recSeeAllText}>See all recommendations</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -228,6 +268,20 @@ function makeStyles(c: AppColors) {
       alignItems: "center", justifyContent: "center",
     },
 
+    recCard: {
+      backgroundColor: c.card, borderRadius: 16, borderWidth: 1.5, borderColor: c.accentGreen,
+      padding: 16, marginBottom: 16, position: "relative",
+    },
+    recDismissBtn: { position: "absolute", top: 10, right: 10, padding: 4 },
+    recEyebrow: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginBottom: 10, paddingRight: 20 },
+    recBodyRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    recThumb: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    recTitle: { flex: 1, fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    recActionsRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 14 },
+    recStartBtn: { backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10 },
+    recStartBtnText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+    recSeeAllText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+
     evalCard: {
       backgroundColor: "rgba(224,164,65,0.1)",
       borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -280,6 +334,43 @@ export default function HomeTab() {
   // note in learn.tsx; always false until a real peer-guide/mentee tracking
   // system is built.
   const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
+
+  const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      const dismissedKey = `firstRecommendationDismissed:${profile.id}`;
+      const dismissed = await AsyncStorage.getItem(dismissedKey);
+      if (dismissed || cancelled) return;
+      try {
+        const res = await fetch(`${getApiUrl()}/plans/recommended/${profile.id}`);
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data) && data.length > 0) {
+          setFirstRecommendation({ id: data[0].id, title: data[0].title, coverImageUrl: data[0].coverImageUrl ?? null, colorTheme: data[0].colorTheme ?? "#1D9E75" });
+        }
+      } catch {
+        // No recommendation available yet — not an error state, just nothing to show.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.id]);
+
+  const dismissRecommendation = useCallback(async () => {
+    setFirstRecommendation(null);
+    if (profile?.id) await AsyncStorage.setItem(`firstRecommendationDismissed:${profile.id}`, "true");
+  }, [profile?.id]);
+
+  const startRecommendation = useCallback(async () => {
+    if (!firstRecommendation) return;
+    const planId = firstRecommendation.id;
+    await dismissRecommendation();
+    if (!profile?.id) { router.push(`/plan/${planId}` as any); return; }
+    const { data } = await supabase.from("p2p_plan_enrollments").select("id").eq("user_id", profile.id).eq("plan_id", planId).maybeSingle();
+    if (data) router.push(`/plan/${planId}` as any);
+    else router.push(`/plans/pre-plan-questions?planId=${planId}` as any);
+  }, [firstRecommendation, profile?.id, router, dismissRecommendation]);
 
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   const hour = new Date().getHours();
@@ -387,6 +478,17 @@ export default function HomeTab() {
           router.push("/(tabs)/learn");
         }}
       />
+
+      {/* First recommendation (one-time, based on onboarding goals) */}
+      {firstRecommendation && (
+        <FirstRecommendationCard
+          rec={firstRecommendation}
+          onStart={startRecommendation}
+          onSeeAll={() => { dismissRecommendation(); router.push("/plans?tab=find" as any); }}
+          onDismiss={dismissRecommendation}
+          colors={colors}
+        />
+      )}
 
       {/* Daily Verse */}
       {dailyVerse && (
