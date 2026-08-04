@@ -6,16 +6,14 @@ const router = Router();
 function mapProfile(row: Record<string, unknown>) {
   return {
     id: row.id,
-    displayName: row.display_name,
+    displayName: row.full_name,
     email: row.email,
-    avatarUrl: row.avatar_url ?? null,
-    city: row.city ?? null,
+    avatarUrl: row.photo_url ?? null,
     country: row.country ?? null,
-    languageCode: row.language_code ?? "en",
+    languageCode: row.language ?? "en",
     growthLevel: row.growth_level ?? 0,
     role: row.role ?? "disciple",
     gifts: row.gifts ?? [],
-    mentorId: row.mentor_id ?? null,
     isPraying: row.is_praying ?? false,
     createdAt: row.created_at,
   };
@@ -42,10 +40,9 @@ router.patch("/:userId", async (req, res) => {
   const body = req.body as Record<string, unknown>;
 
   const dbUpdates: Record<string, unknown> = {};
-  if (body.displayName !== undefined) dbUpdates.display_name = body.displayName;
-  if (body.city !== undefined) dbUpdates.city = body.city;
+  if (body.displayName !== undefined) dbUpdates.full_name = body.displayName;
   if (body.country !== undefined) dbUpdates.country = body.country;
-  if (body.languageCode !== undefined) dbUpdates.language_code = body.languageCode;
+  if (body.languageCode !== undefined) dbUpdates.language = body.languageCode;
   if (body.growthLevel !== undefined) dbUpdates.growth_level = body.growthLevel;
   if (body.role !== undefined) dbUpdates.role = body.role;
   if (body.gifts !== undefined) dbUpdates.gifts = body.gifts;
@@ -80,11 +77,16 @@ router.get("/:userId/forest", async (req, res) => {
   }
 
   // Fetch discipleship links where user is mentor
-  const { data: links } = await supabase
+  const { data: links, error: linksErr } = await supabase
     .from("p2p_discipleship_links")
-    .select("disciple_id, is_active")
+    .select("disciple_id, active")
     .eq("mentor_id", userId)
-    .eq("is_active", true);
+    .eq("active", true);
+
+  if (linksErr) {
+    console.error("Forest query failed:", linksErr.message);
+    return res.status(500).json({ error: "Failed to load forest data" });
+  }
 
   // Fetch disciple profiles
   const discipleIds = (links ?? []).map((l: Record<string, unknown>) => l.disciple_id as string);
@@ -100,14 +102,14 @@ router.get("/:userId/forest", async (req, res) => {
   const rp = rootProfile as Record<string, unknown>;
   const forest = {
     id: rp.id,
-    name: rp.display_name,
+    name: rp.full_name,
     role: rp.role,
     growthLevel: rp.growth_level ?? 0,
     country: rp.country ?? null,
     depth: 0,
     children: disciples.map((d) => ({
       id: d.id,
-      name: d.display_name,
+      name: d.full_name,
       role: d.role,
       growthLevel: d.growth_level ?? 0,
       country: d.country ?? null,

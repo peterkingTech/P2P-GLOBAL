@@ -35,8 +35,8 @@ router.get("/tree", async (_req, res) => {
     { data: lessons, error: lErr },
   ] = await Promise.all([
     supabase.from("p2p_curriculums").select("*").order("created_at"),
-    supabase.from("p2p_modules").select("*").order("sort_order"),
-    supabase.from("p2p_lessons").select("id,module_id,title,subtitle,status,sort_order").order("sort_order"),
+    supabase.from("p2p_modules").select("*").order("order_index"),
+    supabase.from("p2p_lessons").select("id,module_id,title,subtitle,status,order_index").order("order_index"),
   ]);
   if (cErr || mErr || lErr) return err(res, (cErr ?? mErr ?? lErr)!.message);
 
