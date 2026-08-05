@@ -79,7 +79,7 @@ export default function SessionScreen() {
   const isCompleted = realSession?.status === "completed";
 
   async function handleMarkComplete() {
-    if (!realSession || completing) return;
+    if (!realSession || completing || !user) return;
     setCompleting(true);
     const { error } = await supabase
       .from("p2p_sessions")
@@ -90,6 +90,12 @@ export default function SessionScreen() {
       Alert.alert("Couldn't mark complete", error.message);
       return;
     }
+    const peerId = realSession.mentor_id === user.id ? realSession.participant_id : realSession.mentor_id;
+    void supabase.from("p2p_user_activity_events").insert({
+      user_id: user.id,
+      event_type: "session_held",
+      metadata: { session_id: realSession.id, peer_id: peerId },
+    });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await loadRealSession();
   }

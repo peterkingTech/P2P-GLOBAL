@@ -139,6 +139,7 @@ function SubmitterContextCard({ context }: { context: SubmitterEvaluationContext
 
 function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
   const { resolveEvaluation, getSubmitterEvaluationContext } = useData();
+  const { user } = useAuth();
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState<"approved" | "needs_revision" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -156,13 +157,26 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
     if (submitting) return;
     setSubmitting(status);
     setError(null);
-    const err = await resolveEvaluation(evaluation.id, status, feedback.trim());
+    const trimmedFeedback = feedback.trim();
+    const err = await resolveEvaluation(evaluation.id, status, trimmedFeedback);
     // Reset on both outcomes — on success the card is about to unmount as this
     // evaluation drops out of pendingEvaluations, but leaving `submitting` set
     // left the button permanently disabled for any render that happens first.
     setSubmitting(null);
     if (err) setError(err);
-    else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Encouraging feedback = approved with real written feedback attached
+      // (same "genuine encouragement" heuristic as the Encouragement Fruit
+      // trigger in migration 036: written feedback, not just approve/reject).
+      if (status === "approved" && trimmedFeedback.length > 0 && user) {
+        void supabase.from("p2p_user_activity_events").insert({
+          user_id: user.id,
+          event_type: "peer_encouraged",
+          metadata: { target_user_id: evaluation.submitterId, context: "lesson_evaluation" },
+        });
+      }
+    }
   }
 
   const isMedia = evaluation.submissionType === "audio" || evaluation.submissionType === "video";

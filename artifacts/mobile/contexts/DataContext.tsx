@@ -57,6 +57,27 @@ export interface Plan {
   lessonCount: number;
 }
 
+// ── 7 Mountains mapping (Dashboard activity tracking) ───────────────────────
+// p2p_curriculums has no dedicated category column, only freeform `tags` —
+// same honest, non-fabricated taxonomy substitute already used elsewhere in
+// this codebase (Plans hub category browsing, recommendation engine).
+const MOUNTAIN_MAP: Record<string, string> = {
+  business: "Marketplace",
+  education: "Education",
+  government: "Government",
+  media: "Media",
+  technology: "Innovation",
+  family: "Family",
+  church: "Church",
+};
+function getMountainForPlan(tags: string[]): string | null {
+  for (const tag of tags) {
+    const mountain = MOUNTAIN_MAP[tag.toLowerCase()];
+    if (mountain) return mountain;
+  }
+  return null;
+}
+
 // ── Kingdom School status (Core Curriculum rebrand) ─────────────────────────
 // Pure, stateless — callers pass in whatever counts they already have from
 // `modules` rather than this file computing them, since the same numbers are
@@ -761,6 +782,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           progressMap.set(p.id, total > 0 ? Math.round((done / total) * 100) : 0);
         }
         setPlanProgress(progressMap);
+
+        // Dashboard tracking (Prompt 7) — a plan that just reached 100% and
+        // whose enrollment isn't already marked completed fires plan_completed
+        // + mountain_touched exactly once, then flips the enrollment row so
+        // it never fires again for the same plan.
+        const completedPlanIds = builtPlans.filter((p) => (progressMap.get(p.id) ?? 0) === 100).map((p) => p.id);
+        if (completedPlanIds.length > 0) {
+          const { data: enrollments } = await supabase
+            .from("p2p_plan_enrollments")
+            .select("id, plan_id, status")
+            .eq("user_id", userId)
+            .in("plan_id", completedPlanIds);
+          const newlyCompleted = ((enrollments ?? []) as Record<string, unknown>[]).filter((e) => e.status !== "completed");
+          for (const enrollment of newlyCompleted) {
+            const plan = builtPlans.find((p) => p.id === enrollment.plan_id);
+            if (!plan) continue;
+            await supabase.from("p2p_plan_enrollments").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", enrollment.id as string);
+            await supabase.from("p2p_user_activity_events").insert({
+              user_id: userId, event_type: "plan_completed",
+              metadata: { plan_id: plan.id, plan_title: plan.title },
+            });
+            const mountain = getMountainForPlan(plan.tags);
+            if (mountain) {
+              await supabase.from("p2p_user_activity_events").insert({
+                user_id: userId, event_type: "mountain_touched",
+                metadata: { mountain_name: mountain, plan_id: plan.id },
+              });
+            }
+          }
+        }
       } else {
         setPlanProgress(new Map());
       }

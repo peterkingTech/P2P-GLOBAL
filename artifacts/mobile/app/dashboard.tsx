@@ -33,12 +33,32 @@ const CATEGORY_LABEL: Record<string, string> = {
   faithfulness: "Faithfulness", kingdom_influence: "Kingdom Influence", special: "Special", legendary: "Legendary",
 };
 
-function StatRow({ label, value, comingSoon, c }: { label: string; value: number | string; comingSoon?: boolean; c: AppColors }) {
+const SEVEN_MOUNTAINS = ["Marketplace", "Education", "Government", "Media", "Innovation", "Family", "Church"];
+
+function StatRow({ label, value, c }: { label: string; value: number | string; c: AppColors }) {
   const s = makeStyles(c);
   return (
     <View style={s.statRow}>
-      <Text style={s.statLabel}>{label}{comingSoon ? " (coming soon)" : ""}</Text>
-      <Text style={[s.statValue, comingSoon && { color: c.textMuted }]}>{value}</Text>
+      <Text style={s.statLabel}>{label}</Text>
+      <Text style={s.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+function MountainsGrid({ touched, c }: { touched: string[]; c: AppColors }) {
+  const s = makeStyles(c);
+  const touchedSet = new Set(touched);
+  return (
+    <View style={s.mountainsGrid}>
+      {SEVEN_MOUNTAINS.map((name) => {
+        const isTouched = touchedSet.has(name);
+        return (
+          <View key={name} style={[s.mountainTile, isTouched && s.mountainTileTouched]}>
+            <Ionicons name="triangle" size={16} color={isTouched ? "#fff" : c.textMuted} />
+            <Text style={[s.mountainTileText, isTouched && s.mountainTileTextTouched]}>{name}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -113,10 +133,10 @@ export default function GrowthDashboardScreen() {
           </SectionCard>
 
           <SectionCard title="🤝 Community Activity" c={colors}>
-            <StatRow label="Peer Sessions Held" value={data.peerSessionsHeld} comingSoon c={colors} />
-            <StatRow label="Peers Encouraged" value={data.peersEncouraged} comingSoon c={colors} />
-            <StatRow label="Prayers Offered for Others" value={data.prayersOfferedForOthers} comingSoon c={colors} />
-            <StatRow label="Scripture References Opened" value={data.scriptureReferencesOpened} comingSoon c={colors} />
+            <StatRow label="Peer Sessions Held" value={data.peerSessionsHeld} c={colors} />
+            <StatRow label="Peers Encouraged" value={data.peersEncouraged} c={colors} />
+            <StatRow label="Prayers Offered for Others" value={data.prayersOfferedForOthers} c={colors} />
+            <StatRow label="Scripture References Opened" value={data.scriptureReferencesOpened} c={colors} />
           </SectionCard>
 
           <SectionCard title="🌾 Multiplication Activity" c={colors}>
@@ -160,8 +180,9 @@ export default function GrowthDashboardScreen() {
           </SectionCard>
 
           <SectionCard title="🌍 Kingdom Influence" c={colors}>
-            <StatRow label="Kingdom Plans Completed" value={data.kingdomPlansCompleted} comingSoon c={colors} />
-            <StatRow label="Mountains Touched" value={data.mountainsTouched.length > 0 ? data.mountainsTouched.join(", ") : "None yet"} comingSoon c={colors} />
+            <StatRow label="Kingdom Plans Completed" value={data.kingdomPlansCompleted} c={colors} />
+            <Text style={[s.statLabel, { marginTop: 10, marginBottom: 8 }]}>Mountains Touched</Text>
+            <MountainsGrid touched={data.mountainsTouched} c={colors} />
           </SectionCard>
 
           {timelineEvents.length > 0 && (
@@ -226,5 +247,15 @@ function makeStyles(c: AppColors) {
     timelineLine: { flex: 1, width: 1, backgroundColor: c.borderBeige, marginTop: 2 },
     timelineLabel: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     timelineDate: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+    mountainsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    mountainTile: {
+      flexDirection: "row", alignItems: "center", gap: 6,
+      backgroundColor: c.cardBeige, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige,
+      paddingHorizontal: 10, paddingVertical: 7,
+    },
+    mountainTileTouched: { backgroundColor: c.amber, borderColor: c.amber },
+    mountainTileText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium" },
+    mountainTileTextTouched: { color: "#fff", fontFamily: "Inter_600SemiBold" },
   });
 }

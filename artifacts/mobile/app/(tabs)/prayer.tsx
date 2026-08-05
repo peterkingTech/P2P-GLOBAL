@@ -315,6 +315,14 @@ export default function PrayerTab() {
       : p
     ));
     await reactToPost(id, type);
+    if (type === "praying" && profile?.id) {
+      const post = posts.find((p) => p.id === id);
+      void supabase.from("p2p_user_activity_events").insert({
+        user_id: profile.id,
+        event_type: "prayer_offered",
+        metadata: { prayer_id: id, recipient_id: post?.userId ?? null },
+      });
+    }
   }
 
   async function handleAnswer(id: string) {

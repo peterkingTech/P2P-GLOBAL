@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Linking,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -676,13 +677,27 @@ export default function LessonScreen() {
             const displayText = fetched?.text ?? s.verse;
             const translationCode = fetched?.translationCode;
             return (
-              <View key={s.id} style={styles.verseCard}>
+              <TouchableOpacity
+                key={s.id}
+                style={styles.verseCard}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (user) {
+                    void supabase.from("p2p_user_activity_events").insert({
+                      user_id: user.id,
+                      event_type: "scripture_opened",
+                      metadata: { reference: s.reference, lesson_id: id },
+                    });
+                  }
+                  Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(s.reference)}`).catch(() => {});
+                }}
+              >
                 <Text style={styles.verseText}>"{displayText}"</Text>
                 <Text style={styles.verseRef}>
                   — {s.reference}
                   {translationCode ? ` (${translationCode})` : ""}
                 </Text>
-              </View>
+              </TouchableOpacity>
             );
           })}
 
