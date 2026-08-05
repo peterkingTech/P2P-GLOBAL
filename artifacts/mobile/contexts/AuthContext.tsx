@@ -70,6 +70,7 @@ export interface UserProfile {
   mission?: string;
   calling?: string;
   occupation?: string;
+  onboardingJourneyCompletedAt?: string;
 }
 
 interface AuthContextValue {
@@ -120,6 +121,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     mission: row.mission as string | undefined,
     calling: row.calling as string | undefined,
     occupation: row.occupation as string | undefined,
+    onboardingJourneyCompletedAt: row.onboarding_journey_completed_at as string | undefined,
   };
 }
 
@@ -230,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.mission !== undefined) dbUpdates.mission = updates.mission;
     if (updates.calling !== undefined) dbUpdates.calling = updates.calling;
     if (updates.occupation !== undefined) dbUpdates.occupation = updates.occupation;
+    if (updates.onboardingJourneyCompletedAt !== undefined) dbUpdates.onboarding_journey_completed_at = updates.onboardingJourneyCompletedAt;
 
     const { error } = await supabase
       .from("p2p_profiles")

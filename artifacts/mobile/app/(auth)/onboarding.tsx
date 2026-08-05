@@ -86,7 +86,12 @@ export default function OnboardingScreen() {
 
   function goNext() {
     if (isLast) {
-      router.replace("/(auth)/login");
+      // The marketing carousel is the pre-login introduction to Kingdom
+      // School — it must lead into registration, not skip straight to
+      // login. The real Integration and Onboarding Journey (Meet Your Peer
+      // Guide, Share Your Story, Pray Together, Plant Your Tree, Begin
+      // Module 1) only happens after registration + profile setup.
+      router.replace("/(auth)/register");
     } else {
       const next = current + 1;
       listRef.current?.scrollToIndex({ index: next, animated: true });
@@ -168,13 +173,16 @@ export default function OnboardingScreen() {
 
       {/* CTA */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+        {isLast && (
+          <Text style={styles.kingdomSchoolIntro}>{t("onboarding.kingdomSchoolIntro")}</Text>
+        )}
         <TouchableOpacity
           style={styles.btn}
           onPress={goNext}
           activeOpacity={0.85}
         >
           <Text style={styles.btnText}>
-            {isLast ? t("onboarding.getStarted") : t("onboarding.continue")}
+            {isLast ? t("onboarding.createAccount") : t("onboarding.continue")}
           </Text>
           <Ionicons name="arrow-forward" size={18} color={colors.cream} />
         </TouchableOpacity>
@@ -193,7 +201,7 @@ export default function OnboardingScreen() {
             <Text style={styles.discoverBtnText}>{t("onboarding.discoverMore")}</Text>
           </TouchableOpacity>
         )}
-        {current === 0 && (
+        {(current === 0 || isLast) && (
           <TouchableOpacity
             onPress={() => router.replace("/(auth)/login")}
             style={styles.skipBtn}
@@ -338,6 +346,10 @@ const styles = StyleSheet.create({
   dots: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 32 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   footer: { paddingHorizontal: 24, gap: 14 },
+  kingdomSchoolIntro: {
+    fontSize: 12, color: colors.lightGreen, textAlign: "center",
+    fontFamily: "Inter_400Regular", opacity: 0.8, lineHeight: 18, marginBottom: -2,
+  },
   btn: {
     backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

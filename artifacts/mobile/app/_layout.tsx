@@ -30,8 +30,11 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 // Screens inside (auth) that authenticated users are allowed to stay on
-// (post-signup setup flows)
-const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake"]);
+// (post-signup setup flows). "goals-onboarding" and "journey" were missing
+// here before — an authenticated user landing on either got immediately
+// bounced back to /(tabs) by the effect below (isAuthenticated && inAuth &&
+// !inSetupFlow), since AUTH_SETUP_SCREENS didn't know about them yet.
+const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey"]);
 
 function AuthGate() {
   const { isAuthenticated, isLoading, profile } = useAuth();
@@ -78,10 +81,24 @@ function AuthGate() {
 
     if (!isAuthenticated && !inAuth && !isAdminRoute) {
       router.replace("/(auth)/onboarding");
-    } else if (isAuthenticated && inAuth && !inSetupFlow) {
+      return;
+    }
+    if (!isAuthenticated || isAdminRoute) return;
+    // Wait for the profile fetch to resolve before deciding where an
+    // authenticated user belongs — deciding early (while profile is still
+    // null) risks a flicker-route to /(tabs) immediately followed by a
+    // bounce back into /journey once the real profile arrives.
+    if (!profile) return;
+
+    const onJourneyScreen = inAuth && screenName === "journey";
+    const journeyIncomplete = !profile.onboardingJourneyCompletedAt;
+
+    if (journeyIncomplete && !inSetupFlow && !onJourneyScreen) {
+      router.replace("/(auth)/journey" as any);
+    } else if (!journeyIncomplete && inAuth && !inSetupFlow) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, profile]);
 
   return (
     <Stack

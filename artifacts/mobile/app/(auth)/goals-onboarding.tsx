@@ -66,7 +66,7 @@ export default function GoalsOnboardingScreen() {
   function goNext() { setStep((s) => Math.min(4, s + 1) as Step); }
 
   async function finish() {
-    if (!profile?.id) { router.replace("/(tabs)"); return; }
+    if (!profile?.id) { router.replace("/(auth)/journey" as any); return; }
     setSaving(true);
     try {
       const { data: existing } = await supabase.from("p2p_user_goals").select("*").eq("user_id", profile.id).maybeSingle();
@@ -91,12 +91,12 @@ export default function GoalsOnboardingScreen() {
       // Best-effort — never block entry to the app on a save failure.
     } finally {
       setSaving(false);
-      router.replace("/(tabs)");
+      router.replace("/(auth)/journey" as any);
     }
   }
 
   function skip() {
-    router.replace("/(tabs)");
+    router.replace("/(auth)/journey" as any);
   }
 
   return (
