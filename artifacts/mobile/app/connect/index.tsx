@@ -18,8 +18,8 @@ const MATCH_PATHS = [
   {
     id: "smart",
     icon: "sparkles" as const,
-    title: "Smart Match",
-    subtitle: "Matched partner based on your gifts & country",
+    title: "Find a Peer Guide",
+    subtitle: "Matched by language, timezone, and availability",
     color: colors.primaryGreen,
     route: "/connect/smart-match" as const,
   },
@@ -106,6 +106,21 @@ export default function ConnectHub() {
             </View>
             <Text style={styles.pathTitle}>Pending Confirmations</Text>
             <Text style={styles.pathSub}>Confirm real encouragement, prayer, and peer sessions</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pathCard}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/peer-guide-requests" as any);
+            }}
+          >
+            <View style={[styles.pathIconRing, { backgroundColor: `${colors.amber}18`, borderColor: `${colors.amber}33` }]}>
+              <Ionicons name="people-circle" size={28} color={colors.amber} />
+            </View>
+            <Text style={styles.pathTitle}>Peer Guide Requests</Text>
+            <Text style={styles.pathSub}>Accept or decline learners asking you to guide them</Text>
           </TouchableOpacity>
         </View>
 
