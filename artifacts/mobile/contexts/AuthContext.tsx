@@ -51,7 +51,6 @@ export interface UserProfile {
   role: DiscipleRole;
   gifts: SpiritualGift[];
   skills: string[];
-  mentorId?: string;
   isPraying: boolean;
   createdAt: string;
   serviceScore: number;
@@ -102,10 +101,11 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     role: ((row.role as string) ?? "student") as DiscipleRole,
     gifts: ((row.gifts as string[]) ?? []) as SpiritualGift[],
     skills: (row.skills as string[]) ?? [],
-    mentorId: row.mentor_id as string | undefined,
     isPraying: (row.is_praying as boolean) ?? false,
     createdAt: (row.created_at as string) ?? new Date().toISOString(),
-    serviceScore: (row.servant_score as number) ?? 0,
+    // Column was renamed servant_score -> service_score in migration 026;
+    // this read was never updated to match, so serviceScore always read 0.
+    serviceScore: (row.service_score as number) ?? 0,
     wisdomPoints: (row.wisdom_points as number) ?? 0,
     dateOfBirth: row.date_of_birth as string | undefined,
     bio: row.bio as string | undefined,
