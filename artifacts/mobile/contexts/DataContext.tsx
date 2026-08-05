@@ -2524,6 +2524,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         duration_seconds: durationSeconds ?? null,
       });
       if (error) return error.message;
+      // Pastoral care (Elijah Protocol / Dormant Seed) reads last_active_at
+      // to detect inactivity — best-effort, never blocks the real submission.
+      void supabase.from("p2p_profiles").update({ last_active_at: new Date().toISOString() }).eq("id", profile.id);
       // Covers the self-approval edge case (no evaluator available yet), where
       // the evaluation — and any resulting growth event — is created synchronously.
       await checkGrowthEvents(profile.id);

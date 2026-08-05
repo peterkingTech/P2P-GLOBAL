@@ -13,6 +13,7 @@ import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
 import bibleRouter from "./bible";
 import circlesRouter from "./circles";
+import pastoralCareRouter from "./pastoralCare";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use("/registration", registrationRouter);
 router.use("/translations", translationsRouter);
 router.use("/bible", bibleRouter);
 router.use("/circles", circlesRouter);
+router.use("/pastoral-care", pastoralCareRouter);
 
 export default router;

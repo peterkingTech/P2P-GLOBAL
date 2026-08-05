@@ -156,6 +156,26 @@ function FirstRecommendationCard({ rec, onStart, onSeeAll, onDismiss, colors }: 
   );
 }
 
+// Surfaces an unresponded Elijah Protocol pastoral-care message (see
+// GET /pastoral-care/pending/:userId). This app has no push-notification
+// tap-routing infrastructure, so this Home-screen card — not a notification
+// tap — is the real way a returning user reaches elijah-response.tsx.
+function ElijahCheckInCard({ onPress, colors }: { onPress: () => void; colors: any }) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.elijahIconWrap}>
+        <Ionicons name="leaf-outline" size={20} color={colors.amber} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.elijahTitle}>We noticed you have been quiet</Text>
+        <Text style={styles.elijahSub}>Tap to see a gentle word — no pressure.</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.amber} />
+    </TouchableOpacity>
+  );
+}
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -282,6 +302,15 @@ function makeStyles(c: AppColors) {
     recStartBtnText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     recSeeAllText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
 
+    elijahCard: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: "rgba(224,164,65,0.08)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(224,164,65,0.25)",
+      padding: 14, marginBottom: 16,
+    },
+    elijahIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(224,164,65,0.15)", alignItems: "center", justifyContent: "center" },
+    elijahTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    elijahSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+
     evalCard: {
       backgroundColor: "rgba(224,164,65,0.1)",
       borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -336,6 +365,22 @@ export default function HomeTab() {
   const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
 
   const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
+  const [pendingElijahCheckIn, setPendingElijahCheckIn] = useState(false);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiUrl()}/pastoral-care/pending/${profile.id}`);
+        const data = await res.json();
+        if (!cancelled) setPendingElijahCheckIn(!!data);
+      } catch {
+        // Not critical — the card simply doesn't show this load.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -468,6 +513,17 @@ export default function HomeTab() {
           </Text>
         )}
       </View>
+
+      {/* Elijah Protocol check-in, if pastoral care has flagged one */}
+      {pendingElijahCheckIn && (
+        <ElijahCheckInCard
+          colors={colors}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/elijah-response" as any);
+          }}
+        />
+      )}
 
       {/* Kingdom School status */}
       <KingdomSchoolCard

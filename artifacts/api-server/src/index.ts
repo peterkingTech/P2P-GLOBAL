@@ -1,5 +1,7 @@
+import cron from "node-cron";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { detectInactiveUsers } from "./lib/pastoralCare";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -32,4 +34,15 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+});
+
+// Elijah Protocol + Dormant Seed pastoral care — daily inactivity scan.
+cron.schedule("0 6 * * *", async () => {
+  logger.info("Running pastoral care check...");
+  try {
+    const result = await detectInactiveUsers();
+    logger.info(result, "Pastoral care check complete");
+  } catch (err) {
+    logger.error({ err }, "Pastoral care check failed");
+  }
 });

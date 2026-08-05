@@ -160,7 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.user) {
+      // Pastoral care (Elijah Protocol / Dormant Seed) reads last_active_at
+      // to detect inactivity — best-effort, never blocks the real sign-in.
+      void supabase.from("p2p_profiles").update({ last_active_at: new Date().toISOString() }).eq("id", data.user.id);
+    }
     return error ? error.message : null;
   }, []);
 
