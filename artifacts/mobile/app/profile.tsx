@@ -31,6 +31,7 @@ import { HelpButton } from "@/components/HelpButton";
 import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
+import LivingTree, { stageLabel } from "@/components/LivingTree";
 import "@/lib/i18n";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
@@ -103,6 +104,19 @@ function makeStyles(c: AppColors) {
     statNum: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
     statLabel: { fontSize: 11, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
     statDivider: { width: 1, height: 32, backgroundColor: c.borderBeige },
+    treeMiniCard: {
+      alignItems: "center", backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 14, marginBottom: 16,
+    },
+    treeMiniLabel: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 4 },
+    completionBadgeCard: {
+      backgroundColor: "rgba(224,164,65,0.1)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
+      padding: 14, marginBottom: 16,
+    },
+    completionBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    completionBadgeTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    completionBadgeDate: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
+    completionBadgeSub: { fontSize: 12, color: c.amber, fontFamily: "Inter_600SemiBold", marginTop: 2 },
     sectionTitle: { fontSize: 14, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
     rowsList: { gap: 10, marginBottom: 28 },
     fullRow: {
@@ -232,7 +246,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, pendingConfirmationCount, modules } = useData();
+  const { submitHelpRequest, pendingConfirmationCount, modules, treeData } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
@@ -363,6 +377,32 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>{t("profile.servantScore")}</Text>
           </View>
         </View>
+
+        {/* Living Tree — compact real SVG tree (what other users see when
+            they view this profile — the profile owner's tree, not the
+            viewer's). */}
+        {treeData && (
+          <View style={styles.treeMiniCard}>
+            <LivingTree treeData={treeData} compact />
+            <Text style={styles.treeMiniLabel}>{stageLabel(treeData.growthStage)}</Text>
+          </View>
+        )}
+
+        {/* Completion badge */}
+        {profile?.curriculumCompletedAt && (
+          <View style={styles.completionBadgeCard}>
+            <View style={styles.completionBadgeRow}>
+              <Ionicons name="ribbon" size={18} color={colors.amber} />
+              <Text style={styles.completionBadgeTitle}>Foundation Complete</Text>
+            </View>
+            <Text style={styles.completionBadgeDate}>
+              Completed {new Date(profile.curriculumCompletedAt).toLocaleDateString(undefined, { year: "numeric", month: "long" })}
+            </Text>
+            {profile.isPeerGuideEligible && (
+              <Text style={styles.completionBadgeSub}>Now Guiding Others</Text>
+            )}
+          </View>
+        )}
 
         {/* Kingdom School */}
         <TouchableOpacity style={styles.ksCard} activeOpacity={0.85} onPress={() => router.push("/(tabs)/learn" as any)}>

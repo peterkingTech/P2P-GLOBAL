@@ -5,9 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Platform,
-  useWindowDimensions,
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -17,10 +15,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
-import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
+import LivingTree, { stageLabel } from "@/components/LivingTree";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -84,9 +83,8 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
 export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
   const { profile } = useAuth();
-  const { forestNodes, forestStats, isLoading } = useData();
+  const { forestNodes, forestStats, isLoading, treeData, treeMentees, fruitCatalog, userFruits } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
   const [tab, setTab] = useState<"tree" | "forest">(params.tab === "forest" ? "forest" : "tree");
   const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
@@ -147,6 +145,13 @@ export default function LivingTreeScreen() {
   }
   const isForestBuilder = stageIndex === 4;
   const isForestOfNations = stageIndex >= 5;
+
+  const categoryByFruitKey = new Map(fruitCatalog.map((f) => [f.fruitKey, f.category]));
+  const treeFruits = userFruits.map((f) => ({
+    fruitKey: f.fruitKey,
+    category: categoryByFruitKey.get(f.fruitKey) ?? "special",
+    awardedAt: f.awardedAt,
+  }));
 
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>
@@ -237,17 +242,30 @@ export default function LivingTreeScreen() {
             )}
           </View>
 
-          <View style={[styles.photoCard, { height: Math.min(screenWidth - 40, 380) }]}>
-            <Image source={STAGE_IMAGES[stageIndex]} style={styles.photo} resizeMode="cover" />
-            <TouchableOpacity style={styles.watchBtn} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
-              <Ionicons name="play" size={12} color="#fff" />
-              <Text style={styles.watchBtnText}>Watch growth</Text>
-            </TouchableOpacity>
-            <View style={styles.photoBottomLabel}>
-              <Text style={styles.photoLabelEmoji}>{stage.emoji}</Text>
-              <Text style={styles.photoLabelText}>{stage.name}</Text>
+          {treeData ? (
+            <View style={styles.treeCard}>
+              <LivingTree
+                treeData={treeData}
+                mentees={treeMentees}
+                fruits={treeFruits}
+                onTapFruit={(fruitKey) => router.push(`/fruit/${fruitKey}` as any)}
+              />
+              <Text style={styles.treeStageLabel}>{stageLabel(treeData.growthStage)}</Text>
+              <View style={styles.treeStatsRow}>
+                <Text style={styles.treeStatItem}>{treeData.fruitCount} fruit</Text>
+                <Text style={styles.treeStatDot}>·</Text>
+                <Text style={styles.treeStatItem}>{treeData.activeMentees} mentee{treeData.activeMentees === 1 ? "" : "s"}</Text>
+              </View>
+              <TouchableOpacity style={styles.watchBtnInline} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
+                <Ionicons name="play" size={12} color={colors.primaryGreen} />
+                <Text style={styles.watchBtnInlineText}>Watch growth</Text>
+              </TouchableOpacity>
             </View>
-          </View>
+          ) : (
+            <View style={[styles.treeCard, styles.loading]}>
+              <ActivityIndicator color={colors.accentGreen} />
+            </View>
+          )}
 
           <View style={styles.descSection}>
             <Text style={styles.descText}>{stage.description}</Text>
@@ -270,6 +288,11 @@ export default function LivingTreeScreen() {
               <Text style={styles.tapHint}>Tap the roots, trunk, branches, canopy, or fruit to explore each one.</Text>
             </View>
           )}
+
+          <TouchableOpacity style={styles.allStagesBtn} onPress={() => setTab("forest")} activeOpacity={0.8}>
+            <Text style={styles.allStagesBtnText}>View My Forest</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primaryGreen} />
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.allStagesBtn} onPress={() => router.push("/stages")} activeOpacity={0.8}>
             <Text style={styles.allStagesBtnText}>The Six Stages of Growth</Text>
@@ -384,19 +407,19 @@ const styles = StyleSheet.create({
   progressBarFill: { height: 6, backgroundColor: colors.progressFill, borderRadius: 3 },
   pointsHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
-  photoCard: { borderRadius: 16, overflow: "hidden", marginBottom: 20, position: "relative" },
-  photo: { width: "100%", height: "100%" },
-  watchBtn: {
-    position: "absolute", top: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+  treeCard: {
+    borderRadius: 16, marginBottom: 20, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.borderBeige, alignItems: "center", paddingVertical: 20,
   },
-  watchBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" },
-  photoBottomLabel: { position: "absolute", bottom: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6 },
-  photoLabelEmoji: { fontSize: 16 },
-  photoLabelText: {
-    color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold",
-    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  treeStageLabel: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
+  treeStatsRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  treeStatItem: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  treeStatDot: { color: colors.textMuted },
+  watchBtnInline: {
+    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14,
+    borderWidth: 1, borderColor: colors.primaryGreen, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
   },
+  watchBtnInlineText: { color: colors.primaryGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   descSection: { marginBottom: 20 },
   descText: { fontSize: 15, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 24, marginBottom: 12 },

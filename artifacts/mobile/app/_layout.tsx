@@ -156,12 +156,34 @@ function GrowthCelebrationHost() {
   );
 }
 
+// The Completion Moment (Prompt 6) — DataContext sets pendingCompletionMoment
+// the instant a user's 12th Core Curriculum module is detected complete, but
+// navigation must never interrupt a lesson mid-session. This host just waits
+// until the user isn't on a lesson screen, then fires the one-time
+// navigation and clears the flag so it can't re-fire.
+function CompletionMomentHost() {
+  const { pendingCompletionMoment, dismissPendingCompletionMoment } = useData();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (!pendingCompletionMoment) return;
+    if (segments[0] === "lesson") return; // still mid-lesson — wait for the session to end
+    dismissPendingCompletionMoment();
+    router.push("/completion" as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCompletionMoment, segments]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
       <DataProvider>
         <AuthGate />
         <GrowthCelebrationHost />
+        <CompletionMomentHost />
       </DataProvider>
     </AuthProvider>
   );

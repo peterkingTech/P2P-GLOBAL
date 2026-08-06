@@ -330,6 +330,93 @@ export interface ForestNode {
   children: ForestNode[];
 }
 
+// ── Living Tree (real SVG visualization) ────────────────────────────────────
+export type GrowthStage = "seed" | "sprout" | "young_tree" | "fruitful_tree" | "forest_builder";
+export type HealthStatus = "healthy" | "drought" | "wilting" | "dormant";
+
+export interface MenteeBranchInfo {
+  id: string;
+  name: string;
+  currentModule: string | null;
+  daysAgo: number;
+  isWilting: boolean;
+}
+
+export interface TreeData {
+  lessonsCompleted: number;
+  modulesCompleted: number;
+  activeDays: number;
+  activeMentees: number;
+  wiltingMentees: number;
+  fruitCount: number;
+  fruitKeys: string[];
+  secondGenDisciples: number;
+  lastActiveAt: string | null;
+  joinedAt: string | null;
+  streakDays: number;
+  rootDepth: number;
+  trunkHeight: number;
+  branchCount: number;
+  canopySize: number;
+  growthStage: GrowthStage;
+  healthStatus: HealthStatus;
+  daysInactive: number;
+}
+
+function computeGrowthStage(modulesCompleted: number, activeMentees: number, fruitCount: number, secondGenDisciples: number): GrowthStage {
+  // Checked from most- to least-advanced — the given rules overlap (e.g. a
+  // fruitful_tree case also satisfies young_tree), so the highest qualifying
+  // stage must win.
+  if (modulesCompleted === 12 && secondGenDisciples >= 1) return "forest_builder";
+  if (modulesCompleted >= 9 && activeMentees >= 2 && fruitCount >= 5) return "fruitful_tree";
+  if (modulesCompleted >= 4 && activeMentees >= 1) return "young_tree";
+  if (modulesCompleted >= 1 || activeMentees >= 1) return "sprout";
+  return "seed";
+}
+
+function computeHealthStatus(daysInactive: number): HealthStatus {
+  // dormant's range (>=60) is a subset of wilting's stated range (>=30), so
+  // the more severe status must be checked first.
+  if (daysInactive >= 60) return "dormant";
+  if (daysInactive >= 30) return "wilting";
+  if (daysInactive >= 14) return "drought";
+  return "healthy";
+}
+
+function buildTreeData(raw: Record<string, unknown>): TreeData {
+  const modulesCompleted = (raw.modulesCompleted as number) ?? 0;
+  const activeMentees = (raw.activeMentees as number) ?? 0;
+  const wiltingMentees = (raw.wiltingMentees as number) ?? 0;
+  const fruitCount = (raw.fruitCount as number) ?? 0;
+  const secondGenDisciples = (raw.secondGenDisciples as number) ?? 0;
+  const activeDays = (raw.activeDays as number) ?? 0;
+  const lastActiveAt = (raw.lastActiveAt as string) ?? null;
+  const daysInactive = lastActiveAt
+    ? Math.floor((Date.now() - new Date(lastActiveAt).getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
+
+  return {
+    lessonsCompleted: (raw.lessonsCompleted as number) ?? 0,
+    modulesCompleted,
+    activeDays,
+    activeMentees,
+    wiltingMentees,
+    fruitCount,
+    fruitKeys: (raw.fruitKeys as string[]) ?? [],
+    secondGenDisciples,
+    lastActiveAt,
+    joinedAt: (raw.joinedAt as string) ?? null,
+    streakDays: (raw.streakDays as number) ?? 0,
+    rootDepth: Math.min(modulesCompleted, 12),
+    trunkHeight: Math.min(100, Math.round((activeDays / 60) * 100)),
+    branchCount: activeMentees,
+    canopySize: activeMentees + secondGenDisciples,
+    growthStage: computeGrowthStage(modulesCompleted, activeMentees, fruitCount, secondGenDisciples),
+    healthStatus: computeHealthStatus(daysInactive),
+    daysInactive,
+  };
+}
+
 // A catalog row describes every possible fruit, earned or not — the display
 // screen merges this with a user's earned rows and progress rows to render
 // the full "My Fruits" journey (see app/fruit.tsx and app/fruit/[fruitKey].tsx).
@@ -536,6 +623,11 @@ interface DataContextValue {
   sessions: StudySession[];
   forestNodes: ForestNode[];
   forestStats: ForestStats;
+  treeData: TreeData | null;
+  treeMentees: MenteeBranchInfo[];
+  refreshTreeData: () => Promise<void>;
+  pendingCompletionMoment: boolean;
+  dismissPendingCompletionMoment: () => void;
   fruitCatalog: FruitCatalogEntry[];
   userFruits: EarnedFruit[];
   fruitProgress: FruitProgressEntry[];
@@ -690,6 +782,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     hasDiscipleMaker: false,
     countriesReached: [],
   });
+  const [treeData, setTreeData] = useState<TreeData | null>(null);
+  const [treeMentees, setTreeMentees] = useState<MenteeBranchInfo[]>([]);
+  const [pendingCompletionMoment, setPendingCompletionMoment] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
   // 0-100 completion percentage per plan id — computed from the same
@@ -1333,6 +1428,100 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Living Tree real data (Prompt 5) — get_user_tree_data RPC (migration 051)
+  // + the mentee list used for branch tap tooltips.
+  const loadTreeData = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc("get_user_tree_data", { p_user_id: userId });
+      if (error || !data) { setTreeData(null); return; }
+      setTreeData(buildTreeData(data as Record<string, unknown>));
+    } catch {
+      setTreeData(null);
+    }
+
+    try {
+      const { data: links } = await supabase
+        .from("p2p_discipleship_links")
+        .select("disciple_id")
+        .eq("mentor_id", userId)
+        .eq("active", true);
+      const discipleIds = ((links ?? []) as Record<string, unknown>[]).map((l) => l.disciple_id as string);
+      if (discipleIds.length === 0) { setTreeMentees([]); return; }
+
+      // profiles_select_scoped (migration 046) already lets a mentor read
+      // their active disciples' profiles — growth_level is used here as an
+      // honest stand-in for "current module," since reading another user's
+      // literal lesson-by-lesson progress would need RLS surface area this
+      // app doesn't grant a mentor today.
+      const { data: menteeProfiles } = await supabase
+        .from("p2p_profiles")
+        .select("id, full_name, growth_level, last_active_at")
+        .in("id", discipleIds);
+
+      const mentees: MenteeBranchInfo[] = ((menteeProfiles ?? []) as Record<string, unknown>[]).map((p) => {
+        const lastActive = p.last_active_at as string | null;
+        const daysAgo = lastActive ? Math.floor((Date.now() - new Date(lastActive).getTime()) / (24 * 60 * 60 * 1000)) : 0;
+        return {
+          id: p.id as string,
+          name: (p.full_name as string) ?? "A disciple",
+          currentModule: `Level ${(p.growth_level as number) ?? 0}`,
+          daysAgo,
+          isWilting: daysAgo >= 14,
+        };
+      });
+      setTreeMentees(mentees);
+    } catch {
+      setTreeMentees([]);
+    }
+  }, []);
+
+  // The Completion Moment (Prompt 6) — fires exactly once, the moment all 12
+  // Core Curriculum modules (order_index 1-12; 0 is the orientation module,
+  // same convention as the Maturity Fruit trigger) are fully complete.
+  // Setting curriculum_completed_at happens immediately here; the actual
+  // navigation to the cinematic screen is deferred (see
+  // pendingCompletionMoment / CompletionMomentHost in _layout.tsx) so it
+  // never interrupts a lesson mid-session.
+  const checkCurriculumCompletion = useCallback(async (userId: string) => {
+    try {
+      const { data: profileRow } = await supabase.from("p2p_profiles").select("curriculum_completed_at").eq("id", userId).maybeSingle();
+      if ((profileRow as Record<string, unknown> | null)?.curriculum_completed_at) return;
+
+      const { data: curriculumId } = await supabase.rpc("p2p_active_curriculum_id");
+      if (!curriculumId) return;
+
+      const { data: coreModules } = await supabase
+        .from("p2p_modules")
+        .select("id")
+        .eq("curriculum_id", curriculumId as string)
+        .gte("order_index", 1)
+        .lte("order_index", 12);
+      const moduleIds = ((coreModules ?? []) as Record<string, unknown>[]).map((m) => m.id as string);
+      if (moduleIds.length < 12) return;
+
+      const results = await Promise.all(
+        moduleIds.map((id) => supabase.rpc("p2p_module_fully_completed", { p_user_id: userId, p_module_id: id }))
+      );
+      const completedCount = results.filter((r) => r.data === true).length;
+      if (completedCount < 12) return;
+
+      await supabase.from("p2p_profiles").update({ curriculum_completed_at: new Date().toISOString() }).eq("id", userId);
+
+      await supabase.rpc("p2p_award_fruit", {
+        p_user_id: userId, p_fruit_key: "maturity_fruit", p_trigger_event: "curriculum_complete",
+        p_source_type: "milestone", p_source_id: null,
+        p_evidence: { summary: "Completed the entire 12-module Core Curriculum." },
+      });
+      await supabase.rpc("p2p_award_fruit", {
+        p_user_id: userId, p_fruit_key: "harvest_fruit", p_trigger_event: "curriculum_complete",
+        p_source_type: "milestone", p_source_id: null,
+        p_evidence: { summary: "Reached the harvest moment — ready to guide others." },
+      });
+
+      setPendingCompletionMoment(true);
+    } catch {}
+  }, []);
+
   const resetAllState = useCallback(() => {
     setModules([]);
     setLessons([]);
@@ -1478,6 +1667,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           growthLevel: profile.growthLevel, country: profile.country, depth: 0,
           children: [],
         });
+        await loadTreeData(profile.id);
+        // Catches the case a self-submission check can't: a peer evaluator
+        // approving this user's last lesson flips completion via a DB
+        // trigger (p2p_apply_evaluation_outcome), from the EVALUATOR's
+        // session, not this user's — so this user's own next app load is
+        // what actually catches it.
+        await checkCurriculumCompletion(profile.id);
       }
     } catch {
       setDailyVerse(DAILY_VERSES[0]);
@@ -1485,7 +1681,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork, loadTreeData, checkCurriculumCompletion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -2332,8 +2528,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       } catch (e) { console.error("markLessonComplete failed:", e); }
       await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
       await checkGrowthEvents(profile.id);
+      await checkCurriculumCompletion(profile.id);
+      void loadTreeData(profile.id);
     }
-  }, [profile, loadCurriculum, checkGrowthEvents]);
+  }, [profile, loadCurriculum, checkGrowthEvents, checkCurriculumCompletion, loadTreeData]);
 
   const refreshData = useCallback(() => loadData(), [loadData]);
 
@@ -2586,11 +2784,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // refetch, a submission shows 0 submitted and keeps the next lesson
       // locked until a manual refresh/app reload.
       await loadCurriculum(profile.id, profile.contentLanguage ?? "en");
+      await checkCurriculumCompletion(profile.id);
+      void loadTreeData(profile.id);
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : "Failed to submit.";
     }
-  }, [profile, checkGrowthEvents, loadCurriculum]);
+  }, [profile, checkGrowthEvents, loadCurriculum, checkCurriculumCompletion, loadTreeData]);
 
   const submitAssignment = useCallback(async (assignmentId: string, lessonId: string, content: string): Promise<string | null> => {
     return submitContent({ lessonId, assignmentId, type: "text", text: content });
@@ -2662,9 +2862,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
+  const refreshTreeData = useCallback(async () => {
+    if (profile?.id) await loadTreeData(profile.id);
+  }, [profile, loadTreeData]);
+
+  const dismissPendingCompletionMoment = useCallback(() => setPendingCompletionMoment(false), []);
+
   return (
     <DataContext.Provider value={{
       modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress, prayers, sessions, forestNodes, forestStats,
+      treeData, treeMentees, refreshTreeData, pendingCompletionMoment, dismissPendingCompletionMoment,
       fruitCatalog, userFruits, fruitProgress, fruitCount: userFruits.length, missions,
       dailyVerse, pendingEvaluations, isLoading,
       addPrayer, prayForRequest,

@@ -70,6 +70,8 @@ export interface UserProfile {
   calling?: string;
   occupation?: string;
   onboardingJourneyCompletedAt?: string;
+  curriculumCompletedAt?: string;
+  isPeerGuideEligible?: boolean;
 }
 
 interface AuthContextValue {
@@ -122,6 +124,8 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     calling: row.calling as string | undefined,
     occupation: row.occupation as string | undefined,
     onboardingJourneyCompletedAt: row.onboarding_journey_completed_at as string | undefined,
+    curriculumCompletedAt: row.curriculum_completed_at as string | undefined,
+    isPeerGuideEligible: (row.is_peer_guide_eligible as boolean) ?? false,
   };
 }
 
@@ -238,6 +242,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.calling !== undefined) dbUpdates.calling = updates.calling;
     if (updates.occupation !== undefined) dbUpdates.occupation = updates.occupation;
     if (updates.onboardingJourneyCompletedAt !== undefined) dbUpdates.onboarding_journey_completed_at = updates.onboardingJourneyCompletedAt;
+    if (updates.curriculumCompletedAt !== undefined) dbUpdates.curriculum_completed_at = updates.curriculumCompletedAt;
+    if (updates.isPeerGuideEligible !== undefined) dbUpdates.is_peer_guide_eligible = updates.isPeerGuideEligible;
 
     const { error } = await supabase
       .from("p2p_profiles")
