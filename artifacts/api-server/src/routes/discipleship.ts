@@ -98,6 +98,22 @@ router.post("/notify-peer-guide", async (req, res) => {
   return res.json({ notified: true });
 });
 
+// POST /discipleship/notify-user — direct, caller-supplied-userId
+// notification (no lookup). Same trust model as the rest of this non-admin
+// API (e.g. /plans/:planId/progress/:userId) — the caller's own client
+// already knows who they mean to notify (e.g. a peer guide sending their
+// learner the completion letter). Needed because p2p_notifications has no
+// client-facing INSERT policy for writing to someone else's user_id.
+router.post("/notify-user", async (req, res) => {
+  const { userId, title, message } = req.body as { userId?: string; title?: string; message?: string };
+  if (!userId || !title || !message) {
+    return res.status(400).json({ error: "userId, title, and message are required" });
+  }
+  const { error } = await supabaseWrite.from("p2p_notifications").insert({ user_id: userId, title, message });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ notified: true });
+});
+
 // ── Peer Guide Smart Matching ────────────────────────────────────────────────
 //
 // Continent lookup is a best-effort, honestly partial signal: p2p_profiles

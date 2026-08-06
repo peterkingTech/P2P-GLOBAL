@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
 const MATCH_PATHS = [
@@ -53,6 +54,7 @@ export default function ConnectHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { pendingConfirmationCount } = useData();
+  const { profile } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   return (
@@ -122,6 +124,23 @@ export default function ConnectHub() {
             <Text style={styles.pathTitle}>Peer Guide Requests</Text>
             <Text style={styles.pathSub}>Accept or decline learners asking you to guide them</Text>
           </TouchableOpacity>
+
+          {profile?.isPeerGuideEligible && (
+            <TouchableOpacity
+              style={styles.pathCard}
+              activeOpacity={0.85}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/graduates" as any);
+              }}
+            >
+              <View style={[styles.pathIconRing, { backgroundColor: `${colors.accentGreen}18`, borderColor: `${colors.accentGreen}33` }]}>
+                <Ionicons name="mail-open" size={28} color={colors.accentGreen} />
+              </View>
+              <Text style={styles.pathTitle}>Completion Letters</Text>
+              <Text style={styles.pathSub}>Write a letter for disciples who finished the Core Curriculum</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.tipCard}>

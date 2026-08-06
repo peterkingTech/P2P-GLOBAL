@@ -177,6 +177,25 @@ function ElijahCheckInCard({ onPress, colors }: { onPress: () => void; colors: a
   );
 }
 
+// One-time card set by completion.tsx's Phase4Commission the moment a user
+// becomes peer-guide eligible (see guideInvitationPending:<userId> in
+// AsyncStorage) — shown once, then cleared, never re-shown after that.
+function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void; onDismiss: () => void; colors: any }) {
+  const styles = makeStyles(colors);
+  return (
+    <View style={styles.guideInviteCard}>
+      <TouchableOpacity style={styles.recDismissBtn} onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
+      </TouchableOpacity>
+      <Text style={styles.guideInviteTitle}>Someone is waiting for a guide like you.</Text>
+      <Text style={styles.guideInviteSub}>Ready to meet them?</Text>
+      <TouchableOpacity style={styles.guideInviteBtn} onPress={onFind} activeOpacity={0.85}>
+        <Text style={styles.guideInviteBtnText}>Find Someone to Guide</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -299,6 +318,14 @@ function makeStyles(c: AppColors) {
     elijahTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     elijahSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
 
+    guideInviteCard: {
+      backgroundColor: "#0B1F19", borderRadius: 16, padding: 16, marginBottom: 16, position: "relative",
+    },
+    guideInviteTitle: { fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", paddingRight: 20 },
+    guideInviteSub: { fontSize: 13, color: "rgba(255,255,255,0.7)", fontFamily: "Inter_400Regular", marginTop: 4 },
+    guideInviteBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, alignSelf: "flex-start", marginTop: 14 },
+    guideInviteBtnText: { fontSize: 13, fontWeight: "700", color: "#0B1F19", fontFamily: "Inter_700Bold" },
+
     evalCard: {
       backgroundColor: "rgba(224,164,65,0.1)",
       borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
@@ -354,6 +381,21 @@ export default function HomeTab() {
 
   const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
   const [pendingElijahCheckIn, setPendingElijahCheckIn] = useState(false);
+  const [showGuideInvitation, setShowGuideInvitation] = useState(false);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    AsyncStorage.getItem(`guideInvitationPending:${profile.id}`).then((v) => {
+      if (!cancelled && v) setShowGuideInvitation(true);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [profile?.id]);
+
+  const dismissGuideInvitation = useCallback(async () => {
+    setShowGuideInvitation(false);
+    if (profile?.id) await AsyncStorage.removeItem(`guideInvitationPending:${profile.id}`);
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -508,6 +550,19 @@ export default function HomeTab() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/elijah-response" as any);
           }}
+        />
+      )}
+
+      {/* One-time invitation to guide, shown right after becoming peer-guide eligible */}
+      {showGuideInvitation && (
+        <GuideInvitationCard
+          colors={colors}
+          onFind={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            dismissGuideInvitation();
+            router.push("/connect/smart-match" as any);
+          }}
+          onDismiss={dismissGuideInvitation}
         />
       )}
 
