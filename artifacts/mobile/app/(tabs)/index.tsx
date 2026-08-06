@@ -8,6 +8,7 @@ import {
   Platform,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,10 +28,10 @@ import {
 import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { STAGES, getStageFromPoints } from "@/constants/stages";
+import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
-import LivingTree, { stageLabel } from "@/components/LivingTree";
+import LivingTree from "@/components/LivingTree";
 
 function ProgressRing({ pct, size = 56, strokeWidth = 6, color, track }: { pct: number; size?: number; strokeWidth?: number; color: string; track: string }) {
   const radius = (size - strokeWidth) / 2;
@@ -218,24 +219,40 @@ function makeStyles(c: AppColors) {
 
     treeCard: {
       borderRadius: 18,
+      overflow: "hidden",
+      height: 220,
       marginBottom: 12,
       position: "relative",
-      backgroundColor: c.card,
-      borderWidth: 1,
-      borderColor: c.borderBeige,
-      alignItems: "center",
-      paddingVertical: 16,
     },
-    miniTreeStageLabel: {
-      fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 6,
+    treePhoto: { width: "100%", height: "100%" },
+    treePhotoFallback: {
+      width: "100%", height: "100%", alignItems: "center", justifyContent: "center", backgroundColor: c.card,
     },
-    miniTreeFruitLabel: {
-      fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2,
+    stageOverlay: {
+      position: "absolute",
+      bottom: 14,
+      left: 14,
+      backgroundColor: "rgba(0,0,0,0.48)",
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    stageOverlayText: {
+      color: "#fff",
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+    },
+    stageOfText: {
+      color: "rgba(255,255,255,0.75)",
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      marginTop: 1,
     },
     arrowOverlay: {
       position: "absolute",
       top: 14,
       right: 14,
+      backgroundColor: "rgba(0,0,0,0.35)",
       width: 28,
       height: 28,
       borderRadius: 14,
@@ -382,6 +399,7 @@ export default function HomeTab() {
   const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
   const [pendingElijahCheckIn, setPendingElijahCheckIn] = useState(false);
   const [showGuideInvitation, setShowGuideInvitation] = useState(false);
+  const [treePhotoFailed, setTreePhotoFailed] = useState(false);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -497,7 +515,8 @@ export default function HomeTab() {
         </TouchableOpacity>
       </View>
 
-      {/* Living Tree — compact real SVG tree */}
+      {/* Living Tree — growth photo card (falls back to the SVG tree if the
+          image fails to load, e.g. offline) */}
       <TouchableOpacity
         style={[styles.treeCard, isTablet && { height: 260 }]}
         onPress={() => {
@@ -506,17 +525,26 @@ export default function HomeTab() {
         }}
         activeOpacity={0.9}
       >
-        {treeData ? (
-          <>
+        {!treePhotoFailed ? (
+          <Image
+            source={STAGE_IMAGES[stageIndex]}
+            style={styles.treePhoto}
+            resizeMode="cover"
+            onError={() => setTreePhotoFailed(true)}
+          />
+        ) : treeData ? (
+          <View style={styles.treePhotoFallback}>
             <LivingTree treeData={treeData} compact />
-            <Text style={styles.miniTreeStageLabel}>{stageLabel(treeData.growthStage)}</Text>
-            <Text style={styles.miniTreeFruitLabel}>{treeData.fruitCount} fruit</Text>
-          </>
+          </View>
         ) : (
           <ActivityIndicator color={colors.accentGreen} />
         )}
+        <View style={styles.stageOverlay}>
+          <Text style={styles.stageOverlayText}>{stage.emoji} {stage.name}</Text>
+          <Text style={styles.stageOfText}>{t("home.stageOf", { stage: stageIndex + 1 })}</Text>
+        </View>
         <View style={styles.arrowOverlay}>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={16} color="#fff" />
         </View>
       </TouchableOpacity>
 

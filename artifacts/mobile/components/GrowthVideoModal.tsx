@@ -31,6 +31,12 @@ export function GrowthVideoModal({
   const videoRef = useRef<Video>(null);
   const [reachedEnd, setReachedEnd] = useState(false);
   const hasSeekedRef = useRef(false);
+  // expo-av's `style` prop only sizes the outer wrapping View on web — the
+  // actual <video> element is sized by the separate `videoStyle` prop, which
+  // defaults to an absolute-fill that silently collapses to the browser's
+  // intrinsic 300x150 video size unless given explicit dimensions. Measure
+  // the wrap's real layout size and feed it through videoStyle to fix this.
+  const [videoAreaSize, setVideoAreaSize] = useState({ width: SW, height: SW });
 
   async function handleLoad() {
     if (hasSeekedRef.current) return;
@@ -59,11 +65,15 @@ export function GrowthVideoModal({
           <Ionicons name="close" size={26} color="#fff" />
         </TouchableOpacity>
 
-        <View style={styles.videoWrap}>
+        <View
+          style={styles.videoWrap}
+          onLayout={(e) => setVideoAreaSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        >
           <Video
             ref={videoRef}
             source={GROWTH_VIDEO_SOURCE}
             style={styles.video}
+            videoStyle={videoAreaSize}
             resizeMode={ResizeMode.COVER}
             isLooping={false}
             onLoad={handleLoad}

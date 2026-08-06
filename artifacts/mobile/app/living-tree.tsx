@@ -7,16 +7,18 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
-import { getWatchGrowthPlan } from "@/constants/growthVideo";
+import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VIDEO_STAGE_INDEX } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
 import LivingTree, { stageLabel } from "@/components/LivingTree";
@@ -83,13 +85,17 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
 export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { profile } = useAuth();
-  const { forestNodes, forestStats, isLoading, treeData, treeMentees, fruitCatalog, userFruits } = useData();
+  const { forestNodes, forestStats, isLoading, treeData } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
   const [tab, setTab] = useState<"tree" | "forest">(params.tab === "forest" ? "forest" : "tree");
   const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
   const [showForestTransition, setShowForestTransition] = useState(false);
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false);
   const autoTriggeredRef = useRef(false);
+  const heroVideoRef = useRef<Video>(null);
+  const heroSeekedRef = useRef(false);
 
   const growthPoints = profile?.growthLevel ?? 0;
   const stageIndex = getStageFromPoints(growthPoints);
@@ -130,6 +136,33 @@ export default function LivingTreeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.prevStage]);
 
+  // Ambient hero video — plays the current stage's segment of the growth
+  // video on a continuous loop (re-seeking to the segment start instead of
+  // pausing, unlike the one-shot GrowthVideoModal). Only stages 0-3 have
+  // footage (see constants/growthVideo.ts); stages 4-5 and any load failure
+  // fall back to the SVG tree.
+  const hasHeroVideo = stageIndex <= LAST_VIDEO_STAGE_INDEX && !heroVideoFailed;
+  const heroSegment = STAGE_VIDEO_SEGMENTS[Math.min(stageIndex, LAST_VIDEO_STAGE_INDEX)];
+
+  useEffect(() => {
+    heroSeekedRef.current = false;
+  }, [stageIndex]);
+
+  async function handleHeroLoad() {
+    if (heroSeekedRef.current) return;
+    heroSeekedRef.current = true;
+    await heroVideoRef.current?.setPositionAsync(heroSegment.start * 1000);
+    await heroVideoRef.current?.playAsync();
+  }
+
+  async function handleHeroStatus(status: AVPlaybackStatus) {
+    if (!status.isLoaded) return;
+    if (status.positionMillis >= heroSegment.end * 1000 - 80) {
+      await heroVideoRef.current?.setPositionAsync(heroSegment.start * 1000);
+      await heroVideoRef.current?.playAsync();
+    }
+  }
+
   const { modules } = useData();
   const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
   const countriesCount = forestStats.countriesReached.length;
@@ -145,13 +178,7 @@ export default function LivingTreeScreen() {
   }
   const isForestBuilder = stageIndex === 4;
   const isForestOfNations = stageIndex >= 5;
-
-  const categoryByFruitKey = new Map(fruitCatalog.map((f) => [f.fruitKey, f.category]));
-  const treeFruits = userFruits.map((f) => ({
-    fruitKey: f.fruitKey,
-    category: categoryByFruitKey.get(f.fruitKey) ?? "special",
-    awardedAt: f.awardedAt,
-  }));
+  const heroHeight = Math.min(screenWidth * 1.05, 320);
 
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>
@@ -175,6 +202,42 @@ export default function LivingTreeScreen() {
           <Text style={[styles.segmentText, tab === "forest" && styles.segmentTextActive]}>Global Forest</Text>
         </TouchableOpacity>
       </View>
+
+      {tab === "tree" && (
+        <View style={[styles.videoHero, { width: screenWidth, height: heroHeight }]}>
+          {hasHeroVideo ? (
+            <Video
+              ref={heroVideoRef}
+              source={GROWTH_VIDEO_SOURCE}
+              style={{ width: screenWidth, height: heroHeight }}
+              videoStyle={{ width: screenWidth, height: heroHeight }}
+              resizeMode={ResizeMode.COVER}
+              isMuted
+              isLooping={false}
+              shouldPlay
+              onLoad={handleHeroLoad}
+              onPlaybackStatusUpdate={handleHeroStatus}
+              onError={() => setHeroVideoFailed(true)}
+            />
+          ) : treeData ? (
+            <View style={[styles.videoHeroFallback, { width: screenWidth, height: heroHeight }]}>
+              <LivingTree treeData={treeData} compact />
+            </View>
+          ) : (
+            <View style={[styles.videoHeroPlayer, styles.loading, { width: screenWidth, height: heroHeight }]}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          )}
+          <View style={styles.videoHeroLabel}>
+            <Text style={styles.videoHeroEmoji}>{stage.emoji}</Text>
+            <Text style={styles.videoHeroText}>{stage.name}</Text>
+          </View>
+          <TouchableOpacity style={styles.videoHeroWatchBtn} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
+            <Ionicons name="play" size={12} color="#fff" />
+            <Text style={styles.videoHeroWatchBtnText}>Watch full growth story</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {tab === "tree" ? (
         <ScrollView
@@ -242,28 +305,14 @@ export default function LivingTreeScreen() {
             )}
           </View>
 
-          {treeData ? (
-            <View style={styles.treeCard}>
-              <LivingTree
-                treeData={treeData}
-                mentees={treeMentees}
-                fruits={treeFruits}
-                onTapFruit={(fruitKey) => router.push(`/fruit/${fruitKey}` as any)}
-              />
+          {treeData && (
+            <View style={styles.treeDataCard}>
               <Text style={styles.treeStageLabel}>{stageLabel(treeData.growthStage)}</Text>
               <View style={styles.treeStatsRow}>
                 <Text style={styles.treeStatItem}>{treeData.fruitCount} fruit</Text>
                 <Text style={styles.treeStatDot}>·</Text>
                 <Text style={styles.treeStatItem}>{treeData.activeMentees} mentee{treeData.activeMentees === 1 ? "" : "s"}</Text>
               </View>
-              <TouchableOpacity style={styles.watchBtnInline} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
-                <Ionicons name="play" size={12} color={colors.primaryGreen} />
-                <Text style={styles.watchBtnInlineText}>Watch growth</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={[styles.treeCard, styles.loading]}>
-              <ActivityIndicator color={colors.accentGreen} />
             </View>
           )}
 
@@ -407,19 +456,29 @@ const styles = StyleSheet.create({
   progressBarFill: { height: 6, backgroundColor: colors.progressFill, borderRadius: 3 },
   pointsHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
-  treeCard: {
-    borderRadius: 16, marginBottom: 20, backgroundColor: colors.card,
-    borderWidth: 1, borderColor: colors.borderBeige, alignItems: "center", paddingVertical: 20,
+  videoHero: { position: "relative", backgroundColor: "#0B0B0B", alignSelf: "center" },
+  videoHeroPlayer: { width: "100%", height: "100%" },
+  videoHeroFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.card },
+  videoHeroLabel: {
+    position: "absolute", bottom: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(0,0,0,0.48)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
   },
-  treeStageLabel: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
+  videoHeroEmoji: { fontSize: 16 },
+  videoHeroText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  videoHeroWatchBtn: {
+    position: "absolute", top: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  videoHeroWatchBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+
+  treeDataCard: {
+    borderRadius: 16, marginBottom: 20, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.borderBeige, alignItems: "center", paddingVertical: 16,
+  },
+  treeStageLabel: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   treeStatsRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
   treeStatItem: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   treeStatDot: { color: colors.textMuted },
-  watchBtnInline: {
-    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14,
-    borderWidth: 1, borderColor: colors.primaryGreen, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-  },
-  watchBtnInlineText: { color: colors.primaryGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   descSection: { marginBottom: 20 },
   descText: { fontSize: 15, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 24, marginBottom: 12 },
