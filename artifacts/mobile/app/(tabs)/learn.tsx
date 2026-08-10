@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import {
   useData,
   Module,
@@ -179,6 +179,73 @@ function PlanCard({ plan, progress, onPress }: { plan: Plan; progress: number; o
   );
 }
 
+type KingdomSchoolSection = "foundation" | "electives" | null;
+
+// The two-card selector at the top of Kingdom School — designed to feel
+// like tabs but built as premium cards, not a generic segmented control.
+// Only one of Foundation/Electives is expanded below at a time; tapping the
+// already-expanded card collapses it.
+function KingdomSchoolCards({
+  selected,
+  onSelect,
+  modulesCompleted,
+  totalModules,
+  foundationPct,
+  plansCount,
+  enrolledCount,
+}: {
+  selected: KingdomSchoolSection;
+  onSelect: (s: KingdomSchoolSection) => void;
+  modulesCompleted: number;
+  totalModules: number;
+  foundationPct: number;
+  plansCount: number;
+  enrolledCount: number;
+}) {
+  return (
+    <View style={cardSelectorStyles.row}>
+      <TouchableOpacity
+        style={[cardSelectorStyles.card, cardSelectorStyles.foundationCard, selected === "foundation" && cardSelectorStyles.cardSelected]}
+        activeOpacity={0.9}
+        onPress={() => onSelect(selected === "foundation" ? null : "foundation")}
+      >
+        <Ionicons name="book" size={22} color="#fff" />
+        <Text style={cardSelectorStyles.cardTitle}>Foundation</Text>
+        <Text style={cardSelectorStyles.cardSubtitle}>Core Curriculum</Text>
+        <Text style={cardSelectorStyles.cardInfo}>{modulesCompleted} of {totalModules} modules</Text>
+        <View style={cardSelectorStyles.progressBg}>
+          <View style={[cardSelectorStyles.progressFill, { width: `${foundationPct}%` as any }]} />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[cardSelectorStyles.card, cardSelectorStyles.electivesCard, selected === "electives" && cardSelectorStyles.cardSelected]}
+        activeOpacity={0.9}
+        onPress={() => onSelect(selected === "electives" ? null : "electives")}
+      >
+        <Ionicons name="star" size={22} color="#fff" />
+        <Text style={cardSelectorStyles.cardTitle}>Electives</Text>
+        <Text style={cardSelectorStyles.cardSubtitle}>Plans & Courses</Text>
+        <Text style={cardSelectorStyles.cardInfo}>{plansCount} plan{plansCount === 1 ? "" : "s"} available</Text>
+        <Text style={cardSelectorStyles.cardInfo}>{enrolledCount} enrolled</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const cardSelectorStyles = StyleSheet.create({
+  row: { flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 20 },
+  card: { flex: 1, borderRadius: 18, padding: 16, minHeight: 148, justifyContent: "space-between" },
+  cardSelected: { borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" },
+  foundationCard: { backgroundColor: "#1D4E2B" },
+  electivesCard: { backgroundColor: "#B8860B" },
+  cardTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10 },
+  cardSubtitle: { fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_500Medium", marginTop: 2 },
+  cardInfo: { fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", marginTop: 8 },
+  progressBg: { height: 4, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, marginTop: 8, overflow: "hidden" },
+  progressFill: { height: 4, backgroundColor: "#fff", borderRadius: 2 },
+});
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -295,6 +362,17 @@ export default function LearnTab() {
   const { t } = useTranslation();
 
   const [completionCard, setCompletionCard] = useState<{ date: string } | null>(null);
+  const [selectedSection, setSelectedSection] = useState<KingdomSchoolSection>("foundation");
+  const [enrolledCount, setEnrolledCount] = useState(0);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    supabase
+      .from("p2p_plan_enrollments")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", profile.id)
+      .then(({ count }) => setEnrolledCount(count ?? 0));
+  }, [profile?.id]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
@@ -323,7 +401,18 @@ export default function LearnTab() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" } : { flex: 1 }}>
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          <KingdomSchoolCards
+            selected={selectedSection}
+            onSelect={setSelectedSection}
+            modulesCompleted={modulesCompleted}
+            totalModules={totalModules}
+            foundationPct={foundationPct}
+            plansCount={plans.length}
+            enrolledCount={enrolledCount}
+          />
+
           {/* ── Section 1: Foundation ── */}
+          {selectedSection === "foundation" && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeaderTitle}>{t("learn.foundationHeader")}</Text>
@@ -376,8 +465,10 @@ export default function LearnTab() {
               </View>
             )}
           </View>
+          )}
 
           {/* ── Section 2: Electives ── */}
+          {selectedSection === "electives" && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeaderTitle}>{t("learn.electivesHeader")}</Text>
@@ -419,6 +510,7 @@ export default function LearnTab() {
               </TouchableOpacity>
             </View>
           </View>
+          )}
         </ScrollView>
       </View>
 

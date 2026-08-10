@@ -50,7 +50,7 @@ export default function Discover() {
           Alert.alert(
             "Add your date of birth",
             "Please add your date of birth in Settings before messaging other members.",
-            [{ text: "Go to Settings", onPress: () => router.push("/settings") }, { text: "Cancel", style: "cancel" }]
+            [{ text: "Go to Settings", onPress: () => router.push("/settings/index" as any) }, { text: "Cancel", style: "cancel" }]
           );
         } else if (error?.message?.includes("adult and minor accounts")) {
           Alert.alert("Can't message this person", "This conversation isn't available.");

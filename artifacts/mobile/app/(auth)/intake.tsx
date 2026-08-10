@@ -40,12 +40,11 @@ const BORN_AGAIN_OPTIONS = [
   { value: "other", label: "Other / Not sure" },
 ];
 
-const FAITH_STAGE_LABELS = [
-  "Just exploring",
-  "New believer",
-  "Growing in faith",
-  "Established believer",
-  "Mature believer, leading others",
+const FAITH_STAGES: { value: number; emoji: string; label: string; desc: string }[] = [
+  { value: 1, emoji: "🌱", label: "Brand new to faith", desc: "I just started" },
+  { value: 2, emoji: "📖", label: "Growing", desc: "I have believed for a while" },
+  { value: 3, emoji: "🌳", label: "Mature", desc: "I have walked with God for years" },
+  { value: 4, emoji: "↩️", label: "Returning", desc: "I am coming back after time away" },
 ];
 
 // ── Section 1 ─────────────────────────────────────────────────────────────────
@@ -412,27 +411,26 @@ function Section2Form({
 
   return (
     <View style={styles.form}>
-      {/* Faith Journey Stage — 5-step selector */}
+      {/* Faith Journey Stage — 4 full-width selectable cards */}
       <Field label="Where are you in your faith journey? *">
         <View style={styles.stageWrap}>
-          {FAITH_STAGE_LABELS.map((label, i) => {
-            const stageNum = i + 1;
-            const selected = values.faith_journey_stage === stageNum;
+          {FAITH_STAGES.map((stage) => {
+            const selected = values.faith_journey_stage === stage.value;
             return (
               <TouchableOpacity
-                key={stageNum}
+                key={stage.value}
                 style={[styles.stageTile, selected && styles.stageTileSelected]}
-                onPress={() => set("faith_journey_stage", stageNum)}
+                onPress={() => set("faith_journey_stage", stage.value)}
                 activeOpacity={0.8}
               >
-                <View style={[styles.stageCircle, selected && styles.stageCircleSelected]}>
-                  <Text style={[styles.stageNum, selected && styles.stageNumSelected]}>
-                    {stageNum}
+                <Text style={styles.stageEmoji}>{stage.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.stageLabel, selected && styles.stageLabelSelected]}>
+                    {stage.label}
                   </Text>
+                  <Text style={styles.stageDesc}>{stage.desc}</Text>
                 </View>
-                <Text style={[styles.stageLabel, selected && styles.stageLabelSelected]}>
-                  {label}
-                </Text>
+                {selected && <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />}
               </TouchableOpacity>
             );
           })}
@@ -570,22 +568,16 @@ const styles = StyleSheet.create({
   // Faith stage
   stageWrap: { gap: 10 },
   stageTile: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    padding: 13, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderBeige,
+    flexDirection: "row", alignItems: "center", gap: 14,
+    padding: 16, borderRadius: 14,
+    borderWidth: 1.5, borderColor: colors.borderBeige,
     backgroundColor: "#fff",
   },
   stageTileSelected: { borderColor: colors.accentGreen, backgroundColor: "rgba(29,158,117,0.06)" },
-  stageCircle: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.cardBeige,
-  },
-  stageCircleSelected: { backgroundColor: colors.accentGreen },
-  stageNum: { fontSize: 14, fontWeight: "700", color: colors.textMid, fontFamily: "Inter_700Bold" },
-  stageNumSelected: { color: colors.cream },
-  stageLabel: { fontSize: 13, color: colors.textMid, flex: 1, fontFamily: "Inter_400Regular" },
-  stageLabelSelected: { color: colors.textDark, fontFamily: "Inter_500Medium" },
+  stageEmoji: { fontSize: 26 },
+  stageLabel: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  stageLabelSelected: { color: colors.accentGreen },
+  stageDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
   // Duration / radio
   durationWrap: { gap: 8 },

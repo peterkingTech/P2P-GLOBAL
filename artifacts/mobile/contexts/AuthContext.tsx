@@ -72,6 +72,20 @@ export interface UserProfile {
   onboardingJourneyCompletedAt?: string;
   curriculumCompletedAt?: string;
   isPeerGuideEligible?: boolean;
+  notifySessionReminders: boolean;
+  notifyPeerGuideAlerts: boolean;
+  notifyFruitAwards: boolean;
+  notifyWeeklyEncouragement: boolean;
+  notifyElijahCheckins: boolean;
+  visibleToChurchLeadership: boolean;
+  showCountryOnProfile: boolean;
+  analyticsOptOut: boolean;
+  dateFormat: "DD.MM.YYYY" | "MM/DD/YYYY";
+  preferredSessionLength?: "15min" | "45min" | "flexible";
+  reminderDay?: string;
+  morningConfessionEnabled: boolean;
+  morningConfessionTime: string;
+  prayerJournalReminderEnabled: boolean;
 }
 
 interface AuthContextValue {
@@ -126,6 +140,20 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     onboardingJourneyCompletedAt: row.onboarding_journey_completed_at as string | undefined,
     curriculumCompletedAt: row.curriculum_completed_at as string | undefined,
     isPeerGuideEligible: (row.is_peer_guide_eligible as boolean) ?? false,
+    notifySessionReminders: (row.notify_session_reminders as boolean) ?? true,
+    notifyPeerGuideAlerts: (row.notify_peer_guide_alerts as boolean) ?? true,
+    notifyFruitAwards: (row.notify_fruit_awards as boolean) ?? true,
+    notifyWeeklyEncouragement: (row.notify_weekly_encouragement as boolean) ?? true,
+    notifyElijahCheckins: (row.notify_elijah_checkins as boolean) ?? true,
+    visibleToChurchLeadership: (row.visible_to_church_leadership as boolean) ?? true,
+    showCountryOnProfile: (row.show_country_on_profile as boolean) ?? true,
+    analyticsOptOut: (row.analytics_opt_out as boolean) ?? false,
+    dateFormat: ((row.date_format as string) ?? "DD.MM.YYYY") as "DD.MM.YYYY" | "MM/DD/YYYY",
+    preferredSessionLength: row.preferred_session_length as "15min" | "45min" | "flexible" | undefined,
+    reminderDay: row.reminder_day as string | undefined,
+    morningConfessionEnabled: (row.morning_confession_enabled as boolean) ?? false,
+    morningConfessionTime: (row.morning_confession_time as string) ?? "07:00",
+    prayerJournalReminderEnabled: (row.prayer_journal_reminder_enabled as boolean) ?? false,
   };
 }
 
@@ -244,6 +272,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.onboardingJourneyCompletedAt !== undefined) dbUpdates.onboarding_journey_completed_at = updates.onboardingJourneyCompletedAt;
     if (updates.curriculumCompletedAt !== undefined) dbUpdates.curriculum_completed_at = updates.curriculumCompletedAt;
     if (updates.isPeerGuideEligible !== undefined) dbUpdates.is_peer_guide_eligible = updates.isPeerGuideEligible;
+    if (updates.notifySessionReminders !== undefined) dbUpdates.notify_session_reminders = updates.notifySessionReminders;
+    if (updates.notifyPeerGuideAlerts !== undefined) dbUpdates.notify_peer_guide_alerts = updates.notifyPeerGuideAlerts;
+    if (updates.notifyFruitAwards !== undefined) dbUpdates.notify_fruit_awards = updates.notifyFruitAwards;
+    if (updates.notifyWeeklyEncouragement !== undefined) dbUpdates.notify_weekly_encouragement = updates.notifyWeeklyEncouragement;
+    if (updates.notifyElijahCheckins !== undefined) dbUpdates.notify_elijah_checkins = updates.notifyElijahCheckins;
+    if (updates.visibleToChurchLeadership !== undefined) dbUpdates.visible_to_church_leadership = updates.visibleToChurchLeadership;
+    if (updates.showCountryOnProfile !== undefined) dbUpdates.show_country_on_profile = updates.showCountryOnProfile;
+    if (updates.analyticsOptOut !== undefined) dbUpdates.analytics_opt_out = updates.analyticsOptOut;
+    if (updates.dateFormat !== undefined) dbUpdates.date_format = updates.dateFormat;
+    if (updates.preferredSessionLength !== undefined) dbUpdates.preferred_session_length = updates.preferredSessionLength;
+    if (updates.reminderDay !== undefined) dbUpdates.reminder_day = updates.reminderDay;
+    if (updates.morningConfessionEnabled !== undefined) dbUpdates.morning_confession_enabled = updates.morningConfessionEnabled;
+    if (updates.morningConfessionTime !== undefined) dbUpdates.morning_confession_time = updates.morningConfessionTime;
+    if (updates.prayerJournalReminderEnabled !== undefined) dbUpdates.prayer_journal_reminder_enabled = updates.prayerJournalReminderEnabled;
 
     const { error } = await supabase
       .from("p2p_profiles")

@@ -59,7 +59,12 @@ const DURATION_LABELS: Record<string, string> = {
   "10_plus_years": "10+ years",
 };
 
-const FAITH_STAGE_SHORT = ["Exploring", "New believer", "Growing", "Established", "Leading others"];
+// Values 1-4 match intake.tsx's current 4-card faith journey selector
+// (Brand new / Growing / Mature / Returning). Index 4 ("Leading others") is
+// legacy-only — the old 5-option scale could produce a 5th value that no
+// registration written after this change will ever produce again, but old
+// rows with faith_journey_stage=5 still need a label here.
+const FAITH_STAGE_SHORT = ["Brand new to faith", "Growing", "Mature", "Returning", "Leading others (legacy)"];
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 

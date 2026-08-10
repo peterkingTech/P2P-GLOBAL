@@ -19,3 +19,29 @@ export function ageFromISODate(isoDate: string, today: Date = new Date()): numbe
   if (!hadBirthdayThisYear) age--;
   return age;
 }
+
+// Rebuilds a DD.MM.YYYY masked string from whatever digits are currently
+// typed — dots are inserted at fixed positions (after day, after month) and
+// naturally disappear on backspace since they're derived from digit count,
+// not tracked as separate typed characters.
+export function formatDobInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  let out = "";
+  for (let i = 0; i < digits.length; i++) {
+    if (i === 2 || i === 4) out += ".";
+    out += digits[i];
+  }
+  return out;
+}
+
+export function parseDMY(value: string): { day: number; month: number; year: number } | null {
+  const m = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  return { day: parseInt(m[1], 10), month: parseInt(m[2], 10), year: parseInt(m[3], 10) };
+}
+
+export function isoToDMY(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-");
+  if (!y || !m || !d) return "";
+  return `${d}.${m}.${y}`;
+}

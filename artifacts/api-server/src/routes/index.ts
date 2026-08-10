@@ -14,6 +14,7 @@ import translationsRouter from "./translations";
 import bibleRouter from "./bible";
 import circlesRouter from "./circles";
 import pastoralCareRouter from "./pastoralCare";
+import accountRouter from "./account";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use("/translations", translationsRouter);
 router.use("/bible", bibleRouter);
 router.use("/circles", circlesRouter);
 router.use("/pastoral-care", pastoralCareRouter);
+router.use("/account", accountRouter);
 
 export default router;

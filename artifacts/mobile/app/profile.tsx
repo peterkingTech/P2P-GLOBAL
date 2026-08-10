@@ -553,12 +553,12 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>{t("profile.account")}</Text>
         <View style={styles.settingsList}>
           {[
-            { icon: "create-outline", label: t("profile.editProfile") },
-            { icon: "notifications-outline", label: t("profile.notifications") },
-            { icon: "language-outline", label: t("profile.language") },
-            { icon: "shield-outline", label: t("profile.privacy") },
+            { icon: "create-outline", label: t("profile.editProfile"), route: "/settings/account" },
+            { icon: "notifications-outline", label: t("profile.notifications"), route: "/settings/notifications" },
+            { icon: "language-outline", label: t("profile.language"), route: "/settings/language" },
+            { icon: "shield-outline", label: t("profile.privacy"), route: "/settings/privacy" },
           ].map((item) => (
-            <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push("/settings")}>
+            <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
               <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
               <Text style={styles.settingsLabel}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />

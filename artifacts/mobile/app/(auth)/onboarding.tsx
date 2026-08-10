@@ -1,11 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
-  FlatList,
   Image,
   Platform,
   Modal,
@@ -44,8 +43,6 @@ export default function OnboardingScreen() {
   const [selectedLang, setSelectedLang] = useState(
     LANGUAGES.find((l) => l.code === (i18next.language?.slice(0, 2) ?? "en")) ?? LANGUAGES[0]
   );
-  const listRef = useRef<FlatList>(null);
-
   const isLast = current === 3;
 
   const SLIDES = [
@@ -93,9 +90,7 @@ export default function OnboardingScreen() {
       // Module 1) only happens after registration + profile setup.
       router.replace("/(auth)/register");
     } else {
-      const next = current + 1;
-      listRef.current?.scrollToIndex({ index: next, animated: true });
-      setCurrent(next);
+      setCurrent((c) => c + 1);
     }
   }
 
@@ -124,39 +119,32 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        ref={listRef}
-        data={SLIDES}
-        horizontal
-        pagingEnabled
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-        style={{ backgroundColor: colors.darkBg }}
-        contentContainerStyle={{ backgroundColor: colors.darkBg }}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            {item.icon === null ? (
-              <View style={styles.logoWrap}>
-                <Image source={LOGO} style={styles.logoImg} />
-              </View>
-            ) : (
-              <View style={styles.iconRing}>
-                <Ionicons
-                  name={item.icon}
-                  size={52}
-                  color={colors.accentGreen}
-                />
-              </View>
-            )}
-            <Text style={[styles.title, item.id === "1" && styles.titleHero]}>{item.title}</Text>
-            {item.id === "1" && (
-              <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
-            )}
-            <Text style={styles.subtitle}>{item.subtitle}</Text>
+      {/* A fixed 4-item carousel driven directly by `current` — this used to
+          be a FlatList navigated via scrollToIndex, but scrollToIndex is
+          unreliable on react-native-web (it updates state/dots but never
+          actually scrolls the visible content), which meant every slide
+          silently showed slide 1's text. Rendering the current slide
+          directly sidesteps that platform gap entirely. */}
+      <View style={[styles.slide, { width, backgroundColor: colors.darkBg }]}>
+        {SLIDES[current].icon === null ? (
+          <View style={styles.logoWrap}>
+            <Image source={LOGO} style={styles.logoImg} />
+          </View>
+        ) : (
+          <View style={styles.iconRing}>
+            <Ionicons
+              name={SLIDES[current].icon}
+              size={52}
+              color={colors.accentGreen}
+            />
           </View>
         )}
-      />
+        <Text style={[styles.title, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</Text>
+        {SLIDES[current].id === "1" && (
+          <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
+        )}
+        <Text style={styles.subtitle}>{SLIDES[current].subtitle}</Text>
+      </View>
 
       {/* Dots */}
       <View style={styles.dots}>
@@ -190,11 +178,7 @@ export default function OnboardingScreen() {
         {current === 0 && (
           <TouchableOpacity
             style={styles.discoverBtn}
-            onPress={() => {
-              const next = 1;
-              listRef.current?.scrollToIndex({ index: next, animated: true });
-              setCurrent(next);
-            }}
+            onPress={() => setCurrent(1)}
             activeOpacity={0.8}
           >
             <Ionicons name="compass-outline" size={16} color={colors.accentGreen} />

@@ -142,7 +142,7 @@ export default function PrePlanQuestionsScreen() {
       // Best-effort — never block navigation on a save failure.
     } finally {
       setSaving(false);
-      if (isGeneral) router.replace((returnTo as any) ?? "/settings");
+      if (isGeneral) router.replace((returnTo as any) ?? "/settings/index");
       else router.replace(`/plan/${planId}` as any);
     }
   }
@@ -161,7 +161,7 @@ export default function PrePlanQuestionsScreen() {
           ))}
         </View>
         {isGeneral && step < 5 ? (
-          <TouchableOpacity onPress={() => router.replace((returnTo as any) ?? "/settings")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => router.replace((returnTo as any) ?? "/settings/index")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.skipHeaderText}>Skip</Text>
           </TouchableOpacity>
         ) : (

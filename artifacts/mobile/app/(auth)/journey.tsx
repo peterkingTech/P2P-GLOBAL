@@ -27,6 +27,15 @@ import colors from "@/constants/colors";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
+const TREE_NAME_SUGGESTIONS = [
+  "e.g. Spiritual Growth Journey",
+  "e.g. My Faith Walk",
+  "e.g. Rooted in Christ",
+  "e.g. Growing in Grace",
+  "e.g. Kingdom Journey",
+  "e.g. Walking with God",
+];
+
 interface PeerGuide {
   id: string;
   fullName: string;
@@ -63,8 +72,16 @@ export default function JourneyScreen() {
   // Step 4
   const [treeName, setTreeName] = useState("");
   const [savingStep4, setSavingStep4] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const seedScale = useRef(new Animated.Value(0.4)).current;
   const seedOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % TREE_NAME_SUGGESTIONS.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Step 5
   const [beginning, setBeginning] = useState(false);
@@ -228,6 +245,16 @@ export default function JourneyScreen() {
         {step === 1 && (
           <>
             <Text style={styles.title}>Meet Your Peer Guide</Text>
+            <Text style={styles.peerGuideExplainer}>
+              A peer guide is a fellow believer who is one step ahead of you{"\n"}
+              on the discipleship journey. They are not a pastor or a teacher —{"\n"}
+              they are simply someone who has walked this path before you and{"\n"}
+              is ready to walk alongside you now.
+              {"\n\n"}
+              Your peer guide will go through every lesson with you, answer{"\n"}
+              your questions, review your reflections, and pray with you.{"\n"}
+              Think of them as a spiritual friend with a little more experience.
+            </Text>
             <View style={styles.verseBlock}>
               <Text style={styles.verseText}>"Accept one another, just as Christ accepted you."</Text>
               <Text style={styles.verseRef}>Romans 15:7</Text>
@@ -394,9 +421,10 @@ export default function JourneyScreen() {
               style={styles.input}
               value={treeName}
               onChangeText={setTreeName}
-              placeholder="Optional"
+              placeholder={TREE_NAME_SUGGESTIONS[placeholderIndex]}
               placeholderTextColor={colors.textMuted}
             />
+            <Text style={styles.treeNameNote}>You can always change this later in your profile settings.</Text>
 
             <TouchableOpacity style={styles.primaryBtn} onPress={handleStep4Continue} disabled={savingStep4}>
               {savingStep4 ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Plant My Tree</Text>}
@@ -445,6 +473,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center", marginBottom: 8 },
   subtitle: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginBottom: 20, lineHeight: 20 },
 
+  peerGuideExplainer: {
+    fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular",
+    textAlign: "center", lineHeight: 20, marginBottom: 20, paddingHorizontal: 8,
+  },
   verseBlock: { alignItems: "center", marginBottom: 24, paddingHorizontal: 12 },
   verseText: { fontSize: 15, color: colors.textDark, fontStyle: "italic", textAlign: "center", fontFamily: "Inter_400Regular", lineHeight: 22 },
   verseRef: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 6 },
@@ -476,6 +508,7 @@ const styles = StyleSheet.create({
     padding: 14, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
   },
   privacyNote: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic", marginTop: 16, textAlign: "center" },
+  treeNameNote: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
 
   prayerCard: {
     backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
