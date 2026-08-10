@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import BlockEditorPanel from "@/components/admin/BlockEditorPanel";
+import PdfImportModal from "@/components/admin/PdfImportModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ export default function CurriculumManagerScreen() {
   const [createParentId, setCreateParentId] = useState<string>("");
   const [createTitle, setCreateTitle] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
+  const [pdfImportVisible, setPdfImportVisible] = useState(false);
 
   const loadTree = useCallback(async () => {
     setTreeLoading(true);
@@ -326,10 +328,18 @@ export default function CurriculumManagerScreen() {
 
       <View style={styles.navPanelHeader}>
         <Text style={styles.navPanelTitle}>{adminTab === "plans" ? "Study Plans" : "Curricula"}</Text>
-        <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate(adminTab === "plans" ? "plan" : "curriculum")}>
-          <Ionicons name="add" size={16} color={colors.accentGreen} />
-          <Text style={styles.addBtnSmallText}>New</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {adminTab === "plans" && (
+            <TouchableOpacity style={styles.addBtnSmall} onPress={() => setPdfImportVisible(true)}>
+              <Ionicons name="document-attach-outline" size={16} color={colors.accentGreen} />
+              <Text style={styles.addBtnSmallText}>Import from PDF</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate(adminTab === "plans" ? "plan" : "curriculum")}>
+            <Ionicons name="add" size={16} color={colors.accentGreen} />
+            <Text style={styles.addBtnSmallText}>New</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {treeLoading ? (
@@ -514,6 +524,12 @@ export default function CurriculumManagerScreen() {
           </View>
         </View>
       </Modal>
+
+      <PdfImportModal
+        visible={pdfImportVisible}
+        onClose={() => setPdfImportVisible(false)}
+        onImported={loadTree}
+      />
     </View>
   );
 }

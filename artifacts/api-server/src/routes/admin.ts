@@ -1,6 +1,9 @@
 import { Router } from "express";
+import multer from "multer";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
+import { parsePlanPdf, type ParsedLesson, type ParsedPlan } from "../lib/planPdfParser";
 
 const router = Router();
 
@@ -463,6 +466,276 @@ router.patch("/registrations/:id", async (req, res) => {
     .single();
   if (error) return err(res, error.message);
   return ok(res, data);
+});
+
+// ── PDF Plan Importer ───────────────────────────────────────────────────────
+
+// p2p_curriculums/p2p_modules/p2p_lessons (and the lesson-content tables
+// below) RLS write policies require auth.uid() to satisfy p2p_is_admin() —
+// same fix already applied in curriculum.ts/translationEngine.ts — so writes
+// here use a service-role client, not the anon-key `supabase` import above.
+const SUPABASE_URL =
+  process.env.SUPABASE_DB_URL?.startsWith("https://")
+    ? process.env.SUPABASE_DB_URL
+    : (process.env.SUPABASE_URL ?? "https://omkqkasniakcnmfcwrvs.supabase.co");
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ta3FrYXNuaWFrY25tZmN3cnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4ODM5MzYsImV4cCI6MjA5ODQ1OTkzNn0.093jpH0sX9gAcCBirXunIL0i1qNm6jzIZm8JqwVnIxM";
+const supabaseWrite = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+// Same 10-category slug->color mapping used by the one-off 144-plan bulk
+// import script, kept in sync so plans imported either way look consistent.
+const CATEGORY_COLORS: Record<string, string> = {
+  faith_kingdom: "#1D4E2B",
+  ministry_leadership: "#2C3E6B",
+  spiritual_growth: "#1D9E75",
+  family_relationships: "#8B4513",
+  identity_salvation: "#4B0082",
+  marketplace_purpose: "#B8860B",
+  prayer: "#1A237E",
+  holy_spirit: "#4A90D9",
+  healing_freedom: "#C0392B",
+  church_community: "#2E7D32",
+};
+
+// POST /admin/plans/upload-pdf — parse only, no writes. Lets the admin
+// preview (and edit) the extracted structure before anything is inserted.
+router.post("/plans/upload-pdf", upload.single("pdf"), async (req, res) => {
+  if (!req.file) return err(res, "No file uploaded (expected field name 'pdf')", 400);
+  try {
+    const plan = await parsePlanPdf(req.file.buffer, req.file.originalname);
+    return ok(res, plan);
+  } catch (e) {
+    return err(res, e instanceof Error ? e.message : "Failed to parse PDF", 400);
+  }
+});
+
+function splitMemoryVerse(combined: string): { reference: string; text: string } {
+  const m = /^"([\s\S]*)"\s*—\s*(.*)$/.exec(combined.trim());
+  if (m) return { text: m[1].trim(), reference: m[2].trim() };
+  return { text: combined.trim(), reference: "" };
+}
+
+type NewBlock = {
+  lesson_id: string;
+  block_type: string;
+  content: Record<string, unknown>;
+  order_index: number;
+  is_required: boolean;
+  is_submittable: boolean;
+};
+
+// Builds both the p2p_lesson_blocks rows (read exclusively by the admin
+// Block Editor) and the p2p_lesson_sections/p2p_scriptures/
+// p2p_reflection_questions/p2p_assignments(+questions) rows (read
+// exclusively by the real learner-facing lesson screen) from one parsed
+// lesson — these are two disconnected systems in this codebase, so an
+// imported plan needs both populated to be functional in either place.
+function buildLessonBlocks(lessonId: string, lesson: ParsedLesson): NewBlock[] {
+  const blocks: NewBlock[] = [];
+  let order = 0;
+
+  if (lesson.memoryVerse.trim()) {
+    const { reference, text } = splitMemoryVerse(lesson.memoryVerse);
+    blocks.push({
+      lesson_id: lessonId,
+      block_type: "memory_verse",
+      content: { reference, text, translation: "" },
+      order_index: order++,
+      is_required: true,
+      is_submittable: false,
+    });
+  }
+
+  if (lesson.content.trim()) {
+    blocks.push({
+      lesson_id: lessonId,
+      block_type: "paragraph",
+      content: { text: lesson.content.trim() },
+      order_index: order++,
+      is_required: false,
+      is_submittable: false,
+    });
+  }
+
+  const questions = lesson.discussionQuestions.split("\n").map((q) => q.trim()).filter(Boolean);
+  for (const question of questions) {
+    blocks.push({
+      lesson_id: lessonId,
+      block_type: "reflection_question",
+      content: { question },
+      order_index: order++,
+      is_required: true,
+      is_submittable: true,
+    });
+  }
+
+  const assignmentItems = lesson.lifeAssignment.split("\n").map((a) => a.trim()).filter(Boolean);
+  if (assignmentItems.length) {
+    blocks.push({
+      lesson_id: lessonId,
+      block_type: "assignment",
+      content: {
+        title: "Life Application",
+        instructions: "",
+        due_after_days: 7,
+        questions: assignmentItems.map((question) => ({ question })),
+      },
+      order_index: order++,
+      is_required: true,
+      is_submittable: true,
+    });
+  }
+
+  if (lesson.checkpoint.trim()) {
+    blocks.push({
+      lesson_id: lessonId,
+      block_type: "checkpoint",
+      content: { text: lesson.checkpoint.trim() },
+      order_index: order++,
+      is_required: false,
+      is_submittable: false,
+    });
+  }
+
+  return blocks;
+}
+
+// Cleans up everything created so far for a partially-imported plan — same
+// try/track/cleanup-on-failure pattern used by the 144-plan bulk import
+// script. FK cascades from p2p_lessons downward are not guaranteed here, so
+// each table is cleared explicitly.
+async function rollbackImport(curriculumId: string, lessonIds: string[], assignmentIds: string[]) {
+  if (assignmentIds.length) {
+    await supabaseWrite.from("p2p_assignment_questions").delete().in("assignment_id", assignmentIds);
+  }
+  if (lessonIds.length) {
+    await supabaseWrite.from("p2p_lesson_blocks").delete().in("lesson_id", lessonIds);
+    await supabaseWrite.from("p2p_assignments").delete().in("lesson_id", lessonIds);
+    await supabaseWrite.from("p2p_reflection_questions").delete().in("lesson_id", lessonIds);
+    await supabaseWrite.from("p2p_scriptures").delete().in("lesson_id", lessonIds);
+    await supabaseWrite.from("p2p_lesson_sections").delete().in("lesson_id", lessonIds);
+    await supabaseWrite.from("p2p_lessons").delete().in("id", lessonIds);
+  }
+  await supabaseWrite.from("p2p_modules").delete().eq("curriculum_id", curriculumId);
+  await supabaseWrite.from("p2p_curriculums").delete().eq("id", curriculumId);
+}
+
+// POST /admin/plans/confirm-import — actually inserts the (possibly
+// admin-edited) parsed plan as a draft.
+router.post("/plans/confirm-import", async (req, res) => {
+  const plan = req.body as ParsedPlan;
+  const title = plan?.title?.trim();
+  if (!title) return err(res, "title is required", 400);
+  if (!Array.isArray(plan.modules) || plan.modules.length === 0) {
+    return err(res, "At least one module is required", 400);
+  }
+
+  const { data: existing, error: dupErr } = await supabaseWrite
+    .from("p2p_curriculums")
+    .select("id")
+    .eq("type", "plan")
+    .eq("title", title)
+    .maybeSingle();
+  if (dupErr) return err(res, dupErr.message);
+  if (existing) return err(res, `A plan titled "${title}" already exists`, 409);
+
+  const colorTheme = CATEGORY_COLORS[plan.category] ?? "#1D9E75";
+  const description = plan.lectureIntro?.trim()
+    ? [plan.description?.trim(), plan.lectureIntro.trim()].filter(Boolean).join("\n\n")
+    : plan.description?.trim() || null;
+
+  const { data: curriculum, error: curErr } = await supabaseWrite
+    .from("p2p_curriculums")
+    .insert({
+      title,
+      description,
+      subtitle: plan.subtitle?.trim() || null,
+      type: "plan",
+      status: "draft",
+      tags: plan.category ? [plan.category] : [],
+      color_theme: colorTheme,
+    })
+    .select()
+    .single();
+  if (curErr || !curriculum) return err(res, curErr?.message ?? "Failed to create plan");
+
+  const curriculumId = curriculum.id as string;
+  const createdLessonIds: string[] = [];
+  const createdAssignmentIds: string[] = [];
+
+  try {
+    for (const [modIdx, mod] of plan.modules.entries()) {
+      const { data: moduleRow, error: modErr } = await supabaseWrite
+        .from("p2p_modules")
+        .insert({ curriculum_id: curriculumId, title: mod.title, status: "draft", order_index: mod.orderIndex ?? modIdx })
+        .select()
+        .single();
+      if (modErr || !moduleRow) throw new Error(modErr?.message ?? `Failed to create module "${mod.title}"`);
+
+      for (const [lesIdx, lesson] of mod.lessons.entries()) {
+        const { data: lessonRow, error: lesErr } = await supabaseWrite
+          .from("p2p_lessons")
+          .insert({ module_id: moduleRow.id, title: lesson.title, status: "draft", order_index: lesson.orderIndex ?? lesIdx })
+          .select()
+          .single();
+        if (lesErr || !lessonRow) throw new Error(lesErr?.message ?? `Failed to create lesson "${lesson.title}"`);
+        const lessonId = lessonRow.id as string;
+        createdLessonIds.push(lessonId);
+
+        // Real learner-facing content tables.
+        if (lesson.content.trim()) {
+          const { error } = await supabaseWrite
+            .from("p2p_lesson_sections")
+            .insert({ lesson_id: lessonId, section_order: 1, section_type: "teaching", title: null, content: lesson.content.trim() });
+          if (error) throw new Error(error.message);
+        }
+        if (lesson.memoryVerse.trim()) {
+          const { reference, text } = splitMemoryVerse(lesson.memoryVerse);
+          const { error } = await supabaseWrite
+            .from("p2p_scriptures")
+            .insert({ lesson_id: lessonId, reference, verse: text, display_order: 1 });
+          if (error) throw new Error(error.message);
+        }
+        const questions = lesson.discussionQuestions.split("\n").map((q) => q.trim()).filter(Boolean);
+        if (questions.length) {
+          const { error } = await supabaseWrite
+            .from("p2p_reflection_questions")
+            .insert(questions.map((question, i) => ({ lesson_id: lessonId, question, display_order: i + 1 })));
+          if (error) throw new Error(error.message);
+        }
+        const assignmentItems = lesson.lifeAssignment.split("\n").map((a) => a.trim()).filter(Boolean);
+        if (assignmentItems.length) {
+          const { data: assignmentRow, error: asnErr } = await supabaseWrite
+            .from("p2p_assignments")
+            .insert({ lesson_id: lessonId, title: "Life Application", instructions: "", due_after_days: 7 })
+            .select()
+            .single();
+          if (asnErr || !assignmentRow) throw new Error(asnErr?.message ?? "Failed to create assignment");
+          createdAssignmentIds.push(assignmentRow.id as string);
+          const { error: aqErr } = await supabaseWrite
+            .from("p2p_assignment_questions")
+            .insert(assignmentItems.map((question, i) => ({ assignment_id: assignmentRow.id, question, display_order: i + 1 })));
+          if (aqErr) throw new Error(aqErr.message);
+        }
+
+        // Admin Block Editor's content system.
+        const blocks = buildLessonBlocks(lessonId, lesson);
+        if (blocks.length) {
+          const { error } = await supabaseWrite.from("p2p_lesson_blocks").insert(blocks);
+          if (error) throw new Error(error.message);
+        }
+      }
+    }
+  } catch (e) {
+    await rollbackImport(curriculumId, createdLessonIds, createdAssignmentIds);
+    return err(res, e instanceof Error ? e.message : "Import failed, changes rolled back");
+  }
+
+  return ok(res, { id: curriculumId });
 });
 
 export default router;
