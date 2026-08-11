@@ -31,6 +31,9 @@ type Curriculum = {
   teaching_credit_location?: string | null;
   teaching_credit_youtube?: string | null;
   teaching_credit_instagram?: string | null;
+  parent_category_id?: string | null;
+  topic_number?: number | null;
+  display_order?: number | null;
 };
 type Module = {
   id: string; curriculum_id: string; title: string; description: string | null;
@@ -130,9 +133,30 @@ export default function CurriculumManagerScreen() {
 
   useEffect(() => { loadTree(); }, [loadTree]);
 
-  const coreCurricula = curricula.filter((c) => c.type !== "plan");
+  const coreCurricula = curricula.filter((c) => c.type !== "plan" && c.type !== "plan_category");
   const planCurricula = curricula.filter((c) => c.type === "plan");
+  const planCategories = curricula
+    .filter((c) => c.type === "plan_category")
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
   const visibleCurricula = adminTab === "plans" ? planCurricula : coreCurricula;
+
+  const UNCATEGORIZED_KEY = "__uncategorized__";
+  const plansByCategory = new Map<string, Curriculum[]>();
+  for (const p of planCurricula) {
+    const key = p.parent_category_id ?? UNCATEGORIZED_KEY;
+    (plansByCategory.get(key) ?? plansByCategory.set(key, []).get(key)!).push(p);
+  }
+  for (const list of plansByCategory.values()) {
+    list.sort((a, b) => (a.topic_number ?? 0) - (b.topic_number ?? 0));
+  }
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  function toggleCategoryExpanded(key: string) {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
 
   const selectedCurriculum = curricula.find((c) => c.id === selectedCurriculumId) ?? null;
   const modulesForSelected = selectedCurriculumId ? (modulesMap[selectedCurriculumId] ?? []) : [];
@@ -313,6 +337,49 @@ export default function CurriculumManagerScreen() {
 
   // ── Panels ────────────────────────────────────────────────────────────────────
 
+  function renderCurriculumRow(c: Curriculum) {
+    const cSel = selectedCurriculumId === c.id;
+    const mods = modulesMap[c.id] ?? [];
+    return (
+      <View key={c.id} style={{ marginBottom: 10 }}>
+        <TouchableOpacity style={[styles.navRow, cSel && !selectedModuleId && styles.navRowSelected]} onPress={() => selectCurriculum(c.id)} onLongPress={editCurriculumSettings}>
+          <Ionicons name={adminTab === "plans" ? "radio-outline" : "book-outline"} size={14} color={colors.primaryGreen} />
+          <Text style={[styles.navLabel, { flex: 1, fontFamily: "Inter_700Bold" }]} numberOfLines={1}>{c.title}</Text>
+          <StatusBadge status={c.status} />
+        </TouchableOpacity>
+
+        {cSel && (
+          <View style={styles.moduleList}>
+            {mods.map((m) => {
+              const mSel = selectedModuleId === m.id;
+              const lessonCount = (lessonsMap[m.id] ?? []).length;
+              return (
+                <TouchableOpacity key={m.id} style={[styles.navRow, styles.moduleRow, mSel && styles.navRowSelected]} onPress={() => selectModule(m.id)}>
+                  <View style={[styles.moduleColorDot, { backgroundColor: m.color_theme || colors.primaryGreen }]} />
+                  <Text style={[styles.navLabel, { flex: 1 }]} numberOfLines={1}>{m.title}</Text>
+                  <Text style={styles.navMeta}>{lessonCount}L</Text>
+                  <View style={styles.reorderBtns}>
+                    <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "up", c.id, setModulesMap)}>
+                      <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "down", c.id, setModulesMap)}>
+                      <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <StatusBadge status={m.status} />
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={styles.addInTreeBtn} onPress={() => openCreate("module", c.id)}>
+              <Ionicons name="add" size={12} color={colors.accentGreen} />
+              <Text style={styles.addInTreeText}>Add module</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  }
+
   const moduleNavigator = (
     <ScrollView style={styles.navPanel} contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 20 }}>
       <View style={styles.adminTabRow}>
@@ -349,49 +416,53 @@ export default function CurriculumManagerScreen() {
           <Ionicons name={adminTab === "plans" ? "radio-outline" : "book-outline"} size={32} color={colors.textMuted} />
           <Text style={styles.emptyTreeText}>Nothing here yet</Text>
         </View>
-      ) : (
-        visibleCurricula.map((c) => {
-          const cSel = selectedCurriculumId === c.id;
-          const mods = modulesMap[c.id] ?? [];
-          return (
-            <View key={c.id} style={{ marginBottom: 10 }}>
-              <TouchableOpacity style={[styles.navRow, cSel && !selectedModuleId && styles.navRowSelected]} onPress={() => selectCurriculum(c.id)} onLongPress={editCurriculumSettings}>
-                <Ionicons name={adminTab === "plans" ? "radio-outline" : "book-outline"} size={14} color={colors.primaryGreen} />
-                <Text style={[styles.navLabel, { flex: 1, fontFamily: "Inter_700Bold" }]} numberOfLines={1}>{c.title}</Text>
-                <StatusBadge status={c.status} />
+      ) : adminTab === "plans" ? (
+        <>
+          {planCategories.map((cat) => {
+            const plansInCat = plansByCategory.get(cat.id) ?? [];
+            const isExpanded = expandedCategories.has(cat.id);
+            return (
+              <View key={cat.id} style={{ marginBottom: 10 }}>
+                <TouchableOpacity
+                  style={[styles.categoryHeaderRow, { borderLeftColor: cat.color_theme || colors.primaryGreen }]}
+                  onPress={() => toggleCategoryExpanded(cat.id)}
+                >
+                  <Ionicons name={isExpanded ? "chevron-down" : "chevron-forward"} size={14} color={colors.textMid} />
+                  <Text style={styles.categoryHeaderText} numberOfLines={1}>{cat.title}</Text>
+                  <Text style={styles.categoryHeaderCount}>{plansInCat.length}</Text>
+                </TouchableOpacity>
+                {isExpanded && (
+                  <View style={{ paddingLeft: 8 }}>
+                    {plansInCat.length === 0 ? (
+                      <Text style={[styles.emptyTreeText, { paddingVertical: 8 }]}>No plans in this category yet</Text>
+                    ) : (
+                      plansInCat.map((c) => renderCurriculumRow(c))
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })}
+          {(plansByCategory.get(UNCATEGORIZED_KEY) ?? []).length > 0 && (
+            <View style={{ marginBottom: 10 }}>
+              <TouchableOpacity
+                style={[styles.categoryHeaderRow, { borderLeftColor: colors.textMuted }]}
+                onPress={() => toggleCategoryExpanded(UNCATEGORIZED_KEY)}
+              >
+                <Ionicons name={expandedCategories.has(UNCATEGORIZED_KEY) ? "chevron-down" : "chevron-forward"} size={14} color={colors.textMid} />
+                <Text style={styles.categoryHeaderText}>Uncategorized</Text>
+                <Text style={styles.categoryHeaderCount}>{(plansByCategory.get(UNCATEGORIZED_KEY) ?? []).length}</Text>
               </TouchableOpacity>
-
-              {cSel && (
-                <View style={styles.moduleList}>
-                  {mods.map((m) => {
-                    const mSel = selectedModuleId === m.id;
-                    const lessonCount = (lessonsMap[m.id] ?? []).length;
-                    return (
-                      <TouchableOpacity key={m.id} style={[styles.navRow, styles.moduleRow, mSel && styles.navRowSelected]} onPress={() => selectModule(m.id)}>
-                        <View style={[styles.moduleColorDot, { backgroundColor: m.color_theme || colors.primaryGreen }]} />
-                        <Text style={[styles.navLabel, { flex: 1 }]} numberOfLines={1}>{m.title}</Text>
-                        <Text style={styles.navMeta}>{lessonCount}L</Text>
-                        <View style={styles.reorderBtns}>
-                          <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "up", c.id, setModulesMap)}>
-                            <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "down", c.id, setModulesMap)}>
-                            <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
-                          </TouchableOpacity>
-                        </View>
-                        <StatusBadge status={m.status} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                  <TouchableOpacity style={styles.addInTreeBtn} onPress={() => openCreate("module", c.id)}>
-                    <Ionicons name="add" size={12} color={colors.accentGreen} />
-                    <Text style={styles.addInTreeText}>Add module</Text>
-                  </TouchableOpacity>
+              {expandedCategories.has(UNCATEGORIZED_KEY) && (
+                <View style={{ paddingLeft: 8 }}>
+                  {(plansByCategory.get(UNCATEGORIZED_KEY) ?? []).map((c) => renderCurriculumRow(c))}
                 </View>
               )}
             </View>
-          );
-        })
+          )}
+        </>
+      ) : (
+        visibleCurricula.map((c) => renderCurriculumRow(c))
       )}
     </ScrollView>
   );
@@ -893,6 +964,10 @@ const styles = StyleSheet.create({
   navPanel: { flex: 1, backgroundColor: "#fff" },
   navPanelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   navPanelTitle: { fontSize: 13, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+
+  categoryHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderLeftWidth: 3, backgroundColor: colors.cardBeige, borderRadius: 6 },
+  categoryHeaderText: { flex: 1, fontSize: 13, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  categoryHeaderCount: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   addBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
   addBtnSmallText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 

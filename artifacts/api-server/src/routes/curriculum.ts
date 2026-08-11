@@ -21,6 +21,34 @@ const ANON_KEY =
 // a service-role client.
 const supabaseRead = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
+// PostgREST's .in() filter is serialized into the request URL, which has a
+// real length limit — a plain, un-chunked .in() over ~150+ UUIDs (each ~36
+// chars) can silently return zero rows past that point instead of erroring,
+// which is exactly what happened here once the Plans catalog grew past ~140
+// rows (every lessonCount silently came back 0). Chunk any .in() call whose
+// id list scales with catalog size, not just ones already known to be large.
+const SUPABASE_IN_CHUNK_SIZE = 100;
+function chunkIds(ids: string[], size = SUPABASE_IN_CHUNK_SIZE): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+async function selectInChunks<T = Record<string, unknown>>(
+  table: string,
+  columns: string,
+  column: string,
+  ids: string[]
+): Promise<T[]> {
+  if (!ids.length) return [];
+  const results: T[] = [];
+  for (const c of chunkIds(ids)) {
+    const { data, error } = await supabaseRead.from(table).select(columns).in(column, c);
+    if (error) throw new Error(`${table}.${column} IN chunk failed: ${error.message}`);
+    results.push(...((data ?? []) as T[]));
+  }
+  return results;
+}
+
 interface LessonContentBase {
   id: unknown;
   moduleId: unknown;
@@ -322,17 +350,12 @@ router.get("/plans", async (_req, res) => {
   if (error) return res.status(500).json({ error: error.message });
 
   const planIds = (plans ?? []).map((p) => p.id as string);
-  const { data: modules } = planIds.length
-    ? await supabaseRead
-        .from("p2p_modules")
-        .select("id,curriculum_id,image_url,order_index")
-        .in("curriculum_id", planIds)
-        .order("order_index", { ascending: true })
-    : { data: [] as { id: string; curriculum_id: string; image_url: string | null; order_index: number }[] };
-  const moduleIds = (modules ?? []).map((m) => m.id as string);
-  const { data: lessons } = moduleIds.length
-    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
-    : { data: [] as { id: string; module_id: string }[] };
+  const modules = await selectInChunks<{ id: string; curriculum_id: string; image_url: string | null; order_index: number }>(
+    "p2p_modules", "id,curriculum_id,image_url,order_index", "curriculum_id", planIds
+  );
+  modules.sort((a, b) => a.order_index - b.order_index);
+  const moduleIds = modules.map((m) => m.id);
+  const lessons = await selectInChunks<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds);
 
   const moduleCountByPlan = new Map<string, number>();
   const moduleToPlanId = new Map<string, string>();
@@ -361,9 +384,232 @@ router.get("/plans", async (_req, res) => {
   );
 });
 
-// GET /plans/:planId — a single plan with all modules and lessons
+// ── Plan Categories ──────────────────────────────────────────────────────────
+// Categories are p2p_curriculums rows with type='plan_category' (migration
+// 054_plan_categories.sql) — 10 top-level collections that group the
+// individual topic plans (type='plan') via parent_category_id. Field names
+// below follow this file's existing camelCase convention (mapPlan etc.), not
+// the snake_case originally sketched for this feature.
+
+// GET /plans/categories — the 10 top-level category collections
+router.get("/plans/categories", async (_req, res) => {
+  const { data: categories, error } = await supabaseRead
+    .from("p2p_curriculums")
+    .select("*")
+    .eq("type", "plan_category")
+    .eq("status", "published")
+    .order("display_order", { ascending: true, nullsFirst: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const categoryIds = (categories ?? []).map((c) => c.id as string);
+  const { data: plans } = categoryIds.length
+    ? await supabaseRead
+        .from("p2p_curriculums")
+        .select("id,parent_category_id")
+        .eq("type", "plan")
+        .in("parent_category_id", categoryIds)
+    : { data: [] as { id: string; parent_category_id: string | null }[] };
+
+  const planToCategory = new Map<string, string>();
+  const planCountByCategory = new Map<string, number>();
+  for (const p of (plans ?? []) as Record<string, unknown>[]) {
+    const catId = p.parent_category_id as string | null;
+    if (!catId) continue;
+    planToCategory.set(p.id as string, catId);
+    planCountByCategory.set(catId, (planCountByCategory.get(catId) ?? 0) + 1);
+  }
+  const planIds = Array.from(planToCategory.keys());
+
+  const modules = await selectInChunks<{ id: string; curriculum_id: string }>("p2p_modules", "id,curriculum_id", "curriculum_id", planIds);
+  const moduleToPlan = new Map<string, string>();
+  for (const m of modules) moduleToPlan.set(m.id, m.curriculum_id);
+  const moduleIds = Array.from(moduleToPlan.keys());
+
+  const lessons = await selectInChunks<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds);
+  const totalLessonsByCategory = new Map<string, number>();
+  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
+    const planId = moduleToPlan.get(l.module_id as string);
+    const catId = planId ? planToCategory.get(planId) : undefined;
+    if (catId) totalLessonsByCategory.set(catId, (totalLessonsByCategory.get(catId) ?? 0) + 1);
+  }
+
+  return res.json(
+    (categories ?? []).map((c) => ({
+      id: c.id,
+      title: c.title,
+      description: c.description ?? null,
+      category: (c.tags as string[] | null)?.[0] ?? null,
+      colorTheme: c.color_theme ?? "#1D9E75",
+      displayOrder: c.display_order ?? null,
+      planCount: planCountByCategory.get(c.id as string) ?? 0,
+      totalLessons: totalLessonsByCategory.get(c.id as string) ?? 0,
+    }))
+  );
+});
+
+// ── Sequential plan locking ──────────────────────────────────────────────────
+// A plan is "complete" for a user once every one of its lessons is marked
+// completed in p2p_lesson_progress — the same definition GET
+// /plans/completed/:userId already uses via getUserPlanProgressMap's percent
+// field, just checked for one specific plan here instead of filtering all of
+// them. Plans unlock one at a time within a category via unlock_after_plan_id
+// (migration 055_plan_locking.sql); a plan with no unlock_after_plan_id
+// (topic 1 in every category, plus every pre-restructure plan) is never locked.
+function planIsComplete(
+  progressMap: Map<string, { percent: number; completedLessons: number; totalLessons: number; lastActivityAt: string | null }>,
+  planId: string
+): boolean {
+  const p = progressMap.get(planId);
+  return !!p && p.totalLessons > 0 && p.percent === 100;
+}
+
+function resolveLockStatus(
+  unlockAfterPlanId: string | null,
+  progressMap: Map<string, { percent: number; completedLessons: number; totalLessons: number; lastActivityAt: string | null }> | null,
+  titleById: Map<string, string>
+): { locked: boolean; unlockMessage: string | null } {
+  if (!unlockAfterPlanId) return { locked: false, unlockMessage: null };
+  // No user context to check against — default to locked rather than
+  // silently granting access to sequential content.
+  if (!progressMap) return { locked: true, unlockMessage: null };
+  const complete = planIsComplete(progressMap, unlockAfterPlanId);
+  if (complete) return { locked: false, unlockMessage: null };
+  const prereqTitle = titleById.get(unlockAfterPlanId) ?? "the previous plan";
+  return { locked: true, unlockMessage: `Complete "${prereqTitle}" to unlock this plan` };
+}
+
+// GET /plans/search?q=&userId= — full-text-ish search across plan titles,
+// module titles, and lesson titles. Results are plans (never bare modules/
+// lessons), ordered exact-title-match first, then partial-title-match, then
+// "content" matches (the query only hit inside a module/lesson title).
+// Capped at 50. Lock status is included per result when userId is given.
+// Must be registered before /plans/:planId, or Express matches "search" as
+// a planId (same reason /plans/categories precedes it too).
+router.get("/plans/search", async (req, res) => {
+  const q = ((req.query.q as string) ?? "").trim();
+  const userId = req.query.userId as string | undefined;
+  if (!q) return res.json([]);
+
+  const { data: titleMatches, error: titleErr } = await supabaseRead
+    .from("p2p_curriculums")
+    .select("id")
+    .eq("type", "plan")
+    .eq("status", "published")
+    .ilike("title", `%${q}%`);
+  if (titleErr) return res.status(500).json({ error: titleErr.message });
+
+  const { data: moduleMatches } = await supabaseRead
+    .from("p2p_modules")
+    .select("curriculum_id")
+    .ilike("title", `%${q}%`)
+    .limit(300);
+
+  const { data: lessonMatches } = await supabaseRead
+    .from("p2p_lessons")
+    .select("module_id")
+    .ilike("title", `%${q}%`)
+    .limit(300);
+  const lessonModuleIds = Array.from(new Set((lessonMatches ?? []).map((l) => l.module_id as string)));
+  const lessonModules = await selectInChunks<{ id: string; curriculum_id: string }>("p2p_modules", "id,curriculum_id", "id", lessonModuleIds);
+
+  const contentMatchPlanIds = new Set<string>([
+    ...(moduleMatches ?? []).map((m) => m.curriculum_id as string),
+    ...lessonModules.map((m) => m.curriculum_id),
+  ]);
+  const titleMatchPlanIds = new Set((titleMatches ?? []).map((p) => p.id as string));
+
+  const allCandidateIds = Array.from(new Set([...titleMatchPlanIds, ...contentMatchPlanIds])).slice(0, 200);
+  if (!allCandidateIds.length) return res.json([]);
+
+  const candidatePlans = await selectInChunks("p2p_curriculums", "*", "id", allCandidateIds).then((rows) =>
+    rows.filter((p) => p.type === "plan" && p.status === "published")
+  );
+
+  const categoryIds = Array.from(new Set((candidatePlans ?? []).map((p) => p.parent_category_id as string | null).filter((id): id is string => !!id)));
+  const { data: categories } = categoryIds.length
+    ? await supabaseRead.from("p2p_curriculums").select("id,title,color_theme").in("id", categoryIds)
+    : { data: [] as { id: string; title: string; color_theme: string | null }[] };
+  const categoryById = new Map((categories ?? []).map((c) => [c.id as string, c]));
+
+  const counts = await getPlanModuleLessonCounts(allCandidateIds);
+  const progressMap = userId ? await getUserPlanProgressMap(userId) : null;
+  const titleById = new Map((candidatePlans ?? []).map((p) => [p.id as string, p.title as string]));
+
+  const qLower = q.toLowerCase();
+  const results = (candidatePlans ?? []).map((p) => {
+    const planId = p.id as string;
+    const titleLower = (p.title as string).toLowerCase();
+    const matchType: "exact" | "partial" | "content" = titleLower === qLower ? "exact" : titleMatchPlanIds.has(planId) ? "partial" : "content";
+    const category = p.parent_category_id ? categoryById.get(p.parent_category_id as string) : null;
+    const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById);
+    return {
+      id: planId,
+      title: p.title,
+      topicNumber: p.topic_number ?? null,
+      categoryId: category?.id ?? null,
+      categoryTitle: category?.title ?? null,
+      categoryColorTheme: category?.color_theme ?? "#1D9E75",
+      moduleCount: counts.moduleCountByPlan.get(planId) ?? 0,
+      lessonCount: counts.lessonCountByPlan.get(planId) ?? 0,
+      locked,
+      unlockMessage,
+      matchType,
+    };
+  });
+
+  const matchRank = { exact: 0, partial: 1, content: 2 } as const;
+  results.sort((a, b) => matchRank[a.matchType] - matchRank[b.matchType] || (a.title as string).localeCompare(b.title as string));
+
+  return res.json(results.slice(0, 50));
+});
+
+// GET /plans/categories/:categoryId/plans — topic plans inside a category, ordered by topic_number
+router.get("/plans/categories/:categoryId/plans", async (req, res) => {
+  const { categoryId } = req.params;
+  const userId = req.query.userId as string | undefined;
+  const { data: plans, error } = await supabaseRead
+    .from("p2p_curriculums")
+    .select("*")
+    .eq("type", "plan")
+    .eq("status", "published")
+    .eq("parent_category_id", categoryId)
+    .order("topic_number", { ascending: true, nullsFirst: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const planIds = (plans ?? []).map((p) => p.id as string);
+  const counts = await getPlanModuleLessonCounts(planIds);
+  const progressMap = userId ? await getUserPlanProgressMap(userId) : null;
+  const titleById = new Map((plans ?? []).map((p) => [p.id as string, p.title as string]));
+
+  return res.json(
+    (plans ?? []).map((p) => {
+      const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById);
+      const progress = progressMap?.get(p.id as string);
+      return {
+        id: p.id,
+        title: p.title,
+        description: p.description ?? null,
+        subtitle: p.subtitle ?? null,
+        topicNumber: p.topic_number ?? null,
+        moduleCount: counts.moduleCountByPlan.get(p.id as string) ?? 0,
+        lessonCount: counts.lessonCountByPlan.get(p.id as string) ?? 0,
+        difficultyLevel: p.difficulty_level ?? "beginner",
+        estimatedWeeks: p.estimated_weeks ?? null,
+        locked,
+        unlockMessage,
+        progressPercent: progress?.percent ?? 0,
+      };
+    })
+  );
+});
+
+// GET /plans/:planId — a single plan with all modules and lessons. Pass
+// ?userId= to get real lock enforcement — a locked plan returns 403 with
+// enough info (previousPlanId/Title) to link back to its prerequisite,
+// rather than the full plan body.
 router.get("/plans/:planId", async (req, res) => {
   const { planId } = req.params;
+  const userId = req.query.userId as string | undefined;
   const { data: plan } = await supabaseRead
     .from("p2p_curriculums")
     .select("*")
@@ -371,6 +617,32 @@ router.get("/plans/:planId", async (req, res) => {
     .eq("type", "plan")
     .maybeSingle();
   if (!plan) return res.status(404).json({ error: "Plan not found" });
+
+  const unlockAfterId = plan.unlock_after_plan_id as string | null;
+  if (unlockAfterId) {
+    const progressMap = userId ? await getUserPlanProgressMap(userId) : null;
+    const prereqComplete = progressMap ? planIsComplete(progressMap, unlockAfterId) : false;
+    if (!prereqComplete) {
+      const { data: prevPlan } = await supabaseRead.from("p2p_curriculums").select("id,title").eq("id", unlockAfterId).maybeSingle();
+      return res.status(403).json({
+        locked: true,
+        title: plan.title,
+        unlockMessage: prevPlan ? `Complete "${prevPlan.title}" to unlock this plan` : "Complete the previous plan to unlock this plan",
+        previousPlanId: prevPlan?.id ?? null,
+        previousPlanTitle: prevPlan?.title ?? null,
+      });
+    }
+  }
+
+  let categoryInfo: { id: string; title: string; colorTheme: string } | null = null;
+  if (plan.parent_category_id) {
+    const { data: category } = await supabaseRead
+      .from("p2p_curriculums")
+      .select("id,title,color_theme")
+      .eq("id", plan.parent_category_id as string)
+      .maybeSingle();
+    if (category) categoryInfo = { id: category.id as string, title: category.title as string, colorTheme: (category.color_theme as string) ?? "#1D9E75" };
+  }
 
   const { data: modules } = await supabaseRead
     .from("p2p_modules")
@@ -406,6 +678,9 @@ router.get("/plans/:planId", async (req, res) => {
 
   return res.json({
     ...mapPlan(plan as Record<string, unknown>, mappedModules.length, totalLessons, fallbackImageUrl),
+    locked: false,
+    topicNumber: plan.topic_number ?? null,
+    category: categoryInfo,
     modules: mappedModules,
   });
 });
@@ -515,23 +790,20 @@ async function getPlanModuleLessonCounts(planIds: string[]) {
   const moduleToPlanId = new Map<string, string>();
   if (!planIds.length) return { moduleCountByPlan, lessonCountByPlan, fallbackImageByPlan, moduleToPlanId };
 
-  const { data: modules } = await supabaseRead
-    .from("p2p_modules")
-    .select("id,curriculum_id,image_url,order_index")
-    .in("curriculum_id", planIds)
-    .order("order_index", { ascending: true });
-  for (const m of (modules ?? []) as Record<string, unknown>[]) {
-    const planId = m.curriculum_id as string;
+  const modules = await selectInChunks<{ id: string; curriculum_id: string; image_url: string | null; order_index: number }>(
+    "p2p_modules", "id,curriculum_id,image_url,order_index", "curriculum_id", planIds
+  );
+  modules.sort((a, b) => a.order_index - b.order_index);
+  for (const m of modules) {
+    const planId = m.curriculum_id;
     moduleCountByPlan.set(planId, (moduleCountByPlan.get(planId) ?? 0) + 1);
-    moduleToPlanId.set(m.id as string, planId);
-    if (!fallbackImageByPlan.has(planId) && m.image_url) fallbackImageByPlan.set(planId, m.image_url as string);
+    moduleToPlanId.set(m.id, planId);
+    if (!fallbackImageByPlan.has(planId) && m.image_url) fallbackImageByPlan.set(planId, m.image_url);
   }
   const moduleIds = Array.from(moduleToPlanId.keys());
-  const { data: lessons } = moduleIds.length
-    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
-    : { data: [] as { id: string; module_id: string }[] };
-  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
-    const planId = moduleToPlanId.get(l.module_id as string);
+  const lessons = await selectInChunks<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds);
+  for (const l of lessons) {
+    const planId = moduleToPlanId.get(l.module_id);
     if (planId) lessonCountByPlan.set(planId, (lessonCountByPlan.get(planId) ?? 0) + 1);
   }
   return { moduleCountByPlan, lessonCountByPlan, fallbackImageByPlan, moduleToPlanId };
@@ -547,27 +819,32 @@ async function getUserPlanProgressMap(userId: string) {
   const result = new Map<string, { percent: number; completedLessons: number; totalLessons: number; lastActivityAt: string | null }>();
   if (!planIds.length) return result;
 
-  const { data: modules } = await supabaseRead.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds);
+  const modules = await selectInChunks<{ id: string; curriculum_id: string }>("p2p_modules", "id,curriculum_id", "curriculum_id", planIds);
   const moduleToPlanId = new Map<string, string>();
-  for (const m of (modules ?? []) as Record<string, unknown>[]) moduleToPlanId.set(m.id as string, m.curriculum_id as string);
+  for (const m of modules) moduleToPlanId.set(m.id, m.curriculum_id);
   const moduleIds = Array.from(moduleToPlanId.keys());
 
-  const { data: lessons } = moduleIds.length
-    ? await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
-    : { data: [] as { id: string; module_id: string }[] };
+  const lessons = await selectInChunks<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds);
   const lessonToPlanId = new Map<string, string>();
   const totalLessonsByPlan = new Map<string, number>();
-  for (const l of (lessons ?? []) as Record<string, unknown>[]) {
-    const planId = moduleToPlanId.get(l.module_id as string);
+  for (const l of lessons) {
+    const planId = moduleToPlanId.get(l.module_id);
     if (!planId) continue;
-    lessonToPlanId.set(l.id as string, planId);
+    lessonToPlanId.set(l.id, planId);
     totalLessonsByPlan.set(planId, (totalLessonsByPlan.get(planId) ?? 0) + 1);
   }
   const lessonIds = Array.from(lessonToPlanId.keys());
 
-  const { data: progress } = lessonIds.length
-    ? await supabaseRead.from("p2p_lesson_progress").select("lesson_id,completed,updated_at").eq("user_id", userId).in("lesson_id", lessonIds)
-    : { data: [] as { lesson_id: string; completed: boolean; updated_at: string | null }[] };
+  const progress: { lesson_id: string; completed: boolean; updated_at: string | null }[] = [];
+  for (const c of chunkIds(lessonIds)) {
+    const { data, error } = await supabaseRead
+      .from("p2p_lesson_progress")
+      .select("lesson_id,completed,updated_at")
+      .eq("user_id", userId)
+      .in("lesson_id", c);
+    if (error) throw new Error(`p2p_lesson_progress IN chunk failed: ${error.message}`);
+    progress.push(...((data ?? []) as { lesson_id: string; completed: boolean; updated_at: string | null }[]));
+  }
 
   const completedByPlan = new Map<string, number>();
   const lastActivityByPlan = new Map<string, string>();

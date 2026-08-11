@@ -57,6 +57,60 @@ export interface Plan {
   lessonCount: number;
 }
 
+// ── Plan categories (migration 054_plan_categories.sql / 055_plan_locking.sql) ──
+// The 10 top-level collections that group individual topic plans
+// (p2p_curriculums rows with type='plan_category'), each with a sequential
+// per-category unlock chain — see resolveLockStatus() in curriculum.ts.
+export interface PlanCategory {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  colorTheme: string;
+  displayOrder: number | null;
+  planCount: number;
+  totalLessons: number;
+}
+
+export interface PlanWithLockStatus {
+  id: string;
+  title: string;
+  description: string | null;
+  subtitle: string | null;
+  topicNumber: number | null;
+  moduleCount: number;
+  lessonCount: number;
+  difficultyLevel: string;
+  estimatedWeeks: number | null;
+  locked: boolean;
+  unlockMessage: string | null;
+  progressPercent: number;
+}
+
+export interface PlanSearchResult {
+  id: string;
+  title: string;
+  topicNumber: number | null;
+  categoryId: string | null;
+  categoryTitle: string | null;
+  categoryColorTheme: string;
+  moduleCount: number;
+  lessonCount: number;
+  locked: boolean;
+  unlockMessage: string | null;
+  matchType: "exact" | "partial" | "content";
+}
+
+export interface PlanWithCategory {
+  id: string;
+  title: string;
+  topicNumber: number | null;
+  categoryId: string | null;
+  categoryTitle: string | null;
+  categoryColorTheme: string;
+  locked: boolean;
+}
+
 // ── 7 Mountains mapping (Dashboard activity tracking) ───────────────────────
 // p2p_curriculums has no dedicated category column, only freeform `tags` —
 // same honest, non-fabricated taxonomy substitute already used elsewhere in
@@ -619,6 +673,11 @@ interface DataContextValue {
   loadPlans: () => Promise<void>;
   getPlanById: (planId: string) => Plan | undefined;
   getPlanProgress: (planId: string) => number;
+  planCategories: PlanCategory[];
+  loadPlanCategories: () => Promise<void>;
+  getCategoryPlans: (categoryId: string) => Promise<PlanWithLockStatus[]>;
+  searchPlans: (query: string) => Promise<PlanSearchResult[]>;
+  getAllPlansAZ: () => Promise<PlanWithCategory[]>;
   prayers: PrayerRequest[];
   sessions: StudySession[];
   forestNodes: ForestNode[];
@@ -791,6 +850,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // p2p_lesson_progress table core curriculum uses (plans ARE p2p_curriculums
   // rows now, see migration 041_unify_plans_system.sql), not a separate table.
   const [planProgress, setPlanProgress] = useState<Map<string, number>>(new Map());
+  const [planCategories, setPlanCategories] = useState<PlanCategory[]>([]);
   const [fruitCatalog, setFruitCatalog] = useState<FruitCatalogEntry[]>([]);
   const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
@@ -945,6 +1005,76 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const getPlanById = useCallback((planId: string) => plans.find((p) => p.id === planId), [plans]);
   const getPlanProgress = useCallback((planId: string) => planProgress.get(planId) ?? 0, [planProgress]);
+
+  const loadPlanCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/plans/categories`);
+      const data = (await res.json()) as PlanCategory[];
+      setPlanCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setPlanCategories([]);
+    }
+  }, []);
+
+  const getCategoryPlans = useCallback(async (categoryId: string): Promise<PlanWithLockStatus[]> => {
+    try {
+      const params = profile?.id ? `?userId=${profile.id}` : "";
+      const res = await fetch(`${getApiUrl()}/plans/categories/${categoryId}/plans${params}`);
+      const data = (await res.json()) as PlanWithLockStatus[];
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }, [profile?.id]);
+
+  const searchPlans = useCallback(async (query: string): Promise<PlanSearchResult[]> => {
+    const q = query.trim();
+    if (!q) return [];
+    try {
+      const params = new URLSearchParams({ q });
+      if (profile?.id) params.set("userId", profile.id);
+      const res = await fetch(`${getApiUrl()}/plans/search?${params.toString()}`);
+      const data = (await res.json()) as PlanSearchResult[];
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }, [profile?.id]);
+
+  // All 144 plans across all 10 categories, for the A-Z tab — categories are
+  // a small, fixed set (10), so fetching each one's plans in parallel is
+  // simpler and just as fast as a dedicated flat endpoint would be.
+  const getAllPlansAZ = useCallback(async (): Promise<PlanWithCategory[]> => {
+    try {
+      const apiUrl = getApiUrl();
+      const catRes = await fetch(`${apiUrl}/plans/categories`);
+      const categories = (await catRes.json()) as PlanCategory[];
+      if (!Array.isArray(categories) || categories.length === 0) return [];
+
+      const params = profile?.id ? `?userId=${profile.id}` : "";
+      const perCategory = await Promise.all(
+        categories.map((c) =>
+          fetch(`${apiUrl}/plans/categories/${c.id}/plans${params}`)
+            .then((r) => r.json())
+            .then((plansInCat: PlanWithLockStatus[]) =>
+              (Array.isArray(plansInCat) ? plansInCat : []).map((p) => ({
+                id: p.id,
+                title: p.title,
+                topicNumber: p.topicNumber,
+                categoryId: c.id,
+                categoryTitle: c.title,
+                categoryColorTheme: c.colorTheme,
+                locked: p.locked,
+              }))
+            )
+            .catch(() => [] as PlanWithCategory[])
+        )
+      );
+      return perCategory.flat().sort((a, b) => a.title.localeCompare(b.title));
+    } catch {
+      return [];
+    }
+  }, [profile?.id]);
 
   const loadCurriculum = useCallback(async (userId?: string, languageCode?: string) => {
     try {
@@ -2870,7 +3000,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress, prayers, sessions, forestNodes, forestStats,
+      modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
+      planCategories, loadPlanCategories, getCategoryPlans, searchPlans, getAllPlansAZ,
+      prayers, sessions, forestNodes, forestStats,
       treeData, treeMentees, refreshTreeData, pendingCompletionMoment, dismissPendingCompletionMoment,
       fruitCatalog, userFruits, fruitProgress, fruitCount: userFruits.length, missions,
       dailyVerse, pendingEvaluations, isLoading,

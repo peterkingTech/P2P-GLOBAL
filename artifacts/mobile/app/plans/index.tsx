@@ -9,6 +9,9 @@ import {
   Image,
   ActivityIndicator,
   Modal,
+  Alert,
+  Platform,
+  LayoutChangeEvent,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,34 +19,78 @@ import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useAuth, supabase } from "@/contexts/AuthContext";
-import { useData, Plan } from "@/contexts/DataContext";
+import { useData, Plan, PlanCategory, PlanSearchResult, PlanWithCategory } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { getPlanCategoryMeta } from "@/lib/planCategories";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
+type FindSubTab = "categories" | "az" | "search";
 
 type ActivePlan = Plan & { progressPercent: number; lastActivityAt: string | null };
 type SavedPlan = Plan & { savedAt: string | null };
 type CompletedPlan = Plan & { completedAt: string | null };
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-const CATEGORIES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; tagMatch?: string }[] = [
-  { key: "life_stage", label: "Life Stage", icon: "hourglass-outline", tagMatch: "life stage" },
-  { key: "freedom_recovery", label: "Freedom and Recovery", icon: "shield-checkmark-outline", tagMatch: "freedom" },
-  { key: "relationships", label: "Relationships", icon: "heart-outline", tagMatch: "relationships" },
-  { key: "kingdom_influence", label: "Kingdom Influence", icon: "globe-outline", tagMatch: "kingdom influence" },
-  { key: "seasonal", label: "Seasonal", icon: "calendar-outline", tagMatch: "seasonal" },
-  { key: "featured", label: "Featured", icon: "star-outline" },
-];
+function alertLocked(message: string) {
+  if (Platform.OS === "web") window.alert(message);
+  else Alert.alert("Plan Locked", message);
+}
 
-const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"];
-const DURATION_OPTIONS = [
-  { key: "short", label: "Short (≤3 weeks)", test: (w: number | null) => !!w && w <= 3 },
-  { key: "medium", label: "Medium (4–8 weeks)", test: (w: number | null) => !!w && w >= 4 && w <= 8 },
-  { key: "long", label: "Long (9+ weeks)", test: (w: number | null) => !!w && w >= 9 },
-];
+// The 10 top-level plan category collections (p2p_curriculums rows with
+// type='plan_category', see migration 054_plan_categories.sql) — id/
+// planCount/description are fetched live via DataContext's planCategories
+// (the database is authoritative for those); label/icon/color/order come
+// from the shared PLAN_CATEGORIES constant (lib/planCategories.ts) so
+// they're defined in exactly one place across the app.
+function CategoryCard({ category, colors, onPress }: { category: PlanCategory; colors: AppColors; onPress: () => void }) {
+  const styles = makeStyles(colors);
+  const meta = getPlanCategoryMeta(category.category);
+  return (
+    <TouchableOpacity
+      style={[styles.categoryCard, { backgroundColor: meta?.color ?? category.colorTheme }]}
+      activeOpacity={0.88}
+      onPress={onPress}
+    >
+      <Text style={styles.categoryCardEmoji}>{meta?.icon ?? "📖"}</Text>
+      <Text style={styles.categoryCardTitle} numberOfLines={2}>{meta?.label ?? category.title}</Text>
+      <Text style={styles.categoryCardCount}>{category.planCount} plan{category.planCount === 1 ? "" : "s"}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Shared row for the A-Z list and Search Results — both show a plan's
+// title, its category (colored dot + name), and lock status.
+function PlanListRow({
+  title, categoryTitle, categoryColorTheme, locked, unlockMessage, onPress,
+}: {
+  title: string; categoryTitle: string | null; categoryColorTheme: string;
+  locked: boolean; unlockMessage: string | null; onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity
+      style={[styles.azRow, locked && styles.azRowLocked]}
+      activeOpacity={0.85}
+      onPress={() => (locked ? alertLocked(unlockMessage ?? "Complete the previous plan first to access this plan.") : onPress())}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.azRowTitle, locked && styles.azRowTitleLocked]} numberOfLines={1}>{title}</Text>
+        {categoryTitle && (
+          <View style={styles.azRowCategoryRow}>
+            <View style={[styles.azRowDot, { backgroundColor: categoryColorTheme }]} />
+            <Text style={styles.azRowCategoryText}>{categoryTitle}</Text>
+          </View>
+        )}
+      </View>
+      <Ionicons name={locked ? "lock-closed" : "chevron-forward"} size={16} color={locked ? colors.textMuted : colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
 
 const FORMAT_LABELS: Record<string, string> = {
   solo: "Solo",
@@ -67,6 +114,7 @@ function PlanCard({
   colors,
   progressPercent,
   subLine,
+  categoryLabel,
   isSaved,
   onToggleSave,
   primaryLabel,
@@ -79,6 +127,10 @@ function PlanCard({
   colors: AppColors;
   progressPercent?: number;
   subLine?: string;
+  // Which of the 10 plan-category collections this plan belongs to — shown
+  // as "Category · Title" so an enrolled plan in My Plans carries context of
+  // which collection it's from (see migration 054_plan_categories.sql).
+  categoryLabel?: string;
   isSaved?: boolean;
   onToggleSave?: () => void;
   primaryLabel?: string;
@@ -113,7 +165,9 @@ function PlanCard({
       </View>
 
       <View style={styles.planCardBody}>
-        <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title}</Text>
+        <Text style={styles.planCardTitle} numberOfLines={2}>
+          {categoryLabel ? `${categoryLabel} · ${plan.title}` : plan.title}
+        </Text>
         {plan.teachingCreditName && (
           <Text style={styles.planCardCredit} numberOfLines={1}>{plan.teachingCreditName}</Text>
         )}
@@ -230,71 +284,12 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
   );
 }
 
-// ── Filter modal (Find Plans → All Plans) ───────────────────────────────────
-function FilterModal({
-  visible, onClose, difficulties, onToggleDifficulty, duration, onSetDuration, onClear,
-}: {
-  visible: boolean; onClose: () => void;
-  difficulties: string[]; onToggleDifficulty: (d: string) => void;
-  duration: string | null; onSetDuration: (d: string | null) => void;
-  onClear: () => void;
-}) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.filterOverlay}>
-        <View style={styles.filterSheet}>
-          <View style={styles.filterHeader}>
-            <Text style={styles.filterTitle}>Filter Plans</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textDark} /></TouchableOpacity>
-          </View>
-          <Text style={styles.filterLabel}>Difficulty</Text>
-          <View style={styles.filterChipRow}>
-            {DIFFICULTY_OPTIONS.map((d) => (
-              <TouchableOpacity
-                key={d}
-                style={[styles.filterChip, difficulties.includes(d) && styles.filterChipActive]}
-                onPress={() => onToggleDifficulty(d)}
-              >
-                <Text style={[styles.filterChipText, difficulties.includes(d) && styles.filterChipTextActive]}>
-                  {d.charAt(0).toUpperCase() + d.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.filterLabel}>Duration</Text>
-          <View style={styles.filterChipRow}>
-            {DURATION_OPTIONS.map((d) => (
-              <TouchableOpacity
-                key={d.key}
-                style={[styles.filterChip, duration === d.key && styles.filterChipActive]}
-                onPress={() => onSetDuration(duration === d.key ? null : d.key)}
-              >
-                <Text style={[styles.filterChipText, duration === d.key && styles.filterChipTextActive]}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.filterActionsRow}>
-            <TouchableOpacity style={styles.filterClearBtn} onPress={onClear}>
-              <Text style={styles.filterClearText}>Clear</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.filterApplyBtn} onPress={onClose}>
-              <Text style={styles.filterApplyText}>Apply</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 export default function PlansHubScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { profile } = useAuth();
-  const { plans: allPlans, getPlanProgress } = useData();
+  const { plans: allPlans, getPlanProgress, planCategories, loadPlanCategories, searchPlans, getAllPlansAZ } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -317,10 +312,15 @@ export default function PlansHubScreen() {
 
   // Find Plans state
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterDifficulties, setFilterDifficulties] = useState<string[]>([]);
-  const [filterDuration, setFilterDuration] = useState<string | null>(null);
+  const [findSubTab, setFindSubTab] = useState<FindSubTab>("categories");
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [azPlans, setAzPlans] = useState<PlanWithCategory[]>([]);
+  const [azLoading, setAzLoading] = useState(false);
+  const [azLoaded, setAzLoaded] = useState(false);
+  const [searchResults, setSearchResults] = useState<PlanSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const azScrollRef = useRef<ScrollView>(null);
+  const letterOffsets = useRef<Record<string, number>>({});
 
   const loadMyPlans = useCallback(async () => {
     if (!profile?.id) return;
@@ -380,9 +380,56 @@ export default function PlansHubScreen() {
     }
   }, [profile?.id]);
 
+  const loadCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    await loadPlanCategories();
+    setCategoriesLoading(false);
+  }, [loadPlanCategories]);
+
+  const loadAz = useCallback(async () => {
+    setAzLoading(true);
+    try {
+      const data = await getAllPlansAZ();
+      setAzPlans(data);
+      setAzLoaded(true);
+    } finally {
+      setAzLoading(false);
+    }
+  }, [getAllPlansAZ]);
+
   useEffect(() => { loadMyPlans(); }, [loadMyPlans]);
   useEffect(() => { loadSaved(); }, [loadSaved]);
   useEffect(() => { loadCompleted(); }, [loadCompleted]);
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  // Load the A-Z list lazily, the first time that sub-tab is opened.
+  useEffect(() => {
+    if (findSubTab === "az" && !azLoaded && !azLoading) loadAz();
+  }, [findSubTab, azLoaded, azLoading, loadAz]);
+
+  // 300ms-debounced server search — jumps to the Search Results sub-tab the
+  // moment text appears, and returns to Categories once it's cleared.
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) {
+      setSearchResults([]);
+      setFindSubTab((prev) => (prev === "search" ? "categories" : prev));
+      return;
+    }
+    setFindSubTab("search");
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const results = await searchPlans(q);
+      setSearchResults(results);
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, searchPlans]);
+
+  function scrollToLetter(letter: string) {
+    const y = letterOffsets.current[letter];
+    if (y !== undefined) azScrollRef.current?.scrollTo({ y, animated: true });
+  }
 
   async function toggleSave(planId: string) {
     if (!profile?.id) return;
@@ -413,40 +460,34 @@ export default function PlansHubScreen() {
     }
   }
 
+  // A topic plan's category slug lives in tags[0] (see migration
+  // 054_plan_categories.sql) — same convention already used everywhere else
+  // in this file for tag-based lookups.
+  const categoryTitleBySlug = new Map(planCategories.filter((c) => c.category).map((c) => [c.category as string, c.title]));
+  function categoryLabelFor(plan: Plan): string | undefined {
+    return plan.tags[0] ? categoryTitleBySlug.get(plan.tags[0]) : undefined;
+  }
+
   const now = Date.now();
   const recentActive = activePlans.filter((p) => p.lastActivityAt && now - new Date(p.lastActivityAt).getTime() < FOURTEEN_DAYS_MS);
   const staleEnrolled = activePlans.filter((p) => !p.lastActivityAt || now - new Date(p.lastActivityAt).getTime() >= FOURTEEN_DAYS_MS);
 
-  const searchLower = search.trim().toLowerCase();
-  const searchResults = searchLower
-    ? allPlans.filter((p) =>
-        p.title.toLowerCase().includes(searchLower) ||
-        (p.description ?? "").toLowerCase().includes(searchLower) ||
-        (p.teachingCreditName ?? "").toLowerCase().includes(searchLower)
-      )
-    : [];
-
   const recommended = allPlans.filter((p) => p.isFeatured).slice(0, 6);
 
-  const categoryPlans = activeCategory
-    ? allPlans.filter((p) => {
-        const cat = CATEGORIES.find((c) => c.key === activeCategory);
-        if (!cat) return false;
-        if (cat.key === "featured") return p.isFeatured;
-        return p.tags.some((t) => t.toLowerCase().includes(cat.tagMatch ?? "__none__"));
-      })
-    : [];
+  // Grid order follows PLAN_CATEGORIES' canonical `order`, not whatever
+  // order the API happened to return (though in practice they already
+  // agree, since display_order in the DB was seeded to match).
+  const orderedCategories = [...planCategories].sort(
+    (a, b) => (getPlanCategoryMeta(a.category)?.order ?? 99) - (getPlanCategoryMeta(b.category)?.order ?? 99)
+  );
 
-  const filteredAllPlans = allPlans.filter((p) => {
-    if (filterDifficulties.length && !filterDifficulties.includes(p.difficultyLevel)) return false;
-    if (filterDuration) {
-      const opt = DURATION_OPTIONS.find((d) => d.key === filterDuration);
-      if (opt && !opt.test(p.estimatedWeeks)) return false;
-    }
-    return true;
-  });
-
-  const hasActiveFilters = filterDifficulties.length > 0 || !!filterDuration;
+  // Group the A-Z list by first letter for the alphabet-strip index.
+  const azGroups: { letter: string; plans: PlanWithCategory[] }[] = [];
+  for (const letter of ALPHABET) {
+    const inLetter = azPlans.filter((p) => p.title.trim().charAt(0).toUpperCase() === letter);
+    if (inLetter.length) azGroups.push({ letter, plans: inLetter });
+  }
+  const availableLetters = new Set(azGroups.map((g) => g.letter));
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -495,6 +536,7 @@ export default function PlansHubScreen() {
                     colors={colors}
                     progressPercent={p.progressPercent}
                     subLine={p.lastActivityAt ? `Last active ${new Date(p.lastActivityAt).toLocaleDateString()}` : undefined}
+                    categoryLabel={categoryLabelFor(p)}
                     primaryLabel="Continue"
                     onPrimary={() => router.push(`/plan/${p.id}` as any)}
                     onPress={() => router.push(`/plan/${p.id}` as any)}
@@ -512,6 +554,7 @@ export default function PlansHubScreen() {
                       colors={colors}
                       progressPercent={p.progressPercent}
                       subLine="You started this — pick it up again"
+                      categoryLabel={categoryLabelFor(p)}
                       primaryLabel="Continue"
                       onPrimary={() => router.push(`/plan/${p.id}` as any)}
                       onPress={() => router.push(`/plan/${p.id}` as any)}
@@ -529,14 +572,14 @@ export default function PlansHubScreen() {
 
       {/* ── Find Plans ── */}
       {tab === "find" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={styles.searchBar}>
+        <View style={{ flex: 1 }}>
+          <View style={[styles.searchBar, { marginHorizontal: 20, marginTop: 16 }]}>
             <Ionicons name="search" size={16} color={colors.textMuted} />
             <TextInput
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
-              placeholder="Search plans, teachers, topics..."
+              placeholder="Search plans by title, module, or lesson..."
               placeholderTextColor={colors.textMuted}
             />
             {search.length > 0 && (
@@ -546,49 +589,21 @@ export default function PlansHubScreen() {
             )}
           </View>
 
-          {searchLower ? (
-            searchResults.length === 0 ? (
-              <EmptyState colors={colors} icon="search-outline" text="No plans match your search." />
-            ) : (
-              searchResults.map((p) => (
-                <PlanCard
-                  key={p.id}
-                  plan={p}
-                  colors={colors}
-                  isSaved={savedIds.has(p.id)}
-                  onToggleSave={() => toggleSave(p.id)}
-                  primaryLabel="Enroll"
-                  onPrimary={() => goToPlanOrQuestions(p.id)}
-                  onPress={() => router.push(`/plan/${p.id}` as any)}
-                />
-              ))
-            )
-          ) : activeCategory ? (
-            <>
-              <TouchableOpacity style={styles.backToCategoriesRow} onPress={() => setActiveCategory(null)}>
-                <Ionicons name="chevron-back" size={16} color={colors.accentGreen} />
-                <Text style={styles.backToCategoriesText}>Categories</Text>
+          <View style={styles.findSubTabRow}>
+            {([
+              { key: "categories", label: "Categories" },
+              { key: "az", label: "A-Z" },
+              ...(search.trim() ? [{ key: "search", label: "Search Results" }] : []),
+            ] as { key: FindSubTab; label: string }[]).map((t) => (
+              <TouchableOpacity key={t.key} style={[styles.findSubTabBtn, findSubTab === t.key && styles.findSubTabBtnActive]} onPress={() => setFindSubTab(t.key)}>
+                <Text style={[styles.findSubTabText, findSubTab === t.key && styles.findSubTabTextActive]}>{t.label}</Text>
               </TouchableOpacity>
-              <Text style={styles.sectionHeading}>{CATEGORIES.find((c) => c.key === activeCategory)?.label}</Text>
-              {categoryPlans.length === 0 ? (
-                <EmptyState colors={colors} icon="albums-outline" text="No plans in this category yet." />
-              ) : (
-                categoryPlans.map((p) => (
-                  <PlanCard
-                    key={p.id}
-                    plan={p}
-                    colors={colors}
-                    isSaved={savedIds.has(p.id)}
-                    onToggleSave={() => toggleSave(p.id)}
-                    primaryLabel="Enroll"
-                    onPrimary={() => goToPlanOrQuestions(p.id)}
-                    onPress={() => router.push(`/plan/${p.id}` as any)}
-                  />
-                ))
-              )}
-            </>
-          ) : (
-            <>
+            ))}
+          </View>
+
+          {/* ── Categories sub-tab ── */}
+          {findSubTab === "categories" && (
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
               {recommended.length > 0 && (
                 <>
                   <View style={styles.recommendedHeaderRow}>
@@ -613,41 +628,88 @@ export default function PlansHubScreen() {
                 </>
               )}
 
-              <Text style={styles.sectionHeading}>Browse by Category</Text>
-              <View style={styles.categoryGrid}>
-                {CATEGORIES.map((c) => (
-                  <TouchableOpacity key={c.key} style={styles.categoryRow} onPress={() => setActiveCategory(c.key)}>
-                    <View style={styles.categoryIconWrap}>
-                      <Ionicons name={c.icon} size={16} color={colors.accentGreen} />
+              <Text style={styles.sectionHeading}>Plan Collections</Text>
+              {categoriesLoading ? (
+                <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
+              ) : planCategories.length === 0 ? (
+                <EmptyState colors={colors} icon="albums-outline" text="Plan collections are not available yet." />
+              ) : (
+                <View style={styles.categoryCardGrid}>
+                  {orderedCategories.map((c) => (
+                    <View key={c.id} style={styles.categoryCardWrap}>
+                      <CategoryCard category={c} colors={colors} onPress={() => router.push(`/plans/category/${c.id}` as any)} />
                     </View>
-                    <Text style={styles.categoryLabel}>{c.label}</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          )}
+
+          {/* ── A-Z sub-tab ── */}
+          {findSubTab === "az" && (
+            <View style={{ flex: 1, flexDirection: "row" }}>
+              <ScrollView
+                ref={azScrollRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100, paddingRight: 32 }]}
+                showsVerticalScrollIndicator={false}
+              >
+                {azLoading ? (
+                  <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
+                ) : azGroups.length === 0 ? (
+                  <EmptyState colors={colors} icon="text-outline" text="No plans found." />
+                ) : (
+                  azGroups.map((group) => (
+                    <View key={group.letter} onLayout={(e: LayoutChangeEvent) => { letterOffsets.current[group.letter] = e.nativeEvent.layout.y; }}>
+                      <Text style={styles.azLetterHeading}>{group.letter}</Text>
+                      {group.plans.map((p) => (
+                        <PlanListRow
+                          key={p.id}
+                          title={p.title}
+                          categoryTitle={p.categoryTitle}
+                          categoryColorTheme={p.categoryColorTheme}
+                          locked={p.locked}
+                          unlockMessage={null}
+                          onPress={() => router.push(`/plan/${p.id}` as any)}
+                        />
+                      ))}
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+              <View style={styles.alphabetStrip}>
+                {ALPHABET.map((letter) => (
+                  <TouchableOpacity key={letter} onPress={() => scrollToLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 4, right: 4 }}>
+                    <Text style={[styles.alphabetStripLetter, !availableLetters.has(letter) && styles.alphabetStripLetterMuted]}>{letter}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-
-              <View style={styles.allPlansHeaderRow}>
-                <Text style={styles.sectionHeading}>All Plans</Text>
-                <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterOpen(true)}>
-                  <Ionicons name="options-outline" size={14} color={hasActiveFilters ? "#fff" : colors.accentGreen} />
-                  <Text style={[styles.filterBtnText, hasActiveFilters && { color: "#fff" }]}>Filter</Text>
-                </TouchableOpacity>
-              </View>
-              {filteredAllPlans.map((p) => (
-                <PlanCard
-                  key={p.id}
-                  plan={p}
-                  colors={colors}
-                  isSaved={savedIds.has(p.id)}
-                  onToggleSave={() => toggleSave(p.id)}
-                  primaryLabel="Enroll"
-                  onPrimary={() => goToPlanOrQuestions(p.id)}
-                  onPress={() => router.push(`/plan/${p.id}` as any)}
-                />
-              ))}
-            </>
+            </View>
           )}
-        </ScrollView>
+
+          {/* ── Search Results sub-tab ── */}
+          {findSubTab === "search" && (
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {searchLoading ? (
+                <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
+              ) : searchResults.length === 0 ? (
+                <EmptyState colors={colors} icon="search-outline" text="No plans match your search." />
+              ) : (
+                searchResults.map((p) => (
+                  <PlanListRow
+                    key={p.id}
+                    title={p.title}
+                    categoryTitle={p.categoryTitle}
+                    categoryColorTheme={p.categoryColorTheme}
+                    locked={p.locked}
+                    unlockMessage={p.unlockMessage}
+                    onPress={() => router.push(`/plan/${p.id}` as any)}
+                  />
+                ))
+              )}
+            </ScrollView>
+          )}
+        </View>
       )}
 
       {/* ── Saved ── */}
@@ -701,16 +763,6 @@ export default function PlansHubScreen() {
           )}
         </ScrollView>
       )}
-
-      <FilterModal
-        visible={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        difficulties={filterDifficulties}
-        onToggleDifficulty={(d) => setFilterDifficulties((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])}
-        duration={filterDuration}
-        onSetDuration={setFilterDuration}
-        onClear={() => { setFilterDifficulties([]); setFilterDuration(null); }}
-      />
 
       {shareTarget && (
         <PlanCompletionShareModal plan={shareTarget} completedAt={shareTarget.completedAt} onClose={() => setShareTarget(null)} />
@@ -772,17 +824,31 @@ function makeStyles(c: AppColors) {
     recommendedHeaderRow: { marginBottom: 4 },
     recommendedTag: { fontSize: 11, color: c.accentGreen, fontFamily: "Inter_500Medium", marginBottom: 12, marginTop: -8 },
 
-    categoryGrid: { gap: 8, marginBottom: 8 },
-    categoryRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 12 },
-    categoryIconWrap: { width: 30, height: 30, borderRadius: 8, backgroundColor: "rgba(29,158,117,0.1)", alignItems: "center", justifyContent: "center" },
-    categoryLabel: { flex: 1, fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    findSubTabRow: { flexDirection: "row", gap: 6, marginHorizontal: 20, marginTop: 12, marginBottom: 4 },
+    findSubTabBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    findSubTabBtnActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
+    findSubTabText: { fontSize: 12, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
+    findSubTabTextActive: { color: "#fff" },
 
-    backToCategoriesRow: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 8 },
-    backToCategoriesText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+    azLetterHeading: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginTop: 16, marginBottom: 6 },
+    azRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 12, marginBottom: 8 },
+    azRowLocked: { opacity: 0.55 },
+    azRowTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    azRowTitleLocked: { color: c.textMuted },
+    azRowCategoryRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+    azRowDot: { width: 7, height: 7, borderRadius: 3.5 },
+    azRowCategoryText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
-    allPlansHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.card, borderWidth: 1, borderColor: c.accentGreen, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5 },
-    filterBtnText: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    alphabetStrip: { width: 22, paddingTop: 8, alignItems: "center", gap: 2 },
+    alphabetStripLetter: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    alphabetStripLetterMuted: { color: c.borderBeige },
+
+    categoryCardGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 },
+    categoryCardWrap: { width: "50%", paddingHorizontal: 6, marginBottom: 12 },
+    categoryCard: { borderRadius: 16, padding: 16, minHeight: 120, justifyContent: "space-between" },
+    categoryCardEmoji: { fontSize: 26 },
+    categoryCardTitle: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10, lineHeight: 19 },
+    categoryCardCount: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_500Medium", marginTop: 4 },
 
     filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
     filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },

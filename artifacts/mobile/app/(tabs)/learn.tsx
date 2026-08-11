@@ -18,7 +18,6 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import {
   useData,
   Module,
-  Plan,
   getModuleProgressCounts,
   getFoundationProgress,
   getKingdomSchoolStatus,
@@ -27,6 +26,7 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
+import { PLAN_CATEGORIES } from "@/lib/planCategories";
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
@@ -122,64 +122,7 @@ function ModuleCard({ module, isCurrent, onPress }: { module: Module; isCurrent:
   );
 }
 
-// Unified plan card — a Plan is a p2p_curriculums row (type='plan') now, see
-// migration 041_unify_plans_system.sql. Title/description arrive already
-// translated (DataContext.loadPlans does the on-demand translation), and
-// progress is looked up via getPlanProgress rather than carried on the
-// object itself, since it depends on the current user.
-function PlanCard({ plan, progress, onPress }: { plan: Plan; progress: number; onPress: () => void }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const [imgErr, setImgErr] = useState(false);
-  const isComplete = progress === 100;
-  const hasProgress = plan.lessonCount > 0 && progress > 0;
-  return (
-    <TouchableOpacity style={styles.planCard} onPress={onPress} activeOpacity={0.85}>
-      {plan.coverImageUrl && !imgErr ? (
-        <Image source={{ uri: plan.coverImageUrl }} style={styles.planThumb} resizeMode="cover" onError={() => setImgErr(true)} />
-      ) : (
-        <View style={[styles.planThumb, styles.planThumbPlaceholder, { backgroundColor: `${plan.colorTheme}1A` }]}>
-          <Ionicons name="book-outline" size={22} color={plan.colorTheme} />
-        </View>
-      )}
-      <View style={styles.planCardBody}>
-        <View style={styles.planTitleRow}>
-          <Text style={styles.planTitle} numberOfLines={1}>{plan.title}</Text>
-          {plan.isFeatured && (
-            <View style={styles.featuredPill}>
-              <Ionicons name="star" size={9} color="#fff" />
-              <Text style={styles.featuredPillText}>Featured</Text>
-            </View>
-          )}
-        </View>
-        {plan.description ? <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text> : null}
-        <View style={styles.planMetaRow}>
-          <View style={[styles.difficultyBadge, { borderColor: plan.colorTheme }]}>
-            <Text style={[styles.difficultyBadgeText, { color: plan.colorTheme }]}>{plan.difficultyLevel}</Text>
-          </View>
-          <Text style={styles.planMetaText}>
-            {plan.moduleCount} module{plan.moduleCount === 1 ? "" : "s"} · {plan.lessonCount} lesson{plan.lessonCount === 1 ? "" : "s"}
-          </Text>
-        </View>
-        {hasProgress && (
-          <View style={[styles.progressRow, { marginTop: 6 }]}>
-            <View style={[styles.progressBg, { backgroundColor: colors.progressTrack }]}>
-              <View style={[styles.progressFill, { width: `${progress}%` as any, backgroundColor: isComplete ? colors.accentGreen : colors.amber }]} />
-            </View>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>{progress}%</Text>
-          </View>
-        )}
-      </View>
-      {isComplete ? (
-        <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
-      ) : (
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      )}
-    </TouchableOpacity>
-  );
-}
-
-type KingdomSchoolSection = "foundation" | "electives" | null;
+type KingdomSchoolSection = "foundation" | null;
 
 // The two-card selector at the top of Kingdom School — designed to feel
 // like tabs but built as premium cards, not a generic segmented control.
@@ -202,6 +145,7 @@ function KingdomSchoolCards({
   plansCount: number;
   enrolledCount: number;
 }) {
+  const router = useRouter();
   return (
     <View style={cardSelectorStyles.row}>
       <TouchableOpacity
@@ -218,16 +162,22 @@ function KingdomSchoolCards({
         </View>
       </TouchableOpacity>
 
+      {/* Navigates straight to Find Plans (Categories sub-tab, its default)
+          instead of expanding inline, since Electives is now a full
+          10-category/144-plan browsing experience of its own. */}
       <TouchableOpacity
-        style={[cardSelectorStyles.card, cardSelectorStyles.electivesCard, selected === "electives" && cardSelectorStyles.cardSelected]}
+        style={[cardSelectorStyles.card, cardSelectorStyles.electivesCard]}
         activeOpacity={0.9}
-        onPress={() => onSelect(selected === "electives" ? null : "electives")}
+        onPress={() => router.push("/plans?tab=find" as any)}
       >
         <Ionicons name="star" size={22} color="#fff" />
         <Text style={cardSelectorStyles.cardTitle}>Electives</Text>
         <Text style={cardSelectorStyles.cardSubtitle}>Plans & Courses</Text>
-        <Text style={cardSelectorStyles.cardInfo}>{plansCount} plan{plansCount === 1 ? "" : "s"} available</Text>
-        <Text style={cardSelectorStyles.cardInfo}>{enrolledCount} enrolled</Text>
+        <Text style={cardSelectorStyles.cardInfo}>{PLAN_CATEGORIES.length} categories</Text>
+        <Text style={cardSelectorStyles.cardInfo}>{plansCount} plan{plansCount === 1 ? "" : "s"}</Text>
+        {enrolledCount > 0 && (
+          <Text style={cardSelectorStyles.cardInfo}>{enrolledCount} in progress</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -279,43 +229,6 @@ function makeStyles(c: AppColors) {
     allModulesHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 24, marginBottom: 12 },
     modulesList: { gap: 8 },
 
-    plansList: { gap: 12, marginTop: 16 },
-    planCard: {
-      backgroundColor: c.card, borderRadius: 16,
-      borderWidth: 1, borderColor: c.borderBeige, padding: 14,
-      flexDirection: "row", alignItems: "center", gap: 12,
-    },
-    planCardLocked: { opacity: 0.55 },
-    planCardBody: { flex: 1 },
-    planThumb: { width: 56, height: 56, borderRadius: 12, flexShrink: 0 },
-    planThumbPlaceholder: { alignItems: "center", justifyContent: "center" },
-    planTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
-    planTitle: { flex: 1, fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    featuredPill: {
-      flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.amber,
-      borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0,
-    },
-    featuredPillText: { fontSize: 9, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
-    planDesc: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
-    planMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
-    difficultyBadge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
-    difficultyBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
-    planMetaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-
-    electivesBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-    findElectivesBtn: {
-      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      backgroundColor: c.card, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 14,
-      paddingVertical: 13,
-    },
-    findElectivesBtnText: { fontSize: 14, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    myPlansBtn: {
-      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14,
-      paddingVertical: 13,
-    },
-    myPlansBtnText: { fontSize: 14, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold" },
-
     loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 },
 
     card: {
@@ -354,7 +267,7 @@ export default function LearnTab() {
   // Title/description arrive already translated — DataContext.loadPlans
   // does the on-demand translation fetch itself (parallel, English fallback
   // always), so there's nothing left for this screen to fetch.
-  const { modules, isLoading, plans, plansLoading, getPlanProgress } = useData();
+  const { modules, isLoading, plans } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -467,50 +380,6 @@ export default function LearnTab() {
           </View>
           )}
 
-          {/* ── Section 2: Electives ── */}
-          {selectedSection === "electives" && (
-          <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeaderTitle}>{t("learn.electivesHeader")}</Text>
-              <Text style={styles.sectionHeaderSubtitle}>{t("learn.electivesSubtitle")}</Text>
-            </View>
-
-            {plansLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator color={colors.accentGreen} />
-              </View>
-            ) : plans.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <Ionicons name="radio-outline" size={40} color={colors.textMuted} />
-                <Text style={[styles.sectionHeaderSubtitle, { textAlign: "center", marginTop: 12 }]}>
-                  {t("learn.noPlans")}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.plansList}>
-                {plans.map((item) => (
-                  <PlanCard
-                    key={item.id}
-                    plan={item}
-                    progress={getPlanProgress(item.id)}
-                    onPress={() => router.push(`/plan/${item.id}` as any)}
-                  />
-                ))}
-              </View>
-            )}
-
-            <View style={styles.electivesBtnRow}>
-              <TouchableOpacity style={styles.myPlansBtn} activeOpacity={0.85} onPress={() => router.push("/plans?tab=my" as any)}>
-                <Ionicons name="list-outline" size={16} color={colors.textMid} />
-                <Text style={styles.myPlansBtnText}>My Plans</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.findElectivesBtn} activeOpacity={0.85} onPress={() => router.push("/plans?tab=find" as any)}>
-                <Ionicons name="search" size={16} color={colors.accentGreen} />
-                <Text style={styles.findElectivesBtnText}>{t("learn.findElectives")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          )}
         </ScrollView>
       </View>
 

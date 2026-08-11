@@ -25,13 +25,16 @@ const COVER_HEIGHT = 200;
 // uses) ─────────────────────────────────────────────────────────────────────
 type PlanLessonDetail = { id: string; moduleId: string | null; title: string; subtitle: string | null; sortOrder: number; status: string };
 type PlanModuleDetail = { id: string; title: string; description: string | null; coverImageUrl: string | null; colorTheme: string | null; sortOrder: number; status: string; lessons: PlanLessonDetail[] };
+type PlanCategoryRef = { id: string; title: string; colorTheme: string };
 type PlanDetail = {
   id: string; title: string; description: string | null; subtitle: string | null;
   coverImageUrl: string | null; colorTheme: string; difficultyLevel: string; estimatedWeeks: number | null;
   teachingCreditName: string | null; teachingCreditRole: string | null; teachingCreditChurch: string | null;
   teachingCreditLocation: string | null; teachingCreditYoutube: string | null; teachingCreditInstagram: string | null;
+  topicNumber: number | null; category: PlanCategoryRef | null;
   modules: PlanModuleDetail[];
 };
+type LockedPlanInfo = { locked: true; title: string; unlockMessage: string; previousPlanId: string | null; previousPlanTitle: string | null };
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,15 +46,24 @@ export default function PlanDetailScreen() {
   const styles = makeStyles(colors);
 
   const [plan, setPlan] = useState<PlanDetail | null>(null);
+  const [lockedInfo, setLockedInfo] = useState<LockedPlanInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgErr, setImgErr] = useState(false);
 
   const loadPlan = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setLockedInfo(null);
     try {
       const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/plans/${id}`);
+      const params = profile?.id ? `?userId=${profile.id}` : "";
+      const res = await fetch(`${apiUrl}/plans/${id}${params}`);
+      if (res.status === 403) {
+        const body = (await res.json()) as LockedPlanInfo;
+        setLockedInfo(body);
+        setPlan(null);
+        return;
+      }
       if (!res.ok) { setPlan(null); return; }
       const data = (await res.json()) as PlanDetail;
       setPlan(data);
@@ -97,16 +109,50 @@ export default function PlanDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, profile?.contentLanguage]);
+  }, [id, profile?.id, profile?.contentLanguage]);
 
   // Refetch on every focus — returning from a lesson after submitting should
-  // reflect the new progress percentage immediately.
+  // reflect the new progress percentage immediately, and re-checks lock
+  // status in case completing that lesson just unlocked this very plan.
   useFocusEffect(useCallback(() => { loadPlan(); }, [loadPlan]));
 
   if (loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
         <ActivityIndicator color={colors.accentGreen} />
+      </View>
+    );
+  }
+
+  if (lockedInfo) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerBarTitle} numberOfLines={1}>{lockedInfo.title}</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={styles.lockedScreen}>
+          <View style={styles.lockedIconWrap}>
+            <Ionicons name="lock-closed" size={36} color={colors.textMuted} />
+          </View>
+          <Text style={styles.lockedHeading}>This plan is locked</Text>
+          <Text style={styles.lockedMessage}>
+            {lockedInfo.previousPlanTitle
+              ? `Complete "${lockedInfo.previousPlanTitle}" to unlock "${lockedInfo.title}"`
+              : lockedInfo.unlockMessage}
+          </Text>
+          {lockedInfo.previousPlanId && (
+            <TouchableOpacity
+              style={styles.lockedBtn}
+              onPress={() => router.replace(`/plan/${lockedInfo.previousPlanId}` as any)}
+            >
+              <Text style={styles.lockedBtnText}>Go to Previous Plan</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   }
@@ -133,6 +179,16 @@ export default function PlanDetailScreen() {
         <Text style={styles.headerBarTitle} numberOfLines={1}>{plan.title}</Text>
         <View style={{ width: 22 }} />
       </View>
+
+      {plan.category && (
+        <View style={styles.breadcrumbRow}>
+          <TouchableOpacity onPress={() => router.push(`/plans/category/${plan.category!.id}` as any)}>
+            <Text style={styles.breadcrumbLink}>{plan.category.title}</Text>
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
+          <Text style={styles.breadcrumbCurrent} numberOfLines={1}>{plan.title}</Text>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {plan.coverImageUrl && !imgErr ? (
@@ -253,6 +309,17 @@ function makeStyles(c: AppColors) {
     root: { flex: 1, backgroundColor: c.lightCream },
     headerBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: c.lightCream, borderBottomWidth: 1, borderBottomColor: c.borderBeige, gap: 12 },
     headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
+
+    breadcrumbRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+    breadcrumbLink: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+    breadcrumbCurrent: { flex: 1, fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+
+    lockedScreen: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 14 },
+    lockedIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: c.cardBeige, alignItems: "center", justifyContent: "center" },
+    lockedHeading: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    lockedMessage: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+    lockedBtn: { backgroundColor: c.accentGreen, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+    lockedBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
     scroll: { paddingHorizontal: 20, paddingTop: 20 },
     errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
 

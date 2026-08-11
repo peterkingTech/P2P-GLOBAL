@@ -627,7 +627,7 @@ async function rollbackImport(curriculumId: string, lessonIds: string[], assignm
 // POST /admin/plans/confirm-import — actually inserts the (possibly
 // admin-edited) parsed plan as a draft.
 router.post("/plans/confirm-import", async (req, res) => {
-  const plan = req.body as ParsedPlan;
+  const plan = req.body as ParsedPlan & { parentCategoryId?: string | null; topicNumber?: number | null };
   const title = plan?.title?.trim();
   if (!title) return err(res, "title is required", 400);
   if (!Array.isArray(plan.modules) || plan.modules.length === 0) {
@@ -658,6 +658,8 @@ router.post("/plans/confirm-import", async (req, res) => {
       status: "draft",
       tags: plan.category ? [plan.category] : [],
       color_theme: colorTheme,
+      parent_category_id: plan.parentCategoryId ?? null,
+      topic_number: plan.topicNumber ?? null,
     })
     .select()
     .single();

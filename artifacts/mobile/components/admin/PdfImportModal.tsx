@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Modal, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -9,6 +9,10 @@ import { getApiUrl } from "@/lib/apiUrl";
 // Admin PDF Plan Importer — upload one or more P2P Plan PDFs, preview the
 // auto-extracted modules/lessons for a single file (or run a sequential
 // bulk import for multiple), then confirm to insert as a draft plan.
+//
+// STEP 1 also requires picking which of the 10 plan-category collections
+// (migration 054_plan_categories.sql) the plan(s) belong to before
+// uploading — parentCategoryId is attached to every import from here.
 
 type ParsedLesson = {
   title: string; orderIndex: number; memoryVerse: string; content: string;
@@ -18,7 +22,9 @@ type ParsedModule = { title: string; orderIndex: number; lessons: ParsedLesson[]
 type ParsedPlan = {
   title: string; description: string; subtitle: string; category: string;
   lectureIntro: string; modules: ParsedModule[];
+  parentCategoryId?: string | null; topicNumber?: number | null;
 };
+type PlanCategory = { id: string; title: string; colorTheme: string; planCount: number };
 type BulkResult = { filename: string; ok: boolean; title?: string; error?: string };
 
 type Step = "upload" | "preview" | "importing" | "success" | "error";
@@ -73,6 +79,26 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
   const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
   const [importedTitle, setImportedTitle] = useState("");
+  const [categories, setCategories] = useState<PlanCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setCategoriesLoading(true);
+    (async () => {
+      try {
+        const token = await getAuthToken();
+        const res = await fetch(`${getApiUrl()}/plans/categories`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = (await res.json()) as PlanCategory[];
+        setCategories(Array.isArray(data) ? data : []);
+      } catch {
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    })();
+  }, [visible]);
 
   function reset() {
     setStep("upload"); setPlan(null); setErrorMsg(""); setBulkProgress(null);
@@ -81,6 +107,8 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
   function close() { reset(); onClose(); }
 
   async function pickFiles() {
+    if (!selectedCategoryId) return;
+    const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
     const result = await DocumentPicker.getDocumentAsync({
       type: "application/pdf", multiple: true, copyToCacheDirectory: true,
     });
@@ -92,6 +120,8 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
       setBusy(true);
       try {
         const parsed = await uploadPdf(assets[0]);
+        parsed.parentCategoryId = selectedCategoryId;
+        parsed.topicNumber = (selectedCategory?.planCount ?? 0) + 1;
         setPlan(parsed);
         setExpandedModules(new Set([0]));
         setStep("preview");
@@ -104,14 +134,19 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
       return;
     }
 
-    // Bulk mode: sequential parse + import, no per-file preview.
+    // Bulk mode: sequential parse + import, no per-file preview. Topic
+    // numbers increment locally across the batch, continuing on from the
+    // category's current plan count.
     setStep("importing");
     const results: BulkResult[] = [];
+    let nextTopicNumber = (selectedCategory?.planCount ?? 0) + 1;
     for (let i = 0; i < assets.length; i++) {
       const asset = assets[i];
       setBulkProgress({ current: i + 1, total: assets.length, filename: asset.name });
       try {
         const parsed = await uploadPdf(asset);
+        parsed.parentCategoryId = selectedCategoryId;
+        parsed.topicNumber = nextTopicNumber++;
         await confirmImport(parsed);
         results.push({ filename: asset.name, ok: true, title: parsed.title });
       } catch (e: any) {
@@ -169,7 +204,33 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
               <Text style={styles.uploadHint}>
                 Choose one PDF to preview before importing, or select up to 20 to bulk-import them sequentially.
               </Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={pickFiles} disabled={busy}>
+
+              <View style={{ width: "100%", gap: 8 }}>
+                <Text style={styles.fieldLabel}>Category *</Text>
+                {categoriesLoading ? (
+                  <ActivityIndicator color={colors.accentGreen} size="small" />
+                ) : (
+                  <View style={styles.categoryChipRow}>
+                    {categories.map((c) => (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[
+                          styles.categoryChip,
+                          { borderColor: c.colorTheme },
+                          selectedCategoryId === c.id && { backgroundColor: c.colorTheme },
+                        ]}
+                        onPress={() => setSelectedCategoryId(c.id)}
+                      >
+                        <Text style={[styles.categoryChipText, { color: selectedCategoryId === c.id ? "#fff" : c.colorTheme }]}>
+                          {c.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity style={[styles.primaryBtn, !selectedCategoryId && { opacity: 0.5 }]} onPress={pickFiles} disabled={busy || !selectedCategoryId}>
                 {busy ? <ActivityIndicator color="#fff" size="small" /> : (
                   <><Ionicons name="folder-open-outline" size={16} color="#fff" /><Text style={styles.primaryBtnText}>Choose PDF(s)</Text></>
                 )}
@@ -320,4 +381,8 @@ const styles = StyleSheet.create({
   bulkResultText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", flex: 1 },
 
   errorText: { fontSize: 13, color: "#B91C1C", textAlign: "center", fontFamily: "Inter_400Regular" },
+
+  categoryChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  categoryChip: { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  categoryChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });

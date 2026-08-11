@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { PLAN_CATEGORIES } from "@/lib/planCategories";
 
 // Moved verbatim from the old settings.tsx "My Goals" section — same fields,
 // same behavior, just living on its own screen now.
@@ -26,10 +27,14 @@ const LIFE_SITUATION_OPTIONS: { value: string; label: string }[] = [
   { value: "professional", label: "Working Professional" },
 ];
 
-const TOPIC_INTEREST_OPTIONS = [
-  "Marriage & Family", "Purity & Freedom", "Leadership", "Prayer & Intercession",
-  "Evangelism", "Mental Health", "Finances", "Missions",
-];
+// Was a hand-picked, generic 8-item list that predated (and didn't match)
+// the 10 real plan categories — topic_interests now stores the category
+// slug directly, so it matches the recommendation engine's tag-based
+// scoring exactly instead of relying on loose free-text overlap.
+const TOPIC_INTEREST_OPTIONS: { value: string; label: string }[] = PLAN_CATEGORIES
+  .slice()
+  .sort((a, b) => a.order - b.order)
+  .map((c) => ({ value: c.key, label: c.label }));
 
 const AGE_RANGE_OPTIONS: { value: string; label: string }[] = [
   { value: "13-17", label: "Under 18" },
@@ -159,13 +164,13 @@ export default function GoalsSettingsScreen() {
 
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Topic interests</Text>
           <View style={styles.chipWrapRow}>
-            {TOPIC_INTEREST_OPTIONS.map((topic) => (
+            {TOPIC_INTEREST_OPTIONS.map((opt) => (
               <TouchableOpacity
-                key={topic}
-                style={[styles.chip, goalsRow?.topic_interests?.includes(topic) && styles.chipActive]}
-                onPress={() => toggleTopicInterest(topic)}
+                key={opt.value}
+                style={[styles.chip, goalsRow?.topic_interests?.includes(opt.value) && styles.chipActive]}
+                onPress={() => toggleTopicInterest(opt.value)}
               >
-                <Text style={[styles.chipText, goalsRow?.topic_interests?.includes(topic) && styles.chipTextActive]}>{topic}</Text>
+                <Text style={[styles.chipText, goalsRow?.topic_interests?.includes(opt.value) && styles.chipTextActive]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
