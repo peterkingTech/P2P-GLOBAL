@@ -775,7 +775,7 @@ router.get("/plans/saved/:userId", async (req, res) => {
   const planIds = (saves ?? []).map((s) => s.plan_id as string);
   if (!planIds.length) return res.json([]);
 
-  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", planIds);
+  const plans = await selectInChunks<Record<string, unknown>>("p2p_curriculums", "*", "id", planIds);
   const savedAtByPlan = new Map((saves ?? []).map((s) => [s.plan_id as string, s.saved_at as string]));
   const counts = await getPlanModuleLessonCounts(planIds);
 
@@ -887,7 +887,7 @@ router.get("/plans/active/:userId", async (req, res) => {
     .map(([planId]) => planId);
   if (!activePlanIds.length) return res.json([]);
 
-  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", activePlanIds);
+  const plans = await selectInChunks<Record<string, unknown>>("p2p_curriculums", "*", "id", activePlanIds);
   const counts = await getPlanModuleLessonCounts(activePlanIds);
   const ordered = activePlanIds
     .map((id) => (plans ?? []).find((p) => p.id === id))
@@ -913,7 +913,7 @@ router.get("/plans/completed/:userId", async (req, res) => {
     .map(([planId]) => planId);
   if (!completedPlanIds.length) return res.json([]);
 
-  const { data: plans } = await supabaseRead.from("p2p_curriculums").select("*").eq("type", "plan").in("id", completedPlanIds);
+  const plans = await selectInChunks<Record<string, unknown>>("p2p_curriculums", "*", "id", completedPlanIds);
   const counts = await getPlanModuleLessonCounts(completedPlanIds);
   const ordered = completedPlanIds
     .map((id) => (plans ?? []).find((p) => p.id === id))
