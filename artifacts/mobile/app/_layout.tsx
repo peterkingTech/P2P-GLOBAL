@@ -19,6 +19,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
+import { CategoryCompletionModal } from "@/components/CategoryCompletionModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -116,12 +117,17 @@ function AuthGate() {
 }
 
 function GrowthCelebrationHost() {
-  const { toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent, fruitCelebrationQueue, dismissCurrentFruitCelebration } = useData();
+  const {
+    toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
+    fruitCelebrationQueue, dismissCurrentFruitCelebration,
+    categoryCompletionQueue, dismissCurrentCategoryCompletion,
+  } = useData();
   const router = useRouter();
 
   // Fruit celebrations take priority over the growth toast/module modal —
   // they're queued one at a time (see DataContext), so only ever one shows.
   const currentFruitCelebration = fruitCelebrationQueue[0] ?? null;
+  const currentCategoryCompletion = categoryCompletionQueue[0] ?? null;
 
   return (
     <>
@@ -150,6 +156,12 @@ function GrowthCelebrationHost() {
             router.push("/fruit");
           }}
           onContinue={dismissCurrentFruitCelebration}
+        />
+      )}
+      {!currentFruitCelebration && currentCategoryCompletion && (
+        <CategoryCompletionModal
+          completion={currentCategoryCompletion}
+          onContinue={dismissCurrentCategoryCompletion}
         />
       )}
     </>

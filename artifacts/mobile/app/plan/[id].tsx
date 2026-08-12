@@ -41,7 +41,7 @@ export default function PlanDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { getPlanProgress } = useData();
+  const { getPlanProgress, checkCategoryCompletion } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -67,6 +67,7 @@ export default function PlanDetailScreen() {
       if (!res.ok) { setPlan(null); return; }
       const data = (await res.json()) as PlanDetail;
       setPlan(data);
+      if (data.category) void checkCategoryCompletion(data.category.id);
 
       // On-demand translation, English already showing — this silently
       // upgrades title/description/subtitle and module titles in place once
@@ -109,7 +110,7 @@ export default function PlanDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, profile?.id, profile?.contentLanguage]);
+  }, [id, profile?.id, profile?.contentLanguage, checkCategoryCompletion]);
 
   // Refetch on every focus — returning from a lesson after submitting should
   // reflect the new progress percentage immediately, and re-checks lock

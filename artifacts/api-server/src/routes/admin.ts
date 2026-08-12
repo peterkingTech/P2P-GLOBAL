@@ -740,4 +740,432 @@ router.post("/plans/confirm-import", async (req, res) => {
   return ok(res, { id: curriculumId });
 });
 
+// ── Plan Category Management ─────────────────────────────────────────────────
+// Same URL-length reasoning as curriculum.ts's selectInChunks (see that file's
+// comment) — chunk any .in() call whose id list scales with catalog size.
+const ADMIN_IN_CHUNK_SIZE = 100;
+function chunkIdsAdmin(ids: string[], size = ADMIN_IN_CHUNK_SIZE): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+async function selectInChunksAdmin<T = Record<string, unknown>>(table: string, columns: string, column: string, ids: string[]): Promise<T[]> {
+  if (!ids.length) return [];
+  const results: T[] = [];
+  for (const c of chunkIdsAdmin(ids)) {
+    const { data, error } = await supabaseWrite.from(table).select(columns).in(column, c);
+    if (error) throw new Error(`${table}.${column} IN chunk failed: ${error.message}`);
+    results.push(...((data ?? []) as T[]));
+  }
+  return results;
+}
+
+function slugifyCategoryTitle(title: string): string {
+  return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function mapAdminCategory(c: Record<string, unknown>, planCount: number) {
+  return {
+    id: c.id,
+    title: c.title,
+    description: c.description ?? null,
+    category: (c.tags as string[] | null)?.[0] ?? null,
+    colorTheme: c.color_theme ?? "#1D9E75",
+    icon: c.icon ?? null,
+    displayOrder: c.display_order ?? null,
+    planCount,
+    status: c.status,
+    isVisible: c.is_visible ?? true,
+  };
+}
+
+function mapAdminPlan(p: Record<string, unknown>) {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description ?? null,
+    subtitle: p.subtitle ?? null,
+    status: p.status,
+    parentCategoryId: p.parent_category_id ?? null,
+    topicNumber: p.topic_number ?? null,
+    colorTheme: p.color_theme ?? "#1D9E75",
+    tags: p.tags ?? [],
+    isLocked: !!p.unlock_after_plan_id && !p.manually_unlocked,
+    manuallyUnlocked: p.manually_unlocked ?? false,
+    isVisible: p.is_visible ?? true,
+    isFeaturedInCategory: p.is_featured_in_category ?? false,
+    adminNotes: p.admin_notes ?? null,
+    icon: p.icon ?? null,
+    createdAt: p.created_at,
+  };
+}
+
+// Rebuilds the sequential unlock_after_plan_id chain for every plan in a
+// category, ordered by topic_number — topic 1 always unlocked, each later
+// topic points at the one immediately before it. Does not touch
+// manually_unlocked, which is an independent override checked at read time
+// (see resolveLockStatus in curriculum.ts).
+async function recalculateLockChain(categoryId: string) {
+  const { data: plans } = await supabaseWrite
+    .from("p2p_curriculums")
+    .select("id,topic_number")
+    .eq("type", "plan")
+    .eq("parent_category_id", categoryId)
+    .order("topic_number", { ascending: true, nullsFirst: false });
+  if (!plans || !plans.length) return;
+  let previousId: string | null = null;
+  for (const p of plans) {
+    const { error } = await supabaseWrite.from("p2p_curriculums").update({ unlock_after_plan_id: previousId }).eq("id", p.id as string);
+    if (error) throw new Error(error.message);
+    previousId = p.id as string;
+  }
+}
+
+// GET /admin/plan-categories — all categories with live plan counts
+router.get("/plan-categories", async (_req, res) => {
+  const { data: categories, error } = await supabaseWrite
+    .from("p2p_curriculums")
+    .select("*")
+    .eq("type", "plan_category")
+    .order("display_order", { ascending: true, nullsFirst: false });
+  if (error) return err(res, error.message);
+
+  const categoryIds = (categories ?? []).map((c) => c.id as string);
+  const plans = categoryIds.length
+    ? await selectInChunksAdmin<{ parent_category_id: string }>("p2p_curriculums", "id,parent_category_id", "parent_category_id", categoryIds)
+    : [];
+  const planCountByCategory = new Map<string, number>();
+  for (const p of plans) {
+    planCountByCategory.set(p.parent_category_id, (planCountByCategory.get(p.parent_category_id) ?? 0) + 1);
+  }
+
+  return ok(res, (categories ?? []).map((c) => mapAdminCategory(c as Record<string, unknown>, planCountByCategory.get(c.id as string) ?? 0)));
+});
+
+// POST /admin/plan-categories — create a new category
+router.post("/plan-categories", async (req, res) => {
+  const { title, description, color_theme, icon } = req.body as { title?: string; description?: string; color_theme?: string; icon?: string };
+  if (!title?.trim()) return err(res, "title is required", 400);
+  const slug = slugifyCategoryTitle(title);
+  if (!slug) return err(res, "title must contain at least one letter or number", 400);
+
+  const { data: existing } = await supabaseWrite.from("p2p_curriculums").select("id").eq("type", "plan_category").contains("tags", [slug]).maybeSingle();
+  if (existing) return err(res, `A category for "${title.trim()}" (slug "${slug}") already exists`, 409);
+
+  const { data: maxRow } = await supabaseWrite
+    .from("p2p_curriculums").select("display_order").eq("type", "plan_category")
+    .order("display_order", { ascending: false }).limit(1).maybeSingle();
+  const nextOrder = ((maxRow?.display_order as number) ?? 0) + 1;
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_curriculums")
+    .insert({
+      title: title.trim(),
+      description: description?.trim() || null,
+      type: "plan_category",
+      status: "published",
+      tags: [slug],
+      color_theme: color_theme || "#1D9E75",
+      icon: icon || null,
+      display_order: nextOrder,
+    })
+    .select()
+    .single();
+  if (error || !data) return err(res, error?.message ?? "Failed to create category");
+  return ok(res, mapAdminCategory(data as Record<string, unknown>, 0));
+});
+
+// PUT /admin/plan-categories/:categoryId — update a category
+router.put("/plan-categories/:categoryId", async (req, res) => {
+  const { categoryId } = req.params;
+  const { title, description, color_theme, icon, display_order, status } = req.body as Record<string, unknown>;
+  const updates: Record<string, unknown> = {};
+  if (title !== undefined) updates.title = title;
+  if (description !== undefined) updates.description = description;
+  if (color_theme !== undefined) updates.color_theme = color_theme;
+  if (icon !== undefined) updates.icon = icon;
+  if (display_order !== undefined) updates.display_order = display_order;
+  if (status !== undefined) updates.status = status;
+  if (!Object.keys(updates).length) return err(res, "No fields to update", 400);
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_curriculums").update(updates).eq("id", categoryId).eq("type", "plan_category").select().single();
+  if (error || !data) return err(res, error?.message ?? "Category not found");
+
+  const { count } = await supabaseWrite.from("p2p_curriculums").select("id", { count: "exact", head: true }).eq("type", "plan").eq("parent_category_id", categoryId);
+  return ok(res, mapAdminCategory(data as Record<string, unknown>, count ?? 0));
+});
+
+// DELETE /admin/plan-categories/:categoryId — only when empty
+router.delete("/plan-categories/:categoryId", async (req, res) => {
+  const { categoryId } = req.params;
+  const { count } = await supabaseWrite.from("p2p_curriculums").select("id", { count: "exact", head: true }).eq("type", "plan").eq("parent_category_id", categoryId);
+  if (count && count > 0) {
+    return err(res, `This category contains ${count} plan${count === 1 ? "" : "s"}. Move or delete them before removing the category.`, 400);
+  }
+  const { error } = await supabaseWrite.from("p2p_curriculums").delete().eq("id", categoryId).eq("type", "plan_category");
+  if (error) return err(res, error.message);
+  return ok(res, { deleted: true });
+});
+
+// PUT /admin/plan-categories/reorder — batch display_order update
+router.put("/plan-categories/reorder", async (req, res) => {
+  const items = req.body as { id: string; display_order: number }[];
+  if (!Array.isArray(items) || !items.length) return err(res, "Body must be a non-empty array of { id, display_order }", 400);
+  for (const item of items) {
+    if (!item.id || typeof item.display_order !== "number") return err(res, "Each item needs id and display_order", 400);
+    const { error } = await supabaseWrite.from("p2p_curriculums").update({ display_order: item.display_order }).eq("id", item.id).eq("type", "plan_category");
+    if (error) return err(res, error.message);
+  }
+  return ok(res, { updated: items.length });
+});
+
+// GET /admin/plan-categories/:categoryId/stats
+router.get("/plan-categories/:categoryId/stats", async (req, res) => {
+  const { categoryId } = req.params;
+  const { data: plans } = await supabaseWrite
+    .from("p2p_curriculums").select("id,title,topic_number").eq("type", "plan").eq("parent_category_id", categoryId);
+  const planIds = (plans ?? []).map((p) => p.id as string);
+  if (!planIds.length) {
+    return ok(res, { usersEnrolled: 0, lessonsCompleted: 0, mostReachedTopic: null, avgCompletionWeeks: null });
+  }
+
+  const enrollments = await selectInChunksAdmin<{ user_id: string; plan_id: string; status: string; enrolled_at: string; completed_at: string | null }>(
+    "p2p_plan_enrollments", "user_id,plan_id,status,enrolled_at,completed_at", "plan_id", planIds
+  );
+  const usersEnrolled = new Set(enrollments.map((e) => e.user_id)).size;
+
+  const modules = await selectInChunksAdmin<{ id: string; curriculum_id: string }>("p2p_modules", "id,curriculum_id", "curriculum_id", planIds);
+  const moduleToPlan = new Map(modules.map((m) => [m.id, m.curriculum_id]));
+  const moduleIds = Array.from(moduleToPlan.keys());
+  const lessons = moduleIds.length ? await selectInChunksAdmin<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds) : [];
+  const lessonToPlan = new Map(lessons.map((l) => [l.id, moduleToPlan.get(l.module_id) as string]));
+  const lessonIds = Array.from(lessonToPlan.keys());
+
+  const progressRows = lessonIds.length
+    ? await selectInChunksAdmin<{ lesson_id: string; completed: boolean }>("p2p_lesson_progress", "lesson_id,completed", "lesson_id", lessonIds)
+    : [];
+  const completedRows = progressRows.filter((p) => p.completed);
+  const lessonsCompleted = completedRows.length;
+
+  const completedByPlan = new Map<string, number>();
+  for (const p of completedRows) {
+    const planId = lessonToPlan.get(p.lesson_id);
+    if (planId) completedByPlan.set(planId, (completedByPlan.get(planId) ?? 0) + 1);
+  }
+  let mostReachedTopic: { title: string; topicNumber: number | null } | null = null;
+  let maxCompleted = 0;
+  for (const p of plans ?? []) {
+    const c = completedByPlan.get(p.id as string) ?? 0;
+    if (c > maxCompleted) { maxCompleted = c; mostReachedTopic = { title: p.title as string, topicNumber: (p.topic_number as number | null) ?? null }; }
+  }
+
+  const completedEnrollments = enrollments.filter((e) => e.status === "completed" && e.completed_at);
+  let avgCompletionWeeks: number | null = null;
+  if (completedEnrollments.length) {
+    const totalDays = completedEnrollments.reduce((sum, e) => {
+      const days = (new Date(e.completed_at as string).getTime() - new Date(e.enrolled_at).getTime()) / (1000 * 60 * 60 * 24);
+      return sum + Math.max(0, days);
+    }, 0);
+    avgCompletionWeeks = Math.round((totalDays / completedEnrollments.length / 7) * 10) / 10;
+  }
+
+  return ok(res, { usersEnrolled, lessonsCompleted, mostReachedTopic, avgCompletionWeeks });
+});
+
+// GET /admin/plans/uncategorized
+router.get("/plans/uncategorized", async (_req, res) => {
+  const { data, error } = await supabaseWrite
+    .from("p2p_curriculums").select("*").eq("type", "plan").is("parent_category_id", null).order("created_at", { ascending: true });
+  if (error) return err(res, error.message);
+  return ok(res, (data ?? []).map((p) => mapAdminPlan(p as Record<string, unknown>)));
+});
+
+// PUT /admin/plans/:planId/move-category
+router.put("/plans/:planId/move-category", async (req, res) => {
+  const { planId } = req.params;
+  const { category_id } = req.body as { category_id?: string };
+  if (!category_id) return err(res, "category_id is required", 400);
+
+  const { data: plan } = await supabaseWrite.from("p2p_curriculums").select("id,parent_category_id").eq("id", planId).eq("type", "plan").maybeSingle();
+  if (!plan) return err(res, "Plan not found", 404);
+  const sourceCategoryId = plan.parent_category_id as string | null;
+  if (sourceCategoryId === category_id) return err(res, "Plan is already in that category", 400);
+
+  const { count } = await supabaseWrite.from("p2p_curriculums").select("id", { count: "exact", head: true }).eq("type", "plan").eq("parent_category_id", category_id);
+  const newTopicNumber = (count ?? 0) + 1;
+
+  const { error: updateErr } = await supabaseWrite
+    .from("p2p_curriculums").update({ parent_category_id: category_id, topic_number: newTopicNumber }).eq("id", planId);
+  if (updateErr) return err(res, updateErr.message);
+
+  try {
+    if (sourceCategoryId) await recalculateLockChain(sourceCategoryId);
+    await recalculateLockChain(category_id);
+  } catch (e) {
+    return err(res, e instanceof Error ? e.message : "Moved, but failed to recalculate lock chains");
+  }
+
+  return ok(res, { id: planId, parentCategoryId: category_id, topicNumber: newTopicNumber });
+});
+
+// PUT /admin/plans/:planId/reorder — change position within its category
+router.put("/plans/:planId/reorder", async (req, res) => {
+  const { planId } = req.params;
+  const { new_topic_number } = req.body as { new_topic_number?: number };
+  if (!new_topic_number || new_topic_number < 1) return err(res, "new_topic_number must be a positive integer", 400);
+
+  const { data: plan } = await supabaseWrite.from("p2p_curriculums").select("id,parent_category_id").eq("id", planId).eq("type", "plan").maybeSingle();
+  if (!plan || !plan.parent_category_id) return err(res, "Plan not found or has no category", 404);
+  const categoryId = plan.parent_category_id as string;
+
+  const { data: siblings } = await supabaseWrite
+    .from("p2p_curriculums").select("id,topic_number").eq("type", "plan").eq("parent_category_id", categoryId)
+    .order("topic_number", { ascending: true, nullsFirst: false });
+  if (!siblings) return err(res, "Failed to load category plans");
+
+  const orderedIds = siblings.filter((s) => s.id !== planId).map((s) => s.id as string);
+  const clampedPos = Math.min(Math.max(1, new_topic_number), orderedIds.length + 1);
+  orderedIds.splice(clampedPos - 1, 0, planId);
+
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabaseWrite.from("p2p_curriculums").update({ topic_number: i + 1 }).eq("id", orderedIds[i]);
+    if (error) return err(res, error.message);
+  }
+
+  try {
+    await recalculateLockChain(categoryId);
+  } catch (e) {
+    return err(res, e instanceof Error ? e.message : "Reordered, but failed to recalculate lock chain");
+  }
+
+  return ok(res, { id: planId, newTopicNumber: clampedPos });
+});
+
+// PUT /admin/plans/:planId/toggle-lock — manual override
+router.put("/plans/:planId/toggle-lock", async (req, res) => {
+  const { planId } = req.params;
+  const { is_locked } = req.body as { is_locked?: boolean };
+  if (typeof is_locked !== "boolean") return err(res, "is_locked (boolean) is required", 400);
+
+  // is_locked:false means "manually unlock" (sets the override on);
+  // is_locked:true means "re-apply sequential lock" (clears the override).
+  const { data, error } = await supabaseWrite
+    .from("p2p_curriculums").update({ manually_unlocked: !is_locked }).eq("id", planId).eq("type", "plan").select().single();
+  if (error || !data) return err(res, error?.message ?? "Plan not found");
+  return ok(res, mapAdminPlan(data as Record<string, unknown>));
+});
+
+// POST /admin/plans/:planId/duplicate — full copy (modules, lessons, all
+// content tables + block-editor blocks), title suffixed "(Copy)", draft
+// status, appended as the next topic in the same category.
+router.post("/plans/:planId/duplicate", async (req, res) => {
+  const { planId } = req.params;
+  const { data: original } = await supabaseWrite.from("p2p_curriculums").select("*").eq("id", planId).eq("type", "plan").maybeSingle();
+  if (!original) return err(res, "Plan not found", 404);
+
+  let newTopicNumber: number | null = null;
+  if (original.parent_category_id) {
+    const { count } = await supabaseWrite.from("p2p_curriculums").select("id", { count: "exact", head: true }).eq("type", "plan").eq("parent_category_id", original.parent_category_id as string);
+    newTopicNumber = (count ?? 0) + 1;
+  }
+
+  const { data: newPlan, error: insErr } = await supabaseWrite
+    .from("p2p_curriculums")
+    .insert({
+      title: `${original.title} (Copy)`,
+      description: original.description,
+      subtitle: original.subtitle,
+      type: "plan",
+      status: "draft",
+      tags: original.tags,
+      color_theme: original.color_theme,
+      difficulty_level: original.difficulty_level,
+      estimated_weeks: original.estimated_weeks,
+      parent_category_id: original.parent_category_id,
+      topic_number: newTopicNumber,
+      icon: original.icon,
+    })
+    .select()
+    .single();
+  if (insErr || !newPlan) return err(res, insErr?.message ?? "Failed to duplicate plan");
+  const newPlanId = newPlan.id as string;
+
+  try {
+    const { data: modules } = await supabaseWrite.from("p2p_modules").select("*").eq("curriculum_id", planId).order("order_index");
+    for (const mod of modules ?? []) {
+      const { data: newModule, error: modErr } = await supabaseWrite
+        .from("p2p_modules")
+        .insert({ curriculum_id: newPlanId, title: mod.title, description: mod.description, status: "draft", order_index: mod.order_index })
+        .select().single();
+      if (modErr || !newModule) throw new Error(modErr?.message ?? `Failed to duplicate module "${mod.title}"`);
+
+      const { data: lessons } = await supabaseWrite.from("p2p_lessons").select("*").eq("module_id", mod.id).order("order_index");
+      for (const lesson of lessons ?? []) {
+        const { data: newLesson, error: lesErr } = await supabaseWrite
+          .from("p2p_lessons")
+          .insert({ module_id: newModule.id, title: lesson.title, subtitle: lesson.subtitle, status: "draft", order_index: lesson.order_index })
+          .select().single();
+        if (lesErr || !newLesson) throw new Error(lesErr?.message ?? `Failed to duplicate lesson "${lesson.title}"`);
+
+        const [{ data: sections }, { data: scriptures }, { data: questions }, { data: assignments }, { data: blocks }] = await Promise.all([
+          supabaseWrite.from("p2p_lesson_sections").select("*").eq("lesson_id", lesson.id),
+          supabaseWrite.from("p2p_scriptures").select("*").eq("lesson_id", lesson.id),
+          supabaseWrite.from("p2p_reflection_questions").select("*").eq("lesson_id", lesson.id),
+          supabaseWrite.from("p2p_assignments").select("*").eq("lesson_id", lesson.id),
+          supabaseWrite.from("p2p_lesson_blocks").select("*").eq("lesson_id", lesson.id),
+        ]);
+        if (sections?.length) {
+          const { error } = await supabaseWrite.from("p2p_lesson_sections").insert(sections.map((s) => ({ lesson_id: newLesson.id, section_order: s.section_order, section_type: s.section_type, title: s.title, content: s.content })));
+          if (error) throw new Error(error.message);
+        }
+        if (scriptures?.length) {
+          const { error } = await supabaseWrite.from("p2p_scriptures").insert(scriptures.map((s) => ({ lesson_id: newLesson.id, reference: s.reference, verse: s.verse, display_order: s.display_order })));
+          if (error) throw new Error(error.message);
+        }
+        if (questions?.length) {
+          const { error } = await supabaseWrite.from("p2p_reflection_questions").insert(questions.map((q) => ({ lesson_id: newLesson.id, question: q.question, display_order: q.display_order })));
+          if (error) throw new Error(error.message);
+        }
+        if (blocks?.length) {
+          const { error } = await supabaseWrite.from("p2p_lesson_blocks").insert(blocks.map((b) => ({ lesson_id: newLesson.id, block_type: b.block_type, content: b.content, order_index: b.order_index, is_required: b.is_required, is_submittable: b.is_submittable })));
+          if (error) throw new Error(error.message);
+        }
+        for (const a of assignments ?? []) {
+          const { data: newAssignment, error: asnErr } = await supabaseWrite
+            .from("p2p_assignments").insert({ lesson_id: newLesson.id, title: a.title, instructions: a.instructions, due_after_days: a.due_after_days }).select().single();
+          if (asnErr || !newAssignment) throw new Error(asnErr?.message ?? "Failed to duplicate assignment");
+          const { data: aqs } = await supabaseWrite.from("p2p_assignment_questions").select("*").eq("assignment_id", a.id);
+          if (aqs?.length) {
+            const { error } = await supabaseWrite.from("p2p_assignment_questions").insert(aqs.map((q) => ({ assignment_id: newAssignment.id, question: q.question, display_order: q.display_order })));
+            if (error) throw new Error(error.message);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Best-effort cleanup — remove the partially-duplicated plan rather than
+    // leave a broken half-copy sitting in the catalog.
+    const { data: partialModules } = await supabaseWrite.from("p2p_modules").select("id").eq("curriculum_id", newPlanId);
+    const partialModuleIds = (partialModules ?? []).map((m) => m.id as string);
+    if (partialModuleIds.length) {
+      const partialLessons = await selectInChunksAdmin<{ id: string }>("p2p_lessons", "id", "module_id", partialModuleIds);
+      const partialLessonIds = partialLessons.map((l) => l.id);
+      if (partialLessonIds.length) {
+        await supabaseWrite.from("p2p_lesson_blocks").delete().in("lesson_id", partialLessonIds);
+        await supabaseWrite.from("p2p_lesson_sections").delete().in("lesson_id", partialLessonIds);
+        await supabaseWrite.from("p2p_scriptures").delete().in("lesson_id", partialLessonIds);
+        await supabaseWrite.from("p2p_reflection_questions").delete().in("lesson_id", partialLessonIds);
+        await supabaseWrite.from("p2p_assignments").delete().in("lesson_id", partialLessonIds);
+        await supabaseWrite.from("p2p_lessons").delete().in("id", partialLessonIds);
+      }
+      await supabaseWrite.from("p2p_modules").delete().in("id", partialModuleIds);
+    }
+    await supabaseWrite.from("p2p_curriculums").delete().eq("id", newPlanId);
+    return err(res, e instanceof Error ? e.message : "Duplication failed, changes rolled back");
+  }
+
+  return ok(res, { id: newPlanId, title: newPlan.title });
+});
+
 export default router;

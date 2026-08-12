@@ -398,6 +398,11 @@ router.get("/plans/categories", async (_req, res) => {
     .select("*")
     .eq("type", "plan_category")
     .eq("status", "published")
+    // is_visible=false is the admin "Hidden" toggle (Plan Category Management)
+    // — the category still exists and is manageable in admin, just excluded
+    // from what users see here. Pre-migration rows have is_visible=NULL,
+    // which the `neq` filter would incorrectly exclude, so OR in "is null".
+    .or("is_visible.eq.true,is_visible.is.null")
     .order("display_order", { ascending: true, nullsFirst: false });
   if (error) return res.status(500).json({ error: error.message });
 
@@ -466,8 +471,12 @@ function planIsComplete(
 function resolveLockStatus(
   unlockAfterPlanId: string | null,
   progressMap: Map<string, { percent: number; completedLessons: number; totalLessons: number; lastActivityAt: string | null }> | null,
-  titleById: Map<string, string>
+  titleById: Map<string, string>,
+  manuallyUnlocked?: boolean
 ): { locked: boolean; unlockMessage: string | null } {
+  // Admin override (Plan Category Management "Toggle Lock") always wins,
+  // regardless of prerequisite completion.
+  if (manuallyUnlocked) return { locked: false, unlockMessage: null };
   if (!unlockAfterPlanId) return { locked: false, unlockMessage: null };
   // No user context to check against — default to locked rather than
   // silently granting access to sequential content.
@@ -541,7 +550,7 @@ router.get("/plans/search", async (req, res) => {
     const titleLower = (p.title as string).toLowerCase();
     const matchType: "exact" | "partial" | "content" = titleLower === qLower ? "exact" : titleMatchPlanIds.has(planId) ? "partial" : "content";
     const category = p.parent_category_id ? categoryById.get(p.parent_category_id as string) : null;
-    const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById);
+    const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById, p.manually_unlocked as boolean | undefined);
     return {
       id: planId,
       title: p.title,
@@ -583,7 +592,7 @@ router.get("/plans/categories/:categoryId/plans", async (req, res) => {
 
   return res.json(
     (plans ?? []).map((p) => {
-      const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById);
+      const { locked, unlockMessage } = resolveLockStatus(p.unlock_after_plan_id as string | null, progressMap, titleById, p.manually_unlocked as boolean | undefined);
       const progress = progressMap?.get(p.id as string);
       return {
         id: p.id,
@@ -619,7 +628,7 @@ router.get("/plans/:planId", async (req, res) => {
   if (!plan) return res.status(404).json({ error: "Plan not found" });
 
   const unlockAfterId = plan.unlock_after_plan_id as string | null;
-  if (unlockAfterId) {
+  if (unlockAfterId && !plan.manually_unlocked) {
     const progressMap = userId ? await getUserPlanProgressMap(userId) : null;
     const prereqComplete = progressMap ? planIsComplete(progressMap, unlockAfterId) : false;
     if (!prereqComplete) {

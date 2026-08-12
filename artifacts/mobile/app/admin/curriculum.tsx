@@ -10,13 +10,14 @@ import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import BlockEditorPanel from "@/components/admin/BlockEditorPanel";
 import PdfImportModal from "@/components/admin/PdfImportModal";
+import PlanCategoryManager from "@/components/admin/PlanCategoryManager";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Status = "draft" | "published" | "archived";
 type LessonStatus = "draft" | "review" | "published" | "archived";
 
-type Curriculum = {
+export type Curriculum = {
   id: string; title: string; description: string | null; status: Status; created_at: string; type?: string;
   subtitle?: string | null;
   cover_image?: string | null;
@@ -34,6 +35,12 @@ type Curriculum = {
   parent_category_id?: string | null;
   topic_number?: number | null;
   display_order?: number | null;
+  unlock_after_plan_id?: string | null;
+  manually_unlocked?: boolean;
+  is_visible?: boolean;
+  is_featured_in_category?: boolean;
+  admin_notes?: string | null;
+  icon?: string | null;
 };
 type Module = {
   id: string; curriculum_id: string; title: string; description: string | null;
@@ -91,6 +98,7 @@ export default function CurriculumManagerScreen() {
   const [languages, setLanguages] = useState<Language[]>([]);
 
   const [adminTab, setAdminTab] = useState<"curriculum" | "plans">("curriculum");
+  const [plansView, setPlansView] = useState<"manage" | "editor">("manage");
   const [selectedCurriculumId, setSelectedCurriculumId] = useState<string | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -209,8 +217,14 @@ export default function CurriculumManagerScreen() {
         .insert({ title: createTitle.trim(), status: "draft" }).select().single();
       error = e; if (data) newId = data.id;
     } else if (createModal === "plan") {
+      const insert: Record<string, unknown> = { title: createTitle.trim(), status: "draft", type: "plan" };
+      if (createParentId) {
+        const siblingCount = (plansByCategory.get(createParentId) ?? []).length;
+        insert.parent_category_id = createParentId;
+        insert.topic_number = siblingCount + 1;
+      }
       const { data, error: e } = await supabase.from("p2p_curriculums")
-        .insert({ title: createTitle.trim(), status: "draft", type: "plan" }).select().single();
+        .insert(insert).select().single();
       error = e; if (data) newId = data.id;
     } else if (createModal === "module") {
       const sibs = modulesMap[createParentId] ?? [];
@@ -382,17 +396,6 @@ export default function CurriculumManagerScreen() {
 
   const moduleNavigator = (
     <ScrollView style={styles.navPanel} contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 20 }}>
-      <View style={styles.adminTabRow}>
-        <TouchableOpacity style={[styles.adminTab, adminTab === "curriculum" && styles.adminTabActive]} onPress={() => setAdminTab("curriculum")}>
-          <Ionicons name="book-outline" size={13} color={adminTab === "curriculum" ? "#fff" : colors.textMid} />
-          <Text style={[styles.adminTabText, adminTab === "curriculum" && styles.adminTabTextActive]}>Curriculum</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.adminTab, adminTab === "plans" && styles.adminTabActive]} onPress={() => setAdminTab("plans")}>
-          <Ionicons name="radio-outline" size={13} color={adminTab === "plans" ? "#fff" : colors.textMid} />
-          <Text style={[styles.adminTabText, adminTab === "plans" && styles.adminTabTextActive]}>Plans</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.navPanelHeader}>
         <Text style={styles.navPanelTitle}>{adminTab === "plans" ? "Study Plans" : "Curricula"}</Text>
         <View style={{ flexDirection: "row", gap: 6 }}>
@@ -550,9 +553,51 @@ export default function CurriculumManagerScreen() {
     </View>
   );
 
+  function switchAdminTab(tab: "curriculum" | "plans") {
+    setAdminTab(tab);
+    setPlansView("manage");
+    setSelectedCurriculumId(null);
+    setSelectedModuleId(null);
+    setSelectedLessonId(null);
+    setMobilePanel("modules");
+  }
+
+  function openPlanEditor(id: string) {
+    setSelectedCurriculumId(id);
+    setSelectedModuleId(null);
+    setSelectedLessonId(null);
+    setPlansView("editor");
+    if (!isSplit) setMobilePanel("editor");
+  }
+
   return (
     <View style={styles.root}>
-      {isSplit ? (
+      <View style={styles.adminTabRow}>
+        <TouchableOpacity style={[styles.adminTab, adminTab === "curriculum" && styles.adminTabActive]} onPress={() => switchAdminTab("curriculum")}>
+          <Ionicons name="book-outline" size={13} color={adminTab === "curriculum" ? "#fff" : colors.textMid} />
+          <Text style={[styles.adminTabText, adminTab === "curriculum" && styles.adminTabTextActive]}>Curriculum</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.adminTab, adminTab === "plans" && styles.adminTabActive]} onPress={() => switchAdminTab("plans")}>
+          <Ionicons name="radio-outline" size={13} color={adminTab === "plans" ? "#fff" : colors.textMid} />
+          <Text style={[styles.adminTabText, adminTab === "plans" && styles.adminTabTextActive]}>Plans</Text>
+        </TouchableOpacity>
+        {adminTab === "plans" && plansView === "editor" && (
+          <TouchableOpacity style={styles.backToPlansBtn} onPress={() => setPlansView("manage")}>
+            <Ionicons name="arrow-back" size={14} color={colors.accentGreen} />
+            <Text style={styles.backToPlansText}>Back to Plans</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {adminTab === "plans" && plansView === "manage" ? (
+        <PlanCategoryManager
+          curricula={curricula}
+          onReload={loadTree}
+          onEditPlan={openPlanEditor}
+          onOpenPdfImport={() => setPdfImportVisible(true)}
+          onCreatePlanInCategory={(categoryId) => openCreate("plan", categoryId)}
+        />
+      ) : isSplit ? (
         <View style={styles.splitWrap}>
           <View style={[styles.navContainer, { borderRightWidth: 1, borderRightColor: colors.borderBeige }]}>{moduleNavigator}</View>
           <View style={[styles.lessonContainer, { borderRightWidth: 1, borderRightColor: colors.borderBeige }]}>{lessonListPanel}</View>
@@ -971,11 +1016,13 @@ const styles = StyleSheet.create({
   addBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
   addBtnSmallText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
-  adminTabRow: { flexDirection: "row", gap: 6, marginBottom: 10, backgroundColor: colors.cardBeige, borderRadius: 10, padding: 4 },
-  adminTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 7, borderRadius: 8 },
+  adminTabRow: { flexDirection: "row", alignItems: "center", gap: 6, margin: 12, marginBottom: 0, backgroundColor: colors.cardBeige, borderRadius: 10, padding: 4 },
+  adminTab: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 7, paddingHorizontal: 14, borderRadius: 8 },
   adminTabActive: { backgroundColor: colors.primaryGreen },
   adminTabText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   adminTabTextActive: { color: "#fff" },
+  backToPlansBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: "auto", paddingHorizontal: 10, paddingVertical: 6 },
+  backToPlansText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
   emptyTree: { alignItems: "center", paddingTop: 40, gap: 10 },
   emptyTreeText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular" },

@@ -516,6 +516,18 @@ export interface FruitCelebration {
   menteeName: string | null;
 }
 
+// One queued "you finished every plan in this category" moment — detected
+// client-side (see checkCategoryCompletion) rather than a server-computed
+// flag, since a category's completeness depends on the live progress of
+// every plan inside it, which the plans-with-progress endpoint already
+// computes per-user on each fetch.
+export interface CategoryCompletion {
+  categoryId: string;
+  categoryTitle: string;
+  categoryColorTheme: string;
+  planCount: number;
+}
+
 export type PeerConfirmationType = "encouragement" | "compassion" | "service" | "fellowship" | "unity" | "global";
 
 // A pending confirmation the current user needs to action — someone else's
@@ -768,6 +780,9 @@ interface DataContextValue {
   dismissCelebrationEvent: () => void;
   fruitCelebrationQueue: FruitCelebration[];
   dismissCurrentFruitCelebration: () => void;
+  categoryCompletionQueue: CategoryCompletion[];
+  dismissCurrentCategoryCompletion: () => void;
+  checkCategoryCompletion: (categoryId: string) => Promise<void>;
   pendingConfirmations: PendingPeerConfirmation[];
   pendingConfirmationCount: number;
   confirmPeer: (confirmationId: string) => Promise<string | null>;
@@ -851,6 +866,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // rows now, see migration 041_unify_plans_system.sql), not a separate table.
   const [planProgress, setPlanProgress] = useState<Map<string, number>>(new Map());
   const [planCategories, setPlanCategories] = useState<PlanCategory[]>([]);
+  const [categoryCompletionQueue, setCategoryCompletionQueue] = useState<CategoryCompletion[]>([]);
   const [fruitCatalog, setFruitCatalog] = useState<FruitCatalogEntry[]>([]);
   const [userFruits, setUserFruits] = useState<EarnedFruit[]>([]);
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
@@ -1026,6 +1042,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return [];
     }
   }, [profile?.id]);
+
+  // Fires from the plan detail screen every time it loads a plan that
+  // belongs to a category — cheap to call repeatedly since the AsyncStorage
+  // flag below makes it a no-op once this category has already celebrated
+  // for this user, and getCategoryPlans is a single lightweight fetch.
+  const checkCategoryCompletion = useCallback(async (categoryId: string) => {
+    if (!profile?.id) return;
+    const storageKey = `category_complete_${profile.id}_${categoryId}`;
+    try {
+      if (await AsyncStorage.getItem(storageKey)) return;
+      const plansInCategory = await getCategoryPlans(categoryId);
+      if (plansInCategory.length === 0) return;
+      if (!plansInCategory.every((p) => p.progressPercent >= 100)) return;
+
+      await AsyncStorage.setItem(storageKey, "true");
+      const category = planCategories.find((c) => c.id === categoryId);
+      setCategoryCompletionQueue((prev) => [...prev, {
+        categoryId,
+        categoryTitle: category?.title ?? "this category",
+        categoryColorTheme: category?.colorTheme ?? "#1D9E75",
+        planCount: plansInCategory.length,
+      }]);
+    } catch {
+      // Not critical — the celebration simply won't fire this time.
+    }
+  }, [profile?.id, getCategoryPlans, planCategories]);
+
+  const dismissCurrentCategoryCompletion = useCallback(() => {
+    setCategoryCompletionQueue((prev) => prev.slice(1));
+  }, []);
 
   const searchPlans = useCallback(async (query: string): Promise<PlanSearchResult[]> => {
     const q = query.trim();
@@ -3023,6 +3069,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       refreshPendingEvaluations, resolveEvaluation, getSubmitterEvaluationContext,
       toastEvent, celebrationEvent, dismissToastEvent, dismissCelebrationEvent,
       fruitCelebrationQueue, dismissCurrentFruitCelebration,
+      categoryCompletionQueue, dismissCurrentCategoryCompletion, checkCategoryCompletion,
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
     }}>
       {children}
