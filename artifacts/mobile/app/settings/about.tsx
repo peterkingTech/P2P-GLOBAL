@@ -6,6 +6,7 @@ import Constants from "expo-constants";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { shareApp } from "@/lib/sharing";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -25,6 +26,16 @@ export default function AboutSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <SettingsSubHeader title="About" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <TouchableOpacity style={[styles.linkRow, styles.rowLast]} onPress={shareApp}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Ionicons name="share-social-outline" size={18} color={colors.accentGreen} />
+              <Text style={styles.label}>Share P2P Global</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.card}>
           <View style={[styles.row, styles.rowLast]}>
             <Text style={styles.label}>App version</Text>

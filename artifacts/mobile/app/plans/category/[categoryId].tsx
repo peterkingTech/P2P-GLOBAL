@@ -8,6 +8,7 @@ import { useData, PlanWithLockStatus } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { shareCategory } from "@/lib/sharing";
 
 type PlanCategory = {
   id: string;
@@ -101,9 +102,17 @@ export default function CategoryDetailScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={[styles.header, { backgroundColor: category.colorTheme }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => shareCategory({ id: category.id, title: category.title, planCount: category.planCount })}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="share-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerTitle}>{category.title}</Text>
         {category.description ? <Text style={styles.headerDescription}>{category.description}</Text> : null}
         <Text style={styles.headerCount}>
@@ -206,6 +215,7 @@ function makeStyles(c: AppColors) {
     errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
     header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20, gap: 8 },
+    headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     headerTitle: { fontSize: 22, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10 },
     headerDescription: { fontSize: 13, color: "rgba(255,255,255,0.88)", fontFamily: "Inter_400Regular", lineHeight: 19 },
     headerCount: { fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_500Medium", marginTop: 2 },

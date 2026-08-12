@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { fetchBatchVerseText, VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getLanguageName } from "@/lib/languageNames";
+import { shareLesson } from "@/lib/sharing";
 
 interface LessonContent {
   title: string;
@@ -657,6 +658,15 @@ export default function LessonScreen() {
             <Text style={styles.completedTagText}>{t("lesson.done")}</Text>
           </View>
         )}
+        {content && (
+          <TouchableOpacity
+            onPress={() => id && shareLesson({ id, title: content.title })}
+            style={styles.shareBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="share-outline" size={20} color={colors.textDark} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {isLoading || !content ? (
@@ -839,6 +849,7 @@ function makeStyles(c: AppColors) {
     borderBottomWidth: 1, borderBottomColor: c.borderBeige,
   },
   backBtn: { padding: 4 },
+  shareBtn: { padding: 4 },
   headerLabel: { flex: 1, fontSize: 16, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
   completedTag: {
     flexDirection: "row", gap: 4, alignItems: "center",

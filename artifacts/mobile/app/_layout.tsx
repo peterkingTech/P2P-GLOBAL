@@ -6,9 +6,9 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Alert, I18nManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -40,7 +40,12 @@ const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding
 function AuthGate() {
   const { isAuthenticated, isLoading, profile } = useAuth();
   const segments = useSegments();
+  const pathname = usePathname();
   const router = useRouter();
+  // Deep link (lesson/plan/category) opened while signed out — the effect
+  // below bounces to onboarding before expo-router can land on that route,
+  // so the intended path is saved here and replayed once auth completes.
+  const pendingDeepLinkPath = useRef<string | null>(null);
 
   const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur"]);
 
@@ -81,6 +86,11 @@ function AuthGate() {
     const isAdminRoute = segments[0] === "admin";
 
     if (!isAuthenticated && !inAuth && !isAdminRoute) {
+      // Only worth replaying a path that isn't just the default landing
+      // screen a fresh, link-free launch would already end up on.
+      if (pathname && pathname !== "/" && !pathname.startsWith("/(tabs)")) {
+        pendingDeepLinkPath.current = pathname;
+      }
       router.replace("/(auth)/onboarding");
       return;
     }
@@ -97,9 +107,11 @@ function AuthGate() {
     if (journeyIncomplete && !inSetupFlow && !onJourneyScreen) {
       router.replace("/(auth)/journey" as any);
     } else if (!journeyIncomplete && inAuth && !inSetupFlow) {
-      router.replace("/(tabs)");
+      const target = pendingDeepLinkPath.current;
+      pendingDeepLinkPath.current = null;
+      router.replace((target ?? "/(tabs)") as any);
     }
-  }, [isAuthenticated, isLoading, segments, profile]);
+  }, [isAuthenticated, isLoading, segments, profile, pathname, router]);
 
   return (
     <Stack

@@ -17,6 +17,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { sharePlan } from "@/lib/sharing";
 
 const COVER_HEIGHT = 200;
 
@@ -178,7 +179,12 @@ export default function PlanDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{plan.title}</Text>
-        <View style={{ width: 22 }} />
+        <TouchableOpacity
+          onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null })}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="share-outline" size={20} color={colors.textDark} />
+        </TouchableOpacity>
       </View>
 
       {plan.category && (
@@ -299,6 +305,14 @@ export default function PlanDetailScreen() {
               )}
             </View>
           )}
+
+          <TouchableOpacity
+            style={styles.sharePlanBtn}
+            onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null })}
+          >
+            <Ionicons name="share-outline" size={16} color={plan.colorTheme} />
+            <Text style={[styles.sharePlanBtnText, { color: plan.colorTheme }]}>Share this plan</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -340,6 +354,8 @@ function makeStyles(c: AppColors) {
     progressBarFill: { height: 6, borderRadius: 3 },
     progressLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
 
+    sharePlanBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1.5, borderColor: c.borderBeige, borderRadius: 12, paddingVertical: 12, marginTop: 24 },
+    sharePlanBtnText: { fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
     overviewBlock: { marginTop: 20 },
     sectionHeading: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.6 },
     overviewText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 22 },

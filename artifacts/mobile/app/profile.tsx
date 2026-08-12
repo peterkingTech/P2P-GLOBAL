@@ -28,6 +28,7 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
+import { shareApp } from "@/lib/sharing";
 import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
@@ -180,6 +181,13 @@ function makeStyles(c: AppColors) {
     },
     reachOutTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     reachOutSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    shareAppBtn: {
+      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+      backgroundColor: "rgba(29,158,117,0.08)",
+      borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.2)",
+      height: 48, marginBottom: 10,
+    },
+    shareAppBtnText: { fontSize: 15, color: c.accentGreen, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
     signOutBtn: {
       flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
       backgroundColor: "rgba(185,28,28,0.08)",
@@ -587,6 +595,11 @@ export default function ProfileScreen() {
             <Text style={styles.reachOutSub}>Reach out privately for support and follow-up</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.shareAppBtn} onPress={shareApp} activeOpacity={0.85}>
+          <Ionicons name="share-social-outline" size={18} color={colors.accentGreen} />
+          <Text style={styles.shareAppBtnText}>Share App</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.85}>
