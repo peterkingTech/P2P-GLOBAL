@@ -34,6 +34,7 @@ export default function CircleDetailScreen() {
   const [sessionLessonId, setSessionLessonId] = useState("");
   const [savingSession, setSavingSession] = useState(false);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
+  const [startingSession, setStartingSession] = useState(false);
 
   const isLeader = circle?.leaderId === profile?.id;
 
@@ -89,6 +90,29 @@ export default function CircleDetailScreen() {
       Alert.alert("Couldn't create session", "Please try again.");
     } finally {
       setSavingSession(false);
+    }
+  }
+
+  async function startSession() {
+    if (!profile?.id || !circle) return;
+    if (!circle.currentLessonId) {
+      Alert.alert("No lesson set", "This circle doesn't have a current lesson assigned yet.");
+      return;
+    }
+    setStartingSession(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/circles/${circleId}/start-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startedBy: profile.id }),
+      });
+      if (!res.ok) throw new Error("start-session failed");
+      const { channelName } = (await res.json()) as { channelName: string; sessionId: string };
+      router.push({ pathname: "/call/group" as any, params: { circleId: circleId as string, channelName } });
+    } catch {
+      Alert.alert("Couldn't start session", "Please try again.");
+    } finally {
+      setStartingSession(false);
     }
   }
 
@@ -150,6 +174,19 @@ export default function CircleDetailScreen() {
             <Ionicons name="clipboard-outline" size={18} color={colors.upperRoomAmber} />
             <Text style={styles.reviewBannerText}>Review Submissions ({pendingEvals.length})</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.upperRoomAmber} />
+          </TouchableOpacity>
+        )}
+
+        {isLeader && (
+          <TouchableOpacity style={styles.startSessionBtn} onPress={startSession} disabled={startingSession}>
+            {startingSession ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="videocam" size={18} color="#fff" />
+                <Text style={styles.startSessionBtnText}>Start Session</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 
@@ -289,6 +326,8 @@ function makeStyles(c: AppColors) {
     scroll: { padding: 20 },
     errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
     description: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 21, marginBottom: 16 },
+    startSessionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 14, marginBottom: 16 },
+    startSessionBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     reviewBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)", borderRadius: 12, padding: 14, marginBottom: 16 },
     reviewBannerText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
     sectionHeading: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },

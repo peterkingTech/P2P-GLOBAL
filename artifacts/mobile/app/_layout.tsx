@@ -17,6 +17,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
+import { CircleSessionBanner } from "@/components/CircleSessionBanner";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
 import { CategoryCompletionModal } from "@/components/CategoryCompletionModal";
@@ -212,6 +213,31 @@ function IncomingCallHost() {
   return null;
 }
 
+// Peer Circle "Start Session" invite — unlike IncomingCallHost this doesn't
+// auto-navigate (it's not a ringing call), it renders a dismissible banner
+// the member can tap to join whenever they're ready.
+function CircleSessionBannerHost() {
+  const { circleSessionInvite, dismissCircleSessionInvite } = useData();
+  const router = useRouter();
+
+  if (!circleSessionInvite) return null;
+
+  return (
+    <CircleSessionBanner
+      circleName={circleSessionInvite.circleName}
+      onPress={() => {
+        const invite = circleSessionInvite;
+        dismissCircleSessionInvite();
+        router.push({
+          pathname: "/call/group",
+          params: { circleId: invite.circleId, channelName: invite.channelName },
+        } as any);
+      }}
+      onDismiss={dismissCircleSessionInvite}
+    />
+  );
+}
+
 // The Completion Moment (Prompt 6) — DataContext sets pendingCompletionMoment
 // the instant a user's 12th Core Curriculum module is detected complete, but
 // navigation must never interrupt a lesson mid-session. This host just waits
@@ -240,6 +266,7 @@ function RootLayoutNav() {
         <AuthGate />
         <GrowthCelebrationHost />
         <IncomingCallHost />
+        <CircleSessionBannerHost />
         <CompletionMomentHost />
       </DataProvider>
     </AuthProvider>

@@ -11,6 +11,8 @@ function mapNotification(row: Record<string, unknown>) {
     message: row.message ?? null,
     isRead: row.read ?? false,
     createdAt: row.created_at,
+    notificationType: row.notification_type ?? null,
+    data: row.data ?? null,
   };
 }
 

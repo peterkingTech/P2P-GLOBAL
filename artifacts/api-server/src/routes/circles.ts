@@ -134,13 +134,13 @@ router.get("/:circleId", async (req, res) => {
     .order("joined_at", { ascending: true });
   const memberIds = (members ?? []).map((m) => m.user_id as string);
   const { data: profiles } = memberIds.length
-    ? await supabaseRead.from("p2p_profiles").select("id,full_name,avatar_url").in("id", memberIds)
-    : { data: [] as { id: string; full_name: string; avatar_url: string | null }[] };
+    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url,country").in("id", memberIds)
+    : { data: [] as { id: string; full_name: string; photo_url: string | null; country: string | null }[] };
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
   const mappedMembers = (members ?? []).map((m) => {
     const p = profileById.get(m.user_id as string);
-    return mapMember(m as Record<string, unknown>, { name: p?.full_name ?? "Member", avatarUrl: p?.avatar_url ?? null });
+    return mapMember(m as Record<string, unknown>, { name: p?.full_name ?? "Member", avatarUrl: p?.photo_url ?? null, country: p?.country ?? null });
   });
 
   const { data: sessions } = await supabaseRead
@@ -217,8 +217,8 @@ router.get("/:circleId/join-requests", async (req, res) => {
     .order("requested_at", { ascending: true });
   const userIds = (requests ?? []).map((r) => r.user_id as string);
   const { data: profiles } = userIds.length
-    ? await supabaseRead.from("p2p_profiles").select("id,full_name,avatar_url").in("id", userIds)
-    : { data: [] as { id: string; full_name: string; avatar_url: string | null }[] };
+    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url").in("id", userIds)
+    : { data: [] as { id: string; full_name: string; photo_url: string | null }[] };
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
   return res.json(
@@ -226,7 +226,7 @@ router.get("/:circleId/join-requests", async (req, res) => {
       id: r.id,
       userId: r.user_id,
       userName: profileById.get(r.user_id as string)?.full_name ?? "Someone",
-      avatarUrl: profileById.get(r.user_id as string)?.avatar_url ?? null,
+      avatarUrl: profileById.get(r.user_id as string)?.photo_url ?? null,
       message: r.message,
       requestedAt: r.requested_at,
     }))
@@ -278,6 +278,61 @@ router.post("/:circleId/sessions", async (req, res) => {
   await supabaseRead.from("p2p_peer_circles").update({ current_lesson_id: lessonId }).eq("id", circleId);
 
   return res.json(mapSession(data as Record<string, unknown>));
+});
+
+// POST /circles/:circleId/start-session — leader taps "Start Session": ensures
+// a scheduled session row exists for the circle's current lesson (creating one
+// if needed so the group call always has something to mark complete), notifies
+// every active member, and hands back the Agora channel name to join.
+router.post("/:circleId/start-session", async (req, res) => {
+  const { circleId } = req.params;
+  const { startedBy } = req.body as { startedBy?: string };
+  if (!startedBy) return res.status(400).json({ error: "startedBy is required" });
+
+  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("*").eq("id", circleId).maybeSingle();
+  if (!circle) return res.status(404).json({ error: "Circle not found" });
+  if (circle.leader_id !== startedBy) return res.status(403).json({ error: "Only the circle leader can start a session" });
+  if (!circle.current_lesson_id) return res.status(400).json({ error: "This circle has no current lesson set" });
+
+  let { data: session } = await supabaseRead
+    .from("p2p_peer_circle_sessions")
+    .select("*")
+    .eq("circle_id", circleId)
+    .eq("lesson_id", circle.current_lesson_id)
+    .eq("session_status", "scheduled")
+    .maybeSingle();
+
+  if (!session) {
+    const { data: created, error: createErr } = await supabaseRead
+      .from("p2p_peer_circle_sessions")
+      .insert({ circle_id: circleId, lesson_id: circle.current_lesson_id, session_status: "scheduled", created_by: startedBy })
+      .select()
+      .single();
+    if (createErr) return res.status(500).json({ error: createErr.message });
+    session = created;
+  }
+
+  const { data: members } = await supabaseRead
+    .from("p2p_peer_circle_members")
+    .select("user_id")
+    .eq("circle_id", circleId)
+    .eq("status", "active")
+    .neq("user_id", startedBy);
+
+  const channelName = `circle_${circleId}`;
+  if (members && members.length > 0) {
+    await supabaseRead.from("p2p_notifications").insert(
+      members.map((m) => ({
+        user_id: m.user_id,
+        title: `${circle.name} is starting`,
+        message: "Tap to join the group call now.",
+        notification_type: "circle_session_start",
+        data: { circleId, circleName: circle.name, channelName },
+      }))
+    );
+  }
+
+  return res.json({ channelName, sessionId: (session as Record<string, unknown>).id });
 });
 
 // PUT /circles/:circleId/sessions/:sessionId/complete

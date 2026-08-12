@@ -562,6 +562,17 @@ export interface IncomingCallInfo {
   callLogId: string | null;
 }
 
+// A Peer Circle "Start Session" invite banner for the current user — set the
+// instant a p2p_notifications row of type circle_session_start targeting them
+// is seen over realtime. Modeled on incomingCall above, but dismissible
+// (tapping away just clears the banner, it doesn't count as a missed call).
+export interface CircleSessionInvite {
+  notificationId: string;
+  circleId: string;
+  circleName: string;
+  channelName: string;
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -848,6 +859,8 @@ interface DataContextValue {
   declinePeer: (confirmationId: string) => Promise<string | null>;
   incomingCall: IncomingCallInfo | null;
   dismissIncomingCall: () => void;
+  circleSessionInvite: CircleSessionInvite | null;
+  dismissCircleSessionInvite: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -936,6 +949,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [fruitCelebrationQueue, setFruitCelebrationQueue] = useState<FruitCelebration[]>([]);
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingPeerConfirmation[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
+  const [circleSessionInvite, setCircleSessionInvite] = useState<CircleSessionInvite | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -2073,6 +2087,39 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
   }, []);
 
+  // Peer Circle "Start Session" invites — same shape as incomingCall above,
+  // but sourced from p2p_notifications (a generic table also used by Break
+  // Rooms and pastoral/crisis calls) rather than a dedicated table, since
+  // this is a dismissible banner, not a ringing call.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const channel = supabase
+      .channel(`p2p_notifications_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row.notification_type !== "circle_session_start") return;
+          const data = row.data as Record<string, unknown> | null;
+          if (!data?.circleId || !data?.channelName) return;
+          setCircleSessionInvite({
+            notificationId: row.id as string,
+            circleId: data.circleId as string,
+            circleName: (data.circleName as string) ?? "Peer Circle",
+            channelName: data.channelName as string,
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id]);
+
+  const dismissCircleSessionInvite = useCallback(() => {
+    setCircleSessionInvite(null);
+  }, []);
+
   const checkGrowthEvents = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -3191,6 +3238,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       categoryCompletionQueue, dismissCurrentCategoryCompletion, checkCategoryCompletion,
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
       incomingCall, dismissIncomingCall,
+      circleSessionInvite, dismissCircleSessionInvite,
     }}>
       {children}
     </DataContext.Provider>
