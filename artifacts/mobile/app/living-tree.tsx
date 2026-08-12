@@ -379,6 +379,10 @@ export default function LivingTreeScreen() {
               {forestNodes.map((node) => (
                 <NodeCard key={node.id} node={node} depth={0} />
               ))}
+              <TouchableOpacity style={styles.viewFullForestBtn} onPress={() => router.push("/forest" as any)}>
+                <Text style={styles.viewFullForestBtnText}>View Full Forest</Text>
+                <Ionicons name="chevron-forward" size={16} color="#fff" />
+              </TouchableOpacity>
             </ScrollView>
           )}
         </View>
@@ -517,6 +521,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
   list: { paddingHorizontal: 16, paddingTop: 12 },
+  viewFullForestBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: colors.primaryGreen, borderRadius: 14, paddingVertical: 14, marginTop: 8,
+  },
+  viewFullForestBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   nodeWrapper: { marginBottom: 8 },
   nodeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   expandBtn: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },

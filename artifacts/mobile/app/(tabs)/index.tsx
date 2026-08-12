@@ -271,6 +271,12 @@ function makeStyles(c: AppColors) {
     progressBarBg: { height: 5, backgroundColor: c.progressTrack, borderRadius: 3 },
     progressBarFill: { height: 5, backgroundColor: c.progressFill, borderRadius: 3 },
     progressHint: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    forestLinkRow: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      marginHorizontal: 20, marginTop: 12, backgroundColor: c.card, borderRadius: 12,
+      borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14, paddingVertical: 12,
+    },
+    forestLinkText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold", flex: 1 },
 
     verseCard: {
       backgroundColor: c.cardBeige,
@@ -382,7 +388,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -569,6 +575,17 @@ export default function HomeTab() {
           </Text>
         )}
       </View>
+
+      <TouchableOpacity
+        style={styles.forestLinkRow}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/forest" as any); }}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.forestLinkText}>
+          🌳 View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
+      </TouchableOpacity>
 
       {/* Elijah Protocol check-in, if pastoral care has flagged one */}
       {pendingElijahCheckIn && (

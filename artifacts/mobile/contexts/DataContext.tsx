@@ -676,6 +676,44 @@ export interface ForestStats {
   countriesReached: string[];
 }
 
+// ── Generational Forest View (GET /profiles/:userId/forest) — a richer,
+// server-computed lineage than ForestNode/loadForestNetwork above (which is
+// an unlimited-depth client-side walk used by the simple list view on
+// living-tree.tsx). This one is capped at 3 forward generations + a minimal
+// 4th-gen preview, includes backward ancestry, and aggregate stats. ──
+export interface ForestPerson {
+  userId: string;
+  displayName: string;
+  photoUrl: string | null;
+  country: string | null;
+  growthLevel: number;
+  lastActiveAt: string | null;
+  modulesCompleted: number;
+}
+export interface ForestMenteeNode extends ForestPerson {
+  mentees: ForestMenteeNode[];
+}
+export interface ForestAncestor extends ForestPerson {
+  generation: number;
+}
+export interface ForestMinimalPerson {
+  userId: string;
+  country: string | null;
+  growthLevel: number;
+}
+export interface GenerationalForestData {
+  self: ForestPerson & { fruitCount: number };
+  mentees: ForestMenteeNode[];
+  ancestry: ForestAncestor[];
+  stats: {
+    totalInLineage: number;
+    generationsDeep: number;
+    countriesRepresented: string[];
+    totalModulesCompletedAcrossLineage: number;
+    totalFruitsAcrossLineage: number;
+  };
+}
+
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
@@ -694,6 +732,9 @@ interface DataContextValue {
   sessions: StudySession[];
   forestNodes: ForestNode[];
   forestStats: ForestStats;
+  forestData: GenerationalForestData | null;
+  forestDataLoading: boolean;
+  loadForestData: (userId: string) => Promise<void>;
   treeData: TreeData | null;
   treeMentees: MenteeBranchInfo[];
   refreshTreeData: () => Promise<void>;
@@ -856,6 +897,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     hasDiscipleMaker: false,
     countriesReached: [],
   });
+  const [forestData, setForestData] = useState<GenerationalForestData | null>(null);
+  const [forestDataLoading, setForestDataLoading] = useState(false);
   const [treeData, setTreeData] = useState<TreeData | null>(null);
   const [treeMentees, setTreeMentees] = useState<MenteeBranchInfo[]>([]);
   const [pendingCompletionMoment, setPendingCompletionMoment] = useState(false);
@@ -1601,6 +1644,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setForestNodes([userNode]);
       setForestStats({ totalDisciples: 0, hasDiscipleMaker: false, countriesReached: [] });
+    }
+  }, []);
+
+  // Generational Forest View data — cached in state, only refetched on
+  // explicit call (pull-to-refresh on /forest, or a fresh screen mount).
+  const loadForestData = useCallback(async (userId: string) => {
+    setForestDataLoading(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/${userId}/forest`);
+      if (!res.ok) { setForestData(null); return; }
+      const data = (await res.json()) as GenerationalForestData;
+      setForestData(data);
+    } catch {
+      setForestData(null);
+    } finally {
+      setForestDataLoading(false);
     }
   }, []);
 
@@ -3048,7 +3107,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     <DataContext.Provider value={{
       modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
       planCategories, loadPlanCategories, getCategoryPlans, searchPlans, getAllPlansAZ,
-      prayers, sessions, forestNodes, forestStats,
+      prayers, sessions, forestNodes, forestStats, forestData, forestDataLoading, loadForestData,
       treeData, treeMentees, refreshTreeData, pendingCompletionMoment, dismissPendingCompletionMoment,
       fruitCatalog, userFruits, fruitProgress, fruitCount: userFruits.length, missions,
       dailyVerse, pendingEvaluations, isLoading,

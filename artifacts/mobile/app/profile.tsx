@@ -449,6 +449,16 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
         </TouchableOpacity>
 
+        {/* My Generational Forest */}
+        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/forest" as any)}>
+          <Ionicons name="git-branch-outline" size={18} color={colors.primaryGreen} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dashboardTitle}>My Generational Forest</Text>
+            <Text style={styles.dashboardSub}>Your discipleship lineage across the nations</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
+
         {/* Peers / Groups / Notes / Highlights */}
         <View style={styles.rowsList}>
           {PROFILE_ROWS.map((row) => (
