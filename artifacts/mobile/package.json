@@ -65,6 +65,7 @@
     "expo-sharing": "~14.0.8",
     "i18next": "^26.3.5",
     "react-i18next": "^17.0.8",
+    "react-native-agora": "^4.6.2",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-view-shot": "4.0.3"
   }

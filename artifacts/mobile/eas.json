@@ -8,7 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
+        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
       }
     },
     "preview": {
@@ -17,7 +18,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
+        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
       }
     },
     "production": {
@@ -26,7 +28,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
+        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
       }
     }
   },
