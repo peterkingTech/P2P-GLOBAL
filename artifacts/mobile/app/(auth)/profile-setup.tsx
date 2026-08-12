@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
+import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import colors from "@/constants/colors";
 
 const GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
@@ -30,6 +31,7 @@ export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
   const { updateProfile } = useAuth();
 
+  const [step, setStep] = useState<"gifts" | "location">("gifts");
   const [selectedGifts, setSelectedGifts] = useState<SpiritualGift[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,13 +41,56 @@ export default function ProfileSetupScreen() {
     );
   }
 
-  async function handleFinish() {
+  async function handleGiftsDone() {
     setLoading(true);
     await updateProfile({ gifts: selectedGifts });
     setLoading(false);
+    setStep("location");
+  }
+
+  function goToGoals() {
     // Optional goal-setting step before entering the main app — 4 quick
     // questions, clearly skippable; answers land in p2p_user_goals either way.
     router.replace("/(auth)/goals-onboarding" as any);
+  }
+
+  async function handleLocationVerified(location: VerifiedLocation) {
+    await updateProfile({
+      city: location.city || undefined,
+      country: location.country,
+      countryCode: location.countryCode || undefined,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationVerified: true,
+      locationVerifiedAt: new Date().toISOString(),
+    });
+    goToGoals();
+  }
+
+  if (step === "location") {
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + (Platform.OS === "web" ? 40 : 32),
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <View style={styles.iconRing}>
+            <Ionicons name="earth" size={36} color={colors.brightYellow} />
+          </View>
+          <Text style={styles.title}>Where Are You Based?</Text>
+          <Text style={styles.subtitle}>
+            This step is optional — you can always add it later in Settings.
+          </Text>
+        </View>
+        <LocationVerifier onVerified={handleLocationVerified} onSkip={goToGoals} />
+      </ScrollView>
+    );
   }
 
   return (
@@ -99,7 +144,7 @@ export default function ProfileSetupScreen() {
 
       <TouchableOpacity
         style={styles.primaryBtn}
-        onPress={handleFinish}
+        onPress={handleGiftsDone}
         activeOpacity={0.85}
         disabled={loading}
       >
@@ -107,7 +152,7 @@ export default function ProfileSetupScreen() {
           <ActivityIndicator color={colors.cream} />
         ) : (
           <Text style={styles.primaryBtnText}>
-            {selectedGifts.length === 0 ? "Skip for Now" : "Plant My Tree"}
+            {selectedGifts.length === 0 ? "Skip for Now" : "Continue"}
           </Text>
         )}
       </TouchableOpacity>

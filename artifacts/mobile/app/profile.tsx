@@ -355,6 +355,9 @@ export default function ProfileScreen() {
               {profile?.city && <Text style={styles.locationText}>{profile.city}</Text>}
               {profile?.city && profile?.country && <Text style={styles.locationText}> · </Text>}
               {profile?.country && <Text style={styles.locationText}>{profile.country}</Text>}
+              {profile?.locationVerified && (
+                <Ionicons name="checkmark-circle" size={13} color={colors.accentGreen} style={{ marginLeft: 4 }} />
+              )}
             </View>
           )}
           {profile?.bio ? <Text style={styles.bioText}>{profile.bio}</Text> : null}

@@ -10,7 +10,19 @@ import { AppColors } from "@/constants/themes";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY, isoToDMY } from "@/lib/dateOfBirth";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import { getApiUrl } from "@/lib/apiUrl";
+import { getFlagEmoji } from "@/lib/countryGeo";
+
+function timeAgo(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.floor(months / 12);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
 
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -29,6 +41,7 @@ export default function AccountSettingsScreen() {
   const [showPasswordField, setShowPasswordField] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showLocationVerifier, setShowLocationVerifier] = useState(false);
 
   async function handleSaveProfile() {
     let dateOfBirth: string | undefined;
@@ -109,6 +122,19 @@ export default function AccountSettingsScreen() {
       setShowPasswordField(false);
       Alert.alert("Password changed", "Your password has been updated.");
     }
+  }
+
+  async function handleLocationVerified(location: VerifiedLocation) {
+    await updateProfile({
+      city: location.city || undefined,
+      country: location.country,
+      countryCode: location.countryCode || undefined,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationVerified: true,
+      locationVerifiedAt: new Date().toISOString(),
+    });
+    setShowLocationVerifier(false);
   }
 
   function confirmDeleteAccount() {
@@ -218,6 +244,32 @@ export default function AccountSettingsScreen() {
           )}
         </View>
 
+        <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Location</Text>
+          {showLocationVerifier ? (
+            <LocationVerifier onVerified={handleLocationVerified} onSkip={() => setShowLocationVerifier(false)} compact />
+          ) : (
+            <TouchableOpacity style={styles.locationRow} onPress={() => setShowLocationVerifier(true)}>
+              <Ionicons name="location-outline" size={18} color={colors.accentGreen} />
+              <View style={{ flex: 1 }}>
+                {profile?.locationVerified ? (
+                  <>
+                    <Text style={styles.locationText}>
+                      {getFlagEmoji(profile.country)} {profile.country}{profile.city ? ` · ${profile.city}` : ""} <Text style={{ color: colors.accentGreen }}>✓ Verified</Text>
+                    </Text>
+                    {profile.locationVerifiedAt && (
+                      <Text style={styles.locationSub}>Verified {timeAgo(profile.locationVerifiedAt)}</Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={styles.locationText}>Location not set</Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <TouchableOpacity style={styles.deleteBtn} onPress={confirmDeleteAccount} disabled={deleting}>
           {deleting ? <ActivityIndicator color="#B91C1C" size="small" /> : (
             <>
@@ -264,6 +316,9 @@ function makeStyles(c: AppColors) {
     saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     changePwBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 4 },
     changePwBtnText: { fontSize: 14, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    locationRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+    locationText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
+    locationSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     deleteBtn: {
       flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
       borderWidth: 1.5, borderColor: "#B91C1C", borderRadius: 14, height: 50, marginTop: 8,

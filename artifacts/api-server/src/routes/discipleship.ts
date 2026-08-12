@@ -162,12 +162,14 @@ interface PeerGuideCandidate {
   activeMenteeCount: number;
   maxMentees: number;
   modulesCompleted: number;
+  countryCode: string | null;
+  locationVerified: boolean;
 }
 
 async function getEligibleCandidates(requesterId: string, excludeCandidateIds: string[] = []): Promise<PeerGuideCandidate[]> {
   const { data: candidateProfiles } = await supabaseWrite
     .from("p2p_profiles")
-    .select("id, full_name, photo_url, country, content_language, timezone, background_sensitivity, is_peer_guide_eligible, max_mentees, accepting_mentees")
+    .select("id, full_name, photo_url, country, country_code, location_verified, content_language, timezone, background_sensitivity, is_peer_guide_eligible, max_mentees, accepting_mentees")
     .neq("id", requesterId)
     .eq("accepting_mentees", true);
 
@@ -280,6 +282,8 @@ async function getEligibleCandidates(requesterId: string, excludeCandidateIds: s
       activeMenteeCount,
       maxMentees,
       modulesCompleted: modulesCompletedByUser.get(id) ?? 0,
+      countryCode: (c.country_code as string) ?? null,
+      locationVerified: (c.location_verified as boolean) ?? false,
     });
   }
   return eligible;
@@ -301,7 +305,7 @@ interface ScoredMatch {
 async function scoreCandidates(requesterId: string, excludeCandidateIds: string[] = []): Promise<ScoredMatch[]> {
   const { data: requesterProfile } = await supabaseWrite
     .from("p2p_profiles")
-    .select("country, content_language, timezone, background_sensitivity")
+    .select("country, country_code, content_language, timezone, background_sensitivity")
     .eq("id", requesterId)
     .maybeSingle();
   const requester = (requesterProfile ?? {}) as Record<string, unknown>;
@@ -318,7 +322,11 @@ async function scoreCandidates(requesterId: string, excludeCandidateIds: string[
       score += 30;
       reasons.push("Same language");
     }
-    if (requester.country && c.country && (requester.country as string).trim().toLowerCase() === c.country.trim().toLowerCase()) {
+    // Country matching uses only the GPS-verified country_code, never the
+    // freeform, manually-typed `country` text field — a verified code is
+    // exact and can't be spoofed by typing a fake location.
+    const requesterCode = requester.country_code as string | undefined;
+    if (requesterCode && c.countryCode && requesterCode === c.countryCode) {
       score += 20;
       reasons.push("Same country");
     } else {
@@ -327,6 +335,12 @@ async function scoreCandidates(requesterId: string, excludeCandidateIds: string[
         score += 10;
         reasons.push("Same region of the world");
       }
+    }
+    // Verified location gives a small trust boost — it signals the
+    // candidate's profile location is real, not just typed in.
+    if (c.locationVerified) {
+      score += 5;
+      reasons.push("Verified location");
     }
     const candidateOffset = parseUtcOffset(c.timezone);
     if (requesterOffset !== null && candidateOffset !== null && Math.abs(requesterOffset - candidateOffset) <= 4) {

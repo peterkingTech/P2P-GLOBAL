@@ -46,6 +46,11 @@ export interface UserProfile {
   avatarUrl?: string;
   city?: string;
   country?: string;
+  countryCode?: string;
+  latitude?: number;
+  longitude?: number;
+  locationVerified: boolean;
+  locationVerifiedAt?: string;
   languageCode: string;
   growthLevel: number;
   role: DiscipleRole;
@@ -112,6 +117,11 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     avatarUrl: row.photo_url as string | undefined,
     city: row.city as string | undefined,
     country: row.country as string | undefined,
+    countryCode: row.country_code as string | undefined,
+    latitude: row.latitude as number | undefined,
+    longitude: row.longitude as number | undefined,
+    locationVerified: (row.location_verified as boolean) ?? false,
+    locationVerifiedAt: row.location_verified_at as string | undefined,
     languageCode: (row.language as string) ?? "en",
     growthLevel: (row.growth_level as number) ?? 0,
     role: ((row.role as string) ?? "student") as DiscipleRole,
@@ -257,6 +267,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.isPraying !== undefined) dbUpdates.is_praying = updates.isPraying;
     if (updates.avatarUrl !== undefined) dbUpdates.photo_url = updates.avatarUrl;
     if (updates.city !== undefined) dbUpdates.city = updates.city;
+    if (updates.countryCode !== undefined) dbUpdates.country_code = updates.countryCode;
+    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
+    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
+    if (updates.locationVerified !== undefined) dbUpdates.location_verified = updates.locationVerified;
+    if (updates.locationVerifiedAt !== undefined) dbUpdates.location_verified_at = updates.locationVerifiedAt;
     if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
     if (updates.notificationsEnabled !== undefined) dbUpdates.notifications_enabled = updates.notificationsEnabled;
     if (updates.notifyPrayer !== undefined) dbUpdates.notify_prayer = updates.notifyPrayer;
