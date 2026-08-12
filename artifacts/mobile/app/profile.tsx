@@ -181,13 +181,14 @@ function makeStyles(c: AppColors) {
     },
     reachOutTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     reachOutSub: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-    shareAppBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      backgroundColor: "rgba(29,158,117,0.08)",
-      borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.2)",
-      height: 48, marginBottom: 10,
+    inviteRow: {
+      flexDirection: "row", alignItems: "center", gap: 12,
+      backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige,
+      paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16,
     },
-    shareAppBtnText: { fontSize: 15, color: c.accentGreen, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    inviteIconWrap: { backgroundColor: c.accentGreen, borderRadius: 8, padding: 8 },
+    inviteTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    inviteSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     signOutBtn: {
       flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
       backgroundColor: "rgba(185,28,28,0.08)",
@@ -470,6 +471,18 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
         </TouchableOpacity>
 
+        {/* Invite Someone */}
+        <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={shareApp}>
+          <View style={styles.inviteIconWrap}>
+            <Ionicons name="share-social-outline" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.inviteTitle}>Invite Someone</Text>
+            <Text style={styles.inviteSub}>Share P2P Global with a friend</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.borderBeige} />
+        </TouchableOpacity>
+
         {/* Peers / Groups / Notes / Highlights */}
         <View style={styles.rowsList}>
           {PROFILE_ROWS.map((row) => (
@@ -595,11 +608,6 @@ export default function ProfileScreen() {
             <Text style={styles.reachOutSub}>Reach out privately for support and follow-up</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.shareAppBtn} onPress={shareApp} activeOpacity={0.85}>
-          <Ionicons name="share-social-outline" size={18} color={colors.accentGreen} />
-          <Text style={styles.shareAppBtnText}>Share App</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.85}>

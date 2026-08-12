@@ -26,15 +26,10 @@ export default function AboutSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <SettingsSubHeader title="About" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
-          <TouchableOpacity style={[styles.linkRow, styles.rowLast]} onPress={shareApp}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <Ionicons name="share-social-outline" size={18} color={colors.accentGreen} />
-              <Text style={styles.label}>Share P2P Global</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.shareAppBtn} onPress={shareApp} activeOpacity={0.85}>
+          <Ionicons name="share-social-outline" size={20} color="#fff" />
+          <Text style={styles.shareAppBtnText}>Share P2P Global</Text>
+        </TouchableOpacity>
 
         <View style={styles.card}>
           <View style={[styles.row, styles.rowLast]}>
@@ -71,6 +66,11 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     content: { paddingHorizontal: 20, paddingTop: 20 },
     card: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 16 },
+    shareAppBtn: {
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+      backgroundColor: c.accentGreen, borderRadius: 14, height: 52, marginBottom: 16,
+    },
+    shareAppBtnText: { fontSize: 16, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     row: {
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",
       paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
