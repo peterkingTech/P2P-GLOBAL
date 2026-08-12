@@ -88,4 +88,78 @@ router.post("/calls/room-channel", async (req, res) => {
   return ok(res, { channelName: `room_${roomId}` });
 });
 
+// POST /calls/start — creates the one p2p_call_logs row for this call plus
+// the p2p_incoming_calls row that signals the recipient. Both writes go
+// through the service-role client because neither table has an INSERT RLS
+// policy for the anon key (see migration 058) — call/message system writes
+// are meant to be server-owned, not client-owned with a spoofable actor id.
+router.post("/calls/start", async (req, res) => {
+  const { channelName, callType, callerId, recipientId, conversationId } = req.body as {
+    channelName?: string; callType?: string; callerId?: string; recipientId?: string; conversationId?: string;
+  };
+  if (!channelName || !callType || !callerId || !recipientId) {
+    return err(res, "channelName, callType, callerId, recipientId required");
+  }
+
+  const { data: callLog, error: logErr } = await supabaseWrite
+    .from("p2p_call_logs")
+    .insert({
+      channel_name: channelName, call_type: callType, initiated_by: callerId,
+      participants: [callerId, recipientId], status: "initiated",
+    })
+    .select("id").single();
+  if (logErr || !callLog) return err(res, logErr?.message ?? "Failed to create call log", 500);
+
+  const { data: incomingCall, error: incomingErr } = await supabaseWrite
+    .from("p2p_incoming_calls")
+    .insert({
+      channel_name: channelName, call_type: callType, caller_id: callerId, recipient_id: recipientId,
+      status: "ringing", conversation_id: conversationId ?? null, call_log_id: callLog.id,
+    })
+    .select("id").single();
+  if (incomingErr || !incomingCall) return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
+
+  return ok(res, { callLogId: callLog.id as string, incomingCallId: incomingCall.id as string });
+});
+
+const CALL_TYPE_SUMMARY_LABEL: Record<string, string> = {
+  audio: "Audio call", video: "Video call", pastoral: "Pastoral check-in", crisis: "Crisis call", group: "Group call",
+};
+
+// POST /calls/end — closes out the call_log row and, if this call belonged
+// to a DM conversation, posts the read-only "📞 Audio call · 4m 32s" system
+// message (sender_id = null; see migration 059 and the same RLS reasoning
+// as /calls/start).
+router.post("/calls/end", async (req, res) => {
+  const { callLogId, conversationId, callType, connected, durationSeconds } = req.body as {
+    callLogId?: string; conversationId?: string | null; callType?: string; connected?: boolean; durationSeconds?: number;
+  };
+  if (!callLogId) return err(res, "callLogId required");
+
+  const duration = Math.max(0, Math.round(durationSeconds ?? 0));
+  const { error: updateErr } = await supabaseWrite
+    .from("p2p_call_logs")
+    .update({ status: connected ? "ended" : "missed", ended_at: new Date().toISOString(), duration_seconds: duration })
+    .eq("id", callLogId);
+  if (updateErr) return err(res, updateErr.message, 500);
+
+  if (conversationId) {
+    const label = CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call";
+    const icon = callType === "video" ? "📹" : "📞";
+    const body = connected ? `${icon} ${label} · ${formatDuration(duration)}` : `📞 Missed call · ${label}`;
+    const { error: msgErr } = await supabaseWrite
+      .from("p2p_messages")
+      .insert({ conversation_id: conversationId, sender_id: null, body, message_type: "call_summary", call_log_id: callLogId });
+    if (msgErr) return err(res, msgErr.message, 500);
+  }
+
+  return ok(res, { ended: true });
+});
+
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 export default router;

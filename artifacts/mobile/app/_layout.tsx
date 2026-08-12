@@ -180,6 +180,38 @@ function GrowthCelebrationHost() {
   );
 }
 
+// Incoming call detection — DataContext sets incomingCall the instant a
+// p2p_incoming_calls row targeting this user arrives over realtime (see the
+// subscription there). This just navigates to the ringing screen, the same
+// pattern GrowthCelebrationHost uses for fruit celebrations — it works
+// regardless of which screen the user is currently on, since it's mounted
+// once at the root alongside the rest of the app.
+function IncomingCallHost() {
+  const { incomingCall, dismissIncomingCall } = useData();
+  const router = useRouter();
+  const shownForCallId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!incomingCall || shownForCallId.current === incomingCall.callId) return;
+    shownForCallId.current = incomingCall.callId;
+    router.push({
+      pathname: "/call/incoming",
+      params: {
+        callId: incomingCall.callId,
+        channelName: incomingCall.channelName,
+        callType: incomingCall.callType,
+        callerId: incomingCall.callerId,
+        callerName: incomingCall.callerName,
+        conversationId: incomingCall.conversationId ?? "",
+        callLogId: incomingCall.callLogId ?? "",
+      },
+    } as any);
+    dismissIncomingCall();
+  }, [incomingCall, dismissIncomingCall, router]);
+
+  return null;
+}
+
 // The Completion Moment (Prompt 6) — DataContext sets pendingCompletionMoment
 // the instant a user's 12th Core Curriculum module is detected complete, but
 // navigation must never interrupt a lesson mid-session. This host just waits
@@ -207,6 +239,7 @@ function RootLayoutNav() {
       <DataProvider>
         <AuthGate />
         <GrowthCelebrationHost />
+        <IncomingCallHost />
         <CompletionMomentHost />
       </DataProvider>
     </AuthProvider>

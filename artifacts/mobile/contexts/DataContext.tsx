@@ -544,6 +544,24 @@ export interface PendingPeerConfirmation {
   expiresAt: string | null;
 }
 
+// A ringing call for the current user — set the instant a new
+// p2p_incoming_calls row targeting them is seen over realtime (see the
+// subscription below), cleared once the incoming-call screen navigates away
+// (accepted/declined/missed). Modeled on the fruitCelebrationQueue pattern
+// just above, but single-slot rather than a queue — only one call rings at
+// a time. "audio"/"video" are peer-initiated; "pastoral" and "crisis" carry
+// the special rules built out in the pastoral-care/Watchtower integration.
+export type CallType = "audio" | "video" | "pastoral" | "crisis";
+export interface IncomingCallInfo {
+  callId: string;
+  channelName: string;
+  callType: CallType;
+  callerId: string;
+  callerName: string;
+  conversationId: string | null;
+  callLogId: string | null;
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -828,6 +846,8 @@ interface DataContextValue {
   pendingConfirmationCount: number;
   confirmPeer: (confirmationId: string) => Promise<string | null>;
   declinePeer: (confirmationId: string) => Promise<string | null>;
+  incomingCall: IncomingCallInfo | null;
+  dismissIncomingCall: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -915,6 +935,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [fruitProgress, setFruitProgress] = useState<FruitProgressEntry[]>([]);
   const [fruitCelebrationQueue, setFruitCelebrationQueue] = useState<FruitCelebration[]>([]);
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingPeerConfirmation[]>([]);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -2011,6 +2032,45 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const dismissCurrentFruitCelebration = useCallback(() => {
     setFruitCelebrationQueue((prev) => prev.slice(1));
+  }, []);
+
+  // Incoming call detection — fires the moment someone inserts a
+  // p2p_incoming_calls row targeting this user, regardless of which screen
+  // they're currently on. IncomingCallHost (app/_layout.tsx) reads
+  // incomingCall and navigates to the ringing screen the same way
+  // GrowthCelebrationHost does for fruit celebrations.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const channel = supabase
+      .channel(`p2p_incoming_calls_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_incoming_calls", filter: `recipient_id=eq.${userId}` },
+        async (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row.status !== "ringing") return;
+
+          const { data: callerProfile } = await supabase
+            .from("p2p_profiles").select("full_name").eq("id", row.caller_id as string).maybeSingle();
+
+          setIncomingCall({
+            callId: row.id as string,
+            channelName: row.channel_name as string,
+            callType: row.call_type as CallType,
+            callerId: row.caller_id as string,
+            callerName: (callerProfile?.full_name as string) ?? "Someone",
+            conversationId: (row.conversation_id as string) ?? null,
+            callLogId: (row.call_log_id as string) ?? null,
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id]);
+
+  const dismissIncomingCall = useCallback(() => {
+    setIncomingCall(null);
   }, []);
 
   const checkGrowthEvents = useCallback(async (userId: string) => {
@@ -3130,6 +3190,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       fruitCelebrationQueue, dismissCurrentFruitCelebration,
       categoryCompletionQueue, dismissCurrentCategoryCompletion, checkCategoryCompletion,
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
+      incomingCall, dismissIncomingCall,
     }}>
       {children}
     </DataContext.Provider>

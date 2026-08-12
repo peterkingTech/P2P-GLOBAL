@@ -18,14 +18,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 import colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/apiUrl";
 
 interface Message {
   id: string;
   conversation_id: string;
-  sender_id: string;
+  sender_id: string | null;
   body: string | null;
   created_at: string;
   senderName?: string;
+  message_type?: string;
 }
 
 export default function ChatScreen() {
@@ -36,6 +38,9 @@ export default function ChatScreen() {
   const { reportContent } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
   const [title, setTitle] = useState("Conversation");
+  const [isDirect, setIsDirect] = useState(false);
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
   const [text, setText] = useState("");
   const [startersVisible, setStartersVisible] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -52,20 +57,23 @@ export default function ChatScreen() {
       .eq("id", id)
       .maybeSingle();
     if (conv?.type === "direct") {
+      setIsDirect(true);
       const { data: members } = await supabase
         .from("p2p_conversation_members")
         .select("user_id, p2p_profiles(full_name)")
         .eq("conversation_id", id)
         .neq("user_id", user.id)
         .maybeSingle();
+      setOtherUserId((members as any)?.user_id ?? null);
       setTitle((members as any)?.p2p_profiles?.full_name ?? "Direct message");
     } else {
+      setIsDirect(false);
       setTitle(conv?.name ?? "Group chat");
     }
 
     const { data: msgs } = await supabase
       .from("p2p_messages")
-      .select("id, conversation_id, sender_id, body, created_at, p2p_profiles(full_name)")
+      .select("id, conversation_id, sender_id, body, created_at, message_type, p2p_profiles(full_name)")
       .eq("conversation_id", id)
       .order("created_at", { ascending: true });
     setMessages(
@@ -74,6 +82,7 @@ export default function ChatScreen() {
         conversation_id: m.conversation_id,
         sender_id: m.sender_id,
         body: m.body,
+        message_type: m.message_type,
         created_at: m.created_at,
         senderName: m.p2p_profiles?.full_name,
       }))
@@ -109,8 +118,56 @@ export default function ChatScreen() {
     };
   }, [id, supabase]);
 
+  async function initiateCall(callType: "audio" | "video") {
+    if (!user || !otherUserId || !id || callingType) return;
+    setCallingType(callType);
+    try {
+      const apiUrl = getApiUrl();
+      const channelRes = await fetch(`${apiUrl}/calls/peer-channel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentUserId: user.id, otherUserId }),
+      });
+      const channelData = await channelRes.json();
+      if (!channelRes.ok) throw new Error(channelData.error || "Failed to start call");
+      const channelName = channelData.channelName as string;
+
+      // Call-log/incoming-call creation goes through the server — neither
+      // table has an INSERT policy for the anon key (see calls.ts), by
+      // design: who's allowed to start a call and log it server-side, not
+      // client-spoofable.
+      const startRes = await fetch(`${apiUrl}/calls/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelName, callType, callerId: user.id, recipientId: otherUserId, conversationId: id }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
+
+      router.push({
+        pathname: callType === "video" ? "/call/video" : "/call/audio",
+        params: {
+          channelName,
+          otherUserId,
+          otherUserName: title,
+          callType,
+          isInitiator: "true",
+          callId: startData.incomingCallId,
+          conversationId: id,
+          callLogId: startData.callLogId,
+        },
+      } as any);
+    } catch (e: any) {
+      Alert.alert("Couldn't start call", e.message ?? "Please try again.");
+    } finally {
+      setCallingType(null);
+    }
+  }
+
   function handleLongPressMessage(item: Message) {
+    if (item.message_type === "call_summary" || !item.sender_id) return;
     if (item.sender_id === user?.id) return;
+    const senderId = item.sender_id;
     Alert.alert(
       item.senderName || "This message",
       "What would you like to report?",
@@ -127,7 +184,7 @@ export default function ChatScreen() {
           text: "Report profile",
           style: "destructive",
           onPress: async () => {
-            const err = await reportContent("profile", item.sender_id, "Reported from conversation");
+            const err = await reportContent("profile", senderId, "Reported from conversation");
             Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
           },
         },
@@ -176,7 +233,17 @@ export default function ChatScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{title}</Text>
+          <Text style={[styles.headerTitle, { flex: 1 }]} numberOfLines={1}>{title}</Text>
+          {isDirect && otherUserId && (
+            <View style={styles.headerCallBtns}>
+              <TouchableOpacity onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
+                {callingType === "audio" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="call-outline" size={20} color={colors.accentGreen} />}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => initiateCall("video")} disabled={!!callingType} style={styles.headerIconBtn}>
+                {callingType === "video" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="videocam-outline" size={22} color={colors.accentGreen} />}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {loading ? (
@@ -191,6 +258,13 @@ export default function ChatScreen() {
             contentContainerStyle={{ padding: 16, gap: 8 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
+              if (item.message_type === "call_summary") {
+                return (
+                  <View style={styles.callSummaryRow}>
+                    <Text style={styles.callSummaryText}>{item.body}</Text>
+                  </View>
+                );
+              }
               const mine = item.sender_id === user?.id;
               return (
                 <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
@@ -256,7 +330,14 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  headerCallBtns: { flexDirection: "row", gap: 4 },
+  headerIconBtn: { padding: 6, width: 34, alignItems: "center" },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
+  callSummaryRow: { alignItems: "center", paddingVertical: 4 },
+  callSummaryText: {
+    fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium",
+    backgroundColor: colors.cardBeige, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5,
+  },
   bubbleRow: { flexDirection: "row" },
   bubbleRowMine: { justifyContent: "flex-end" },
   bubble: { maxWidth: "78%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
