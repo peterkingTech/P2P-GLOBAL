@@ -11,6 +11,8 @@ import { getFlagEmoji } from "@/lib/countryGeo";
 import { Avatar } from "@/components/Avatar";
 import { shareProfile } from "@/lib/sharing";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
+import { grainLabel } from "@/lib/grain";
 
 interface PublicProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
@@ -40,6 +42,8 @@ export default function PublicProfileScreen() {
   const [connecting, setConnecting] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const [isBlockedByMe, setIsBlockedByMe] = useState(false);
+  const [grainCount, setGrainCount] = useState(0);
+  const [grainSheetOpen, setGrainSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!username) return;
@@ -64,6 +68,14 @@ export default function PublicProfileScreen() {
     supabase.from("p2p_user_blocks").select("id").eq("blocker_id", viewer.id).eq("blocked_id", data.userId).maybeSingle()
       .then(({ data: block }) => setIsBlockedByMe(!!block));
   }, [viewer?.id, data?.userId]);
+
+  useEffect(() => {
+    if (!data?.userId) { setGrainCount(0); return; }
+    fetch(`${getApiUrl()}/profiles/${data.userId}/grain`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => setGrainCount(body?.grainCount ?? 0))
+      .catch(() => setGrainCount(0));
+  }, [data?.userId]);
 
   const isOwnProfile = viewer?.id === data?.userId;
 
@@ -248,6 +260,18 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
+        {grainCount > 0 && (
+          <TouchableOpacity style={styles.grainRow} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
+            <Text style={styles.grainRowText}>{grainLabel(grainCount)}</Text>
+          </TouchableOpacity>
+        )}
+        <GrainExplanationSheet
+          visible={grainSheetOpen}
+          onClose={() => setGrainSheetOpen(false)}
+          count={grainCount}
+          displayName={data.fullName || `@${data.username}`}
+        />
+
         {!isOwnProfile && (
           <View style={styles.actionsGrid}>
             <TouchableOpacity style={styles.actionBtnPrimary} onPress={handleConnect} disabled={connecting}>
@@ -313,6 +337,11 @@ function makeStyles(c: AppColors) {
     statsCard: { flexDirection: "row", backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 20, justifyContent: "space-around" },
     statsCardHidden: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 20, alignItems: "center" },
     hiddenText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    grainRow: {
+      backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige,
+      paddingVertical: 12, paddingHorizontal: 16, marginBottom: 20, alignItems: "center",
+    },
+    grainRowText: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     statItem: { alignItems: "center" },
     statNum: { fontSize: 16, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
     statLabel: { fontSize: 11, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },

@@ -1,12 +1,14 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
-import { shareApp } from "@/lib/sharing";
+import { shareInviteLink } from "@/lib/sharing";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -21,15 +23,38 @@ export default function AboutSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { profile } = useAuth();
+  const { getMyInviteLink } = useData();
+  const [inviting, setInviting] = useState(false);
+
+  async function handleShareInvite() {
+    if (!profile?.username) {
+      Alert.alert("Set a username first", "Add a username before inviting others.");
+      return;
+    }
+    setInviting(true);
+    try {
+      const inviteLink = await getMyInviteLink();
+      if (!inviteLink) { Alert.alert("Couldn't get invite link", "Please try again."); return; }
+      await shareInviteLink({ username: profile.username, inviteLink });
+    } finally {
+      setInviting(false);
+    }
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <SettingsSubHeader title="About" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.shareAppBtn} onPress={shareApp} activeOpacity={0.85}>
-          <Ionicons name="share-social-outline" size={20} color="#fff" />
-          <Text style={styles.shareAppBtnText}>Share P2P Global</Text>
+        <TouchableOpacity style={styles.shareAppBtn} onPress={handleShareInvite} activeOpacity={0.85} disabled={inviting}>
+          {inviting ? <ActivityIndicator color="#fff" size="small" /> : (
+            <>
+              <Ionicons name="share-social-outline" size={20} color="#fff" />
+              <Text style={styles.shareAppBtnText}>Invite Someone · Share your link</Text>
+            </>
+          )}
         </TouchableOpacity>
+        {!!profile?.grainCount && <Text style={styles.grainEarnedText}>🌾 {profile.grainCount} Grain earned so far</Text>}
 
         <View style={styles.card}>
           <View style={[styles.row, styles.rowLast]}>
@@ -71,6 +96,7 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.accentGreen, borderRadius: 14, height: 52, marginBottom: 16,
     },
     shareAppBtnText: { fontSize: 16, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+    grainEarnedText: { fontSize: 12, color: c.textMuted, textAlign: "center", marginTop: -8, marginBottom: 16, fontFamily: "Inter_400Regular" },
     row: {
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",
       paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.borderBeige,

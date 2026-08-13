@@ -12,7 +12,9 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { useAuth } from "@/contexts/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, supabase } from "@/contexts/AuthContext";
+import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY } from "@/lib/dateOfBirth";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
@@ -20,10 +22,37 @@ import { validateUsername, formatUsername, generateUsernameSuggestions } from "@
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
+const PENDING_INVITE_KEY = "pending_invite_code";
+
+interface InviterNotice {
+  username: string;
+  fullName: string | null;
+  country: string | null;
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signUp, checkUsernameAvailable } = useAuth();
+
+  const [inviterNotice, setInviterNotice] = useState<InviterNotice | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const code = await AsyncStorage.getItem(PENDING_INVITE_KEY);
+      if (!code) return;
+      try {
+        const res = await fetch(`${getApiUrl()}/profiles/username/${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setInviterNotice({ username: data.username, fullName: data.fullName, country: data.country });
+        }
+      } catch {
+        // Not critical — registration proceeds either way, redemption is
+        // attempted silently again after signUp regardless of this preview.
+      }
+    })();
+  }, []);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -97,13 +126,33 @@ export default function RegisterScreen() {
     setLoading(true);
     setError(null);
     const err = await signUp(email.trim(), password, name.trim(), isoDob, formatUsername(username));
-    setLoading(false);
     if (err) {
+      setLoading(false);
       setError(err);
-    } else {
-      // Go to intake form (sections 1-2 of the registration questionnaire)
-      router.replace("/(auth)/intake");
+      return;
     }
+
+    const inviteCode = await AsyncStorage.getItem(PENDING_INVITE_KEY);
+    if (inviteCode) {
+      try {
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+        if (newUser) {
+          await fetch(`${getApiUrl()}/profiles/invite/redeem`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inviteCode, newUserId: newUser.id }),
+          });
+        }
+      } catch {
+        // Silent fail — never block registration over an invite issue.
+      } finally {
+        await AsyncStorage.removeItem(PENDING_INVITE_KEY);
+      }
+    }
+
+    setLoading(false);
+    // Go to intake form (sections 1-2 of the registration questionnaire)
+    router.replace("/(auth)/intake");
   }
 
   return (
@@ -128,6 +177,21 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.form}>
+        {inviterNotice && (
+          <View style={styles.inviteNotice}>
+            <Text style={styles.inviteNoticeEmoji}>🌾</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inviteNoticeTitle}>You were invited by</Text>
+              <Text style={styles.inviteNoticeUsername}>@{inviterNotice.username}</Text>
+              {(inviterNotice.fullName || inviterNotice.country) && (
+                <Text style={styles.inviteNoticeSub}>
+                  {inviterNotice.fullName}{inviterNotice.fullName && inviterNotice.country ? " · " : ""}{inviterNotice.country ?? ""}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {error && (
           <View style={styles.errorBanner}>
             <Ionicons name="alert-circle" size={16} color="#FCA5A5" />
@@ -275,6 +339,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   errorText: { color: "#FCA5A5", fontSize: 13, flex: 1, fontFamily: "Inter_400Regular" },
+  inviteNotice: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 12,
+    borderWidth: 1, borderColor: "rgba(29,158,117,0.3)", padding: 14,
+  },
+  inviteNoticeEmoji: { fontSize: 22 },
+  inviteNoticeTitle: { fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_400Regular" },
+  inviteNoticeUsername: { fontSize: 15, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
+  inviteNoticeSub: { fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2, fontFamily: "Inter_400Regular" },
   inputGroup: { gap: 6 },
   usernameRow: { flexDirection: "row", alignItems: "center" },
   usernamePrefix: { position: "absolute", left: 14, zIndex: 1, color: colors.lightGreen, fontSize: 15, fontFamily: "Inter_600SemiBold" },

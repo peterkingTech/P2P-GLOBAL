@@ -11,6 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { InviteCard } from "@/components/InviteCard";
 
 interface DiscoverCircleSummary {
   id: string;
@@ -369,6 +370,8 @@ export default function DiscoverTab() {
               <Text style={styles.circleCardMeta}>Led by {c.leaderName} · {c.memberCount}/{c.maxMembers} members</Text>
             </TouchableOpacity>
           ))}
+
+          <InviteCard label="🌾 Plant a grain — invite someone to P2P Global" buttonText="Share your invite link" />
         </ScrollView>
       )}
       </View>

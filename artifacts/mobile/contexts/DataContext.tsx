@@ -917,6 +917,11 @@ interface DataContextValue {
   submitVerification: (method: "selfie_note" | "video_selfie", fileUri: string, fileName: string, mimeType: string) => Promise<string | null>;
   withdrawVerification: () => Promise<string | null>;
   toggleBadgeVisibility: (visible: boolean) => Promise<string | null>;
+  grainCount: number;
+  inviteLink: string | null;
+  peopleInvited: number;
+  getMyInviteLink: () => Promise<string>;
+  refreshGrainCount: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -978,6 +983,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
   const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
+  const [grainCount, setGrainCount] = useState(0);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [peopleInvited, setPeopleInvited] = useState(0);
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
@@ -2718,6 +2726,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id, loadVerificationStatus]);
 
+  const refreshGrainCount = useCallback(async (): Promise<void> => {
+    if (!profile?.id) { setGrainCount(0); setPeopleInvited(0); return; }
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/${profile.id}/grain`);
+      if (!res.ok) return;
+      const body = await res.json();
+      setGrainCount(body.grainCount ?? 0);
+      setPeopleInvited(body.peopleInvited ?? 0);
+    } catch (e) {
+      console.error("refreshGrainCount failed", e);
+    }
+  }, [profile?.id]);
+
+  const getMyInviteLink = useCallback(async (): Promise<string> => {
+    if (!profile?.id) return "";
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/invite/my-link?userId=${profile.id}`);
+      if (!res.ok) return "";
+      const body = await res.json();
+      setInviteLink(body.inviteLink ?? null);
+      setGrainCount(body.grainCount ?? 0);
+      setPeopleInvited(body.peopleInvited ?? 0);
+      return body.inviteLink ?? "";
+    } catch (e) {
+      console.error("getMyInviteLink failed", e);
+      return "";
+    }
+  }, [profile?.id]);
+
   const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
     try {
       const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
@@ -3456,6 +3493,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       searchUsersByUsername, getProfileByUsername, sendConnectionRequest, respondToConnectionRequest,
       blockUser, unblockUser, blockedUsers, refreshBlockedUsers,
       verificationStatus, loadVerificationStatus, submitVerification, withdrawVerification, toggleBadgeVisibility,
+      grainCount, inviteLink, peopleInvited, getMyInviteLink, refreshGrainCount,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,

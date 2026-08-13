@@ -75,6 +75,16 @@ export async function shareCategory(category: { id: string; title: string; planC
   });
 }
 
+// Personal Grain invite link — the URL is built server-side (GET
+// /profiles/invite/my-link) since it depends on live grain state, not
+// something worth duplicating the query-string shape for here.
+export async function shareInviteLink(user: { username: string; inviteLink: string }) {
+  await Share.share({
+    title: "Join me on P2P Global Kingdom School",
+    message: `🌾 Join me on P2P Global Kingdom School\n\nI am going through the Bible with a peer guide — join using my link:\n${user.inviteLink}\n\n"Go and make disciples of all nations." — Matthew 28:19`,
+  });
+}
+
 export async function shareApp() {
   await Share.share({
     title: "P2P Global Bible Study Network",

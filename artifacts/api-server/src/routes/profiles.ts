@@ -503,6 +503,82 @@ router.post("/verification/withdraw", async (req, res) => {
   return res.json({ success: true });
 });
 
+// ── Grain invitations ─────────────────────────────────────────────────────────
+// One rule: invite someone, they register with your link, you earn 1 Grain.
+// The invite code IS the inviter's current @username — see migration 066's
+// deviation notes for why there's no separate generated code or persisted
+// link (usernames can change, so nothing is stored that could go stale).
+// Same GitHub Pages landing page as lib/sharing.ts on mobile — real URL,
+// not a fabricated domain.
+const INVITE_LANDING_BASE_URL = "https://peterkingtech.github.io/P2P-GLOBAL/share-landing.html";
+function buildInviteLink(username: string): string {
+  return `${INVITE_LANDING_BASE_URL}?type=invite&username=${encodeURIComponent(username)}`;
+}
+
+// GET /profiles/invite/my-link?userId= — the current user's personal invite
+// link + grain count. Nothing is created or persisted; it's computed live
+// from the current profile row.
+router.get("/invite/my-link", async (req, res) => {
+  const { userId } = req.query as { userId?: string };
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { data: profile } = await supabaseRead
+    .from("p2p_profiles").select("username, grain_count").eq("id", userId).maybeSingle();
+  if (!profile) return res.status(404).json({ error: "Profile not found" });
+  if (!profile.username) return res.status(400).json({ error: "Set a username before inviting others" });
+
+  const { count: peopleInvited } = await supabaseRead
+    .from("p2p_invitations").select("id", { count: "exact", head: true }).eq("inviter_id", userId);
+
+  return res.json({
+    inviteLink: buildInviteLink(profile.username as string),
+    inviteCode: profile.username,
+    grainCount: (profile.grain_count as number) ?? 0,
+    peopleInvited: peopleInvited ?? 0,
+  });
+});
+
+// POST /profiles/invite/redeem — { inviteCode, newUserId }. Called right
+// after a new account registers. Never blocks registration: any failure
+// here (bad code, self-referral, already redeemed) is reported back but the
+// account itself already exists by the time this runs.
+router.post("/invite/redeem", async (req, res) => {
+  const { inviteCode, newUserId } = req.body as { inviteCode?: string; newUserId?: string };
+  if (!inviteCode || !newUserId) return res.status(400).json({ error: "inviteCode and newUserId are required" });
+
+  const { data: inviter } = await supabaseRead
+    .from("p2p_profiles").select("id, username, full_name, grain_count").ilike("username", inviteCode.replace(/^@/, "")).maybeSingle();
+  if (!inviter) return res.status(404).json({ error: "Invalid invite code" });
+  if (inviter.id === newUserId) return res.status(400).json({ error: "You can't redeem your own invite link" });
+
+  const { data: existing } = await supabaseRead
+    .from("p2p_invitations").select("id").eq("invited_user_id", newUserId).maybeSingle();
+  if (existing) return res.status(409).json({ error: "You've already used an invite code" });
+
+  const { error: insertErr } = await supabaseRead.from("p2p_invitations").insert({
+    inviter_id: inviter.id, invited_user_id: newUserId, invite_code: inviter.username,
+  });
+  if (insertErr) {
+    if ((insertErr as { code?: string }).code === "23505") return res.status(409).json({ error: "You've already used an invite code" });
+    return res.status(500).json({ error: insertErr.message });
+  }
+
+  // Fetch current count, then increment (same pattern as prayer.ts's /pray).
+  const newGrainCount = ((inviter.grain_count as number) ?? 0) + 1;
+  await supabaseRead.from("p2p_profiles").update({ grain_count: newGrainCount }).eq("id", inviter.id);
+
+  const { data: newUserProfile } = await supabaseRead.from("p2p_profiles").select("full_name, username").eq("id", newUserId).maybeSingle();
+  const newUserName = (newUserProfile?.username as string | undefined) ? `@${newUserProfile!.username}` : (newUserProfile?.full_name as string | undefined) ?? "Someone";
+  await supabaseRead.from("p2p_notifications").insert({
+    user_id: inviter.id, title: "🌾 You earned Grain",
+    message: `${newUserName} joined P2P Global through your invitation.`,
+    notification_type: "grain_earned",
+    data: { newUserUsername: newUserProfile?.username ?? null, newGrainCount },
+  });
+
+  return res.json({ success: true, inviterUsername: inviter.username });
+});
+
 // GET /profiles/:userId
 router.get("/:userId", async (req, res) => {
   const { userId } = req.params;
@@ -680,6 +756,18 @@ async function loadAncestry(userId: string, maxGenerations: number) {
   }
   return ancestry.reverse(); // oldest ancestor first, so it reads outward-in toward "you"
 }
+
+// GET /profiles/:userId/grain — public grain info for any profile.
+router.get("/:userId/grain", async (req, res) => {
+  const { userId } = req.params;
+  const { data: profile } = await supabaseRead.from("p2p_profiles").select("grain_count").eq("id", userId).maybeSingle();
+  if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+  const { count: peopleInvited } = await supabaseRead
+    .from("p2p_invitations").select("id", { count: "exact", head: true }).eq("inviter_id", userId);
+
+  return res.json({ grainCount: (profile.grain_count as number) ?? 0, peopleInvited: peopleInvited ?? 0 });
+});
 
 const FOREST_FORWARD_GENERATIONS = 3;
 

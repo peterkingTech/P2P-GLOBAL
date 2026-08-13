@@ -27,10 +27,26 @@
       cursor: pointer; width: 100%; margin-bottom: 12px;
     }
     .subtitle { color: #888; font-size: 13px; }
+    .invite-avatar {
+      width: 72px; height: 72px; border-radius: 36px; margin: 0 auto 12px;
+      display: block; object-fit: cover; border: 2px solid #1D9E75;
+    }
+    .invite-avatar-fallback {
+      width: 72px; height: 72px; border-radius: 36px; margin: 0 auto 12px;
+      background: rgba(29,158,117,0.15); color: #1D9E75; font-size: 28px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .invite-name { color: #aaa; font-size: 13px; margin: 0 0 12px; }
+    .invite-progress { color: #ccc; font-size: 13px; margin: 0 0 12px; }
+    blockquote {
+      color: #888; font-size: 13px; font-style: italic; margin: 16px 0;
+      padding: 12px; background: #1A2332; border-radius: 10px; border: none;
+    }
+    .grain-note { color: #888; font-size: 12px; margin-top: 8px; }
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="card" id="staticCard">
     <div class="logo">🌳</div>
     <h1>P2P Global Bible Study Network</h1>
     <p class="tagline">Someone shared this with you</p>
@@ -41,44 +57,116 @@
     <p class="subtitle">Free on Android &middot; This content will open automatically if you have the app</p>
   </div>
 
+  <div class="card" id="inviteCard" style="display:none">
+    <div id="inviteAvatarWrap"></div>
+    <h1 id="inviteTitle"></h1>
+    <p class="invite-name" id="inviteName"></p>
+    <p class="invite-progress" id="inviteProgress"></p>
+    <p class="tagline" id="inviteDesc"></p>
+    <blockquote>"Go and make disciples of all nations." — Matthew 28:19</blockquote>
+    <button class="download-btn" id="inviteDownloadBtn">📱 Download P2P Global</button>
+    <p class="grain-note" id="grainNote"></p>
+  </div>
+
   <script>
     var params = new URLSearchParams(window.location.search);
     var type = params.get("type");
-    var title = params.get("title") || "";
-    var desc = params.get("desc") || "";
-    var deepLink = params.get("link") || "";
-
-    var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : "";
-    var preview = document.getElementById("preview");
-    if (title) {
-      preview.innerHTML =
-        "<small>" + typeLabel + "</small>" +
-        "<h3></h3>" +
-        "<p></p>";
-      preview.querySelector("h3").textContent = title;
-      preview.querySelector("p").textContent = desc;
-    } else {
-      preview.style.display = "none";
-    }
-
     var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amentech.p2pglobalbiblestudy";
+    // Real, deployed production API — same URL every mobile build points at
+    // (see EXPO_PUBLIC_API_URL in eas.json). Not a placeholder.
+    var API_BASE = "https://workspaceapi-server-production-6d56.up.railway.app/api";
 
-    document.getElementById("downloadBtn").addEventListener("click", function () {
+    if (type === "invite") {
+      // ── Personalised Grain invite landing (dynamic — fetches the live profile) ──
+      document.getElementById("staticCard").style.display = "none";
+      var inviteCard = document.getElementById("inviteCard");
+      inviteCard.style.display = "block";
+
+      var username = params.get("username") || "";
+      var deepLink = "p2pglobalbiblestudy://join/" + encodeURIComponent(username);
+
+      function goToApp() {
+        window.location = deepLink;
+        setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+      }
+      document.getElementById("inviteDownloadBtn").addEventListener("click", goToApp);
+
+      if (username) {
+        fetch(API_BASE + "/profiles/username/" + encodeURIComponent(username))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (p) {
+            if (!p) {
+              document.getElementById("inviteTitle").textContent = "You've been invited to P2P Global";
+              document.getElementById("inviteDesc").textContent = "Join Kingdom School — free, for every nation.";
+              return;
+            }
+            var avatarWrap = document.getElementById("inviteAvatarWrap");
+            if (p.photoUrl) {
+              var img = document.createElement("img");
+              img.className = "invite-avatar";
+              img.src = p.photoUrl;
+              avatarWrap.appendChild(img);
+            } else {
+              var fallback = document.createElement("div");
+              fallback.className = "invite-avatar-fallback";
+              fallback.textContent = (p.fullName || p.username || "?").charAt(0).toUpperCase();
+              avatarWrap.appendChild(fallback);
+            }
+            document.getElementById("inviteTitle").textContent = "@" + p.username + " invited you";
+            var nameLine = [p.fullName, p.country].filter(Boolean).join(" · ");
+            document.getElementById("inviteName").textContent = nameLine;
+            if (p.showProgressPublicly && p.modulesCompleted != null) {
+              document.getElementById("inviteProgress").textContent =
+                "🌳 Module " + p.modulesCompleted + " · " + (p.fruitCount || 0) + " Fruits earned";
+            }
+            document.getElementById("inviteDesc").textContent =
+              (p.fullName || "@" + p.username) + " is going through the Bible with a peer guide on P2P Global Kingdom School. Join them — free, for every nation.";
+            document.getElementById("grainNote").textContent =
+              "When you register, " + (p.fullName || "@" + p.username) + " will earn Grain for planting this seed.";
+          })
+          .catch(function () {
+            document.getElementById("inviteTitle").textContent = "You've been invited to P2P Global";
+          });
+      }
+
+      // Attempt the deep link immediately in case the app is already installed.
+      goToApp();
+    } else {
+      // ── Static content preview (lesson / plan / category / profile) ──
+      var title = params.get("title") || "";
+      var desc = params.get("desc") || "";
+      var deepLink = params.get("link") || "";
+
+      var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : "";
+      var preview = document.getElementById("preview");
+      if (title) {
+        preview.innerHTML =
+          "<small>" + typeLabel + "</small>" +
+          "<h3></h3>" +
+          "<p></p>";
+        preview.querySelector("h3").textContent = title;
+        preview.querySelector("p").textContent = desc;
+      } else {
+        preview.style.display = "none";
+      }
+
+      document.getElementById("downloadBtn").addEventListener("click", function () {
+        if (deepLink) {
+          window.location = deepLink;
+          // If the app isn't installed, the custom-scheme navigation above is a
+          // no-op and the page stays put — fall back to the Play Store after a
+          // short delay so an installed app gets a chance to intercept first.
+          setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+        } else {
+          window.location = PLAY_STORE_URL;
+        }
+      });
+
+      // Also attempt the deep link immediately on load, in case the app is
+      // installed — the button above stays as a manual fallback either way.
       if (deepLink) {
         window.location = deepLink;
-        // If the app isn't installed, the custom-scheme navigation above is a
-        // no-op and the page stays put — fall back to the Play Store after a
-        // short delay so an installed app gets a chance to intercept first.
-        setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
-      } else {
-        window.location = PLAY_STORE_URL;
       }
-    });
-
-    // Also attempt the deep link immediately on load, in case the app is
-    // installed — the button above stays as a manual fallback either way.
-    if (deepLink) {
-      window.location = deepLink;
     }
   </script>
 </body>

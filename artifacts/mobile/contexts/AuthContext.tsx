@@ -100,6 +100,7 @@ export interface UserProfile {
   usernameChangeRequired: boolean;
   isVerified: boolean;
   verificationBadgeVisible: boolean;
+  grainCount: number;
 }
 
 interface AuthContextValue {
@@ -161,6 +162,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     usernameChangeRequired: (row.username_change_required as boolean) ?? false,
     isVerified: (row.is_verified as boolean) ?? false,
     verificationBadgeVisible: (row.verification_badge_visible as boolean) ?? true,
+    grainCount: (row.grain_count as number) ?? 0,
     appLanguage: (row.app_language as string) ?? "en",
     contentLanguage: (row.content_language as string) ?? "en",
     churchId: row.church_id as string | undefined,

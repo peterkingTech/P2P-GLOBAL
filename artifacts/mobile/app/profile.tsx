@@ -28,8 +28,9 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
-import { shareApp } from "@/lib/sharing";
+import { shareInviteLink } from "@/lib/sharing";
 import { Avatar } from "@/components/Avatar";
+import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import LivingTree, { stageLabel } from "@/components/LivingTree";
@@ -255,7 +256,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, pendingConfirmationCount, modules, treeData } = useData();
+  const { submitHelpRequest, pendingConfirmationCount, modules, treeData, getMyInviteLink } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
@@ -273,6 +274,27 @@ export default function ProfileScreen() {
     if (!profile?.id || !isFoundationDone) { setCompletionDate(null); return; }
     getFoundationCompletionDate(profile.id).then(setCompletionDate);
   }, [profile?.id, isFoundationDone]);
+
+  const [grainSheetOpen, setGrainSheetOpen] = useState(false);
+  const [invitingBusy, setInvitingBusy] = useState(false);
+
+  async function handleShareInvite() {
+    if (!profile?.username) {
+      Alert.alert("Set a username first", "Add a username before inviting others.");
+      return;
+    }
+    setInvitingBusy(true);
+    try {
+      const inviteLink = await getMyInviteLink();
+      if (!inviteLink) {
+        Alert.alert("Couldn't get invite link", "Please try again.");
+        return;
+      }
+      await shareInviteLink({ username: profile.username, inviteLink });
+    } finally {
+      setInvitingBusy(false);
+    }
+  }
 
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
@@ -388,7 +410,23 @@ export default function ProfileScreen() {
             <Text style={styles.statNum}>{profile?.serviceScore ?? 0}</Text>
             <Text style={styles.statLabel}>{t("profile.servantScore")}</Text>
           </View>
+          {!!profile?.grainCount && (
+            <>
+              <View style={styles.statDivider} />
+              <TouchableOpacity style={styles.statItem} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
+                <Text style={styles.statNum}>🌾 {profile.grainCount}</Text>
+                <Text style={styles.statLabel}>Grain</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
+
+        <GrainExplanationSheet
+          visible={grainSheetOpen}
+          onClose={() => setGrainSheetOpen(false)}
+          count={profile?.grainCount ?? 0}
+          displayName={profile?.displayName || "This person"}
+        />
 
         {/* Living Tree — compact real SVG tree (what other users see when
             they view this profile — the profile owner's tree, not the
@@ -472,15 +510,17 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Invite Someone */}
-        <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={shareApp}>
+        <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={handleShareInvite} disabled={invitingBusy}>
           <View style={styles.inviteIconWrap}>
-            <Ionicons name="share-social-outline" size={20} color="#fff" />
+            <Text style={{ fontSize: 20 }}>🌾</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.inviteTitle}>Invite Someone</Text>
-            <Text style={styles.inviteSub}>Share P2P Global with a friend</Text>
+            <Text style={styles.inviteSub}>
+              {profile?.grainCount ? `${profile.grainCount} ${profile.grainCount === 1 ? "person" : "people"} invited so far` : "Share Kingdom School with a friend"}
+            </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.borderBeige} />
+          {invitingBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="share-social-outline" size={20} color={colors.accentGreen} />}
         </TouchableOpacity>
 
         {/* Peers / Groups / Notes / Highlights */}

@@ -32,6 +32,7 @@ import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import LivingTree from "@/components/LivingTree";
+import { InviteCard } from "@/components/InviteCard";
 
 function ProgressRing({ pct, size = 56, strokeWidth = 6, color, track }: { pct: number; size?: number; strokeWidth?: number; color: string; track: string }) {
   const radius = (size - strokeWidth) / 2;
@@ -715,6 +716,14 @@ export default function HomeTab() {
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.amber} />
         </TouchableOpacity>
+      )}
+
+      {/* Invite — only once they have something real to invite people into */}
+      {modulesCompleted >= 1 && (
+        <InviteCard
+          label="Know someone who would benefit from Kingdom School?"
+          buttonText="Invite them →"
+        />
       )}
 
       {/* More */}
