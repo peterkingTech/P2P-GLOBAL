@@ -10,13 +10,14 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import { Avatar } from "@/components/Avatar";
 import { shareProfile } from "@/lib/sharing";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 interface PublicProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
   country: string | null; countryCode: string | null; bio: string | null;
   isPeerGuideEligible: boolean; joinedAt: string; showProgressPublicly: boolean;
   growthLevel: number | null; modulesCompleted: number | null; fruitCount: number | null;
-  activeMenteesCount: number | null;
+  activeMenteesCount: number | null; isVerified: boolean;
 }
 
 function showAlert(title: string, message: string) {
@@ -213,7 +214,10 @@ export default function PublicProfileScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}>
         <View style={styles.avatarSection}>
           <Avatar photoUrl={data.photoUrl} name={data.fullName ?? data.username} size={96} borderWidth={3} style={styles.avatarCircle} />
-          <Text style={styles.username}>@{data.username}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.username}>@{data.username}</Text>
+            <VerificationBadge isVerified={data.isVerified} username={data.username} size="large" />
+          </View>
           {data.fullName && <Text style={styles.fullName}>{data.fullName}</Text>}
           {data.country && (
             <Text style={styles.countryLine}>{getFlagEmoji(data.country)} {data.country}</Text>

@@ -181,12 +181,13 @@ interface PeerGuideCandidate {
   modulesCompleted: number;
   countryCode: string | null;
   locationVerified: boolean;
+  isVerified: boolean;
 }
 
 async function getEligibleCandidates(requesterId: string, excludeCandidateIds: string[] = []): Promise<PeerGuideCandidate[]> {
   const { data: candidateProfiles } = await supabaseWrite
     .from("p2p_profiles")
-    .select("id, full_name, photo_url, country, country_code, location_verified, content_language, timezone, background_sensitivity, is_peer_guide_eligible, max_mentees, accepting_mentees")
+    .select("id, full_name, photo_url, country, country_code, location_verified, content_language, timezone, background_sensitivity, is_peer_guide_eligible, max_mentees, accepting_mentees, is_verified")
     .neq("id", requesterId)
     .eq("accepting_mentees", true);
 
@@ -301,6 +302,7 @@ async function getEligibleCandidates(requesterId: string, excludeCandidateIds: s
       modulesCompleted: modulesCompletedByUser.get(id) ?? 0,
       countryCode: (c.country_code as string) ?? null,
       locationVerified: (c.location_verified as boolean) ?? false,
+      isVerified: (c.is_verified as boolean) ?? false,
     });
   }
   return eligible;
@@ -315,6 +317,7 @@ interface ScoredMatch {
   modulesCompleted: number;
   activeMenteeCount: number;
   maxMentees: number;
+  isVerified: boolean;
   score: number;
   reasons: string[];
 }
@@ -375,6 +378,10 @@ async function scoreCandidates(requesterId: string, excludeCandidateIds: string[
       score += 20;
       reasons.push("Understands your background");
     }
+    if (c.isVerified) {
+      score += 10;
+      reasons.push("Identity verified");
+    }
 
     return {
       id: c.id,
@@ -385,6 +392,7 @@ async function scoreCandidates(requesterId: string, excludeCandidateIds: string[
       modulesCompleted: c.modulesCompleted,
       activeMenteeCount: c.activeMenteeCount,
       maxMentees: c.maxMentees,
+      isVerified: c.isVerified,
       score,
       reasons,
     };

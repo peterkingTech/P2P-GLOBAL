@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY, isoToDMY } from "@/lib/dateOfBirth";
@@ -28,8 +29,13 @@ export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, user, updateProfile, signOut, supabase } = useAuth();
+  const { verificationStatus, loadVerificationStatus } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+
+  useEffect(() => {
+    loadVerificationStatus();
+  }, [loadVerificationStatus]);
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
@@ -278,6 +284,23 @@ export default function AccountSettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.fieldLabel}>Blocked Users</Text>
               <Text style={styles.locationSub}>Manage who you've blocked</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/verification" as any)}>
+          <Text style={styles.fieldLabel}>Verification</Text>
+          <View style={styles.usernameRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+              <Ionicons
+                name={verificationStatus?.isVerified ? "checkmark-circle" : verificationStatus?.status === "pending" ? "time-outline" : "ellipse-outline"}
+                size={16}
+                color={verificationStatus?.isVerified ? colors.accentGreen : verificationStatus?.status === "pending" ? colors.amber : colors.textMuted}
+              />
+              <Text style={styles.usernameValue}>
+                {verificationStatus?.isVerified ? "Identity Verified" : verificationStatus?.status === "pending" ? "Verification Pending" : "Not Verified"}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </View>

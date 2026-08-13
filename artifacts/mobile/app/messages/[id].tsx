@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -66,6 +67,7 @@ export default function ChatScreen() {
   const [title, setTitle] = useState("Conversation");
   const [isDirect, setIsDirect] = useState(false);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [otherUserVerified, setOtherUserVerified] = useState(false);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
   const [text, setText] = useState("");
   const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
@@ -88,12 +90,13 @@ export default function ChatScreen() {
       setIsDirect(true);
       const { data: members } = await supabase
         .from("p2p_conversation_members")
-        .select("user_id, p2p_profiles(full_name)")
+        .select("user_id, p2p_profiles(full_name, is_verified)")
         .eq("conversation_id", id)
         .neq("user_id", user.id)
         .maybeSingle();
       setOtherUserId((members as any)?.user_id ?? null);
       setTitle((members as any)?.p2p_profiles?.full_name ?? "Direct message");
+      setOtherUserVerified((members as any)?.p2p_profiles?.is_verified ?? false);
     } else {
       setIsDirect(false);
       setTitle(conv?.name ?? "Group chat");
@@ -288,7 +291,10 @@ export default function ChatScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { flex: 1 }]} numberOfLines={1}>{title}</Text>
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+            {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
+          </View>
           {isDirect && otherUserId && (
             <View style={styles.headerCallBtns}>
               <TouchableOpacity onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>

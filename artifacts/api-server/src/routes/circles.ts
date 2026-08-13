@@ -135,13 +135,16 @@ router.get("/:circleId", async (req, res) => {
     .order("joined_at", { ascending: true });
   const memberIds = (members ?? []).map((m) => m.user_id as string);
   const { data: profiles } = memberIds.length
-    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url,country,username").in("id", memberIds)
-    : { data: [] as { id: string; full_name: string; photo_url: string | null; country: string | null; username: string | null }[] };
+    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url,country,username,is_verified").in("id", memberIds)
+    : { data: [] as { id: string; full_name: string; photo_url: string | null; country: string | null; username: string | null; is_verified: boolean | null }[] };
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
   const mappedMembers = (members ?? []).map((m) => {
     const p = profileById.get(m.user_id as string);
-    return mapMember(m as Record<string, unknown>, { name: p?.full_name ?? "Member", avatarUrl: p?.photo_url ?? null, country: p?.country ?? null, username: p?.username ?? null });
+    return mapMember(m as Record<string, unknown>, {
+      name: p?.full_name ?? "Member", avatarUrl: p?.photo_url ?? null, country: p?.country ?? null,
+      username: p?.username ?? null, isVerified: p?.is_verified ?? false,
+    });
   });
 
   const { data: sessions } = await supabaseRead

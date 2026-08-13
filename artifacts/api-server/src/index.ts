@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { detectInactiveUsers, escalateCrisisCalls } from "./lib/pastoralCare";
 import { sweepBreakRooms } from "./lib/breakRooms";
+import { cleanupVerificationFiles } from "./lib/verificationCleanup";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -72,5 +73,18 @@ cron.schedule("*/1 * * * *", async () => {
     }
   } catch (err) {
     logger.error({ err }, "Crisis call escalation sweep failed");
+  }
+});
+
+// Identity verification — delete approved applicants' submitted selfie/video
+// once their 48h post-decision retention window has passed.
+cron.schedule("0 */6 * * *", async () => {
+  try {
+    const result = await cleanupVerificationFiles();
+    if (result.deleted || result.failed) {
+      logger.info(result, "Verification file cleanup complete");
+    }
+  } catch (err) {
+    logger.error({ err }, "Verification file cleanup failed");
   }
 });

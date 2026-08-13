@@ -10,6 +10,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 interface DiscoverCircleSummary {
   id: string;
@@ -36,6 +37,7 @@ interface SearchResult {
   photoUrl: string | null;
   country: string | null;
   modulesCompleted: number | null;
+  isVerified: boolean;
 }
 
 function makeStyles(c: AppColors) {
@@ -277,7 +279,10 @@ export default function DiscoverTab() {
                   <Text style={styles.searchAvatarText}>{(item.fullName ?? item.username).charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.searchResultUsername}>@{item.username}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={styles.searchResultUsername}>@{item.username}</Text>
+                    <VerificationBadge isVerified={item.isVerified} username={item.username} size="small" />
+                  </View>
                   <Text style={styles.searchResultMeta}>
                     {item.fullName ?? "Someone"}{item.country ? ` · ${item.country}` : ""}
                     {item.modulesCompleted != null ? ` · Module ${item.modulesCompleted}` : ""}

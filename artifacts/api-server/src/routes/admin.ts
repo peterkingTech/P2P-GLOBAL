@@ -1282,4 +1282,309 @@ router.post("/dismiss-username-flag/:userId", async (req, res) => {
   return ok(res, { ok: true });
 });
 
+// ── Identity verification review ─────────────────────────────────────────────
+// Narrower than the blanket requireAdmin() gate above (which also lets
+// peer_guide through) — reviewing someone's selfie/video is more sensitive
+// than the other admin actions in this file, so it's scoped to the same
+// moderator+ set p2p_content_flags already uses (migrations/013_moderation.sql,
+// matched by RLS in migration 065).
+const VERIFICATION_REVIEWER_ROLES = ["moderator", "church_leader", "regional_admin", "super_admin"];
+const VERIFICATION_DECLINE_REAPPLY_MS = 7 * 24 * 60 * 60 * 1000;
+const VERIFICATION_REVOKE_REAPPLY_MS = 30 * 24 * 60 * 60 * 1000;
+const VERIFICATION_DELETE_AFTER_APPROVAL_MS = 48 * 60 * 60 * 1000;
+
+async function requireVerificationReviewer(req: any, res: any): Promise<string | null> {
+  const adminUserId = req.adminUserId as string;
+  const { data: profile } = await supabaseWrite.from("p2p_profiles").select("role").eq("id", adminUserId).maybeSingle();
+  if (!profile || !VERIFICATION_REVIEWER_ROLES.includes(profile.role as string)) {
+    err(res, "Verification review requires moderator, church_leader, regional_admin, or super_admin role", 403);
+    return null;
+  }
+  return adminUserId;
+}
+
+async function notifyUser(userId: string, title: string, message: string, notificationType: string) {
+  await supabaseWrite.from("p2p_notifications").insert({ user_id: userId, title, message, notification_type: notificationType });
+}
+
+// GET /admin/verification/queue — pending applications, oldest first.
+router.get("/verification/queue", async (req, res) => {
+  if (!(await requireVerificationReviewer(req, res))) return;
+
+  const { data: applications, error } = await supabaseWrite
+    .from("p2p_verification_applications")
+    .select("id, user_id, method, submitted_at, attempt_number")
+    .eq("status", "pending")
+    .order("submitted_at", { ascending: true });
+  if (error) return err(res, error.message);
+
+  const userIds = Array.from(new Set((applications ?? []).map((a) => a.user_id as string)));
+  const { data: profiles } = userIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id, username, full_name, photo_url, country, created_at").in("id", userIds)
+    : { data: [] as { id: string; username: string | null; full_name: string | null; photo_url: string | null; country: string | null; created_at: string }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  return ok(res, (applications ?? []).map((a) => {
+    const p = profileById.get(a.user_id as string);
+    const accountAgeDays = p ? Math.floor((Date.now() - new Date(p.created_at as string).getTime()) / (24 * 60 * 60 * 1000)) : null;
+    return {
+      applicationId: a.id, userId: a.user_id,
+      username: p?.username ?? null, displayName: p?.full_name ?? null, photoUrl: p?.photo_url ?? null, country: p?.country ?? null,
+      method: a.method, submittedAt: a.submitted_at, attemptNumber: a.attempt_number, accountAgeDays,
+    };
+  }));
+});
+
+// GET /admin/verification/queue/:applicationId — full detail + a 1-hour
+// signed URL for the submitted selfie/video.
+router.get("/verification/queue/:applicationId", async (req, res) => {
+  if (!(await requireVerificationReviewer(req, res))) return;
+
+  const { data: application, error } = await supabaseWrite
+    .from("p2p_verification_applications")
+    .select("*")
+    .eq("id", req.params.applicationId)
+    .maybeSingle();
+  if (error) return err(res, error.message);
+  if (!application) return err(res, "Application not found", 404);
+
+  const { data: profile } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("id, username, full_name, photo_url, country, created_at")
+    .eq("id", application.user_id)
+    .maybeSingle();
+
+  let submissionUrl: string | null = null;
+  if (application.submission_path) {
+    const { data: signed } = await supabaseWrite.storage
+      .from("verification-submissions")
+      .createSignedUrl(application.submission_path as string, 3600);
+    submissionUrl = signed?.signedUrl ?? null;
+  }
+
+  const accountAgeDays = profile ? Math.floor((Date.now() - new Date(profile.created_at as string).getTime()) / (24 * 60 * 60 * 1000)) : null;
+
+  return ok(res, {
+    applicationId: application.id, userId: application.user_id,
+    username: profile?.username ?? null, displayName: profile?.full_name ?? null,
+    profilePhotoUrl: application.profile_photo_url ?? profile?.photo_url ?? null,
+    country: profile?.country ?? null, accountAgeDays,
+    method: application.method, submissionUrl, status: application.status,
+    submittedAt: application.submitted_at, attemptNumber: application.attempt_number,
+  });
+});
+
+// POST /admin/verification/approve/:applicationId — { notes? }
+router.post("/verification/approve/:applicationId", async (req, res) => {
+  const adminUserId = await requireVerificationReviewer(req, res);
+  if (!adminUserId) return;
+  const { notes } = req.body as { notes?: string };
+
+  const { data: application } = await supabaseWrite
+    .from("p2p_verification_applications").select("id, user_id, status").eq("id", req.params.applicationId).maybeSingle();
+  if (!application) return err(res, "Application not found", 404);
+  if (application.status !== "pending") return err(res, "This application has already been reviewed", 409);
+
+  const now = new Date();
+  await supabaseWrite.from("p2p_verification_applications").update({
+    status: "approved", reviewed_by: adminUserId, reviewed_at: now.toISOString(),
+    face_match_notes: notes ?? null, delete_after: new Date(now.getTime() + VERIFICATION_DELETE_AFTER_APPROVAL_MS).toISOString(),
+  }).eq("id", application.id);
+
+  await supabaseWrite.from("p2p_profiles").update({
+    is_verified: true, verification_status: "approved", verification_approved_at: now.toISOString(),
+    verification_reviewed_by: adminUserId, verification_reviewed_at: now.toISOString(),
+  }).eq("id", application.user_id);
+
+  await supabaseWrite.from("p2p_verification_history").insert({ user_id: application.user_id, action: "approved", action_by: adminUserId });
+  await notifyUser(
+    application.user_id as string, "🎉 You are now verified on P2P Global",
+    "Your blue tick ✓ is now visible on your profile and everywhere your username appears.",
+    "verification_approved"
+  );
+
+  return ok(res, { success: true });
+});
+
+const DECLINE_REASONS = ["face_mismatch", "image_unclear", "no_note_visible", "note_incorrect", "suspected_fake", "other"];
+
+// POST /admin/verification/decline/:applicationId — { reason }
+router.post("/verification/decline/:applicationId", async (req, res) => {
+  const adminUserId = await requireVerificationReviewer(req, res);
+  if (!adminUserId) return;
+  const { reason } = req.body as { reason?: string };
+  if (!reason || !DECLINE_REASONS.includes(reason)) return err(res, `reason must be one of: ${DECLINE_REASONS.join(", ")}`, 400);
+
+  const { data: application } = await supabaseWrite
+    .from("p2p_verification_applications").select("id, user_id, status, submission_path").eq("id", req.params.applicationId).maybeSingle();
+  if (!application) return err(res, "Application not found", 404);
+  if (application.status !== "pending") return err(res, "This application has already been reviewed", 409);
+
+  const now = new Date();
+  const canReapplyAt = new Date(now.getTime() + VERIFICATION_DECLINE_REAPPLY_MS).toISOString();
+
+  if (application.submission_path) {
+    await supabaseWrite.storage.from("verification-submissions").remove([application.submission_path as string]);
+  }
+  await supabaseWrite.from("p2p_verification_applications").update({
+    status: "declined", reviewed_by: adminUserId, reviewed_at: now.toISOString(), decline_reason: reason,
+    submission_path: null, submission_deleted_at: now.toISOString(),
+  }).eq("id", application.id);
+
+  await supabaseWrite.from("p2p_profiles").update({
+    verification_status: "declined", verification_decline_reason: reason, can_reapply_at: canReapplyAt,
+    verification_reviewed_by: adminUserId, verification_reviewed_at: now.toISOString(),
+  }).eq("id", application.user_id);
+
+  await supabaseWrite.from("p2p_verification_history").insert({ user_id: application.user_id, action: "declined", action_by: adminUserId, reason });
+  await notifyUser(
+    application.user_id as string, "Verification update",
+    "We were unable to approve your verification. Tap to see the reason and reapply options.",
+    "verification_declined"
+  );
+
+  return ok(res, { success: true });
+});
+
+// POST /admin/verification/revoke/:userId — { reason }
+router.post("/verification/revoke/:userId", async (req, res) => {
+  const adminUserId = await requireVerificationReviewer(req, res);
+  if (!adminUserId) return;
+  const { reason } = req.body as { reason?: string };
+  if (!reason || !reason.trim()) return err(res, "reason is required", 400);
+
+  const { data: profile } = await supabaseWrite.from("p2p_profiles").select("id, is_verified").eq("id", req.params.userId).maybeSingle();
+  if (!profile) return err(res, "Profile not found", 404);
+
+  const canReapplyAt = new Date(Date.now() + VERIFICATION_REVOKE_REAPPLY_MS).toISOString();
+  await supabaseWrite.from("p2p_profiles").update({
+    is_verified: false, verification_status: "revoked", can_reapply_at: canReapplyAt,
+  }).eq("id", req.params.userId);
+
+  await supabaseWrite.from("p2p_verification_history").insert({ user_id: req.params.userId, action: "revoked", action_by: adminUserId, reason });
+  await notifyUser(
+    req.params.userId, "Verification status update",
+    "Your verification badge has been removed. Tap for details.",
+    "verification_revoked"
+  );
+
+  return ok(res, { success: true });
+});
+
+// POST /admin/verification/grant/:userId — manual grant, no application
+// (known ministry leaders, founding members, special cases).
+router.post("/verification/grant/:userId", async (req, res) => {
+  const adminUserId = await requireVerificationReviewer(req, res);
+  if (!adminUserId) return;
+
+  const { data: profile } = await supabaseWrite.from("p2p_profiles").select("id").eq("id", req.params.userId).maybeSingle();
+  if (!profile) return err(res, "Profile not found", 404);
+
+  const now = new Date();
+  await supabaseWrite.from("p2p_profiles").update({
+    is_verified: true, verification_status: "approved", verification_method: "manual_grant",
+    verification_approved_at: now.toISOString(), verification_reviewed_by: adminUserId, verification_reviewed_at: now.toISOString(),
+  }).eq("id", req.params.userId);
+
+  await supabaseWrite.from("p2p_verification_history").insert({ user_id: req.params.userId, action: "granted", action_by: adminUserId });
+  await notifyUser(
+    req.params.userId, "🎉 You are now verified on P2P Global",
+    "Your blue tick ✓ is now visible on your profile and everywhere your username appears.",
+    "verification_approved"
+  );
+
+  return ok(res, { success: true });
+});
+
+// GET /admin/verification/history/:userId
+router.get("/verification/history/:userId", async (req, res) => {
+  if (!(await requireVerificationReviewer(req, res))) return;
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_verification_history")
+    .select("id, action, action_by, reason, created_at")
+    .eq("user_id", req.params.userId)
+    .order("created_at", { ascending: false });
+  if (error) return err(res, error.message);
+
+  return ok(res, data ?? []);
+});
+
+// GET /admin/verification/history — global feed across all users (History
+// tab), as opposed to the per-user endpoint above (used by the review
+// screen's "view this user's history" drill-in).
+router.get("/verification/history", async (req, res) => {
+  if (!(await requireVerificationReviewer(req, res))) return;
+  const { q } = req.query as { q?: string };
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_verification_history")
+    .select("id, user_id, action, action_by, reason, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return err(res, error.message);
+
+  const userIds = Array.from(new Set((data ?? []).flatMap((h) => [h.user_id as string, h.action_by as string | null]).filter(Boolean) as string[]));
+  const { data: profiles } = userIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id, username, full_name").in("id", userIds)
+    : { data: [] as { id: string; username: string | null; full_name: string | null }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  let rows = (data ?? []).map((h) => ({
+    id: h.id, userId: h.user_id,
+    username: profileById.get(h.user_id as string)?.username ?? null,
+    displayName: profileById.get(h.user_id as string)?.full_name ?? null,
+    action: h.action,
+    actionByUsername: h.action_by ? profileById.get(h.action_by as string)?.username ?? null : null,
+    reason: h.reason, createdAt: h.created_at,
+  }));
+
+  if (q && q.trim()) {
+    const needle = q.trim().replace(/^@/, "").toLowerCase();
+    rows = rows.filter((r) => r.username?.toLowerCase().includes(needle) || r.displayName?.toLowerCase().includes(needle));
+  }
+
+  return ok(res, rows);
+});
+
+// GET /admin/verification/stats
+router.get("/verification/stats", async (req, res) => {
+  if (!(await requireVerificationReviewer(req, res))) return;
+
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [totalVerified, pending, approvedThisWeek, declinedThisWeek, allApplications, allApproved, allDeclined, allRevoked] = await Promise.all([
+    supabaseWrite.from("p2p_profiles").select("id", { count: "exact", head: true }).eq("is_verified", true),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }).eq("status", "approved").gte("reviewed_at", weekAgo),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }).eq("status", "declined").gte("reviewed_at", weekAgo),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabaseWrite.from("p2p_verification_applications").select("id", { count: "exact", head: true }).eq("status", "declined"),
+    supabaseWrite.from("p2p_verification_history").select("id", { count: "exact", head: true }).eq("action", "revoked"),
+  ]);
+
+  const { data: reviewedTimings } = await supabaseWrite
+    .from("p2p_verification_applications")
+    .select("submitted_at, reviewed_at")
+    .not("reviewed_at", "is", null)
+    .limit(500);
+  const hours = (reviewedTimings ?? []).map((r) => (new Date(r.reviewed_at as string).getTime() - new Date(r.submitted_at as string).getTime()) / (60 * 60 * 1000));
+  const avgReviewHours = hours.length ? Math.round((hours.reduce((a, b) => a + b, 0) / hours.length) * 10) / 10 : 0;
+
+  const totalApplicationsAllTime = allApplications.count ?? 0;
+  return ok(res, {
+    totalVerified: totalVerified.count ?? 0,
+    pendingApplications: pending.count ?? 0,
+    approvedThisWeek: approvedThisWeek.count ?? 0,
+    declinedThisWeek: declinedThisWeek.count ?? 0,
+    avgReviewHours,
+    totalApplicationsAllTime,
+    totalApprovalsAllTime: allApproved.count ?? 0,
+    totalDeclinesAllTime: allDeclined.count ?? 0,
+    totalRevocationsAllTime: allRevoked.count ?? 0,
+    verificationRate: totalApplicationsAllTime ? Math.round(((allApproved.count ?? 0) / totalApplicationsAllTime) * 100) : 0,
+  });
+});
+
 export default router;

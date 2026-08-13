@@ -7,8 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
-interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null }
+interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null; isVerified: boolean }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
 interface CircleDetail {
   id: string; name: string; description: string | null; leaderId: string; currentLessonId: string | null;
@@ -340,7 +341,10 @@ export default function CircleDetailScreen() {
               <Text style={styles.memberAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.memberUsername} numberOfLines={1}>{m.username ? `@${m.username}` : m.name}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={styles.memberUsername} numberOfLines={1}>{m.username ? `@${m.username}` : m.name}</Text>
+                <VerificationBadge isVerified={m.isVerified} username={m.username} size="small" />
+              </View>
               {m.username && <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>}
             </View>
             {m.role === "leader" && (

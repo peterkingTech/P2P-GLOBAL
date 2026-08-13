@@ -1,9 +1,16 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
 import { supabase } from "../lib/supabase";
 import { validateUsername, formatUsername } from "../lib/username";
 
 const router = Router();
+
+// Same moderator+ set breakRooms.ts uses for its moderator-alert path —
+// verification review is scoped narrower than the general requireAdmin()
+// gate (which also includes peer_guide) since it means looking at another
+// person's face/selfie.
+const VERIFICATION_REVIEWER_ROLES = ["moderator", "church_leader", "regional_admin", "super_admin"];
 
 // Same RLS workaround as curriculum.ts's supabaseRead — the shared `supabase`
 // client above uses the anon key, which several tables the forest endpoint
@@ -94,6 +101,7 @@ type PublicProfileRow = {
   country: string | null; country_code: string | null; growth_level: number | null; bio: string | null;
   is_peer_guide_eligible: boolean | null; created_at: string; profile_visibility: string | null;
   show_real_name_publicly: boolean | null; show_progress_publicly: boolean | null;
+  is_verified: boolean | null; verification_badge_visible: boolean | null;
 };
 
 async function mapPublicProfile(row: PublicProfileRow) {
@@ -116,10 +124,11 @@ async function mapPublicProfile(row: PublicProfileRow) {
     modulesCompleted: showProgress ? (modulesCompletedByUser.get(row.id) ?? 0) : null,
     fruitCount: showProgress ? (fruitCountByUser.get(row.id) ?? 0) : null,
     activeMenteesCount: showProgress ? (menteeCount ?? 0) : null,
+    isVerified: (row.is_verified ?? false) && (row.verification_badge_visible ?? true),
   };
 }
 
-const PUBLIC_PROFILE_COLUMNS = "id,username,full_name,photo_url,country,country_code,growth_level,bio,is_peer_guide_eligible,created_at,profile_visibility,show_real_name_publicly,show_progress_publicly";
+const PUBLIC_PROFILE_COLUMNS = "id,username,full_name,photo_url,country,country_code,growth_level,bio,is_peer_guide_eligible,created_at,profile_visibility,show_real_name_publicly,show_progress_publicly,is_verified,verification_badge_visible";
 
 // GET /profiles/username/:username — public profile by username.
 router.get("/username/:username", async (req, res) => {
@@ -150,16 +159,19 @@ router.get("/username/:username", async (req, res) => {
 // start" search pattern this UI is built around. The trigram GIN index
 // still accelerates the ILIKE '%...%' pass either way.
 router.get("/search", async (req, res) => {
-  const { q, viewerId } = req.query as { q?: string; viewerId?: string };
+  const { q, viewerId, verified_only } = req.query as { q?: string; viewerId?: string; verified_only?: string };
   if (!q || q.trim().length < 2) return res.json([]);
   const query = q.trim().replace(/^@/, "");
+  const verifiedOnly = verified_only === "true";
 
-  const { data: prefixMatches } = await supabaseRead
+  let prefixQuery = supabaseRead
     .from("p2p_profiles")
     .select(PUBLIC_PROFILE_COLUMNS)
     .ilike("username", `${query}%`)
     .neq("profile_visibility", "private")
     .limit(10);
+  if (verifiedOnly) prefixQuery = prefixQuery.eq("is_verified", true);
+  const { data: prefixMatches } = await prefixQuery;
 
   let results = (prefixMatches ?? []) as PublicProfileRow[];
   if (results.length < 10) {
@@ -170,10 +182,24 @@ router.get("/search", async (req, res) => {
       .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
       .neq("profile_visibility", "private")
       .limit(10 - results.length);
+    if (verifiedOnly) containsQuery = containsQuery.eq("is_verified", true);
     if (excludeIds.length) containsQuery = containsQuery.not("id", "in", `(${excludeIds.join(",")})`);
     const { data: containsMatches } = await containsQuery;
     results = results.concat((containsMatches ?? []) as PublicProfileRow[]);
   }
+
+  // Verified profiles first when otherwise tied on match position (both
+  // arrays above are already ordered prefix-then-contains; a stable sort on
+  // is_verified alone preserves that relative order within each group).
+  results = results
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => {
+      const av = a.r.is_verified ? 1 : 0;
+      const bv = b.r.is_verified ? 1 : 0;
+      if (av !== bv) return bv - av;
+      return a.i - b.i;
+    })
+    .map(({ r }) => r);
 
   if (viewerId) {
     const { data: blocks } = await supabaseRead
@@ -296,6 +322,187 @@ router.post("/login-with-username", async (req, res) => {
   return res.json(session);
 });
 
+// ── Identity verification (blue tick) ────────────────────────────────────────
+// Selfie or short video selfie only — no government ID. Every read/write on
+// p2p_verification_applications/history and the private storage bucket goes
+// through supabaseRead (service role); see migration 065's deviation notes.
+const VERIFICATION_ACCOUNT_MIN_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const verificationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+function mapVerificationStatus(profile: Record<string, unknown>, attemptNumber: number) {
+  return {
+    status: (profile.verification_status as string) ?? "unverified",
+    method: (profile.verification_method as string | null) ?? null,
+    submittedAt: (profile.verification_submitted_at as string | null) ?? null,
+    approvedAt: (profile.verification_approved_at as string | null) ?? null,
+    declineReason: (profile.verification_decline_reason as string | null) ?? null,
+    canReapplyAt: (profile.can_reapply_at as string | null) ?? null,
+    attemptNumber,
+    isVerified: (profile.is_verified as boolean) ?? false,
+    badgeVisible: (profile.verification_badge_visible as boolean) ?? true,
+  };
+}
+
+// POST /profiles/verification/submit — multipart: fields userId, method
+// ('selfie_note'|'video_selfie'), file field 'file'.
+router.post("/verification/submit", verificationUpload.single("file"), async (req, res) => {
+  const { userId, method } = req.body as { userId?: string; method?: string };
+  if (!userId || !method) return res.status(400).json({ error: "userId and method are required" });
+  if (!["selfie_note", "video_selfie"].includes(method)) {
+    return res.status(400).json({ error: "method must be 'selfie_note' or 'video_selfie'" });
+  }
+  if (!req.file) return res.status(400).json({ error: "No file uploaded (expected field name 'file')" });
+
+  const { data: profile } = await supabaseRead
+    .from("p2p_profiles")
+    .select("photo_url, created_at, verification_status, can_reapply_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+  if (!profile.photo_url) {
+    return res.status(400).json({ error: "Please add a profile photo before applying" });
+  }
+  const accountAgeMs = Date.now() - new Date(profile.created_at as string).getTime();
+  if (accountAgeMs < VERIFICATION_ACCOUNT_MIN_AGE_MS) {
+    return res.status(400).json({ error: "Your account must be at least 14 days old to apply" });
+  }
+  if (profile.verification_status === "pending") {
+    return res.status(409).json({ error: "You already have a verification application pending" });
+  }
+  if (profile.can_reapply_at && new Date(profile.can_reapply_at as string).getTime() > Date.now()) {
+    return res.status(429).json({ error: "You can reapply later", can_reapply_at: profile.can_reapply_at });
+  }
+  // "No active moderation flags" — p2p_profiles has no is_flagged column;
+  // the real signal is an open/escalated row in p2p_content_flags (see
+  // migrations/013_moderation.sql).
+  const { data: activeFlag } = await supabaseRead
+    .from("p2p_content_flags")
+    .select("id")
+    .eq("author_id", userId)
+    .in("status", ["open", "escalated"])
+    .maybeSingle();
+  if (activeFlag) {
+    return res.status(403).json({ error: "Your account has active moderation flags" });
+  }
+
+  const { count: priorAttempts } = await supabaseRead
+    .from("p2p_verification_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  const attemptNumber = (priorAttempts ?? 0) + 1;
+
+  const ext = (req.file.originalname.split(".").pop() || (method === "video_selfie" ? "mp4" : "jpg")).toLowerCase();
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const { error: uploadErr } = await supabaseRead.storage
+    .from("verification-submissions")
+    .upload(path, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+  if (uploadErr) return res.status(500).json({ error: uploadErr.message });
+
+  const { data: application, error: insertErr } = await supabaseRead
+    .from("p2p_verification_applications")
+    .insert({
+      user_id: userId, method, submission_path: path, profile_photo_url: profile.photo_url,
+      status: "pending", attempt_number: attemptNumber,
+    })
+    .select("id")
+    .single();
+  if (insertErr || !application) {
+    await supabaseRead.storage.from("verification-submissions").remove([path]);
+    return res.status(500).json({ error: insertErr?.message ?? "Failed to submit application" });
+  }
+
+  await supabaseRead.from("p2p_profiles").update({
+    verification_status: "pending", verification_submitted_at: new Date().toISOString(), verification_method: method,
+  }).eq("id", userId);
+
+  await supabaseRead.from("p2p_verification_history").insert({ user_id: userId, action: "submitted" });
+
+  await supabaseRead.from("p2p_notifications").insert({
+    user_id: userId, title: "Verification submitted",
+    message: "We have received your verification application. You will hear from us within 72 hours.",
+    notification_type: "verification_submitted",
+  });
+
+  const { data: reviewers } = await supabaseRead.from("p2p_profiles").select("id").in("role", VERIFICATION_REVIEWER_ROLES);
+  const { data: submitterProfile } = await supabaseRead.from("p2p_profiles").select("username, full_name").eq("id", userId).maybeSingle();
+  const submitterName = (submitterProfile?.username as string | undefined) ? `@${submitterProfile!.username}` : (submitterProfile?.full_name as string | undefined) ?? "Someone";
+  if (reviewers && reviewers.length) {
+    await supabaseRead.from("p2p_notifications").insert(
+      reviewers.map((r) => ({
+        user_id: r.id, title: "New verification application",
+        message: `${submitterName} has submitted a verification application. Review it in the admin panel.`,
+        notification_type: "verification_admin_alert", data: { applicationId: application.id },
+      }))
+    );
+  }
+
+  return res.status(201).json({ success: true, applicationId: application.id, estimatedReviewHours: 72 });
+});
+
+// GET /profiles/verification/status?userId=
+router.get("/verification/status", async (req, res) => {
+  const { userId } = req.query as { userId?: string };
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { data: profile } = await supabaseRead
+    .from("p2p_profiles")
+    .select("verification_status, verification_method, verification_submitted_at, verification_approved_at, verification_decline_reason, can_reapply_at, is_verified, verification_badge_visible")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+  const { count: attemptCount } = await supabaseRead
+    .from("p2p_verification_applications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  return res.json(mapVerificationStatus(profile as Record<string, unknown>, attemptCount ?? 0));
+});
+
+// PUT /profiles/verification/badge-visibility — { userId, visible }
+router.put("/verification/badge-visibility", async (req, res) => {
+  const { userId, visible } = req.body as { userId?: string; visible?: boolean };
+  if (!userId || typeof visible !== "boolean") return res.status(400).json({ error: "userId and visible are required" });
+
+  const { data: updated, error } = await supabaseRead
+    .from("p2p_profiles")
+    .update({ verification_badge_visible: visible })
+    .eq("id", userId)
+    .select(PUBLIC_PROFILE_COLUMNS)
+    .single();
+  if (error || !updated) return res.status(500).json({ error: error?.message ?? "Failed to update badge visibility" });
+
+  return res.json(mapProfile(updated as Record<string, unknown>));
+});
+
+// POST /profiles/verification/withdraw — { userId } — cancels a pending
+// application and deletes the submitted file immediately.
+router.post("/verification/withdraw", async (req, res) => {
+  const { userId } = req.body as { userId?: string };
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { data: application } = await supabaseRead
+    .from("p2p_verification_applications")
+    .select("id, submission_path")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("submitted_at", { ascending: false })
+    .maybeSingle();
+  if (!application) return res.status(404).json({ error: "No pending application found" });
+
+  if (application.submission_path) {
+    await supabaseRead.storage.from("verification-submissions").remove([application.submission_path]);
+  }
+  await supabaseRead.from("p2p_verification_applications").update({
+    status: "declined", submission_path: null, submission_deleted_at: new Date().toISOString(),
+  }).eq("id", application.id);
+  await supabaseRead.from("p2p_profiles").update({ verification_status: "unverified", verification_submitted_at: null }).eq("id", userId);
+  await supabaseRead.from("p2p_verification_history").insert({ user_id: userId, action: "withdrawn" });
+
+  return res.json({ success: true });
+});
+
 // GET /profiles/:userId
 router.get("/:userId", async (req, res) => {
   const { userId } = req.params;
@@ -357,6 +564,7 @@ type ProfileRow = {
   growth_level: number | null;
   last_active_at: string | null;
   username: string | null;
+  is_verified: boolean | null;
 };
 
 type PersonSummary = {
@@ -367,6 +575,7 @@ type PersonSummary = {
   growthLevel: number;
   lastActiveAt: string | null;
   username: string | null;
+  isVerified: boolean;
 };
 
 function toPersonSummary(p: ProfileRow): PersonSummary {
@@ -378,6 +587,7 @@ function toPersonSummary(p: ProfileRow): PersonSummary {
     growthLevel: p.growth_level ?? 0,
     lastActiveAt: p.last_active_at ?? null,
     username: p.username ?? null,
+    isVerified: p.is_verified ?? false,
   };
 }
 
@@ -461,7 +671,7 @@ async function loadAncestry(userId: string, maxGenerations: number) {
     if (!mentorId) break;
     const { data: mentorProfile } = await supabaseRead
       .from("p2p_profiles")
-      .select("id,full_name,photo_url,country,growth_level,last_active_at,username")
+      .select("id,full_name,photo_url,country,growth_level,last_active_at,username,is_verified")
       .eq("id", mentorId)
       .maybeSingle();
     if (!mentorProfile) break;
@@ -478,7 +688,7 @@ router.get("/:userId/forest", async (req, res) => {
 
   const { data: rootProfile, error: rootErr } = await supabaseRead
     .from("p2p_profiles")
-    .select("id,full_name,photo_url,country,growth_level,last_active_at,username")
+    .select("id,full_name,photo_url,country,growth_level,last_active_at,username,is_verified")
     .eq("id", userId)
     .single();
   if (rootErr || !rootProfile) return res.status(404).json({ error: "Profile not found" });
@@ -515,7 +725,7 @@ router.get("/:userId/forest", async (req, res) => {
     for (const idChunk of chunk(nextIds)) {
       const { data } = await supabaseRead
         .from("p2p_profiles")
-        .select("id,full_name,photo_url,country,growth_level,last_active_at,username")
+        .select("id,full_name,photo_url,country,growth_level,last_active_at,username,is_verified")
         .in("id", idChunk);
       genProfiles = genProfiles.concat((data ?? []) as ProfileRow[]);
     }

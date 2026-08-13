@@ -17,6 +17,7 @@ import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VIDEO_STAGE_INDEX } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
@@ -57,9 +58,12 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
             <Text style={styles.avatarInitial}>{node.name.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.nodeName, depth === 0 && styles.rootNodeName]}>
-              {node.username ? `@${node.username}` : node.name} {depth === 0 ? "(You)" : ""}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={[styles.nodeName, depth === 0 && styles.rootNodeName]}>
+                {node.username ? `@${node.username}` : node.name} {depth === 0 ? "(You)" : ""}
+              </Text>
+              <VerificationBadge isVerified={!!node.isVerified} username={node.username} size="small" />
+            </View>
             {node.username && <Text style={styles.nodeRealName}>{node.name}</Text>}
             <View style={styles.nodeMeta}>
               <View style={[styles.rolePill, { backgroundColor: `${roleColor}22` }]}>

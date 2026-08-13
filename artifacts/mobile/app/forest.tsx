@@ -9,6 +9,7 @@ import { useData, GenerationalForestData, ForestPerson } from "@/contexts/DataCo
 import colors from "@/constants/colors";
 import { getStageFromPoints } from "@/constants/stages";
 import { getContinent, getFlagEmoji, CONTINENT_LABELS, type Continent } from "@/lib/countryGeo";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 // The Generational Forest View — signature discipleship-lineage visualization.
 // "My Forest" renders self + up to 3 generations of mentees as an SVG grove
@@ -195,7 +196,12 @@ function ForestCanvas({ data, revealProgress, onTapPerson }: {
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {gen1Positions.map(({ node, x, y }) => (
           <View key={node.userId} style={[styles.treeLabelWrap, { left: x - 30, top: y - 34 * 1.25 - 54 }]}>
-            {node.username && <Text style={styles.treeUsername} numberOfLines={1}>@{node.username}</Text>}
+            {node.username && (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={styles.treeUsername} numberOfLines={1}>@{node.username}</Text>
+                <VerificationBadge isVerified={node.isVerified} badgeVisible size="small" />
+              </View>
+            )}
             <Text style={styles.flagOverlay}>{getFlagEmoji(node.country)}</Text>
           </View>
         ))}

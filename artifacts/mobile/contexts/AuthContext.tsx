@@ -98,6 +98,8 @@ export interface UserProfile {
   showRealNamePublicly: boolean;
   showProgressPublicly: boolean;
   usernameChangeRequired: boolean;
+  isVerified: boolean;
+  verificationBadgeVisible: boolean;
 }
 
 interface AuthContextValue {
@@ -157,6 +159,8 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     showRealNamePublicly: (row.show_real_name_publicly as boolean) ?? true,
     showProgressPublicly: (row.show_progress_publicly as boolean) ?? true,
     usernameChangeRequired: (row.username_change_required as boolean) ?? false,
+    isVerified: (row.is_verified as boolean) ?? false,
+    verificationBadgeVisible: (row.verification_badge_visible as boolean) ?? true,
     appLanguage: (row.app_language as string) ?? "en",
     contentLanguage: (row.content_language as string) ?? "en",
     churchId: row.church_id as string | undefined,

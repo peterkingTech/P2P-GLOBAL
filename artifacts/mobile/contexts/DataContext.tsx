@@ -339,7 +339,21 @@ export interface PublicUserProfile {
   country: string | null; countryCode: string | null; bio: string | null;
   isPeerGuideEligible: boolean; joinedAt: string; showProgressPublicly: boolean;
   growthLevel: number | null; modulesCompleted: number | null; fruitCount: number | null;
-  activeMenteesCount: number | null;
+  activeMenteesCount: number | null; isVerified: boolean;
+}
+
+export type VerificationStatusValue = "unverified" | "pending" | "approved" | "declined" | "revoked";
+
+export interface VerificationStatus {
+  status: VerificationStatusValue;
+  method: string | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  declineReason: string | null;
+  canReapplyAt: string | null;
+  attemptNumber: number;
+  isVerified: boolean;
+  badgeVisible: boolean;
 }
 
 export interface BlockedUserEntry {
@@ -406,6 +420,7 @@ export interface ForestNode {
   depth: number;
   children: ForestNode[];
   username?: string | null;
+  isVerified?: boolean;
 }
 
 // ── Living Tree (real SVG visualization) ────────────────────────────────────
@@ -743,6 +758,7 @@ export interface ForestPerson {
   lastActiveAt: string | null;
   modulesCompleted: number;
   username: string | null;
+  isVerified: boolean;
 }
 export interface ForestMenteeNode extends ForestPerson {
   mentees: ForestMenteeNode[];
@@ -896,6 +912,11 @@ interface DataContextValue {
   unblockUser: (userId: string) => Promise<string | null>;
   blockedUsers: BlockedUserEntry[];
   refreshBlockedUsers: () => Promise<void>;
+  verificationStatus: VerificationStatus | null;
+  loadVerificationStatus: () => Promise<void>;
+  submitVerification: (method: "selfie_note" | "video_selfie", fileUri: string, fileName: string, mimeType: string) => Promise<string | null>;
+  withdrawVerification: () => Promise<string | null>;
+  toggleBadgeVisibility: (visible: boolean) => Promise<string | null>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -956,6 +977,7 @@ async function uploadSubmissionMedia(
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
   const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
@@ -1642,7 +1664,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadForestNetwork = useCallback(async (userId: string, userNode: ForestNode) => {
     try {
       type LinkRow = { mentor_id: string; disciple_id: string };
-      type ProfileRow = { id: string; full_name: string | null; role: string | null; growth_level: number | null; country: string | null; username: string | null };
+      type ProfileRow = { id: string; full_name: string | null; role: string | null; growth_level: number | null; country: string | null; username: string | null; is_verified: boolean | null };
 
       const allLinks: LinkRow[] = [];
       let frontier = [userId];
@@ -1668,7 +1690,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       const { data: profiles } = await supabase
         .from("p2p_profiles")
-        .select("id,full_name,role,growth_level,country,username")
+        .select("id,full_name,role,growth_level,country,username,is_verified")
         .in("id", discipleIds);
       const profileById = new Map(
         ((profiles ?? []) as ProfileRow[]).map((p) => [p.id, p])
@@ -1691,6 +1713,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           depth,
           children: (childrenByMentor.get(id) ?? []).map((childId) => buildNode(childId, depth + 1)),
           username: p?.username ?? null,
+          isVerified: p?.is_verified ?? false,
         };
       }
 
@@ -2630,6 +2653,71 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id, refreshBlockedUsers]);
 
+  const loadVerificationStatus = useCallback(async (): Promise<void> => {
+    if (!profile?.id) { setVerificationStatus(null); return; }
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/verification/status?userId=${profile.id}`);
+      setVerificationStatus(res.ok ? await res.json() : null);
+    } catch (e) {
+      console.error("loadVerificationStatus failed", e);
+    }
+  }, [profile?.id]);
+
+  // React Native's fetch FormData accepts { uri, name, type } for a file
+  // part — same shape as account.tsx's avatar upload, just posted to Express
+  // (multer) instead of straight to Supabase storage, since the verification
+  // bucket is service-role-only (see migration 065).
+  const submitVerification = useCallback(async (
+    method: "selfie_note" | "video_selfie", fileUri: string, fileName: string, mimeType: string
+  ): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const form = new FormData();
+      form.append("userId", profile.id);
+      form.append("method", method);
+      form.append("file", { uri: fileUri, name: fileName, type: mimeType } as any);
+      const res = await fetch(`${getApiUrl()}/profiles/verification/submit`, { method: "POST", body: form as any });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't submit verification";
+      await loadVerificationStatus();
+      return null;
+    } catch (e: any) {
+      console.error("submitVerification failed", e);
+      return e?.message || "Couldn't submit verification";
+    }
+  }, [profile?.id, loadVerificationStatus]);
+
+  const withdrawVerification = useCallback(async (): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/verification/withdraw`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: profile.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't withdraw application";
+      await loadVerificationStatus();
+      return null;
+    } catch (e: any) {
+      console.error("withdrawVerification failed", e);
+      return e?.message || "Couldn't withdraw application";
+    }
+  }, [profile?.id, loadVerificationStatus]);
+
+  const toggleBadgeVisibility = useCallback(async (visible: boolean): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/verification/badge-visibility`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: profile.id, visible }),
+      });
+      if (!res.ok) { const body = await res.json(); return body?.error ?? "Couldn't update badge visibility"; }
+      await loadVerificationStatus();
+      return null;
+    } catch (e: any) {
+      console.error("toggleBadgeVisibility failed", e);
+      return e?.message || "Couldn't update badge visibility";
+    }
+  }, [profile?.id, loadVerificationStatus]);
+
   const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
     try {
       const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
@@ -3367,6 +3455,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       reportContent, getModerationQueue, moderateFlag,
       searchUsersByUsername, getProfileByUsername, sendConnectionRequest, respondToConnectionRequest,
       blockUser, unblockUser, blockedUsers, refreshBlockedUsers,
+      verificationStatus, loadVerificationStatus, submitVerification, withdrawVerification, toggleBadgeVisibility,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,

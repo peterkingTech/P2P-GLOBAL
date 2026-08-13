@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 // Peer Guide specific matching — replaces the old generic gift/country
 // smart-match with a real eligibility + scoring flow against
@@ -20,6 +21,7 @@ interface Candidate {
   modulesCompleted: number;
   activeMenteeCount: number;
   maxMentees: number;
+  isVerified: boolean;
   score: number;
   reasons: string[];
 }
@@ -35,6 +37,7 @@ export default function SmartMatch() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [sentToName, setSentToName] = useState<string | null>(null);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   async function findMatch() {
     if (!profile?.id) return;
@@ -97,7 +100,13 @@ export default function SmartMatch() {
         {screen === "results" && (
           <View>
             <Text style={styles.title}>Your Matches</Text>
-            {candidates.length === 0 ? (
+            {candidates.some((c) => c.isVerified) && (
+              <TouchableOpacity style={styles.filterToggle} onPress={() => setVerifiedOnly((v) => !v)} activeOpacity={0.8}>
+                <Ionicons name={verifiedOnly ? "checkbox" : "square-outline"} size={18} color={verifiedOnly ? colors.accentGreen : colors.textMuted} />
+                <Text style={styles.filterToggleText}>Show verified only</Text>
+              </TouchableOpacity>
+            )}
+            {(verifiedOnly ? candidates.filter((c) => c.isVerified) : candidates).length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="hourglass-outline" size={28} color={colors.accentGreen} />
                 <Text style={styles.emptyText}>
@@ -116,7 +125,7 @@ export default function SmartMatch() {
                   </View>
                 )}
                 <View style={{ gap: 12 }}>
-                  {candidates.map((c) => (
+                  {(verifiedOnly ? candidates.filter((c) => c.isVerified) : candidates).map((c) => (
                     <View key={c.id} style={styles.candidateCard}>
                       <View style={styles.candidateHeader}>
                         {c.photoUrl ? (
@@ -127,7 +136,10 @@ export default function SmartMatch() {
                           </View>
                         )}
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.candidateName}>{c.fullName}</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            <Text style={styles.candidateName}>{c.fullName}</Text>
+                            <VerificationBadge isVerified={c.isVerified} username={c.fullName} size="medium" />
+                          </View>
                           <Text style={styles.candidateMeta}>
                             {c.country ?? "Location not set"} · {c.contentLanguage?.toUpperCase() ?? "—"}
                           </Text>
@@ -193,6 +205,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: "rgba(29,158,117,0.25)", alignItems: "center", justifyContent: "center", marginBottom: 20,
   },
   title: { fontSize: 22, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center", marginBottom: 10 },
+  filterToggle: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "center", marginBottom: 14 },
+  filterToggleText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
   subtitle: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21, marginBottom: 6 },
   subtitleMuted: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic", textAlign: "center", marginTop: 12 },
   primaryBtn: {
