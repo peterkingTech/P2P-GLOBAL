@@ -32,6 +32,23 @@ function mapLink(row: Record<string, unknown>) {
   };
 }
 
+// GET /discipleship/my-peer-guide/:userId — used by the crisis-alert screen's
+// "Call My Peer Guide" button, which needs the id to call before it can even
+// build the Agora channel name.
+router.get("/my-peer-guide/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data: link } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("mentor_id")
+    .eq("disciple_id", userId)
+    .eq("active", true)
+    .maybeSingle();
+  if (!link?.mentor_id) return res.json({ peerGuideId: null, peerGuideName: null });
+
+  const { data: profile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", link.mentor_id).maybeSingle();
+  return res.json({ peerGuideId: link.mentor_id, peerGuideName: profile?.full_name ?? "Your peer guide" });
+});
+
 // GET /discipleship/:userId/disciples
 router.get("/:userId/disciples", async (req, res) => {
   const { userId } = req.params;

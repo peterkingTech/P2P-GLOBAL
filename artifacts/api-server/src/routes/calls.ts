@@ -108,6 +108,7 @@ router.post("/calls/start", async (req, res) => {
     .insert({
       channel_name: channelName, call_type: callType, initiated_by: callerId,
       participants: [callerId, recipientId], status: "initiated",
+      conversation_id: conversationId ?? null,
     })
     .select("id").single();
   if (logErr || !callLog) return err(res, logErr?.message ?? "Failed to create call log", 500);
@@ -163,6 +164,89 @@ function formatDuration(totalSeconds: number): string {
   const s = totalSeconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
+
+// GET /calls/history/:userId — every 1:1/pastoral/crisis call this user was
+// part of (participants jsonb contains them), most recent first. Group calls
+// (Peer Circles) and Break Rooms aren't logged into p2p_call_logs — circles
+// already show their own session history, and rooms are ephemeral community
+// audio, not personal call history.
+router.get("/calls/history/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data: logs, error } = await supabaseWrite
+    .from("p2p_call_logs")
+    .select("id, channel_name, call_type, status, duration_seconds, created_at, conversation_id, participants")
+    // supabase-js's .contains() helper mis-serializes a plain array against a
+    // jsonb column here (errors "invalid input syntax for type json") —
+    // .filter with an explicitly JSON-stringified value is the form that
+    // actually produces valid `participants @> '["id"]'` SQL.
+    .filter("participants", "cs", JSON.stringify([userId]))
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return err(res, error.message, 500);
+
+  const otherIds = new Set<string>();
+  for (const row of logs ?? []) {
+    for (const p of (row.participants as string[]) ?? []) {
+      if (p !== userId) otherIds.add(p);
+    }
+  }
+  const { data: profiles } = otherIds.size
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name").in("id", Array.from(otherIds))
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+
+  return ok(res, (logs ?? []).map((row) => {
+    const otherId = ((row.participants as string[]) ?? []).find((p) => p !== userId) ?? null;
+    return {
+      id: row.id,
+      callType: row.call_type,
+      status: row.status,
+      durationSeconds: row.duration_seconds ?? 0,
+      createdAt: row.created_at,
+      conversationId: row.conversation_id ?? null,
+      otherUserId: otherId,
+      otherUserName: otherId ? (nameById.get(otherId) ?? "Someone") : null,
+    };
+  }));
+});
+
+// ── Scheduled session video integration ─────────────────────────────────────
+// p2p_sessions (mentor/participant peer sessions) is a genuinely different
+// table from DataContext's `sessions` array/sessions.ts route — see the
+// comment in session/[id].tsx — so these query its real columns directly
+// rather than going through that already-broken mapper.
+
+// POST /calls/sessions/:sessionId/mark-in-progress — either participant calls
+// this the moment the other side's Agora connection comes up (onUserJoined),
+// idempotent so it's safe if both sides fire it.
+router.post("/calls/sessions/:sessionId/mark-in-progress", async (req, res) => {
+  const { sessionId } = req.params;
+  const { data: session } = await supabaseWrite.from("p2p_sessions").select("status,started_at").eq("id", sessionId).maybeSingle();
+  if (!session) return err(res, "Session not found", 404);
+  if (session.status === "in_progress" || session.started_at) return ok(res, { alreadyStarted: true });
+
+  const { error } = await supabaseWrite
+    .from("p2p_sessions")
+    .update({ status: "in_progress", started_at: new Date().toISOString() })
+    .eq("id", sessionId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { alreadyStarted: false });
+});
+
+// POST /calls/sessions/:sessionId/reflection — the post-call reflection note
+// + optional 1-5 star rating.
+router.post("/calls/sessions/:sessionId/reflection", async (req, res) => {
+  const { sessionId } = req.params;
+  const { note, rating } = req.body as { note?: string; rating?: number };
+  if (rating !== undefined && (rating < 1 || rating > 5)) return err(res, "rating must be 1-5");
+
+  const { error } = await supabaseWrite
+    .from("p2p_sessions")
+    .update({ reflection_note: note?.trim() || null, rating: rating ?? null })
+    .eq("id", sessionId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { saved: true });
+});
 
 // ── Break Rooms ──────────────────────────────────────────────────────────────
 // Spontaneous audio community rooms (migrations 058 + 061). One named preset

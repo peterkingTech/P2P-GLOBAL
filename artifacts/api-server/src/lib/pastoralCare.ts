@@ -135,18 +135,75 @@ async function sendElijahProtocol(profile: CareProfile): Promise<void> {
 
 async function sendPeerGuideAlert(profile: CareProfile, peerGuideId: string): Promise<void> {
   const name = profile.full_name ?? "Your disciple";
+  const message = `${name} has been quiet for 21 days. A gentle personal check-in could make all the difference.`;
   await db.from("p2p_notifications").insert({
     user_id: peerGuideId,
     title: "A gentle check-in",
-    message: `${name} has been quiet for 21 days. A gentle personal check-in could make all the difference.`,
+    message,
+    notification_type: "pastoral_alert",
+    data: { discipleId: profile.id, discipleName: name },
   });
   await db.from("p2p_pastoral_care_log").insert({
     user_id: profile.id,
     care_type: "peer_guide_alert",
-    message_sent: `${name} has been quiet for 21 days. A gentle personal check-in could make all the difference.`,
+    message_sent: message,
     peer_guide_notified: true,
     peer_guide_notified_at: new Date().toISOString(),
+    peer_guide_id: peerGuideId,
   });
+}
+
+const CRISIS_RING_TIMEOUT_MS = 5 * 60 * 1000;
+const ESCALATION_ROLES = ["church_leader", "regional_admin", "super_admin"];
+
+// Cron sweep (see index.ts) — a crisis call that's gone unanswered for 5
+// minutes spawns exactly one escalation, to a church-admin-tier profile, on
+// the SAME Agora channel so whoever answers joins the person already
+// waiting. escalated_from_id both chains and caps this at one hop.
+//
+// Checks status IN (ringing, missed) rather than just ringing: the incoming
+// call screen itself auto-marks a call "missed" client-side after only 30s
+// of no answer (see incoming.tsx's RING_TIMEOUT_MS) — that's just the local
+// ringing UI giving up, not evidence the crisis was ever actually handled,
+// so a 30s-old "missed" row still needs this 5-minute escalation exactly
+// like a still-"ringing" one would.
+export async function escalateCrisisCalls(): Promise<{ escalated: number }> {
+  const cutoff = new Date(Date.now() - CRISIS_RING_TIMEOUT_MS).toISOString();
+  const { data: stale } = await db
+    .from("p2p_incoming_calls")
+    .select("id, channel_name, caller_id, recipient_id, conversation_id, call_log_id")
+    .eq("call_type", "crisis")
+    .in("status", ["ringing", "missed"])
+    .is("escalated_from_id", null)
+    .lt("created_at", cutoff);
+
+  let escalated = 0;
+  for (const call of stale ?? []) {
+    // "escalated", not "missed" — a terminal status distinct from the
+    // ringing/missed pair this query matches on, so this exact row can never
+    // be picked up by a later tick and re-escalated (that bug produced one
+    // duplicate escalation per minute in testing before this fix).
+    await db.from("p2p_incoming_calls").update({ status: "escalated", responded_at: new Date().toISOString() }).eq("id", call.id);
+
+    const { data: candidates } = await db
+      .from("p2p_profiles")
+      .select("id")
+      .in("role", ESCALATION_ROLES)
+      .neq("id", call.recipient_id as string)
+      .neq("id", call.caller_id as string)
+      .limit(1);
+    const fallbackId = candidates?.[0]?.id as string | undefined;
+    if (!fallbackId) continue;
+
+    await db.from("p2p_incoming_calls").insert({
+      channel_name: call.channel_name, call_type: "crisis",
+      caller_id: call.caller_id, recipient_id: fallbackId, status: "ringing",
+      conversation_id: call.conversation_id ?? null, call_log_id: call.call_log_id ?? null,
+      escalated_from_id: call.id,
+    });
+    escalated++;
+  }
+  return { escalated };
 }
 
 export async function detectInactiveUsers(): Promise<{ dormantSeedSent: number; elijahSent: number; peerGuideAlertsSent: number; scanned: number }> {

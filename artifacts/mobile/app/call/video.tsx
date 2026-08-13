@@ -80,8 +80,25 @@ export default function VideoCallScreen() {
   const params = useLocalSearchParams<{
     channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
+    sessionId?: string; lessonId?: string;
   }>();
   const isInitiator = params.isInitiator === "true";
+  const markedInProgressRef = useRef(false);
+
+  const [lessonSidebarVisible, setLessonSidebarVisible] = useState(false);
+  const [sessionLessonTitle, setSessionLessonTitle] = useState("");
+  const [sessionQuestions, setSessionQuestions] = useState<{ id: string; question: string }[]>([]);
+
+  useEffect(() => {
+    if (!params.lessonId) return;
+    (async () => {
+      const { data: lesson } = await supabase.from("p2p_lessons").select("title").eq("id", params.lessonId).maybeSingle();
+      setSessionLessonTitle(lesson?.title ?? "This Session's Lesson");
+      const { data: qs } = await supabase
+        .from("p2p_reflection_questions").select("id,question").eq("lesson_id", params.lessonId).order("display_order");
+      setSessionQuestions((qs ?? []) as { id: string; question: string }[]);
+    })();
+  }, [params.lessonId]);
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
@@ -153,6 +170,10 @@ export default function VideoCallScreen() {
         connectedAtRef.current = Date.now();
         setRemoteUid(uid);
         setCallState("connected");
+        if (params.sessionId && !markedInProgressRef.current) {
+          markedInProgressRef.current = true;
+          void fetch(`${getApiUrl()}/calls/sessions/${params.sessionId}/mark-in-progress`, { method: "POST" });
+        }
       },
       onUserOffline: () => {
         setRemoteUid(null);
@@ -283,6 +304,11 @@ export default function VideoCallScreen() {
           <TouchableOpacity style={styles.controlBtn} onPress={() => setScriptureVisible(true)}>
             <Ionicons name="book" size={20} color="#fff" />
           </TouchableOpacity>
+          {sessionQuestions.length > 0 && (
+            <TouchableOpacity style={styles.controlBtn} onPress={() => setLessonSidebarVisible(true)}>
+              <Ionicons name="list" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleEndCall}>
             <Ionicons name="call" size={20} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
           </TouchableOpacity>
@@ -290,6 +316,25 @@ export default function VideoCallScreen() {
       </View>
 
       <ScriptureModal visible={scriptureVisible} onClose={() => setScriptureVisible(false)} />
+
+      <Modal visible={lessonSidebarVisible} transparent animationType="slide" onRequestClose={() => setLessonSidebarVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{sessionLessonTitle}</Text>
+              <TouchableOpacity onPress={() => setLessonSidebarVisible(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {sessionQuestions.map((q, i) => (
+                <View key={q.id} style={styles.sidebarQuestionRow}>
+                  <Text style={styles.sidebarQuestionNumber}>{i + 1}</Text>
+                  <Text style={styles.sidebarQuestionText}>{q.question}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -340,4 +385,7 @@ const styles = StyleSheet.create({
   modalResult: { gap: 6, paddingVertical: 8 },
   modalResultText: { color: "#fff", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
   modalResultRef: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  sidebarQuestionRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  sidebarQuestionNumber: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_700Bold", width: 18 },
+  sidebarQuestionText: { flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
 });

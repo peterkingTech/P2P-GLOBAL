@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { detectInactiveUsers } from "./lib/pastoralCare";
+import { detectInactiveUsers, escalateCrisisCalls } from "./lib/pastoralCare";
 import { sweepBreakRooms } from "./lib/breakRooms";
 
 // Translation calls fail silently into an English fallback (see
@@ -59,5 +59,18 @@ cron.schedule("*/5 * * * *", async () => {
     }
   } catch (err) {
     logger.error({ err }, "Break Rooms sweep failed");
+  }
+});
+
+// Crisis calls — escalate anything still ringing after 5 minutes. Runs every
+// minute since that threshold is exact, not a coarse cap like the sweeps above.
+cron.schedule("*/1 * * * *", async () => {
+  try {
+    const result = await escalateCrisisCalls();
+    if (result.escalated) {
+      logger.warn(result, "Crisis calls escalated to church admin");
+    }
+  } catch (err) {
+    logger.error({ err }, "Crisis call escalation sweep failed");
   }
 });

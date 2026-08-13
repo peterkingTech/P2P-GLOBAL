@@ -28,6 +28,10 @@ function makeStyles(c: AppColors) {
       paddingHorizontal: 20, paddingBottom: 12,
     },
     headerTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    historyBtn: {
+      width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(29,158,117,0.1)",
+      alignItems: "center", justifyContent: "center",
+    },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 40 },
     emptyText: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     emptySub: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular" },
@@ -103,6 +107,9 @@ export default function MessagesTab() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16) }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("tabs.messages")}</Text>
+        <TouchableOpacity style={styles.historyBtn} onPress={() => router.push("/call/history" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="time-outline" size={20} color={colors.accentGreen} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (

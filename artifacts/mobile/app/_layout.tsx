@@ -195,7 +195,12 @@ function IncomingCallHost() {
   useEffect(() => {
     if (!incomingCall || shownForCallId.current === incomingCall.callId) return;
     shownForCallId.current = incomingCall.callId;
-    router.push({
+    const navigate = incomingCall.callType === "crisis" ? router.replace : router.push;
+    // Crisis calls interrupt whatever the recipient is doing — including an
+    // active call screen — by replacing the current route instead of
+    // stacking on top of it; every other call type still pushes so the
+    // recipient can dismiss back to where they were.
+    navigate({
       pathname: "/call/incoming",
       params: {
         callId: incomingCall.callId,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,15 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
+import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
 
 // The REAL p2p_sessions row — distinct from DataContext's `sessions` array,
@@ -28,8 +30,15 @@ interface RealSessionRow {
   title: string;
   mentor_id: string | null;
   participant_id: string | null;
+  lesson_id: string | null;
   status: string;
+  scheduled_time: string | null;
+  started_at: string | null;
+  reflection_note: string | null;
+  rating: number | null;
 }
+
+const JOIN_WINDOW_MS = 5 * 60 * 1000;
 
 interface ChatMessage {
   id: string;
@@ -67,13 +76,79 @@ export default function SessionScreen() {
     if (!id) return;
     const { data } = await supabase
       .from("p2p_sessions")
-      .select("id,title,mentor_id,participant_id,status")
+      .select("id,title,mentor_id,participant_id,lesson_id,status,scheduled_time,started_at,reflection_note,rating")
       .eq("id", id)
       .maybeSingle();
     setRealSession((data as RealSessionRow) ?? null);
   }, [id]);
 
   useEffect(() => { loadRealSession(); }, [loadRealSession]);
+
+  const justJoinedCallRef = useRef(false);
+  const [reflectionModalOpen, setReflectionModalOpen] = useState(false);
+  const [reflectionNote, setReflectionNote] = useState("");
+  const [reflectionRating, setReflectionRating] = useState(0);
+  const [savingReflection, setSavingReflection] = useState(false);
+  const [joiningVideo, setJoiningVideo] = useState(false);
+
+  useFocusEffect(useCallback(() => {
+    loadRealSession();
+    if (justJoinedCallRef.current) {
+      justJoinedCallRef.current = false;
+      if (realSession && !realSession.reflection_note) setReflectionModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadRealSession]));
+
+  const canJoinVideo = !!realSession?.scheduled_time &&
+    Date.now() >= new Date(realSession.scheduled_time).getTime() - JOIN_WINDOW_MS &&
+    realSession.status !== "completed";
+
+  async function joinVideoSession() {
+    if (!realSession || !user || joiningVideo) return;
+    setJoiningVideo(true);
+    try {
+      const otherUserId = realSession.mentor_id === user.id ? realSession.participant_id : realSession.mentor_id;
+      if (!otherUserId) return;
+      const channelRes = await fetch(`${getApiUrl()}/calls/peer-channel`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentUserId: user.id, otherUserId }),
+      });
+      const { channelName } = await channelRes.json();
+      const startRes = await fetch(`${getApiUrl()}/calls/start`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelName, callType: "video", callerId: user.id, recipientId: otherUserId }),
+      });
+      const { callLogId, incomingCallId } = await startRes.json();
+      justJoinedCallRef.current = true;
+      router.push({
+        pathname: "/call/video" as any,
+        params: {
+          channelName, otherUserId, otherUserName: session.title, callType: "video", isInitiator: "true",
+          callId: incomingCallId, callLogId, sessionId: realSession.id, lessonId: realSession.lesson_id ?? undefined,
+        },
+      });
+    } finally {
+      setJoiningVideo(false);
+    }
+  }
+
+  async function submitReflection() {
+    if (!realSession || savingReflection) return;
+    setSavingReflection(true);
+    try {
+      await fetch(`${getApiUrl()}/calls/sessions/${realSession.id}/reflection`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: reflectionNote, rating: reflectionRating || undefined }),
+      });
+      setReflectionModalOpen(false);
+      setReflectionNote("");
+      setReflectionRating(0);
+      await loadRealSession();
+    } finally {
+      setSavingReflection(false);
+    }
+  }
 
   const isParticipant = !!user && !!realSession && (realSession.mentor_id === user.id || realSession.participant_id === user.id);
   const isCompleted = realSession?.status === "completed";
@@ -142,6 +217,17 @@ export default function SessionScreen() {
         <Ionicons name="bookmark" size={13} color={colors.amber} />
         <Text style={styles.verseBarText}>John 15:5</Text>
       </View>
+
+      {isParticipant && canJoinVideo && (
+        <TouchableOpacity style={styles.joinVideoBtn} onPress={joinVideoSession} disabled={joiningVideo} activeOpacity={0.85}>
+          {joiningVideo ? <ActivityIndicator color={colors.cream} size="small" /> : (
+            <>
+              <Ionicons name="videocam" size={16} color={colors.cream} />
+              <Text style={styles.joinVideoBtnText}>Join Video Session</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Mark session complete — this is what actually fires the Fellowship
           confirmation request (and, if participants are from different
@@ -218,6 +304,37 @@ export default function SessionScreen() {
           <Ionicons name="send" size={18} color={colors.cream} />
         </TouchableOpacity>
       </View>
+
+      <Modal visible={reflectionModalOpen} transparent animationType="fade" onRequestClose={() => setReflectionModalOpen(false)}>
+        <View style={styles.reflectionOverlay}>
+          <View style={styles.reflectionSheet}>
+            <Text style={styles.reflectionTitle}>How did your session go?</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => setReflectionRating(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Ionicons name={n <= reflectionRating ? "star" : "star-outline"} size={28} color={colors.amber} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.reflectionInput}
+              value={reflectionNote}
+              onChangeText={setReflectionNote}
+              placeholder="Any reflections from this session? (optional)"
+              placeholderTextColor={colors.textMuted}
+              multiline
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+              <TouchableOpacity style={styles.reflectionSkipBtn} onPress={() => setReflectionModalOpen(false)}>
+                <Text style={styles.reflectionSkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reflectionSaveBtn} onPress={submitReflection} disabled={savingReflection}>
+                {savingReflection ? <ActivityIndicator color={colors.cream} size="small" /> : <Text style={styles.reflectionSaveText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -244,6 +361,24 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingVertical: 10,
   },
   completeBtnText: { color: colors.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  joinVideoBtn: {
+    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#DC2626", marginHorizontal: 16, marginTop: 10,
+    borderRadius: 10, paddingVertical: 10,
+  },
+  joinVideoBtnText: { color: colors.cream, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  reflectionOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: 24 },
+  reflectionSheet: { backgroundColor: colors.navBg, borderRadius: 18, padding: 22, width: "100%", gap: 14, borderWidth: 1, borderColor: colors.navBorder },
+  reflectionTitle: { fontSize: 16, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold", textAlign: "center" },
+  starsRow: { flexDirection: "row", justifyContent: "center", gap: 10 },
+  reflectionInput: {
+    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, borderWidth: 1, borderColor: colors.navBorder,
+    padding: 12, color: colors.cream, fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 70,
+  },
+  reflectionSkipBtn: { flex: 1, borderWidth: 1, borderColor: colors.navBorder, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  reflectionSkipText: { color: colors.lightGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  reflectionSaveBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  reflectionSaveText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   completeBanner: {
     flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(29,158,117,0.1)", marginHorizontal: 16, marginTop: 10,

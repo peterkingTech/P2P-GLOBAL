@@ -181,6 +181,22 @@ function ElijahCheckInCard({ onPress, colors }: { onPress: () => void; colors: a
 // One-time card set by completion.tsx's Phase4Commission the moment a user
 // becomes peer-guide eligible (see guideInvitationPending:<userId> in
 // AsyncStorage) — shown once, then cleared, never re-shown after that.
+function PeerGuideAlertCard({ count, onPress, colors }: { count: number; onPress: () => void; colors: any }) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.elijahIconWrap}>
+        <Text style={{ fontSize: 16 }}>📞</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.elijahTitle}>{count} disciple{count === 1 ? "" : "s"} could use a check-in</Text>
+        <Text style={styles.elijahSub}>Tap to see who, and call them.</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.amber} />
+    </TouchableOpacity>
+  );
+}
+
 function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void; onDismiss: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
@@ -404,6 +420,7 @@ export default function HomeTab() {
 
   const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
   const [pendingElijahCheckIn, setPendingElijahCheckIn] = useState(false);
+  const [pendingGuideAlertCount, setPendingGuideAlertCount] = useState(0);
   const [showGuideInvitation, setShowGuideInvitation] = useState(false);
   const [treePhotoFailed, setTreePhotoFailed] = useState(false);
 
@@ -429,6 +446,24 @@ export default function HomeTab() {
         const res = await fetch(`${getApiUrl()}/pastoral-care/pending/${profile.id}`);
         const data = await res.json();
         if (!cancelled) setPendingElijahCheckIn(!!data);
+      } catch {
+        // Not critical — the card simply doesn't show this load.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.id]);
+
+  // Pending "please check in" alerts for this user as a PEER GUIDE (not the
+  // Elijah card above, which is for THEIR own inactivity) — same
+  // no-push-tap-routing reasoning, surfaced as a Home card instead.
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiUrl()}/pastoral-care/guide-alerts/${profile.id}`);
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) setPendingGuideAlertCount(data.length);
       } catch {
         // Not critical — the card simply doesn't show this load.
       }
@@ -594,6 +629,18 @@ export default function HomeTab() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/elijah-response" as any);
+          }}
+        />
+      )}
+
+      {/* Pending peer-guide check-in alerts (someone else needs a call) */}
+      {pendingGuideAlertCount > 0 && (
+        <PeerGuideAlertCard
+          count={pendingGuideAlertCount}
+          colors={colors}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/pastoral-alert" as any);
           }}
         />
       )}
