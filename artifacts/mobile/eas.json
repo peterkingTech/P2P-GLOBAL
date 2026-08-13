@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
-        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
+        "EXPO_PUBLIC_AGORA_APP_ID": "c942d2beda3449d78fab24ac5bf6e0ba"
       }
     },
     "preview": {
@@ -19,7 +19,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
-        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
+        "EXPO_PUBLIC_AGORA_APP_ID": "c942d2beda3449d78fab24ac5bf6e0ba"
       }
     },
     "production": {
@@ -29,7 +29,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://workspaceapi-server-production-6d56.up.railway.app/api",
-        "EXPO_PUBLIC_AGORA_APP_ID": "your-agora-app-id"
+        "EXPO_PUBLIC_AGORA_APP_ID": "c942d2beda3449d78fab24ac5bf6e0ba"
       }
     }
   },
