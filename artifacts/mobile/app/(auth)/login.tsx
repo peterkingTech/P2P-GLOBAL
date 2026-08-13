@@ -18,25 +18,39 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
+// An email always contains an @ with something on both sides; a username
+// never contains @ except an optional leading one the user typed as a
+// habit — so "starts with @" or "no @ at all" both mean username.
+function isUsername(input: string): boolean {
+  const trimmed = input.trim();
+  if (trimmed.startsWith("@")) return true;
+  return !trimmed.includes("@");
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { signIn } = useAuth();
+  const { signIn, signInWithUsername } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const usingUsername = identifier.trim().length > 0 && isUsername(identifier);
+
   async function handleLogin() {
-    if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+    if (!identifier.trim() || !password) {
+      setError("Please enter your email or username, and your password.");
       return;
     }
     setLoading(true);
     setError(null);
-    const err = await signIn(email.trim(), password);
+    const trimmed = identifier.trim();
+    const err = usingUsername
+      ? await signInWithUsername(trimmed.replace(/^@/, ""), password)
+      : await signIn(trimmed.toLowerCase(), password);
     setLoading(false);
     if (err) setError(err);
     else router.replace("/(tabs)");
@@ -71,17 +85,25 @@ export default function LoginScreen() {
         )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>Email or Username</Text>
+            {usingUsername && (
+              <View style={styles.atBadge}>
+                <Text style={styles.atBadgeText}>@ username</Text>
+              </View>
+            )}
+          </View>
           <TextInput
             style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            value={identifier}
+            onChangeText={setIdentifier}
+            keyboardType="default"
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="your@email.com"
+            placeholder="hello@email.com or @username"
             placeholderTextColor={colors.textMuted}
           />
+          <Text style={styles.inputHint}>You can log in with your email or your @username</Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -178,6 +200,10 @@ const styles = StyleSheet.create({
   errorText: { color: "#FCA5A5", fontSize: 13, flex: 1, fontFamily: "Inter_400Regular" },
   inputGroup: { gap: 6 },
   label: { color: colors.lightGreen, fontSize: 13, opacity: 0.75, fontFamily: "Inter_500Medium" },
+  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  atBadge: { backgroundColor: "rgba(29,158,117,0.18)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  atBadgeText: { color: colors.accentGreen, fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  inputHint: { color: colors.textMuted, fontSize: 11, marginTop: 4, fontFamily: "Inter_400Regular" },
   input: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,

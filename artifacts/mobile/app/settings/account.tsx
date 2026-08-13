@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +42,20 @@ export default function AccountSettingsScreen() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showLocationVerifier, setShowLocationVerifier] = useState(false);
+  const [bio, setBio] = useState(profile?.bio ?? "");
+  const [savingBio, setSavingBio] = useState(false);
+
+  const nextChangeDate = profile?.usernameChangedAt
+    ? new Date(new Date(profile.usernameChangedAt).getTime() + 90 * 24 * 60 * 60 * 1000)
+    : null;
+  const changeAllowed = !nextChangeDate || nextChangeDate.getTime() <= Date.now();
+
+  async function handleSaveBio() {
+    setSavingBio(true);
+    const err = await updateProfile({ bio: bio.trim() });
+    setSavingBio(false);
+    if (err) Alert.alert("Couldn't save", err);
+  }
 
   async function handleSaveProfile() {
     let dateOfBirth: string | undefined;
@@ -202,6 +216,73 @@ export default function AccountSettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/change-username" as any)}>
+          <Text style={styles.fieldLabel}>Username</Text>
+          <View style={styles.usernameRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.usernameValue}>@{profile?.username ?? "not set"}</Text>
+              {nextChangeDate && (
+                <Text style={styles.locationSub}>Next change available {nextChangeDate.toLocaleDateString()}</Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Bio</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 70, textAlignVertical: "top" }]}
+            value={bio}
+            onChangeText={setBio}
+            placeholder="Tell people a little about yourself"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            maxLength={280}
+          />
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBio} disabled={savingBio}>
+            {savingBio ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Bio</Text>}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Public profile visibility</Text>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Anyone can view my profile</Text>
+            <Switch
+              value={profile?.profileVisibility === "public"}
+              onValueChange={(v: boolean) => { updateProfile({ profileVisibility: v ? "public" : "peers" }); }}
+              trackColor={{ true: colors.accentGreen }}
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Show my real name publicly</Text>
+            <Switch
+              value={profile?.showRealNamePublicly ?? true}
+              onValueChange={(v: boolean) => { updateProfile({ showRealNamePublicly: v }); }}
+              trackColor={{ true: colors.accentGreen }}
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Show my progress publicly</Text>
+            <Switch
+              value={profile?.showProgressPublicly ?? true}
+              onValueChange={(v: boolean) => { updateProfile({ showProgressPublicly: v }); }}
+              trackColor={{ true: colors.accentGreen }}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/blocked-users" as any)}>
+          <View style={styles.usernameRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Blocked Users</Text>
+              <Text style={styles.locationSub}>Manage who you've blocked</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </View>
+        </TouchableOpacity>
+
         <View style={styles.card}>
           <Text style={styles.fieldLabel}>Email</Text>
           <TextInput
@@ -307,6 +388,10 @@ function makeStyles(c: AppColors) {
       padding: 16, marginBottom: 16,
     },
     fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 8, fontFamily: "Inter_600SemiBold" },
+    usernameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    usernameValue: { fontSize: 15, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
+    toggleLabel: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium", flex: 1, marginRight: 10 },
     input: {
       backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige,
       borderRadius: 10, padding: 12, color: c.textDark, fontSize: 14,

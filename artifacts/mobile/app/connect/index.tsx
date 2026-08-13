@@ -48,6 +48,14 @@ const MATCH_PATHS = [
     color: colors.accentGreen,
     route: "/connect/groups" as const,
   },
+  {
+    id: "username",
+    icon: "at" as const,
+    title: "Find by Username",
+    subtitle: "Already know their @username? Connect directly",
+    color: colors.primaryGreen,
+    route: "/connect/by-username" as const,
+  },
 ];
 
 export default function ConnectHub() {
@@ -79,7 +87,7 @@ export default function ConnectHub() {
               activeOpacity={0.85}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push(path.route);
+                router.push(path.route as any);
               }}
             >
               <View style={[styles.pathIconRing, { backgroundColor: `${path.color}18`, borderColor: `${path.color}33` }]}>

@@ -36,7 +36,7 @@ const queryClient = new QueryClient();
 // here before — an authenticated user landing on either got immediately
 // bounced back to /(tabs) by the effect below (isAuthenticated && inAuth &&
 // !inSetupFlow), since AUTH_SETUP_SCREENS didn't know about them yet.
-const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey"]);
+const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
 
 function AuthGate() {
   const { isAuthenticated, isLoading, profile } = useAuth();
@@ -101,6 +101,18 @@ function AuthGate() {
     // null) risks a flicker-route to /(tabs) immediately followed by a
     // bounce back into /journey once the real profile arrives.
     if (!profile) return;
+
+    // Existing accounts created before the @username system (or accounts an
+    // admin has force-flagged via Admin > Usernames) must pick/change a
+    // username before doing anything else — checked ahead of the journey
+    // gate since it blocks even users who already finished onboarding.
+    const onUsernameSetupScreen = inAuth && screenName === "username-setup";
+    const needsUsernameSetup = !profile.username || profile.usernameChangeRequired;
+
+    if (needsUsernameSetup && !onUsernameSetupScreen) {
+      router.replace("/(auth)/username-setup" as any);
+      return;
+    }
 
     const onJourneyScreen = inAuth && screenName === "journey";
     const journeyIncomplete = !profile.onboardingJourneyCompletedAt;

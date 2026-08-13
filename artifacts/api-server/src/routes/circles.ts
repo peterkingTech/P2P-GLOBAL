@@ -97,10 +97,11 @@ async function getCircleContext(circleIds: string[]) {
 
 // GET /circles — discovery list
 router.get("/", async (req, res) => {
-  const { planId, language, timezone, status } = req.query as { planId?: string; language?: string; timezone?: string; status?: string };
+  const { planId, language, timezone, status, leaderId } = req.query as { planId?: string; language?: string; timezone?: string; status?: string; leaderId?: string };
   let query = supabaseRead.from("p2p_peer_circles").select("*");
   query = status ? query.in("status", status.split(",")) : query.in("status", ["forming", "active"]);
   if (planId) query = query.eq("plan_id", planId);
+  if (leaderId) query = query.eq("leader_id", leaderId);
   if (language) query = query.eq("language_code", language);
   if (timezone) query = query.eq("timezone", timezone);
 
@@ -134,13 +135,13 @@ router.get("/:circleId", async (req, res) => {
     .order("joined_at", { ascending: true });
   const memberIds = (members ?? []).map((m) => m.user_id as string);
   const { data: profiles } = memberIds.length
-    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url,country").in("id", memberIds)
-    : { data: [] as { id: string; full_name: string; photo_url: string | null; country: string | null }[] };
+    ? await supabaseRead.from("p2p_profiles").select("id,full_name,photo_url,country,username").in("id", memberIds)
+    : { data: [] as { id: string; full_name: string; photo_url: string | null; country: string | null; username: string | null }[] };
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
   const mappedMembers = (members ?? []).map((m) => {
     const p = profileById.get(m.user_id as string);
-    return mapMember(m as Record<string, unknown>, { name: p?.full_name ?? "Member", avatarUrl: p?.photo_url ?? null, country: p?.country ?? null });
+    return mapMember(m as Record<string, unknown>, { name: p?.full_name ?? "Member", avatarUrl: p?.photo_url ?? null, country: p?.country ?? null, username: p?.username ?? null });
   });
 
   const { data: sessions } = await supabaseRead
@@ -259,6 +260,102 @@ router.put("/:circleId/join-requests/:requestId", async (req, res) => {
     );
   }
   return res.json({ status: newStatus });
+});
+
+// POST /circles/:circleId/members/by-username — leader adds someone
+// directly by @username, bypassing the join-request flow (the leader
+// already has authority to add members; requiring the target to separately
+// request-and-be-approved would be backwards for this action).
+router.post("/:circleId/members/by-username", async (req, res) => {
+  const { circleId } = req.params;
+  const { username, addedBy } = req.body as { username?: string; addedBy?: string };
+  if (!username || !addedBy) return res.status(400).json({ error: "username and addedBy are required" });
+
+  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id,max_members,name").eq("id", circleId).maybeSingle();
+  if (!circle) return res.status(404).json({ error: "Circle not found" });
+  if (circle.leader_id !== addedBy) return res.status(403).json({ error: "Only the circle leader can add members" });
+
+  const { data: targetProfile } = await supabaseRead.from("p2p_profiles").select("id,full_name").ilike("username", username.replace(/^@/, "")).maybeSingle();
+  if (!targetProfile) return res.status(404).json({ error: `No account found for @${username}` });
+
+  const { count } = await supabaseRead.from("p2p_peer_circle_members").select("id", { count: "exact", head: true }).eq("circle_id", circleId).eq("status", "active");
+  if ((count ?? 0) >= (circle.max_members as number)) return res.status(409).json({ error: "This circle is full" });
+
+  const { error } = await supabaseRead.from("p2p_peer_circle_members").upsert(
+    { circle_id: circleId, user_id: targetProfile.id, role: "member", status: "active", joined_at: new Date().toISOString() },
+    { onConflict: "circle_id,user_id" }
+  );
+  if (error) return res.status(500).json({ error: error.message });
+
+  await supabaseRead.from("p2p_notifications").insert({
+    user_id: targetProfile.id, title: `You've been added to ${circle.name}`, message: "Tap to view the circle.",
+  });
+
+  return res.json({ userId: targetProfile.id, fullName: targetProfile.full_name });
+});
+
+// PUT /circles/:circleId/members/:userId/role — { role: 'co_leader'|'member', changedBy }
+router.put("/:circleId/members/:userId/role", async (req, res) => {
+  const { circleId, userId } = req.params;
+  const { role, changedBy } = req.body as { role?: string; changedBy?: string };
+  if (!role || !["co_leader", "member"].includes(role) || !changedBy) {
+    return res.status(400).json({ error: "role ('co_leader'|'member') and changedBy are required" });
+  }
+  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id").eq("id", circleId).maybeSingle();
+  if (!circle || circle.leader_id !== changedBy) return res.status(403).json({ error: "Only the circle leader can change member roles" });
+
+  const { error } = await supabaseRead.from("p2p_peer_circle_members").update({ role }).eq("circle_id", circleId).eq("user_id", userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true, role });
+});
+
+// DELETE /circles/:circleId/members/:userId — { removedBy }
+router.delete("/:circleId/members/:userId", async (req, res) => {
+  const { circleId, userId } = req.params;
+  const { removedBy } = req.body as { removedBy?: string };
+  if (!removedBy) return res.status(400).json({ error: "removedBy is required" });
+
+  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id,name").eq("id", circleId).maybeSingle();
+  if (!circle) return res.status(404).json({ error: "Circle not found" });
+  if (circle.leader_id !== removedBy) return res.status(403).json({ error: "Only the circle leader can remove members" });
+  if (userId === removedBy) return res.status(400).json({ error: "Use Transfer Leadership before leaving your own circle" });
+
+  const { error } = await supabaseRead.from("p2p_peer_circle_members").update({ status: "removed" }).eq("circle_id", circleId).eq("user_id", userId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  await supabaseRead.from("p2p_notifications").insert({
+    user_id: userId, title: `You've been removed from ${circle.name}`, message: "",
+  });
+  return res.json({ ok: true });
+});
+
+// PUT /circles/:circleId/transfer-leadership — { newLeaderId, currentLeaderId }
+router.put("/:circleId/transfer-leadership", async (req, res) => {
+  const { circleId } = req.params;
+  const { newLeaderId, currentLeaderId } = req.body as { newLeaderId?: string; currentLeaderId?: string };
+  if (!newLeaderId || !currentLeaderId) return res.status(400).json({ error: "newLeaderId and currentLeaderId are required" });
+
+  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id,name").eq("id", circleId).maybeSingle();
+  if (!circle) return res.status(404).json({ error: "Circle not found" });
+  if (circle.leader_id !== currentLeaderId) return res.status(403).json({ error: "Only the current leader can transfer leadership" });
+
+  const { data: newLeaderMembership } = await supabaseRead
+    .from("p2p_peer_circle_members").select("id").eq("circle_id", circleId).eq("user_id", newLeaderId).eq("status", "active").maybeSingle();
+  if (!newLeaderMembership) return res.status(400).json({ error: "The new leader must already be an active member of this circle" });
+
+  const { error: circleErr } = await supabaseRead.from("p2p_peer_circles").update({ leader_id: newLeaderId }).eq("id", circleId);
+  if (circleErr) return res.status(500).json({ error: circleErr.message });
+
+  await supabaseRead.from("p2p_peer_circle_members").update({ role: "leader" }).eq("circle_id", circleId).eq("user_id", newLeaderId);
+  await supabaseRead.from("p2p_peer_circle_members").update({ role: "member" }).eq("circle_id", circleId).eq("user_id", currentLeaderId);
+
+  const { data: newLeaderProfile } = await supabaseRead.from("p2p_profiles").select("full_name,username").eq("id", newLeaderId).maybeSingle();
+  const newLeaderName = (newLeaderProfile?.username as string | undefined) ? `@${newLeaderProfile!.username}` : (newLeaderProfile?.full_name as string | undefined) ?? "The new leader";
+  await supabaseRead.from("p2p_notifications").insert({
+    user_id: newLeaderId, title: `You're now leading ${circle.name}`, message: "",
+  });
+
+  return res.json({ ok: true, newLeaderId, newLeaderName });
 });
 
 // POST /circles/:circleId/sessions — create a session

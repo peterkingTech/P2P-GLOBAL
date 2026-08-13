@@ -180,7 +180,7 @@ export default function PlanDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{plan.title}</Text>
         <TouchableOpacity
-          onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null })}
+          onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null }, profile?.username)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="share-outline" size={20} color={colors.textDark} />
@@ -242,7 +242,7 @@ export default function PlanDetailScreen() {
 
           <TouchableOpacity
             style={styles.sharePlanBtn}
-            onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null })}
+            onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null }, profile?.username)}
           >
             <Ionicons name="share-social-outline" size={18} color="#fff" />
             <Text style={styles.sharePlanBtnText}>Share this Plan</Text>

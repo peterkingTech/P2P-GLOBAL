@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
 import { parsePlanPdf, type ParsedLesson, type ParsedPlan } from "../lib/planPdfParser";
+import { validateUsername, formatUsername } from "../lib/username";
 
 const router = Router();
 
@@ -1166,6 +1167,119 @@ router.post("/plans/:planId/duplicate", async (req, res) => {
   }
 
   return ok(res, { id: newPlanId, title: newPlan.title });
+});
+
+// ── Username Management ──────────────────────────────────────────────────────
+
+function mapReserved(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    username: row.username,
+    reason: row.reason ?? null,
+    reservedBy: row.reserved_by ?? null,
+    reservedAt: row.reserved_at,
+    isActive: row.is_active ?? true,
+  };
+}
+
+// GET /admin/reserved-usernames
+router.get("/reserved-usernames", async (_req, res) => {
+  const { data, error } = await supabaseWrite
+    .from("p2p_reserved_usernames").select("*").eq("is_active", true).order("username");
+  if (error) return err(res, error.message);
+  return ok(res, (data ?? []).map(mapReserved));
+});
+
+// POST /admin/reserved-usernames — { username, reason }
+router.post("/reserved-usernames", async (req, res) => {
+  const { username, reason } = req.body as { username?: string; reason?: string };
+  if (!username) return err(res, "username is required", 400);
+  const validation = validateUsername(username);
+  if (!validation.valid) return err(res, validation.error ?? "Invalid username format", 400);
+  const clean = formatUsername(username);
+
+  const { data: takenBy } = await supabaseWrite
+    .from("p2p_profiles").select("id,full_name,email").ilike("username", clean).maybeSingle();
+  if (takenBy) return err(res, `@${clean} is already taken by an existing account`, 409);
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_reserved_usernames")
+    .upsert({ username: clean, reason: reason ?? null, is_active: true }, { onConflict: "username" })
+    .select()
+    .single();
+  if (error || !data) return err(res, error?.message ?? "Failed to reserve username");
+  return res.status(201).json(mapReserved(data as Record<string, unknown>));
+});
+
+// DELETE /admin/reserved-usernames/:username
+router.delete("/reserved-usernames/:username", async (req, res) => {
+  const { error } = await supabaseWrite
+    .from("p2p_reserved_usernames").delete().ilike("username", req.params.username);
+  if (error) return err(res, error.message);
+  return res.status(204).send();
+});
+
+// GET /admin/username-search?q= — searches ALL profiles including private
+// ones (unlike the public GET /profiles/search, which filters those out).
+router.get("/username-search", async (req, res) => {
+  const { q } = req.query as { q?: string };
+  if (!q || q.trim().length < 2) return ok(res, []);
+  const query = q.trim().replace(/^@/, "");
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("id,username,full_name,email,country,role,profile_visibility,created_at")
+    .or(`username.ilike.%${query}%,full_name.ilike.%${query}%,email.ilike.%${query}%`)
+    .limit(25);
+  if (error) return err(res, error.message);
+  return ok(res, (data ?? []).map((p) => ({
+    userId: p.id,
+    username: p.username ?? null,
+    fullName: p.full_name ?? null,
+    email: p.email ?? null,
+    country: p.country ?? null,
+    role: p.role ?? "student",
+    isPrivate: p.profile_visibility === "private",
+    createdAt: p.created_at,
+  })));
+});
+
+// POST /admin/force-username-change/:userId — flags the account so the
+// client shows a mandatory username-setup screen on next load (see
+// mobile's app/_layout.tsx auth gate — Step 16).
+router.post("/force-username-change/:userId", async (req, res) => {
+  const { data, error } = await supabaseWrite
+    .from("p2p_profiles").update({ username_change_required: true }).eq("id", req.params.userId).select("id").maybeSingle();
+  if (error) return err(res, error.message);
+  if (!data) return err(res, "Profile not found", 404);
+  return ok(res, { ok: true });
+});
+
+// GET /admin/flagged-usernames — accounts currently flagged for a forced
+// username change (set via force-username-change above, or the Step 16
+// admin/seed backfill). There's no separate "flag" table — the boolean on
+// p2p_profiles IS the flag, so this tab is just that filter.
+router.get("/flagged-usernames", async (_req, res) => {
+  const { data, error } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("id,username,full_name,email,role,created_at")
+    .eq("username_change_required", true)
+    .order("created_at", { ascending: false });
+  if (error) return err(res, error.message);
+  return ok(res, (data ?? []).map((p) => ({
+    userId: p.id, username: p.username ?? null, fullName: p.full_name ?? null,
+    email: p.email ?? null, role: p.role ?? "student", createdAt: p.created_at,
+  })));
+});
+
+// POST /admin/dismiss-username-flag/:userId — clears the forced-change flag
+// without requiring the user to actually change their username.
+router.post("/dismiss-username-flag/:userId", async (req, res) => {
+  const { data, error } = await supabaseWrite
+    .from("p2p_profiles").update({ username_change_required: false }).eq("id", req.params.userId).select("id").maybeSingle();
+  if (error) return err(res, error.message);
+  if (!data) return err(res, "Profile not found", 404);
+  return ok(res, { ok: true });
 });
 
 export default router;

@@ -326,6 +326,29 @@ export interface DiscoverablePeer {
   photoUrl: string | null;
 }
 
+export interface UsernameSearchResult {
+  userId: string;
+  username: string;
+  fullName: string | null;
+  photoUrl: string | null;
+  country: string | null;
+}
+
+export interface PublicUserProfile {
+  userId: string; username: string; fullName: string | null; photoUrl: string | null;
+  country: string | null; countryCode: string | null; bio: string | null;
+  isPeerGuideEligible: boolean; joinedAt: string; showProgressPublicly: boolean;
+  growthLevel: number | null; modulesCompleted: number | null; fruitCount: number | null;
+  activeMenteesCount: number | null;
+}
+
+export interface BlockedUserEntry {
+  userId: string;
+  username: string | null;
+  fullName: string;
+  blockedAt: string;
+}
+
 export interface PeerGroup {
   id: string;
   name: string;
@@ -382,6 +405,7 @@ export interface ForestNode {
   country?: string;
   depth: number;
   children: ForestNode[];
+  username?: string | null;
 }
 
 // ── Living Tree (real SVG visualization) ────────────────────────────────────
@@ -718,6 +742,7 @@ export interface ForestPerson {
   growthLevel: number;
   lastActiveAt: string | null;
   modulesCompleted: number;
+  username: string | null;
 }
 export interface ForestMenteeNode extends ForestPerson {
   mentees: ForestMenteeNode[];
@@ -861,6 +886,16 @@ interface DataContextValue {
   dismissIncomingCall: () => void;
   circleSessionInvite: CircleSessionInvite | null;
   dismissCircleSessionInvite: () => void;
+  searchUsersByUsername: (query: string) => Promise<UsernameSearchResult[]>;
+  getProfileByUsername: (username: string) => Promise<PublicUserProfile | null>;
+  sendConnectionRequest: (params: {
+    toUserId: string; requestType: "connect" | "circle_invite"; circleId?: string; message?: string;
+  }) => Promise<string | null>;
+  respondToConnectionRequest: (requestId: string, response: "accepted" | "declined") => Promise<string | null>;
+  blockUser: (userId: string) => Promise<string | null>;
+  unblockUser: (userId: string) => Promise<string | null>;
+  blockedUsers: BlockedUserEntry[];
+  refreshBlockedUsers: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -920,6 +955,7 @@ async function uploadSubmissionMedia(
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
@@ -1606,7 +1642,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadForestNetwork = useCallback(async (userId: string, userNode: ForestNode) => {
     try {
       type LinkRow = { mentor_id: string; disciple_id: string };
-      type ProfileRow = { id: string; full_name: string | null; role: string | null; growth_level: number | null; country: string | null };
+      type ProfileRow = { id: string; full_name: string | null; role: string | null; growth_level: number | null; country: string | null; username: string | null };
 
       const allLinks: LinkRow[] = [];
       let frontier = [userId];
@@ -1632,7 +1668,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       const { data: profiles } = await supabase
         .from("p2p_profiles")
-        .select("id,full_name,role,growth_level,country")
+        .select("id,full_name,role,growth_level,country,username")
         .in("id", discipleIds);
       const profileById = new Map(
         ((profiles ?? []) as ProfileRow[]).map((p) => [p.id, p])
@@ -1654,6 +1690,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           country: p?.country ?? undefined,
           depth,
           children: (childrenByMentor.get(id) ?? []).map((childId) => buildNode(childId, depth + 1)),
+          username: p?.username ?? null,
         };
       }
 
@@ -2487,6 +2524,112 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const searchUsersByUsername = useCallback(async (query: string): Promise<UsernameSearchResult[]> => {
+    if (query.trim().length < 2) return [];
+    try {
+      const params = new URLSearchParams({ q: query.trim() });
+      if (profile?.id) params.set("viewerId", profile.id);
+      const res = await fetch(`${getApiUrl()}/profiles/search?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("searchUsersByUsername failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const getProfileByUsername = useCallback(async (username: string): Promise<PublicUserProfile | null> => {
+    try {
+      const params = profile?.id ? `?viewerId=${profile.id}` : "";
+      const res = await fetch(`${getApiUrl()}/profiles/username/${encodeURIComponent(username)}${params}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getProfileByUsername failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const sendConnectionRequest = useCallback(async (params: {
+    toUserId: string; requestType: "connect" | "circle_invite"; circleId?: string; message?: string;
+  }): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromUserId: profile.id, toUserId: params.toUserId, requestType: params.requestType, circleId: params.circleId, message: params.message }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't send request";
+      return null;
+    } catch (e: any) {
+      console.error("sendConnectionRequest failed", e);
+      return e?.message || "Couldn't send request";
+    }
+  }, [profile?.id]);
+
+  const respondToConnectionRequest = useCallback(async (requestId: string, response: "accepted" | "declined"): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/${requestId}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responderId: profile.id, response }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't respond to request";
+      return null;
+    } catch (e: any) {
+      console.error("respondToConnectionRequest failed", e);
+      return e?.message || "Couldn't respond to request";
+    }
+  }, [profile?.id]);
+
+  const refreshBlockedUsers = useCallback(async (): Promise<void> => {
+    if (!profile?.id) { setBlockedUsers([]); return; }
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/blocked/${profile.id}`);
+      setBlockedUsers(res.ok ? await res.json() : []);
+    } catch (e) {
+      console.error("refreshBlockedUsers failed", e);
+    }
+  }, [profile?.id]);
+
+  const blockUser = useCallback(async (userId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/block`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blockerId: profile.id, blockedId: userId }),
+      });
+      if (!res.ok) { const body = await res.json(); return body?.error ?? "Couldn't block user"; }
+      await refreshBlockedUsers();
+      return null;
+    } catch (e: any) {
+      console.error("blockUser failed", e);
+      return e?.message || "Couldn't block user";
+    }
+  }, [profile?.id, refreshBlockedUsers]);
+
+  const unblockUser = useCallback(async (userId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/unblock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blockerId: profile.id, blockedId: userId }),
+      });
+      if (!res.ok) { const body = await res.json(); return body?.error ?? "Couldn't unblock user"; }
+      await refreshBlockedUsers();
+      return null;
+    } catch (e: any) {
+      console.error("unblockUser failed", e);
+      return e?.message || "Couldn't unblock user";
+    }
+  }, [profile?.id, refreshBlockedUsers]);
+
   const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
     try {
       const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
@@ -3222,6 +3365,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, getComments, addComment,
       submitHelpRequest, getHelpRequests, updateHelpRequestStatus,
       reportContent, getModerationQueue, moderateFlag,
+      searchUsersByUsername, getProfileByUsername, sendConnectionRequest, respondToConnectionRequest,
+      blockUser, unblockUser, blockedUsers, refreshBlockedUsers,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,

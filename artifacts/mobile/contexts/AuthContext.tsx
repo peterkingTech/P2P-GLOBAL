@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { createClient, SupabaseClient, Session, User } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getApiUrl } from "@/lib/apiUrl";
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -92,6 +93,11 @@ export interface UserProfile {
   morningConfessionEnabled: boolean;
   morningConfessionTime: string;
   prayerJournalReminderEnabled: boolean;
+  username?: string;
+  usernameChangedAt?: string;
+  showRealNamePublicly: boolean;
+  showProgressPublicly: boolean;
+  usernameChangeRequired: boolean;
 }
 
 interface AuthContextValue {
@@ -102,10 +108,15 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string, name: string, dateOfBirth: string) => Promise<string | null>;
+  signInWithUsername: (username: string, password: string) => Promise<string | null>;
+  signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<string | null>;
+  username: string | null;
+  usernameRequired: boolean;
+  updateUsername: (username: string) => Promise<string | null>;
+  checkUsernameAvailable: (username: string) => Promise<{ available: boolean; reason?: string }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -141,6 +152,11 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     notifyMessages: (row.notify_messages as boolean) ?? true,
     notifyGroups: (row.notify_groups as boolean) ?? true,
     profileVisibility: ((row.profile_visibility as string) ?? "peers") as "public" | "peers" | "private",
+    username: row.username as string | undefined,
+    usernameChangedAt: row.username_changed_at as string | undefined,
+    showRealNamePublicly: (row.show_real_name_publicly as boolean) ?? true,
+    showProgressPublicly: (row.show_progress_publicly as boolean) ?? true,
+    usernameChangeRequired: (row.username_change_required as boolean) ?? false,
     appLanguage: (row.app_language as string) ?? "en",
     contentLanguage: (row.content_language as string) ?? "en",
     churchId: row.church_id as string | undefined,
@@ -213,11 +229,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return error ? error.message : null;
   }, []);
 
+  // Resolves username -> email entirely server-side (POST /profiles/login-with-username)
+  // and gets back real Supabase session tokens, never the email itself — see
+  // that endpoint's comment in profiles.ts for why a client-side
+  // email-lookup call was rejected as a design (a "secret" baked into a
+  // public mobile build isn't actually secret).
+  const signInWithUsername = useCallback(async (username: string, password: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/login-with-username`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.replace(/^@/, ""), password }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Invalid username or password";
+
+      const { error } = await supabase.auth.setSession({
+        access_token: body.access_token, refresh_token: body.refresh_token,
+      });
+      if (error) return error.message;
+      if (body.user?.id) {
+        void supabase.from("p2p_profiles").update({ last_active_at: new Date().toISOString() }).eq("id", body.user.id);
+      }
+      return null;
+    } catch {
+      return "Couldn't sign in. Please check your connection and try again.";
+    }
+  }, []);
+
   const signUp = useCallback(async (
     email: string,
     password: string,
     name: string,
-    dateOfBirth: string
+    dateOfBirth: string,
+    username: string
   ): Promise<string | null> => {
     if (!dateOfBirth) return "Date of birth is required.";
     const { data, error } = await supabase.auth.signUp({
@@ -234,17 +279,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         full_name: name,
         date_of_birth: dateOfBirth,
+        username: username.trim().toLowerCase(),
+        username_changed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
       if (onboardingLanguage) profileRow.app_language = onboardingLanguage;
       const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
-      if (profileErr) return profileErr.message;
+      if (profileErr) {
+        // Someone else claimed this exact username between the real-time
+        // check on the registration screen and this insert — surface a
+        // clear, actionable message instead of the raw constraint error.
+        if (profileErr.message.toLowerCase().includes("duplicate") || profileErr.message.toLowerCase().includes("unique")) {
+          return "That username was just taken. Please go back and choose another.";
+        }
+        return profileErr.message;
+      }
       // Set the profile immediately so the UI shows the real name before
       // onAuthStateChange triggers fetchProfile (which may race with the upsert).
       setProfile(mapProfileRow({ ...profileRow, role: "student", growth_level: 0, gifts: [], skills: [] }));
     }
     return null;
   }, []);
+
+  const checkUsernameAvailable = useCallback(async (username: string): Promise<{ available: boolean; reason?: string }> => {
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/check-username`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      return await res.json();
+    } catch {
+      return { available: false, reason: "invalid_format" };
+    }
+  }, []);
+
+  const updateUsername = useCallback(async (username: string): Promise<string | null> => {
+    if (!session?.user) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/username`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.user.id, username }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        if (res.status === 429 && body.next_change_allowed_at) {
+          return `You can change your username again on ${new Date(body.next_change_allowed_at).toLocaleDateString()}.`;
+        }
+        return body?.error ?? "Couldn't update username";
+      }
+      await fetchProfile(session.user.id);
+      return null;
+    } catch {
+      return "Couldn't update username. Please try again.";
+    }
+  }, [session, fetchProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -280,6 +370,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.notifyMessages !== undefined) dbUpdates.notify_messages = updates.notifyMessages;
     if (updates.notifyGroups !== undefined) dbUpdates.notify_groups = updates.notifyGroups;
     if (updates.profileVisibility !== undefined) dbUpdates.profile_visibility = updates.profileVisibility;
+    if (updates.showRealNamePublicly !== undefined) dbUpdates.show_real_name_publicly = updates.showRealNamePublicly;
+    if (updates.showProgressPublicly !== undefined) dbUpdates.show_progress_publicly = updates.showProgressPublicly;
     if (updates.appLanguage !== undefined) dbUpdates.app_language = updates.appLanguage;
     if (updates.contentLanguage !== undefined) dbUpdates.content_language = updates.contentLanguage;
     if (updates.dateOfBirth !== undefined) dbUpdates.date_of_birth = updates.dateOfBirth;
@@ -325,10 +417,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!session,
         signIn,
+        signInWithUsername,
         signUp,
         signOut,
         refreshProfile,
         updateProfile,
+        username: profile?.username ?? null,
+        usernameRequired: !!profile && !profile.username,
+        updateUsername,
+        checkUsernameAvailable,
       }}
     >
       {children}

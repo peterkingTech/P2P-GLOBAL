@@ -16,6 +16,7 @@ import circlesRouter from "./circles";
 import pastoralCareRouter from "./pastoralCare";
 import accountRouter from "./account";
 import callsRouter from "./calls";
+import connectionsRouter from "./connections";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use("/circles", circlesRouter);
 router.use("/pastoral-care", pastoralCareRouter);
 router.use("/account", accountRouter);
 router.use(callsRouter); // calls + break rooms (paths differ, handled internally)
+router.use("/connections", connectionsRouter);
 
 export default router;

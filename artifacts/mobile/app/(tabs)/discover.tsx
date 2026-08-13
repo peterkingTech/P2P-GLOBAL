@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, TextInput, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
@@ -29,6 +29,15 @@ interface LiveRoomSummary {
   speakingMode: "open" | "structured";
 }
 
+interface SearchResult {
+  userId: string;
+  username: string;
+  fullName: string | null;
+  photoUrl: string | null;
+  country: string | null;
+  modulesCompleted: number | null;
+}
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -53,6 +62,27 @@ function makeStyles(c: AppColors) {
     countText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
 
     sectionHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10, marginTop: 4 },
+
+    searchBar: {
+      flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
+      borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginTop: 12,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", padding: 0 },
+    searchEmpty: { padding: 40, alignItems: "center", gap: 14 },
+    searchEmptyTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+    searchEmptySub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18 },
+    searchEmptyBtn: { borderWidth: 1, borderColor: c.accentGreen, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, marginTop: 6 },
+    searchEmptyBtnText: { color: c.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    searchResultRow: {
+      flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige, padding: 12, marginBottom: 10,
+    },
+    searchAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(29,158,117,0.15)", alignItems: "center", justifyContent: "center" },
+    searchAvatarText: { fontSize: 15, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    searchResultUsername: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    searchResultMeta: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    connectBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+    connectBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     liveSectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
     liveSectionHeading: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
@@ -100,6 +130,44 @@ export default function DiscoverTab() {
   const [showAllRooms, setShowAllRooms] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const { t } = useTranslation();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const q = searchQuery.trim();
+    if (q.length < 2) { setSearchResults([]); setSearching(false); return; }
+    setSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const url = `${getApiUrl()}/profiles/search?q=${encodeURIComponent(q)}${profile?.id ? `&viewerId=${profile.id}` : ""}`;
+        const res = await fetch(url);
+        setSearchResults(await res.json());
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [searchQuery, profile?.id]);
+
+  async function quickConnect(target: SearchResult) {
+    if (!profile?.id || connectingId) return;
+    setConnectingId(target.userId);
+    try {
+      await fetch(`${getApiUrl()}/connections/request`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromUserId: profile.id, toUserId: target.userId, requestType: "connect" }),
+      });
+    } finally {
+      setConnectingId(null);
+    }
+  }
 
   const loadLiveRooms = useCallback(async () => {
     try {
@@ -168,9 +236,61 @@ export default function DiscoverTab() {
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.headerTitle}>{t("discover.title")}</Text>
         <Text style={styles.headerSub}>{t("discover.subtitle")}</Text>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={16} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search @username"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {loading ? (
+      {searchQuery.trim().length >= 2 ? (
+        searching ? (
+          <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
+        ) : searchResults.length === 0 ? (
+          <View style={styles.searchEmpty}>
+            <Text style={styles.searchEmptyTitle}>No one found for "{searchQuery.trim()}"</Text>
+            <Text style={styles.searchEmptySub}>Check the spelling or try:{"\n"}· Searching without the @{"\n"}· A shorter search term</Text>
+            <TouchableOpacity style={styles.searchEmptyBtn} onPress={() => { setSearchQuery(""); }}>
+              <Text style={styles.searchEmptyBtnText}>Invite someone to P2P Global</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={searchResults}
+            keyExtractor={(r) => r.userId}
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.searchResultRow} activeOpacity={0.8} onPress={() => router.push(`/profile/${item.username}` as any)}>
+                <View style={styles.searchAvatar}>
+                  <Text style={styles.searchAvatarText}>{(item.fullName ?? item.username).charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.searchResultUsername}>@{item.username}</Text>
+                  <Text style={styles.searchResultMeta}>
+                    {item.fullName ?? "Someone"}{item.country ? ` · ${item.country}` : ""}
+                    {item.modulesCompleted != null ? ` · Module ${item.modulesCompleted}` : ""}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.connectBtn} onPress={() => quickConnect(item)} disabled={connectingId === item.userId}>
+                  {connectingId === item.userId ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.connectBtnText}>Connect</Text>}
+                </TouchableOpacity>
+              </TouchableOpacity>
+            )}
+          />
+        )
+      ) : loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.accentGreen} />
         </View>

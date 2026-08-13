@@ -20,7 +20,7 @@ const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amente
 // the file to deploy.
 const SHARE_LANDING_BASE_URL = "https://peterkingtech.github.io/P2P-GLOBAL";
 
-function buildWebShareUrl(params: { type: "lesson" | "plan" | "category"; title: string; desc: string; deepLink: string }): string {
+function buildWebShareUrl(params: { type: "lesson" | "plan" | "category" | "profile"; title: string; desc: string; deepLink: string }): string {
   const q = new URLSearchParams({
     type: params.type,
     title: params.title,
@@ -30,24 +30,37 @@ function buildWebShareUrl(params: { type: "lesson" | "plan" | "category"; title:
   return `${SHARE_LANDING_BASE_URL}/share-landing.html?${q.toString()}`;
 }
 
-export async function shareLesson(lesson: { id: string; title: string; moduleTitle?: string | null; planTitle?: string | null }) {
+export async function shareLesson(lesson: { id: string; title: string; moduleTitle?: string | null; planTitle?: string | null }, sharedByUsername?: string | null) {
   const deepLink = `${APP_SCHEME}://lesson/${lesson.id}`;
   const desc = [lesson.moduleTitle, lesson.planTitle].filter(Boolean).join(" · ");
   const webUrl = buildWebShareUrl({ type: "lesson", title: lesson.title, desc, deepLink });
+  const byLine = sharedByUsername ? `Shared by @${sharedByUsername}\n\n` : "";
 
   await Share.share({
     title: lesson.title,
-    message: `📖 "${lesson.title}"${desc ? ` — ${desc}` : ""}\n\nI'm studying this on P2P Global Bible Study Network. Join me:\n${webUrl}`,
+    message: `📖 "${lesson.title}"${desc ? ` — ${desc}` : ""}\n${byLine}\nI'm studying this on P2P Global Bible Study Network. Join me:\n${webUrl}`,
   });
 }
 
-export async function sharePlan(plan: { id: string; title: string; categoryTitle?: string | null }) {
+export async function sharePlan(plan: { id: string; title: string; categoryTitle?: string | null }, sharedByUsername?: string | null) {
   const deepLink = `${APP_SCHEME}://plan/${plan.id}`;
   const webUrl = buildWebShareUrl({ type: "plan", title: plan.title, desc: plan.categoryTitle ?? "", deepLink });
+  const byLine = sharedByUsername ? `@${sharedByUsername} thinks you should study this.\n\n` : "";
 
   await Share.share({
     title: plan.title,
-    message: `🎯 "${plan.title}"${plan.categoryTitle ? ` — ${plan.categoryTitle}` : ""}\n\nJoin me on this discipleship plan on P2P Global:\n${webUrl}`,
+    message: `🎯 "${plan.title}"${plan.categoryTitle ? ` — ${plan.categoryTitle}` : ""}\n${byLine}\nJoin me on this discipleship plan on P2P Global:\n${webUrl}`,
+  });
+}
+
+// Public @username profile — see profile/[username].tsx's "Share Profile" menu item.
+export async function shareProfile(username: string) {
+  const deepLink = `${APP_SCHEME}://profile/${username}`;
+  const webUrl = buildWebShareUrl({ type: "profile", title: `@${username}`, desc: "", deepLink });
+
+  await Share.share({
+    title: `@${username} on P2P Global`,
+    message: `Connect with @${username} on P2P Global Bible Study Network:\n${webUrl}`,
   });
 }
 

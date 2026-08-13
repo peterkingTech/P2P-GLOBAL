@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,11 +16,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY } from "@/lib/dateOfBirth";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
+import { validateUsername, formatUsername, generateUsernameSuggestions } from "@/lib/username";
+
+type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { signUp } = useAuth();
+  const { signUp, checkUsernameAvailable } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,10 +33,55 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [username, setUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+  const [usernameMessage, setUsernameMessage] = useState<string | null>(null);
+  const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkSeq = useRef(0);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const clean = formatUsername(username);
+    if (!clean) { setUsernameStatus("idle"); setUsernameMessage(null); setUsernameSuggestions([]); return; }
+
+    const localCheck = validateUsername(clean);
+    if (!localCheck.valid) {
+      setUsernameStatus("unavailable");
+      setUsernameMessage(localCheck.error ?? "Invalid username");
+      setUsernameSuggestions([]);
+      return;
+    }
+
+    setUsernameStatus("checking");
+    const seq = ++checkSeq.current;
+    debounceRef.current = setTimeout(async () => {
+      const result = await checkUsernameAvailable(clean);
+      if (checkSeq.current !== seq) return; // a newer keystroke already superseded this check
+      if (result.available) {
+        setUsernameStatus("available");
+        setUsernameMessage(`@${clean} is available`);
+        setUsernameSuggestions([]);
+      } else {
+        setUsernameStatus("unavailable");
+        const reasonText: Record<string, string> = {
+          reserved: "This username is reserved",
+          taken: `@${clean} is taken`,
+          recently_released: `@${clean} was just released and isn't claimable yet`,
+          invalid_format: "Invalid username",
+        };
+        setUsernameMessage(reasonText[result.reason ?? ""] ?? "That username isn't available");
+        setUsernameSuggestions(result.reason === "taken" ? generateUsernameSuggestions(clean) : []);
+      }
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [username, checkUsernameAvailable]);
+
   async function handleRegister() {
     if (!name.trim()) { setError("Please enter your name."); return; }
     if (!email.trim()) { setError("Please enter your email."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (usernameStatus !== "available") { setError("Please choose an available username."); return; }
 
     const parsed = parseDMY(dob);
     if (!parsed || !isValidCalendarDate(parsed.year, parsed.month, parsed.day)) {
@@ -48,7 +96,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     setError(null);
-    const err = await signUp(email.trim(), password, name.trim(), isoDob);
+    const err = await signUp(email.trim(), password, name.trim(), isoDob, formatUsername(username));
     setLoading(false);
     if (err) {
       setError(err);
@@ -97,6 +145,39 @@ export default function RegisterScreen() {
             placeholderTextColor={colors.textMuted}
             autoCapitalize="words"
           />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Choose your username</Text>
+          <View style={styles.usernameRow}>
+            <Text style={styles.usernamePrefix}>@</Text>
+            <TextInput
+              style={[styles.input, styles.usernameInput]}
+              value={username}
+              onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9._]/g, ""))}
+              placeholder="kingdomwalker"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {usernameStatus === "checking" && <ActivityIndicator size="small" color={colors.lightGreen} style={styles.usernameStatusIcon} />}
+            {usernameStatus === "available" && <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} style={styles.usernameStatusIcon} />}
+            {usernameStatus === "unavailable" && <Ionicons name="close-circle" size={20} color="#F87171" style={styles.usernameStatusIcon} />}
+          </View>
+          {usernameMessage && (
+            <Text style={[styles.usernameMessage, usernameStatus === "available" ? styles.usernameMessageOk : styles.usernameMessageBad]}>
+              {usernameMessage}
+            </Text>
+          )}
+          {usernameSuggestions.length > 0 && (
+            <View style={styles.suggestionsRow}>
+              {usernameSuggestions.map((s) => (
+                <TouchableOpacity key={s} style={styles.suggestionChip} onPress={() => setUsername(s)}>
+                  <Text style={styles.suggestionChipText}>@{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.inputGroup}>
@@ -195,6 +276,16 @@ const styles = StyleSheet.create({
   },
   errorText: { color: "#FCA5A5", fontSize: 13, flex: 1, fontFamily: "Inter_400Regular" },
   inputGroup: { gap: 6 },
+  usernameRow: { flexDirection: "row", alignItems: "center" },
+  usernamePrefix: { position: "absolute", left: 14, zIndex: 1, color: colors.lightGreen, fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  usernameInput: { flex: 1, paddingLeft: 26 },
+  usernameStatusIcon: { position: "absolute", right: 14 },
+  usernameMessage: { fontSize: 12, marginTop: 2, fontFamily: "Inter_400Regular" },
+  usernameMessageOk: { color: colors.accentGreen },
+  usernameMessageBad: { color: "#F87171" },
+  suggestionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  suggestionChip: { backgroundColor: "rgba(29,158,117,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  suggestionChipText: { color: colors.accentGreen, fontSize: 12, fontFamily: "Inter_500Medium" },
   label: { color: colors.lightGreen, fontSize: 13, opacity: 0.75, fontFamily: "Inter_500Medium" },
   input: {
     backgroundColor: "rgba(255,255,255,0.05)",

@@ -8,7 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 
-interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null }
+interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
 interface CircleDetail {
   id: string; name: string; description: string | null; leaderId: string; currentLessonId: string | null;
@@ -35,6 +35,16 @@ export default function CircleDetailScreen() {
   const [savingSession, setSavingSession] = useState(false);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [startingSession, setStartingSession] = useState(false);
+
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [addUsername, setAddUsername] = useState("");
+  const [addPreview, setAddPreview] = useState<{ userId: string; fullName: string } | null>(null);
+  const [addSearching, setAddSearching] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addingMember, setAddingMember] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferUsername, setTransferUsername] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   const isLeader = circle?.leaderId === profile?.id;
 
@@ -137,6 +147,106 @@ export default function CircleDetailScreen() {
     }
   }
 
+  async function searchAddMember() {
+    const clean = addUsername.trim().replace(/^@/, "");
+    if (!clean) return;
+    setAddSearching(true);
+    setAddError(null);
+    setAddPreview(null);
+    try {
+      const res = await fetch(`${getApiUrl()}/profiles/username/${encodeURIComponent(clean)}`);
+      if (!res.ok) { setAddError(`No account found for @${clean}`); return; }
+      const data = await res.json();
+      setAddPreview({ userId: data.userId, fullName: data.fullName ?? `@${data.username}` });
+    } catch {
+      setAddError("Couldn't search right now. Please try again.");
+    } finally {
+      setAddSearching(false);
+    }
+  }
+
+  async function confirmAddMember() {
+    if (!profile?.id || !addUsername.trim()) return;
+    setAddingMember(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/circles/${circleId}/members/by-username`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: addUsername.trim().replace(/^@/, ""), addedBy: profile.id }),
+      });
+      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't add member", body.error ?? "Please try again."); return; }
+      setAddMemberOpen(false);
+      setAddUsername("");
+      setAddPreview(null);
+      load();
+    } finally {
+      setAddingMember(false);
+    }
+  }
+
+  function memberActionSheet(member: CircleMember) {
+    if (!isLeader || member.userId === profile?.id) return;
+    Alert.alert(member.username ? `@${member.username}` : member.name, undefined, [
+      {
+        text: member.role === "co_leader" ? "Remove Co-Leader" : "Make Co-Leader",
+        onPress: () => setMemberRole(member, member.role === "co_leader" ? "member" : "co_leader"),
+      },
+      { text: "Remove from Circle", style: "destructive", onPress: () => confirmRemoveMember(member) },
+      ...(member.username ? [{ text: "View Profile", onPress: () => router.push(`/profile/${member.username}` as any) }] : []),
+      { text: "Cancel", style: "cancel" as const },
+    ]);
+  }
+
+  async function setMemberRole(member: CircleMember, role: "co_leader" | "member") {
+    if (!profile?.id) return;
+    await fetch(`${getApiUrl()}/circles/${circleId}/members/${member.userId}/role`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, changedBy: profile.id }),
+    });
+    load();
+  }
+
+  function confirmRemoveMember(member: CircleMember) {
+    Alert.alert(
+      `Remove ${member.username ? `@${member.username}` : member.name}?`,
+      "They will be notified.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove", style: "destructive", onPress: async () => {
+            if (!profile?.id) return;
+            await fetch(`${getApiUrl()}/circles/${circleId}/members/${member.userId}`, {
+              method: "DELETE", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ removedBy: profile.id }),
+            });
+            load();
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleTransferLeadership() {
+    if (!profile?.id || !transferUsername.trim()) return;
+    setTransferring(true);
+    try {
+      const clean = transferUsername.trim().replace(/^@/, "");
+      const target = circle?.members.find((m) => m.username?.toLowerCase() === clean.toLowerCase());
+      if (!target) { Alert.alert("Not found", `@${clean} isn't an active member of this circle.`); return; }
+      const res = await fetch(`${getApiUrl()}/circles/${circleId}/transfer-leadership`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newLeaderId: target.userId, currentLeaderId: profile.id }),
+      });
+      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't transfer leadership", body.error ?? "Please try again."); return; }
+      const body = await res.json();
+      Alert.alert("Leadership transferred", `${body.newLeaderName} is now the circle leader. You are now a member.`);
+      setTransferOpen(false);
+      setTransferUsername("");
+      load();
+    } finally {
+      setTransferring(false);
+    }
+  }
+
   if (loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
@@ -210,18 +320,44 @@ export default function CircleDetailScreen() {
           </>
         )}
 
-        <Text style={styles.sectionHeading}>Members ({circle.members.length})</Text>
+        <View style={styles.membersHeaderRow}>
+          <Text style={styles.sectionHeading}>Members ({circle.members.length})</Text>
+          {isLeader && (
+            <TouchableOpacity onPress={() => setTransferOpen(true)}>
+              <Text style={styles.transferLink}>Transfer Leadership</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {circle.members.map((m) => (
-          <View key={m.id} style={styles.memberRow}>
+          <TouchableOpacity
+            key={m.id}
+            style={styles.memberRow}
+            activeOpacity={isLeader && m.userId !== profile?.id ? 0.6 : 1}
+            onLongPress={() => memberActionSheet(m)}
+            onPress={() => m.username && router.push(`/profile/${m.username}` as any)}
+          >
             <View style={styles.memberAvatar}>
               <Text style={styles.memberAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
             </View>
-            <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.memberUsername} numberOfLines={1}>{m.username ? `@${m.username}` : m.name}</Text>
+              {m.username && <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>}
+            </View>
             {m.role === "leader" && (
               <View style={styles.leaderPill}><Text style={styles.leaderPillText}>Leader</Text></View>
             )}
-          </View>
+            {m.role === "co_leader" && (
+              <View style={styles.coLeaderPill}><Text style={styles.leaderPillText}>Co-Leader</Text></View>
+            )}
+          </TouchableOpacity>
         ))}
+
+        {isLeader && (
+          <TouchableOpacity style={styles.addMemberBtn} onPress={() => { setAddMemberOpen(true); setAddUsername(""); setAddPreview(null); setAddError(null); }}>
+            <Ionicons name="person-add-outline" size={16} color={colors.accentGreen} />
+            <Text style={styles.addMemberBtnText}>Add a member by username</Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={styles.sectionHeading}>Sessions</Text>
         {nextSession ? (
@@ -314,6 +450,67 @@ export default function CircleDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Add member by username modal */}
+      <Modal visible={addMemberOpen} animationType="fade" transparent onRequestClose={() => setAddMemberOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Add a member by username</Text>
+            <View style={styles.usernameSearchRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={addUsername}
+                onChangeText={(v) => { setAddUsername(v); setAddPreview(null); setAddError(null); }}
+                placeholder="@username"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onSubmitEditing={searchAddMember}
+              />
+              <TouchableOpacity style={styles.usernameSearchBtn} onPress={searchAddMember} disabled={addSearching}>
+                {addSearching ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={16} color="#fff" />}
+              </TouchableOpacity>
+            </View>
+            {addError && <Text style={styles.addErrorText}>{addError}</Text>}
+            {addPreview && <Text style={styles.addPreviewText}>@{addUsername.trim().replace(/^@/, "")} — {addPreview.fullName}</Text>}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddMemberOpen(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={confirmAddMember} disabled={!addPreview || addingMember}>
+                {addingMember ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Add to Circle</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Transfer leadership modal */}
+      <Modal visible={transferOpen} animationType="fade" transparent onRequestClose={() => setTransferOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Transfer Leadership</Text>
+            <Text style={styles.fieldLabel}>New leader's username (must already be a member)</Text>
+            <TextInput
+              style={styles.input}
+              value={transferUsername}
+              onChangeText={setTransferUsername}
+              placeholder="@username"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setTransferOpen(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleTransferLeadership} disabled={!transferUsername.trim() || transferring}>
+                {transferring ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Transfer</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -336,12 +533,22 @@ function makeStyles(c: AppColors) {
     requestMessage: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     approveBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
     declineBtn: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
+    membersHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20 },
+    transferLink: { fontSize: 11, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     memberRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
     memberAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(29,158,117,0.15)", alignItems: "center", justifyContent: "center" },
     memberAvatarText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    memberName: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
+    memberUsername: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    memberName: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
     leaderPill: { backgroundColor: "rgba(224,164,65,0.18)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+    coLeaderPill: { backgroundColor: "rgba(29,158,117,0.15)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
     leaderPillText: { fontSize: 10, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
+    addMemberBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 11, marginTop: 12 },
+    addMemberBtnText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    usernameSearchRow: { flexDirection: "row", gap: 8 },
+    usernameSearchBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
+    addErrorText: { fontSize: 12, color: "#C0392B", marginTop: 8, fontFamily: "Inter_400Regular" },
+    addPreviewText: { fontSize: 13, color: c.textDark, marginTop: 8, fontFamily: "Inter_500Medium" },
     sessionCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 14 },
     sessionText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
     emptyMuted: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },

@@ -33,6 +33,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(depth === 0);
   const hasChildren = node.children.length > 0;
   const roleColor = ROLE_COLORS[node.role] ?? colors.borderBeige;
@@ -47,14 +48,19 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
         )}
         {!hasChildren && <View style={{ width: 24 }} />}
 
-        <View style={[styles.nodeCard, depth === 0 && styles.rootNode]}>
+        <TouchableOpacity
+          style={[styles.nodeCard, depth === 0 && styles.rootNode]}
+          activeOpacity={depth > 0 && node.username ? 0.7 : 1}
+          onPress={() => { if (depth > 0 && node.username) router.push(`/profile/${node.username}` as any); }}
+        >
           <View style={[styles.avatarCircle, { borderColor: roleColor }]}>
             <Text style={styles.avatarInitial}>{node.name.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.nodeName, depth === 0 && styles.rootNodeName]}>
-              {node.name} {depth === 0 ? "(You)" : ""}
+              {node.username ? `@${node.username}` : node.name} {depth === 0 ? "(You)" : ""}
             </Text>
+            {node.username && <Text style={styles.nodeRealName}>{node.name}</Text>}
             <View style={styles.nodeMeta}>
               <View style={[styles.rolePill, { backgroundColor: `${roleColor}22` }]}>
                 <Text style={[styles.roleText, { color: roleColor }]}>{node.role}</Text>
@@ -65,7 +71,7 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
           <View style={styles.levelPill}>
             <Text style={styles.levelText}>Lv{node.growthLevel}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {expanded && hasChildren && (
@@ -537,6 +543,7 @@ const styles = StyleSheet.create({
   avatarCircle: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, backgroundColor: colors.cardBeige, alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   nodeName: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  nodeRealName: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
   rootNodeName: { color: colors.primaryGreen },
   nodeMeta: { flexDirection: "row", gap: 8, marginTop: 4, alignItems: "center" },
   rolePill: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },

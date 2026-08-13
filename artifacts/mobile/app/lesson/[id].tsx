@@ -660,7 +660,7 @@ export default function LessonScreen() {
         )}
         {content && (
           <TouchableOpacity
-            onPress={() => id && shareLesson({ id, title: content.title })}
+            onPress={() => id && shareLesson({ id, title: content.title }, authProfile?.username)}
             style={styles.shareBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >

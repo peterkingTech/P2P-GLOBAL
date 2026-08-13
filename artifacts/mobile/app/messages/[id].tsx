@@ -30,6 +30,32 @@ interface Message {
   message_type?: string;
 }
 
+const MENTION_PATTERN = /@[a-zA-Z][a-zA-Z0-9._]{2,19}/g;
+
+// Splits a message body on @username mentions and renders each as a
+// tappable link to that user's public profile — doesn't verify the
+// username actually exists (would mean an extra lookup per rendered
+// message), so a mistyped/invalid mention just 404s harmlessly on tap,
+// same as any other broken deep link.
+function MentionText({ body, style, linkStyle }: { body: string; style: any; linkStyle: any }) {
+  const router = useRouter();
+  const parts = body.split(MENTION_PATTERN);
+  const mentions = body.match(MENTION_PATTERN) ?? [];
+  const nodes: React.ReactNode[] = [];
+  parts.forEach((part, i) => {
+    if (part) nodes.push(<Text key={`t${i}`}>{part}</Text>);
+    if (mentions[i]) {
+      const username = mentions[i].slice(1);
+      nodes.push(
+        <Text key={`m${i}`} style={linkStyle} onPress={() => router.push(`/profile/${username}` as any)}>
+          {mentions[i]}
+        </Text>
+      );
+    }
+  });
+  return <Text style={style}>{nodes}</Text>;
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -42,6 +68,8 @@ export default function ChatScreen() {
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
   const [text, setText] = useState("");
+  const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
+  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [startersVisible, setStartersVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -199,12 +227,39 @@ export default function ChatScreen() {
     "✝️ Share a verse with me",
   ];
 
+  // @mention autocomplete — only looks at a mention right at the end of the
+  // current text (not wherever the cursor happens to be), since plain
+  // RN TextInput doesn't expose cursor position without onSelectionChange
+  // wiring; that covers the common "type @name while composing" case.
+  function handleTextChange(v: string) {
+    setText(v);
+    if (mentionDebounceRef.current) clearTimeout(mentionDebounceRef.current);
+    const match = /@([a-zA-Z0-9._]*)$/.exec(v);
+    if (!match || match[1].length < 2) { setMentionResults([]); return; }
+    const partial = match[1];
+    mentionDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${getApiUrl()}/profiles/search?q=${encodeURIComponent(partial)}`);
+        const data = await res.json();
+        setMentionResults(Array.isArray(data) ? data.slice(0, 5).map((r: any) => ({ username: r.username, fullName: r.fullName })) : []);
+      } catch {
+        setMentionResults([]);
+      }
+    }, 250);
+  }
+
+  function selectMention(username: string) {
+    setText((prev) => prev.replace(/@([a-zA-Z0-9._]*)$/, `@${username} `));
+    setMentionResults([]);
+  }
+
   async function handleSend() {
     const body = text.trim();
     if (!body || !id || !user) return;
     setStartersVisible(false);
     setSending(true);
     setText("");
+    setMentionResults([]);
     const { data, error } = await supabase
       .from("p2p_messages")
       .insert({ conversation_id: id, sender_id: user.id, body })
@@ -274,7 +329,11 @@ export default function ChatScreen() {
                     style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
                   >
                     {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
-                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.body}</Text>
+                    <MentionText
+                      body={item.body ?? ""}
+                      style={[styles.bubbleText, mine && styles.bubbleTextMine]}
+                      linkStyle={styles.mentionLink}
+                    />
                   </TouchableOpacity>
                 </View>
               );
@@ -297,11 +356,26 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {mentionResults.length > 0 && (
+          <View style={styles.mentionDropdown}>
+            {mentionResults.map((r) => (
+              <TouchableOpacity
+                key={r.username}
+                style={styles.mentionRow}
+                onPress={() => selectMention(r.username)}
+              >
+                <Text style={styles.mentionRowUsername}>@{r.username}</Text>
+                {r.fullName ? <Text style={styles.mentionRowName}>{r.fullName}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
           <TextInput
             style={styles.input}
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             placeholder="Message..."
             placeholderTextColor={colors.textMuted}
             multiline
@@ -346,6 +420,19 @@ const styles = StyleSheet.create({
   senderName: { fontSize: 11, fontWeight: "600", color: colors.accentGreen, marginBottom: 2, fontFamily: "Inter_600SemiBold" },
   bubbleText: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
   bubbleTextMine: { color: "#fff" },
+  mentionLink: { color: "#3B82F6", fontFamily: "Inter_600SemiBold" },
+  mentionDropdown: {
+    marginHorizontal: 16, marginBottom: 4,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
+    borderRadius: 10, overflow: "hidden",
+  },
+  mentionRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 12, paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: colors.borderBeige,
+  },
+  mentionRowUsername: { fontSize: 13, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  mentionRowName: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   startersRow: {
     flexDirection: "row", flexWrap: "wrap", gap: 8,
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,

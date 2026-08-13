@@ -190,13 +190,14 @@ function ForestCanvas({ data, revealProgress, onTapPerson }: {
         </Svg>
       </Animated.View>
 
-      {/* Flag labels overlaid above each gen1 tree — simpler and more legible
-          than embedding emoji text inside the SVG canvas. */}
+      {/* Username + flag overlaid above each gen1 tree — simpler and more
+          legible than embedding text inside the SVG canvas. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {gen1Positions.map(({ node, x, y }) => (
-          <Text key={node.userId} style={[styles.flagOverlay, { left: x - 10, top: y - 34 * 1.25 - 40 }]}>
-            {getFlagEmoji(node.country)}
-          </Text>
+          <View key={node.userId} style={[styles.treeLabelWrap, { left: x - 30, top: y - 34 * 1.25 - 54 }]}>
+            {node.username && <Text style={styles.treeUsername} numberOfLines={1}>@{node.username}</Text>}
+            <Text style={styles.flagOverlay}>{getFlagEmoji(node.country)}</Text>
+          </View>
         ))}
       </View>
     </ScrollView>
@@ -283,7 +284,10 @@ export default function ForestScreen() {
     setRefreshing(false);
   }
 
-  function handleTapPerson(p: { userId: string; displayName?: string; country: string | null; growthLevel: number }) {
+  function handleTapPerson(p: { userId: string; displayName?: string; country: string | null; growthLevel: number; username?: string | null }) {
+    if (p.username) { router.push(`/profile/${p.username}` as any); return; }
+    // Gen-3+ minimal nodes and anyone without a username yet fall back to
+    // the lightweight info alert — there's no profile page to send them to.
     const name = "displayName" in p ? p.displayName : "A disciple";
     showInfo(name ?? "A disciple", `${getFlagEmoji(p.country)} ${p.country ?? "Unknown location"}\nGrowth level ${p.growthLevel}`);
   }
@@ -398,7 +402,9 @@ const styles = StyleSheet.create({
   canvasEmptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
   findGuideBtn: { marginTop: 12, backgroundColor: colors.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
   findGuideBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  flagOverlay: { position: "absolute", fontSize: 14, width: 20, textAlign: "center" },
+  treeLabelWrap: { position: "absolute", width: 60, alignItems: "center" },
+  treeUsername: { fontSize: 9, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
+  flagOverlay: { fontSize: 14, textAlign: "center" },
 
   statsBar: { flexDirection: "row", justifyContent: "space-around", marginHorizontal: 20, marginTop: 20, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, paddingVertical: 14 },
   statChip: { alignItems: "center", gap: 2, minWidth: 60 },
