@@ -29,6 +29,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", message: "P2P Global API server is running.", health: "/api/healthz" });
+});
+
 app.use("/api", router);
 
 export default app;
