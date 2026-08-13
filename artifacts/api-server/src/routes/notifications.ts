@@ -1,7 +1,23 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 
 const router = Router();
+
+// p2p_notifications' RLS policies both require auth.uid() = user_id (see
+// migrations) — the shared lib/supabase.ts client carries no forwarded
+// session, so every read/write through it was silently blocked (rows exist,
+// queries just return empty/no-op). Same fix as calls.ts/circles.ts: a local
+// service-role client, scoped by the trusted :userId route param instead of
+// a verified JWT (this API has no requireAuth middleware — see calls.ts).
+const SUPABASE_URL =
+  process.env.SUPABASE_DB_URL?.startsWith("https://")
+    ? process.env.SUPABASE_DB_URL
+    : (process.env.SUPABASE_URL ?? "https://omkqkasniakcnmfcwrvs.supabase.co");
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ta3FrYXNuaWFrY25tZmN3cnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4ODM5MzYsImV4cCI6MjA5ODQ1OTkzNn0.093jpH0sX9gAcCBirXunIL0i1qNm6jzIZm8JqwVnIxM";
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
 function mapNotification(row: Record<string, unknown>) {
   return {

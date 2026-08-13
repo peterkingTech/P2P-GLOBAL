@@ -12,6 +12,7 @@ const TOGGLES: { key: keyof UserProfile; label: string; desc: string }[] = [
   { key: "notifyFruitAwards", label: "Fruit Awards", desc: "Celebrate when I earn a new fruit" },
   { key: "notifyWeeklyEncouragement", label: "Weekly Encouragement", desc: "A weekly message of encouragement for your journey" },
   { key: "notifyElijahCheckins", label: "Elijah Protocol Check-ins", desc: "A gentle check-in if you've been quiet for a while" },
+  { key: "notifyBreakRooms", label: "Break Rooms", desc: "Let me know when a room opens in a topic I've studied (max 2 a day)" },
 ];
 
 export default function NotificationsSettingsScreen() {

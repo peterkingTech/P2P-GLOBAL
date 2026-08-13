@@ -1,6 +1,8 @@
+import crypto from "node:crypto";
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
+import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
 
 const router = Router();
 
@@ -161,5 +163,258 @@ function formatDuration(totalSeconds: number): string {
   const s = totalSeconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
+
+// ── Break Rooms ──────────────────────────────────────────────────────────────
+// Spontaneous audio community rooms (migrations 058 + 061). One named preset
+// per PLAN_CATEGORIES entry (see mobile/lib/planCategories.ts — duplicated
+// here rather than shared, since api-server and mobile are separate packages
+// with no shared-constants workspace) plus a handful of named presets and a
+// fully custom option.
+const NAMED_ROOM_PRESETS = [
+  { key: "morning_prayer", label: "Morning Prayer", icon: "🙏", category: "prayer" },
+  { key: "bible_qa", label: "Bible Q&A", icon: "📖", category: "identity_salvation" },
+  { key: "kingdom_men", label: "Kingdom Men", icon: "🛡️", category: "ministry_leadership" },
+  { key: "kingdom_women", label: "Kingdom Women", icon: "👑", category: "faith_kingdom" },
+  { key: "new_believers", label: "New Believers Welcome", icon: "🌱", category: "spiritual_growth" },
+];
+const CATEGORY_ROOM_PRESETS = [
+  { key: "faith_kingdom", label: "Faith & Kingdom Living", icon: "👑" },
+  { key: "ministry_leadership", label: "Ministry & Leadership", icon: "🧭" },
+  { key: "spiritual_growth", label: "Spiritual Growth", icon: "🌱" },
+  { key: "family_relationships", label: "Family & Relationships", icon: "❤️" },
+  { key: "identity_salvation", label: "Identity & Salvation", icon: "✝️" },
+  { key: "marketplace_purpose", label: "Marketplace & Purpose", icon: "💼" },
+  { key: "prayer", label: "Prayer", icon: "🙏" },
+  { key: "holy_spirit", label: "Holy Spirit", icon: "🕊️" },
+  { key: "healing_freedom", label: "Healing & Freedom", icon: "🩹" },
+  { key: "church_community", label: "Church & Community", icon: "⛪" },
+];
+const ROOM_PRESETS = [
+  ...NAMED_ROOM_PRESETS.map((p) => ({ ...p, roomType: "topic" as const })),
+  ...CATEGORY_ROOM_PRESETS.map((c) => ({ key: `category_${c.key}`, label: c.label, icon: c.icon, roomType: "topic" as const, category: c.key })),
+  { key: "custom", label: "Custom Room", icon: "✨", roomType: "open" as const, category: null as string | null },
+];
+
+function mapRoom(row: Record<string, unknown>, hostName: string) {
+  return {
+    id: row.id, name: row.name, description: row.description ?? null,
+    roomType: row.room_type, category: row.category ?? null, languageCode: row.language_code ?? null,
+    hostId: row.host_id, hostName, channelName: row.channel_name,
+    maxParticipants: row.max_participants, currentParticipants: row.current_participants,
+    isLive: row.is_live, speakingMode: row.speaking_mode, currentSpeakerId: row.current_speaker_id ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+router.get("/calls/rooms/presets", (_req, res) => ok(res, ROOM_PRESETS));
+
+// GET /calls/rooms — live rooms, most-populated first (Discover's LIVE NOW).
+router.get("/calls/rooms", async (_req, res) => {
+  const { data: rooms, error } = await supabaseWrite
+    .from("p2p_break_rooms")
+    .select("*")
+    .eq("is_live", true)
+    .order("current_participants", { ascending: false });
+  if (error) return err(res, error.message, 500);
+
+  const hostIds = Array.from(new Set((rooms ?? []).map((r) => r.host_id as string)));
+  const { data: profiles } = hostIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name").in("id", hostIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+
+  return ok(res, (rooms ?? []).map((r) => mapRoom(r as Record<string, unknown>, nameById.get(r.host_id as string) ?? "Host")));
+});
+
+// GET /calls/rooms/:roomId — full detail + active roster, for room.tsx.
+router.get("/calls/rooms/:roomId", async (req, res) => {
+  const { roomId } = req.params;
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
+  if (!room) return err(res, "Room not found", 404);
+
+  const { data: participants } = await supabaseWrite
+    .from("p2p_break_room_participants")
+    .select("user_id, joined_at")
+    .eq("room_id", roomId)
+    .is("left_at", null);
+
+  const userIds = (participants ?? []).map((p) => p.user_id as string);
+  const { data: profiles } = userIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name,country").in("id", userIds)
+    : { data: [] as { id: string; full_name: string; country: string | null }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  return ok(res, {
+    ...mapRoom(room as Record<string, unknown>, profileById.get(room.host_id as string)?.full_name ?? "Host"),
+    participants: (participants ?? []).map((p) => ({
+      userId: p.user_id,
+      name: profileById.get(p.user_id as string)?.full_name ?? "Someone",
+      country: profileById.get(p.user_id as string)?.country ?? null,
+      joinedAt: p.joined_at,
+    })),
+  });
+});
+
+// POST /calls/rooms — create + auto-join the host, then fires (non-blocking)
+// interest-matched notifications to users who've studied this category.
+router.post("/calls/rooms", async (req, res) => {
+  const { hostId, name, description, roomType, category, languageCode, speakingMode } = req.body as {
+    hostId?: string; name?: string; description?: string; roomType?: string;
+    category?: string | null; languageCode?: string | null; speakingMode?: string;
+  };
+  if (!hostId || !name) return err(res, "hostId and name required");
+
+  const roomId = crypto.randomUUID();
+  const channelName = `room_${roomId}`;
+  const { data: room, error } = await supabaseWrite
+    .from("p2p_break_rooms")
+    .insert({
+      id: roomId, name: name.trim(), description: description?.trim() || null,
+      room_type: roomType || "open", category: category || null, language_code: languageCode || null,
+      host_id: hostId, channel_name: channelName,
+      speaking_mode: speakingMode === "structured" ? "structured" : "open",
+      current_participants: 1,
+    })
+    .select("*")
+    .single();
+  if (error || !room) return err(res, error?.message ?? "Failed to create room", 500);
+
+  await supabaseWrite.from("p2p_break_room_participants").insert({ room_id: roomId, user_id: hostId });
+
+  const { data: hostProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", hostId).maybeSingle();
+  void notifyInterestedUsers({ id: roomId, name: room.name as string, category: room.category as string | null, channelName });
+
+  return ok(res, mapRoom(room as Record<string, unknown>, (hostProfile?.full_name as string) ?? "Host"));
+});
+
+// POST /calls/rooms/:roomId/join — respects the max-participants cap and any
+// active 24h removal block before letting a user (re)join.
+router.post("/calls/rooms/:roomId/join", async (req, res) => {
+  const { roomId } = req.params;
+  const { userId } = req.body as { userId?: string };
+  if (!userId) return err(res, "userId required");
+
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
+  if (!room || !room.is_live) return err(res, "Room is not live", 404);
+
+  const { data: block } = await supabaseWrite
+    .from("p2p_break_room_blocks").select("blocked_until").eq("room_id", roomId).eq("user_id", userId).maybeSingle();
+  if (block && new Date(block.blocked_until as string) > new Date()) {
+    return err(res, "You've been removed from this room", 403);
+  }
+  if ((room.current_participants as number) >= (room.max_participants as number)) {
+    return err(res, "Room is full", 409);
+  }
+
+  await supabaseWrite.from("p2p_break_room_participants").upsert(
+    { room_id: roomId, user_id: userId, joined_at: new Date().toISOString(), left_at: null },
+    { onConflict: "room_id,user_id" }
+  );
+  await supabaseWrite.from("p2p_break_rooms").update({ current_participants: (room.current_participants as number) + 1 }).eq("id", roomId);
+
+  return ok(res, {
+    channelName: room.channel_name, speakingMode: room.speaking_mode,
+    currentSpeakerId: room.current_speaker_id ?? null, hostId: room.host_id,
+  });
+});
+
+// POST /calls/rooms/:roomId/leave — auto-ends the room only if the host was
+// the one leaving and no one else is left; a lone abandoned room (host gone,
+// others still in it) is instead caught by the 5-minute sweep in breakRooms.ts.
+router.post("/calls/rooms/:roomId/leave", async (req, res) => {
+  const { roomId } = req.params;
+  const { userId } = req.body as { userId?: string };
+  if (!userId) return err(res, "userId required");
+
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
+  if (!room) return err(res, "Room not found", 404);
+
+  await supabaseWrite
+    .from("p2p_break_room_participants").update({ left_at: new Date().toISOString() })
+    .eq("room_id", roomId).eq("user_id", userId).is("left_at", null);
+  const nextCount = Math.max(0, (room.current_participants as number) - 1);
+  await supabaseWrite.from("p2p_break_rooms").update({ current_participants: nextCount }).eq("id", roomId);
+
+  if (userId === room.host_id && nextCount <= 0) {
+    await supabaseWrite.from("p2p_break_rooms").update({ is_live: false, ended_at: new Date().toISOString() }).eq("id", roomId);
+  }
+
+  return ok(res, { left: true });
+});
+
+// DELETE /calls/rooms/:roomId — host-only manual end.
+router.delete("/calls/rooms/:roomId", async (req, res) => {
+  const { roomId } = req.params;
+  const { hostId } = req.body as { hostId?: string };
+  if (!hostId) return err(res, "hostId required");
+
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("host_id").eq("id", roomId).maybeSingle();
+  if (!room) return err(res, "Room not found", 404);
+  if (room.host_id !== hostId) return err(res, "Only the host can end this room", 403);
+
+  await supabaseWrite.from("p2p_break_rooms").update({ is_live: false, ended_at: new Date().toISOString() }).eq("id", roomId);
+  return ok(res, { ended: true });
+});
+
+// POST /calls/rooms/:roomId/flag — anonymous to other participants (only the
+// service-role write path ever sees flagger_id); 3 flags auto-ends the room
+// and notifies moderator/admin-role profiles.
+router.post("/calls/rooms/:roomId/flag", async (req, res) => {
+  const { roomId } = req.params;
+  const { flaggerId, reason } = req.body as { flaggerId?: string; reason?: string };
+  if (!flaggerId || !reason) return err(res, "flaggerId and reason required");
+
+  await supabaseWrite.from("p2p_break_room_flags").insert({ room_id: roomId, flagger_id: flaggerId, reason });
+  const { count } = await supabaseWrite
+    .from("p2p_break_room_flags").select("id", { count: "exact", head: true }).eq("room_id", roomId);
+
+  if ((count ?? 0) >= 3) {
+    const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("name").eq("id", roomId).maybeSingle();
+    await supabaseWrite.from("p2p_break_rooms").update({ is_live: false, ended_at: new Date().toISOString() }).eq("id", roomId);
+    await notifyModerators(roomId, (room?.name as string) ?? "A Break Room", count ?? 0);
+    return ok(res, { flagged: true, roomEnded: true });
+  }
+  return ok(res, { flagged: true, roomEnded: false });
+});
+
+// POST /calls/rooms/:roomId/remove — host removes a participant and blocks
+// them from rejoining this specific room for 24h.
+router.post("/calls/rooms/:roomId/remove", async (req, res) => {
+  const { roomId } = req.params;
+  const { hostId, userId } = req.body as { hostId?: string; userId?: string };
+  if (!hostId || !userId) return err(res, "hostId and userId required");
+
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
+  if (!room) return err(res, "Room not found", 404);
+  if (room.host_id !== hostId) return err(res, "Only the host can remove participants", 403);
+
+  const blockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  await supabaseWrite
+    .from("p2p_break_room_blocks")
+    .upsert({ room_id: roomId, user_id: userId, blocked_until: blockedUntil }, { onConflict: "room_id,user_id" });
+  await supabaseWrite
+    .from("p2p_break_room_participants").update({ left_at: new Date().toISOString() })
+    .eq("room_id", roomId).eq("user_id", userId).is("left_at", null);
+  const nextCount = Math.max(0, (room.current_participants as number) - 1);
+  await supabaseWrite.from("p2p_break_rooms").update({ current_participants: nextCount }).eq("id", roomId);
+
+  return ok(res, { removed: true });
+});
+
+// POST /calls/rooms/:roomId/set-speaker — host grants/revokes the floor in a
+// structured room; room.tsx watches current_speaker_id over realtime and
+// unmutes/mutes locally based on it (Agora RTC has no cross-client mute).
+router.post("/calls/rooms/:roomId/set-speaker", async (req, res) => {
+  const { roomId } = req.params;
+  const { hostId, speakerId } = req.body as { hostId?: string; speakerId?: string | null };
+  if (!hostId) return err(res, "hostId required");
+
+  const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("host_id").eq("id", roomId).maybeSingle();
+  if (!room) return err(res, "Room not found", 404);
+  if (room.host_id !== hostId) return err(res, "Only the host can set the speaker", 403);
+
+  await supabaseWrite.from("p2p_break_rooms").update({ current_speaker_id: speakerId || null }).eq("id", roomId);
+  return ok(res, { currentSpeakerId: speakerId || null });
+});
 
 export default router;

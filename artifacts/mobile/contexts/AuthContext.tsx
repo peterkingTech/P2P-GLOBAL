@@ -82,6 +82,7 @@ export interface UserProfile {
   notifyFruitAwards: boolean;
   notifyWeeklyEncouragement: boolean;
   notifyElijahCheckins: boolean;
+  notifyBreakRooms: boolean;
   visibleToChurchLeadership: boolean;
   showCountryOnProfile: boolean;
   analyticsOptOut: boolean;
@@ -155,6 +156,7 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     notifyFruitAwards: (row.notify_fruit_awards as boolean) ?? true,
     notifyWeeklyEncouragement: (row.notify_weekly_encouragement as boolean) ?? true,
     notifyElijahCheckins: (row.notify_elijah_checkins as boolean) ?? true,
+    notifyBreakRooms: (row.notify_break_rooms as boolean) ?? true,
     visibleToChurchLeadership: (row.visible_to_church_leadership as boolean) ?? true,
     showCountryOnProfile: (row.show_country_on_profile as boolean) ?? true,
     analyticsOptOut: (row.analytics_opt_out as boolean) ?? false,
@@ -292,6 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.notifyFruitAwards !== undefined) dbUpdates.notify_fruit_awards = updates.notifyFruitAwards;
     if (updates.notifyWeeklyEncouragement !== undefined) dbUpdates.notify_weekly_encouragement = updates.notifyWeeklyEncouragement;
     if (updates.notifyElijahCheckins !== undefined) dbUpdates.notify_elijah_checkins = updates.notifyElijahCheckins;
+    if (updates.notifyBreakRooms !== undefined) dbUpdates.notify_break_rooms = updates.notifyBreakRooms;
     if (updates.visibleToChurchLeadership !== undefined) dbUpdates.visible_to_church_leadership = updates.visibleToChurchLeadership;
     if (updates.showCountryOnProfile !== undefined) dbUpdates.show_country_on_profile = updates.showCountryOnProfile;
     if (updates.analyticsOptOut !== undefined) dbUpdates.analytics_opt_out = updates.analyticsOptOut;

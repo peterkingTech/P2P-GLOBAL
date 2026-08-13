@@ -2,6 +2,7 @@ import cron from "node-cron";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { detectInactiveUsers } from "./lib/pastoralCare";
+import { sweepBreakRooms } from "./lib/breakRooms";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -44,5 +45,19 @@ cron.schedule("0 6 * * *", async () => {
     logger.info(result, "Pastoral care check complete");
   } catch (err) {
     logger.error({ err }, "Pastoral care check failed");
+  }
+});
+
+// Break Rooms — auto-end rooms past the 3 hour cap or abandoned by their
+// host for 5+ minutes. Runs every 5 minutes since that's the finer of the
+// two thresholds this sweep enforces.
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const result = await sweepBreakRooms();
+    if (result.endedForTimeLimit || result.endedForAbandonment) {
+      logger.info(result, "Break Rooms sweep ended rooms");
+    }
+  } catch (err) {
+    logger.error({ err }, "Break Rooms sweep failed");
   }
 });

@@ -6,6 +6,7 @@ import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
@@ -17,6 +18,15 @@ interface DiscoverCircleSummary {
   maxMembers: number;
   leaderName: string;
   isFeatured: boolean;
+}
+
+interface LiveRoomSummary {
+  id: string;
+  name: string;
+  hostName: string;
+  currentParticipants: number;
+  category: string | null;
+  speakingMode: "open" | "structured";
 }
 
 function makeStyles(c: AppColors) {
@@ -43,6 +53,21 @@ function makeStyles(c: AppColors) {
     countText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
 
     sectionHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10, marginTop: 4 },
+
+    liveSectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+    liveSectionHeading: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+    liveSectionAction: { fontSize: 12, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    liveEmptyCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 14, marginBottom: 16 },
+    liveEmptyText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    liveRoomCard: {
+      flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: "rgba(220,38,38,0.25)", padding: 14, marginBottom: 10,
+    },
+    liveRoomName: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    liveRoomMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
+    joinRoomBtn: { backgroundColor: "#DC2626", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
+    joinRoomBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    seeAllRoomsText: { fontSize: 12, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold", textAlign: "center", marginBottom: 16 },
     circleCard: {
       backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
       padding: 14, marginBottom: 10,
@@ -60,6 +85,7 @@ function makeStyles(c: AppColors) {
 export default function DiscoverTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { profile } = useAuth();
   const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -70,7 +96,19 @@ export default function DiscoverTab() {
   const [groupCount, setGroupCount] = useState(0);
   const [wallCount, setWallCount] = useState(0);
   const [circles, setCircles] = useState<DiscoverCircleSummary[]>([]);
+  const [liveRooms, setLiveRooms] = useState<LiveRoomSummary[]>([]);
+  const [showAllRooms, setShowAllRooms] = useState(false);
+  const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const { t } = useTranslation();
+
+  const loadLiveRooms = useCallback(async () => {
+    try {
+      const res = await fetch(`${getApiUrl()}/calls/rooms`);
+      setLiveRooms(await res.json());
+    } catch {
+      setLiveRooms([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +116,7 @@ export default function DiscoverTab() {
       getDiscoverablePeers(),
       getGroups(),
       getPrayerWallPosts("recent"),
+      loadLiveRooms(),
     ]);
     setPeerCount(peers.length);
     setGroupCount(groups.length);
@@ -91,9 +130,26 @@ export default function DiscoverTab() {
       setCircles([]);
     }
     setLoading(false);
-  }, [getDiscoverablePeers, getGroups, getPrayerWallPosts]);
+  }, [getDiscoverablePeers, getGroups, getPrayerWallPosts, loadLiveRooms]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Live-updated LIVE NOW section — new rooms opening/closing or their
+  // participant counts changing over time.
+  useEffect(() => {
+    const channel = supabase
+      .channel("discover_break_rooms")
+      .on("postgres_changes", { event: "*", schema: "public", table: "p2p_break_rooms" }, () => { loadLiveRooms(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadLiveRooms]);
+
+  async function joinRoom(roomId: string) {
+    if (!profile?.id || joiningRoomId) return;
+    setJoiningRoomId(roomId);
+    router.push({ pathname: "/call/room" as any, params: { roomId } });
+    setJoiningRoomId(null);
+  }
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -120,6 +176,39 @@ export default function DiscoverTab() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          <View style={styles.liveSectionHeaderRow}>
+            <Text style={styles.liveSectionHeading}>🔴 LIVE NOW</Text>
+            <TouchableOpacity onPress={() => router.push("/call/create-room" as any)}>
+              <Text style={styles.liveSectionAction}>+ Start a Room</Text>
+            </TouchableOpacity>
+          </View>
+          {liveRooms.length === 0 ? (
+            <View style={styles.liveEmptyCard}>
+              <Text style={styles.liveEmptyText}>No rooms are live right now — be the first to start one.</Text>
+            </View>
+          ) : (
+            <>
+              {(showAllRooms ? liveRooms : liveRooms.slice(0, 3)).map((r) => (
+                <View key={r.id} style={styles.liveRoomCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.liveRoomName} numberOfLines={1}>{r.name}</Text>
+                    <Text style={styles.liveRoomMeta}>
+                      Hosted by {r.hostName} · {r.currentParticipants} listening{r.speakingMode === "structured" ? " · Structured" : ""}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.joinRoomBtn} onPress={() => joinRoom(r.id)} disabled={joiningRoomId === r.id}>
+                    <Text style={styles.joinRoomBtnText}>Join</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {liveRooms.length > 3 && (
+                <TouchableOpacity onPress={() => setShowAllRooms((v) => !v)}>
+                  <Text style={styles.seeAllRoomsText}>{showAllRooms ? "Show fewer rooms" : `See all ${liveRooms.length} rooms`}</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
           {cards.map((c) => (
             <TouchableOpacity key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route)}>
               <View style={styles.iconWrap}>
