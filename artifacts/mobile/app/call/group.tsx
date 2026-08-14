@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Tex
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { RtcSurfaceView } from "react-native-agora";
+import { RtcSurfaceView } from "@/lib/agoraNative";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
