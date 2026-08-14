@@ -103,6 +103,14 @@ export interface UserProfile {
   grainCount: number;
 }
 
+export interface SignUpLocation {
+  city?: string;
+  country: string;
+  countryCode?: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface AuthContextValue {
   supabase: SupabaseClient;
   session: Session | null;
@@ -112,7 +120,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithUsername: (username: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string) => Promise<string | null>;
+  signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string, location?: SignUpLocation) => Promise<string | null>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<string | null>;
@@ -268,7 +276,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     name: string,
     dateOfBirth: string,
-    username: string
+    username: string,
+    location?: SignUpLocation
   ): Promise<string | null> => {
     if (!dateOfBirth) return "Date of birth is required.";
     const { data, error } = await supabase.auth.signUp({
@@ -290,6 +299,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
       if (onboardingLanguage) profileRow.app_language = onboardingLanguage;
+      if (location) {
+        profileRow.city = location.city || null;
+        profileRow.country = location.country;
+        profileRow.country_code = location.countryCode || null;
+        profileRow.latitude = location.latitude;
+        profileRow.longitude = location.longitude;
+        profileRow.location_verified = true;
+        profileRow.location_verified_at = new Date().toISOString();
+      }
       const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
       if (profileErr) {
         // Someone else claimed this exact username between the real-time
@@ -315,8 +333,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ username }),
       });
       return await res.json();
-    } catch {
-      return { available: false, reason: "invalid_format" };
+    } catch (e) {
+      // A network/fetch failure is NOT the same thing as a bad username —
+      // conflating the two (this used to return reason: "invalid_format"
+      // here) makes an unreachable API server look like a validation bug in
+      // whatever the user typed, for every single username, no matter what.
+      console.error("checkUsernameAvailable network error", e);
+      return { available: false, reason: "network_error" };
     }
   }, []);
 

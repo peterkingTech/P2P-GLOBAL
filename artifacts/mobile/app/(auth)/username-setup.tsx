@@ -55,6 +55,7 @@ export default function UsernameSetupScreen() {
           taken: `@${clean} is taken`,
           recently_released: `@${clean} was just released and isn't claimable yet`,
           invalid_format: "Invalid username",
+          network_error: "Couldn't reach the server to check this — check your connection and try again",
         };
         setMessage(reasonText[result.reason ?? ""] ?? "That username isn't available");
         setSuggestions(result.reason === "taken" ? generateUsernameSuggestions(clean) : []);
@@ -97,7 +98,7 @@ export default function UsernameSetupScreen() {
             style={styles.input}
             value={username}
             onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9._]/g, ""))}
-            placeholder="kingdomwalker"
+            placeholder=""
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}

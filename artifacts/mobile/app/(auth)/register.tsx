@@ -21,6 +21,8 @@ import colors from "@/constants/colors";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY } from "@/lib/dateOfBirth";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
 import { validateUsername, formatUsername, generateUsernameSuggestions } from "@/lib/username";
+import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
+import type { SignUpLocation } from "@/contexts/AuthContext";
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
@@ -57,13 +59,16 @@ export default function RegisterScreen() {
     })();
   }, []);
 
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<VerifiedLocation | null>(null);
 
   const [username, setUsername] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
@@ -101,6 +106,7 @@ export default function RegisterScreen() {
           taken: `@${clean} is taken`,
           recently_released: `@${clean} was just released and isn't claimable yet`,
           invalid_format: "Invalid username",
+          network_error: "Couldn't reach the server to check this — check your connection and try again",
         };
         setUsernameMessage(reasonText[result.reason ?? ""] ?? "That username isn't available");
         setUsernameSuggestions(result.reason === "taken" ? generateUsernameSuggestions(clean) : []);
@@ -110,7 +116,7 @@ export default function RegisterScreen() {
   }, [username, checkUsernameAvailable]);
 
   async function handleRegister() {
-    if (!name.trim()) { setError("Please enter your name."); return; }
+    if (!firstName.trim() || !lastName.trim()) { setError("Please enter your first and last name."); return; }
     if (!email.trim()) { setError("Please enter your email."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (usernameStatus !== "available") { setError("Please choose an available username."); return; }
@@ -128,7 +134,17 @@ export default function RegisterScreen() {
 
     setLoading(true);
     setError(null);
-    const err = await signUp(email.trim(), password, name.trim(), isoDob, formatUsername(username));
+    const fullName = [firstName.trim(), middleName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    const signUpLocation: SignUpLocation | undefined = location
+      ? {
+          city: location.city || undefined,
+          country: location.country,
+          countryCode: location.countryCode || undefined,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        }
+      : undefined;
+    const err = await signUp(email.trim(), password, fullName, isoDob, formatUsername(username), signUpLocation);
     if (err) {
       setLoading(false);
       setError(err);
@@ -204,12 +220,36 @@ export default function RegisterScreen() {
         )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>First Name</Text>
           <TextInput
             style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Your name"
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="First name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="words"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Middle Name (optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={middleName}
+            onChangeText={setMiddleName}
+            placeholder="Middle name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="words"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={styles.input}
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Last name"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="words"
           />
@@ -223,7 +263,7 @@ export default function RegisterScreen() {
               style={[styles.input, styles.usernameInput]}
               value={username}
               onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9._]/g, ""))}
-              placeholder="kingdomwalker"
+              placeholder=""
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -292,6 +332,23 @@ export default function RegisterScreen() {
           <Text style={styles.dobNote}>
             We ask this to keep the community safe — it's never shown to other users. You must be {MIN_SIGNUP_AGE}+ to join.
           </Text>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Location</Text>
+          {location ? (
+            <View style={styles.locationConfirmed}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
+              <Text style={styles.locationConfirmedText}>
+                {location.city ? `${location.city} · ` : ""}{location.country}
+              </Text>
+              <TouchableOpacity onPress={() => setLocation(null)}>
+                <Text style={styles.locationChangeText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <LocationVerifier compact onVerified={(loc) => setLocation(loc)} onSkip={() => setLocation(null)} />
+          )}
         </View>
 
         <TouchableOpacity
@@ -363,6 +420,13 @@ const styles = StyleSheet.create({
   suggestionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   suggestionChip: { backgroundColor: "rgba(29,158,117,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   suggestionChipText: { color: colors.accentGreen, fontSize: 12, fontFamily: "Inter_500Medium" },
+  locationConfirmed: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12, padding: 14,
+  },
+  locationConfirmedText: { color: colors.cream, fontSize: 14, fontFamily: "Inter_400Regular", flex: 1 },
+  locationChangeText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   label: { color: colors.lightGreen, fontSize: 13, opacity: 0.75, fontFamily: "Inter_500Medium" },
   input: {
     backgroundColor: "rgba(255,255,255,0.05)",

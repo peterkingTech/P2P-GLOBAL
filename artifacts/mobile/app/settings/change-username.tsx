@@ -61,6 +61,7 @@ export default function ChangeUsernameScreen() {
           taken: `@${clean} is taken`,
           recently_released: `@${clean} was just released and isn't claimable yet`,
           invalid_format: "Invalid username",
+          network_error: "Couldn't reach the server to check this — check your connection and try again",
         };
         setMessage(reasonText[result.reason ?? ""] ?? "That username isn't available");
         setSuggestions(result.reason === "taken" ? generateUsernameSuggestions(clean) : []);
