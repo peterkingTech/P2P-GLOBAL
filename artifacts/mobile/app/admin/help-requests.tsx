@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useData, HelpRequest, HelpRequestTier, HelpRequestStatus } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
 
 const TIER_FILTERS: Array<{ value: HelpRequestTier | "all"; label: string }> = [
@@ -31,11 +32,12 @@ function timeAgo(iso: string): string {
 
 export default function HelpRequestsScreen() {
   const { getHelpRequests, updateHelpRequestStatus } = useData();
-  const { supabase } = useAuth();
+  const { supabase, user } = useAuth();
   const router = useRouter();
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [messaging, setMessaging] = useState<string | null>(null);
+  const [calling, setCalling] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<HelpRequestTier | "all">("all");
   const [statusFilter, setStatusFilter] = useState<HelpRequestStatus | "all">("all");
 
@@ -48,12 +50,76 @@ export default function HelpRequestsScreen() {
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
       if (error || !data) {
+        console.error("p2p_start_direct_conversation failed", error);
         Alert.alert("Couldn't start conversation", error?.message ?? "Please try again.");
         return;
       }
       router.push(`/messages/${data}` as any);
+    } catch (e: any) {
+      console.error("handleMessageThem threw", e);
+      Alert.alert("Couldn't start conversation", e?.message ?? "A network error occurred. Please try again.");
     } finally {
       setMessaging(null);
+    }
+  }
+
+  async function handleCallThem(req: HelpRequest) {
+    if (!req.userId) {
+      Alert.alert("Account removed", "This user's account no longer exists and cannot be called.");
+      return;
+    }
+    if (!user) return;
+    setCalling(req.id);
+    try {
+      // Reuse the same eligibility check messaging uses (super_admin, or
+      // church_leader/regional_admin/moderator responding to a help request)
+      // — /calls/start itself trusts the caller-supplied ids with no
+      // permission check of its own, so this RPC is the only gate.
+      const { data: conversationId, error: convErr } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
+      if (convErr || !conversationId) {
+        console.error("p2p_start_direct_conversation failed", convErr);
+        Alert.alert("Couldn't start call", convErr?.message ?? "Please try again.");
+        return;
+      }
+
+      const apiUrl = getApiUrl();
+      const channelRes = await fetch(`${apiUrl}/calls/peer-channel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentUserId: user.id, otherUserId: req.userId }),
+      });
+      const channelData = await channelRes.json();
+      if (!channelRes.ok) throw new Error(channelData.error || "Failed to start call");
+      const channelName = channelData.channelName as string;
+
+      const startRes = await fetch(`${apiUrl}/calls/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channelName, callType: "audio", callerId: user.id, recipientId: req.userId, conversationId,
+        }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
+
+      router.push({
+        pathname: "/call/audio",
+        params: {
+          channelName,
+          otherUserId: req.userId,
+          otherUserName: req.userName || "this user",
+          callType: "audio",
+          isInitiator: "true",
+          callId: startData.incomingCallId,
+          conversationId,
+          callLogId: startData.callLogId,
+        },
+      } as any);
+    } catch (e: any) {
+      console.error("handleCallThem threw", e);
+      Alert.alert("Couldn't start call", e?.message ?? "Please try again.");
+    } finally {
+      setCalling(null);
     }
   }
 
@@ -127,20 +193,36 @@ export default function HelpRequestsScreen() {
               <TouchableOpacity style={[styles.statusBtn, styles[`status_${item.status}` as const]]} onPress={() => cycleStatus(item)}>
                 <Text style={styles.statusBtnText}>{item.status.toUpperCase()} · tap to advance</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.messageBtn}
-                onPress={() => handleMessageThem(item)}
-                disabled={messaging === item.id}
-              >
-                {messaging === item.id ? (
-                  <ActivityIndicator size="small" color={colors.accentGreen} />
-                ) : (
-                  <>
-                    <Ionicons name="chatbubble-outline" size={14} color={colors.accentGreen} />
-                    <Text style={styles.messageBtnText}>Message them</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.messageBtn, styles.actionBtnHalf]}
+                  onPress={() => handleMessageThem(item)}
+                  disabled={messaging === item.id || calling === item.id}
+                >
+                  {messaging === item.id ? (
+                    <ActivityIndicator size="small" color={colors.accentGreen} />
+                  ) : (
+                    <>
+                      <Ionicons name="chatbubble-outline" size={14} color={colors.accentGreen} />
+                      <Text style={styles.messageBtnText}>Message them</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.callBtn, styles.actionBtnHalf]}
+                  onPress={() => handleCallThem(item)}
+                  disabled={messaging === item.id || calling === item.id}
+                >
+                  {calling === item.id ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="call-outline" size={14} color="#fff" />
+                      <Text style={styles.callBtnText}>Call</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         />
@@ -179,12 +261,20 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, color: colors.textMid, marginTop: 6, lineHeight: 18, fontFamily: "Inter_400Regular" },
   statusBtn: { marginTop: 10, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
   statusBtnText: { fontSize: 11, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  actionRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  actionBtnHalf: { flex: 1, marginTop: 0 },
   messageBtn: {
-    marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     paddingVertical: 8, borderRadius: 8,
     borderWidth: 1, borderColor: colors.accentGreen, backgroundColor: "rgba(29,158,117,0.06)",
   },
   messageBtnText: { fontSize: 12, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  callBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 8, borderRadius: 8,
+    backgroundColor: colors.accentGreen,
+  },
+  callBtnText: { fontSize: 12, fontWeight: "600", color: "#fff", fontFamily: "Inter_600SemiBold" },
   status_open: { backgroundColor: "#B91C1C" },
   status_contacted: { backgroundColor: "#D97706" },
   status_resolved: { backgroundColor: colors.accentGreen },
