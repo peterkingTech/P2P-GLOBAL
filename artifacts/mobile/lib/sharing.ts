@@ -5,7 +5,18 @@ import { Share } from "react-native";
 // `<scheme>://plan/abc` straight to app/plan/[id].tsx with no extra native
 // config beyond the scheme already being set in app.json.
 const APP_SCHEME = "p2pglobalbiblestudy";
+// Confirmed against app.json's android.package — NOT
+// "com.amentech.p2pglobal" (that id was requested at one point but doesn't
+// match what's actually configured to build/publish; using it here would
+// point the download button at a Play Store listing that doesn't exist).
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amentech.p2pglobalbiblestudy";
+
+// Live Netlify deployment (confirmed reachable — HTTP 200 on the root as of
+// this change). /join/* isn't wired up there yet (404s), so invite links
+// built from this base won't resolve end-to-end until web/share-landing.html
+// (or an equivalent page) is actually deployed to that path on Netlify.
+export const WEB_APP_URL = "https://peer-to-peer-globalbiblestudynetwork.netlify.app";
+export const EFFECTIVE_INVITE_BASE = "https://peer-to-peer-globalbiblestudynetwork.netlify.app/join";
 
 // Raw custom-scheme links (p2pglobalbiblestudy://...) aren't reliably
 // clickable inside chat apps, so shared messages point at an HTTPS landing

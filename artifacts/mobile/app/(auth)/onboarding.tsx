@@ -17,6 +17,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import i18next from "i18next";
 import colors from "@/constants/colors";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { isSmallPhone, fs } from "@/lib/responsive";
 
 const { width } = Dimensions.get("window");
 
@@ -37,6 +39,7 @@ const LANGUAGES = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
@@ -125,21 +128,27 @@ export default function OnboardingScreen() {
           actually scrolls the visible content), which meant every slide
           silently showed slide 1's text. Rendering the current slide
           directly sidesteps that platform gap entirely. */}
-      <View style={[styles.slide, { width, backgroundColor: colors.darkBg }]}>
+      <View
+        style={[
+          styles.slide,
+          { width: isTablet ? MAX_CONTENT_WIDTH : width, backgroundColor: colors.darkBg },
+          isTablet && { alignSelf: "center" },
+        ]}
+      >
         {SLIDES[current].icon === null ? (
           <View style={styles.logoWrap}>
-            <Image source={LOGO} style={styles.logoImg} />
+            <Image source={LOGO} style={[styles.logoImg, isSmallPhone && styles.logoImgSmall]} />
           </View>
         ) : (
-          <View style={styles.iconRing}>
+          <View style={[styles.iconRing, isSmallPhone && styles.iconRingSmall]}>
             <Ionicons
               name={SLIDES[current].icon}
-              size={52}
+              size={isSmallPhone ? 40 : 52}
               color={colors.accentGreen}
             />
           </View>
         )}
-        <Text style={[styles.title, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</Text>
+        <Text style={[styles.title, isSmallPhone && { fontSize: fs(22) }, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</Text>
         {SLIDES[current].id === "1" && (
           <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
         )}
@@ -147,7 +156,7 @@ export default function OnboardingScreen() {
       </View>
 
       {/* Dots */}
-      <View style={styles.dots}>
+      <View style={[styles.dots, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
         {SLIDES.map((_, i) => (
           <View
             key={i}
@@ -160,7 +169,7 @@ export default function OnboardingScreen() {
       </View>
 
       {/* CTA */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
         {isLast && (
           <Text style={styles.kingdomSchoolIntro}>{t("onboarding.kingdomSchoolIntro")}</Text>
         )}
@@ -290,6 +299,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   logoImg: { width: 140, height: 140, borderRadius: 32 },
+  logoImgSmall: { width: 100, height: 100, borderRadius: 24 },
   iconRing: {
     width: 110, height: 110, borderRadius: 55,
     backgroundColor: "rgba(29,158,117,0.12)",
@@ -297,6 +307,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     marginBottom: 36,
   },
+  iconRingSmall: { width: 84, height: 84, borderRadius: 42, marginBottom: 24 },
   title: {
     fontSize: 26, fontWeight: "700", color: colors.cream,
     textAlign: "center", marginBottom: 16, lineHeight: 34,

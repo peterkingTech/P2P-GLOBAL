@@ -1,0 +1,10 @@
+# Netlify redirect rules for the P2P Global web landing pages.
+# Rewrites (not full redirects — status 200) so the browser URL stays
+# /join/@username and share-landing.html's client-side JS can read the
+# username out of window.location.pathname.
+#
+# NOTE: this file only takes effect once Netlify is actually configured to
+# publish from this directory (artifacts/mobile/web) — it has no effect
+# just by existing in the git repo. See lib/sharing.ts's EFFECTIVE_INVITE_BASE
+# and profiles.ts's INVITE_BASE_URL for where this URL is referenced.
+/join/*   /share-landing.html   200

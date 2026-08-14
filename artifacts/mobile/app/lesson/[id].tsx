@@ -32,6 +32,7 @@ import { fetchBatchVerseText, VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getLanguageName } from "@/lib/languageNames";
 import { shareLesson } from "@/lib/sharing";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 interface LessonContent {
   title: string;
@@ -398,6 +399,7 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const { user, profile: authProfile } = useAuth();
   const {
     lessons, markLessonComplete,
@@ -672,7 +674,14 @@ export default function LessonScreen() {
       {isLoading || !content ? (
         <View style={styles.loadingContainer}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 40 },
+            isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {translationBanner ? (
             <View style={styles.translationBanner}>
               <ActivityIndicator size="small" color={colors.accentGreen} />

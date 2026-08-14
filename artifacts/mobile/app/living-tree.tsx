@@ -23,6 +23,7 @@ import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VID
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
 import LivingTree, { stageLabel } from "@/components/LivingTree";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -96,6 +97,7 @@ export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
+  const { isTablet } = useLayout();
   const { profile } = useAuth();
   const { forestNodes, forestStats, isLoading, treeData } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
@@ -252,7 +254,11 @@ export default function LivingTreeScreen() {
       {tab === "tree" ? (
         <ScrollView
           style={styles.screen}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 120 },
+            isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.introLabel}>P2P GLOBAL BIBLE STUDY NETWORK</Text>
@@ -385,7 +391,14 @@ export default function LivingTreeScreen() {
               <Text style={styles.emptyText}>Connect with a study partner to plant your first branch.</Text>
             </View>
           ) : (
-            <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.list,
+                { paddingBottom: insets.bottom + 100 },
+                isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+              ]}
+              showsVerticalScrollIndicator={false}
+            >
               {forestNodes.map((node) => (
                 <NodeCard key={node.id} node={node} depth={0} />
               ))}

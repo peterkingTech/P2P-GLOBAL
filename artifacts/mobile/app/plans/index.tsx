@@ -24,6 +24,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getPlanCategoryMeta } from "@/lib/planCategories";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -234,8 +235,13 @@ function EmptyState({ colors, icon, text, actionLabel, onAction }: { colors: App
 function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: CompletedPlan; completedAt: string | null; onClose: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { screenWidth } = useLayout();
   const shotRef = useRef<ViewShot>(null);
   const [busy, setBusy] = useState(false);
+  // Bounded responsive width — fits comfortably on a 320px phone (was a
+  // flat 280, only 20px of breathing room either side) without letting the
+  // shareable card balloon on a tablet.
+  const cardWidth = Math.min(screenWidth - 48, 320);
   const dateLabel = completedAt
     ? new Date(completedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
     : new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
@@ -262,7 +268,7 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <ViewShot ref={shotRef} options={{ format: "png", quality: 1 }}>
-          <View style={[styles.shareCard, { borderColor: `${plan.colorTheme}66` }]}>
+          <View style={[styles.shareCard, { width: cardWidth, borderColor: `${plan.colorTheme}66` }]}>
             <View style={[styles.shareBadge, { backgroundColor: plan.colorTheme }]}>
               <Ionicons name="checkmark" size={22} color="#fff" />
             </View>
@@ -286,6 +292,7 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
 
 export default function PlansHubScreen() {
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { profile } = useAuth();
@@ -514,7 +521,7 @@ export default function PlansHubScreen() {
 
       {/* ── My Plans ── */}
       {tab === "my" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
           {myPlansLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : (
@@ -603,7 +610,7 @@ export default function PlansHubScreen() {
 
           {/* ── Categories sub-tab ── */}
           {findSubTab === "categories" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
               {recommended.length > 0 && (
                 <>
                   <View style={styles.recommendedHeaderRow}>
@@ -689,7 +696,7 @@ export default function PlansHubScreen() {
 
           {/* ── Search Results sub-tab ── */}
           {findSubTab === "search" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {searchLoading ? (
                 <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
               ) : searchResults.length === 0 ? (
@@ -714,7 +721,7 @@ export default function PlansHubScreen() {
 
       {/* ── Saved ── */}
       {tab === "saved" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
           {savedLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : savedPlans.length === 0 ? (
@@ -741,7 +748,7 @@ export default function PlansHubScreen() {
 
       {/* ── Completed ── */}
       {tab === "completed" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
           {completedLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : completedPlans.length === 0 ? (
@@ -868,7 +875,7 @@ function makeStyles(c: AppColors) {
 
     shareOverlay: { flex: 1, backgroundColor: "rgba(6,17,13,0.94)", alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
     shareCloseBtn: { position: "absolute", top: 50, right: 20 },
-    shareCard: { width: 280, backgroundColor: "#0B1F19", borderRadius: 20, borderWidth: 1.5, padding: 28, alignItems: "center" },
+    shareCard: { backgroundColor: "#0B1F19", borderRadius: 20, borderWidth: 1.5, padding: 28, alignItems: "center" },
     shareBadge: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 14 },
     shareTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", textAlign: "center" },
     shareSubtitle: { fontSize: 12, color: "#E0A441", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6, marginTop: 6 },

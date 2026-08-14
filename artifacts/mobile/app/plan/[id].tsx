@@ -18,6 +18,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { sharePlan } from "@/lib/sharing";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 const COVER_HEIGHT = 200;
 
@@ -41,6 +42,7 @@ export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const { profile } = useAuth();
   const { getPlanProgress, checkCategoryCompletion } = useData();
   const { colors } = useTheme();
@@ -197,7 +199,13 @@ export default function PlanDetailScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          { paddingBottom: insets.bottom + 40 },
+          isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {plan.coverImageUrl && !imgErr ? (
           <Image
             source={{ uri: plan.coverImageUrl }}

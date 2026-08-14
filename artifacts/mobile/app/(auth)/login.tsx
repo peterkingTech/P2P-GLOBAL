@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { isSmallPhone, fs } from "@/lib/responsive";
 import colors from "@/constants/colors";
 
 // An email always contains an @ with something on both sides; a username
@@ -30,6 +32,7 @@ function isUsername(input: string): boolean {
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const { signIn, signInWithUsername } = useAuth();
 
   const [identifier, setIdentifier] = useState("");
@@ -65,13 +68,14 @@ export default function LoginScreen() {
           paddingTop: insets.top + (Platform.OS === "web" ? 40 : 24),
           paddingBottom: insets.bottom + 40,
         },
+        isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
       ]}
       keyboardShouldPersistTaps="handled"
     >
       {/* Logo */}
       <View style={styles.logoArea}>
-        <Image source={LOGO} style={styles.logoImg} />
-        <Text style={styles.appName}>P2P Bible Study</Text>
+        <Image source={LOGO} style={[styles.logoImg, isSmallPhone && styles.logoImgSmall]} />
+        <Text style={[styles.appName, isSmallPhone && { fontSize: fs(19) }]}>P2P Bible Study</Text>
         <Text style={styles.tagline}>Welcome back</Text>
       </View>
 
@@ -173,6 +177,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 8,
   },
+  logoImgSmall: { width: 64, height: 64, borderRadius: 16 },
   appName: {
     fontSize: 22,
     fontWeight: "700",

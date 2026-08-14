@@ -70,11 +70,22 @@
 
   <script>
     var params = new URLSearchParams(window.location.search);
-    var type = params.get("type");
+    // Confirmed against app.json's android.package — not the
+    // "com.amentech.p2pglobal" id that was floated at one point, which
+    // doesn't match what's actually configured to build/publish.
     var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amentech.p2pglobalbiblestudy";
     // Real, deployed production API — same URL every mobile build points at
     // (see EXPO_PUBLIC_API_URL in eas.json). Not a placeholder.
     var API_BASE = "https://workspaceapi-server-production-6d56.up.railway.app/api";
+
+    // Invite links are path-based — https://.../join/@username (see
+    // EFFECTIVE_INVITE_BASE in lib/sharing.ts and INVITE_BASE_URL in
+    // profiles.ts) — not the query-string form the other share types use,
+    // so detect + parse them from the path, not `type=`. Requires Netlify
+    // to rewrite /join/* to this file (see web/_redirects) so the path
+    // survives to be read here.
+    var pathMatch = window.location.pathname.match(/\/join\/@?([^/]+)/);
+    var type = pathMatch ? "invite" : params.get("type");
 
     if (type === "invite") {
       // ── Personalised Grain invite landing (dynamic — fetches the live profile) ──
@@ -82,7 +93,7 @@
       var inviteCard = document.getElementById("inviteCard");
       inviteCard.style.display = "block";
 
-      var username = params.get("username") || "";
+      var username = pathMatch ? decodeURIComponent(pathMatch[1]) : (params.get("username") || "");
       var deepLink = "p2pglobalbiblestudy://join/" + encodeURIComponent(username);
 
       function goToApp() {

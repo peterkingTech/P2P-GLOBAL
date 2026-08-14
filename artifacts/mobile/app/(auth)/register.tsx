@@ -15,6 +15,8 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { isSmallPhone, fs } from "@/lib/responsive";
 import colors from "@/constants/colors";
 import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDMY } from "@/lib/dateOfBirth";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
@@ -33,6 +35,7 @@ interface InviterNotice {
 export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useLayout();
   const { signUp, checkUsernameAvailable } = useAuth();
 
   const [inviterNotice, setInviterNotice] = useState<InviterNotice | null>(null);
@@ -164,6 +167,7 @@ export default function RegisterScreen() {
           paddingTop: insets.top + (Platform.OS === "web" ? 40 : 24),
           paddingBottom: insets.bottom + 40,
         },
+        isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
       ]}
       keyboardShouldPersistTaps="handled"
     >
@@ -172,7 +176,7 @@ export default function RegisterScreen() {
       </TouchableOpacity>
 
       <View style={styles.header}>
-        <Text style={styles.title}>Join the Network</Text>
+        <Text style={[styles.title, isSmallPhone && { fontSize: fs(23) }]}>Join the Network</Text>
         <Text style={styles.subtitle}>Begin your discipleship journey</Text>
       </View>
 

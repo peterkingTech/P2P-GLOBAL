@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import "@/lib/i18n";
 
@@ -43,9 +44,15 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const { t } = useTranslation();
+  // Take the larger of the real device inset and the previous flat value —
+  // preserves existing look on devices the old constants already covered,
+  // and fixes the gap on devices (e.g. some Android gesture nav) where the
+  // real home-indicator/gesture-bar inset exceeds it.
+  const bottomInset = Math.max(insets.bottom, isWeb ? 34 : 8);
 
   const TAB_ITEMS = [
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
@@ -68,8 +75,8 @@ function ClassicTabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.navBorder,
           elevation: 0,
-          height: isWeb ? 84 : 62,
-          paddingBottom: isWeb ? 34 : 8,
+          height: (isWeb ? 50 : 54) + bottomInset,
+          paddingBottom: bottomInset,
         },
         tabBarBackground: () =>
           isIOS ? (

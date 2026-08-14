@@ -659,7 +659,7 @@ export default function ProfileScreen() {
       {/* Reach Out Modal */}
       <Modal visible={reachOutOpen} animationType="slide" transparent onRequestClose={() => setReachOutOpen(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Reach Out</Text>
               <TouchableOpacity onPress={() => setReachOutOpen(false)} style={styles.closeBtn}>
@@ -719,7 +719,7 @@ export default function ProfileScreen() {
       {/* Gifts Modal */}
       <Modal visible={giftsOpen} animationType="slide" transparent onRequestClose={() => setGiftsOpen(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t("profile.spiritualGifts")}</Text>
               <TouchableOpacity onPress={() => setGiftsOpen(false)} style={styles.closeBtn}>

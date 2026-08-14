@@ -508,11 +508,12 @@ router.post("/verification/withdraw", async (req, res) => {
 // The invite code IS the inviter's current @username — see migration 066's
 // deviation notes for why there's no separate generated code or persisted
 // link (usernames can change, so nothing is stored that could go stale).
-// Same GitHub Pages landing page as lib/sharing.ts on mobile — real URL,
-// not a fabricated domain.
-const INVITE_LANDING_BASE_URL = "https://peterkingtech.github.io/P2P-GLOBAL/share-landing.html";
+// Real, live Netlify deployment (confirmed reachable) — overridable via
+// INVITE_BASE_URL for staging/local testing without touching code.
+const INVITE_BASE = process.env.INVITE_BASE_URL
+  || "https://peer-to-peer-globalbiblestudynetwork.netlify.app/join";
 function buildInviteLink(username: string): string {
-  return `${INVITE_LANDING_BASE_URL}?type=invite&username=${encodeURIComponent(username)}`;
+  return `${INVITE_BASE}/@${encodeURIComponent(username)}`;
 }
 
 // GET /profiles/invite/my-link?userId= — the current user's personal invite
