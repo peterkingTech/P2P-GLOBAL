@@ -38,7 +38,21 @@ export type DiscipleRole =
   | "church_leader"
   | "regional_admin"
   | "moderator"
-  | "super_admin";
+  | "super_admin"
+  | "admin_supervisor"
+  | "admin_zone"
+  | "admin_national"
+  | "admin_content"
+  | "admin_translation"
+  | "admin_moderation"
+  | "admin_verification"
+  | "admin_help"
+  | "admin_username"
+  | "admin_finance"
+  | "admin_marketing"
+  | "admin_church";
+
+export type OfficialAccountType = "crisis_response" | "announcement" | "support" | "general";
 
 export interface UserProfile {
   id: string;
@@ -101,6 +115,14 @@ export interface UserProfile {
   isVerified: boolean;
   verificationBadgeVisible: boolean;
   grainCount: number;
+  isOfficialAccount: boolean;
+  officialAccountType?: OfficialAccountType;
+  officialAccountLabel?: string;
+  adminZone?: string;
+  adminCountry?: string;
+  adminAppointedAt?: string;
+  adminAppointmentReason?: string;
+  adminIsActive: boolean;
 }
 
 export interface SignUpLocation {
@@ -171,6 +193,14 @@ function mapProfileRow(row: Record<string, unknown>): UserProfile {
     isVerified: (row.is_verified as boolean) ?? false,
     verificationBadgeVisible: (row.verification_badge_visible as boolean) ?? true,
     grainCount: (row.grain_count as number) ?? 0,
+    isOfficialAccount: (row.is_official_account as boolean) ?? false,
+    officialAccountType: row.official_account_type as OfficialAccountType | undefined,
+    officialAccountLabel: row.official_account_label as string | undefined,
+    adminZone: row.admin_zone as string | undefined,
+    adminCountry: row.admin_country as string | undefined,
+    adminAppointedAt: row.admin_appointed_at as string | undefined,
+    adminAppointmentReason: row.admin_appointment_reason as string | undefined,
+    adminIsActive: (row.admin_is_active as boolean) ?? true,
     appLanguage: (row.app_language as string) ?? "en",
     contentLanguage: (row.content_language as string) ?? "en",
     churchId: row.church_id as string | undefined,

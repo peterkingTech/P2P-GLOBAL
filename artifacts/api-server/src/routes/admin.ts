@@ -2,7 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import { requireAdmin } from "../middleware/adminAuth";
+import { requireAdmin, requireRole } from "../middleware/adminAuth";
+import { computeReportStats } from "../lib/adminReports";
 import { parsePlanPdf, type ParsedLesson, type ParsedPlan } from "../lib/planPdfParser";
 import { validateUsername, formatUsername } from "../lib/username";
 
@@ -1585,6 +1586,346 @@ router.get("/verification/stats", async (req, res) => {
     totalRevocationsAllTime: allRevoked.count ?? 0,
     verificationRate: totalApplicationsAllTime ? Math.round(((allApproved.count ?? 0) / totalApplicationsAllTime) * 100) : 0,
   });
+});
+
+// ── Help Request → Conversation linking ──────────────────────────────────────
+// Called right after "Message them"/"Call" on the Help Requests screen
+// creates (or reuses) a DM via p2p_start_direct_conversation() — that RPC
+// knows nothing about the help request itself, so this stamps the
+// conversation with the metadata the crisis thread banner (messages/[id].tsx)
+// and feedback flow key off. Client can't do this directly: p2p_conversations
+// has no UPDATE RLS policy for these columns (only messages_update_pin, for
+// pinning), by design — this is a privileged admin action.
+router.post("/help-requests/:id/link-conversation", async (req, res) => {
+  const { id } = req.params;
+  const { conversationId } = req.body as { conversationId?: string };
+  if (!conversationId) return err(res, "conversationId is required", 400);
+
+  const { data: helpRequest } = await supabaseWrite
+    .from("p2p_help_requests").select("id, created_at").eq("id", id).maybeSingle();
+  if (!helpRequest) return err(res, "Help request not found", 404);
+
+  const { error } = await supabaseWrite
+    .from("p2p_conversations")
+    .update({
+      conversation_type: "help_request",
+      crisis_type: "help_request",
+      help_request_id: helpRequest.id,
+      crisis_submitted_at: helpRequest.created_at,
+      is_pinned_by_system: true,
+    })
+    .eq("id", conversationId);
+  if (error) return err(res, error.message, 500);
+
+  return ok(res, { ok: true });
+});
+
+// ── Admin hierarchy (migration 069) ──────────────────────────────────────────
+// admin_zone options mirror the CHECK constraint on p2p_profiles.admin_zone.
+const ADMIN_ZONES = ["europe", "africa", "asia", "americas", "oceania", "middle_east"];
+// Roles this endpoint is allowed to grant — deliberately excludes
+// super_admin and admin_supervisor per the spec ("appointed directly in DB
+// for security"), even though req.adminRole === 'super_admin' already
+// bypasses every requireRole check in this file.
+const APPOINTABLE_ROLES = [
+  "admin_zone", "admin_national", "admin_content", "admin_translation",
+  "admin_moderation", "admin_verification", "admin_help", "admin_username",
+  "admin_finance", "admin_marketing", "admin_church", "peer_guide", "church_leader",
+  "regional_admin", "moderator",
+];
+
+async function logAdminActivity(params: {
+  adminId: string; adminRole: string; actionType: string;
+  targetUserId?: string | null; targetResourceId?: string | null; targetResourceType?: string | null;
+  actionDetail?: Record<string, unknown>; durationSeconds?: number | null;
+}) {
+  await supabaseWrite.from("p2p_admin_activity_log").insert({
+    admin_id: params.adminId, admin_role: params.adminRole, action_type: params.actionType,
+    target_user_id: params.targetUserId ?? null, target_resource_id: params.targetResourceId ?? null,
+    target_resource_type: params.targetResourceType ?? null, action_detail: params.actionDetail ?? {},
+    duration_seconds: params.durationSeconds ?? null,
+  });
+  await supabaseWrite.from("p2p_profiles").update({ admin_last_active_at: new Date().toISOString() }).eq("id", params.adminId);
+}
+
+// POST /admin/activity/log — generic, client-callable action logger. Always
+// self-attributed to the calling admin (req.adminUserId/req.adminRole from
+// requireAdmin's verified JWT) — a client can log its own admin's actions,
+// never spoof another admin's.
+router.post("/activity/log", async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const adminRole = (req as any).adminRole as string;
+  const { actionType, targetUserId, targetResourceId, targetResourceType, actionDetail } = req.body as {
+    actionType?: string; targetUserId?: string; targetResourceId?: string; targetResourceType?: string; actionDetail?: Record<string, unknown>;
+  };
+  if (!actionType) return err(res, "actionType is required", 400);
+  await logAdminActivity({ adminId, adminRole, actionType, targetUserId, targetResourceId, targetResourceType, actionDetail });
+  return ok(res, { ok: true });
+});
+
+// POST /admin/appointments/create — super_admin only
+router.post("/appointments/create", requireRole("super_admin"), async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const { username, role, admin_zone, admin_country, reason } = req.body as {
+    username?: string; role?: string; admin_zone?: string; admin_country?: string; reason?: string;
+  };
+  if (!username || !role || !reason?.trim()) return err(res, "username, role, and reason are required", 400);
+  if (!APPOINTABLE_ROLES.includes(role)) return err(res, `role must be one of: ${APPOINTABLE_ROLES.join(", ")}`, 400);
+  if (admin_zone && !ADMIN_ZONES.includes(admin_zone)) return err(res, `admin_zone must be one of: ${ADMIN_ZONES.join(", ")}`, 400);
+
+  const { data: target } = await supabaseWrite
+    .from("p2p_profiles").select("id, role, is_verified").eq("username", username.trim().toLowerCase()).maybeSingle();
+  if (!target) return err(res, "No user found with that username", 404);
+  if (target.role !== "student") return err(res, "This user already has an elevated role", 409);
+
+  const { data: updated, error } = await supabaseWrite
+    .from("p2p_profiles")
+    .update({
+      role, admin_zone: admin_zone ?? null, admin_country: admin_country ?? null,
+      admin_appointed_by: adminId, admin_appointed_at: new Date().toISOString(),
+      admin_appointment_reason: reason.trim(), admin_is_active: true,
+    })
+    .eq("id", target.id)
+    .select("id, username, full_name, role")
+    .single();
+  if (error || !updated) return err(res, error?.message ?? "Failed to appoint admin", 500);
+
+  await logAdminActivity({
+    adminId, adminRole: (req as any).adminRole, actionType: "admin_appointed",
+    targetUserId: target.id, actionDetail: { role, admin_zone, admin_country },
+  });
+  await supabaseWrite.from("p2p_notifications").insert({
+    user_id: target.id,
+    title: "You've been appointed as an admin",
+    message: `You have been appointed as ${role.replace(/^admin_/, "").replace(/_/g, " ")} on P2P Global. Your admin dashboard is now active.`,
+    notification_type: "admin_appointed",
+    data: { role },
+  });
+
+  return ok(res, updated);
+});
+
+// PUT /admin/appointments/:userId/remove — super_admin only
+router.put("/appointments/:userId/remove", requireRole("super_admin"), async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const userId = req.params.userId as string;
+  const { reason } = req.body as { reason?: string };
+  if (!reason?.trim()) return err(res, "reason is required", 400);
+
+  const { data: target } = await supabaseWrite.from("p2p_profiles").select("id, role").eq("id", userId).maybeSingle();
+  if (!target) return err(res, "User not found", 404);
+
+  const { error } = await supabaseWrite
+    .from("p2p_profiles")
+    .update({ role: "student", admin_zone: null, admin_country: null, admin_appointment_reason: null, admin_is_active: true })
+    .eq("id", userId);
+  if (error) return err(res, error.message, 500);
+
+  await logAdminActivity({
+    adminId, adminRole: (req as any).adminRole, actionType: "admin_removed",
+    targetUserId: userId, actionDetail: { previousRole: target.role, reason: reason.trim() },
+  });
+  await supabaseWrite.from("p2p_notifications").insert({
+    user_id: userId, title: "Your admin role has been removed",
+    message: "Your admin access on P2P Global has been removed.",
+    notification_type: "admin_removed", data: {},
+  });
+
+  return ok(res, { ok: true });
+});
+
+// PUT /admin/appointments/:userId/suspend — super_admin only (deactivates
+// without removing the role, per spec — the role/zone/country stay intact)
+router.put("/appointments/:userId/suspend", requireRole("super_admin"), async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const userId = req.params.userId as string;
+  const { reason } = req.body as { reason?: string };
+  if (!reason?.trim()) return err(res, "reason is required", 400);
+
+  const { data: target } = await supabaseWrite.from("p2p_profiles").select("id, admin_is_active").eq("id", userId).maybeSingle();
+  if (!target) return err(res, "User not found", 404);
+
+  const nextActive = !target.admin_is_active; // toggle: suspend if active, reinstate if already suspended
+  const { error } = await supabaseWrite.from("p2p_profiles").update({ admin_is_active: nextActive }).eq("id", userId);
+  if (error) return err(res, error.message, 500);
+
+  await logAdminActivity({
+    adminId, adminRole: (req as any).adminRole, actionType: nextActive ? "admin_reinstated" : "admin_suspended",
+    targetUserId: userId, actionDetail: { reason: reason.trim() },
+  });
+
+  return ok(res, { ok: true, adminIsActive: nextActive });
+});
+
+// GET /admin/appointments/list — super_admin + admin_supervisor
+router.get("/appointments/list", requireRole("admin_supervisor"), async (_req, res) => {
+  const { data: admins, error } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("id, username, full_name, role, admin_zone, admin_country, admin_is_active, admin_appointed_at, admin_last_active_at")
+    .neq("role", "student")
+    .order("admin_appointed_at", { ascending: false, nullsFirst: false });
+  if (error) return err(res, error.message, 500);
+
+  const adminIds = (admins ?? []).map((a) => a.id as string);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [{ data: weekActivity }, { data: feedback }] = await Promise.all([
+    adminIds.length
+      ? supabaseWrite.from("p2p_admin_activity_log").select("admin_id").in("admin_id", adminIds).gte("created_at", weekAgo)
+      : Promise.resolve({ data: [] as { admin_id: string }[] }),
+    adminIds.length
+      ? supabaseWrite.from("p2p_admin_interaction_feedback").select("admin_user_id, rating").in("admin_user_id", adminIds)
+      : Promise.resolve({ data: [] as { admin_user_id: string; rating: number | null }[] }),
+  ]);
+  const casesByAdmin = new Map<string, number>();
+  for (const a of weekActivity ?? []) casesByAdmin.set(a.admin_id, (casesByAdmin.get(a.admin_id) ?? 0) + 1);
+  const ratingsByAdmin = new Map<string, number[]>();
+  for (const f of feedback ?? []) {
+    if (f.rating == null) continue;
+    const arr = ratingsByAdmin.get(f.admin_user_id) ?? [];
+    arr.push(f.rating);
+    ratingsByAdmin.set(f.admin_user_id, arr);
+  }
+
+  return ok(res, (admins ?? []).map((a) => {
+    const ratings = ratingsByAdmin.get(a.id as string) ?? [];
+    return {
+      id: a.id, username: a.username, fullName: a.full_name, role: a.role,
+      adminZone: a.admin_zone, adminCountry: a.admin_country, adminIsActive: a.admin_is_active,
+      adminAppointedAt: a.admin_appointed_at, lastActiveAt: a.admin_last_active_at,
+      casesThisWeek: casesByAdmin.get(a.id as string) ?? 0,
+      avgRating: ratings.length ? Math.round((ratings.reduce((s, r) => s + r, 0) / ratings.length) * 10) / 10 : null,
+    };
+  }));
+});
+
+// GET /admin/activity/live — super_admin + admin_supervisor, cursor-paginated
+// by created_at (descending — pass the oldest row's created_at back as
+// ?cursor= to fetch the next page).
+router.get("/activity/live", requireRole("admin_supervisor"), async (req, res) => {
+  const { cursor, adminId, actionType } = req.query as { cursor?: string; adminId?: string; actionType?: string };
+  let query = supabaseWrite
+    .from("p2p_admin_activity_log")
+    .select("id, admin_id, admin_role, action_type, target_user_id, action_detail, created_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (cursor) query = query.lt("created_at", cursor);
+  if (adminId) query = query.eq("admin_id", adminId);
+  if (actionType) query = query.eq("action_type", actionType);
+  const { data, error } = await query;
+  if (error) return err(res, error.message, 500);
+
+  const adminIds = Array.from(new Set((data ?? []).map((r) => r.admin_id as string)));
+  const { data: admins } = adminIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id, full_name").in("id", adminIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((admins ?? []).map((a) => [a.id as string, a.full_name as string]));
+
+  return ok(res, (data ?? []).map((r) => ({
+    id: r.id, adminId: r.admin_id, adminName: nameById.get(r.admin_id as string) ?? "Someone",
+    adminRole: r.admin_role, actionType: r.action_type, targetUserId: r.target_user_id,
+    actionDetail: r.action_detail, createdAt: r.created_at,
+  })));
+});
+
+// GET /admin/activity/my-stats — any admin, own activity only. Stats are
+// computed from whatever's actually been logged via logAdminActivity/
+// POST /admin/activity/log — real numbers, but only as complete as the
+// call sites that log activity (currently: appointments, help-request
+// resolution; not yet every admin action in this 1500+ line file).
+router.get("/activity/my-stats", async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const adminRole = (req as any).adminRole as string;
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: myConvos } = await supabaseWrite.from("p2p_conversation_members").select("conversation_id").eq("user_id", adminId);
+  const myConvoIds = (myConvos ?? []).map((m) => m.conversation_id as string);
+
+  const [{ data: weekActivity }, { data: feedback }, { data: openConvos }] = await Promise.all([
+    supabaseWrite.from("p2p_admin_activity_log").select("action_type, created_at").eq("admin_id", adminId).gte("created_at", weekAgo),
+    supabaseWrite.from("p2p_admin_interaction_feedback").select("rating").eq("admin_user_id", adminId),
+    myConvoIds.length
+      ? supabaseWrite.from("p2p_conversations").select("id, resolved_at").eq("conversation_type", "help_request").is("resolved_at", null).in("id", myConvoIds)
+      : Promise.resolve({ data: [] as { id: string; resolved_at: string | null }[] }),
+  ]);
+
+  const casesHandled = (weekActivity ?? []).filter((a) => a.action_type === "case_resolved").length;
+  const ratings = (feedback ?? []).map((f) => f.rating).filter((r): r is number => r != null);
+  const avgFeedbackRating = ratings.length ? Math.round((ratings.reduce((s, r) => s + r, 0) / ratings.length) * 10) / 10 : null;
+
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+
+  return ok(res, {
+    role: adminRole,
+    casesHandled,
+    avgResponseMinutes: null,
+    avgFeedbackRating,
+    openCases: (openConvos ?? []).length,
+    weekLabel: `Week of ${weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+  });
+});
+
+// ── Admin reports ─────────────────────────────────────────────────────────────
+// Shared with the cron jobs in lib/adminReports.ts (generateWeeklyReportDrafts
+// uses the exact same computation so a submitted report's stats always match
+// what the auto-generated draft showed).
+
+// POST /admin/reports/submit — any admin
+router.post("/reports/submit", async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const adminRole = (req as any).adminRole as string;
+  const { reportPeriod, periodStart, periodEnd, adminNotes } = req.body as {
+    reportPeriod?: "weekly" | "monthly" | "annual"; periodStart?: string; periodEnd?: string; adminNotes?: string;
+  };
+  if (!reportPeriod || !periodStart || !periodEnd) return err(res, "reportPeriod, periodStart, and periodEnd are required", 400);
+
+  const stats = await computeReportStats(adminId, periodStart, periodEnd);
+  const { data, error } = await supabaseWrite
+    .from("p2p_admin_reports")
+    .insert({
+      admin_id: adminId, admin_role: adminRole, report_period: reportPeriod,
+      period_start: periodStart, period_end: periodEnd, stats, admin_notes: adminNotes?.trim() || null,
+      submitted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error || !data) return err(res, error?.message ?? "Failed to submit report", 500);
+
+  await logAdminActivity({ adminId, adminRole, actionType: "report_submitted", targetResourceId: data.id, targetResourceType: "admin_report" });
+
+  const { data: supervisors } = await supabaseWrite.from("p2p_profiles").select("id").in("role", ["super_admin", "admin_supervisor"]);
+  if (supervisors?.length) {
+    await supabaseWrite.from("p2p_notifications").insert(
+      supervisors.map((s) => ({
+        user_id: s.id, title: "New admin report submitted",
+        message: `A ${reportPeriod} report has been submitted for review.`,
+        notification_type: "admin_report_submitted", data: { reportId: data.id, adminId },
+      }))
+    );
+  }
+
+  return ok(res, { id: data.id });
+});
+
+// GET /admin/reports/my-reports — any admin
+router.get("/reports/my-reports", async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const { data, error } = await supabaseWrite
+    .from("p2p_admin_reports").select("*").eq("admin_id", adminId).order("period_start", { ascending: false });
+  if (error) return err(res, error.message, 500);
+  return ok(res, data ?? []);
+});
+
+// GET /admin/reports/all — super_admin + admin_supervisor + admin_zone
+router.get("/reports/all", requireRole("admin_supervisor", "admin_zone"), async (req, res) => {
+  const { role, period } = req.query as { role?: string; period?: string };
+  let query = supabaseWrite.from("p2p_admin_reports").select("*").order("submitted_at", { ascending: false, nullsFirst: false });
+  if (role) query = query.eq("admin_role", role);
+  if (period) query = query.eq("report_period", period);
+  const { data, error } = await query;
+  if (error) return err(res, error.message, 500);
+  return ok(res, data ?? []);
 });
 
 export default router;

@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { CircleSessionBanner } from "@/components/CircleSessionBanner";
+import { MessageBanner } from "@/components/MessageBanner";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
 import { CategoryCompletionModal } from "@/components/CategoryCompletionModal";
@@ -276,6 +277,32 @@ function CompletionMomentHost() {
   return null;
 }
 
+// New message on a conversation the user isn't currently viewing — see
+// handleIncomingMessageForBanner in DataContext, same host pattern as
+// CircleSessionBannerHost above.
+function MessageBannerHost() {
+  const { incomingMessageBanner, dismissMessageBanner } = useData();
+  const router = useRouter();
+
+  if (!incomingMessageBanner) return null;
+
+  return (
+    <MessageBanner
+      senderName={incomingMessageBanner.senderName}
+      senderPhotoUrl={incomingMessageBanner.senderPhotoUrl}
+      senderIsOfficial={incomingMessageBanner.senderIsOfficial}
+      senderOfficialType={incomingMessageBanner.senderOfficialType}
+      messageBody={incomingMessageBanner.messageBody}
+      onPress={() => {
+        const conversationId = incomingMessageBanner.conversationId;
+        dismissMessageBanner();
+        router.push(`/messages/${conversationId}` as any);
+      }}
+      onDismiss={dismissMessageBanner}
+    />
+  );
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
@@ -285,6 +312,7 @@ function RootLayoutNav() {
         <IncomingCallHost />
         <CircleSessionBannerHost />
         <CompletionMomentHost />
+        <MessageBannerHost />
       </DataProvider>
     </AuthProvider>
   );

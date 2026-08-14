@@ -1,23 +1,36 @@
-import React, { useCallback, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Platform, ActivityIndicator,
+  Platform, ActivityIndicator, TextInput, Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/contexts/AuthContext";
+import { useData, ConversationSummary } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { OfficialBadge } from "@/components/OfficialBadge";
 import "@/lib/i18n";
 
-interface ConversationRow {
-  id: string;
-  type: "direct" | "group";
-  name: string | null;
-  lastMessage: string | null;
-  lastAt: string | null;
+type TabKey = "all" | "unread" | "favourites" | "peer_groups" | "circles";
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "unread", label: "Unread" },
+  { key: "favourites", label: "Favourites" },
+  { key: "peer_groups", label: "Peer Groups" },
+  { key: "circles", label: "Circles" },
+];
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
 function makeStyles(c: AppColors) {
@@ -32,6 +45,25 @@ function makeStyles(c: AppColors) {
       width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(29,158,117,0.1)",
       alignItems: "center", justifyContent: "center",
     },
+    searchRow: {
+      flexDirection: "row", alignItems: "center", gap: 8,
+      marginHorizontal: 20, marginBottom: 12,
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
+      borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
+    tabsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginBottom: 8 },
+    tabChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16 },
+    tabChipActive: { backgroundColor: c.accentGreen },
+    tabChipText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
+    tabChipTextActive: { color: "#fff", fontWeight: "700" },
+    requestsBanner: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      marginHorizontal: 20, marginBottom: 8, padding: 12,
+      backgroundColor: "rgba(184,134,11,0.1)", borderWidth: 1, borderColor: "rgba(184,134,11,0.3)",
+      borderRadius: 12,
+    },
+    requestsBannerText: { fontSize: 13, fontWeight: "600", color: "#B8860B", fontFamily: "Inter_600SemiBold" },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 40 },
     emptyText: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     emptySub: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular" },
@@ -45,8 +77,20 @@ function makeStyles(c: AppColors) {
       backgroundColor: "rgba(29,158,117,0.12)",
       alignItems: "center", justifyContent: "center",
     },
-    rowTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    rowTop: { flexDirection: "row", alignItems: "center" },
+    rowTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+    rowTitleUnread: { fontWeight: "700" },
+    unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen, marginRight: 6 },
+    systemPin: { marginLeft: 4 },
     rowSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    rowSubUnread: { color: c.textDark, fontFamily: "Inter_500Medium" },
+    rowRight: { alignItems: "flex-end", gap: 4 },
+    timeText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    unreadBadge: {
+      minWidth: 20, height: 20, borderRadius: 10, backgroundColor: c.accentGreen,
+      alignItems: "center", justifyContent: "center", paddingHorizontal: 5,
+    },
+    unreadBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }
 
@@ -54,54 +98,56 @@ export default function MessagesTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
-  const { supabase, user } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const [rows, setRows] = useState<ConversationRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    conversations, conversationsLoading, loadConversations,
+    pendingConnectionRequestCount, addToFavourites, removeFromFavourites,
+    pinConversation, unpinConversation,
+  } = useData();
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data: memberships } = await supabase
-      .from("p2p_conversation_members")
-      .select("conversation_id")
-      .eq("user_id", user.id);
-    const convIds = (memberships ?? []).map((m: any) => m.conversation_id);
-    if (convIds.length === 0) { setRows([]); setLoading(false); return; }
+  const [tab, setTab] = useState<TabKey>("all");
+  const [search, setSearch] = useState("");
 
-    const { data: convs } = await supabase
-      .from("p2p_conversations")
-      .select("id, type, name")
-      .in("id", convIds);
+  useFocusEffect(React.useCallback(() => { loadConversations(); }, [loadConversations]));
 
-    const results: ConversationRow[] = [];
-    for (const c of convs ?? []) {
-      let name = c.name as string | null;
-      if (c.type === "direct") {
-        const { data: members } = await supabase
-          .from("p2p_conversation_members")
-          .select("user_id, p2p_profiles(full_name)")
-          .eq("conversation_id", c.id)
-          .neq("user_id", user.id)
-          .maybeSingle();
-        name = (members as any)?.p2p_profiles?.full_name ?? "Direct message";
-      }
-      const { data: lastMsg } = await supabase
-        .from("p2p_messages")
-        .select("body, created_at")
-        .eq("conversation_id", c.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      results.push({ id: c.id, type: c.type, name, lastMessage: lastMsg?.body ?? null, lastAt: lastMsg?.created_at ?? null });
+  const filtered = useMemo(() => {
+    let rows = conversations;
+    if (tab === "unread") rows = rows.filter((c) => c.unreadCount > 0);
+    else if (tab === "favourites") rows = rows.filter((c) => c.isFavourite);
+    else if (tab === "peer_groups") rows = rows.filter((c) => c.conversationType === "peer_group");
+    else if (tab === "circles") rows = rows.filter((c) => c.conversationType === "circle");
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      rows = rows.filter((c) => (c.name ?? "").toLowerCase().includes(q));
     }
-    results.sort((a, b) => (b.lastAt ?? "").localeCompare(a.lastAt ?? ""));
-    setRows(results);
-    setLoading(false);
-  }, [supabase, user]);
+    return rows;
+  }, [conversations, tab, search]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  function handleLongPressRow(item: ConversationSummary) {
+    const options: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[] = [];
+    options.push({
+      text: item.isFavourite ? "Remove from Favourites" : "Add to Favourites",
+      onPress: () => (item.isFavourite ? removeFromFavourites(item.id) : addToFavourites(item.id)).then(loadConversations),
+    });
+    if (!item.isPinnedBySystem) {
+      options.push({
+        text: item.isPinnedByUser ? "Unpin" : "Pin to top",
+        onPress: () => (item.isPinnedByUser ? unpinConversation(item.id) : pinConversation(item.id)).then(loadConversations),
+      });
+    }
+    options.push({ text: "Cancel", style: "cancel" });
+    Alert.alert(item.name ?? "Conversation", undefined, options);
+  }
+
+  const emptyMessages: Record<TabKey, { title: string; sub: string }> = {
+    all: { title: "No conversations yet", sub: "Start a conversation from a peer's profile or a study group." },
+    unread: { title: "You are all caught up ✓", sub: "No unread messages right now." },
+    favourites: { title: "No favourites yet", sub: "Star conversations to find them quickly here." },
+    peer_groups: { title: "No peer groups yet", sub: "Create one from the Connect tab." },
+    circles: { title: "Not in any circles yet", sub: "Find one in Discover." },
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16) }]}>
@@ -112,45 +158,96 @@ export default function MessagesTab() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search conversations"
+          placeholderTextColor={colors.textMuted}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")}>
+            <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.tabsRow}>
+        {TABS.map((tb) => (
+          <TouchableOpacity
+            key={tb.key}
+            style={[styles.tabChip, tab === tb.key && styles.tabChipActive]}
+            onPress={() => setTab(tb.key)}
+          >
+            <Text style={[styles.tabChipText, tab === tb.key && styles.tabChipTextActive]}>{tb.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {pendingConnectionRequestCount > 0 && (
+        <TouchableOpacity style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>
+          <Text style={styles.requestsBannerText}>Message Requests ({pendingConnectionRequestCount})</Text>
+          <Ionicons name="chevron-forward" size={16} color="#B8860B" />
+        </TouchableOpacity>
+      )}
+
+      {conversationsLoading && conversations.length === 0 ? (
         <View style={styles.centerFill}>
           <ActivityIndicator color={colors.accentGreen} />
         </View>
-      ) : rows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <View style={styles.centerFill}>
           <Ionicons name="chatbubbles-outline" size={44} color={colors.borderBeige} />
-          <Text style={styles.emptyText}>No conversations yet</Text>
-          <Text style={styles.emptySub}>
-            Start a conversation from a peer's profile or a study group.
-          </Text>
+          <Text style={styles.emptyText}>{emptyMessages[tab].title}</Text>
+          <Text style={styles.emptySub}>{emptyMessages[tab].sub}</Text>
         </View>
       ) : (
         <FlatList
-          data={rows}
+          data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.row}
-              activeOpacity={0.8}
-              onPress={() => router.push(`/messages/${item.id}` as any)}
-            >
-              <View style={styles.avatarCircle}>
-                <Ionicons
-                  name={item.type === "group" ? "people" : "person"}
-                  size={20}
-                  color={colors.primaryGreen}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{item.name ?? "Conversation"}</Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {item.lastMessage ?? "No messages yet"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const unread = item.unreadCount > 0;
+            return (
+              <TouchableOpacity
+                style={styles.row}
+                activeOpacity={0.8}
+                onPress={() => router.push(`/messages/${item.id}` as any)}
+                onLongPress={() => handleLongPressRow(item)}
+              >
+                <View style={styles.avatarCircle}>
+                  <Ionicons
+                    name={item.type === "group" ? "people" : "person"}
+                    size={20}
+                    color={colors.primaryGreen}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.rowTop}>
+                    {unread && <View style={styles.unreadDot} />}
+                    <Text style={[styles.rowTitle, unread && styles.rowTitleUnread]} numberOfLines={1}>
+                      {item.name ?? "Conversation"}
+                    </Text>
+                    {item.otherUserOfficialType && <OfficialBadge accountType={item.otherUserOfficialType} size="small" />}
+                    {item.isPinnedBySystem && <Ionicons name="pin" size={13} color="#C0392B" style={styles.systemPin} />}
+                  </View>
+                  <Text style={[styles.rowSub, unread && styles.rowSubUnread]} numberOfLines={1}>
+                    {item.lastMessage ?? "No messages yet"}
+                  </Text>
+                </View>
+                <View style={styles.rowRight}>
+                  <Text style={styles.timeText}>{timeAgo(item.lastMessageAt)}</Text>
+                  {unread && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </View>

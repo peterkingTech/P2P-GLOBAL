@@ -14,6 +14,20 @@ const ADMIN_ROLES = new Set([
   "regional_admin",
   "moderator",
   "super_admin",
+  // Admin hierarchy roles (migration 069) — additive alongside the six roles
+  // above, none of which they replace.
+  "admin_supervisor",
+  "admin_zone",
+  "admin_national",
+  "admin_content",
+  "admin_translation",
+  "admin_moderation",
+  "admin_verification",
+  "admin_help",
+  "admin_username",
+  "admin_finance",
+  "admin_marketing",
+  "admin_church",
 ]);
 
 /**
@@ -60,11 +74,34 @@ export async function requireAdmin(
   }
 
   if (!ADMIN_ROLES.has(profile.role as string)) {
-    res.status(403).json({ error: "Admin access required (peer_guide, church_leader, regional_admin, moderator, or super_admin role)." });
+    res.status(403).json({ error: "Admin access required (peer_guide, church_leader, regional_admin, moderator, super_admin, or an admin_* role)." });
     return;
   }
 
-  // Attach user ID for downstream use
+  // Attach user ID + role for downstream use
   (req as any).adminUserId = user.id;
+  (req as any).adminRole = profile.role as string;
   next();
+}
+
+/**
+ * Stacks on top of requireAdmin (which must run first — see admin.ts's
+ * blanket router.use(requireAdmin)) to further restrict a specific route to
+ * a subset of admin roles. super_admin always passes, matching this
+ * codebase's existing "super_admin is the full-access escape hatch"
+ * convention (see p2p_start_direct_conversation, migration 021/067).
+ */
+export function requireRole(...allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = (req as any).adminRole as string | undefined;
+    if (!role) {
+      res.status(401).json({ error: "Unauthorized." });
+      return;
+    }
+    if (role !== "super_admin" && !allowedRoles.includes(role)) {
+      res.status(403).json({ error: `This action requires one of: ${allowedRoles.join(", ")}.` });
+      return;
+    }
+    next();
+  };
 }

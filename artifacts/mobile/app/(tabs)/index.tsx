@@ -198,6 +198,22 @@ function PeerGuideAlertCard({ count, onPress, colors }: { count: number; onPress
   );
 }
 
+function UnreadMessagesCard({ count, preview, onPress, colors }: { count: number; preview: string | null; onPress: () => void; colors: any }) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.elijahIconWrap}>
+        <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accentGreen} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.elijahTitle}>{count} unread {count === 1 ? "message" : "messages"}</Text>
+        {preview && <Text style={styles.elijahSub} numberOfLines={1}>{preview}</Text>}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.accentGreen} />
+    </TouchableOpacity>
+  );
+}
+
 function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void; onDismiss: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
@@ -405,7 +421,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -630,6 +646,19 @@ export default function HomeTab() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/elijah-response" as any);
+          }}
+        />
+      )}
+
+      {/* Unread messages preview */}
+      {totalUnreadCount > 0 && (
+        <UnreadMessagesCard
+          count={totalUnreadCount}
+          preview={mostRecentUnread?.lastMessage ?? null}
+          colors={colors}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/(tabs)/messages" as any);
           }}
         />
       )}

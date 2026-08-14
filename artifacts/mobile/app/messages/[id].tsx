@@ -10,14 +10,17 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Alert,
+  Share,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import type { OfficialAccountType } from "@/contexts/AuthContext";
 import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { OfficialBadge } from "@/components/OfficialBadge";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -29,7 +32,40 @@ interface Message {
   created_at: string;
   senderName?: string;
   message_type?: string;
+  is_pinned?: boolean;
+  pinned_label?: string | null;
+  is_official_response?: boolean;
+  crisis_context?: string | null;
 }
+
+type CrisisThreadType = "watchtower" | "help_request" | "pastoral_checkin" | "support";
+
+const CRISIS_BANNER_CONFIG: Record<CrisisThreadType, { icon: string; label: string; color: string; description: string }> = {
+  watchtower: { icon: "🛡️", label: "CRISIS RESPONSE", color: "#C0392B", description: "Response to your Watchtower alert" },
+  help_request: { icon: "🆘", label: "HELP REQUEST RESPONSE", color: "#B8860B", description: "Response to your help request" },
+  pastoral_checkin: { icon: "🙏", label: "PASTORAL CHECK-IN", color: "#1D4E2B", description: "A support team member is following up" },
+  support: { icon: "ℹ️", label: "SUPPORT MESSAGE", color: "#1D9E75", description: "Official message from P2P Global Support" },
+};
+
+function CrisisThreadBanner({ crisisType, submittedAt }: { crisisType: CrisisThreadType; submittedAt: string | null }) {
+  const config = CRISIS_BANNER_CONFIG[crisisType];
+  return (
+    <View style={[bannerStyles.banner, { backgroundColor: `${config.color}20`, borderLeftColor: config.color }]}>
+      <Text style={[bannerStyles.label, { color: config.color }]}>{config.icon} {config.label}</Text>
+      <Text style={bannerStyles.description}>{config.description}</Text>
+      {submittedAt && (
+        <Text style={bannerStyles.submitted}>Submitted: {new Date(submittedAt).toLocaleDateString()}</Text>
+      )}
+    </View>
+  );
+}
+
+const bannerStyles = StyleSheet.create({
+  banner: { borderLeftWidth: 4, padding: 12, marginHorizontal: 16, marginTop: 12, borderRadius: 8 },
+  label: { fontWeight: "700", fontSize: 12, fontFamily: "Inter_700Bold" },
+  description: { color: colors.textDark, fontSize: 13, marginTop: 2, fontFamily: "Inter_400Regular" },
+  submitted: { color: colors.textMuted, fontSize: 11, marginTop: 2, fontFamily: "Inter_400Regular" },
+});
 
 const MENTION_PATTERN = /@[a-zA-Z][a-zA-Z0-9._]{2,19}/g;
 
@@ -62,12 +98,19 @@ export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { supabase, user } = useAuth();
-  const { reportContent } = useData();
+  const { reportContent, pinMessage, unpinMessage, setActiveConversationId } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const [title, setTitle] = useState("Conversation");
   const [isDirect, setIsDirect] = useState(false);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [otherUserVerified, setOtherUserVerified] = useState(false);
+  const [otherUserOfficialType, setOtherUserOfficialType] = useState<OfficialAccountType | null>(null);
+  const [crisisType, setCrisisType] = useState<CrisisThreadType | null>(null);
+  const [crisisSubmittedAt, setCrisisSubmittedAt] = useState<string | null>(null);
+  const [helpRequestId, setHelpRequestId] = useState<string | null>(null);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
   const [text, setText] = useState("");
   const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
@@ -83,41 +126,59 @@ export default function ChatScreen() {
     setLoading(true);
     const { data: conv } = await supabase
       .from("p2p_conversations")
-      .select("id, type, name")
+      .select("id, type, name, crisis_type, crisis_submitted_at, help_request_id, feedback_requested, feedback_submitted")
       .eq("id", id)
       .maybeSingle();
+    setCrisisType((conv?.crisis_type as CrisisThreadType | null) ?? null);
+    setCrisisSubmittedAt((conv?.crisis_submitted_at as string | null) ?? null);
+    setHelpRequestId((conv?.help_request_id as string | null) ?? null);
+    setShowFeedbackPrompt(!!conv?.feedback_requested && !conv?.feedback_submitted);
     if (conv?.type === "direct") {
       setIsDirect(true);
       const { data: members } = await supabase
         .from("p2p_conversation_members")
-        .select("user_id, p2p_profiles(full_name, is_verified)")
+        .select("user_id, p2p_profiles(full_name, is_verified, official_account_type)")
         .eq("conversation_id", id)
         .neq("user_id", user.id)
         .maybeSingle();
       setOtherUserId((members as any)?.user_id ?? null);
       setTitle((members as any)?.p2p_profiles?.full_name ?? "Direct message");
       setOtherUserVerified((members as any)?.p2p_profiles?.is_verified ?? false);
+      setOtherUserOfficialType((members as any)?.p2p_profiles?.official_account_type ?? null);
     } else {
       setIsDirect(false);
       setTitle(conv?.name ?? "Group chat");
+      setOtherUserOfficialType(null);
     }
 
-    const { data: msgs } = await supabase
-      .from("p2p_messages")
-      .select("id, conversation_id, sender_id, body, created_at, message_type, p2p_profiles(full_name)")
-      .eq("conversation_id", id)
-      .order("created_at", { ascending: true });
-    setMessages(
-      (msgs ?? []).map((m: any) => ({
-        id: m.id,
-        conversation_id: m.conversation_id,
-        sender_id: m.sender_id,
-        body: m.body,
-        message_type: m.message_type,
-        created_at: m.created_at,
-        senderName: m.p2p_profiles?.full_name,
-      }))
-    );
+    const [{ data: msgs }, { data: pinned }] = await Promise.all([
+      supabase
+        .from("p2p_messages")
+        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, p2p_profiles(full_name)")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("p2p_messages")
+        .select("id, conversation_id, sender_id, body, created_at, pinned_label, p2p_profiles(full_name)")
+        .eq("conversation_id", id)
+        .eq("is_pinned", true)
+        .order("pinned_at", { ascending: false }),
+    ]);
+    const mapMsg = (m: any): Message => ({
+      id: m.id,
+      conversation_id: m.conversation_id,
+      sender_id: m.sender_id,
+      body: m.body,
+      message_type: m.message_type,
+      created_at: m.created_at,
+      senderName: m.p2p_profiles?.full_name,
+      is_pinned: m.is_pinned,
+      pinned_label: m.pinned_label,
+      is_official_response: m.is_official_response,
+      crisis_context: m.crisis_context,
+    });
+    setMessages((msgs ?? []).map(mapMsg));
+    setPinnedMessages((pinned ?? []).map(mapMsg));
     setLoading(false);
 
     await supabase
@@ -130,6 +191,14 @@ export default function ChatScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Suppresses the global MessageBanner for whichever conversation is
+  // currently open (see setActiveConversationId in DataContext).
+  useEffect(() => {
+    if (!id) return;
+    setActiveConversationId(id);
+    return () => setActiveConversationId(null);
+  }, [id, setActiveConversationId]);
 
   useEffect(() => {
     if (!id) return;
@@ -197,28 +266,70 @@ export default function ChatScreen() {
 
   function handleLongPressMessage(item: Message) {
     if (item.message_type === "call_summary" || !item.sender_id) return;
-    if (item.sender_id === user?.id) return;
     const senderId = item.sender_id;
+    const mine = senderId === user?.id;
+    const canPin = isDirect || true; // either DM party, or a group/circle leader — enforced server-side by p2p_can_pin_message
+
+    const options: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[] = [];
+
+    if (item.is_pinned) {
+      options.push({
+        text: "Unpin Message",
+        onPress: async () => {
+          const err = await unpinMessage(item.id);
+          if (err) Alert.alert("Couldn't unpin message", err);
+          else load();
+        },
+      });
+    } else if (canPin) {
+      options.push({
+        text: "📌 Pin Message",
+        onPress: () => promptPinLabel(item.id),
+      });
+    }
+
+    options.push({
+      text: "↗️ Share",
+      onPress: () => { Share.share({ message: item.body ?? "" }); },
+    });
+
+    if (!mine) {
+      options.push({
+        text: "Report message",
+        onPress: async () => {
+          const err = await reportContent("message", item.id, "Reported from conversation");
+          Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+        },
+      });
+      options.push({
+        text: "Report profile",
+        style: "destructive",
+        onPress: async () => {
+          const err = await reportContent("profile", senderId, "Reported from conversation");
+          Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+        },
+      });
+    }
+
+    options.push({ text: "Cancel", style: "cancel" });
+    Alert.alert(item.senderName || "Message options", undefined, options);
+  }
+
+  function promptPinLabel(messageId: string) {
+    const labels = ["No label", "Important", "Follow up", "Scripture reference", "Action item"];
     Alert.alert(
-      item.senderName || "This message",
-      "What would you like to report?",
+      "Pin this message",
+      "Add a label (optional)",
       [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Report message",
+        ...labels.map((label) => ({
+          text: label,
           onPress: async () => {
-            const err = await reportContent("message", item.id, "Reported from conversation");
-            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+            const err = await pinMessage(messageId, label === "No label" ? undefined : label);
+            if (err) Alert.alert("Couldn't pin message", err);
+            else load();
           },
-        },
-        {
-          text: "Report profile",
-          style: "destructive",
-          onPress: async () => {
-            const err = await reportContent("profile", senderId, "Reported from conversation");
-            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
-          },
-        },
+        })),
+        { text: "Cancel", style: "cancel" as const },
       ]
     );
   }
@@ -294,6 +405,7 @@ export default function ChatScreen() {
           <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
             <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
             {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
+            {isDirect && otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
           </View>
           {isDirect && otherUserId && (
             <View style={styles.headerCallBtns}>
@@ -307,6 +419,49 @@ export default function ChatScreen() {
           )}
         </View>
 
+        {crisisType && <CrisisThreadBanner crisisType={crisisType} submittedAt={crisisSubmittedAt} />}
+
+        {showFeedbackPrompt && (
+          <TouchableOpacity
+            style={styles.feedbackPrompt}
+            onPress={() => {
+              setShowFeedbackPrompt(false);
+              router.push({
+                pathname: "/feedback/admin-interaction",
+                params: { conversationId: id, helpRequestId: helpRequestId ?? "", adminUserId: otherUserId ?? "" },
+              } as any);
+            }}
+          >
+            <Text style={styles.feedbackPromptText}>How was your support experience? Tap to share feedback.</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.accentGreen} />
+          </TouchableOpacity>
+        )}
+
+        {pinnedMessages.length > 0 && (
+          <View style={styles.pinnedBar}>
+            <TouchableOpacity style={styles.pinnedBarHeader} onPress={() => setPinnedExpanded((v) => !v)}>
+              <Text style={styles.pinnedBarTitle}>
+                📌 {pinnedMessages.length} pinned message{pinnedMessages.length === 1 ? "" : "s"}
+              </Text>
+              <Ionicons name={pinnedExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            {pinnedExpanded && pinnedMessages.map((pm) => (
+              <TouchableOpacity
+                key={pm.id}
+                style={styles.pinnedItem}
+                onPress={() => {
+                  const idx = messages.findIndex((m) => m.id === pm.id);
+                  if (idx >= 0) listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+                }}
+              >
+                <Text style={styles.pinnedItemMeta}>{pm.senderName ?? "Someone"} · {new Date(pm.created_at).toLocaleDateString()}</Text>
+                <Text style={styles.pinnedItemBody} numberOfLines={2}>{pm.body}</Text>
+                {pm.pinned_label && <Text style={styles.pinnedItemLabel}>{pm.pinned_label}</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {loading ? (
           <View style={styles.centerFill}>
             <ActivityIndicator color={colors.accentGreen} />
@@ -318,6 +473,7 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, gap: 8 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+            onScrollToIndexFailed={() => {}}
             renderItem={({ item }) => {
               if (item.message_type === "call_summary") {
                 return (
@@ -329,8 +485,13 @@ export default function ChatScreen() {
               const mine = item.sender_id === user?.id;
               return (
                 <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
+                  {item.is_official_response && (
+                    <Text style={styles.officialResponseLabel}>
+                      Official Response{item.crisis_context ? ` · ${item.crisis_context}` : ""}
+                    </Text>
+                  )}
                   <TouchableOpacity
-                    activeOpacity={mine ? 1 : 0.7}
+                    activeOpacity={0.7}
                     onLongPress={() => handleLongPressMessage(item)}
                     style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
                   >
@@ -340,6 +501,7 @@ export default function ChatScreen() {
                       style={[styles.bubbleText, mine && styles.bubbleTextMine]}
                       linkStyle={styles.mentionLink}
                     />
+                    {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
                   </TouchableOpacity>
                 </View>
               );
@@ -425,6 +587,27 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: colors.accentGreen },
   senderName: { fontSize: 11, fontWeight: "600", color: colors.accentGreen, marginBottom: 2, fontFamily: "Inter_600SemiBold" },
   bubbleText: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
+  officialResponseLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 3, fontFamily: "Inter_400Regular" },
+  feedbackPrompt: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginHorizontal: 16, marginTop: 10, padding: 12,
+    backgroundColor: "rgba(29,158,117,0.08)", borderWidth: 1, borderColor: "rgba(29,158,117,0.3)", borderRadius: 10,
+  },
+  feedbackPromptText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium", flex: 1, marginRight: 8 },
+  pinIcon: { position: "absolute", top: 4, right: 4 },
+  pinnedBar: {
+    marginHorizontal: 16, marginTop: 10, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, overflow: "hidden",
+  },
+  pinnedBarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10 },
+  pinnedBarTitle: { fontSize: 12, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  pinnedItem: { padding: 10, borderTopWidth: 1, borderTopColor: colors.borderBeige },
+  pinnedItemMeta: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular", marginBottom: 2 },
+  pinnedItemBody: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular" },
+  pinnedItemLabel: {
+    fontSize: 10, color: colors.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 3,
+    alignSelf: "flex-start", backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
   bubbleTextMine: { color: "#fff" },
   mentionLink: { color: "#3B82F6", fontFamily: "Inter_600SemiBold" },
   mentionDropdown: {

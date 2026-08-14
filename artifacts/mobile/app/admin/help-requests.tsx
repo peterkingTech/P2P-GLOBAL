@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useData, HelpRequest, HelpRequestTier, HelpRequestStatus } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 const TIER_FILTERS: Array<{ value: HelpRequestTier | "all"; label: string }> = [
@@ -41,6 +42,22 @@ export default function HelpRequestsScreen() {
   const [tierFilter, setTierFilter] = useState<HelpRequestTier | "all">("all");
   const [statusFilter, setStatusFilter] = useState<HelpRequestStatus | "all">("all");
 
+  // Best-effort — the DM/call itself already succeeded by the time this
+  // runs, so a failure here (e.g. flaky network) shouldn't block the admin;
+  // it just means the crisis thread banner won't show on this particular
+  // conversation.
+  async function linkConversationToHelpRequest(reqId: string, conversationId: string) {
+    try {
+      await authedFetch(`/admin/help-requests/${reqId}/link-conversation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId }),
+      });
+    } catch (e) {
+      console.error("linkConversationToHelpRequest failed", e);
+    }
+  }
+
   async function handleMessageThem(req: HelpRequest) {
     if (!req.userId) {
       Alert.alert("Account removed", "This user's account no longer exists and cannot be messaged.");
@@ -54,6 +71,7 @@ export default function HelpRequestsScreen() {
         Alert.alert("Couldn't start conversation", error?.message ?? "Please try again.");
         return;
       }
+      await linkConversationToHelpRequest(req.id, data as string);
       router.push(`/messages/${data}` as any);
     } catch (e: any) {
       console.error("handleMessageThem threw", e);
@@ -102,6 +120,7 @@ export default function HelpRequestsScreen() {
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
 
+      await linkConversationToHelpRequest(req.id, conversationId as string);
       router.push({
         pathname: "/call/audio",
         params: {
@@ -139,6 +158,30 @@ export default function HelpRequestsScreen() {
     const next: HelpRequestStatus = req.status === "open" ? "contacted" : req.status === "contacted" ? "resolved" : "open";
     setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: next } : r)));
     await updateHelpRequestStatus(req.id, next);
+
+    if (next === "resolved" && req.userId) {
+      try {
+        await authedFetch("/admin/activity/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ actionType: "case_resolved", targetUserId: req.userId, targetResourceId: req.id, targetResourceType: "help_request" }),
+        });
+        const { data: conv } = await supabase
+          .from("p2p_conversations")
+          .select("id")
+          .eq("help_request_id", req.id)
+          .maybeSingle();
+        if (conv?.id) {
+          await fetch(`${getApiUrl()}/feedback/request`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ conversationId: conv.id, peerUserId: req.userId }),
+          });
+        }
+      } catch (e) {
+        console.error("feedback request trigger failed", e);
+      }
+    }
   }
 
   return (

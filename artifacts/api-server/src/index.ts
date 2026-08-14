@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { detectInactiveUsers, escalateCrisisCalls } from "./lib/pastoralCare";
 import { sweepBreakRooms } from "./lib/breakRooms";
 import { cleanupVerificationFiles } from "./lib/verificationCleanup";
+import { generateWeeklyReportDrafts, notifyAdminsToSubmitReports, flagOverdueReports, sendSuperAdminDailyDigest } from "./lib/adminReports";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -86,5 +87,39 @@ cron.schedule("0 */6 * * *", async () => {
     }
   } catch (err) {
     logger.error({ err }, "Verification file cleanup failed");
+  }
+});
+
+// Admin weekly report drafts — every Sunday 20:00 UTC. Pre-generates an
+// unsubmitted report (real computed stats, empty notes) per active admin for
+// the week that just ended, then notifies them it's ready.
+cron.schedule("0 20 * * 0", async () => {
+  try {
+    const drafts = await generateWeeklyReportDrafts();
+    const notified = await notifyAdminsToSubmitReports();
+    logger.info({ ...drafts, ...notified }, "Weekly admin report drafts generated");
+  } catch (err) {
+    logger.error({ err }, "Weekly admin report draft generation failed");
+  }
+});
+
+// Overdue admin reports — every Monday 09:00 UTC. Anything still unsubmitted
+// from Sunday's draft generation gets flagged to supervisors/super admin.
+cron.schedule("0 9 * * 1", async () => {
+  try {
+    const result = await flagOverdueReports();
+    if (result.overdue) logger.warn(result, "Overdue admin reports flagged");
+  } catch (err) {
+    logger.error({ err }, "Overdue admin report check failed");
+  }
+});
+
+// Super Admin daily digest — every day 08:00 UTC.
+cron.schedule("0 8 * * *", async () => {
+  try {
+    const result = await sendSuperAdminDailyDigest();
+    logger.info(result, "Super Admin daily digest sent");
+  } catch (err) {
+    logger.error({ err }, "Super Admin daily digest failed");
   }
 });

@@ -7,9 +7,10 @@ import React, {
   useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { supabase, useAuth } from "./AuthContext";
+import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "./AuthContext";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -278,6 +279,83 @@ export interface HelpRequest {
   note: string | null;
   status: HelpRequestStatus;
   createdAt: string;
+}
+
+export type ConversationType = "direct" | "crisis_response" | "help_request" | "pastoral" | "support" | "peer_group" | "circle";
+
+export interface ConversationSummary {
+  id: string;
+  type: "direct" | "group";
+  conversationType: ConversationType;
+  name: string | null;
+  otherUserId: string | null;
+  otherUserVerified: boolean;
+  otherUserIsOfficial: boolean;
+  otherUserOfficialType: OfficialAccountType | null;
+  memberCount: number;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+  isPinnedBySystem: boolean;
+  isPinnedByUser: boolean;
+  isFavourite: boolean;
+  isMuted: boolean;
+}
+
+export interface IncomingMessageBannerInfo {
+  conversationId: string;
+  messageBody: string;
+  senderName: string;
+  senderPhotoUrl: string | null;
+  senderIsOfficial: boolean;
+  senderOfficialType: OfficialAccountType | null;
+}
+
+export interface AdminFeedbackInput {
+  conversationId: string;
+  helpRequestId?: string | null;
+  adminUserId: string;
+  rating: number;
+  wasTimely: boolean;
+  wasRespectful: boolean;
+  wasHelpful: boolean;
+  wasRude: boolean;
+  didNotAddressConcern: boolean;
+  freeText?: string;
+}
+
+export interface AdminStats {
+  role: string;
+  casesHandled: number;
+  avgResponseMinutes: number | null;
+  avgFeedbackRating: number | null;
+  openCases: number;
+  weekLabel: string;
+}
+
+export interface AdminActivityEntry {
+  id: string;
+  adminId: string;
+  adminName: string;
+  adminRole: string;
+  actionType: string;
+  targetUserId: string | null;
+  actionDetail: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AdminAccountEntry {
+  id: string;
+  username: string | null;
+  fullName: string;
+  role: string;
+  adminZone: string | null;
+  adminCountry: string | null;
+  adminIsActive: boolean;
+  adminAppointedAt: string | null;
+  lastActiveAt: string | null;
+  casesThisWeek: number;
+  avgRating: number | null;
 }
 
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
@@ -922,6 +1000,46 @@ interface DataContextValue {
   peopleInvited: number;
   getMyInviteLink: () => Promise<string>;
   refreshGrainCount: () => Promise<void>;
+
+  // ── Messaging overhaul ──────────────────────────────────────────────────────
+  conversations: ConversationSummary[];
+  conversationsLoading: boolean;
+  totalUnreadCount: number;
+  mostRecentUnread: ConversationSummary | null;
+  loadConversations: () => Promise<void>;
+  pinMessage: (messageId: string, label?: string) => Promise<string | null>;
+  unpinMessage: (messageId: string) => Promise<string | null>;
+  pinConversation: (conversationId: string) => Promise<string | null>;
+  unpinConversation: (conversationId: string) => Promise<string | null>;
+  addToFavourites: (conversationId: string) => Promise<string | null>;
+  removeFromFavourites: (conversationId: string) => Promise<string | null>;
+  submitAdminFeedback: (data: AdminFeedbackInput) => Promise<string | null>;
+  pendingConnectionRequestCount: number;
+  incomingMessageBanner: IncomingMessageBannerInfo | null;
+  dismissMessageBanner: () => void;
+  setActiveConversationId: (id: string | null) => void;
+
+  // ── Admin hierarchy ──────────────────────────────────────────────────────────
+  adminRole: DiscipleRole | null;
+  adminStats: AdminStats | null;
+  loadAdminStats: () => Promise<void>;
+  submitAdminReport: (report: { reportPeriod: "weekly" | "monthly" | "annual"; periodStart: string; periodEnd: string; adminNotes: string }) => Promise<string | null>;
+  appointAdmin: (username: string, role: string, options: { adminZone?: string; adminCountry?: string; reason: string }) => Promise<string | null>;
+  removeAdmin: (userId: string, reason: string) => Promise<string | null>;
+  suspendAdmin: (userId: string, reason: string) => Promise<string | null>;
+  getAdminList: () => Promise<AdminAccountEntry[]>;
+  getAdminActivityFeed: (cursor?: string) => Promise<AdminActivityEntry[]>;
+}
+
+// Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
+// list reflects a pin/favourite toggle immediately rather than waiting on the
+// next loadConversations() poll/realtime tick.
+function mapSettingUpdatesToSummary(updates: Record<string, unknown>): Partial<ConversationSummary> {
+  const out: Partial<ConversationSummary> = {};
+  if ("is_pinned" in updates) out.isPinnedByUser = updates.is_pinned as boolean;
+  if ("is_favourite" in updates) out.isFavourite = updates.is_favourite as boolean;
+  if ("is_muted" in updates) out.isMuted = updates.is_muted as boolean;
+  return out;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -981,6 +1099,17 @@ async function uploadSubmissionMedia(
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [pendingConnectionRequestCount, setPendingConnectionRequestCount] = useState(0);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [incomingMessageBanner, setIncomingMessageBanner] = useState<IncomingMessageBannerInfo | null>(null);
+  // Ref, not state — read inside the realtime callback's closure without
+  // forcing the channel to resubscribe every time the user opens/leaves a
+  // conversation (see setActiveConversationId / messages/[id].tsx).
+  const activeConversationIdRef = useRef<string | null>(null);
+  const setActiveConversationId = useCallback((id: string | null) => { activeConversationIdRef.current = id; }, []);
+  const dismissMessageBanner = useCallback(() => setIncomingMessageBanner(null), []);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUserEntry[]>([]);
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
   const [grainCount, setGrainCount] = useState(0);
@@ -3470,6 +3599,301 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  // ── Messaging overhaul ──────────────────────────────────────────────────────
+  const loadConversations = useCallback(async () => {
+    if (!profile) { setConversations([]); return; }
+    setConversationsLoading(true);
+    try {
+      const { data: memberships } = await supabase
+        .from("p2p_conversation_members")
+        .select("conversation_id, last_read_at")
+        .eq("user_id", profile.id);
+      const convIds = (memberships ?? []).map((m: any) => m.conversation_id as string);
+      const lastReadById = new Map((memberships ?? []).map((m: any) => [m.conversation_id, m.last_read_at as string]));
+      if (convIds.length === 0) { setConversations([]); setConversationsLoading(false); return; }
+
+      const [{ data: convs }, { data: allMembers }, { data: recentMessages }, { data: settingsRows }] = await Promise.all([
+        supabase.from("p2p_conversations")
+          .select("id, type, conversation_type, name, group_id, circle_id, is_pinned_by_system")
+          .in("id", convIds),
+        supabase.from("p2p_conversation_members")
+          .select("conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type)")
+          .in("conversation_id", convIds)
+          .neq("user_id", profile.id),
+        supabase.from("p2p_messages")
+          .select("conversation_id, body, sender_id, created_at")
+          .in("conversation_id", convIds)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase.from("p2p_conversation_settings")
+          .select("conversation_id, is_pinned, is_favourite, is_muted")
+          .eq("user_id", profile.id)
+          .in("conversation_id", convIds),
+      ]);
+
+      const otherMemberByConv = new Map<string, any>();
+      const memberCountByConv = new Map<string, number>();
+      for (const m of (allMembers ?? []) as any[]) {
+        memberCountByConv.set(m.conversation_id, (memberCountByConv.get(m.conversation_id) ?? 0) + 1);
+        if (!otherMemberByConv.has(m.conversation_id)) otherMemberByConv.set(m.conversation_id, m);
+      }
+
+      const lastMsgByConv = new Map<string, any>();
+      const unreadCountByConv = new Map<string, number>();
+      for (const m of (recentMessages ?? []) as any[]) {
+        if (!lastMsgByConv.has(m.conversation_id)) lastMsgByConv.set(m.conversation_id, m);
+        const lastRead = lastReadById.get(m.conversation_id);
+        if (m.sender_id !== profile.id && (!lastRead || m.created_at > lastRead)) {
+          unreadCountByConv.set(m.conversation_id, (unreadCountByConv.get(m.conversation_id) ?? 0) + 1);
+        }
+      }
+      const settingsByConv = new Map((settingsRows ?? []).map((s: any) => [s.conversation_id, s]));
+
+      const results: ConversationSummary[] = ((convs ?? []) as any[]).map((c) => {
+        const other = otherMemberByConv.get(c.id);
+        const otherProfile = other?.p2p_profiles;
+        const lastMsg = lastMsgByConv.get(c.id);
+        const settings = settingsByConv.get(c.id);
+        let name = c.name as string | null;
+        if (c.type === "direct" && otherProfile) name = otherProfile.full_name ?? "Direct message";
+        return {
+          id: c.id,
+          type: c.type,
+          conversationType: (c.conversation_type ?? "direct") as ConversationType,
+          name,
+          otherUserId: other?.user_id ?? null,
+          otherUserVerified: otherProfile?.is_verified ?? false,
+          otherUserIsOfficial: otherProfile?.is_official_account ?? false,
+          otherUserOfficialType: otherProfile?.official_account_type ?? null,
+          memberCount: memberCountByConv.get(c.id) ?? 0,
+          lastMessage: lastMsg?.body ?? null,
+          lastMessageAt: lastMsg?.created_at ?? null,
+          unreadCount: unreadCountByConv.get(c.id) ?? 0,
+          isPinnedBySystem: c.is_pinned_by_system ?? false,
+          isPinnedByUser: settings?.is_pinned ?? false,
+          isFavourite: settings?.is_favourite ?? false,
+          isMuted: settings?.is_muted ?? false,
+        };
+      });
+      results.sort((a, b) => {
+        if (a.isPinnedBySystem !== b.isPinnedBySystem) return a.isPinnedBySystem ? -1 : 1;
+        if (a.isPinnedByUser !== b.isPinnedByUser) return a.isPinnedByUser ? -1 : 1;
+        return (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? "");
+      });
+      setConversations(results);
+    } catch (e) {
+      console.error("loadConversations failed", e);
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, [profile]);
+
+  // In-app banner for a new message on a conversation the user isn't
+  // currently viewing (activeConversationIdRef, set by messages/[id].tsx on
+  // mount/unmount) and didn't send themselves. Auto-clears after 4s.
+  const handleIncomingMessageForBanner = useCallback(async (row: Record<string, unknown>) => {
+    if (!profile) return;
+    const conversationId = row.conversation_id as string;
+    const senderId = row.sender_id as string | null;
+    if (!senderId || senderId === profile.id) return;
+    if (conversationId === activeConversationIdRef.current) return;
+    if (row.message_type && row.message_type !== "text") return;
+
+    const { data: sender } = await supabase
+      .from("p2p_profiles")
+      .select("full_name, photo_url, is_official_account, official_account_type")
+      .eq("id", senderId)
+      .maybeSingle();
+    if (!sender) return;
+
+    setIncomingMessageBanner({
+      conversationId,
+      messageBody: (row.body as string) ?? "",
+      senderName: (sender.full_name as string) ?? "Someone",
+      senderPhotoUrl: (sender.photo_url as string | null) ?? null,
+      senderIsOfficial: (sender.is_official_account as boolean) ?? false,
+      senderOfficialType: (sender.official_account_type as OfficialAccountType | null) ?? null,
+    });
+    setTimeout(() => {
+      setIncomingMessageBanner((prev) => (prev?.conversationId === conversationId ? null : prev));
+    }, 4000);
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    loadConversations();
+    const channel = supabase
+      .channel(`p2p_inbox_${profile.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "p2p_messages" }, (payload) => {
+        loadConversations();
+        handleIncomingMessageForBanner(payload.new as Record<string, unknown>);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile?.id) { setPendingConnectionRequestCount(0); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${getApiUrl()}/connections/pending/${profile.id}`);
+        const body = await res.json();
+        setPendingConnectionRequestCount(Array.isArray(body) ? body.length : 0);
+      } catch {
+        setPendingConnectionRequestCount(0);
+      }
+    })();
+  }, [profile?.id]);
+
+  const mostRecentUnread = conversations.filter((c) => c.unreadCount > 0)
+    .sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""))[0] ?? null;
+  const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+
+  const pinMessage = useCallback(async (messageId: string, label?: string): Promise<string | null> => {
+    if (!profile) return "Not authenticated";
+    const { error } = await supabase.from("p2p_messages").update({
+      is_pinned: true, pinned_by: profile.id, pinned_at: new Date().toISOString(), pinned_label: label ?? null,
+    }).eq("id", messageId);
+    return error ? error.message : null;
+  }, [profile]);
+
+  const unpinMessage = useCallback(async (messageId: string): Promise<string | null> => {
+    const { error } = await supabase.from("p2p_messages").update({
+      is_pinned: false, pinned_by: null, pinned_at: null, pinned_label: null,
+    }).eq("id", messageId);
+    return error ? error.message : null;
+  }, []);
+
+  const upsertConversationSetting = useCallback(async (conversationId: string, updates: Record<string, unknown>): Promise<string | null> => {
+    if (!profile) return "Not authenticated";
+    const { error } = await supabase.from("p2p_conversation_settings").upsert(
+      { user_id: profile.id, conversation_id: conversationId, ...updates, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,conversation_id" }
+    );
+    if (!error) setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, ...mapSettingUpdatesToSummary(updates) } : c)));
+    return error ? error.message : null;
+  }, [profile]);
+
+  const pinConversation = useCallback((id: string) => upsertConversationSetting(id, { is_pinned: true, pinned_at: new Date().toISOString() }), [upsertConversationSetting]);
+  const unpinConversation = useCallback((id: string) => upsertConversationSetting(id, { is_pinned: false }), [upsertConversationSetting]);
+  const addToFavourites = useCallback((id: string) => upsertConversationSetting(id, { is_favourite: true, favourited_at: new Date().toISOString() }), [upsertConversationSetting]);
+  const removeFromFavourites = useCallback((id: string) => upsertConversationSetting(id, { is_favourite: false }), [upsertConversationSetting]);
+
+  const submitAdminFeedback = useCallback(async (data: AdminFeedbackInput): Promise<string | null> => {
+    if (!profile) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/feedback/admin-interaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, peerUserId: profile.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't submit feedback";
+      return null;
+    } catch {
+      return "Couldn't submit feedback. Please check your connection.";
+    }
+  }, [profile]);
+
+  // ── Admin hierarchy ──────────────────────────────────────────────────────────
+  const adminRole = (profile?.role && profile.role !== "student" ? profile.role : null) as DiscipleRole | null;
+
+  const loadAdminStats = useCallback(async () => {
+    if (!adminRole) { setAdminStats(null); return; }
+    try {
+      const res = await authedFetch("/admin/activity/my-stats");
+      if (!res.ok) { setAdminStats(null); return; }
+      const body = await res.json();
+      setAdminStats(body as AdminStats);
+    } catch (e) {
+      console.error("loadAdminStats failed", e);
+      setAdminStats(null);
+    }
+  }, [adminRole]);
+
+  const submitAdminReport = useCallback(async (report: { reportPeriod: "weekly" | "monthly" | "annual"; periodStart: string; periodEnd: string; adminNotes: string }): Promise<string | null> => {
+    try {
+      const res = await authedFetch("/admin/reports/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(report),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't submit report";
+      return null;
+    } catch {
+      return "Couldn't submit report. Please check your connection.";
+    }
+  }, []);
+
+  const appointAdmin = useCallback(async (username: string, role: string, options: { adminZone?: string; adminCountry?: string; reason: string }): Promise<string | null> => {
+    try {
+      const res = await authedFetch("/admin/appointments/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, role, admin_zone: options.adminZone, admin_country: options.adminCountry, reason: options.reason }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't appoint admin";
+      return null;
+    } catch {
+      return "Couldn't appoint admin. Please check your connection.";
+    }
+  }, []);
+
+  const removeAdmin = useCallback(async (userId: string, reason: string): Promise<string | null> => {
+    try {
+      const res = await authedFetch(`/admin/appointments/${userId}/remove`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't remove admin";
+      return null;
+    } catch {
+      return "Couldn't remove admin. Please check your connection.";
+    }
+  }, []);
+
+  const suspendAdmin = useCallback(async (userId: string, reason: string): Promise<string | null> => {
+    try {
+      const res = await authedFetch(`/admin/appointments/${userId}/suspend`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't suspend admin";
+      return null;
+    } catch {
+      return "Couldn't suspend admin. Please check your connection.";
+    }
+  }, []);
+
+  const getAdminList = useCallback(async (): Promise<AdminAccountEntry[]> => {
+    try {
+      const res = await authedFetch("/admin/appointments/list");
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getAdminList failed", e);
+      return [];
+    }
+  }, []);
+
+  const getAdminActivityFeed = useCallback(async (cursor?: string): Promise<AdminActivityEntry[]> => {
+    try {
+      const res = await authedFetch(`/admin/activity/live${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getAdminActivityFeed failed", e);
+      return [];
+    }
+  }, []);
+
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
   const refreshTreeData = useCallback(async () => {
@@ -3511,6 +3935,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
       incomingCall, dismissIncomingCall,
       circleSessionInvite, dismissCircleSessionInvite,
+      conversations, conversationsLoading, totalUnreadCount, mostRecentUnread, loadConversations,
+      pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,
+      submitAdminFeedback, pendingConnectionRequestCount,
+      incomingMessageBanner, dismissMessageBanner, setActiveConversationId,
+      adminRole, adminStats, loadAdminStats, submitAdminReport,
+      appointAdmin, removeAdmin, suspendAdmin, getAdminList, getAdminActivityFeed,
     }}>
       {children}
     </DataContext.Provider>

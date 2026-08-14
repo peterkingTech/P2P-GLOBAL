@@ -1,17 +1,19 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { Badge, Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useData } from "@/contexts/DataContext";
 import "@/lib/i18n";
 
 function NativeTabLayout() {
   const { t } = useTranslation();
+  const { totalUnreadCount } = useData();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -25,6 +27,7 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="messages">
         <Icon sf={{ default: "message", selected: "message.fill" }} />
         <Label>{t("tabs.messages")}</Label>
+        <Badge hidden={totalUnreadCount === 0}>{String(totalUnreadCount)}</Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="prayer">
         <Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
@@ -48,6 +51,7 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const { t } = useTranslation();
+  const { totalUnreadCount } = useData();
   // Take the larger of the real device inset and the previous flat value —
   // preserves existing look on devices the old constants already covered,
   // and fixes the gap on devices (e.g. some Android gesture nav) where the
@@ -106,6 +110,9 @@ function ClassicTabLayout() {
                 color={color}
               />
             ),
+            ...(tab.name === "messages" && totalUnreadCount > 0
+              ? { tabBarBadge: totalUnreadCount, tabBarBadgeStyle: { backgroundColor: "#C0392B" } }
+              : {}),
           }}
         />
       ))}

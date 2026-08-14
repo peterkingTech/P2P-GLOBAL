@@ -17,17 +17,32 @@ const ADMIN_ROLES = new Set([
   "regional_admin",
   "moderator",
   "super_admin",
+  // Admin hierarchy roles (migration 069) — additive; none of the six above
+  // are removed or renamed.
+  "admin_supervisor",
+  "admin_zone",
+  "admin_national",
+  "admin_content",
+  "admin_translation",
+  "admin_moderation",
+  "admin_verification",
+  "admin_help",
+  "admin_username",
+  "admin_finance",
+  "admin_marketing",
+  "admin_church",
 ]);
 
 const NAV_ITEMS = [
-  { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin"] },
+  { label: "Dashboard", path: "/admin", icon: "grid" as const, roles: Array.from(ADMIN_ROLES) },
+  { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
-  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin"] },
-  { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin"] },
-  { label: "Usernames", path: "/admin/usernames", icon: "at" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin"] },
-  { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin"] },
-  { label: "Translations", path: "/admin/translations", icon: "language" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin"] },
-  { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin"] },
+  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin", "admin_help"] },
+  { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_moderation"] },
+  { label: "Usernames", path: "/admin/usernames", icon: "at" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_username"] },
+  { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"] },
+  { label: "Translations", path: "/admin/translations", icon: "language" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_translation"] },
+  { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin", "admin_supervisor"] },
 ];
 
 export default function AdminLayout() {
