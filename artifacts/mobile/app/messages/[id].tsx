@@ -21,6 +21,8 @@ import type { OfficialAccountType } from "@/contexts/AuthContext";
 import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { OfficialBadge } from "@/components/OfficialBadge";
+import AudioRecorder from "@/components/AudioRecorder";
+import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -36,6 +38,8 @@ interface Message {
   pinned_label?: string | null;
   is_official_response?: boolean;
   crisis_context?: string | null;
+  media_url?: string | null;
+  media_duration_seconds?: number | null;
 }
 
 type CrisisThreadType = "watchtower" | "help_request" | "pastoral_checkin" | "support";
@@ -112,6 +116,7 @@ export default function ChatScreen() {
   const [helpRequestId, setHelpRequestId] = useState<string | null>(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
+  const [showRecorder, setShowRecorder] = useState(false);
   const [text, setText] = useState("");
   const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
   const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,15 +156,23 @@ export default function ChatScreen() {
       setOtherUserOfficialType(null);
     }
 
-    const [{ data: msgs }, { data: pinned }] = await Promise.all([
+    const [{ data: msgs, error: msgsErr }, { data: pinned, error: pinnedErr }] = await Promise.all([
       supabase
         .from("p2p_messages")
-        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, p2p_profiles(full_name)")
+        // p2p_messages now has two FKs into p2p_profiles (sender_id and
+        // pinned_by, migration 068) — the bare `p2p_profiles(...)` embed
+        // syntax is ambiguous once there's more than one, and PostgREST
+        // errors instead of guessing, which was silently emptying this
+        // entire query (data came back null, and the result was never
+        // checked for .error). Disambiguating by FK constraint name is the
+        // same pattern already used elsewhere in this codebase, e.g.
+        // DataContext's getModerationQueue.
+        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, p2p_profiles!p2p_messages_sender_id_fkey(full_name)")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true }),
       supabase
         .from("p2p_messages")
-        .select("id, conversation_id, sender_id, body, created_at, pinned_label, p2p_profiles(full_name)")
+        .select("id, conversation_id, sender_id, body, created_at, pinned_label, p2p_profiles!p2p_messages_sender_id_fkey(full_name)")
         .eq("conversation_id", id)
         .eq("is_pinned", true)
         .order("pinned_at", { ascending: false }),
@@ -176,7 +189,11 @@ export default function ChatScreen() {
       pinned_label: m.pinned_label,
       is_official_response: m.is_official_response,
       crisis_context: m.crisis_context,
+      media_url: m.media_url,
+      media_duration_seconds: m.media_duration_seconds,
     });
+    if (msgsErr) console.error("Failed to load messages", msgsErr);
+    if (pinnedErr) console.error("Failed to load pinned messages", pinnedErr);
     setMessages((msgs ?? []).map(mapMsg));
     setPinnedMessages((pinned ?? []).map(mapMsg));
     setLoading(false);
@@ -390,6 +407,48 @@ export default function ChatScreen() {
     }
   }
 
+  // Mirrors DataContext's uploadSubmissionMedia (same fetch→arrayBuffer→
+  // storage.upload shape) but against the public 'voice-messages' bucket
+  // (migration 070) instead of the signed-URL 'submissions' bucket, since a
+  // voice note needs to render inline as soon as the message list refreshes
+  // rather than requiring a signed-URL round trip per bubble.
+  async function handleSendVoice(localUri: string, durationSeconds: number) {
+    if (!id || !user) return;
+    try {
+      const ext = localUri.split(".").pop()?.toLowerCase() || "m4a";
+      const path = `${user.id}/${id}/${Date.now()}.${ext}`;
+      const response = await fetch(localUri);
+      const arrayBuffer = await response.arrayBuffer();
+      const { error: uploadError } = await supabase.storage
+        .from("voice-messages")
+        .upload(path, arrayBuffer, { contentType: "audio/m4a", upsert: false });
+      if (uploadError) {
+        Alert.alert("Voice message not sent", uploadError.message);
+        setShowRecorder(false);
+        return;
+      }
+      const { data: { publicUrl } } = supabase.storage.from("voice-messages").getPublicUrl(path);
+
+      const { data, error } = await supabase
+        .from("p2p_messages")
+        .insert({
+          conversation_id: id, sender_id: user.id, message_type: "voice",
+          media_url: publicUrl, media_duration_seconds: durationSeconds,
+        })
+        .select("id, flagged_self_harm")
+        .single();
+      setShowRecorder(false);
+      if (error) {
+        Alert.alert("Voice message not sent", error.message);
+        return;
+      }
+      if (data?.flagged_self_harm) setShowCrisisModal(true);
+    } catch (e: any) {
+      Alert.alert("Voice message not sent", e?.message ?? "Please try again.");
+      setShowRecorder(false);
+    }
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -496,11 +555,19 @@ export default function ChatScreen() {
                     style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
                   >
                     {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
-                    <MentionText
-                      body={item.body ?? ""}
-                      style={[styles.bubbleText, mine && styles.bubbleTextMine]}
-                      linkStyle={styles.mentionLink}
-                    />
+                    {item.message_type === "voice" && item.media_url ? (
+                      <VoiceMessageBubble
+                        mediaUrl={item.media_url}
+                        durationSeconds={item.media_duration_seconds ?? null}
+                        mine={mine}
+                      />
+                    ) : (
+                      <MentionText
+                        body={item.body ?? ""}
+                        style={[styles.bubbleText, mine && styles.bubbleTextMine]}
+                        linkStyle={styles.mentionLink}
+                      />
+                    )}
                     {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
                   </TouchableOpacity>
                 </View>
@@ -539,19 +606,36 @@ export default function ChatScreen() {
           </View>
         )}
 
-        <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={handleTextChange}
-            placeholder="Message..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending || !text.trim()}>
-            <Ionicons name="send" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        {showRecorder ? (
+          <View style={[styles.recorderRow, { paddingBottom: insets.bottom + 10 }]}>
+            <View style={{ flex: 1 }}>
+              <AudioRecorder onSubmit={handleSendVoice} />
+            </View>
+            <TouchableOpacity style={styles.cancelRecorderBtn} onPress={() => setShowRecorder(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={handleTextChange}
+              placeholder="Message..."
+              placeholderTextColor={colors.textMuted}
+              multiline
+            />
+            {text.trim() ? (
+              <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending}>
+                <Ionicons name="send" size={18} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.sendBtn} onPress={() => setShowRecorder(true)}>
+                <Ionicons name="mic" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       <CrisisResourcesModal
@@ -638,6 +722,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 10,
     borderTopWidth: 1, borderTopColor: colors.borderBeige,
   },
+  recorderRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 16, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: colors.borderBeige,
+  },
+  cancelRecorderBtn: { padding: 6 },
   input: {
     flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
     borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10,

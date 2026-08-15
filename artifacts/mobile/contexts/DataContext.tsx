@@ -3621,7 +3621,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .in("conversation_id", convIds)
           .neq("user_id", profile.id),
         supabase.from("p2p_messages")
-          .select("conversation_id, body, sender_id, created_at")
+          .select("conversation_id, body, sender_id, created_at, message_type")
           .in("conversation_id", convIds)
           .order("created_at", { ascending: false })
           .limit(500),
@@ -3666,7 +3666,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           otherUserIsOfficial: otherProfile?.is_official_account ?? false,
           otherUserOfficialType: otherProfile?.official_account_type ?? null,
           memberCount: memberCountByConv.get(c.id) ?? 0,
-          lastMessage: lastMsg?.body ?? null,
+          lastMessage: lastMsg?.message_type === "voice" ? "🎤 Voice message" : lastMsg?.body ?? null,
           lastMessageAt: lastMsg?.created_at ?? null,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           isPinnedBySystem: c.is_pinned_by_system ?? false,
