@@ -18,6 +18,7 @@ import accountRouter from "./account";
 import callsRouter from "./calls";
 import connectionsRouter from "./connections";
 import feedbackRouter from "./feedback";
+import churchesRouter from "./churches";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use("/account", accountRouter);
 router.use(callsRouter); // calls + break rooms (paths differ, handled internally)
 router.use("/connections", connectionsRouter);
 router.use("/feedback", feedbackRouter);
+router.use(churchesRouter); // church + members + grove + cohorts + announcements (paths differ, handled internally)
 
 export default router;

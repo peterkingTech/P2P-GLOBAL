@@ -96,6 +96,15 @@ export async function shareInviteLink(user: { username: string; inviteLink: stri
   });
 }
 
+// Church Discipleship Portal invite — completely free, no tiers, no payment.
+export async function shareChurchInvite(church: { name: string; inviteLink: string; city: string; country: string }) {
+  const location = [church.city, church.country].filter(Boolean).join(", ");
+  await Share.share({
+    title: `Join ${church.name} on P2P Global`,
+    message: `⛪ ${church.name}${location ? ` (${location})` : ""} is using P2P Global Kingdom School for discipleship.\n\nJoin our church community and go through the Bible with a peer guide:\n${church.inviteLink}\n\n"Accept one another, just as Christ accepted you." — Romans 15:7`,
+  });
+}
+
 export async function shareApp() {
   await Share.share({
     title: "P2P Global Bible Study Network",

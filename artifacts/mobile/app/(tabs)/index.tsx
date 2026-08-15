@@ -421,7 +421,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread, userChurch } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -635,6 +635,19 @@ export default function HomeTab() {
       >
         <Text style={styles.forestLinkText}>
           🌳 View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
+      </TouchableOpacity>
+
+      {/* Church Discipleship Portal — completely free, no tiers */}
+      <TouchableOpacity
+        style={styles.forestLinkRow}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
+        activeOpacity={0.85}
+      >
+        <Text style={{ fontSize: 20 }}>⛪</Text>
+        <Text style={[styles.forestLinkText, { marginLeft: 10 }]}>
+          {userChurch ? userChurch.name : "Connect your church to P2P Global"}
         </Text>
         <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
       </TouchableOpacity>

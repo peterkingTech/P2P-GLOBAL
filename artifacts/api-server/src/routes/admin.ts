@@ -1928,4 +1928,79 @@ router.get("/reports/all", requireRole("admin_supervisor", "admin_zone"), async 
   return ok(res, data ?? []);
 });
 
+// ── Church Discipleship Portal admin — admin_church + super_admin only ───────
+// Completely free for every church: no tiers, no subscriptions, no payment
+// processing anywhere in this section.
+function mapAdminChurch(row: Record<string, unknown>, memberCount: number) {
+  return {
+    id: row.id, name: row.name, city: row.city ?? null, country: row.country,
+    status: row.status, isVerified: row.is_verified ?? false, verifiedAt: row.verified_at ?? null,
+    contactEmail: row.contact_email ?? null, contactName: row.contact_name ?? null, website: row.website ?? null,
+    createdAt: row.created_at, memberCount,
+  };
+}
+
+// GET /admin/churches — search/filter, all statuses.
+router.get("/churches", requireRole("admin_church"), async (req, res) => {
+  const { search, verified, country } = req.query as { search?: string; verified?: string; country?: string };
+  let query = supabaseWrite.from("p2p_churches").select("*").order("created_at", { ascending: false });
+  if (verified === "true") query = query.eq("is_verified", true);
+  if (verified === "false") query = query.eq("is_verified", false);
+  if (country) query = query.eq("country", country);
+  const { data: churches, error } = await query;
+  if (error) return err(res, error.message, 500);
+
+  let rows = churches ?? [];
+  if (search?.trim()) {
+    const q = search.trim().toLowerCase();
+    rows = rows.filter((c) => `${c.name} ${c.country} ${c.city ?? ""}`.toLowerCase().includes(q));
+  }
+
+  const churchIds = rows.map((c) => c.id as string);
+  const { data: memberRows } = churchIds.length
+    ? await supabaseWrite.from("p2p_church_members").select("church_id").eq("is_active", true).in("church_id", churchIds)
+    : { data: [] as { church_id: string }[] };
+  const countByChurch = new Map<string, number>();
+  for (const m of memberRows ?? []) countByChurch.set(m.church_id as string, (countByChurch.get(m.church_id as string) ?? 0) + 1);
+
+  return ok(res, rows.map((c) => mapAdminChurch(c as Record<string, unknown>, countByChurch.get(c.id as string) ?? 0)));
+});
+
+// GET /admin/churches/stats — portal-wide statistics.
+router.get("/churches/stats", requireRole("admin_church"), async (_req, res) => {
+  const [{ count: totalChurches }, { count: verifiedChurches }, { count: totalMembers }, { data: countryRows }] = await Promise.all([
+    supabaseWrite.from("p2p_churches").select("id", { count: "exact", head: true }),
+    supabaseWrite.from("p2p_churches").select("id", { count: "exact", head: true }).eq("is_verified", true),
+    supabaseWrite.from("p2p_church_members").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabaseWrite.from("p2p_churches").select("country"),
+  ]);
+  const nationsWithChurches = new Set((countryRows ?? []).map((c) => c.country)).size;
+
+  return ok(res, {
+    totalChurches: totalChurches ?? 0, verifiedChurches: verifiedChurches ?? 0,
+    totalChurchMembers: totalMembers ?? 0, nationsWithChurches,
+  });
+});
+
+// PUT /admin/churches/:id/verify — { verified: boolean }
+router.put("/churches/:id/verify", requireRole("admin_church"), async (req, res) => {
+  const adminId = (req as any).adminUserId as string;
+  const id = req.params.id as string;
+  const { verified } = req.body as { verified?: boolean };
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_churches")
+    .update({ is_verified: verified !== false, verified_at: verified !== false ? new Date().toISOString() : null, verified_by: verified !== false ? adminId : null })
+    .eq("id", id)
+    .select("*").single();
+  if (error || !data) return err(res, error?.message ?? "Church not found", 404);
+
+  await logAdminActivity({
+    adminId, adminRole: (req as any).adminRole, actionType: verified !== false ? "church_verified" : "church_unverified",
+    targetResourceId: id, targetResourceType: "church",
+  });
+
+  return ok(res, mapAdminChurch(data as Record<string, unknown>, 0));
+});
+
 export default router;

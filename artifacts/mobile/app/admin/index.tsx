@@ -195,10 +195,7 @@ function ChurchAdminDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <DashboardHeader role="admin_church" />
-      <View style={styles.emptyCard}>
-        <Ionicons name="business-outline" size={28} color={colors.borderBeige} />
-        <Text style={styles.emptyText}>A dedicated church verification queue isn't built yet.</Text>
-      </View>
+      <QueueLinkCard label="Church Portal Management" sub="All churches, verification queue, and platform stats" path="/admin/churches" icon="business" />
       <SubmitReportButton />
     </ScrollView>
   );

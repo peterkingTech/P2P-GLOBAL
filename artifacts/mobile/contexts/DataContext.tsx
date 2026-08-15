@@ -358,6 +358,63 @@ export interface AdminAccountEntry {
   avgRating: number | null;
 }
 
+// ── Church Discipleship Portal — completely free, no tiers ──────────────────
+export type ChurchRole = "senior_pastor" | "discipleship_pastor" | "small_group_leader" | "peer_guide" | "member";
+
+export interface Church {
+  id: string; name: string; description: string | null; logoUrl: string | null; website: string | null;
+  city: string | null; country: string; countryCode: string | null; timezone: string | null;
+  denomination: string | null; languageCode: string; contactEmail: string | null; contactName: string | null;
+  inviteCode: string; inviteLink: string; status: string; isVerified: boolean; verifiedAt: string | null;
+  createdAt: string; createdBy: string;
+}
+
+export interface ChurchRegistrationData {
+  name: string; description?: string; city?: string; country: string; countryCode?: string;
+  timezone?: string; denomination?: string; languageCode?: string;
+  contactEmail?: string; contactName?: string; website?: string;
+}
+
+export interface GroveData {
+  stageCounts: Record<string, number>;
+  activeLearners: number; lessonsThisWeek: number; modulesCompletedTotal: number; newMembersThisMonth: number;
+  activePeerGuides: number; nationsReached: number; totalGrainPlanted: number; totalFruitsEarned: number;
+  inactiveMembers: number; newBelieversWithoutGuides: number; deepestDiscipleshipChain: number;
+  recentActivity: { userDisplayName: string; action: string; createdAt: string }[];
+}
+
+export interface ChurchMember {
+  userId: string; role: ChurchRole; visible: boolean; joinedAt: string;
+  username?: string | null; displayName?: string; photoUrl?: string | null; country?: string | null;
+  treeStage?: string; lastActiveAt?: string | null; hasPeerGuide?: boolean; fruitsCount?: number; grainCount?: number;
+}
+
+export interface ChurchMemberProfile {
+  userId: string; username: string | null; displayName: string; photoUrl: string | null; country: string | null;
+  treeStage: string; growthLevel: number; lastActiveAt: string | null;
+  peerGuide: { username: string | null; displayName: string | null; country: string | null } | null;
+  guidingCount: number; nationsGuided: number;
+  fruits: { key: string; awardedAt: string }[]; grainCount: number;
+  cohorts: { cohortId: string; status: string; name: string }[]; adminNotes: string | null;
+}
+
+export interface ChurchCohort {
+  id: string; churchId: string; name: string; description: string | null;
+  curriculumId: string | null; moduleId: string | null; leaderId: string | null;
+  targetStartDate: string | null; targetEndDate: string | null; maxMembers: number | null;
+  status: string; createdAt: string; memberCount?: number; leaderUsername?: string | null; leaderName?: string | null;
+}
+
+export interface ChurchCohortData {
+  name: string; description?: string; curriculumId?: string; moduleId?: string; leaderId?: string;
+  targetStartDate?: string; targetEndDate?: string; maxMembers?: number;
+}
+
+export interface ChurchAnnouncement {
+  id: string; churchId: string; title: string; body: string; authorId: string; authorName: string | null;
+  isPinned: boolean; createdAt: string; expiresAt: string | null;
+}
+
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
 export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
 
@@ -1029,6 +1086,31 @@ interface DataContextValue {
   suspendAdmin: (userId: string, reason: string) => Promise<string | null>;
   getAdminList: () => Promise<AdminAccountEntry[]>;
   getAdminActivityFeed: (cursor?: string) => Promise<AdminActivityEntry[]>;
+
+  // ── Church Discipleship Portal — completely free, no tiers ─────────────────
+  userChurch: Church | null;
+  userChurchRole: ChurchRole | null;
+  isChurchLeader: boolean;
+  churchMemberCount: number;
+  churchCohortCount: number;
+  loadUserChurch: () => Promise<void>;
+  registerChurch: (data: ChurchRegistrationData) => Promise<{ church: Church | null; error: string | null }>;
+  joinChurch: (inviteCode: string) => Promise<{ church: Church | null; error: string | null }>;
+  leaveChurch: () => Promise<string | null>;
+  getGroveData: (churchId: string) => Promise<GroveData | null>;
+  getChurchMembers: (churchId: string, search?: string) => Promise<ChurchMember[]>;
+  getChurchMemberProfile: (churchId: string, userId: string) => Promise<ChurchMemberProfile | null>;
+  updateChurchMemberNotes: (churchId: string, userId: string, notes: string) => Promise<string | null>;
+  updateMemberRole: (churchId: string, userId: string, role: ChurchRole) => Promise<string | null>;
+  removeChurchMember: (churchId: string, userId: string) => Promise<string | null>;
+  createCohort: (churchId: string, data: ChurchCohortData) => Promise<{ cohort: ChurchCohort | null; error: string | null }>;
+  getChurchCohorts: (churchId: string) => Promise<ChurchCohort[]>;
+  updateCohort: (churchId: string, cohortId: string, data: Partial<ChurchCohortData> & { status?: string }) => Promise<string | null>;
+  addMemberToCohort: (churchId: string, cohortId: string, usernameOrUserId: { userId?: string; username?: string }) => Promise<string | null>;
+  removeMemberFromCohort: (churchId: string, cohortId: string, userId: string) => Promise<string | null>;
+  createAnnouncement: (churchId: string, title: string, body: string, expiresAt?: string) => Promise<string | null>;
+  getAnnouncements: (churchId: string) => Promise<ChurchAnnouncement[]>;
+  pinAnnouncement: (churchId: string, id: string, pinned: boolean) => Promise<string | null>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -1103,6 +1185,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [pendingConnectionRequestCount, setPendingConnectionRequestCount] = useState(0);
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [userChurch, setUserChurch] = useState<Church | null>(null);
+  const [userChurchRole, setUserChurchRole] = useState<ChurchRole | null>(null);
+  const [churchMemberCount, setChurchMemberCount] = useState(0);
+  const [churchCohortCount, setChurchCohortCount] = useState(0);
   const [incomingMessageBanner, setIncomingMessageBanner] = useState<IncomingMessageBannerInfo | null>(null);
   // Ref, not state — read inside the realtime callback's closure without
   // forcing the channel to resubscribe every time the user opens/leaves a
@@ -3894,6 +3980,279 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── Church Discipleship Portal — completely free, no tiers ─────────────────
+  const isChurchLeader = userChurchRole === "senior_pastor" || userChurchRole === "discipleship_pastor" || userChurchRole === "small_group_leader";
+
+  const loadUserChurch = useCallback(async () => {
+    if (!profile?.id) { setUserChurch(null); setUserChurchRole(null); setChurchMemberCount(0); setChurchCohortCount(0); return; }
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/my-church?requesterId=${profile.id}`);
+      const body = await res.json();
+      setUserChurch(body?.church ?? null);
+      setUserChurchRole(body?.userRole ?? null);
+      setChurchMemberCount(body?.memberCount ?? 0);
+      setChurchCohortCount(body?.cohortCount ?? 0);
+    } catch (e) {
+      console.error("loadUserChurch failed", e);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => { loadUserChurch(); }, [loadUserChurch]);
+
+  const registerChurch = useCallback(async (data: ChurchRegistrationData): Promise<{ church: Church | null; error: string | null }> => {
+    if (!profile?.id) return { church: null, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/churches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterId: profile.id, name: data.name, description: data.description, city: data.city,
+          country: data.country, country_code: data.countryCode, timezone: data.timezone,
+          denomination: data.denomination, language_code: data.languageCode,
+          contact_email: data.contactEmail, contact_name: data.contactName, website: data.website,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) return { church: null, error: body?.error ?? "Couldn't register church" };
+      await loadUserChurch();
+      return { church: body as Church, error: null };
+    } catch {
+      return { church: null, error: "Couldn't register church. Please check your connection." };
+    }
+  }, [profile?.id, loadUserChurch]);
+
+  const joinChurch = useCallback(async (inviteCode: string): Promise<{ church: Church | null; error: string | null }> => {
+    if (!profile?.id) return { church: null, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, inviteCode }),
+      });
+      const body = await res.json();
+      if (!res.ok) return { church: null, error: body?.error ?? "Couldn't join church" };
+      await loadUserChurch();
+      return { church: body as Church, error: null };
+    } catch {
+      return { church: null, error: "Couldn't join church. Please check your connection." };
+    }
+  }, [profile?.id, loadUserChurch]);
+
+  const leaveChurch = useCallback(async (): Promise<string | null> => {
+    if (!profile?.id || !userChurch) return "Not in a church";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${userChurch.id}/members/${profile.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) return body?.error ?? "Couldn't leave church";
+      await loadUserChurch();
+      return null;
+    } catch {
+      return "Couldn't leave church. Please check your connection.";
+    }
+  }, [profile?.id, userChurch, loadUserChurch]);
+
+  const getGroveData = useCallback(async (churchId: string): Promise<GroveData | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/grove?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getGroveData failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const getChurchMembers = useCallback(async (churchId: string, search?: string): Promise<ChurchMember[]> => {
+    if (!profile?.id) return [];
+    try {
+      const params = new URLSearchParams({ requesterId: profile.id });
+      if (search) params.set("search", search);
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getChurchMembers failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const getChurchMemberProfile = useCallback(async (churchId: string, userId: string): Promise<ChurchMemberProfile | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getChurchMemberProfile failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const updateChurchMemberNotes = useCallback(async (churchId: string, userId: string, notes: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}/notes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, notes }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't save note");
+    } catch {
+      return "Couldn't save note. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const updateMemberRole = useCallback(async (churchId: string, userId: string, role: ChurchRole): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}/role`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, role }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't update role");
+    } catch {
+      return "Couldn't update role. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const removeChurchMember = useCallback(async (churchId: string, userId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't remove member");
+    } catch {
+      return "Couldn't remove member. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const createCohort = useCallback(async (churchId: string, data: ChurchCohortData): Promise<{ cohort: ChurchCohort | null; error: string | null }> => {
+    if (!profile?.id) return { cohort: null, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, ...data }),
+      });
+      const body = await res.json();
+      if (!res.ok) return { cohort: null, error: body?.error ?? "Couldn't create cohort" };
+      return { cohort: body as ChurchCohort, error: null };
+    } catch {
+      return { cohort: null, error: "Couldn't create cohort. Please check your connection." };
+    }
+  }, [profile?.id]);
+
+  const getChurchCohorts = useCallback(async (churchId: string): Promise<ChurchCohort[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getChurchCohorts failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const updateCohort = useCallback(async (churchId: string, cohortId: string, data: Partial<ChurchCohortData> & { status?: string }): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, ...data }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't update cohort");
+    } catch {
+      return "Couldn't update cohort. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const addMemberToCohort = useCallback(async (churchId: string, cohortId: string, target: { userId?: string; username?: string }): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, ...target }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't add member to cohort");
+    } catch {
+      return "Couldn't add member to cohort. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const removeMemberFromCohort = useCallback(async (churchId: string, cohortId: string, userId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}/members/${userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't remove member from cohort");
+    } catch {
+      return "Couldn't remove member from cohort. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const createAnnouncement = useCallback(async (churchId: string, title: string, body: string, expiresAt?: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, title, body, expiresAt }),
+      });
+      const responseBody = await res.json();
+      return res.ok ? null : (responseBody?.error ?? "Couldn't post announcement");
+    } catch {
+      return "Couldn't post announcement. Please check your connection.";
+    }
+  }, [profile?.id]);
+
+  const getAnnouncements = useCallback(async (churchId: string): Promise<ChurchAnnouncement[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getAnnouncements failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const pinAnnouncement = useCallback(async (churchId: string, id: string, pinned: boolean): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements/${id}/pin`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, pinned }),
+      });
+      const body = await res.json();
+      return res.ok ? null : (body?.error ?? "Couldn't update announcement");
+    } catch {
+      return "Couldn't update announcement. Please check your connection.";
+    }
+  }, [profile?.id]);
+
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
   const refreshTreeData = useCallback(async () => {
@@ -3941,6 +4300,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       incomingMessageBanner, dismissMessageBanner, setActiveConversationId,
       adminRole, adminStats, loadAdminStats, submitAdminReport,
       appointAdmin, removeAdmin, suspendAdmin, getAdminList, getAdminActivityFeed,
+      userChurch, userChurchRole, isChurchLeader, churchMemberCount, churchCohortCount, loadUserChurch,
+      registerChurch, joinChurch, leaveChurch, getGroveData, getChurchMembers, getChurchMemberProfile,
+      updateChurchMemberNotes, updateMemberRole, removeChurchMember, createCohort, getChurchCohorts,
+      updateCohort, addMemberToCohort, removeMemberFromCohort, createAnnouncement, getAnnouncements, pinAnnouncement,
     }}>
       {children}
     </DataContext.Provider>
