@@ -3,16 +3,17 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Scr
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useData, ChurchCohort, ChurchAnnouncement } from "@/contexts/DataContext";
+import { useData, ChurchCohort, ChurchAnnouncement, LearningGoal } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userChurch, isChurchLeader, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData } = useData();
+  const { userChurch, isChurchLeader, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData, getLearningGoalsDashboard } = useData();
   const [loading, setLoading] = useState(true);
   const [cohorts, setCohorts] = useState<ChurchCohort[]>([]);
   const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>([]);
+  const [goalDashboard, setGoalDashboard] = useState<LearningGoal[]>([]);
   const [grove, setGrove] = useState<{ activeLearners: number; lessonsThisWeek: number; nationsReached: number; totalGrainPlanted: number; inactiveMembers: number; newBelieversWithoutGuides: number } | null>(null);
 
   useFocusEffect(
@@ -28,6 +29,8 @@ export default function ChurchHomeScreen() {
   useEffect(() => {
     if (!userChurch) return;
     (async () => {
+      const dashboardGoals = await getLearningGoalsDashboard(userChurch.id);
+      setGoalDashboard(dashboardGoals);
       if (isChurchLeader) {
         const g = await getGroveData(userChurch.id);
         if (g) setGrove(g);
@@ -37,7 +40,7 @@ export default function ChurchHomeScreen() {
         setAnnouncements(a);
       }
     })();
-  }, [userChurch, isChurchLeader, getGroveData, getChurchCohorts, getAnnouncements]);
+  }, [userChurch, isChurchLeader, getGroveData, getChurchCohorts, getAnnouncements, getLearningGoalsDashboard]);
 
   if (loading) {
     return (
@@ -85,6 +88,25 @@ export default function ChurchHomeScreen() {
         </View>
       </View>
 
+      {goalDashboard.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>How Is Our Church Learning?</Text>
+          {goalDashboard.map((g) => (
+            <View key={g.id} style={styles.goalCard}>
+              <Text style={styles.goalTitle}>{g.title}</Text>
+              <View style={styles.goalProgressTrack}>
+                <View style={[styles.goalProgressFill, { width: `${Math.min(100, g.progressPercent ?? 0)}%` }, g.achieved && styles.goalProgressFillAchieved]} />
+              </View>
+              <Text style={styles.goalProgressText}>
+                {g.achieved
+                  ? `🎉 Goal reached! ${g.completedCount ?? 0} member${(g.completedCount ?? 0) === 1 ? "" : "s"} completed this ${g.timeframe === "today" ? "lesson" : g.timeframe === "this_week" ? "week's lesson" : "goal"}.`
+                  : `${g.completedCount ?? 0} of ${g.totalMembers ?? 0} members so far — there's still time to grow together.`}
+              </Text>
+            </View>
+          ))}
+        </>
+      )}
+
       {isChurchLeader ? (
         <>
           <Text style={styles.sectionTitle}>Grove Overview</Text>
@@ -114,6 +136,7 @@ export default function ChurchHomeScreen() {
             <NavRow icon="school-outline" label="Cohorts" onPress={() => router.push("/church/cohorts" as any)} />
             <NavRow icon="megaphone-outline" label="Announcements" onPress={() => router.push("/church/announcements" as any)} />
             <NavRow icon="person-add-outline" label="Invite Members" onPress={() => router.push("/church/register" as any)} />
+            <NavRow icon="settings-outline" label="Church Settings" onPress={() => router.push("/church/settings" as any)} />
           </View>
         </>
       ) : (
@@ -201,6 +224,12 @@ const styles = StyleSheet.create({
   attentionTitle: { fontSize: 13, fontWeight: "700", color: "#D97706", fontFamily: "Inter_700Bold" },
   attentionLine: { fontSize: 12, color: colors.cream, opacity: 0.85, fontFamily: "Inter_400Regular" },
   attentionLink: { fontSize: 12, color: "#D97706", fontWeight: "600", marginTop: 4, fontFamily: "Inter_600SemiBold" },
+  goalCard: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRadius: 14, padding: 14, marginBottom: 10 },
+  goalTitle: { fontSize: 14, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
+  goalProgressTrack: { height: 8, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 4, marginTop: 10, overflow: "hidden" },
+  goalProgressFill: { height: "100%", backgroundColor: colors.accentGreen, borderRadius: 4 },
+  goalProgressFillAchieved: { backgroundColor: "#D97706" },
+  goalProgressText: { fontSize: 12, color: colors.lightGreen, opacity: 0.85, marginTop: 8, lineHeight: 17, fontFamily: "Inter_400Regular" },
   navRow: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, padding: 14,

@@ -35,6 +35,23 @@ async function getMembership(churchId: string, userId: string) {
   return data as { role: string; is_active: boolean } | null;
 }
 
+async function getChurch(churchId: string) {
+  const { data } = await db.from("p2p_churches").select("*").eq("id", churchId).maybeSingle();
+  return data as Record<string, unknown> | null;
+}
+
+// Ownership is a distinct authorization axis from role (LEADERSHIP_ROLES/
+// PASTOR_ROLES): it's "the person who created THIS church", independent of
+// whatever role they or anyone else currently holds. A senior_pastor
+// appointed later — or one who simply isn't the original creator — must
+// still be blocked from ownership-level actions (branding, name/description,
+// social media, location visibility). Kept as its own helper, syntactically
+// distinct from the role-array checks, so every call site is obviously using
+// the new, separate gate rather than the existing role system.
+function isCreator(church: Record<string, unknown> | null, requesterId: string): boolean {
+  return !!church && church.created_by === requesterId;
+}
+
 // Same URL-length-safety reasoning as admin.ts's selectInChunksAdmin.
 const IN_CHUNK_SIZE = 100;
 function chunk<T>(items: T[], size = IN_CHUNK_SIZE): T[][] {
@@ -86,8 +103,20 @@ function mapChurch(row: Record<string, unknown>) {
     inviteLink: buildChurchInviteLink(row.invite_code as string),
     status: row.status, isVerified: row.is_verified ?? false,
     verifiedAt: row.verified_at ?? null, createdAt: row.created_at, createdBy: row.created_by,
+    churchType: row.church_type ?? null, churchTypeOther: row.church_type_other ?? null,
+    locationHidden: row.location_hidden ?? false, churchSlug: row.church_slug ?? null,
   };
 }
+
+function mapSocialAccount(row: Record<string, unknown>) {
+  return {
+    id: row.id, churchId: row.church_id, platform: row.platform,
+    handleOrUrl: row.handle_or_url, displayOrder: row.display_order ?? 0,
+  };
+}
+
+const SOCIAL_PLATFORMS = ["facebook", "instagram", "youtube", "tiktok", "x_twitter", "whatsapp", "telegram", "website", "other"];
+const MAX_SOCIAL_ACCOUNTS = 8;
 
 // ── Registration / membership ────────────────────────────────────────────────
 
@@ -97,13 +126,20 @@ router.post("/churches", async (req, res) => {
   const {
     requesterId, name, description, city, country, country_code, timezone,
     denomination, language_code, contact_email, contact_name, website,
-  } = req.body as Record<string, string | undefined>;
-  if (!requesterId || !name?.trim() || !country?.trim()) {
+    church_type, church_type_other, location_hidden, logo_url, social_accounts,
+  } = req.body as Record<string, unknown>;
+  if (!requesterId || typeof name !== "string" || !name.trim() || typeof country !== "string" || !country.trim()) {
     return err(res, "requesterId, name, and country are required", 400);
+  }
+  const socialAccounts = Array.isArray(social_accounts) ? social_accounts as { platform?: string; handleOrUrl?: string }[] : [];
+  if (socialAccounts.length > MAX_SOCIAL_ACCOUNTS) return err(res, `A church may list at most ${MAX_SOCIAL_ACCOUNTS} social media accounts`, 400);
+  for (const s of socialAccounts) {
+    if (!s.platform || !SOCIAL_PLATFORMS.includes(s.platform)) return err(res, `Invalid social platform: ${s.platform}`, 400);
+    if (!s.handleOrUrl?.trim()) return err(res, "Each social media account needs a handle or URL", 400);
   }
 
   const { data: existingMembership } = await db
-    .from("p2p_church_members").select("id").eq("user_id", requesterId).eq("is_active", true).maybeSingle();
+    .from("p2p_church_members").select("id").eq("user_id", requesterId as string).eq("is_active", true).maybeSingle();
   if (existingMembership) return err(res, "You already belong to a church", 409);
 
   let inviteCode = `${slugify([name, city].filter(Boolean).join(" "))}-${randomSuffix()}`;
@@ -115,11 +151,16 @@ router.post("/churches", async (req, res) => {
   const { data: church, error } = await db
     .from("p2p_churches")
     .insert({
-      name: name.trim(), description: description?.trim() || null, city: city?.trim() || null,
-      country: country.trim(), country_code: country_code || null, timezone: timezone || null,
+      name: (name as string).trim(), description: typeof description === "string" ? description.trim() || null : null,
+      city: typeof city === "string" ? city.trim() || null : null,
+      country: (country as string).trim(), country_code: country_code || null, timezone: timezone || null,
       denomination: denomination || null, language_code: language_code || "en",
-      contact_email: contact_email?.trim() || null, contact_name: contact_name?.trim() || null,
-      website: website?.trim() || null, invite_code: inviteCode, created_by: requesterId,
+      contact_email: typeof contact_email === "string" ? contact_email.trim() || null : null,
+      contact_name: typeof contact_name === "string" ? contact_name.trim() || null : null,
+      website: typeof website === "string" ? website.trim() || null : null,
+      invite_code: inviteCode, created_by: requesterId,
+      church_type: church_type || null, church_type_other: church_type_other || null,
+      location_hidden: location_hidden === true, logo_url: logo_url || null,
     })
     .select("*").single();
   if (error || !church) return err(res, error?.message ?? "Failed to register church", 500);
@@ -136,7 +177,36 @@ router.post("/churches", async (req, res) => {
   // these are now the same "church" concept.
   await db.from("p2p_profiles").update({ church_id: church.id }).eq("id", requesterId);
 
+  if (socialAccounts.length) {
+    await db.from("p2p_church_social_accounts").insert(
+      socialAccounts.map((s, i) => ({
+        church_id: church.id, platform: s.platform, handle_or_url: s.handleOrUrl!.trim(), display_order: i,
+      }))
+    );
+  }
+
   return res.status(201).json(mapChurch(church as Record<string, unknown>));
+});
+
+// GET /churches/check-duplicate?requesterId=&name=&city=&country=&website=
+// Soft, non-blocking signal for the registration Review step — never
+// automatically merges or rejects, per the spec's explicit "many churches
+// can share names" guidance.
+router.get("/churches/check-duplicate", async (req, res) => {
+  const { requesterId, name, country, website } = req.query as Record<string, string | undefined>;
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  if (!name?.trim() && !website?.trim()) return ok(res, { matches: [] });
+
+  const orParts: string[] = [];
+  if (name?.trim() && country?.trim()) orParts.push(`and(name.ilike.%${name.trim().replace(/[%,]/g, "")}%,country.eq.${country.trim().replace(/,/g, "")})`);
+  else if (name?.trim()) orParts.push(`name.ilike.%${name.trim().replace(/[%,]/g, "")}%`);
+  if (website?.trim()) orParts.push(`website.eq.${website.trim().replace(/,/g, "")}`);
+  if (!orParts.length) return ok(res, { matches: [] });
+
+  const { data } = await db
+    .from("p2p_churches").select("id,name,city,country,website")
+    .eq("status", "active").or(orParts.join(",")).limit(5);
+  return ok(res, { matches: (data ?? []).map((c) => ({ id: c.id, name: c.name, city: c.city, country: c.country, website: c.website })) });
 });
 
 // GET /churches/my-church?requesterId=
@@ -173,6 +243,83 @@ router.get("/churches/:churchId", async (req, res) => {
   const { data: church } = await db.from("p2p_churches").select("*").eq("id", churchId).maybeSingle();
   if (!church) return err(res, "Church not found", 404);
   return ok(res, mapChurch(church as Record<string, unknown>));
+});
+
+// PUT /churches/:churchId — creator-only. Services General/Profile/Branding
+// settings screens, each calling this with a different field subset (same
+// shape as account.tsx's bio/photo/email sections all calling one
+// updateProfile()). Ownership fields never trusted from elsewhere.
+const CHURCH_EDITABLE_FIELDS: Record<string, string> = {
+  name: "name", description: "description", churchType: "church_type", churchTypeOther: "church_type_other",
+  website: "website", contactName: "contact_name", contactEmail: "contact_email",
+  city: "city", country: "country", countryCode: "country_code", timezone: "timezone",
+  denomination: "denomination", languageCode: "language_code", locationHidden: "location_hidden",
+  logoUrl: "logo_url",
+};
+router.put("/churches/:churchId", async (req, res) => {
+  const { churchId } = req.params;
+  const { requesterId, ...fields } = req.body as Record<string, unknown>;
+  if (!requesterId) return err(res, "requesterId is required", 400);
+
+  const church = await getChurch(churchId);
+  if (!church) return err(res, "Church not found", 404);
+  if (!isCreator(church, requesterId as string)) {
+    return err(res, "Only the church's original creator can change these settings", 403);
+  }
+
+  const updates: Record<string, unknown> = {};
+  for (const [key, column] of Object.entries(CHURCH_EDITABLE_FIELDS)) {
+    if (fields[key] !== undefined) updates[column] = fields[key];
+  }
+  if (!Object.keys(updates).length) return err(res, "No fields to update", 400);
+  if (typeof updates.name === "string" && !updates.name.trim()) return err(res, "Church name cannot be empty", 400);
+
+  const { data, error } = await db.from("p2p_churches").update(updates).eq("id", churchId).select("*").single();
+  if (error || !data) return err(res, error?.message ?? "Failed to update church", 500);
+  return ok(res, mapChurch(data as Record<string, unknown>));
+});
+
+// GET /churches/:churchId/social-accounts?requesterId= — member-readable.
+router.get("/churches/:churchId/social-accounts", async (req, res) => {
+  const { churchId } = req.params;
+  const { requesterId } = req.query as { requesterId?: string };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId);
+  if (!requester?.is_active) return err(res, "Not a member of this church", 403);
+
+  const { data, error } = await db.from("p2p_church_social_accounts").select("*").eq("church_id", churchId).order("display_order", { ascending: true });
+  if (error) return err(res, error.message, 500);
+  return ok(res, (data ?? []).map((r) => mapSocialAccount(r as Record<string, unknown>)));
+});
+
+// PUT /churches/:churchId/social-accounts — creator-only, full replacement.
+// Delete-all-then-bulk-insert avoids display-order-sync edge cases a
+// granular per-row API would introduce for what's edited as one repeatable
+// list in the settings UI.
+router.put("/churches/:churchId/social-accounts", async (req, res) => {
+  const { churchId } = req.params;
+  const { requesterId, accounts } = req.body as { requesterId?: string; accounts?: { platform?: string; handleOrUrl?: string }[] };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const church = await getChurch(churchId);
+  if (!church) return err(res, "Church not found", 404);
+  if (!isCreator(church, requesterId)) return err(res, "Only the church's original creator can manage social media accounts", 403);
+
+  const list = Array.isArray(accounts) ? accounts : [];
+  if (list.length > MAX_SOCIAL_ACCOUNTS) return err(res, `A church may list at most ${MAX_SOCIAL_ACCOUNTS} social media accounts`, 400);
+  for (const s of list) {
+    if (!s.platform || !SOCIAL_PLATFORMS.includes(s.platform)) return err(res, `Invalid social platform: ${s.platform}`, 400);
+    if (!s.handleOrUrl?.trim()) return err(res, "Each social media account needs a handle or URL", 400);
+  }
+
+  const { error: delErr } = await db.from("p2p_church_social_accounts").delete().eq("church_id", churchId);
+  if (delErr) return err(res, delErr.message, 500);
+  if (list.length) {
+    const { error: insErr } = await db.from("p2p_church_social_accounts").insert(
+      list.map((s, i) => ({ church_id: churchId, platform: s.platform, handle_or_url: s.handleOrUrl!.trim(), display_order: i }))
+    );
+    if (insErr) return err(res, insErr.message, 500);
+  }
+  return ok(res, { ok: true });
 });
 
 // POST /churches/join — { requesterId, inviteCode }
@@ -656,48 +803,128 @@ router.delete("/churches/:churchId/cohorts/:cohortId/members/:userId", async (re
 
 // ── Announcements ─────────────────────────────────────────────────────────────
 
+const ANNOUNCEMENT_TYPES = ["general", "bible_study", "discipleship", "prayer", "learning_goal", "study_plan", "event", "important", "reminder", "other"];
+const MAX_FEATURED_ANNOUNCEMENTS = 3;
+
 function mapAnnouncement(row: Record<string, unknown>, authorName?: string | null) {
   return {
     id: row.id, churchId: row.church_id, title: row.title, body: row.body,
     authorId: row.author_id, authorName: authorName ?? null,
     isPinned: row.is_pinned ?? false, createdAt: row.created_at, expiresAt: row.expires_at ?? null,
+    announcementType: row.announcement_type ?? "general", announcementTypeOther: row.announcement_type_other ?? null,
+    imageUrl: row.image_url ?? null, videoUrl: row.video_url ?? null,
+    publishAt: row.publish_at ?? null, status: row.status ?? "published",
+    isFeatured: row.is_featured ?? false, audience: row.audience ?? "entire_church",
+    updatedAt: row.updated_at ?? row.created_at,
   };
+}
+
+async function notifyChurchAnnouncement(churchId: string, authorId: string, title: string, body: string, announcementId: string) {
+  const memberIds = (await getActiveChurchMemberIds(churchId)).filter((id) => id !== authorId);
+  if (!memberIds.length) return;
+  await db.from("p2p_notifications").insert(
+    memberIds.map((id) => ({
+      user_id: id, title: `📢 ${title}`, message: body,
+      notification_type: "church_announcement", data: { churchId, announcementId },
+    }))
+  );
 }
 
 router.post("/churches/:churchId/announcements", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, title, body, expiresAt } = req.body as { requesterId?: string; title?: string; body?: string; expiresAt?: string };
-  if (!requesterId || !title?.trim() || !body?.trim()) return err(res, "requesterId, title, and body are required", 400);
-  const requester = await getMembership(churchId, requesterId);
+  const {
+    requesterId, title, body, expiresAt, announcementType, announcementTypeOther,
+    imageUrl, videoUrl, publishAt, isFeatured,
+  } = req.body as Record<string, unknown>;
+  if (!requesterId || typeof title !== "string" || !title.trim() || typeof body !== "string" || !body.trim()) {
+    return err(res, "requesterId, title, and body are required", 400);
+  }
+  const requester = await getMembership(churchId, requesterId as string);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
+  const type = typeof announcementType === "string" && ANNOUNCEMENT_TYPES.includes(announcementType) ? announcementType : "general";
+  if (isFeatured === true) {
+    const { count } = await db.from("p2p_church_announcements").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("is_featured", true);
+    if ((count ?? 0) >= MAX_FEATURED_ANNOUNCEMENTS) return err(res, `Only ${MAX_FEATURED_ANNOUNCEMENTS} announcements can be featured at once — unfeature one first`, 400);
+  }
+
+  // status is computed server-side, never trusted from the client.
+  const publishAtIso = typeof publishAt === "string" && publishAt ? publishAt : null;
+  const status = !publishAtIso || new Date(publishAtIso) <= new Date() ? "published" : "scheduled";
+
   const { data, error } = await db.from("p2p_church_announcements").insert({
-    church_id: churchId, title: title.trim(), body: body.trim(), author_id: requesterId, expires_at: expiresAt || null,
+    church_id: churchId, title: (title as string).trim(), body: (body as string).trim(), author_id: requesterId,
+    expires_at: expiresAt || null, announcement_type: type,
+    announcement_type_other: type === "other" ? (announcementTypeOther as string)?.trim() || null : null,
+    image_url: imageUrl || null, video_url: videoUrl || null, publish_at: publishAtIso, status,
+    is_featured: isFeatured === true,
   }).select("*").single();
   if (error || !data) return err(res, error?.message ?? "Failed to post announcement", 500);
 
-  const memberIds = (await getActiveChurchMemberIds(churchId)).filter((id) => id !== requesterId);
-  if (memberIds.length) {
-    await db.from("p2p_notifications").insert(
-      memberIds.map((id) => ({
-        user_id: id, title: `📢 ${title.trim()}`, message: body.trim(),
-        notification_type: "church_announcement", data: { churchId, announcementId: data.id },
-      }))
-    );
+  if (status === "published") {
+    await notifyChurchAnnouncement(churchId, requesterId as string, (title as string).trim(), (body as string).trim(), data.id as string);
   }
   return res.status(201).json(mapAnnouncement(data as Record<string, unknown>));
 });
 
+// PUT /churches/:churchId/announcements/:id — general edit (leadership).
+// The narrow existing .../pin route below is left unmodified for pin-only toggles.
+router.put("/churches/:churchId/announcements/:id", async (req, res) => {
+  const { churchId, id } = req.params;
+  const { requesterId, ...fields } = req.body as Record<string, unknown>;
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId as string);
+  if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
+
+  if (fields.isFeatured === true) {
+    const { count } = await db.from("p2p_church_announcements").select("id", { count: "exact", head: true }).eq("church_id", churchId).eq("is_featured", true).neq("id", id);
+    if ((count ?? 0) >= MAX_FEATURED_ANNOUNCEMENTS) return err(res, `Only ${MAX_FEATURED_ANNOUNCEMENTS} announcements can be featured at once — unfeature one first`, 400);
+  }
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (typeof fields.title === "string") updates.title = fields.title.trim();
+  if (typeof fields.body === "string") updates.body = fields.body.trim();
+  if (fields.announcementType !== undefined && ANNOUNCEMENT_TYPES.includes(fields.announcementType as string)) updates.announcement_type = fields.announcementType;
+  if (fields.announcementTypeOther !== undefined) updates.announcement_type_other = fields.announcementTypeOther;
+  if (fields.imageUrl !== undefined) updates.image_url = fields.imageUrl;
+  if (fields.videoUrl !== undefined) updates.video_url = fields.videoUrl;
+  if (fields.expiresAt !== undefined) updates.expires_at = fields.expiresAt;
+  if (fields.isFeatured !== undefined) updates.is_featured = fields.isFeatured;
+  // Re-publishing (status -> published) or rescheduling recomputes status
+  // server-side, same rule as creation — the client can only ask, not set it directly.
+  if (fields.publishAt !== undefined || fields.status !== undefined) {
+    const publishAtIso = typeof fields.publishAt === "string" && fields.publishAt ? fields.publishAt : null;
+    updates.publish_at = publishAtIso;
+    if (fields.status === "draft" || fields.status === "archived") {
+      updates.status = fields.status;
+    } else {
+      updates.status = !publishAtIso || new Date(publishAtIso) <= new Date() ? "published" : "scheduled";
+    }
+  }
+
+  const { data, error } = await db.from("p2p_church_announcements").update(updates).eq("id", id).eq("church_id", churchId).select("*").single();
+  if (error || !data) return err(res, error?.message ?? "Announcement not found", 404);
+  return ok(res, mapAnnouncement(data as Record<string, unknown>));
+});
+
 router.get("/churches/:churchId/announcements", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
+  const { requesterId, includeAll } = req.query as { requesterId?: string; includeAll?: string };
   if (!requesterId) return err(res, "requesterId is required", 400);
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 
-  const { data, error } = await db
-    .from("p2p_church_announcements").select("*").eq("church_id", churchId)
-    .order("is_pinned", { ascending: false }).order("created_at", { ascending: false });
+  let query = db.from("p2p_church_announcements").select("*").eq("church_id", churchId);
+  if (includeAll === "true") {
+    if (!LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required to view all announcements", 403);
+  } else {
+    const nowIso = new Date().toISOString();
+    query = query.eq("status", "published")
+      .or(`publish_at.is.null,publish_at.lte.${nowIso}`)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
+  }
+  const { data, error } = await query
+    .order("is_featured", { ascending: false }).order("is_pinned", { ascending: false }).order("created_at", { ascending: false });
   if (error) return err(res, error.message, 500);
 
   const authorIds = [...new Set((data ?? []).map((a) => a.author_id as string))];
@@ -717,6 +944,219 @@ router.put("/churches/:churchId/announcements/:id/pin", async (req, res) => {
   const { error } = await db.from("p2p_church_announcements").update({ is_pinned: pinned !== false }).eq("id", id).eq("church_id", churchId);
   if (error) return err(res, error.message, 500);
   return ok(res, { ok: true });
+});
+
+// ── Learning Goals ────────────────────────────────────────────────────────────
+// "Lesson of the Day/Week/Month" are just goals with a preset timeframe —
+// not a separate system. Leadership-gated (not creator-gated): goals aren't
+// a branding/ownership action per the confirmed scope.
+
+const GOAL_LEVELS = ["lesson", "module", "curriculum"];
+const GOAL_TIMEFRAMES = ["today", "this_week", "this_month", "custom"];
+const GOAL_TARGET_TYPES = ["percentage", "member_count"];
+
+function mapLearningGoal(row: Record<string, unknown>, progress?: { completedUserCount: number; totalMembers: number; percent: number; achieved: boolean }) {
+  return {
+    id: row.id, churchId: row.church_id, createdBy: row.created_by, title: row.title,
+    goalLevel: row.goal_level, lessonId: row.lesson_id ?? null, moduleId: row.module_id ?? null, curriculumId: row.curriculum_id ?? null,
+    timeframe: row.timeframe, startsAt: row.starts_at, endsAt: row.ends_at,
+    targetType: row.target_type, targetValue: Number(row.target_value), status: row.status, createdAt: row.created_at,
+    ...(progress ? {
+      completedCount: progress.completedUserCount, totalMembers: progress.totalMembers,
+      progressPercent: Math.round(progress.percent * 10) / 10, achieved: progress.achieved,
+    } : {}),
+  };
+}
+
+// Preset windows use UTC day/week(Mon-Sun)/month boundaries computed once at
+// creation time — not per-member-local-time, and not adjusted for the
+// church's stored timezone (a true per-member-local implementation is a
+// materially bigger feature; flagged as an accepted simplification).
+function computeGoalWindow(timeframe: string, customStartsAt?: string, customEndsAt?: string): { startsAt: string; endsAt: string } | null {
+  const now = new Date();
+  if (timeframe === "custom") {
+    if (!customStartsAt || !customEndsAt) return null;
+    const s = new Date(customStartsAt);
+    const e = new Date(customEndsAt);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s >= e) return null;
+    return { startsAt: s.toISOString(), endsAt: e.toISOString() };
+  }
+  if (timeframe === "today") {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString() };
+  }
+  if (timeframe === "this_week") {
+    const diffToMonday = (now.getUTCDay() + 6) % 7; // Mon=0..Sun=6
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToMonday));
+    return { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+  }
+  if (timeframe === "this_month") {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return { startsAt: start.toISOString(), endsAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString() };
+  }
+  return null;
+}
+
+// Reuses the exact chunked-.in() discipline the grove endpoint already
+// established (selectInChunks) rather than any unchunked query — a
+// church-wide members × lessons aggregation is exactly the shape that broke
+// elsewhere in this codebase (see DataContext.tsx's Plans-progress loader).
+async function computeGoalProgress(goal: Record<string, unknown>, memberIds: string[]): Promise<{ completedUserCount: number; totalMembers: number; percent: number; achieved: boolean }> {
+  const empty = { completedUserCount: 0, totalMembers: memberIds.length, percent: 0, achieved: false };
+  if (!memberIds.length) return empty;
+
+  let relevantLessonIds: string[];
+  if (goal.goal_level === "lesson") {
+    relevantLessonIds = [goal.lesson_id as string];
+  } else if (goal.goal_level === "module") {
+    const lessons = await selectInChunks<{ id: string }>("p2p_lessons", "id", "module_id", [goal.module_id as string]);
+    relevantLessonIds = lessons.map((l) => l.id);
+  } else {
+    const modules = await selectInChunks<{ id: string }>("p2p_modules", "id", "curriculum_id", [goal.curriculum_id as string]);
+    const moduleIds = modules.map((m) => m.id);
+    const lessons = moduleIds.length ? await selectInChunks<{ id: string }>("p2p_lessons", "id", "module_id", moduleIds) : [];
+    relevantLessonIds = lessons.map((l) => l.id);
+  }
+  if (!relevantLessonIds.length) return empty;
+
+  const progressRows = await selectInChunks<{ user_id: string; lesson_id: string; completed: boolean; updated_at: string }>(
+    "p2p_lesson_progress", "user_id,lesson_id,completed,updated_at", "user_id", memberIds
+  );
+  const relevantSet = new Set(relevantLessonIds);
+  const startsAt = goal.starts_at as string;
+  const endsAt = goal.ends_at as string;
+  const inWindow = progressRows.filter((p) => p.completed && relevantSet.has(p.lesson_id) && p.updated_at >= startsAt && p.updated_at <= endsAt);
+
+  let completedUserCount: number;
+  if (goal.goal_level === "lesson") {
+    completedUserCount = new Set(inWindow.map((p) => p.user_id)).size;
+  } else {
+    const doneByUser = new Map<string, Set<string>>();
+    for (const p of inWindow) {
+      if (!doneByUser.has(p.user_id)) doneByUser.set(p.user_id, new Set());
+      doneByUser.get(p.user_id)!.add(p.lesson_id);
+    }
+    completedUserCount = [...doneByUser.values()].filter((set) => relevantLessonIds.every((id) => set.has(id))).length;
+  }
+
+  const percent = (completedUserCount / memberIds.length) * 100;
+  const achieved = goal.target_type === "percentage" ? percent >= Number(goal.target_value) : completedUserCount >= Number(goal.target_value);
+  return { completedUserCount, totalMembers: memberIds.length, percent, achieved };
+}
+
+router.post("/churches/:churchId/learning-goals", async (req, res) => {
+  const { churchId } = req.params;
+  const {
+    requesterId, title, goalLevel, lessonId, moduleId, curriculumId,
+    timeframe, startsAt, endsAt, targetType, targetValue,
+  } = req.body as Record<string, unknown>;
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId as string);
+  if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
+
+  if (typeof title !== "string" || !title.trim()) return err(res, "title is required", 400);
+  if (!GOAL_LEVELS.includes(goalLevel as string)) return err(res, `goalLevel must be one of: ${GOAL_LEVELS.join(", ")}`, 400);
+  if (!GOAL_TIMEFRAMES.includes(timeframe as string)) return err(res, `timeframe must be one of: ${GOAL_TIMEFRAMES.join(", ")}`, 400);
+  if (!GOAL_TARGET_TYPES.includes(targetType as string)) return err(res, `targetType must be one of: ${GOAL_TARGET_TYPES.join(", ")}`, 400);
+  const targetNum = Number(targetValue);
+  if (!(targetNum > 0)) return err(res, "targetValue must be greater than 0", 400);
+  if (targetType === "percentage" && targetNum > 100) return err(res, "A percentage target cannot exceed 100", 400);
+
+  if (goalLevel === "lesson" && !lessonId) return err(res, "lessonId is required for a lesson-level goal", 400);
+  if (goalLevel === "module" && !moduleId) return err(res, "moduleId is required for a module-level goal", 400);
+  if (goalLevel === "curriculum" && !curriculumId) return err(res, "curriculumId is required for a curriculum-level goal", 400);
+
+  const window = computeGoalWindow(timeframe as string, startsAt as string | undefined, endsAt as string | undefined);
+  if (!window) return err(res, "custom timeframe requires a valid startsAt/endsAt (startsAt must be before endsAt)", 400);
+
+  const { data, error } = await db.from("p2p_church_learning_goals").insert({
+    church_id: churchId, created_by: requesterId, title: (title as string).trim(),
+    goal_level: goalLevel, lesson_id: goalLevel === "lesson" ? lessonId : null,
+    module_id: goalLevel === "module" ? moduleId : null, curriculum_id: goalLevel === "curriculum" ? curriculumId : null,
+    timeframe, starts_at: window.startsAt, ends_at: window.endsAt,
+    target_type: targetType, target_value: targetNum, status: "active",
+  }).select("*").single();
+  if (error || !data) return err(res, error?.message ?? "Failed to create learning goal", 500);
+  return res.status(201).json(mapLearningGoal(data as Record<string, unknown>));
+});
+
+router.get("/churches/:churchId/learning-goals", async (req, res) => {
+  const { churchId } = req.params;
+  const { requesterId, status } = req.query as { requesterId?: string; status?: string };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId);
+  if (!requester?.is_active) return err(res, "Not a member of this church", 403);
+
+  let query = db.from("p2p_church_learning_goals").select("*").eq("church_id", churchId);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) return err(res, error.message, 500);
+
+  const memberIds = await getActiveChurchMemberIds(churchId);
+  const results = [];
+  for (const goal of data ?? []) {
+    const progress = await computeGoalProgress(goal as Record<string, unknown>, memberIds);
+    results.push(mapLearningGoal(goal as Record<string, unknown>, progress));
+  }
+  return ok(res, results);
+});
+
+router.put("/churches/:churchId/learning-goals/:goalId", async (req, res) => {
+  const { churchId, goalId } = req.params;
+  const { requesterId, title, targetType, targetValue, status } = req.body as Record<string, unknown>;
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId as string);
+  if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
+
+  const updates: Record<string, unknown> = {};
+  if (typeof title === "string" && title.trim()) updates.title = title.trim();
+  if (targetType !== undefined) {
+    if (!GOAL_TARGET_TYPES.includes(targetType as string)) return err(res, `targetType must be one of: ${GOAL_TARGET_TYPES.join(", ")}`, 400);
+    updates.target_type = targetType;
+  }
+  if (targetValue !== undefined) {
+    const n = Number(targetValue);
+    if (!(n > 0)) return err(res, "targetValue must be greater than 0", 400);
+    updates.target_value = n;
+  }
+  if (status !== undefined) {
+    if (!["active", "completed", "archived"].includes(status as string)) return err(res, "Invalid status", 400);
+    updates.status = status;
+  }
+  if (!Object.keys(updates).length) return err(res, "No fields to update", 400);
+
+  const { data, error } = await db.from("p2p_church_learning_goals").update(updates).eq("id", goalId).eq("church_id", churchId).select("*").single();
+  if (error || !data) return err(res, error?.message ?? "Learning goal not found", 404);
+  return ok(res, mapLearningGoal(data as Record<string, unknown>));
+});
+
+// GET /churches/:churchId/learning-goals/dashboard?requesterId= — purpose-built
+// server-side aggregation for the church home card (today/this-week/this-month
+// active preset goals + progress, in one round trip). Keeping progress math
+// server-side here (rather than the client fetching the full list and
+// computing locally) is how the "don't repeat DataContext's unchunked .in()
+// bug" discipline is actually enforced going forward.
+router.get("/churches/:churchId/learning-goals/dashboard", async (req, res) => {
+  const { churchId } = req.params;
+  const { requesterId } = req.query as { requesterId?: string };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requester = await getMembership(churchId, requesterId);
+  if (!requester?.is_active) return err(res, "Not a member of this church", 403);
+
+  const nowIso = new Date().toISOString();
+  const { data: goals, error } = await db
+    .from("p2p_church_learning_goals").select("*").eq("church_id", churchId).eq("status", "active")
+    .in("timeframe", ["today", "this_week", "this_month"]).gte("ends_at", nowIso);
+  if (error) return err(res, error.message, 500);
+
+  const memberIds = await getActiveChurchMemberIds(churchId);
+  const results = [];
+  for (const goal of goals ?? []) {
+    const progress = await computeGoalProgress(goal as Record<string, unknown>, memberIds);
+    results.push(mapLearningGoal(goal as Record<string, unknown>, progress));
+  }
+  results.sort((a, b) => (a.timeframe === "today" ? -1 : b.timeframe === "today" ? 1 : 0));
+  return ok(res, { goals: results });
 });
 
 export default router;

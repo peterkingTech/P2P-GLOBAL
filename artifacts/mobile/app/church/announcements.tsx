@@ -1,10 +1,16 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useData, ChurchAnnouncement } from "@/contexts/DataContext";
+import { useData, ChurchAnnouncement, ChurchAnnouncementType } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+
+const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
+  general: "General", bible_study: "Bible Study", discipleship: "Discipleship", prayer: "Prayer",
+  learning_goal: "Learning Goal", study_plan: "Study Plan", event: "Event", important: "Important",
+  reminder: "Reminder", other: "Other",
+};
 
 export default function ChurchAnnouncementsScreen() {
   const insets = useSafeAreaInsets();
@@ -29,9 +35,9 @@ export default function ChurchAnnouncementsScreen() {
   async function handlePost() {
     if (!userChurch || !title.trim() || !body.trim()) return;
     setPosting(true);
-    const err = await createAnnouncement(userChurch.id, title.trim(), body.trim());
+    const { error } = await createAnnouncement(userChurch.id, { title: title.trim(), body: body.trim() });
     setPosting(false);
-    if (err) { Alert.alert("Couldn't post announcement", err); return; }
+    if (error) { Alert.alert("Couldn't post announcement", error); return; }
     setTitle(""); setBody(""); setComposerOpen(false);
     load();
   }
@@ -54,7 +60,11 @@ export default function ChurchAnnouncementsScreen() {
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Announcements</Text>
-        <View style={{ width: 22 }} />
+        {isChurchLeader ? (
+          <TouchableOpacity onPress={() => router.push("/church/settings/announcements" as any)}>
+            <Ionicons name="settings-outline" size={20} color={colors.textDark} />
+          </TouchableOpacity>
+        ) : <View style={{ width: 22 }} />}
       </View>
 
       {isChurchLeader && (
@@ -71,11 +81,24 @@ export default function ChurchAnnouncementsScreen() {
           data={announcements}
           keyExtractor={(a) => a.id}
           contentContainerStyle={{ padding: 16, gap: 10 }}
-          ListEmptyComponent={<Text style={styles.emptyText}>No announcements yet.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No announcements yet.{"\n"}When your church leadership posts something, it'll show up here.</Text>
+          }
           renderItem={({ item }) => (
-            <TouchableOpacity style={[styles.card, item.isPinned && styles.cardPinned]} onLongPress={() => handleLongPress(item)}>
+            <TouchableOpacity style={[styles.card, item.isPinned && styles.cardPinned, item.isFeatured && styles.cardFeatured]} onLongPress={() => handleLongPress(item)}>
+              <View style={styles.cardTopRow}>
+                {item.isFeatured && <Text style={styles.featuredBadge}>⭐ FEATURED</Text>}
+                <Text style={styles.typeTag}>{TYPE_LABELS[item.announcementType] ?? "General"}</Text>
+              </View>
               <Text style={styles.cardTitle}>{item.isPinned ? "📌 " : ""}{item.title}</Text>
               <Text style={styles.cardBody}>{item.body}</Text>
+              {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />}
+              {item.videoUrl && (
+                <View style={styles.videoBadgeRow}>
+                  <Ionicons name="videocam" size={14} color={colors.textMid} />
+                  <Text style={styles.cardMeta}>Video attached</Text>
+                </View>
+              )}
               <Text style={styles.cardMeta}>
                 Posted by {item.authorName ?? "Church leadership"} · {new Date(item.createdAt).toLocaleDateString()}
               </Text>
@@ -118,8 +141,17 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
   card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14 },
   cardPinned: { borderColor: colors.accentGreen, borderWidth: 1.5 },
+  cardFeatured: { borderColor: "#D97706", borderWidth: 1.5 },
+  cardTopRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  featuredBadge: { fontSize: 10, fontWeight: "700", color: "#D97706", fontFamily: "Inter_700Bold" },
+  typeTag: {
+    fontSize: 10, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold",
+    backgroundColor: colors.lightCream, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
   cardTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   cardBody: { fontSize: 13, color: colors.textMid, marginTop: 4, lineHeight: 19, fontFamily: "Inter_400Regular" },
+  cardImage: { width: "100%", height: 160, borderRadius: 10, marginTop: 8, backgroundColor: colors.lightCream },
+  videoBadgeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   cardMeta: { fontSize: 11, color: colors.textMuted, marginTop: 8, fontFamily: "Inter_400Regular" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },

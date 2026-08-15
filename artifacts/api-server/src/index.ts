@@ -5,6 +5,7 @@ import { detectInactiveUsers, escalateCrisisCalls } from "./lib/pastoralCare";
 import { sweepBreakRooms } from "./lib/breakRooms";
 import { cleanupVerificationFiles } from "./lib/verificationCleanup";
 import { generateWeeklyReportDrafts, notifyAdminsToSubmitReports, flagOverdueReports, sendSuperAdminDailyDigest } from "./lib/adminReports";
+import { publishScheduledAnnouncements } from "./lib/churchAnnouncements";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -111,6 +112,17 @@ cron.schedule("0 9 * * 1", async () => {
     if (result.overdue) logger.warn(result, "Overdue admin reports flagged");
   } catch (err) {
     logger.error({ err }, "Overdue admin report check failed");
+  }
+});
+
+// Church announcements — publish anything scheduled whose publish_at has
+// passed. Runs every 5 minutes, matching the Break Rooms sweep's cadence.
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const result = await publishScheduledAnnouncements();
+    if (result.published) logger.info(result, "Scheduled church announcements published");
+  } catch (err) {
+    logger.error({ err }, "Church announcement publish sweep failed");
   }
 });
 

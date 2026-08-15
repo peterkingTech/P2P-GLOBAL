@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Activity
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useData, ChurchMember } from "@/contexts/DataContext";
+import { useData, ChurchMember, ChurchRole } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { churchRoleLabel, ASSIGNABLE_CHURCH_ROLES } from "@/constants/churchRoles";
 
 const STAGE_LABELS: Record<string, string> = {
   dormant_seed: "Seed", sprout: "Sprout", young_tree: "Young Tree",
@@ -14,10 +15,11 @@ const STAGE_LABELS: Record<string, string> = {
 export default function ChurchMembersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userChurch, getChurchMembers, removeChurchMember } = useData();
+  const { userChurch, userChurchRole, getChurchMembers, removeChurchMember, updateMemberRole } = useData();
   const [members, setMembers] = useState<ChurchMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const canChangeRoles = userChurchRole === "senior_pastor";
 
   const load = useCallback(async (q?: string) => {
     if (!userChurch) return;
@@ -29,12 +31,29 @@ export default function ChurchMembersScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  function handleChangeRole(member: ChurchMember) {
+    if (!userChurch) return;
+    Alert.alert(`Change ${member.displayName ?? "member"}'s role`, undefined, [
+      ...ASSIGNABLE_CHURCH_ROLES.map((role) => ({
+        text: churchRoleLabel(role) + (role === member.role ? " (current)" : ""),
+        onPress: async () => {
+          if (role === member.role) return;
+          const err = await updateMemberRole(userChurch.id, member.userId, role as ChurchRole);
+          if (err) Alert.alert("Couldn't change role", err);
+          else load(search);
+        },
+      })),
+      { text: "Cancel", style: "cancel" as const },
+    ]);
+  }
+
   function handleMenu(member: ChurchMember) {
     if (!member.visible || !userChurch) return;
     Alert.alert(member.displayName ?? "Member", undefined, [
       { text: "View Profile", onPress: () => router.push({ pathname: "/church/member-profile", params: { userId: member.userId } } as any) },
+      ...(canChangeRoles && member.role !== "senior_pastor" ? [{ text: "Change Role", onPress: () => handleChangeRole(member) }] : []),
       {
-        text: "Remove from Church", style: "destructive",
+        text: "Remove from Church", style: "destructive" as const,
         onPress: () => Alert.alert("Remove member?", `Remove ${member.displayName} from ${userChurch.name}?`, [
           { text: "Cancel", style: "cancel" },
           {
@@ -89,7 +108,10 @@ export default function ChurchMembersScreen() {
               <View style={{ flex: 1 }}>
                 {item.visible ? (
                   <>
-                    <Text style={styles.rowName}>@{item.username ?? "unknown"}</Text>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.rowName}>@{item.username ?? "unknown"}</Text>
+                      {item.role !== "member" && <Text style={styles.roleBadge}>{churchRoleLabel(item.role)}</Text>}
+                    </View>
                     <Text style={styles.rowSub}>{item.displayName} {item.country ? `· ${item.country}` : ""}</Text>
                     <Text style={styles.rowSub}>{STAGE_LABELS[item.treeStage ?? ""] ?? item.treeStage}</Text>
                     <Text style={styles.rowMeta}>
@@ -129,7 +151,12 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 12,
   },
   avatarCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(29,158,117,0.12)", alignItems: "center", justifyContent: "center" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowName: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  roleBadge: {
+    fontSize: 10, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold",
+    backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
   rowSub: { fontSize: 12, color: colors.textMid, marginTop: 1, fontFamily: "Inter_400Regular" },
   rowMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
 });
