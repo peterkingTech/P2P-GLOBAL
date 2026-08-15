@@ -233,6 +233,34 @@ router.get("/churches/my-church", async (req, res) => {
 });
 
 // GET /churches/:churchId?requesterId= — members only.
+// GET /churches/by-code/:inviteCode — public, no auth. Registered before the
+// /churches/:churchId route below so Express doesn't swallow "by-code" as a
+// churchId param. Powers the Netlify share-landing page a scanned QR/link
+// opens for someone who doesn't have the app installed yet — deliberately
+// returns only what's safe to show anonymously (matches the personal invite
+// landing page's same public-profile-preview scope).
+router.get("/churches/by-code/:inviteCode", async (req, res) => {
+  const { inviteCode } = req.params;
+  const { data: church } = await db
+    .from("p2p_churches").select("id,name,city,country,logo_url,location_hidden")
+    .eq("invite_code", inviteCode).eq("status", "active").maybeSingle();
+  if (!church) return err(res, "Church not found", 404);
+
+  const { count: memberCount } = await db
+    .from("p2p_church_members").select("id", { count: "exact", head: true })
+    .eq("church_id", church.id as string).eq("is_active", true);
+
+  return ok(res, {
+    church: {
+      name: church.name,
+      city: church.location_hidden ? null : (church.city ?? null),
+      country: church.location_hidden ? null : church.country,
+      logoUrl: church.logo_url ?? null,
+      memberCount: memberCount ?? 0,
+    },
+  });
+});
+
 router.get("/churches/:churchId", async (req, res) => {
   const { churchId } = req.params;
   const { requesterId } = req.query as { requesterId?: string };

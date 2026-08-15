@@ -68,6 +68,17 @@
     <p class="grain-note" id="grainNote"></p>
   </div>
 
+  <div class="card" id="churchCard" style="display:none">
+    <div id="churchAvatarWrap"></div>
+    <h1 id="churchTitle"></h1>
+    <p class="invite-name" id="churchLocation"></p>
+    <p class="invite-progress" id="churchMemberCount"></p>
+    <p class="tagline" id="churchDesc"></p>
+    <blockquote>"Accept one another, just as Christ accepted you." — Romans 15:7</blockquote>
+    <button class="download-btn" id="churchDownloadBtn">📱 Download P2P Global</button>
+    <p class="grain-note">Completely free — no subscription, no payment, no tiers.</p>
+  </div>
+
   <script>
     var params = new URLSearchParams(window.location.search);
     // Confirmed against app.json's android.package — not the
@@ -84,10 +95,64 @@
     // so detect + parse them from the path, not `type=`. Requires Netlify
     // to rewrite /join/* to this file (see web/_redirects) so the path
     // survives to be read here.
+    // Church invites use an extra path segment — /join/church/CODE — set by
+    // buildChurchInviteLink() in churches.ts, to stay disambiguated from the
+    // personal /join/@username path below. Checked first since its pattern
+    // is more specific (would otherwise also loosely match the invite regex).
+    var churchMatch = window.location.pathname.match(/\/join\/church\/([^/]+)/);
     var pathMatch = window.location.pathname.match(/\/join\/@?([^/]+)/);
-    var type = pathMatch ? "invite" : params.get("type");
+    var type = churchMatch ? "church" : pathMatch ? "invite" : params.get("type");
 
-    if (type === "invite") {
+    if (type === "church") {
+      // ── Church invite landing (dynamic — fetches the live church) ──
+      document.getElementById("staticCard").style.display = "none";
+      var churchCard = document.getElementById("churchCard");
+      churchCard.style.display = "block";
+
+      var inviteCode = decodeURIComponent(churchMatch[1]);
+      var churchDeepLink = "p2pglobalbiblestudy://church/join?code=" + encodeURIComponent(inviteCode);
+
+      function goToChurchApp() {
+        window.location = churchDeepLink;
+        setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+      }
+      document.getElementById("churchDownloadBtn").addEventListener("click", goToChurchApp);
+
+      fetch(API_BASE + "/churches/by-code/" + encodeURIComponent(inviteCode))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (body) {
+          var c = body && body.church;
+          if (!c) {
+            document.getElementById("churchTitle").textContent = "You've been invited to join a church";
+            document.getElementById("churchDesc").textContent = "Join Kingdom School — free, for every nation.";
+            return;
+          }
+          var avatarWrap = document.getElementById("churchAvatarWrap");
+          if (c.logoUrl) {
+            var img = document.createElement("img");
+            img.className = "invite-avatar";
+            img.src = c.logoUrl;
+            avatarWrap.appendChild(img);
+          } else {
+            var fallback = document.createElement("div");
+            fallback.className = "invite-avatar-fallback";
+            fallback.textContent = "⛪";
+            avatarWrap.appendChild(fallback);
+          }
+          document.getElementById("churchTitle").textContent = c.name;
+          var locationLine = [c.city, c.country].filter(Boolean).join(" · ");
+          document.getElementById("churchLocation").textContent = locationLine;
+          document.getElementById("churchMemberCount").textContent =
+            c.memberCount + " member" + (c.memberCount === 1 ? "" : "s") + " on Kingdom School";
+          document.getElementById("churchDesc").textContent =
+            c.name + " is using P2P Global Kingdom School for discipleship. Join them — free, for every nation.";
+        })
+        .catch(function () {
+          document.getElementById("churchTitle").textContent = "You've been invited to join a church";
+        });
+
+      goToChurchApp();
+    } else if (type === "invite") {
       // ── Personalised Grain invite landing (dynamic — fetches the live profile) ──
       document.getElementById("staticCard").style.display = "none";
       var inviteCard = document.getElementById("inviteCard");

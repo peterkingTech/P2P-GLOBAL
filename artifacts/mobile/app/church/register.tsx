@@ -7,6 +7,7 @@ import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, Church, ChurchSocialAccountData } from "@/contexts/DataContext";
+import { ChurchQRCode } from "@/components/ChurchQRCode";
 import { shareChurchInvite } from "@/lib/sharing";
 import colors from "@/constants/colors";
 
@@ -222,6 +223,10 @@ export default function RegisterChurchScreen() {
           <Ionicons name="share-outline" size={16} color={colors.accentGreen} />
           <Text style={styles.secondaryBtnText}>Share Invite Link</Text>
         </TouchableOpacity>
+
+        <View style={{ marginTop: 12 }}>
+          <ChurchQRCode church={{ name: createdChurch.name, city: createdChurch.city, country: createdChurch.country, inviteLink: createdChurch.inviteLink, inviteCode: createdChurch.inviteCode }} />
+        </View>
 
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/church" as any)}>
           <Text style={styles.primaryBtnText}>Go to My Church</Text>

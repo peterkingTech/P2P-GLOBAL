@@ -4,6 +4,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchCohort, ChurchAnnouncement, LearningGoal } from "@/contexts/DataContext";
+import { ChurchQRCode } from "@/components/ChurchQRCode";
 import colors from "@/constants/colors";
 
 export default function ChurchHomeScreen() {
@@ -130,12 +131,14 @@ export default function ChurchHomeScreen() {
             </TouchableOpacity>
           )}
 
+          <Text style={styles.sectionTitle}>Invite Members</Text>
+          <ChurchQRCode church={{ name: userChurch.name, city: userChurch.city, country: userChurch.country, inviteLink: userChurch.inviteLink, inviteCode: userChurch.inviteCode }} />
+
           <View style={{ gap: 10, marginTop: 16 }}>
             <NavRow icon="leaf-outline" label="Grove Dashboard" onPress={() => router.push("/church/grove" as any)} />
             <NavRow icon="people-outline" label="Members" onPress={() => router.push("/church/members" as any)} />
             <NavRow icon="school-outline" label="Cohorts" onPress={() => router.push("/church/cohorts" as any)} />
             <NavRow icon="megaphone-outline" label="Announcements" onPress={() => router.push("/church/announcements" as any)} />
-            <NavRow icon="person-add-outline" label="Invite Members" onPress={() => router.push("/church/register" as any)} />
             <NavRow icon="settings-outline" label="Church Settings" onPress={() => router.push("/church/settings" as any)} />
           </View>
         </>
