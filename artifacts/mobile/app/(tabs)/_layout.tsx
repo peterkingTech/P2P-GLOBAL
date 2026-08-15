@@ -5,11 +5,30 @@ import { Badge, Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
 import "@/lib/i18n";
+
+// Auto-shrinks to fit its slot instead of truncating — a fixed-size label
+// (e.g. the old "K-School" abbreviation, added specifically to dodge
+// truncation on small screens — see commit a36c5b4) always has some device
+// width where it's either too cramped or clips anyway. adjustsFontSizeToFit
+// solves this for any label length on any screen, not just the one word
+// that prompted the original fix.
+function TabLabel({ label, color, baseFontSize }: { label: string; color: string; baseFontSize: number }) {
+  return (
+    <Text
+      style={{ fontSize: baseFontSize, fontFamily: "Inter_500Medium", marginTop: -2, color }}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.7}
+    >
+      {label}
+    </Text>
+  );
+}
 
 function NativeTabLayout() {
   const { t } = useTranslation();
@@ -90,11 +109,6 @@ function ClassicTabLayout() {
               style={[StyleSheet.absoluteFill, { backgroundColor: `${colors.navBg}D9` }]}
             />
           ) : null,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontFamily: "Inter_500Medium",
-          marginTop: -2,
-        },
       }}
     >
       {TAB_ITEMS.map((tab) => (
@@ -103,6 +117,7 @@ function ClassicTabLayout() {
           name={tab.name}
           options={{
             title: tab.label,
+            tabBarLabel: ({ color }) => <TabLabel label={tab.label} color={color} baseFontSize={10} />,
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? tab.iconActive : tab.icon}
