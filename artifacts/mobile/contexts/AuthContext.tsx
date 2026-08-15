@@ -234,15 +234,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  // Retries on PGRST116 ("no rows found") rather than giving up on the first
+  // empty result — this listener's own auth-state-triggered call can fire
+  // before signUp()'s separate profile-row upsert (below) has committed, so
+  // an un-retried fetch right after a fresh signup reliably 406s once and
+  // leaves `profile` null until the next refresh. signUp() already sets
+  // `profile` directly from the row it just wrote as a fast path; this retry
+  // is what makes every OTHER caller (onAuthStateChange, refreshProfile,
+  // updateUsername) robust against the same race instead of silently no-op'ing.
+  const fetchProfile = useCallback(async (userId: string, attempt = 1): Promise<void> => {
     try {
       const { data, error } = await supabase
         .from("p2p_profiles")
         .select("*")
         .eq("id", userId)
         .single();
-      if (!error && data) {
+      if (data) {
         setProfile(mapProfileRow(data as Record<string, unknown>));
+        return;
+      }
+      if (error?.code === "PGRST116" && attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+        return fetchProfile(userId, attempt + 1);
       }
     } catch {}
   }, []);

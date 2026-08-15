@@ -37,12 +37,15 @@ async function selectInChunks<T = Record<string, unknown>>(
   table: string,
   columns: string,
   column: string,
-  ids: string[]
+  ids: string[],
+  extraFilter?: (query: any) => any
 ): Promise<T[]> {
   if (!ids.length) return [];
   const results: T[] = [];
   for (const c of chunkIds(ids)) {
-    const { data, error } = await supabaseRead.from(table).select(columns).in(column, c);
+    let query = supabaseRead.from(table).select(columns).in(column, c);
+    if (extraFilter) query = extraFilter(query);
+    const { data, error } = await query;
     if (error) throw new Error(`${table}.${column} IN chunk failed: ${error.message}`);
     results.push(...((data ?? []) as T[]));
   }
@@ -702,13 +705,14 @@ router.get("/plans/:planId/progress/:userId", async (req, res) => {
   const moduleIds = (modules ?? []).map((m) => m.id as string);
   if (!moduleIds.length) return res.json({ percent: 0, completedLessons: 0, totalLessons: 0, modules: [] });
 
-  const { data: lessons } = await supabaseRead.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds);
-  const lessonIds = (lessons ?? []).map((l) => l.id as string);
-  const { data: progress } = lessonIds.length
-    ? await supabaseRead.from("p2p_lesson_progress").select("lesson_id,completed").eq("user_id", userId).in("lesson_id", lessonIds)
-    : { data: [] as { lesson_id: string; completed: boolean }[] };
+  const lessons = await selectInChunks<{ id: string; module_id: string }>("p2p_lessons", "id,module_id", "module_id", moduleIds);
+  const lessonIds = lessons.map((l) => l.id as string);
+  const progress = await selectInChunks<{ lesson_id: string; completed: boolean }>(
+    "p2p_lesson_progress", "lesson_id,completed", "lesson_id", lessonIds,
+    (q) => q.eq("user_id", userId)
+  );
 
-  const completedSet = new Set((progress ?? []).filter((p) => p.completed).map((p) => p.lesson_id as string));
+  const completedSet = new Set(progress.filter((p) => p.completed).map((p) => p.lesson_id as string));
   const lessonIdsByModule = new Map<string, string[]>();
   for (const l of (lessons ?? []) as Record<string, unknown>[]) {
     const moduleId = l.module_id as string;

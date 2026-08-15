@@ -1231,6 +1231,41 @@ async function uploadSubmissionMedia(
   }
 }
 
+// ── Chunked query helper ──────────────────────────────────────────────────────
+// Same chunking discipline the API server already uses (churches.ts,
+// curriculum.ts's selectInChunks/chunk) — a plain .in() over an id list that
+// scales with catalog/network size (not a single user's own bounded records)
+// can build a URL PostgREST rejects with a 400 once it grows large enough.
+// Confirmed incident: the Plans progress loader below built a ~39KB URL from
+// every lesson across every plan and 400'd on every fresh account.
+const IN_CHUNK_SIZE = 100;
+function chunkIds<T>(items: T[], size = IN_CHUNK_SIZE): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+async function selectInChunks<T = Record<string, unknown>>(
+  table: string,
+  columns: string,
+  column: string,
+  ids: string[],
+  extraFilter?: (query: any) => any
+): Promise<T[]> {
+  if (!ids.length) return [];
+  const results: T[] = [];
+  for (const c of chunkIds(ids)) {
+    let query = supabase.from(table).select(columns).in(column, c);
+    if (extraFilter) query = extraFilter(query);
+    const { data, error } = await query;
+    if (error) {
+      console.error(`${table}.${column} chunked query failed:`, error.message);
+      continue;
+    }
+    results.push(...((data ?? []) as T[]));
+  }
+  return results;
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
@@ -1334,26 +1369,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // No separate progress table exists for plans anymore.
       if (userId && builtPlans.length > 0) {
         const planIds = builtPlans.map((p) => p.id);
-        const { data: planModules } = await supabase
-          .from("p2p_modules").select("id,curriculum_id").in("curriculum_id", planIds);
+        const planModules = await selectInChunks<Record<string, unknown>>(
+          "p2p_modules", "id,curriculum_id", "curriculum_id", planIds
+        );
         const moduleToPlanId = new Map<string, string>();
-        for (const m of (planModules ?? []) as Record<string, unknown>[]) {
+        for (const m of planModules) {
           moduleToPlanId.set(m.id as string, m.curriculum_id as string);
         }
         const moduleIds = Array.from(moduleToPlanId.keys());
-        const { data: planLessons } = moduleIds.length
-          ? await supabase.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
-          : { data: [] as Record<string, unknown>[] };
-        const lessonIds = (planLessons ?? []).map((l: Record<string, unknown>) => l.id as string);
-        const { data: progressRows } = lessonIds.length
-          ? await supabase.from("p2p_lesson_progress").select("lesson_id,completed").eq("user_id", userId).in("lesson_id", lessonIds)
-          : { data: [] as Record<string, unknown>[] };
+        const planLessons = await selectInChunks<Record<string, unknown>>(
+          "p2p_lessons", "id,module_id", "module_id", moduleIds
+        );
+        const lessonIds = planLessons.map((l) => l.id as string);
+        const progressRows = await selectInChunks<Record<string, unknown>>(
+          "p2p_lesson_progress", "lesson_id,completed", "lesson_id", lessonIds,
+          (q) => q.eq("user_id", userId)
+        );
         const completedSet = new Set(
-          ((progressRows ?? []) as Record<string, unknown>[]).filter((p) => p.completed).map((p) => p.lesson_id as string)
+          progressRows.filter((p) => p.completed).map((p) => p.lesson_id as string)
         );
         const totalByPlan = new Map<string, number>();
         const completedByPlan = new Map<string, number>();
-        for (const l of (planLessons ?? []) as Record<string, unknown>[]) {
+        for (const l of planLessons) {
           const planId = moduleToPlanId.get(l.module_id as string);
           if (!planId) continue;
           totalByPlan.set(planId, (totalByPlan.get(planId) ?? 0) + 1);
@@ -1373,12 +1410,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         // it never fires again for the same plan.
         const completedPlanIds = builtPlans.filter((p) => (progressMap.get(p.id) ?? 0) === 100).map((p) => p.id);
         if (completedPlanIds.length > 0) {
-          const { data: enrollments } = await supabase
-            .from("p2p_plan_enrollments")
-            .select("id, plan_id, status")
-            .eq("user_id", userId)
-            .in("plan_id", completedPlanIds);
-          const newlyCompleted = ((enrollments ?? []) as Record<string, unknown>[]).filter((e) => e.status !== "completed");
+          const enrollments = await selectInChunks<Record<string, unknown>>(
+            "p2p_plan_enrollments", "id, plan_id, status", "plan_id", completedPlanIds,
+            (q) => q.eq("user_id", userId)
+          );
+          const newlyCompleted = enrollments.filter((e) => e.status !== "completed");
           for (const enrollment of newlyCompleted) {
             const plan = builtPlans.find((p) => p.id === enrollment.plan_id);
             if (!plan) continue;
@@ -1590,15 +1626,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         // step in that flow, so gating on 'approved' here would mean a
         // freshly-generated title never actually shows up in this list.
         const allIds = [...moduleIds, ...lessonIdList];
-        const { data: newTrans } = await supabase
-          .from("p2p_content_translations")
-          .select("content_type,content_id,title,subtitle,description,status")
-          .in("content_id", allIds)
-          .eq("language_code", languageCode);
+        const newTrans = await selectInChunks<Record<string, unknown>>(
+          "p2p_content_translations", "content_type,content_id,title,subtitle,description,status", "content_id", allIds,
+          (q) => q.eq("language_code", languageCode)
+        );
 
         const newModMap = new Map<string, string>();
         const newLesMap = new Map<string, string>();
-        for (const row of (newTrans ?? []) as Record<string, unknown>[]) {
+        for (const row of newTrans) {
           if (row.title) {
             if (row.content_type === "module") newModMap.set(row.content_id as string, row.title as string);
             if (row.content_type === "lesson") newLesMap.set(row.content_id as string, row.title as string);
@@ -1609,31 +1644,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const missingModuleIds = moduleIds.filter((id) => !newModMap.has(id));
         const missingLessonIds = lessonIdList.filter((id) => !newLesMap.has(id));
 
-        const [{ data: modTrans }, { data: lessTrans }] = await Promise.all([
-          missingModuleIds.length
-            ? supabase
-                .from("p2p_module_translations")
-                .select("module_id,title")
-                .in("module_id", missingModuleIds)
-                .eq("language_code", languageCode)
-            : Promise.resolve({ data: [] }),
-          missingLessonIds.length
-            ? supabase
-                .from("p2p_lesson_translations")
-                .select("lesson_id,title")
-                .in("lesson_id", missingLessonIds)
-                .eq("language_code", languageCode)
-            : Promise.resolve({ data: [] }),
+        const [modTrans, lessTrans] = await Promise.all([
+          selectInChunks<Record<string, unknown>>(
+            "p2p_module_translations", "module_id,title", "module_id", missingModuleIds,
+            (q) => q.eq("language_code", languageCode)
+          ),
+          selectInChunks<Record<string, unknown>>(
+            "p2p_lesson_translations", "lesson_id,title", "lesson_id", missingLessonIds,
+            (q) => q.eq("language_code", languageCode)
+          ),
         ]);
 
         // Merge: new table wins, legacy is fallback
         for (const [id, title] of newModMap) moduleTitleOverrides.set(id, title);
         for (const [id, title] of newLesMap) lessonTitleOverrides.set(id, title);
-        for (const mt of (modTrans ?? []) as Record<string, unknown>[]) {
+        for (const mt of modTrans) {
           if (mt.title && !moduleTitleOverrides.has(mt.module_id as string))
             moduleTitleOverrides.set(mt.module_id as string, mt.title as string);
         }
-        for (const lt of (lessTrans ?? []) as Record<string, unknown>[]) {
+        for (const lt of lessTrans) {
           if (lt.title && !lessonTitleOverrides.has(lt.lesson_id as string))
             lessonTitleOverrides.set(lt.lesson_id as string, lt.title as string);
         }
@@ -1947,12 +1976,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       let frontier = [userId];
       const visitedMentors = new Set<string>();
       for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
-        const { data } = await supabase
-          .from("p2p_discipleship_links")
-          .select("mentor_id,disciple_id")
-          .eq("active", true)
-          .in("mentor_id", frontier);
-        const rows = (data ?? []) as LinkRow[];
+        const rows = await selectInChunks<LinkRow>(
+          "p2p_discipleship_links", "mentor_id,disciple_id", "mentor_id", frontier,
+          (q) => q.eq("active", true)
+        );
         frontier.forEach((m) => visitedMentors.add(m));
         allLinks.push(...rows);
         frontier = [...new Set(rows.map((r) => r.disciple_id))].filter((id) => !visitedMentors.has(id));
@@ -1965,12 +1992,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const { data: profiles } = await supabase
-        .from("p2p_profiles")
-        .select("id,full_name,role,growth_level,country,username,is_verified")
-        .in("id", discipleIds);
+      const profiles = await selectInChunks<ProfileRow>(
+        "p2p_profiles", "id,full_name,role,growth_level,country,username,is_verified", "id", discipleIds
+      );
       const profileById = new Map(
-        ((profiles ?? []) as ProfileRow[]).map((p) => [p.id, p])
+        profiles.map((p) => [p.id, p])
       );
       const childrenByMentor = new Map<string, string[]>();
       allLinks.forEach((l) => {
@@ -2060,12 +2086,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // honest stand-in for "current module," since reading another user's
       // literal lesson-by-lesson progress would need RLS surface area this
       // app doesn't grant a mentor today.
-      const { data: menteeProfiles } = await supabase
-        .from("p2p_profiles")
-        .select("id, full_name, growth_level, last_active_at")
-        .in("id", discipleIds);
+      const menteeProfiles = await selectInChunks<Record<string, unknown>>(
+        "p2p_profiles", "id, full_name, growth_level, last_active_at", "id", discipleIds
+      );
 
-      const mentees: MenteeBranchInfo[] = ((menteeProfiles ?? []) as Record<string, unknown>[]).map((p) => {
+      const mentees: MenteeBranchInfo[] = menteeProfiles.map((p) => {
         const lastActive = p.last_active_at as string | null;
         const daysAgo = lastActive ? Math.floor((Date.now() - new Date(lastActive).getTime()) / (24 * 60 * 60 * 1000)) : 0;
         return {
@@ -3752,28 +3777,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const lastReadById = new Map((memberships ?? []).map((m: any) => [m.conversation_id, m.last_read_at as string]));
       if (convIds.length === 0) { setConversations([]); setConversationsLoading(false); return; }
 
-      const [{ data: convs }, { data: allMembers }, { data: recentMessages }, { data: settingsRows }] = await Promise.all([
-        supabase.from("p2p_conversations")
-          .select("id, type, conversation_type, name, group_id, circle_id, is_pinned_by_system")
-          .in("id", convIds),
-        supabase.from("p2p_conversation_members")
-          .select("conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type)")
-          .in("conversation_id", convIds)
-          .neq("user_id", profile.id),
-        supabase.from("p2p_messages")
-          .select("conversation_id, body, sender_id, created_at, message_type")
-          .in("conversation_id", convIds)
-          .order("created_at", { ascending: false })
-          .limit(500),
-        supabase.from("p2p_conversation_settings")
-          .select("conversation_id, is_pinned, is_favourite, is_muted")
-          .eq("user_id", profile.id)
-          .in("conversation_id", convIds),
+      const [convs, allMembers, recentMessages, settingsRows] = await Promise.all([
+        selectInChunks<any>(
+          "p2p_conversations", "id, type, conversation_type, name, group_id, circle_id, is_pinned_by_system", "id", convIds
+        ),
+        selectInChunks<any>(
+          "p2p_conversation_members",
+          "conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type)",
+          "conversation_id", convIds,
+          (q) => q.neq("user_id", profile.id)
+        ),
+        selectInChunks<any>(
+          "p2p_messages", "conversation_id, body, sender_id, created_at, message_type", "conversation_id", convIds,
+          (q) => q.order("created_at", { ascending: false }).limit(500)
+        ),
+        selectInChunks<any>(
+          "p2p_conversation_settings", "conversation_id, is_pinned, is_favourite, is_muted", "conversation_id", convIds,
+          (q) => q.eq("user_id", profile.id)
+        ),
       ]);
 
       const otherMemberByConv = new Map<string, any>();
       const memberCountByConv = new Map<string, number>();
-      for (const m of (allMembers ?? []) as any[]) {
+      for (const m of allMembers as any[]) {
         memberCountByConv.set(m.conversation_id, (memberCountByConv.get(m.conversation_id) ?? 0) + 1);
         if (!otherMemberByConv.has(m.conversation_id)) otherMemberByConv.set(m.conversation_id, m);
       }
