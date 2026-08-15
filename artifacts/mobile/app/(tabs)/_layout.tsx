@@ -9,7 +9,16 @@ import { Platform, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
+import { isSmallPhone } from "@/lib/responsive";
 import "@/lib/i18n";
+
+// "Kingdom School" only actually needs shortening on narrow phones — every
+// other locale already uses a short generic word for this tab (e.g.
+// "Apprendre"/"Lernen"/"Jifunza"), so the swap only applies in English.
+function getLearnTabLabel(fullLabel: string, language: string): string {
+  if (isSmallPhone && language.startsWith("en")) return "K-School";
+  return fullLabel;
+}
 
 // Auto-shrinks to fit its slot instead of truncating — a fixed-size label
 // (e.g. the old "K-School" abbreviation, added specifically to dodge
@@ -31,7 +40,7 @@ function TabLabel({ label, color, baseFontSize }: { label: string; color: string
 }
 
 function NativeTabLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { totalUnreadCount } = useData();
   return (
     <NativeTabs>
@@ -41,7 +50,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="learn">
         <Icon sf={{ default: "book", selected: "book.fill" }} />
-        <Label>{t("tabs.learn")}</Label>
+        <Label>{getLearnTabLabel(t("tabs.learn"), i18n.language)}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="messages">
         <Icon sf={{ default: "message", selected: "message.fill" }} />
@@ -69,7 +78,7 @@ function ClassicTabLayout() {
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { totalUnreadCount } = useData();
   // Take the larger of the real device inset and the previous flat value —
   // preserves existing look on devices the old constants already covered,
@@ -79,7 +88,7 @@ function ClassicTabLayout() {
 
   const TAB_ITEMS = [
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
-    { name: "learn", label: t("tabs.learn"), icon: "book-outline" as const, iconActive: "book" as const },
+    { name: "learn", label: getLearnTabLabel(t("tabs.learn"), i18n.language), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
     { name: "prayer", label: t("tabs.prayer"), icon: "radio-outline" as const, iconActive: "radio" as const },
     { name: "missions", label: t("tabs.missions"), icon: "earth-outline" as const, iconActive: "earth" as const },
