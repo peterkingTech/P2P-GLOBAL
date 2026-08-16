@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/contexts/AuthContext";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 import BlockEditorPanel from "@/components/admin/BlockEditorPanel";
 import PdfImportModal from "@/components/admin/PdfImportModal";
@@ -711,10 +712,10 @@ function CurriculumEditor({
     const asset = result.assets[0];
     setUploadingCover(true);
     try {
-      const ext = (asset.uri.split(".").pop() ?? "jpg").toLowerCase();
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `plan-covers/${curriculum.id}.${ext}`;
       const blob = await (await fetch(asset.uri)).blob();
-      const { error: upErr } = await supabase.storage.from("curriculum-media").upload(path, blob, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      const { error: upErr } = await supabase.storage.from("curriculum-media").upload(path, blob, { upsert: true, contentType });
       if (upErr) throw new Error(upErr.message);
       const { data: urlData } = supabase.storage.from("curriculum-media").getPublicUrl(path);
       setCoverImage(urlData.publicUrl);
@@ -893,10 +894,10 @@ function ModuleEditor({
     const asset = result.assets[0];
     setUploading(true);
     try {
-      const ext = (asset.uri.split(".").pop() ?? "jpg").toLowerCase();
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `module-thumbnails/${module.id}.${ext}`;
       const blob = await (await fetch(asset.uri)).blob();
-      const { error: upErr } = await supabase.storage.from("Module Title Pictures").upload(path, blob, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      const { error: upErr } = await supabase.storage.from("Module Title Pictures").upload(path, blob, { upsert: true, contentType });
       if (upErr) throw new Error(upErr.message);
       const { data: urlData } = supabase.storage.from("Module Title Pictures").getPublicUrl(path);
       setImageUrl(urlData.publicUrl);

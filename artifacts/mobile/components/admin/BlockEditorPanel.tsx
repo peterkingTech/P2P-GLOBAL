@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/contexts/AuthContext";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 import {
   LessonBlock, BlockType, BLOCK_TYPE_META, BLOCK_SECTIONS, QUICK_TOOLBAR_TYPES,
@@ -283,10 +284,10 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
     setCoverUploading(true);
     try {
       const asset = result.assets[0];
-      const ext = (asset.uri.split(".").pop() ?? "jpg").toLowerCase();
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `curriculum/${lesson?.module_id}/${lessonId}/cover-${Date.now()}.${ext}`;
       const blob = await (await fetch(asset.uri)).blob();
-      const { error: upErr } = await supabase.storage.from("curriculum-media").upload(path, blob, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+      const { error: upErr } = await supabase.storage.from("curriculum-media").upload(path, blob, { upsert: true, contentType });
       if (upErr) throw new Error(upErr.message);
       const { data: urlData } = supabase.storage.from("curriculum-media").getPublicUrl(path);
       scheduleLessonSave({ cover_image_url: urlData.publicUrl });

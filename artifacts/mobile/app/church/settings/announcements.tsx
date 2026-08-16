@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, ChurchAnnouncement, ChurchAnnouncementType } from "@/contexts/DataContext";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
 const TYPE_OPTIONS: { value: ChurchAnnouncementType; label: string }[] = [
@@ -72,12 +73,11 @@ export default function ChurchAnnouncementsManagementScreen() {
     }
     setUploadingMedia(true);
     try {
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? (asset.type === "video" ? "mp4" : "jpg");
       const isVideo = asset.type === "video";
+      const { ext, contentType } = resolveMediaUpload({ ...asset, mimeType: asset.mimeType ?? (isVideo ? "video/mp4" : "image/jpeg") });
       const path = `${userChurch.id}/announcements/${Date.now()}/media.${ext}`;
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
-      const contentType = isVideo ? `video/${ext === "mov" ? "quicktime" : ext}` : `image/${ext === "jpg" ? "jpeg" : ext}`;
       const { error } = await supabase.storage.from("church-media").upload(path, arrayBuffer, { contentType, upsert: true });
       if (error) { Alert.alert("Upload failed", error.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);

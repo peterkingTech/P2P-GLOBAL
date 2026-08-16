@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData, Church, ChurchSocialAccountData } from "@/contexts/DataContext";
 import { ChurchQRCode } from "@/components/ChurchQRCode";
 import { shareChurchInvite } from "@/lib/sharing";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
 const CHURCH_TYPES = [
@@ -140,13 +141,13 @@ export default function RegisterChurchScreen() {
     setUploadingLogo(true);
     try {
       const asset = result.assets[0];
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `${user.id}/church-logo-draft/logo.${ext}`;
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
       const { error: uploadError } = await supabase.storage
         .from("church-media")
-        .upload(path, arrayBuffer, { contentType: `image/${ext === "jpg" ? "jpeg" : ext}`, upsert: true });
+        .upload(path, arrayBuffer, { contentType, upsert: true });
       if (uploadError) { Alert.alert("Upload failed", uploadError.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);
       setLogoUrl(`${data.publicUrl}?t=${Date.now()}`);

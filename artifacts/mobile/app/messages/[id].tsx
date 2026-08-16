@@ -415,7 +415,13 @@ export default function ChatScreen() {
   async function handleSendVoice(localUri: string, durationSeconds: number) {
     if (!id || !user) return;
     try {
-      const ext = localUri.split(".").pop()?.toLowerCase() || "m4a";
+      // On web, localUri is a blob: URL with no dot-extension at all, so a
+      // plain split(".").pop() returns the ENTIRE URL (including "/" and ":"
+      // characters) as "ext" — safe here against a wrong Content-Type (fixed
+      // below) but it would still pollute the storage path with extra
+      // segments. Validate before trusting it, same guard as mediaUpload.ts.
+      const rawExt = localUri.split(".").pop()?.toLowerCase();
+      const ext = rawExt && /^[a-z0-9]{2,5}$/.test(rawExt) ? rawExt : "m4a";
       const path = `${user.id}/${id}/${Date.now()}.${ext}`;
       const response = await fetch(localUri);
       const arrayBuffer = await response.arrayBuffer();

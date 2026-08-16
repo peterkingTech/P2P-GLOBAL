@@ -9,6 +9,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 
 const MIN_ACCOUNT_AGE_DAYS = 14;
 
@@ -73,8 +74,9 @@ export default function VerificationScreen() {
     );
     if (result.canceled || !result.assets?.[0]) return;
     const picked = result.assets[0];
-    const ext = picked.uri.split(".").pop()?.toLowerCase() ?? (m === "video_selfie" ? "mp4" : "jpg");
-    const type = m === "video_selfie" ? `video/${ext === "mov" ? "quicktime" : "mp4"}` : `image/${ext === "png" ? "png" : "jpeg"}`;
+    const { ext, contentType: type } = resolveMediaUpload({
+      ...picked, mimeType: picked.mimeType ?? (m === "video_selfie" ? "video/mp4" : "image/jpeg"),
+    });
     setAsset({ uri: picked.uri, name: `verification.${ext}`, type });
     setStep("preview");
   }

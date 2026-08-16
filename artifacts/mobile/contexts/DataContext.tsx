@@ -1213,7 +1213,12 @@ async function uploadSubmissionMedia(
   userId: string
 ): Promise<{ storagePath: string; contentType: string } | null> {
   try {
-    const rawExt = localUri.split(".").pop()?.toLowerCase() ?? "m4a";
+    // On web, localUri is a blob: URL with no dot-extension, so a plain
+    // split(".").pop() returns the entire URL as "ext" — validate before
+    // trusting it as a storage-path segment (see lib/mediaUpload.ts for the
+    // same guard applied to ImagePicker uploads).
+    const rawExtCandidate = localUri.split(".").pop()?.toLowerCase();
+    const rawExt = rawExtCandidate && /^[a-z0-9]{2,5}$/.test(rawExtCandidate) ? rawExtCandidate : "m4a";
     const isVideo = ["mp4", "mov", "webm", "avi"].includes(rawExt);
     const ext = rawExt === "mov" ? "mp4" : rawExt;
     const contentType = isVideo ? "video/mp4" : "audio/m4a";

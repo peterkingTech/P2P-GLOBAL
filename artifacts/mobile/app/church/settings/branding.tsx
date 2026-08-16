@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
 export default function ChurchBrandingSettingsScreen() {
@@ -26,11 +27,11 @@ export default function ChurchBrandingSettingsScreen() {
     setUploading(true);
     try {
       const asset = result.assets[0];
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `${userChurch.id}/logo/logo.${ext}`;
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
-      const { error: uploadError } = await supabase.storage.from("church-media").upload(path, arrayBuffer, { contentType: `image/${ext === "jpg" ? "jpeg" : ext}`, upsert: true });
+      const { error: uploadError } = await supabase.storage.from("church-media").upload(path, arrayBuffer, { contentType, upsert: true });
       if (uploadError) { Alert.alert("Upload failed", uploadError.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);
       const newUrl = `${data.publicUrl}?t=${Date.now()}`;

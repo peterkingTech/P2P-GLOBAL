@@ -14,6 +14,7 @@ import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
+import { resolveMediaUpload } from "@/lib/mediaUpload";
 
 function timeAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
@@ -100,13 +101,13 @@ export default function AccountSettingsScreen() {
     setUploadingPhoto(true);
     try {
       const asset = result.assets[0];
-      const ext = asset.uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const { ext, contentType } = resolveMediaUpload(asset);
       const path = `${user.id}/avatar.${ext}`;
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(path, arrayBuffer, { contentType: `image/${ext === "jpg" ? "jpeg" : ext}`, upsert: true });
+        .upload(path, arrayBuffer, { contentType, upsert: true });
       if (uploadError) {
         Alert.alert("Upload failed", uploadError.message);
         return;
