@@ -292,11 +292,6 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     marginBottom: 36,
-    shadowColor: colors.accentGreen,
-    shadowOpacity: 0.35,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
   },
   logoImg: { width: 140, height: 140, borderRadius: 32 },
   logoImgSmall: { width: 100, height: 100, borderRadius: 24 },
