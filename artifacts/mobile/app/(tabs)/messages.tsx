@@ -64,6 +64,25 @@ function makeStyles(c: AppColors) {
       borderRadius: 12,
     },
     requestsBannerText: { fontSize: 13, fontWeight: "600", color: "#B8860B", fontFamily: "Inter_600SemiBold" },
+    contactP2PButton: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      marginHorizontal: 20, marginBottom: 4, padding: 14,
+      backgroundColor: "rgba(29,158,117,0.08)", borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
+      borderRadius: 14,
+    },
+    contactP2PLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+    contactP2PIcon: {
+      width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(29,158,117,0.15)",
+      alignItems: "center", justifyContent: "center",
+    },
+    contactP2PTitle: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    contactP2PSubtitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
+    myContactMessagesRow: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      marginHorizontal: 20, marginBottom: 12, paddingVertical: 8,
+    },
+    myContactMessagesText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
+    contactDivider: { height: 1, backgroundColor: c.borderBeige, marginBottom: 8 },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 40 },
     emptyText: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     emptySub: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular" },
@@ -185,6 +204,24 @@ export default function MessagesTab() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <TouchableOpacity style={styles.contactP2PButton} onPress={() => router.push("/messages/contact-p2p" as any)}>
+        <View style={styles.contactP2PLeft}>
+          <View style={styles.contactP2PIcon}>
+            <Text style={{ fontSize: 18 }}>✉️</Text>
+          </View>
+          <View>
+            <Text style={styles.contactP2PTitle}>Contact P2P Global</Text>
+            <Text style={styles.contactP2PSubtitle}>Message our support, help, or crisis team</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.myContactMessagesRow} onPress={() => router.push("/messages/my-contact-messages" as any)}>
+        <Text style={styles.myContactMessagesText}>My Messages to P2P Global</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+      </TouchableOpacity>
+      <View style={styles.contactDivider} />
 
       {pendingConnectionRequestCount > 0 && (
         <TouchableOpacity style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>

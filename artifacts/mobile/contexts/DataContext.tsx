@@ -459,6 +459,45 @@ export interface ChurchAnnouncementCreateData {
   announcementTypeOther?: string; imageUrl?: string; videoUrl?: string; publishAt?: string; isFeatured?: boolean;
 }
 
+export type ContactDepartment = "help_request" | "crisis_response" | "p2p_support" | "marketing";
+export type ContactMessageStatus = "unread" | "read" | "replied" | "forwarded" | "closed";
+export type ContactPriority = "normal" | "high" | "urgent";
+
+export interface ContactMessage {
+  id: string; referenceNumber: string; fromUserId: string; toDepartment: ContactDepartment;
+  subject: string; body: string; attachmentUrl: string | null; attachmentType: "image" | "pdf" | null;
+  status: ContactMessageStatus; priority: ContactPriority; assignedTo: string | null;
+  forwardedFrom: string | null; forwardedNote: string | null; originalDepartment: string | null;
+  feedbackRequested: boolean; feedbackSubmitted: boolean; createdAt: string; updatedAt: string;
+}
+export interface ContactMessageListItem extends ContactMessage {
+  bodyPreview: string; replyCount: number; latestReplyAt: string | null;
+}
+export interface ContactAdminInboxItem extends ContactMessage {
+  bodyPreview: string; fromUsername: string | null; fromDisplayName: string; fromPhotoUrl: string | null;
+  fromCountry: string | null; fromMinistryRole: string | null; fromTreeStage: string;
+  fromIsVerified: boolean; fromAccountAgeDays: number | null;
+}
+export interface ContactReply {
+  id: string; messageId: string; fromAdminId: string; fromAdminUsername: string | null;
+  fromDepartment: string; body: string; isInternalNote: boolean; createdAt: string;
+}
+export interface ContactNote {
+  id: string; messageId: string; adminId: string; adminUsername: string | null; noteText: string; createdAt: string;
+}
+export interface ContactThread { message: ContactMessage; replies: ContactReply[] }
+export interface ContactAdminMessageDetail {
+  message: ContactAdminInboxItem & { fromModulesCompleted: number };
+  replies: ContactReply[]; notes: ContactNote[];
+}
+export interface ContactMessageSendData { toDepartment: ContactDepartment; subject: string; body: string; attachmentUrl?: string; attachmentType?: "image" | "pdf" }
+export interface ContactMessageSendResult { success: boolean; referenceNumber?: string; estimatedResponse?: string; error?: string }
+export interface ContactWeekStats { received: number; replied: number; closed: number; forwarded: number }
+export interface ContactDeptStats {
+  totalUnread: number; totalOpen: number; totalReplied: number; totalClosed: number;
+  overdue: number; avgResponseHours: number; thisWeek: ContactWeekStats;
+}
+
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
 export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
 
@@ -1165,6 +1204,21 @@ interface DataContextValue {
   getLearningGoals: (churchId: string, status?: string) => Promise<LearningGoal[]>;
   updateLearningGoal: (churchId: string, goalId: string, data: { title?: string; targetType?: LearningGoalTargetType; targetValue?: number; status?: string }) => Promise<string | null>;
   getLearningGoalsDashboard: (churchId: string) => Promise<LearningGoal[]>;
+
+  // Contact P2P Global (peer side)
+  sendContactMessage: (data: ContactMessageSendData) => Promise<ContactMessageSendResult>;
+  getMyContactMessages: () => Promise<ContactMessageListItem[]>;
+  getContactThread: (messageId: string) => Promise<ContactThread | null>;
+
+  // Contact P2P Global (admin side)
+  getAdminContactInbox: (filters?: { status?: string; priority?: string; search?: string }) => Promise<ContactAdminInboxItem[]>;
+  getAdminContactMessage: (messageId: string) => Promise<ContactAdminMessageDetail | null>;
+  replyToContactMessage: (messageId: string, body: string, isInternalNote: boolean) => Promise<string | null>;
+  forwardContactMessage: (messageId: string, data: { toDepartment?: ContactDepartment; toAdminId?: string; toUsername?: string; note?: string }) => Promise<string | null>;
+  closeContactMessage: (messageId: string) => Promise<string | null>;
+  setContactMessagePriority: (messageId: string, priority: ContactPriority) => Promise<string | null>;
+  getContactAdminStats: () => Promise<ContactDeptStats | null>;
+  getContactAllDepartmentStats: () => Promise<Record<ContactDepartment, ContactDeptStats> | null>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -4477,6 +4531,169 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
+  // ── Contact P2P Global ────────────────────────────────────────────────────
+  const sendContactMessage = useCallback(async (data: ContactMessageSendData): Promise<ContactMessageSendResult> => {
+    if (!profile?.id) return { success: false, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/send`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterId: profile.id, to_department: data.toDepartment, subject: data.subject, body: data.body,
+          attachment_url: data.attachmentUrl, attachment_type: data.attachmentType,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) return { success: false, error: body?.error ?? "Failed to send message" };
+      return body as ContactMessageSendResult;
+    } catch (e) {
+      console.error("sendContactMessage failed", e);
+      return { success: false, error: "Failed to send message" };
+    }
+  }, [profile?.id]);
+
+  const getMyContactMessages = useCallback(async (): Promise<ContactMessageListItem[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/my-messages?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getMyContactMessages failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const getContactThread = useCallback(async (messageId: string): Promise<ContactThread | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/my-messages/${messageId}?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getContactThread failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const getAdminContactInbox = useCallback(async (filters?: { status?: string; priority?: string; search?: string }): Promise<ContactAdminInboxItem[]> => {
+    if (!profile?.id) return [];
+    try {
+      const params = new URLSearchParams({ requesterId: profile.id });
+      if (filters?.status) params.set("status", filters.status);
+      if (filters?.priority) params.set("priority", filters.priority);
+      if (filters?.search) params.set("search", filters.search);
+      const res = await fetch(`${getApiUrl()}/contact/admin/inbox?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getAdminContactInbox failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const getAdminContactMessage = useCallback(async (messageId: string): Promise<ContactAdminMessageDetail | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/inbox/${messageId}?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getAdminContactMessage failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const replyToContactMessage = useCallback(async (messageId: string, body: string, isInternalNote: boolean): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/reply/${messageId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, body, is_internal_note: isInternalNote }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to send";
+    } catch (e) {
+      console.error("replyToContactMessage failed", e);
+      return "Failed to send";
+    }
+  }, [profile?.id]);
+
+  const forwardContactMessage = useCallback(async (messageId: string, data: { toDepartment?: ContactDepartment; toAdminId?: string; toUsername?: string; note?: string }): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/forward/${messageId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterId: profile.id, to_department: data.toDepartment, to_admin_id: data.toAdminId,
+          to_username: data.toUsername, note: data.note,
+        }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to forward";
+    } catch (e) {
+      console.error("forwardContactMessage failed", e);
+      return "Failed to forward";
+    }
+  }, [profile?.id]);
+
+  const closeContactMessage = useCallback(async (messageId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/close/${messageId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to close";
+    } catch (e) {
+      console.error("closeContactMessage failed", e);
+      return "Failed to close";
+    }
+  }, [profile?.id]);
+
+  const setContactMessagePriority = useCallback(async (messageId: string, priority: ContactPriority): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/priority/${messageId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, priority }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to update priority";
+    } catch (e) {
+      console.error("setContactMessagePriority failed", e);
+      return "Failed to update priority";
+    }
+  }, [profile?.id]);
+
+  const getContactAdminStats = useCallback(async (): Promise<ContactDeptStats | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/stats?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getContactAdminStats failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
+  const getContactAllDepartmentStats = useCallback(async (): Promise<Record<ContactDepartment, ContactDeptStats> | null> => {
+    if (!profile?.id) return null;
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/all-departments?requesterId=${profile.id}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error("getContactAllDepartmentStats failed", e);
+      return null;
+    }
+  }, [profile?.id]);
+
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
   const refreshTreeData = useCallback(async () => {
@@ -4530,6 +4747,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       updateChurchMemberNotes, updateMemberRole, removeChurchMember, createCohort, getChurchCohorts,
       updateCohort, addMemberToCohort, removeMemberFromCohort, createAnnouncement, updateAnnouncement,
       getAnnouncements, pinAnnouncement, createLearningGoal, getLearningGoals, updateLearningGoal, getLearningGoalsDashboard,
+      sendContactMessage, getMyContactMessages, getContactThread, getAdminContactInbox, getAdminContactMessage,
+      replyToContactMessage, forwardContactMessage, closeContactMessage, setContactMessagePriority,
+      getContactAdminStats, getContactAllDepartmentStats,
     }}>
       {children}
     </DataContext.Provider>

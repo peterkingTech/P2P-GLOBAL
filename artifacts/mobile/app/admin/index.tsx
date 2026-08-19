@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { useData, AdminActivityEntry } from "@/contexts/DataContext";
+import { useData, AdminActivityEntry, ContactDepartment, ContactDeptStats } from "@/contexts/DataContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
@@ -76,8 +76,9 @@ function QueueLinkCard({ label, sub, path, icon }: { label: string; sub: string;
 // queue screen (Help Requests, Moderation, Verification, Usernames, Content,
 // Translations) — the dashboard's job here is just orientation + stats +
 // reporting, not re-implementing those screens.
-function RoleQueueDashboard({ role, queueLabel, queueSub, queuePath, queueIcon }: {
+function RoleQueueDashboard({ role, queueLabel, queueSub, queuePath, queueIcon, extraLinks }: {
   role: string; queueLabel: string; queueSub: string; queuePath: string; queueIcon: keyof typeof Ionicons.glyphMap;
+  extraLinks?: { label: string; sub: string; path: string; icon: keyof typeof Ionicons.glyphMap }[];
 }) {
   const { profile } = useAuth();
   const { adminStats, loadAdminStats } = useData();
@@ -87,6 +88,7 @@ function RoleQueueDashboard({ role, queueLabel, queueSub, queuePath, queueIcon }
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <DashboardHeader role={role} zone={profile?.adminZone} country={profile?.adminCountry} />
       <QueueLinkCard label={queueLabel} sub={queueSub} path={queuePath} icon={queueIcon} />
+      {extraLinks?.map((l) => <QueueLinkCard key={l.path} label={l.label} sub={l.sub} path={l.path} icon={l.icon} />)}
       <Text style={styles.sectionTitle}>My Stats This Week</Text>
       {adminStats ? (
         <StatsRow stats={[
@@ -135,6 +137,7 @@ function MarketingAdminDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <DashboardHeader role="admin_marketing" />
+      <QueueLinkCard label="Email Inbox" sub="Contact P2P Global messages" path="/admin/email-inbox" icon="mail" />
       <Text style={styles.sectionTitle}>Growth</Text>
       <StatsRow stats={[{ label: "New users this week", value: newThisWeek ?? "…" }]} />
       <Text style={styles.sectionTitle}>Announcements</Text>
@@ -235,21 +238,27 @@ function ActivityFeedRow({ item }: { item: AdminActivityEntry }) {
   );
 }
 
+const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
+  help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
+};
+
 function SuperAdminDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<"activity" | "monitor" | "stats" | "management">("activity");
   const [feed, setFeed] = useState<AdminActivityEntry[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
+  const [deptStats, setDeptStats] = useState<Record<ContactDepartment, ContactDeptStats> | null>(null);
   const [loading, setLoading] = useState(true);
-  const { getAdminActivityFeed, getAdminList } = useData();
+  const { getAdminActivityFeed, getAdminList, getContactAllDepartmentStats } = useData();
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [f, a] = await Promise.all([getAdminActivityFeed(), getAdminList()]);
+    const [f, a, d] = await Promise.all([getAdminActivityFeed(), getAdminList(), getContactAllDepartmentStats()]);
     setFeed(f);
     setAdmins(a);
+    setDeptStats(d);
     setLoading(false);
-  }, [getAdminActivityFeed, getAdminList]);
+  }, [getAdminActivityFeed, getAdminList, getContactAllDepartmentStats]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -310,6 +319,28 @@ function SuperAdminDashboard() {
           )}
           {tab === "management" && (
             <ScrollView contentContainerStyle={styles.content}>
+              {deptStats && (
+                <>
+                  <Text style={styles.sectionTitle}>All Department Inboxes</Text>
+                  {(Object.keys(DEPARTMENT_LABELS) as ContactDepartment[]).map((dept) => {
+                    const s = deptStats[dept];
+                    if (!s) return null;
+                    return (
+                      <TouchableOpacity key={dept} style={styles.queueCard} onPress={() => router.push("/admin/email-inbox" as any)}>
+                        <View style={styles.queueIconWrap}><Ionicons name="mail" size={18} color={colors.accentGreen} /></View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.queueLabel}>{DEPARTMENT_LABELS[dept]}</Text>
+                          <Text style={styles.queueSub}>
+                            {s.totalUnread} unread · {s.totalOpen} open{s.overdue > 0 ? ` · ⚠️ ${s.overdue} overdue` : ""}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
+              <Text style={styles.sectionTitle}>Admins</Text>
               <TouchableOpacity style={styles.reportBtn} onPress={() => router.push("/admin/appoint-admin" as any)}>
                 <Ionicons name="person-add-outline" size={16} color="#fff" />
                 <Text style={styles.reportBtnText}>Add New Admin</Text>
@@ -365,7 +396,7 @@ export default function AdminHome() {
     case "admin_translation": return <RoleQueueDashboard role="admin_translation" queueLabel="Translations" queueSub="Coverage and pending translation work" queuePath="/admin/translations" queueIcon="language" />;
     case "admin_moderation": return <RoleQueueDashboard role="admin_moderation" queueLabel="Flags Queue" queueSub="Flagged content and users" queuePath="/admin/moderation" queueIcon="flag" />;
     case "admin_verification": return <RoleQueueDashboard role="admin_verification" queueLabel="Verification Queue" queueSub="Pending identity verifications" queuePath="/admin/verification" queueIcon="shield-checkmark" />;
-    case "admin_help": return <RoleQueueDashboard role="admin_help" queueLabel="Help Requests" queueSub="Crisis and struggling-tier cases" queuePath="/admin/help-requests" queueIcon="medkit" />;
+    case "admin_help": return <RoleQueueDashboard role="admin_help" queueLabel="Help Requests" queueSub="Crisis and struggling-tier cases" queuePath="/admin/help-requests" queueIcon="medkit" extraLinks={[{ label: "Email Inbox", sub: "Contact P2P Global messages", path: "/admin/email-inbox", icon: "mail" }]} />;
     case "admin_username": return <RoleQueueDashboard role="admin_username" queueLabel="Usernames" queueSub="Reserved usernames and disputes" queuePath="/admin/usernames" queueIcon="at" />;
     case "admin_finance": return <FinanceAdminDashboard />;
     case "admin_marketing": return <MarketingAdminDashboard />;
