@@ -54,6 +54,8 @@ export type DiscipleRole =
 
 export type OfficialAccountType = "crisis_response" | "announcement" | "support" | "general";
 
+export type MinistryRole = "new_believer" | "believer" | "small_group_leader" | "pastor" | "bible_teacher" | "missionary";
+
 export interface UserProfile {
   id: string;
   displayName: string;
@@ -123,7 +125,16 @@ export interface UserProfile {
   adminAppointedAt?: string;
   adminAppointmentReason?: string;
   adminIsActive: boolean;
+  ministryRole: MinistryRole;
+  ministryRoleUpdatedAt?: string;
+  // Derived from ministryRole at map time — "this person's ministry
+  // identity suggests they lead a congregation," independent of whether
+  // they've joined/registered any church yet. Distinct from DataContext's
+  // isChurchLeader, which is about an actual joined church's role.
+  isMinistryLeader: boolean;
 }
+
+const MINISTRY_LEADER_ROLES: MinistryRole[] = ["pastor", "small_group_leader", "bible_teacher", "missionary"];
 
 export interface SignUpLocation {
   city?: string;
@@ -155,8 +166,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function mapProfileRow(row: Record<string, unknown>): UserProfile {
+  const ministryRole = ((row.ministry_role as string) ?? "believer") as MinistryRole;
   return {
     id: row.id as string,
+    ministryRole,
+    ministryRoleUpdatedAt: row.ministry_role_updated_at as string | undefined,
+    isMinistryLeader: MINISTRY_LEADER_ROLES.includes(ministryRole),
     displayName: (row.full_name as string) ?? "",
     email: (row.email as string) ?? "",
     avatarUrl: row.photo_url as string | undefined,
@@ -468,13 +483,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.morningConfessionEnabled !== undefined) dbUpdates.morning_confession_enabled = updates.morningConfessionEnabled;
     if (updates.morningConfessionTime !== undefined) dbUpdates.morning_confession_time = updates.morningConfessionTime;
     if (updates.prayerJournalReminderEnabled !== undefined) dbUpdates.prayer_journal_reminder_enabled = updates.prayerJournalReminderEnabled;
+    if (updates.ministryRole !== undefined) dbUpdates.ministry_role = updates.ministryRole;
+    if (updates.ministryRoleUpdatedAt !== undefined) dbUpdates.ministry_role_updated_at = updates.ministryRoleUpdatedAt;
 
     const { error } = await supabase
       .from("p2p_profiles")
       .update(dbUpdates)
       .eq("id", session.user.id);
     if (!error) {
-      setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, ...updates };
+        // isMinistryLeader is derived from ministryRole at fetch time, not
+        // itself a stored column — recompute it locally so the optimistic
+        // merge doesn't leave it stale until the next refetch.
+        if (updates.ministryRole !== undefined) next.isMinistryLeader = MINISTRY_LEADER_ROLES.includes(updates.ministryRole);
+        return next;
+      });
     }
     return error ? error.message : null;
   }, [session]);

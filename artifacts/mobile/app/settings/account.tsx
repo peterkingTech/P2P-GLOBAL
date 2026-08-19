@@ -15,6 +15,8 @@ import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifie
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
+import MinistryRolePicker, { MINISTRY_ROLE_OPTIONS } from "@/components/MinistryRolePicker";
+import { MinistryRole } from "@/contexts/AuthContext";
 
 function timeAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
@@ -49,6 +51,8 @@ export default function AccountSettingsScreen() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showLocationVerifier, setShowLocationVerifier] = useState(false);
+  const [showMinistryPicker, setShowMinistryPicker] = useState(false);
+  const [savingMinistryRole, setSavingMinistryRole] = useState(false);
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [savingBio, setSavingBio] = useState(false);
 
@@ -237,6 +241,34 @@ export default function AccountSettingsScreen() {
         </TouchableOpacity>
 
         <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Ministry Role</Text>
+          <TouchableOpacity
+            style={[styles.usernameRow, { justifyContent: "space-between" }]}
+            onPress={() => setShowMinistryPicker((v) => !v)}
+          >
+            <Text style={[styles.usernameValue, { flex: 1 }]}>
+              {MINISTRY_ROLE_OPTIONS.find((o) => o.key === profile?.ministryRole)?.emoji ?? "🌱"}{" "}
+              {MINISTRY_ROLE_OPTIONS.find((o) => o.key === profile?.ministryRole)?.label ?? "New to faith"}
+            </Text>
+            <Text style={styles.changeLinkText}>{showMinistryPicker ? "Cancel" : "Change →"}</Text>
+          </TouchableOpacity>
+          {showMinistryPicker && (
+            <View style={{ marginTop: 14 }}>
+              <MinistryRolePicker
+                value={profile?.ministryRole ?? null}
+                onSelect={async (role: MinistryRole) => {
+                  setSavingMinistryRole(true);
+                  await updateProfile({ ministryRole: role, ministryRoleUpdatedAt: new Date().toISOString() });
+                  setSavingMinistryRole(false);
+                  setShowMinistryPicker(false);
+                }}
+              />
+              {savingMinistryRole && <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 12 }} />}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.fieldLabel}>Bio</Text>
           <TextInput
             style={[styles.input, { minHeight: 70, textAlignVertical: "top" }]}
@@ -414,6 +446,7 @@ function makeStyles(c: AppColors) {
     fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 8, fontFamily: "Inter_600SemiBold" },
     usernameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     usernameValue: { fontSize: 15, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    changeLinkText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
     toggleLabel: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium", flex: 1, marginRight: 10 },
     input: {

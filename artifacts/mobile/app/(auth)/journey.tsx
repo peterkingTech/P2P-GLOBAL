@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import MinistryRolePicker from "@/components/MinistryRolePicker";
 import colors from "@/constants/colors";
 
 // The Integration and Onboarding Journey — 5 mandatory steps every new user
@@ -25,7 +26,7 @@ import colors from "@/constants/colors";
 // (redirects any authenticated user whose onboarding_journey_completed_at
 // is still null here, exactly once).
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 const TREE_NAME_SUGGESTIONS = [
   "e.g. Spiritual Growth Journey",
@@ -195,26 +196,39 @@ export default function JourneyScreen() {
     ? [...lessons].filter((l) => l.moduleId === module1.id).sort((a, b) => a.order - b.order)[0] ?? null
     : null;
 
-  async function handleBeginModule1() {
+  // Shared completion side-effects — marks onboarding done and notifies the
+  // peer guide. Called from the normal step-5 path (non-leaders) and from
+  // both step-6 buttons (ministry leaders), so it only runs once per user
+  // regardless of which path they take.
+  async function completeOnboarding() {
+    if (!profile?.id) return;
+    await updateProfile({
+      onboardingJourneyCompletedAt: new Date().toISOString(),
+      growthLevel: Math.max(profile.growthLevel ?? 0, 4), // 4 = Sprout stage threshold
+    });
+    await refreshProfile();
+    if (peerGuide) {
+      fetch(`${getApiUrl()}/discipleship/notify-peer-guide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: profile.id,
+          title: "Ready for Module 1",
+          message: `${profile.displayName?.split(" ")[0] ?? "Your disciple"} has completed the onboarding journey and is ready to begin Module 1.`,
+        }),
+      }).catch(() => {});
+    }
+  }
+
+  // Step 5's "Begin Module 1" button — ministry leaders see one more step
+  // (Step 6, Your Congregation) before completion; everyone else completes
+  // immediately and jumps straight into the lesson, unchanged from before.
+  async function handleStep5Continue() {
     if (!profile?.id) { router.replace("/(tabs)"); return; }
+    if (profile.isMinistryLeader) { setStep(6); return; }
     setBeginning(true);
     try {
-      await updateProfile({
-        onboardingJourneyCompletedAt: new Date().toISOString(),
-        growthLevel: Math.max(profile.growthLevel ?? 0, 4), // 4 = Sprout stage threshold
-      });
-      await refreshProfile();
-      if (peerGuide) {
-        fetch(`${getApiUrl()}/discipleship/notify-peer-guide`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: profile.id,
-            title: "Ready for Module 1",
-            message: `${profile.displayName?.split(" ")[0] ?? "Your disciple"} has completed the onboarding journey and is ready to begin Module 1.`,
-          }),
-        }).catch(() => {});
-      }
+      await completeOnboarding();
     } finally {
       setBeginning(false);
     }
@@ -225,16 +239,70 @@ export default function JourneyScreen() {
     }
   }
 
+  async function handleRegisterChurchNow() {
+    setBeginning(true);
+    try {
+      await completeOnboarding();
+    } finally {
+      setBeginning(false);
+    }
+    router.replace("/church/register" as any);
+  }
+
+  async function handleChurchLater() {
+    setBeginning(true);
+    try {
+      await completeOnboarding();
+    } finally {
+      setBeginning(false);
+    }
+    router.replace("/(tabs)" as any);
+  }
+
   const topPad = insets.top + (Platform.OS === "web" ? 20 : 0);
+  const totalSteps = profile?.isMinistryLeader ? 6 : 5;
+
+  // Ministry-role capture is required at registration, but the actual
+  // registration flow (register -> intake -> profile-setup) reliably gets
+  // raced out by AuthGate's own redirect-to-/journey-once-authenticated
+  // logic (app/_layout.tsx) before a fresh user ever sees those screens —
+  // confirmed live, not theoretical. journey.tsx is the one screen AuthGate
+  // itself guarantees every new user reaches, so it's the real enforcement
+  // point: gate the whole journey behind this choice rather than relying on
+  // profile-setup.tsx (still built, still useful if that flow is ever
+  // reached some other way, just not the guarantee).
+  if (profile && !profile.ministryRoleUpdatedAt) {
+    return (
+      <View style={[styles.root, { paddingTop: topPad }]}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>What Best Describes You?</Text>
+          <Text style={styles.subtitle}>
+            This helps us tailor your experience — including church tools if you lead a congregation.
+          </Text>
+          <MinistryRolePicker
+            value={profile.ministryRole ?? null}
+            onSelect={async (role) => {
+              await updateProfile({ ministryRole: role, ministryRoleUpdatedAt: new Date().toISOString() });
+              await refreshProfile();
+            }}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
       <View style={styles.progressRow}>
-        {[1, 2, 3, 4, 5].map((i) => (
+        {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((i) => (
           <View key={i} style={[styles.progressDot, i <= step && styles.progressDotActive]} />
         ))}
       </View>
-      <Text style={styles.stepOf}>Step {step} of 5</Text>
+      <Text style={styles.stepOf}>Step {step} of {totalSteps}</Text>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -450,8 +518,34 @@ export default function JourneyScreen() {
               <Text style={styles.withGuideText}>You will go through this with {peerGuide.fullName}</Text>
             )}
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleBeginModule1} disabled={beginning}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep5Continue} disabled={beginning}>
               {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Begin Module 1</Text>}
+            </TouchableOpacity>
+
+            <Text style={styles.footerVerse}>Romans 15:7 — Accept one another, just as Christ accepted you.</Text>
+          </>
+        )}
+
+        {step === 6 && (
+          <>
+            <Text style={styles.title}>⛪ Your Congregation</Text>
+            <Text style={styles.subtitle}>
+              P2P Global has a free Church Discipleship Portal for pastors and church leaders.
+            </Text>
+
+            <View style={styles.moduleCard}>
+              <Text style={styles.moduleCardDesc}>
+                See your congregation's discipleship activity in real time. Manage cohorts. Support your members.
+                {"\n\n"}Completely free. Always.
+              </Text>
+            </View>
+
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleRegisterChurchNow} disabled={beginning}>
+              {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Register My Church Now →</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.secondaryBtn} onPress={handleChurchLater} disabled={beginning}>
+              <Text style={styles.secondaryBtnText}>I will do this later →</Text>
             </TouchableOpacity>
 
             <Text style={styles.footerVerse}>Romans 15:7 — Accept one another, just as Christ accepted you.</Text>
@@ -545,4 +639,10 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center", marginTop: 16,
   },
   primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
+
+  secondaryBtn: {
+    borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 10,
+    borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  secondaryBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

@@ -119,7 +119,7 @@ export default function DiscoverTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions } = useData();
+  const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions, userChurch } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
@@ -370,6 +370,26 @@ export default function DiscoverTab() {
               <Text style={styles.circleCardMeta}>Led by {c.leaderName} · {c.memberCount}/{c.maxMembers} members</Text>
             </TouchableOpacity>
           ))}
+
+          <Text style={styles.sectionHeading}>⛪ Churches on P2P Global</Text>
+          {profile?.isMinistryLeader && !userChurch && (
+            <TouchableOpacity style={styles.circlePrimaryBtn} onPress={() => router.push("/church/register" as any)}>
+              <Ionicons name="add-circle-outline" size={15} color="#fff" />
+              <Text style={styles.circlePrimaryBtnText}>Register Your Church — Free</Text>
+            </TouchableOpacity>
+          )}
+          {!userChurch && (
+            <TouchableOpacity style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church/join" as any)}>
+              <Text style={styles.circleCardName}>Join Your Church Grove</Text>
+              <Text style={styles.circleCardMeta}>Has your church registered on P2P Global? Join with their invite code.</Text>
+            </TouchableOpacity>
+          )}
+          {userChurch && (
+            <TouchableOpacity style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church" as any)}>
+              <Text style={styles.circleCardName}>My Church</Text>
+              <Text style={styles.circleCardMeta}>{userChurch.name}</Text>
+            </TouchableOpacity>
+          )}
 
           <InviteCard label="🌾 Plant a grain — invite someone to P2P Global" buttonText="Share your invite link" />
         </ScrollView>

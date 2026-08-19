@@ -11,8 +11,9 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
+import { useAuth, SpiritualGift, MinistryRole } from "@/contexts/AuthContext";
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
+import MinistryRolePicker from "@/components/MinistryRolePicker";
 import colors from "@/constants/colors";
 
 const GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
@@ -31,9 +32,19 @@ export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
   const { updateProfile } = useAuth();
 
-  const [step, setStep] = useState<"gifts" | "location">("gifts");
+  const [step, setStep] = useState<"ministry" | "gifts" | "location">("ministry");
   const [selectedGifts, setSelectedGifts] = useState<SpiritualGift[]>([]);
+  const [ministryRole, setMinistryRole] = useState<MinistryRole | null>(null);
+  const [savingMinistry, setSavingMinistry] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  async function handleMinistrySelect(role: MinistryRole) {
+    setMinistryRole(role);
+    setSavingMinistry(true);
+    await updateProfile({ ministryRole: role, ministryRoleUpdatedAt: new Date().toISOString() });
+    setSavingMinistry(false);
+    setStep("gifts");
+  }
 
   function toggleGift(gift: SpiritualGift) {
     setSelectedGifts((prev) =>
@@ -65,6 +76,35 @@ export default function ProfileSetupScreen() {
       locationVerifiedAt: new Date().toISOString(),
     });
     goToGoals();
+  }
+
+  if (step === "ministry") {
+    return (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + (Platform.OS === "web" ? 40 : 32),
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <View style={styles.iconRing}>
+            <Ionicons name="people" size={36} color={colors.brightYellow} />
+          </View>
+          <Text style={styles.title}>What Best Describes You?</Text>
+          <Text style={styles.subtitle}>
+            This helps us tailor your experience — including church tools if you lead a congregation.
+          </Text>
+        </View>
+
+        <MinistryRolePicker value={ministryRole} onSelect={handleMinistrySelect} />
+
+        {savingMinistry && <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />}
+      </ScrollView>
+    );
   }
 
   if (step === "location") {

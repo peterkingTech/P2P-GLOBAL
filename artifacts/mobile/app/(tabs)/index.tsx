@@ -24,6 +24,9 @@ import {
   getModuleProgressCounts,
   getFoundationProgress,
   getKingdomSchoolStatus,
+  Church,
+  GroveData,
+  ChurchAnnouncement,
 } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -230,6 +233,74 @@ function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void
   );
 }
 
+// Leader with a joined church — full grove summary.
+function GroveHomeCard({ church, grove, memberCount, onPress, colors }: {
+  church: Church; grove: GroveData | null; memberCount: number; onPress: () => void; colors: AppColors;
+}) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.churchCardTopRow}>
+        <Text style={{ fontSize: 20 }}>⛪</Text>
+        <Text style={styles.churchCardName} numberOfLines={1}>{church.name}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </View>
+      <Text style={styles.churchCardLocation}>
+        {[church.city, church.country].filter(Boolean).join(" · ")}{memberCount ? ` · ${memberCount} members` : ""}
+      </Text>
+      {grove && (
+        <View style={styles.groveStatsRow}>
+          <Text style={styles.groveStatText}>🟢 {grove.activeLearners} active</Text>
+          <Text style={styles.groveStatText}>📖 {grove.lessonsThisWeek} this week</Text>
+        </View>
+      )}
+      {grove && grove.inactiveMembers > 0 && (
+        <Text style={styles.groveAttentionText}>⚠️ {grove.inactiveMembers} need attention</Text>
+      )}
+      <Text style={styles.churchCardCta}>Dashboard →</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Ministry leader without a church yet — compact registration prompt.
+function RegisterChurchPromptCard({ onPress, colors }: { onPress: () => void; colors: AppColors }) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.churchCardTopRow}>
+        <Text style={{ fontSize: 20 }}>⛪</Text>
+        <Text style={styles.churchCardName}>Register your church</Text>
+      </View>
+      <Text style={styles.churchCardLocation}>
+        Bring your congregation onto P2P Global — completely free.
+      </Text>
+      <Text style={styles.churchCardCta}>Register →</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Regular member who has joined a church — light, less prominent card.
+function MemberChurchCard({ church, announcement, onPress, colors }: {
+  church: Church; announcement: ChurchAnnouncement | null; onPress: () => void; colors: AppColors;
+}) {
+  const styles = makeStyles(colors);
+  return (
+    <TouchableOpacity style={styles.churchCardCompact} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.churchCardTopRow}>
+        <Text style={{ fontSize: 16 }}>⛪</Text>
+        <Text style={styles.churchCardNameCompact} numberOfLines={1}>{church.name}</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+      </View>
+      <Text style={styles.churchCardLocationCompact}>
+        {[church.city, church.country].filter(Boolean).join(", ")}
+      </Text>
+      {announcement && (
+        <Text style={styles.churchCardAnnouncement} numberOfLines={1}>📌 {announcement.title}</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.lightCream },
@@ -310,6 +381,26 @@ function makeStyles(c: AppColors) {
       borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14, paddingVertical: 12,
     },
     forestLinkText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold", flex: 1 },
+
+    churchCard: {
+      backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 16, marginBottom: 16, gap: 6,
+    },
+    churchCardTopRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    churchCardName: { flex: 1, fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    churchCardLocation: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    groveStatsRow: { flexDirection: "row", gap: 14, marginTop: 2 },
+    groveStatText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
+    groveAttentionText: { fontSize: 12, color: c.amber, fontFamily: "Inter_500Medium" },
+    churchCardCta: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", alignSelf: "flex-end", marginTop: 2 },
+
+    churchCardCompact: {
+      backgroundColor: c.cardBeige, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 14, marginBottom: 16, gap: 4,
+    },
+    churchCardNameCompact: { flex: 1, fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    churchCardLocationCompact: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    churchCardAnnouncement: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", marginTop: 2 },
 
     verseCard: {
       backgroundColor: c.cardBeige,
@@ -421,7 +512,7 @@ export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread, userChurch } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread, userChurch, isChurchLeader, churchMemberCount, getGroveData, getAnnouncements } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -440,6 +531,24 @@ export default function HomeTab() {
   const [pendingGuideAlertCount, setPendingGuideAlertCount] = useState(0);
   const [showGuideInvitation, setShowGuideInvitation] = useState(false);
   const [treePhotoFailed, setTreePhotoFailed] = useState(false);
+  const [homeGroveData, setHomeGroveData] = useState<GroveData | null>(null);
+  const [homeChurchAnnouncement, setHomeChurchAnnouncement] = useState<ChurchAnnouncement | null>(null);
+
+  // Case 1 (leader with a joined church) needs grove stats for the summary card.
+  useEffect(() => {
+    if (!isChurchLeader || !userChurch) { setHomeGroveData(null); return; }
+    let cancelled = false;
+    getGroveData(userChurch.id).then((data) => { if (!cancelled) setHomeGroveData(data); });
+    return () => { cancelled = true; };
+  }, [isChurchLeader, userChurch, getGroveData]);
+
+  // Case 3 (regular member in a church) needs the latest announcement.
+  useEffect(() => {
+    if (isChurchLeader || !userChurch) { setHomeChurchAnnouncement(null); return; }
+    let cancelled = false;
+    getAnnouncements(userChurch.id).then((list) => { if (!cancelled) setHomeChurchAnnouncement(list[0] ?? null); });
+    return () => { cancelled = true; };
+  }, [isChurchLeader, userChurch, getAnnouncements]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -639,18 +748,33 @@ export default function HomeTab() {
         <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
       </TouchableOpacity>
 
-      {/* Church Discipleship Portal — completely free, no tiers */}
-      <TouchableOpacity
-        style={styles.forestLinkRow}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
-        activeOpacity={0.85}
-      >
-        <Text style={{ fontSize: 20 }}>⛪</Text>
-        <Text style={[styles.forestLinkText, { marginLeft: 10 }]}>
-          {userChurch ? userChurch.name : "Connect your church to P2P Global"}
-        </Text>
-        <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
-      </TouchableOpacity>
+      {/* Church Discipleship Portal — completely free, no tiers. Only shown
+          when relevant: leaders get a prominent dashboard/register prompt,
+          regular members in a church get a light card, everyone else sees
+          nothing (church tools aren't relevant to them). */}
+      {isChurchLeader && userChurch && (
+        <GroveHomeCard
+          church={userChurch}
+          grove={homeGroveData}
+          memberCount={churchMemberCount}
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/grove" as any); }}
+        />
+      )}
+      {profile?.isMinistryLeader && !userChurch && (
+        <RegisterChurchPromptCard
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/register" as any); }}
+        />
+      )}
+      {!profile?.isMinistryLeader && userChurch && (
+        <MemberChurchCard
+          church={userChurch}
+          announcement={homeChurchAnnouncement}
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
+        />
+      )}
 
       {/* Elijah Protocol check-in, if pastoral care has flagged one */}
       {pendingElijahCheckIn && (
