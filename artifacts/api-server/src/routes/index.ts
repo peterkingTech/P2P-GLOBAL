@@ -19,6 +19,7 @@ import callsRouter from "./calls";
 import connectionsRouter from "./connections";
 import feedbackRouter from "./feedback";
 import churchesRouter from "./churches";
+import contactRouter from "./contact";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(callsRouter); // calls + break rooms (paths differ, handled internall
 router.use("/connections", connectionsRouter);
 router.use("/feedback", feedbackRouter);
 router.use(churchesRouter); // church + members + grove + cohorts + announcements (paths differ, handled internally)
+router.use(contactRouter); // Contact P2P Global — peer messages + admin inbox (paths differ, handled internally)
 
 export default router;
