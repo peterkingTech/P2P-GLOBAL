@@ -498,15 +498,31 @@ export interface ContactDeptStats {
   overdue: number; avgResponseHours: number; thisWeek: ContactWeekStats;
 }
 
-// Admin → User official messages — separate from Contact P2P Global above.
-// Reuses the existing p2p_conversations/p2p_messages + official-account
-// system (see officialMessages.ts), so there's no dedicated "thread" type
-// here — the resulting message just shows up in the normal conversations
-// list/thread with an OfficialBadge, like any other official-account DM.
+// Admin → User official messages (Compose) — separate from Contact P2P
+// Global above. Reuses the existing p2p_conversations/p2p_messages +
+// official-account system (see officialMessages.ts), so there's no
+// dedicated "thread" type here — the resulting message just shows up in
+// the normal conversations list/thread with an OfficialBadge, like any
+// other official-account DM. Compose's department is a distinct concept
+// from official_account_type: department is what the admin picks, and the
+// server derives the actual sending identity (which OfficialBadge shows)
+// from it automatically.
+export type ComposeDepartment =
+  | "support_help" | "crisis_safeguarding" | "account_security"
+  | "report_user" | "feedback_suggestions" | "general_contact";
 export interface OfficialMessageSendData {
-  targetUserId: string; officialAccountType: OfficialAccountType; subject?: string; body: string;
+  targetUserId: string; department: ComposeDepartment; subject: string; body: string;
 }
 export interface OfficialMessageSendResult { success: boolean; conversationId?: string; error?: string }
+export interface SentOfficialMessage {
+  id: string; conversationId: string; subject: string; department: ComposeDepartment;
+  bodyPreview: string; createdAt: string; sentByAdminUsername: string | null;
+  recipientUserId: string | null; recipientUsername: string | null; recipientFullName: string | null;
+  isRead: boolean;
+}
+export interface ComposeUserSearchResult {
+  userId: string; username: string; fullName: string | null; photoUrl: string | null; email: string | null;
+}
 
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
 export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
@@ -1231,9 +1247,11 @@ interface DataContextValue {
   getContactAdminStats: () => Promise<ContactDeptStats | null>;
   getContactAllDepartmentStats: () => Promise<Record<ContactDepartment, ContactDeptStats> | null>;
 
-  // Admin → User official "P2P Global" messages
+  // Admin → User official "P2P Global" messages (Compose)
   getOfficialMessageAllowedTypes: () => Promise<OfficialAccountType[]>;
   sendOfficialMessage: (data: OfficialMessageSendData) => Promise<OfficialMessageSendResult>;
+  getSentOfficialMessages: () => Promise<SentOfficialMessage[]>;
+  searchUsersForCompose: (query: string) => Promise<ComposeUserSearchResult[]>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -4744,7 +4762,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requesterId: profile.id, targetUserId: data.targetUserId,
-          officialAccountType: data.officialAccountType, subject: data.subject, body: data.body,
+          department: data.department, subject: data.subject, body: data.body,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -4753,6 +4771,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("sendOfficialMessage failed", e);
       return { success: false, error: "Message could not be sent. Please try again." };
+    }
+  }, [profile?.id]);
+
+  const getSentOfficialMessages = useCallback(async (): Promise<SentOfficialMessage[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/sent?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getSentOfficialMessages failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const searchUsersForCompose = useCallback(async (query: string): Promise<ComposeUserSearchResult[]> => {
+    if (!profile?.id || query.trim().length < 2) return [];
+    try {
+      const params = new URLSearchParams({ requesterId: profile.id, q: query.trim() });
+      const res = await fetch(`${getApiUrl()}/official-messages/search-users?${params.toString()}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("searchUsersForCompose failed", e);
+      return [];
     }
   }, [profile?.id]);
 
@@ -4812,7 +4855,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       sendContactMessage, getMyContactMessages, getContactThread, getAdminContactInbox, getAdminContactMessage,
       replyToContactMessage, forwardContactMessage, closeContactMessage, setContactMessagePriority,
       setContactMessageStatus, getContactAdminStats, getContactAllDepartmentStats,
-      getOfficialMessageAllowedTypes, sendOfficialMessage,
+      getOfficialMessageAllowedTypes, sendOfficialMessage, getSentOfficialMessages, searchUsersForCompose,
     }}>
       {children}
     </DataContext.Provider>

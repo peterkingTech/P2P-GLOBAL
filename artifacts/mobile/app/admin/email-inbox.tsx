@@ -84,7 +84,18 @@ export default function AdminEmailInbox() {
   return (
     <View style={styles.container}>
       <View style={styles.inboxHeader}>
-        <Text style={styles.inboxTitle}>{getDepartmentLabel(profile?.role ?? "")} Inbox</Text>
+        <View style={styles.inboxHeaderTopRow}>
+          <Text style={styles.inboxTitle}>{getDepartmentLabel(profile?.role ?? "")} Inbox</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.sentIconBtn} onPress={() => router.push("/admin/sent-messages" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="paper-plane-outline" size={16} color={colors.textMid} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.composeBtn} onPress={() => router.push("/admin/send-message" as any)}>
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text style={styles.composeBtnText}>Compose</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View style={styles.inboxStats}>
           <Text style={styles.unreadCount}>{unreadCount} unread</Text>
           {overdueCount > 0 && <Text style={styles.overdueCount}>⚠️ {overdueCount} overdue</Text>}
@@ -166,7 +177,18 @@ export default function AdminEmailInbox() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.lightCream },
   inboxHeader: { padding: 16, paddingBottom: 8 },
+  inboxHeaderTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   inboxTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sentIconBtn: {
+    width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  composeBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.primaryGreen,
+    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  composeBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   inboxStats: { flexDirection: "row", gap: 14, marginTop: 4 },
   unreadCount: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   overdueCount: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_600SemiBold" },
