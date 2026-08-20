@@ -90,9 +90,10 @@ export default function HelpRequestsScreen() {
     setCalling(req.id);
     try {
       // Reuse the same eligibility check messaging uses (super_admin, or
-      // church_leader/regional_admin/moderator responding to a help request)
-      // — /calls/start itself trusts the caller-supplied ids with no
-      // permission check of its own, so this RPC is the only gate.
+      // church_leader/regional_admin/moderator/peer_guide/admin_help
+      // responding to a help request — see migration 078) — /calls/start
+      // itself trusts the caller-supplied ids with no permission check of
+      // its own, so this RPC is the only gate.
       const { data: conversationId, error: convErr } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
       if (convErr || !conversationId) {
         console.error("p2p_start_direct_conversation failed", convErr);
