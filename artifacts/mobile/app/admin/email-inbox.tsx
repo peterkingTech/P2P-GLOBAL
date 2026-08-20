@@ -2,21 +2,37 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useData, ContactAdminInboxItem, ContactDepartment } from "@/contexts/DataContext";
+import { useData, ContactAdminInboxItem, ContactDepartment, SentOfficialMessage, ComposeDepartment } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { ComposeMessageModal } from "@/components/ComposeMessageModal";
 import colors from "@/constants/colors";
 
-type InboxTab = "inbox" | "sent" | "forwarded" | "received" | "closed";
+// "compose_sent" is a distinct data source from the other five (Contact
+// P2P Global's p2p_contact_messages vs Compose's official p2p_messages
+// sends) — kept as one more tab on the same screen rather than a separate
+// route, so everything (receive, reply, compose, send) genuinely lives
+// inside this one Email screen.
+type InboxTab = "inbox" | "sent" | "forwarded" | "received" | "closed" | "compose_sent";
 const TABS: { key: InboxTab; label: string }[] = [
   { key: "inbox", label: "Inbox" },
   { key: "sent", label: "Sent" },
   { key: "forwarded", label: "Forwarded" },
   { key: "received", label: "Received" },
   { key: "closed", label: "Closed" },
+  { key: "compose_sent", label: "Sent Mail" },
 ];
 
 const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
   help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
+};
+
+const COMPOSE_DEPARTMENT_LABELS: Record<ComposeDepartment, string> = {
+  support_help: "Support & Help",
+  crisis_safeguarding: "Crisis & Safeguarding",
+  account_security: "Account & Security",
+  report_user: "Report a User",
+  feedback_suggestions: "Feedback & Suggestions",
+  general_contact: "General Contact",
 };
 
 function timeAgo(iso: string): string {
@@ -37,24 +53,27 @@ function getDepartmentLabel(role: string): string {
 
 export default function AdminEmailInbox() {
   const { profile } = useAuth();
-  const { getAdminContactInbox, getContactAdminStats } = useData();
+  const { getAdminContactInbox, getContactAdminStats, getSentOfficialMessages } = useData();
   const router = useRouter();
   const [tab, setTab] = useState<InboxTab>("inbox");
   const [deptFilter, setDeptFilter] = useState<ContactDepartment | "all">("all");
   const [messages, setMessages] = useState<ContactAdminInboxItem[]>([]);
+  const [composeSent, setComposeSent] = useState<SentOfficialMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [showCompose, setShowCompose] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [all, stats] = await Promise.all([getAdminContactInbox(), getContactAdminStats()]);
+    const [all, stats, sent] = await Promise.all([getAdminContactInbox(), getContactAdminStats(), getSentOfficialMessages()]);
     setMessages(all);
     setUnreadCount(stats?.totalUnread ?? 0);
     setOverdueCount(stats?.overdue ?? 0);
+    setComposeSent(sent);
     setLoading(false);
-  }, [getAdminContactInbox, getContactAdminStats]);
+  }, [getAdminContactInbox, getContactAdminStats, getSentOfficialMessages]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -81,16 +100,25 @@ export default function AdminEmailInbox() {
     return rows;
   }, [messages, tab, deptFilter, search, profile?.id]);
 
+  const filteredComposeSent = useMemo(() => {
+    if (!search.trim()) return composeSent;
+    const q = search.trim().toLowerCase();
+    return composeSent.filter((m) =>
+      m.subject.toLowerCase().includes(q) || m.bodyPreview.toLowerCase().includes(q) ||
+      (m.recipientUsername ?? "").toLowerCase().includes(q)
+    );
+  }, [composeSent, search]);
+
   return (
     <View style={styles.container}>
       <View style={styles.inboxHeader}>
         <View style={styles.inboxHeaderTopRow}>
           <Text style={styles.inboxTitle}>{getDepartmentLabel(profile?.role ?? "")} Inbox</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.sentIconBtn} onPress={() => router.push("/admin/sent-messages" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity style={styles.sentIconBtn} onPress={() => setTab("compose_sent")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="paper-plane-outline" size={16} color={colors.textMid} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.composeBtn} onPress={() => router.push("/admin/send-message" as any)}>
+            <TouchableOpacity style={styles.composeBtn} onPress={() => setShowCompose(true)}>
               <Ionicons name="add" size={16} color="#fff" />
               <Text style={styles.composeBtnText}>Compose</Text>
             </TouchableOpacity>
@@ -110,7 +138,7 @@ export default function AdminEmailInbox() {
         ))}
       </ScrollView>
 
-      {availableDepartments.length > 1 && (
+      {tab !== "compose_sent" && availableDepartments.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deptBar} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>
           <TouchableOpacity style={[styles.deptChip, deptFilter === "all" && styles.deptChipActive]} onPress={() => setDeptFilter("all")}>
             <Text style={[styles.deptChipText, deptFilter === "all" && styles.deptChipTextActive]}>All Departments</Text>
@@ -129,13 +157,37 @@ export default function AdminEmailInbox() {
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search by subject, username, or reference"
+          placeholder={tab === "compose_sent" ? "Search sent mail" : "Search by subject, username, or reference"}
           placeholderTextColor={colors.textMuted}
         />
       </View>
 
       {loading ? (
         <View style={styles.loading}><ActivityIndicator color={colors.primaryGreen} /></View>
+      ) : tab === "compose_sent" ? (
+        <FlatList
+          data={filteredComposeSent}
+          keyExtractor={(m) => m.id}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={<Text style={styles.emptyText}>No official messages sent yet. Tap Compose to send one.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardTopRow}>
+                <Text style={styles.senderName}>
+                  To @{item.recipientUsername ?? "unknown"}{item.recipientFullName ? ` · ${item.recipientFullName}` : ""}
+                </Text>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+              </View>
+              <Text style={styles.subject} numberOfLines={1}>{item.subject}</Text>
+              <Text style={styles.preview} numberOfLines={1}>{item.bodyPreview}</Text>
+              <View style={styles.tagsRow}>
+                <Text style={styles.referenceTag}>{COMPOSE_DEPARTMENT_LABELS[item.department]}</Text>
+                <Text style={item.isRead ? styles.readTag : styles.unreadTag}>{item.isRead ? "✓ Read" : "Unread"}</Text>
+                {item.sentByAdminUsername && <Text style={styles.referenceTag}>sent by @{item.sentByAdminUsername}</Text>}
+              </View>
+            </View>
+          )}
+        />
       ) : (
         <FlatList
           data={filtered}
@@ -170,6 +222,12 @@ export default function AdminEmailInbox() {
           }}
         />
       )}
+
+      <ComposeMessageModal
+        visible={showCompose}
+        onClose={() => setShowCompose(false)}
+        onSent={load}
+      />
     </View>
   );
 }
@@ -209,7 +267,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { padding: 14, gap: 10 },
-  emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
+  emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular", paddingHorizontal: 30 },
   card: {
     backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige,
     padding: 14, position: "relative",
@@ -222,10 +280,12 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   subject: { fontSize: 15, color: colors.textDark, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   preview: { fontSize: 12, color: colors.textMid, marginTop: 2, fontFamily: "Inter_400Regular" },
-  tagsRow: { flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" },
+  tagsRow: { flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" },
   referenceTag: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   urgentTag: { fontSize: 10, fontWeight: "700", color: "#B91C1C", fontFamily: "Inter_700Bold" },
   highTag: { fontSize: 10, fontWeight: "700", color: "#D97706", fontFamily: "Inter_700Bold" },
   forwardedTag: { fontSize: 10, fontWeight: "700", color: "#4A90D9", fontFamily: "Inter_700Bold" },
+  readTag: { fontSize: 10, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold" },
+  unreadTag: { fontSize: 10, fontWeight: "700", color: "#B8860B", fontFamily: "Inter_700Bold" },
   unreadDot: { position: "absolute", top: 14, right: 14, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accentGreen },
 });
