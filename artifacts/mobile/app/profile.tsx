@@ -474,16 +474,6 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
 
-        {/* My Progress Dashboard */}
-        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/progress" as any)}>
-          <Ionicons name="stats-chart-outline" size={18} color={colors.primaryGreen} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dashboardTitle}>My Progress</Text>
-            <Text style={styles.dashboardSub}>Submissions, evaluations &amp; plans in progress</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-        </TouchableOpacity>
-
         {/* Pending Confirmations */}
         <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/confirmations" as any)}>
           <Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primaryGreen} />

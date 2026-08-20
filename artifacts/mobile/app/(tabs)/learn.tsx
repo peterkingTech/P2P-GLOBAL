@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Animated,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -291,6 +292,17 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     scroll: { paddingBottom: 100 },
 
+    topBarRow: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8 },
+    topBarMenuBtn: { padding: 4 },
+    dropdownOverlay: { flex: 1 },
+    dropdownCard: {
+      position: "absolute", right: 16, backgroundColor: c.card, borderRadius: 12,
+      borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 6, minWidth: 160,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
+    },
+    dropdownRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+    dropdownRowText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
+
     sectionBlock: { paddingHorizontal: 20, paddingTop: 24 },
     sectionHeaderRow: { marginBottom: 4 },
     sectionHeaderTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -403,6 +415,8 @@ export default function LearnTab() {
     if (profile?.id) AsyncStorage.setItem(`${SPLASH_SEEN_KEY_PREFIX}${profile.id}`, "true");
   }
 
+  const [schoolMenuOpen, setSchoolMenuOpen] = useState(false);
+
   // Celebrate reaching Foundation completion exactly once per user, on-device
   // (no DB column for this — see recordFoundationCompletion's own comment).
   useEffect(() => {
@@ -427,6 +441,33 @@ export default function LearnTab() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" } : { flex: 1 }}>
+        <View style={styles.topBarRow}>
+          <TouchableOpacity style={styles.topBarMenuBtn} onPress={() => setSchoolMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.textDark} />
+          </TouchableOpacity>
+        </View>
+
+        <Modal visible={schoolMenuOpen} transparent animationType="fade" onRequestClose={() => setSchoolMenuOpen(false)}>
+          <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setSchoolMenuOpen(false)}>
+            <View style={[styles.dropdownCard, { top: topPad + 44 }]}>
+              <TouchableOpacity
+                style={styles.dropdownRow}
+                onPress={() => { setSchoolMenuOpen(false); router.push("/notes" as any); }}
+              >
+                <Ionicons name="document-text-outline" size={17} color={colors.textDark} />
+                <Text style={styles.dropdownRowText}>Notes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dropdownRow}
+                onPress={() => { setSchoolMenuOpen(false); router.push("/highlights" as any); }}
+              >
+                <Ionicons name="bookmark-outline" size={17} color={colors.textDark} />
+                <Text style={styles.dropdownRowText}>Highlights</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
           <KingdomSchoolCards
             selected={selectedSection}
