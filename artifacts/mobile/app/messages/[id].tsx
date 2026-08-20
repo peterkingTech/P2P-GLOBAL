@@ -550,32 +550,37 @@ export default function ChatScreen() {
               const mine = item.sender_id === user?.id;
               return (
                 <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
-                  {item.is_official_response && (
-                    <Text style={styles.officialResponseLabel}>
-                      Official Response{item.crisis_context ? ` · ${item.crisis_context}` : ""}
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onLongPress={() => handleLongPressMessage(item)}
-                    style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-                  >
-                    {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
-                    {item.message_type === "voice" && item.media_url ? (
-                      <VoiceMessageBubble
-                        mediaUrl={item.media_url}
-                        durationSeconds={item.media_duration_seconds ?? null}
-                        mine={mine}
-                      />
-                    ) : (
-                      <MentionText
-                        body={item.body ?? ""}
-                        style={[styles.bubbleText, mine && styles.bubbleTextMine]}
-                        linkStyle={styles.mentionLink}
-                      />
+                  <View style={styles.bubbleStack}>
+                    {item.is_official_response && (
+                      <View style={styles.officialResponseRow}>
+                        {otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
+                        <Text style={styles.officialResponseLabel} numberOfLines={1}>
+                          {item.crisis_context ?? "Official Response"}
+                        </Text>
+                      </View>
                     )}
-                    {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onLongPress={() => handleLongPressMessage(item)}
+                      style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+                    >
+                      {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
+                      {item.message_type === "voice" && item.media_url ? (
+                        <VoiceMessageBubble
+                          mediaUrl={item.media_url}
+                          durationSeconds={item.media_duration_seconds ?? null}
+                          mine={mine}
+                        />
+                      ) : (
+                        <MentionText
+                          body={item.body ?? ""}
+                          style={[styles.bubbleText, mine && styles.bubbleTextMine]}
+                          linkStyle={styles.mentionLink}
+                        />
+                      )}
+                      {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             }}
@@ -672,12 +677,14 @@ const styles = StyleSheet.create({
   },
   bubbleRow: { flexDirection: "row" },
   bubbleRowMine: { justifyContent: "flex-end" },
-  bubble: { maxWidth: "78%", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
+  bubbleStack: { maxWidth: "78%" },
+  bubble: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   bubbleTheirs: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
   bubbleMine: { backgroundColor: colors.accentGreen },
   senderName: { fontSize: 11, fontWeight: "600", color: colors.accentGreen, marginBottom: 2, fontFamily: "Inter_600SemiBold" },
   bubbleText: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
-  officialResponseLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 3, fontFamily: "Inter_400Regular" },
+  officialResponseRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+  officialResponseLabel: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", flexShrink: 1 },
   feedbackPrompt: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginHorizontal: 16, marginTop: 10, padding: 12,

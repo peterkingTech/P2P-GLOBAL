@@ -4,6 +4,8 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, ContactThread, ContactMessageStatus } from "@/contexts/DataContext";
+import { OfficialBadge } from "@/components/OfficialBadge";
+import type { OfficialAccountType } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
 const STATUS_DISPLAY: Record<ContactMessageStatus, { label: string; color: string }> = {
@@ -12,6 +14,19 @@ const STATUS_DISPLAY: Record<ContactMessageStatus, { label: string; color: strin
   replied: { label: "Replied", color: "#1D9E75" },
   forwarded: { label: "Being handled", color: "#4A90D9" },
   closed: { label: "Resolved", color: "#555" },
+};
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
+};
+
+// Contact P2P Global's departments (help_request/crisis_response/p2p_support/
+// marketing) are a different, purpose-specific enum from the official-account
+// identities (crisis_response/announcement/support/general) OfficialBadge
+// renders — same mapping used server-side when Compose derives a sending
+// identity from its own department choice, applied here just for the badge.
+const DEPARTMENT_TO_OFFICIAL_TYPE: Record<string, OfficialAccountType> = {
+  help_request: "support", crisis_response: "crisis_response", p2p_support: "support", marketing: "announcement",
 };
 
 export default function ContactThreadScreen() {
@@ -75,7 +90,10 @@ export default function ContactThreadScreen() {
             <Text style={styles.repliesTitle}>REPLIES</Text>
             {thread.replies.map((reply) => (
               <View key={reply.id} style={styles.replyCard}>
-                <Text style={styles.replyDept}>{reply.fromDepartment.replace(/_/g, " ")} team</Text>
+                <View style={styles.replyDeptRow}>
+                  <OfficialBadge accountType={DEPARTMENT_TO_OFFICIAL_TYPE[reply.fromDepartment] ?? "general"} size="small" />
+                  <Text style={styles.replyDept}>{DEPARTMENT_LABELS[reply.fromDepartment] ?? reply.fromDepartment} Team</Text>
+                </View>
                 <Text style={styles.replyBody}>{reply.body}</Text>
                 <Text style={styles.replyDate}>{new Date(reply.createdAt).toLocaleString()}</Text>
               </View>
@@ -108,7 +126,8 @@ const styles = StyleSheet.create({
   originalDate: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   repliesTitle: { fontSize: 11, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginBottom: 8 },
   replyCard: { backgroundColor: "rgba(29,158,117,0.06)", borderWidth: 1, borderColor: "rgba(29,158,117,0.2)", borderRadius: 14, padding: 16, gap: 6, marginBottom: 10 },
-  replyDept: { fontSize: 12, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold", textTransform: "capitalize" },
+  replyDeptRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  replyDept: { fontSize: 12, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   replyBody: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular", lineHeight: 21 },
   replyDate: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   inboxLink: { alignItems: "center", paddingVertical: 14 },
