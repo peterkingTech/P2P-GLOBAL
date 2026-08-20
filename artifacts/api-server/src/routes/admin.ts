@@ -1757,13 +1757,34 @@ router.put("/appointments/:userId/suspend", requireRole("super_admin"), async (r
   return ok(res, { ok: true, adminIsActive: nextActive });
 });
 
-// GET /admin/appointments/list — super_admin + admin_supervisor
-router.get("/appointments/list", requireRole("admin_supervisor"), async (_req, res) => {
-  const { data: admins, error } = await supabaseWrite
+// GET /admin/appointments/list — super_admin + admin_supervisor (unscoped,
+// see all admins) or admin_zone/admin_national (scoped server-side to the
+// caller's own admin_zone/admin_country — ZoneOrNationalAdminDashboard's
+// "my zone" / "my country" view was previously fetching this full,
+// unscoped list and filtering client-side, which both 403'd for these two
+// roles (they weren't in the role gate at all) and, had the gate simply
+// been widened without adding the filter below, would have leaked every
+// admin platform-wide to a zone/national admin instead of just their own).
+router.get("/appointments/list", requireRole("admin_supervisor", "admin_zone", "admin_national"), async (req, res) => {
+  const callerRole = (req as any).adminRole as string;
+  const callerId = (req as any).adminUserId as string;
+
+  let query = supabaseWrite
     .from("p2p_profiles")
     .select("id, username, full_name, role, admin_zone, admin_country, admin_is_active, admin_appointed_at, admin_last_active_at")
-    .neq("role", "student")
-    .order("admin_appointed_at", { ascending: false, nullsFirst: false });
+    .neq("role", "student");
+
+  if (callerRole === "admin_zone" || callerRole === "admin_national") {
+    const { data: callerProfile } = await supabaseWrite
+      .from("p2p_profiles").select("admin_zone, admin_country").eq("id", callerId).maybeSingle();
+    if (callerRole === "admin_zone") {
+      query = query.eq("admin_zone", callerProfile?.admin_zone ?? "__none__");
+    } else {
+      query = query.eq("admin_country", callerProfile?.admin_country ?? "__none__");
+    }
+  }
+
+  const { data: admins, error } = await query.order("admin_appointed_at", { ascending: false, nullsFirst: false });
   if (error) return err(res, error.message, 500);
 
   const adminIds = (admins ?? []).map((a) => a.id as string);
