@@ -436,6 +436,28 @@ router.put("/contact/admin/priority/:messageId", async (req, res) => {
   return ok(res, { ok: true });
 });
 
+const MESSAGE_STATUSES = ["unread", "read", "replied", "forwarded", "closed"] as const;
+
+// PUT /contact/admin/status/:messageId — { requesterId, status }. General
+// status setter — covers "mark as unread" (re-opening a read/replied message
+// for follow-up) and any other manual status change an admin wants to make
+// outside the automatic transitions reply/forward/close already perform.
+router.put("/contact/admin/status/:messageId", async (req, res) => {
+  const { messageId } = req.params;
+  const { requesterId, status } = req.body as { requesterId?: string; status?: string };
+  if (!requesterId || !status) return err(res, "requesterId and status are required", 400);
+  if (!MESSAGE_STATUSES.includes(status as (typeof MESSAGE_STATUSES)[number])) return err(res, "Invalid status", 400);
+  const access = await getAdminAccess(requesterId);
+  if (!access) return err(res, "Admin access required", 403);
+
+  const { data: message } = await db.from("p2p_contact_messages").select("id,to_department").eq("id", messageId).maybeSingle();
+  if (!message || !access.departments.includes(message.to_department as Department)) return err(res, "Message not found", 404);
+
+  const { error } = await db.from("p2p_contact_messages").update({ status, updated_at: new Date().toISOString() }).eq("id", messageId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { ok: true });
+});
+
 async function computeDeptStats(departments: Department[]) {
   const { data: rows } = await db.from("p2p_contact_messages").select("status,priority,created_at,updated_at").in("to_department", departments);
   const all = rows ?? [];

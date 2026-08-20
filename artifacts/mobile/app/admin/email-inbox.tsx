@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useData, ContactAdminInboxItem } from "@/contexts/DataContext";
+import { useData, ContactAdminInboxItem, ContactDepartment } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
@@ -14,6 +14,10 @@ const TABS: { key: InboxTab; label: string }[] = [
   { key: "received", label: "Received" },
   { key: "closed", label: "Closed" },
 ];
+
+const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
+  help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
+};
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -36,6 +40,7 @@ export default function AdminEmailInbox() {
   const { getAdminContactInbox, getContactAdminStats } = useData();
   const router = useRouter();
   const [tab, setTab] = useState<InboxTab>("inbox");
+  const [deptFilter, setDeptFilter] = useState<ContactDepartment | "all">("all");
   const [messages, setMessages] = useState<ContactAdminInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -53,6 +58,11 @@ export default function AdminEmailInbox() {
 
   useEffect(() => { load(); }, [load]);
 
+  const availableDepartments = useMemo(
+    () => Array.from(new Set(messages.map((m) => m.toDepartment))),
+    [messages]
+  );
+
   const filtered = useMemo(() => {
     let rows = messages;
     if (tab === "inbox") rows = rows.filter((m) => m.status === "unread" || m.status === "read");
@@ -60,6 +70,7 @@ export default function AdminEmailInbox() {
     else if (tab === "forwarded") rows = rows.filter((m) => m.status === "forwarded");
     else if (tab === "received") rows = rows.filter((m) => m.assignedTo === profile?.id);
     else if (tab === "closed") rows = rows.filter((m) => m.status === "closed");
+    if (deptFilter !== "all") rows = rows.filter((m) => m.toDepartment === deptFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter((m) =>
@@ -68,7 +79,7 @@ export default function AdminEmailInbox() {
       );
     }
     return rows;
-  }, [messages, tab, search, profile?.id]);
+  }, [messages, tab, deptFilter, search, profile?.id]);
 
   return (
     <View style={styles.container}>
@@ -87,6 +98,19 @@ export default function AdminEmailInbox() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {availableDepartments.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deptBar} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>
+          <TouchableOpacity style={[styles.deptChip, deptFilter === "all" && styles.deptChipActive]} onPress={() => setDeptFilter("all")}>
+            <Text style={[styles.deptChipText, deptFilter === "all" && styles.deptChipTextActive]}>All Departments</Text>
+          </TouchableOpacity>
+          {availableDepartments.map((d) => (
+            <TouchableOpacity key={d} style={[styles.deptChip, deptFilter === d && styles.deptChipActive]} onPress={() => setDeptFilter(d)}>
+              <Text style={[styles.deptChipText, deptFilter === d && styles.deptChipTextActive]}>{DEPARTMENT_LABELS[d]}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={styles.searchBar}>
         <Ionicons name="search" size={16} color={colors.textMuted} />
@@ -151,6 +175,11 @@ const styles = StyleSheet.create({
   tabChipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },
   tabChipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   tabChipTextActive: { color: "#fff", fontWeight: "700" },
+  deptBar: { flexGrow: 0, marginBottom: 8 },
+  deptChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: "rgba(29,158,117,0.06)", borderWidth: 1, borderColor: colors.borderBeige },
+  deptChipActive: { backgroundColor: colors.textDark, borderColor: colors.textDark },
+  deptChipText: { fontSize: 11, color: colors.textMid, fontFamily: "Inter_500Medium" },
+  deptChipTextActive: { color: "#fff", fontWeight: "700" },
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 10,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,

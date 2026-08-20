@@ -104,7 +104,7 @@ export default function AdminEmailMessageDetail() {
   const router = useRouter();
   const {
     getAdminContactMessage, replyToContactMessage, forwardContactMessage,
-    closeContactMessage, setContactMessagePriority,
+    closeContactMessage, setContactMessagePriority, setContactMessageStatus,
   } = useData();
   const [detail, setDetail] = useState<ContactAdminMessageDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -173,6 +173,18 @@ export default function AdminEmailMessageDetail() {
     setBusy(false);
     if (result) await load();
   }, [messageId, setContactMessagePriority, load]);
+
+  // Navigates back immediately rather than reloading in place — reloading
+  // would re-fetch via GET /contact/admin/inbox/:messageId, which flips
+  // status back to "read" the moment it's viewed, undoing this action.
+  const handleMarkUnread = useCallback(async () => {
+    if (!messageId) return;
+    setBusy(true);
+    const result = await setContactMessageStatus(messageId, "unread");
+    setBusy(false);
+    if (result) Alert.alert("Failed to update. Please try again.");
+    else router.back();
+  }, [messageId, setContactMessageStatus, router]);
 
   if (loading) {
     return <View style={[styles.container, styles.centerFill]}><ActivityIndicator color={colors.primaryGreen} /></View>;
@@ -287,6 +299,10 @@ export default function AdminEmailMessageDetail() {
         </View>
 
         <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={handleMarkUnread}>
+            <Ionicons name="mail-unread-outline" size={16} color={colors.textDark} />
+            <Text style={styles.actionBtnText}>Mark Unread</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={() => setShowForward(true)}>
             <Ionicons name="arrow-redo" size={16} color={colors.textDark} />
             <Text style={styles.actionBtnText}>Forward</Text>

@@ -498,6 +498,16 @@ export interface ContactDeptStats {
   overdue: number; avgResponseHours: number; thisWeek: ContactWeekStats;
 }
 
+// Admin → User official messages — separate from Contact P2P Global above.
+// Reuses the existing p2p_conversations/p2p_messages + official-account
+// system (see officialMessages.ts), so there's no dedicated "thread" type
+// here — the resulting message just shows up in the normal conversations
+// list/thread with an OfficialBadge, like any other official-account DM.
+export interface OfficialMessageSendData {
+  targetUserId: string; officialAccountType: OfficialAccountType; subject?: string; body: string;
+}
+export interface OfficialMessageSendResult { success: boolean; conversationId?: string; error?: string }
+
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
 export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
 
@@ -1217,8 +1227,13 @@ interface DataContextValue {
   forwardContactMessage: (messageId: string, data: { toDepartment?: ContactDepartment; toAdminId?: string; toUsername?: string; note?: string }) => Promise<string | null>;
   closeContactMessage: (messageId: string) => Promise<string | null>;
   setContactMessagePriority: (messageId: string, priority: ContactPriority) => Promise<string | null>;
+  setContactMessageStatus: (messageId: string, status: ContactMessageStatus) => Promise<string | null>;
   getContactAdminStats: () => Promise<ContactDeptStats | null>;
   getContactAllDepartmentStats: () => Promise<Record<ContactDepartment, ContactDeptStats> | null>;
+
+  // Admin → User official "P2P Global" messages
+  getOfficialMessageAllowedTypes: () => Promise<OfficialAccountType[]>;
+  sendOfficialMessage: (data: OfficialMessageSendData) => Promise<OfficialMessageSendResult>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -4694,6 +4709,53 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
+  const setContactMessageStatus = useCallback(async (messageId: string, status: ContactMessageStatus): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/status/${messageId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, status }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to update status";
+    } catch (e) {
+      console.error("setContactMessageStatus failed", e);
+      return "Failed to update status";
+    }
+  }, [profile?.id]);
+
+  const getOfficialMessageAllowedTypes = useCallback(async (): Promise<OfficialAccountType[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/allowed-types?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getOfficialMessageAllowedTypes failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const sendOfficialMessage = useCallback(async (data: OfficialMessageSendData): Promise<OfficialMessageSendResult> => {
+    if (!profile?.id) return { success: false, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/send`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterId: profile.id, targetUserId: data.targetUserId,
+          officialAccountType: data.officialAccountType, subject: data.subject, body: data.body,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { success: false, error: json?.error ?? "Message could not be sent. Please try again." };
+      return { success: true, conversationId: json.conversationId };
+    } catch (e) {
+      console.error("sendOfficialMessage failed", e);
+      return { success: false, error: "Message could not be sent. Please try again." };
+    }
+  }, [profile?.id]);
+
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
   const refreshTreeData = useCallback(async () => {
@@ -4749,7 +4811,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAnnouncements, pinAnnouncement, createLearningGoal, getLearningGoals, updateLearningGoal, getLearningGoalsDashboard,
       sendContactMessage, getMyContactMessages, getContactThread, getAdminContactInbox, getAdminContactMessage,
       replyToContactMessage, forwardContactMessage, closeContactMessage, setContactMessagePriority,
-      getContactAdminStats, getContactAllDepartmentStats,
+      setContactMessageStatus, getContactAdminStats, getContactAllDepartmentStats,
+      getOfficialMessageAllowedTypes, sendOfficialMessage,
     }}>
       {children}
     </DataContext.Provider>
