@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
 
 const router = Router();
 
@@ -28,6 +27,8 @@ function mapLink(row: Record<string, unknown>) {
     discipleId: row.disciple_id,
     isActive: row.active ?? true,
     status: row.status ?? "active",
+    message: row.message ?? null,
+    source: row.source ?? "smart_match",
     createdAt: row.created_at,
   };
 }
@@ -45,14 +46,20 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
     .maybeSingle();
   if (!link?.mentor_id) return res.json({ peerGuideId: null, peerGuideName: null });
 
-  const { data: profile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", link.mentor_id).maybeSingle();
-  return res.json({ peerGuideId: link.mentor_id, peerGuideName: profile?.full_name ?? "Your peer guide" });
+  const { data: profile } = await supabaseWrite
+    .from("p2p_profiles").select("full_name, username, photo_url, country").eq("id", link.mentor_id).maybeSingle();
+  const p = profile as Record<string, unknown> | null;
+  return res.json({
+    peerGuideId: link.mentor_id, peerGuideName: (p?.full_name as string) ?? "Your peer guide",
+    peerGuideUsername: (p?.username as string) ?? null, peerGuidePhotoUrl: (p?.photo_url as string) ?? null,
+    peerGuideCountry: (p?.country as string) ?? null,
+  });
 });
 
 // GET /discipleship/:userId/disciples
 router.get("/:userId/disciples", async (req, res) => {
   const { userId } = req.params;
-  const { data, error } = await supabase
+  const { data, error } = await supabaseWrite
     .from("p2p_discipleship_links")
     .select("*")
     .eq("mentor_id", userId)
@@ -61,7 +68,24 @@ router.get("/:userId/disciples", async (req, res) => {
   if (error) {
     return res.status(500).json({ error: error.message });
   }
-  return res.json(((data ?? []) as Record<string, unknown>[]).map(mapLink));
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const discipleIds = rows.map((r) => r.disciple_id as string);
+  let profileById = new Map<string, Record<string, unknown>>();
+  if (discipleIds.length) {
+    const { data: profiles } = await supabaseWrite
+      .from("p2p_profiles").select("id, full_name, username, photo_url, country").in("id", discipleIds);
+    profileById = new Map((profiles ?? []).map((p: Record<string, unknown>) => [p.id as string, p]));
+  }
+  return res.json(rows.map((r) => {
+    const p = profileById.get(r.disciple_id as string);
+    return {
+      ...mapLink(r),
+      discipleName: (p?.full_name as string) ?? "A disciple",
+      discipleUsername: (p?.username as string) ?? null,
+      disciplePhotoUrl: (p?.photo_url as string) ?? null,
+      discipleCountry: (p?.country as string) ?? null,
+    };
+  }));
 });
 
 // POST /discipleship
@@ -71,7 +95,7 @@ router.post("/", async (req, res) => {
     discipleId: string;
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseWrite
     .from("p2p_discipleship_links")
     .insert({
       mentor_id: mentorId,
@@ -308,6 +332,52 @@ async function getEligibleCandidates(requesterId: string, excludeCandidateIds: s
   return eligible;
 }
 
+// Single-target version of getEligibleCandidates' eligibility rule, for
+// "Choose Someone I Know" direct requests — same conditions (accepting
+// mentees, is_peer_guide_eligible or completed Module 1, under their
+// mentee cap, active in the last 30 days), just evaluated for one person
+// instead of scoring/ranking a whole candidate pool. Reuses the rule, not
+// a second eligibility system.
+async function checkDirectPeerGuideEligibility(targetId: string): Promise<boolean> {
+  const { data: target } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("is_peer_guide_eligible, max_mentees, accepting_mentees")
+    .eq("id", targetId)
+    .maybeSingle();
+  if (!target) return false;
+  const t = target as Record<string, unknown>;
+  if (!t.accepting_mentees) return false;
+
+  const maxMentees = (t.max_mentees as number) ?? 3;
+  const { count: activeMenteeCount } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("id", { count: "exact", head: true })
+    .eq("mentor_id", targetId)
+    .eq("active", true);
+  if ((activeMenteeCount ?? 0) >= maxMentees) return false;
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentProgress } = await supabaseWrite
+    .from("p2p_lesson_progress")
+    .select("user_id")
+    .eq("user_id", targetId)
+    .gte("updated_at", thirtyDaysAgo)
+    .limit(1);
+  if (!recentProgress?.length) return false;
+
+  if (t.is_peer_guide_eligible) return true;
+
+  const { data: activeCurriculumId } = await supabaseWrite.rpc("p2p_active_curriculum_id");
+  if (!activeCurriculumId) return false;
+  const { data: module1 } = await supabaseWrite
+    .from("p2p_modules").select("id").eq("curriculum_id", activeCurriculumId as string)
+    .order("order_index", { ascending: true }).limit(1).maybeSingle();
+  const module1Id = (module1 as Record<string, unknown> | null)?.id as string | undefined;
+  if (!module1Id) return false;
+  const { data: done } = await supabaseWrite.rpc("p2p_module_fully_completed", { p_user_id: targetId, p_module_id: module1Id });
+  return !!done;
+}
+
 interface ScoredMatch {
   id: string;
   fullName: string;
@@ -413,10 +483,45 @@ router.get("/find-peer-guide/:userId", async (req, res) => {
   }
 });
 
-// POST /discipleship/request — learner taps "Connect" on a candidate.
+// POST /discipleship/request — learner taps "Connect" on a Smart Match
+// candidate (source omitted -> defaults to 'smart_match'), or asks a
+// specific person they already know (source: 'direct', from a profile
+// screen or "Choose Someone I Know" search, optionally with a personal
+// message).
 router.post("/request", async (req, res) => {
-  const { learnerId, peerGuideId } = req.body as { learnerId?: string; peerGuideId?: string };
+  const { learnerId, peerGuideId, message, source } = req.body as {
+    learnerId?: string; peerGuideId?: string; message?: string; source?: "smart_match" | "direct";
+  };
   if (!learnerId || !peerGuideId) return res.status(400).json({ error: "learnerId and peerGuideId are required" });
+  if (learnerId === peerGuideId) return res.status(400).json({ error: "You cannot request yourself as a peer guide." });
+  const requestSource: "smart_match" | "direct" = source === "direct" ? "direct" : "smart_match";
+  const trimmedMessage = message?.trim().slice(0, 500) || null;
+
+  // Already an active relationship between these two, either direction.
+  const { data: activeLink } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("id")
+    .eq("status", "active")
+    .or(`and(mentor_id.eq.${peerGuideId},disciple_id.eq.${learnerId}),and(mentor_id.eq.${learnerId},disciple_id.eq.${peerGuideId})`)
+    .maybeSingle();
+  if (activeLink) return res.status(409).json({ error: "You already have an active Peer Guide relationship with this person." });
+
+  // Already a pending request in this exact direction.
+  const { data: pendingLink } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("id")
+    .eq("mentor_id", peerGuideId).eq("disciple_id", learnerId).eq("status", "pending")
+    .maybeSingle();
+  if (pendingLink) return res.status(409).json({ error: "Peer Guide request already sent." });
+
+  // Direct ("I know this person") requests enforce the same eligibility
+  // rule the matching system already applies — Smart Match requests skip
+  // this since getEligibleCandidates already filtered the candidate pool
+  // before the client ever saw this person as an option.
+  if (requestSource === "direct") {
+    const eligible = await checkDirectPeerGuideEligibility(peerGuideId);
+    if (!eligible) return res.status(400).json({ error: "This person isn't currently available to be a Peer Guide." });
+  }
 
   const requestedAt = new Date();
   const expiresAt = new Date(requestedAt.getTime() + CONNECTION_REQUEST_TTL_HOURS * 60 * 60 * 1000);
@@ -428,6 +533,8 @@ router.post("/request", async (req, res) => {
       disciple_id: learnerId,
       active: false,
       status: "pending",
+      message: trimmedMessage,
+      source: requestSource,
       requested_at: requestedAt.toISOString(),
       expires_at: expiresAt.toISOString(),
       created_at: requestedAt.toISOString(),
@@ -441,8 +548,12 @@ router.post("/request", async (req, res) => {
 
   await supabaseWrite.from("p2p_notifications").insert({
     user_id: peerGuideId,
-    title: "A new peer guide request",
-    message: `${learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?`,
+    title: requestSource === "direct" ? "New Peer Guide Request" : "A new peer guide request",
+    message: requestSource === "direct"
+      ? `${learnerName} wants you to be their Peer Guide.`
+      : `${learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?`,
+    notification_type: "peer_guide_request",
+    data: { linkId: data.id, learnerId, source: requestSource },
   });
 
   return res.status(201).json(mapLink(data as Record<string, unknown>));
@@ -454,7 +565,7 @@ router.get("/pending-requests/:userId", async (req, res) => {
   const { userId } = req.params;
   const { data: links, error } = await supabaseWrite
     .from("p2p_discipleship_links")
-    .select("id, disciple_id, requested_at, expires_at")
+    .select("id, disciple_id, requested_at, expires_at, message, source")
     .eq("mentor_id", userId)
     .eq("status", "pending")
     .order("requested_at", { ascending: false });
@@ -480,6 +591,8 @@ router.get("/pending-requests/:userId", async (req, res) => {
         learnerName: (p?.full_name as string) ?? "A learner",
         learnerPhotoUrl: (p?.photo_url as string) ?? null,
         learnerCountry: (p?.country as string) ?? null,
+        message: r.message ?? null,
+        source: r.source ?? "smart_match",
         requestedAt: r.requested_at,
         expiresAt: r.expires_at,
       };
@@ -506,6 +619,7 @@ router.put("/request/:linkId/respond", async (req, res) => {
 
   const l = link as Record<string, unknown>;
   const learnerId = l.disciple_id as string;
+  const requestSource = (l.source as string) ?? "smart_match";
 
   if (decision === "accept") {
     const { error } = await supabaseWrite
@@ -517,18 +631,39 @@ router.put("/request/:linkId/respond", async (req, res) => {
     const { data: guideProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
     const guideName = (guideProfile as Record<string, unknown> | null)?.full_name ?? "Your peer guide";
     await supabaseWrite.from("p2p_notifications").insert([
-      { user_id: learnerId, title: "Your peer guide accepted!", message: `${guideName} has accepted your request and is ready to walk alongside you.` },
-      { user_id: userId, title: "Connection confirmed", message: "You are now walking alongside a new disciple. Reach out and welcome them." },
+      {
+        user_id: learnerId, title: "Your Peer Guide request was accepted!",
+        message: `${guideName} has accepted your request and is ready to walk alongside you.`,
+        notification_type: "peer_guide_request_accepted", data: { linkId },
+      },
+      {
+        user_id: userId, title: "New disciple",
+        message: "You are now walking alongside a new disciple. Reach out and welcome them.",
+        notification_type: "peer_guide_request_accepted", data: { linkId },
+      },
     ]);
     return res.json({ status: "active" });
   }
 
-  // Decline — mark this link declined, then automatically offer the next best match.
+  // Decline — mark this link declined. Smart Match requests automatically
+  // offer the learner's next best algorithmic match; direct "I know this
+  // person" requests do not — the learner chose that specific person, so
+  // declining shouldn't silently route the ask to someone they never
+  // picked. Either way, no reason is shared with the requester.
   const { error: declineErr } = await supabaseWrite
     .from("p2p_discipleship_links")
     .update({ status: "declined", active: false, responded_at: new Date().toISOString() })
     .eq("id", linkId);
   if (declineErr) return res.status(500).json({ error: declineErr.message });
+
+  if (requestSource !== "smart_match") {
+    await supabaseWrite.from("p2p_notifications").insert({
+      user_id: learnerId, title: "Peer Guide request declined",
+      message: "Your Peer Guide request was declined.",
+      notification_type: "peer_guide_request_declined", data: { linkId },
+    });
+    return res.json({ status: "declined", nextMatchOffered: false });
+  }
 
   const nextMatches = await scoreCandidates(learnerId, [userId]);
   const next = nextMatches[0];
@@ -540,6 +675,7 @@ router.put("/request/:linkId/respond", async (req, res) => {
       disciple_id: learnerId,
       active: false,
       status: "pending",
+      source: "smart_match",
       requested_at: requestedAt.toISOString(),
       expires_at: expiresAt.toISOString(),
       created_at: requestedAt.toISOString(),

@@ -12,6 +12,7 @@ import { Avatar } from "@/components/Avatar";
 import { shareProfile } from "@/lib/sharing";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
+import { PeerGuideRequestModal } from "@/components/PeerGuideRequestModal";
 import { grainLabel } from "@/lib/grain";
 
 interface PublicProfile {
@@ -44,6 +45,7 @@ export default function PublicProfileScreen() {
   const [isBlockedByMe, setIsBlockedByMe] = useState(false);
   const [grainCount, setGrainCount] = useState(0);
   const [grainSheetOpen, setGrainSheetOpen] = useState(false);
+  const [peerGuideModalOpen, setPeerGuideModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!username) return;
@@ -88,21 +90,6 @@ export default function PublicProfileScreen() {
         body: JSON.stringify({ fromUserId: viewer.id, toUserId: data.userId, requestType: "connect" }),
       });
       if (res.ok) showAlert("Request sent", `@${data.username} will see your connection request.`);
-      else { const body = await res.json(); showAlert("Couldn't send request", body.error ?? "Please try again."); }
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  async function handleRequestPeerGuide() {
-    if (!viewer?.id || !data) return;
-    setConnecting(true);
-    try {
-      const res = await fetch(`${getApiUrl()}/discipleship/request`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ learnerId: viewer.id, peerGuideId: data.userId }),
-      });
-      if (res.ok) showAlert("Request sent", `You've asked @${data.username} to be your peer guide.`);
       else { const body = await res.json(); showAlert("Couldn't send request", body.error ?? "Please try again."); }
     } finally {
       setConnecting(false);
@@ -285,9 +272,9 @@ export default function PublicProfileScreen() {
               )}
             </TouchableOpacity>
             {data.isPeerGuideEligible && (
-              <TouchableOpacity style={[styles.actionBtnSecondary, { flexBasis: "100%" }]} onPress={handleRequestPeerGuide} disabled={connecting}>
+              <TouchableOpacity style={[styles.actionBtnSecondary, { flexBasis: "100%" }]} onPress={() => setPeerGuideModalOpen(true)}>
                 <Ionicons name="compass-outline" size={15} color={colors.accentGreen} />
-                <Text style={styles.actionBtnSecondaryText}>Request as Peer Guide</Text>
+                <Text style={styles.actionBtnSecondaryText}>Ask to Be My Peer Guide</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -314,6 +301,13 @@ export default function PublicProfileScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <PeerGuideRequestModal
+        visible={peerGuideModalOpen}
+        onClose={() => setPeerGuideModalOpen(false)}
+        targetUserId={data.userId}
+        targetName={data.fullName || `@${data.username}`}
+      />
     </View>
   );
 }

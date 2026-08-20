@@ -17,6 +17,8 @@ interface PendingRequest {
   learnerName: string;
   learnerPhotoUrl: string | null;
   learnerCountry: string | null;
+  message: string | null;
+  source: "smart_match" | "direct";
   requestedAt: string;
   expiresAt: string | null;
 }
@@ -99,8 +101,15 @@ export default function PeerGuideRequestsScreen() {
               </View>
 
               <Text style={styles.requestBody}>
-                {r.learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?
+                {r.source === "direct"
+                  ? `${r.learnerName} wants you to be their Peer Guide.`
+                  : `${r.learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?`}
               </Text>
+              {r.message && (
+                <View style={styles.messagePreview}>
+                  <Text style={styles.messagePreviewText}>"{r.message}"</Text>
+                </View>
+              )}
 
               <View style={styles.actionsRow}>
                 <TouchableOpacity
@@ -143,7 +152,9 @@ const styles = StyleSheet.create({
   avatarInitial: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
   learnerName: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   learnerMeta: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-  requestBody: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, marginBottom: 14 },
+  requestBody: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, marginBottom: 10 },
+  messagePreview: { backgroundColor: colors.lightCream, borderRadius: 10, padding: 12, marginBottom: 14 },
+  messagePreviewText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", fontStyle: "italic", lineHeight: 19 },
 
   actionsRow: { flexDirection: "row", gap: 10 },
   declineBtn: {

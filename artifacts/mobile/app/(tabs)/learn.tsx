@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +20,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import {
   useData,
   Module,
+  KingdomSchoolStatus,
   getModuleProgressCounts,
   getFoundationProgress,
   getKingdomSchoolStatus,
@@ -27,6 +30,93 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
+
+const LOGO = require("@/assets/images/logo.png");
+const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
+
+// Shown once per user the first time they deliberately open Kingdom School
+// (mirrors the firstRecommendationDismissed/guideInvitationPending
+// AsyncStorage-flag convention already used on the Home screen) — a plain
+// component-mount gate, no new route and no new progress-tracking system,
+// reusing getKingdomSchoolStatus/getFoundationProgress exactly as learn.tsx
+// already computes them.
+function KingdomSchoolSplash({ status, foundationPct, onEnter, colors }: {
+  status: KingdomSchoolStatus; foundationPct: number; onEnter: () => void; colors: AppColors;
+}) {
+  const styles = splashStyles(colors);
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const missionOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(160, [
+      Animated.timing(logoOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(missionOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(buttonOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const isFirstTime = status === "exploring";
+  const isFoundationDone = status === "foundation_complete" || status === "guiding_others";
+
+  let heading = "Welcome to Kingdom School";
+  let sub = "Your discipleship journey begins here.";
+  let cta = "Start Learning →";
+  if (isFoundationDone) {
+    heading = "Welcome Back";
+    sub = "Your foundation is established. Continue growing and helping others grow.";
+    cta = "Explore Kingdom School →";
+  } else if (!isFirstTime) {
+    heading = "Welcome Back";
+    sub = "Continue your journey of learning and growth.";
+    cta = "Continue Learning →";
+  }
+
+  return (
+    <View style={styles.root}>
+      <Animated.View style={{ opacity: logoOpacity }}>
+        <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+      </Animated.View>
+
+      <Animated.View style={{ opacity: titleOpacity, alignItems: "center" }}>
+        <Text style={styles.eyebrow}>WELCOME TO</Text>
+        <Text style={styles.title}>KINGDOM SCHOOL</Text>
+      </Animated.View>
+
+      <Animated.View style={{ opacity: missionOpacity, alignItems: "center" }}>
+        <Text style={styles.mission}>Learn Christ. Grow in Christ. Help others grow in Christ.</Text>
+        <Text style={styles.heading}>{heading}</Text>
+        <Text style={styles.sub}>{sub}</Text>
+        {!isFirstTime && !isFoundationDone && (
+          <Text style={styles.progressLine}>Foundation — {foundationPct}% complete</Text>
+        )}
+      </Animated.View>
+
+      <Animated.View style={{ opacity: buttonOpacity, width: "100%" }}>
+        <TouchableOpacity style={styles.enterBtn} onPress={onEnter} activeOpacity={0.9}>
+          <Text style={styles.enterBtnText}>{cta}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
+
+function splashStyles(c: AppColors) {
+  return StyleSheet.create({
+    root: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 22, backgroundColor: c.lightCream },
+    logo: { width: 84, height: 84 },
+    eyebrow: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+    title: { fontSize: 26, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 4 },
+    mission: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21, marginBottom: 14 },
+    heading: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
+    sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4 },
+    progressLine: { fontSize: 13, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 10 },
+    enterBtn: { backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 16, alignItems: "center" },
+    enterBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  });
+}
 
 function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
   const { colors } = useTheme();
@@ -300,6 +390,19 @@ export default function LearnTab() {
 
   const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? null;
 
+  // Welcome splash — shown once per user the first time they deliberately
+  // open Kingdom School (null = still checking AsyncStorage, false = show
+  // the splash, true = already seen, go straight to content).
+  const [splashSeen, setSplashSeen] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!profile?.id) return;
+    AsyncStorage.getItem(`${SPLASH_SEEN_KEY_PREFIX}${profile.id}`).then((v) => setSplashSeen(!!v));
+  }, [profile?.id]);
+  function handleEnterKingdomSchool() {
+    setSplashSeen(true);
+    if (profile?.id) AsyncStorage.setItem(`${SPLASH_SEEN_KEY_PREFIX}${profile.id}`, "true");
+  }
+
   // Celebrate reaching Foundation completion exactly once per user, on-device
   // (no DB column for this — see recordFoundationCompletion's own comment).
   useEffect(() => {
@@ -309,6 +412,17 @@ export default function LearnTab() {
       if (isFirstTime) setCompletionCard({ date });
     });
   }, [status, profile?.id]);
+
+  if (splashSeen === null) {
+    return <View style={[styles.container, { paddingTop: topPad }]} />;
+  }
+  if (splashSeen === false) {
+    return (
+      <View style={[styles.container, { paddingTop: topPad }]}>
+        <KingdomSchoolSplash status={status} foundationPct={foundationPct} onEnter={handleEnterKingdomSchool} colors={colors} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>

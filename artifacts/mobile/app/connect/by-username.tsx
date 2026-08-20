@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,13 +25,14 @@ export default function ConnectByUsernameScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const params = useLocalSearchParams<{ type?: string }>();
 
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<FoundProfile | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const [requestType, setRequestType] = useState<RequestType>("connect");
+  const [requestType, setRequestType] = useState<RequestType>(params.type === "peer_guide" ? "peer_guide" : "connect");
   const [myCircles, setMyCircles] = useState<CircleOption[]>([]);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -74,7 +75,7 @@ export default function ConnectByUsernameScreen() {
       if (requestType === "peer_guide") {
         const res = await fetch(`${getApiUrl()}/discipleship/request`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ learnerId: profile.id, peerGuideId: found.userId }),
+          body: JSON.stringify({ learnerId: profile.id, peerGuideId: found.userId, message: message.trim() || undefined, source: "direct" }),
         });
         if (!res.ok) { const body = await res.json(); showAlert("Couldn't send request", body.error ?? "Please try again."); return; }
       } else {
@@ -104,7 +105,7 @@ export default function ConnectByUsernameScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Find Someone by Username</Text>
+        <Text style={styles.headerTitle}>{params.type === "peer_guide" ? "Choose Someone I Know" : "Find Someone by Username"}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -173,14 +174,14 @@ export default function ConnectByUsernameScreen() {
               </View>
             )}
 
-            {requestType !== "peer_guide" && (
+            {requestType !== "circle_invite" && (
               <>
                 <Text style={styles.sectionLabel}>Optional message</Text>
                 <TextInput
                   style={styles.messageInput}
                   value={message}
                   onChangeText={(v) => setMessage(v.slice(0, 200))}
-                  placeholder="We met at the conference in Seoul..."
+                  placeholder={requestType === "peer_guide" ? "Tell them why you would like them to be your Peer Guide…" : "We met at the conference in Seoul..."}
                   placeholderTextColor={colors.textMuted}
                   multiline
                 />
