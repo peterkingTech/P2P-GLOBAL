@@ -56,7 +56,13 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
   });
 });
 
-// GET /discipleship/:userId/disciples
+// GET /discipleship/:userId/disciples — powers My Discipleship's "My
+// Disciples" cards, so beyond the base link/profile info it also resolves
+// each disciple's current-module progress and last-activity/wilting status,
+// reusing the same p2p_active_curriculum_id()/p2p_module_fully_completed()
+// source of truth as getEligibleCandidates() above, and the same 14-day
+// wilting threshold DataContext.loadTreeData() already uses client-side for
+// MenteeBranchInfo.
 router.get("/:userId/disciples", async (req, res) => {
   const { userId } = req.params;
   const { data, error } = await supabaseWrite
@@ -73,17 +79,52 @@ router.get("/:userId/disciples", async (req, res) => {
   let profileById = new Map<string, Record<string, unknown>>();
   if (discipleIds.length) {
     const { data: profiles } = await supabaseWrite
-      .from("p2p_profiles").select("id, full_name, username, photo_url, country").in("id", discipleIds);
+      .from("p2p_profiles").select("id, full_name, username, photo_url, country, last_active_at").in("id", discipleIds);
     profileById = new Map((profiles ?? []).map((p: Record<string, unknown>) => [p.id as string, p]));
   }
+
+  const { data: activeCurriculumId } = await supabaseWrite.rpc("p2p_active_curriculum_id");
+  let totalModules = 0;
+  let moduleIds: string[] = [];
+  if (activeCurriculumId) {
+    const { data: allModules } = await supabaseWrite
+      .from("p2p_modules").select("id").eq("curriculum_id", activeCurriculumId as string);
+    moduleIds = (allModules ?? []).map((m: Record<string, unknown>) => m.id as string);
+    totalModules = moduleIds.length;
+  }
+  const modulesCompletedByDisciple = new Map<string, number>();
+  if (moduleIds.length && discipleIds.length) {
+    await Promise.all(
+      discipleIds.map(async (id) => {
+        let count = 0;
+        for (const mid of moduleIds) {
+          const { data: done } = await supabaseWrite.rpc("p2p_module_fully_completed", {
+            p_user_id: id, p_module_id: mid,
+          });
+          if (done) count += 1;
+        }
+        modulesCompletedByDisciple.set(id, count);
+      })
+    );
+  }
+
+  const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+
   return res.json(rows.map((r) => {
-    const p = profileById.get(r.disciple_id as string);
+    const discipleId = r.disciple_id as string;
+    const p = profileById.get(discipleId);
+    const lastActiveAt = (p?.last_active_at as string) ?? null;
+    const modulesCompleted = modulesCompletedByDisciple.get(discipleId) ?? 0;
     return {
       ...mapLink(r),
       discipleName: (p?.full_name as string) ?? "A disciple",
       discipleUsername: (p?.username as string) ?? null,
       disciplePhotoUrl: (p?.photo_url as string) ?? null,
       discipleCountry: (p?.country as string) ?? null,
+      currentModuleNumber: totalModules ? Math.min(modulesCompleted + 1, totalModules) : null,
+      totalModules: totalModules || null,
+      lastActiveAt,
+      isWilting: !!lastActiveAt && new Date(lastActiveAt).getTime() < fourteenDaysAgo,
     };
   }));
 });

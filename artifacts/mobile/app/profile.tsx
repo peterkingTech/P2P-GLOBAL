@@ -474,6 +474,16 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
 
+        {/* My Discipleship */}
+        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/my-discipleship" as any)}>
+          <Ionicons name="people-circle-outline" size={18} color={colors.primaryGreen} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dashboardTitle}>My Discipleship</Text>
+            <Text style={styles.dashboardSub}>Walk with others and see your impact</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
+
         {/* Pending Confirmations */}
         <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/confirmations" as any)}>
           <Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primaryGreen} />
