@@ -268,7 +268,7 @@ export default function MessagesTab() {
                       {item.name ?? "Conversation"}
                     </Text>
                     {item.otherUserOfficialType && <OfficialBadge accountType={item.otherUserOfficialType} size="small" />}
-                    {item.isPinnedBySystem && <Ionicons name="pin" size={13} color="#C0392B" style={styles.systemPin} />}
+                    {item.isPinnedBySystem && !item.otherUserOfficialType && <Ionicons name="pin" size={13} color="#C0392B" style={styles.systemPin} />}
                   </View>
                   <Text style={[styles.rowSub, unread && styles.rowSubUnread]} numberOfLines={1}>
                     {item.lastMessage ?? "No messages yet"}
