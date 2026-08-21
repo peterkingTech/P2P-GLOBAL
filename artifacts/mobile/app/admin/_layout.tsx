@@ -38,7 +38,7 @@ const NAV_ITEMS = [
   { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
   { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin", "admin_help"] },
-  { label: "Email Inbox", path: "/admin/email-inbox", icon: "mail" as const, roles: ["admin_help", "admin_marketing", "super_admin"] },
+  { label: "P2P Official Mail", path: "/admin/email-inbox", icon: "mail" as const, roles: ["admin_help", "admin_marketing", "super_admin"] },
   { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_moderation"] },
   { label: "Usernames", path: "/admin/usernames", icon: "at" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_username"] },
   { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"] },

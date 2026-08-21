@@ -468,7 +468,7 @@ export interface ContactMessage {
   subject: string; body: string; attachmentUrl: string | null; attachmentType: "image" | "pdf" | null;
   status: ContactMessageStatus; priority: ContactPriority; assignedTo: string | null;
   forwardedFrom: string | null; forwardedNote: string | null; originalDepartment: string | null;
-  feedbackRequested: boolean; feedbackSubmitted: boolean; createdAt: string; updatedAt: string;
+  feedbackRequested: boolean; feedbackSubmitted: boolean; isArchived: boolean; createdAt: string; updatedAt: string;
 }
 export interface ContactMessageListItem extends ContactMessage {
   bodyPreview: string; replyCount: number; latestReplyAt: string | null;
@@ -476,7 +476,7 @@ export interface ContactMessageListItem extends ContactMessage {
 export interface ContactAdminInboxItem extends ContactMessage {
   bodyPreview: string; fromUsername: string | null; fromDisplayName: string; fromPhotoUrl: string | null;
   fromCountry: string | null; fromMinistryRole: string | null; fromTreeStage: string;
-  fromIsVerified: boolean; fromAccountAgeDays: number | null;
+  fromIsVerified: boolean; fromAccountAgeDays: number | null; isStarredByMe: boolean;
 }
 export interface ContactReply {
   id: string; messageId: string; fromAdminId: string; fromAdminUsername: string | null;
@@ -511,9 +511,19 @@ export type ComposeDepartment =
   | "support_help" | "crisis_safeguarding" | "account_security"
   | "report_user" | "feedback_suggestions" | "general_contact";
 export interface OfficialMessageSendData {
-  targetUserId: string; department: ComposeDepartment; subject: string; body: string;
+  targetUserId: string; department: ComposeDepartment; subject: string; body: string; draftId?: string;
 }
 export interface OfficialMessageSendResult { success: boolean; conversationId?: string; error?: string }
+export interface OfficialMailDraft {
+  id: string; targetUserId: string | null; targetUsername: string | null;
+  department: ComposeDepartment | null; subject: string; body: string;
+  createdAt: string; updatedAt: string;
+}
+export interface OfficialMailDraftSaveData {
+  draftId?: string; targetUserId?: string; targetUsername?: string;
+  department?: ComposeDepartment; subject?: string; body?: string;
+}
+export interface OfficialMailDraftSaveResult { draftId: string | null; error: string | null }
 export interface SentOfficialMessage {
   id: string; conversationId: string; subject: string; department: ComposeDepartment;
   bodyPreview: string; createdAt: string; sentByAdminUsername: string | null;
@@ -1237,21 +1247,26 @@ interface DataContextValue {
   getContactThread: (messageId: string) => Promise<ContactThread | null>;
 
   // Contact P2P Global (admin side)
-  getAdminContactInbox: (filters?: { status?: string; priority?: string; search?: string }) => Promise<ContactAdminInboxItem[]>;
+  getAdminContactInbox: (filters?: { status?: string; priority?: string; search?: string; archived?: boolean }) => Promise<ContactAdminInboxItem[]>;
   getAdminContactMessage: (messageId: string) => Promise<ContactAdminMessageDetail | null>;
   replyToContactMessage: (messageId: string, body: string, isInternalNote: boolean) => Promise<string | null>;
   forwardContactMessage: (messageId: string, data: { toDepartment?: ContactDepartment; toAdminId?: string; toUsername?: string; note?: string }) => Promise<string | null>;
   closeContactMessage: (messageId: string) => Promise<string | null>;
   setContactMessagePriority: (messageId: string, priority: ContactPriority) => Promise<string | null>;
   setContactMessageStatus: (messageId: string, status: ContactMessageStatus) => Promise<string | null>;
+  archiveContactMessage: (messageId: string, archived: boolean) => Promise<string | null>;
+  starContactMessage: (messageId: string, starred: boolean) => Promise<string | null>;
   getContactAdminStats: () => Promise<ContactDeptStats | null>;
   getContactAllDepartmentStats: () => Promise<Record<ContactDepartment, ContactDeptStats> | null>;
 
-  // Admin → User official "P2P Global" messages (Compose)
+  // Admin → User official "P2P Global" messages (Compose) — "P2P Official Mail"
   getOfficialMessageAllowedTypes: () => Promise<OfficialAccountType[]>;
   sendOfficialMessage: (data: OfficialMessageSendData) => Promise<OfficialMessageSendResult>;
   getSentOfficialMessages: () => Promise<SentOfficialMessage[]>;
   searchUsersForCompose: (query: string) => Promise<ComposeUserSearchResult[]>;
+  getOfficialMailDrafts: () => Promise<OfficialMailDraft[]>;
+  saveOfficialMailDraft: (data: OfficialMailDraftSaveData) => Promise<OfficialMailDraftSaveResult>;
+  deleteOfficialMailDraft: (draftId: string) => Promise<string | null>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -4608,13 +4623,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
-  const getAdminContactInbox = useCallback(async (filters?: { status?: string; priority?: string; search?: string }): Promise<ContactAdminInboxItem[]> => {
+  const getAdminContactInbox = useCallback(async (filters?: { status?: string; priority?: string; search?: string; archived?: boolean }): Promise<ContactAdminInboxItem[]> => {
     if (!profile?.id) return [];
     try {
       const params = new URLSearchParams({ requesterId: profile.id });
       if (filters?.status) params.set("status", filters.status);
       if (filters?.priority) params.set("priority", filters.priority);
       if (filters?.search) params.set("search", filters.search);
+      if (filters?.archived) params.set("archived", "true");
       const res = await fetch(`${getApiUrl()}/contact/admin/inbox?${params.toString()}`);
       if (!res.ok) return [];
       return await res.json();
@@ -4743,6 +4759,38 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
+  const archiveContactMessage = useCallback(async (messageId: string, archived: boolean): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/archive/${messageId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, archived }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to update";
+    } catch (e) {
+      console.error("archiveContactMessage failed", e);
+      return "Failed to update";
+    }
+  }, [profile?.id]);
+
+  const starContactMessage = useCallback(async (messageId: string, starred: boolean): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/contact/admin/star/${messageId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id, starred }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to update";
+    } catch (e) {
+      console.error("starContactMessage failed", e);
+      return "Failed to update";
+    }
+  }, [profile?.id]);
+
   const getOfficialMessageAllowedTypes = useCallback(async (): Promise<OfficialAccountType[]> => {
     if (!profile?.id) return [];
     try {
@@ -4762,7 +4810,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           requesterId: profile.id, targetUserId: data.targetUserId,
-          department: data.department, subject: data.subject, body: data.body,
+          department: data.department, subject: data.subject, body: data.body, draftId: data.draftId,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -4796,6 +4844,53 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("searchUsersForCompose failed", e);
       return [];
+    }
+  }, [profile?.id]);
+
+  const getOfficialMailDrafts = useCallback(async (): Promise<OfficialMailDraft[]> => {
+    if (!profile?.id) return [];
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/drafts?requesterId=${profile.id}`);
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) {
+      console.error("getOfficialMailDrafts failed", e);
+      return [];
+    }
+  }, [profile?.id]);
+
+  const saveOfficialMailDraft = useCallback(async (data: OfficialMailDraftSaveData): Promise<OfficialMailDraftSaveResult> => {
+    if (!profile?.id) return { draftId: null, error: "Not authenticated" };
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/drafts`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requesterId: profile.id, draftId: data.draftId, targetUserId: data.targetUserId,
+          targetUsername: data.targetUsername, department: data.department, subject: data.subject, body: data.body,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { draftId: null, error: json?.error ?? "Failed to save draft" };
+      return { draftId: json.id, error: null };
+    } catch (e) {
+      console.error("saveOfficialMailDraft failed", e);
+      return { draftId: null, error: "Failed to save draft" };
+    }
+  }, [profile?.id]);
+
+  const deleteOfficialMailDraft = useCallback(async (draftId: string): Promise<string | null> => {
+    if (!profile?.id) return "Not authenticated";
+    try {
+      const res = await fetch(`${getApiUrl()}/official-messages/drafts/${draftId}`, {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requesterId: profile.id }),
+      });
+      if (res.ok) return null;
+      const err = await res.json().catch(() => ({}));
+      return err?.error ?? "Failed to delete draft";
+    } catch (e) {
+      console.error("deleteOfficialMailDraft failed", e);
+      return "Failed to delete draft";
     }
   }, [profile?.id]);
 
@@ -4854,8 +4949,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAnnouncements, pinAnnouncement, createLearningGoal, getLearningGoals, updateLearningGoal, getLearningGoalsDashboard,
       sendContactMessage, getMyContactMessages, getContactThread, getAdminContactInbox, getAdminContactMessage,
       replyToContactMessage, forwardContactMessage, closeContactMessage, setContactMessagePriority,
-      setContactMessageStatus, getContactAdminStats, getContactAllDepartmentStats,
+      setContactMessageStatus, archiveContactMessage, starContactMessage, getContactAdminStats, getContactAllDepartmentStats,
       getOfficialMessageAllowedTypes, sendOfficialMessage, getSentOfficialMessages, searchUsersForCompose,
+      getOfficialMailDrafts, saveOfficialMailDraft, deleteOfficialMailDraft,
     }}>
       {children}
     </DataContext.Provider>

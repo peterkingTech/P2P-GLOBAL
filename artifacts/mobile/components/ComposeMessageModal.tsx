@@ -4,7 +4,7 @@ import {
   FlatList, Image, KeyboardAvoidingView, Platform, Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, ComposeUserSearchResult, ComposeDepartment } from "@/contexts/DataContext";
+import { useData, ComposeUserSearchResult, ComposeDepartment, OfficialMailDraft } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
@@ -22,16 +22,22 @@ interface ComposeMessageModalProps {
   visible: boolean;
   onClose: () => void;
   onSent: () => void;
+  initialDraft?: OfficialMailDraft | null;
 }
 
-// Compose lives entirely inside the Email Inbox screen as a modal — the
+// Compose lives entirely inside the P2P Official Mail screen as a modal — the
 // admin never navigates away to send mail, matching the "everything from
 // the Email" requirement this was built under. All the actual send logic
 // (find-or-create the P2P Global <-> user conversation, derive the sending
 // identity from department, persist subject/department/sent_by_admin_id)
 // happens server-side in officialMessages.ts; this is purely the form.
-export function ComposeMessageModal({ visible, onClose, onSent }: ComposeMessageModalProps) {
-  const { searchUsersForCompose, sendOfficialMessage } = useData();
+//
+// Drafts: closing with unsent content silently saves/updates a draft (no
+// explicit "Save Draft" button needed — matches "if Sarah begins writing a
+// message and leaves before sending, save it as a draft"). Opening with
+// initialDraft resumes that same draft row rather than creating a new one.
+export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: ComposeMessageModalProps) {
+  const { searchUsersForCompose, sendOfficialMessage, saveOfficialMailDraft, deleteOfficialMailDraft } = useData();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ComposeUserSearchResult[]>([]);
@@ -45,23 +51,45 @@ export function ComposeMessageModal({ visible, onClose, onSent }: ComposeMessage
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentOk, setSentOk] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const resetForm = useCallback(() => {
     setSentOk(false);
-    setSelectedUser(null);
+    setSelectedUser(
+      initialDraft?.targetUserId && initialDraft.targetUsername
+        ? { userId: initialDraft.targetUserId, username: initialDraft.targetUsername, fullName: null, photoUrl: null, email: null }
+        : null
+    );
     setQuery("");
     setResults([]);
-    setDepartment(null);
+    setDepartment(initialDraft?.department ?? null);
     setShowDeptPicker(false);
-    setSubject("");
-    setBody("");
+    setSubject(initialDraft?.subject ?? "");
+    setBody(initialDraft?.body ?? "");
     setSendError(null);
     setSending(false);
-  }, []);
+    setDraftId(initialDraft?.id ?? null);
+  }, [initialDraft]);
 
   // Fresh form every time the modal opens, so a previous send's state never
   // leaks into the next one.
   useEffect(() => { if (visible) resetForm(); }, [visible, resetForm]);
+
+  const handleClose = useCallback(async () => {
+    const hasContent = !!selectedUser || !!department || subject.trim() || body.trim();
+    if (!sentOk && hasContent) {
+      const result = await saveOfficialMailDraft({
+        draftId: draftId ?? undefined, targetUserId: selectedUser?.userId,
+        targetUsername: selectedUser?.username, department: department ?? undefined,
+        subject: subject.trim(), body: body.trim(),
+      });
+      if (result.draftId) setDraftId(result.draftId);
+    } else if (!sentOk && !hasContent && draftId) {
+      // Everything was cleared back out — don't leave a stale empty draft behind.
+      await deleteOfficialMailDraft(draftId);
+    }
+    onClose();
+  }, [sentOk, selectedUser, department, subject, body, draftId, saveOfficialMailDraft, deleteOfficialMailDraft, onClose]);
 
   useEffect(() => {
     if (query.trim().length < 2) { setResults([]); return; }
@@ -82,23 +110,25 @@ export function ComposeMessageModal({ visible, onClose, onSent }: ComposeMessage
     setSendError(null);
     const result = await sendOfficialMessage({
       targetUserId: selectedUser.userId, department, subject: subject.trim(), body: body.trim(),
+      draftId: draftId ?? undefined,
     });
     setSending(false);
     if (result.success) {
       setSentOk(true);
+      setDraftId(null);
       onSent();
     } else {
       setSendError(result.error ?? "Message could not be sent. Please try again.");
     }
-  }, [canSend, sending, selectedUser, department, subject, body, sendOfficialMessage, onSent]);
+  }, [canSend, sending, selectedUser, department, subject, body, draftId, sendOfficialMessage, onSent]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Compose</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.sheetTitle}>{draftId && !sentOk ? "Compose (Draft)" : "Compose"}</Text>
+            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textDark} />
             </TouchableOpacity>
           </View>

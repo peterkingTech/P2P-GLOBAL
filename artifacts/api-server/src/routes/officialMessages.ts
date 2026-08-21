@@ -144,8 +144,8 @@ async function findOrCreateOfficialConversation(officialAccountId: string, targe
 // impersonate another user" and always sends "from the official P2P Global
 // identity").
 router.post("/official-messages/send", async (req, res) => {
-  const { requesterId, targetUserId, department, subject, body } = req.body as {
-    requesterId?: string; targetUserId?: string; department?: string; subject?: string; body?: string;
+  const { requesterId, targetUserId, department, subject, body, draftId } = req.body as {
+    requesterId?: string; targetUserId?: string; department?: string; subject?: string; body?: string; draftId?: string;
   };
   if (!requesterId || !targetUserId || !department) {
     return err(res, "requesterId, targetUserId, and department are required", 400);
@@ -183,6 +183,12 @@ router.post("/official-messages/send", async (req, res) => {
     })
     .select("id, created_at").single();
   if (msgErr || !message) return err(res, msgErr?.message ?? "Failed to send message", 500);
+
+  // A message sent successfully from a draft retires that draft — best
+  // effort, a failure here shouldn't undo an already-sent message.
+  if (draftId) {
+    await db.from("p2p_official_mail_drafts").delete().eq("id", draftId).eq("admin_id", requesterId);
+  }
 
   await db.from("p2p_notifications").insert({
     user_id: targetUserId,
@@ -256,6 +262,74 @@ router.get("/official-messages/sent", async (req, res) => {
       isRead,
     };
   }));
+});
+
+// ── Drafts — private to the admin who wrote them (migration 080) ──────────
+
+// GET /official-messages/drafts?requesterId=
+router.get("/official-messages/drafts", async (req, res) => {
+  const { requesterId } = req.query as { requesterId?: string };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
+  if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
+
+  const { data, error } = await db
+    .from("p2p_official_mail_drafts")
+    .select("*")
+    .eq("admin_id", requesterId)
+    .order("updated_at", { ascending: false });
+  if (error) return err(res, error.message, 500);
+
+  return ok(res, (data ?? []).map((d) => ({
+    id: d.id, targetUserId: d.target_user_id ?? null, targetUsername: d.target_username_cache ?? null,
+    department: d.department ?? null, subject: d.subject ?? "", body: d.body ?? "",
+    createdAt: d.created_at, updatedAt: d.updated_at,
+  })));
+});
+
+// POST /official-messages/drafts — { requesterId, draftId?, targetUserId?, targetUsername?, department?, subject?, body? }
+// Upsert: omit draftId to create, include it to update (only that admin's
+// own draft — verified by the .eq("admin_id", ...) below rather than
+// trusting the draftId alone).
+router.post("/official-messages/drafts", async (req, res) => {
+  const { requesterId, draftId, targetUserId, targetUsername, department, subject, body } = req.body as {
+    requesterId?: string; draftId?: string; targetUserId?: string; targetUsername?: string;
+    department?: string; subject?: string; body?: string;
+  };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
+  if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
+
+  const payload = {
+    admin_id: requesterId, target_user_id: targetUserId ?? null, target_username_cache: targetUsername ?? null,
+    department: department ?? null, subject: subject ?? null, body: body ?? null, updated_at: new Date().toISOString(),
+  };
+
+  if (draftId) {
+    const { data, error } = await db
+      .from("p2p_official_mail_drafts").update(payload).eq("id", draftId).eq("admin_id", requesterId)
+      .select("id").maybeSingle();
+    if (error) return err(res, error.message, 500);
+    if (!data) return err(res, "Draft not found", 404);
+    return ok(res, { id: data.id });
+  }
+
+  const { data, error } = await db.from("p2p_official_mail_drafts").insert(payload).select("id").single();
+  if (error || !data) return err(res, error?.message ?? "Failed to save draft", 500);
+  return res.status(201).json({ id: data.id });
+});
+
+// DELETE /official-messages/drafts/:draftId — body { requesterId }
+router.delete("/official-messages/drafts/:draftId", async (req, res) => {
+  const { draftId } = req.params;
+  const { requesterId } = req.body as { requesterId?: string };
+  if (!requesterId) return err(res, "requesterId is required", 400);
+  const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
+  if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
+
+  const { error } = await db.from("p2p_official_mail_drafts").delete().eq("id", draftId).eq("admin_id", requesterId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { ok: true });
 });
 
 export default router;

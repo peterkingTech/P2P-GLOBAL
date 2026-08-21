@@ -137,7 +137,7 @@ function MarketingAdminDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <DashboardHeader role="admin_marketing" />
-      <QueueLinkCard label="Email Inbox" sub="Contact P2P Global messages, plus Compose" path="/admin/email-inbox" icon="mail" />
+      <QueueLinkCard label="P2P Official Mail" sub="Contact P2P Global messages, plus Compose" path="/admin/email-inbox" icon="mail" />
       <Text style={styles.sectionTitle}>Growth</Text>
       <StatsRow stats={[{ label: "New users this week", value: newThisWeek ?? "…" }]} />
       <Text style={styles.sectionTitle}>Announcements</Text>
@@ -396,7 +396,7 @@ export default function AdminHome() {
     case "admin_translation": return <RoleQueueDashboard role="admin_translation" queueLabel="Translations" queueSub="Coverage and pending translation work" queuePath="/admin/translations" queueIcon="language" />;
     case "admin_moderation": return <RoleQueueDashboard role="admin_moderation" queueLabel="Flags Queue" queueSub="Flagged content and users" queuePath="/admin/moderation" queueIcon="flag" />;
     case "admin_verification": return <RoleQueueDashboard role="admin_verification" queueLabel="Verification Queue" queueSub="Pending identity verifications" queuePath="/admin/verification" queueIcon="shield-checkmark" />;
-    case "admin_help": return <RoleQueueDashboard role="admin_help" queueLabel="Help Requests" queueSub="Crisis and struggling-tier cases" queuePath="/admin/help-requests" queueIcon="medkit" extraLinks={[{ label: "Email Inbox", sub: "Contact P2P Global messages, plus Compose", path: "/admin/email-inbox", icon: "mail" }]} />;
+    case "admin_help": return <RoleQueueDashboard role="admin_help" queueLabel="Help Requests" queueSub="Crisis and struggling-tier cases" queuePath="/admin/help-requests" queueIcon="medkit" extraLinks={[{ label: "P2P Official Mail", sub: "Contact P2P Global messages, plus Compose", path: "/admin/email-inbox", icon: "mail" }]} />;
     case "admin_username": return <RoleQueueDashboard role="admin_username" queueLabel="Usernames" queueSub="Reserved usernames and disputes" queuePath="/admin/usernames" queueIcon="at" />;
     case "admin_finance": return <FinanceAdminDashboard />;
     case "admin_marketing": return <MarketingAdminDashboard />;

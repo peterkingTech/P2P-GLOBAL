@@ -105,6 +105,7 @@ export default function AdminEmailMessageDetail() {
   const {
     getAdminContactMessage, replyToContactMessage, forwardContactMessage,
     closeContactMessage, setContactMessagePriority, setContactMessageStatus,
+    starContactMessage, archiveContactMessage,
   } = useData();
   const [detail, setDetail] = useState<ContactAdminMessageDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -186,6 +187,23 @@ export default function AdminEmailMessageDetail() {
     else router.back();
   }, [messageId, setContactMessageStatus, router]);
 
+  const handleToggleStar = useCallback(async () => {
+    if (!messageId || !detail) return;
+    const next = !detail.message.isStarredByMe;
+    setDetail({ ...detail, message: { ...detail.message, isStarredByMe: next } });
+    await starContactMessage(messageId, next);
+  }, [messageId, detail, starContactMessage]);
+
+  const handleToggleArchive = useCallback(async () => {
+    if (!messageId || !detail) return;
+    setBusy(true);
+    const next = !detail.message.isArchived;
+    const result = await archiveContactMessage(messageId, next);
+    setBusy(false);
+    if (result) Alert.alert("Failed to update. Please try again.");
+    else router.back();
+  }, [messageId, detail, archiveContactMessage, router]);
+
   if (loading) {
     return <View style={[styles.container, styles.centerFill]}><ActivityIndicator color={colors.primaryGreen} /></View>;
   }
@@ -206,7 +224,9 @@ export default function AdminEmailMessageDetail() {
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{message.subject}</Text>
-        <View style={{ width: 22 }} />
+        <TouchableOpacity onPress={handleToggleStar} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name={message.isStarredByMe ? "star" : "star-outline"} size={20} color={message.isStarredByMe ? colors.amber : colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
@@ -306,6 +326,10 @@ export default function AdminEmailMessageDetail() {
           <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={() => setShowForward(true)}>
             <Ionicons name="arrow-redo" size={16} color={colors.textDark} />
             <Text style={styles.actionBtnText}>Forward</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={handleToggleArchive}>
+            <Ionicons name={message.isArchived ? "arrow-undo-outline" : "archive-outline"} size={16} color={colors.textDark} />
+            <Text style={styles.actionBtnText}>{message.isArchived ? "Unarchive" : "Archive"}</Text>
           </TouchableOpacity>
           {message.status !== "closed" && (
             <TouchableOpacity style={[styles.actionBtn, styles.closeBtn]} disabled={busy} onPress={handleClose}>

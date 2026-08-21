@@ -94,6 +94,7 @@ function mapMessage(row: Record<string, unknown>) {
     forwardedFrom: row.forwarded_from ?? null, forwardedNote: row.forwarded_note ?? null,
     originalDepartment: row.original_department ?? null,
     feedbackRequested: row.feedback_requested ?? false, feedbackSubmitted: row.feedback_submitted ?? false,
+    isArchived: row.is_archived ?? false,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -203,12 +204,18 @@ router.get("/contact/my-messages/:messageId", async (req, res) => {
 
 // GET /contact/admin/inbox?requesterId=&status=&priority=&search=&includeAll=
 router.get("/contact/admin/inbox", async (req, res) => {
-  const { requesterId, status, priority, search } = req.query as { requesterId?: string; status?: string; priority?: string; search?: string };
+  const { requesterId, status, priority, search, archived } = req.query as {
+    requesterId?: string; status?: string; priority?: string; search?: string; archived?: string;
+  };
   if (!requesterId) return err(res, "requesterId is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
+  // Archived messages are hidden from the normal inbox views by default —
+  // same "declutter but never delete" behavior as email archiving. Pass
+  // archived=true (the Archived tab) to see only archived ones instead.
   let query = db.from("p2p_contact_messages").select("*").in("to_department", access.departments);
+  query = query.eq("is_archived", archived === "true");
   if (status) query = query.eq("status", status);
   if (priority) query = query.eq("priority", priority);
   const { data, error } = await query.order("priority", { ascending: false }).order("created_at", { ascending: true });
@@ -222,6 +229,12 @@ router.get("/contact/admin/inbox", async (req, res) => {
       )
     : [];
   const senderById = new Map(senders.map((s) => [s.id as string, s]));
+
+  const messageIds = rows.map((r) => r.id as string);
+  const { data: starRows } = messageIds.length
+    ? await db.from("p2p_contact_message_stars").select("message_id").eq("admin_id", requesterId).in("message_id", messageIds)
+    : { data: [] as { message_id: string }[] };
+  const starredSet = new Set((starRows ?? []).map((s) => s.message_id as string));
 
   if (search?.trim()) {
     const q = search.trim().toLowerCase();
@@ -247,6 +260,7 @@ router.get("/contact/admin/inbox", async (req, res) => {
       fromMinistryRole: sender?.ministry_role ?? null,
       fromTreeStage: stageKeyForPoints((sender?.growth_level as number) ?? 0),
       fromIsVerified: sender?.is_verified ?? false, fromAccountAgeDays: accountAgeDays,
+      isStarredByMe: starredSet.has(r.id as string),
     };
   }));
 });
@@ -267,11 +281,12 @@ router.get("/contact/admin/inbox/:messageId", async (req, res) => {
     message.status = "read";
   }
 
-  const [{ data: sender }, { data: replies }, { data: notes }, modulesCompletedTotal] = await Promise.all([
+  const [{ data: sender }, { data: replies }, { data: notes }, modulesCompletedTotal, { data: starRow }] = await Promise.all([
     db.from("p2p_profiles").select("id,username,full_name,photo_url,country,ministry_role,growth_level,is_verified,created_at").eq("id", message.from_user_id).maybeSingle(),
     db.from("p2p_contact_replies").select("*").eq("message_id", messageId).order("created_at", { ascending: true }),
     db.from("p2p_contact_notes").select("*").eq("message_id", messageId).order("created_at", { ascending: true }),
     getModulesCompletedForUser(message.from_user_id as string),
+    db.from("p2p_contact_message_stars").select("message_id").eq("message_id", messageId).eq("admin_id", requesterId).maybeSingle(),
   ]);
 
   const adminIds = [...new Set([...(replies ?? []).map((r) => r.from_admin_id as string), ...(notes ?? []).map((n) => n.admin_id as string)])];
@@ -288,6 +303,7 @@ router.get("/contact/admin/inbox/:messageId", async (req, res) => {
       fromMinistryRole: sender?.ministry_role ?? null,
       fromTreeStage: stageKeyForPoints((sender?.growth_level as number) ?? 0),
       fromIsVerified: sender?.is_verified ?? false, fromAccountAgeDays: accountAgeDays,
+      isStarredByMe: !!starRow,
       fromModulesCompleted: modulesCompletedTotal,
     },
     replies: (replies ?? []).map((r) => mapReply(r as Record<string, unknown>, adminUsernameById.get(r.from_admin_id as string))),
@@ -455,6 +471,47 @@ router.put("/contact/admin/status/:messageId", async (req, res) => {
 
   const { error } = await db.from("p2p_contact_messages").update({ status, updated_at: new Date().toISOString() }).eq("id", messageId);
   if (error) return err(res, error.message, 500);
+  return ok(res, { ok: true });
+});
+
+// PUT /contact/admin/archive/:messageId — { requesterId, archived }. Shared
+// across the department (same as status/priority/forward) — declutters the
+// default inbox view without deleting anything or touching status/feedback.
+router.put("/contact/admin/archive/:messageId", async (req, res) => {
+  const { messageId } = req.params;
+  const { requesterId, archived } = req.body as { requesterId?: string; archived?: boolean };
+  if (!requesterId || typeof archived !== "boolean") return err(res, "requesterId and archived (boolean) are required", 400);
+  const access = await getAdminAccess(requesterId);
+  if (!access) return err(res, "Admin access required", 403);
+
+  const { data: message } = await db.from("p2p_contact_messages").select("id,to_department").eq("id", messageId).maybeSingle();
+  if (!message || !access.departments.includes(message.to_department as Department)) return err(res, "Message not found", 404);
+
+  const { error } = await db.from("p2p_contact_messages").update({ is_archived: archived, updated_at: new Date().toISOString() }).eq("id", messageId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { ok: true });
+});
+
+// POST /contact/admin/star/:messageId — { requesterId, starred }. PER-ADMIN
+// bookmark (upsert/delete a row in the join table), unlike every other
+// contact.ts mutation — starring is personal, not a shared department state.
+router.post("/contact/admin/star/:messageId", async (req, res) => {
+  const { messageId } = req.params;
+  const { requesterId, starred } = req.body as { requesterId?: string; starred?: boolean };
+  if (!requesterId || typeof starred !== "boolean") return err(res, "requesterId and starred (boolean) are required", 400);
+  const access = await getAdminAccess(requesterId);
+  if (!access) return err(res, "Admin access required", 403);
+
+  const { data: message } = await db.from("p2p_contact_messages").select("id,to_department").eq("id", messageId).maybeSingle();
+  if (!message || !access.departments.includes(message.to_department as Department)) return err(res, "Message not found", 404);
+
+  if (starred) {
+    const { error } = await db.from("p2p_contact_message_stars").upsert({ message_id: messageId, admin_id: requesterId }, { onConflict: "message_id,admin_id" });
+    if (error) return err(res, error.message, 500);
+  } else {
+    const { error } = await db.from("p2p_contact_message_stars").delete().eq("message_id", messageId).eq("admin_id", requesterId);
+    if (error) return err(res, error.message, 500);
+  }
   return ok(res, { ok: true });
 });
 
