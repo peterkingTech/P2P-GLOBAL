@@ -292,16 +292,33 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     scroll: { paddingBottom: 100 },
 
-    topBarRow: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8 },
-    topBarMenuBtn: { padding: 4 },
+    topBarRow: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2 },
+    topBarMenuBtn: {
+      flexDirection: "row", alignItems: "center", gap: 6,
+      backgroundColor: "rgba(29,158,117,0.1)", borderWidth: 1, borderColor: "rgba(29,158,117,0.3)",
+      borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
+    },
+    topBarMenuBtnActive: { backgroundColor: "rgba(29,158,117,0.18)", borderColor: c.accentGreen },
+    topBarMenuBtnText: { fontSize: 12, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     dropdownOverlay: { flex: 1 },
     dropdownCard: {
-      position: "absolute", right: 16, backgroundColor: c.card, borderRadius: 12,
-      borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 6, minWidth: 160,
-      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4,
+      position: "absolute", right: 16, backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 4, minWidth: 220,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 12, elevation: 6,
     },
-    dropdownRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-    dropdownRowText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
+    dropdownCaret: {
+      position: "absolute", top: -7, right: 22, width: 14, height: 14,
+      backgroundColor: c.card, borderTopWidth: 1, borderLeftWidth: 1, borderColor: c.borderBeige,
+      transform: [{ rotate: "45deg" }],
+    },
+    dropdownRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+    dropdownRowIconWrap: {
+      width: 32, height: 32, borderRadius: 9, backgroundColor: "rgba(29,158,117,0.1)",
+      alignItems: "center", justifyContent: "center",
+    },
+    dropdownRowText: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    dropdownRowSubText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
+    dropdownDivider: { height: 1, backgroundColor: c.borderBeige, marginHorizontal: 14 },
 
     sectionBlock: { paddingHorizontal: 20, paddingTop: 24 },
     sectionHeaderRow: { marginBottom: 4 },
@@ -442,27 +459,50 @@ export default function LearnTab() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" } : { flex: 1 }}>
         <View style={styles.topBarRow}>
-          <TouchableOpacity style={styles.topBarMenuBtn} onPress={() => setSchoolMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.textDark} />
+          <TouchableOpacity
+            style={[styles.topBarMenuBtn, schoolMenuOpen && styles.topBarMenuBtnActive]}
+            onPress={() => setSchoolMenuOpen(true)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="bookmark" size={15} color={colors.accentGreen} />
+            <Text style={styles.topBarMenuBtnText}>Notes & Highlights</Text>
+            <Ionicons name="chevron-down" size={14} color={colors.accentGreen} />
           </TouchableOpacity>
         </View>
 
         <Modal visible={schoolMenuOpen} transparent animationType="fade" onRequestClose={() => setSchoolMenuOpen(false)}>
           <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setSchoolMenuOpen(false)}>
-            <View style={[styles.dropdownCard, { top: topPad + 44 }]}>
+            <View style={[styles.dropdownCard, { top: topPad + 46 }]}>
+              <View style={styles.dropdownCaret} />
               <TouchableOpacity
                 style={styles.dropdownRow}
                 onPress={() => { setSchoolMenuOpen(false); router.push("/notes" as any); }}
+                activeOpacity={0.7}
               >
-                <Ionicons name="document-text-outline" size={17} color={colors.textDark} />
-                <Text style={styles.dropdownRowText}>Notes</Text>
+                <View style={styles.dropdownRowIconWrap}>
+                  <Ionicons name="document-text-outline" size={17} color={colors.accentGreen} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dropdownRowText}>Notes</Text>
+                  <Text style={styles.dropdownRowSubText}>Your written notes</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
               </TouchableOpacity>
+              <View style={styles.dropdownDivider} />
               <TouchableOpacity
                 style={styles.dropdownRow}
                 onPress={() => { setSchoolMenuOpen(false); router.push("/highlights" as any); }}
+                activeOpacity={0.7}
               >
-                <Ionicons name="bookmark-outline" size={17} color={colors.textDark} />
-                <Text style={styles.dropdownRowText}>Highlights</Text>
+                <View style={styles.dropdownRowIconWrap}>
+                  <Ionicons name="bookmark-outline" size={17} color={colors.accentGreen} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dropdownRowText}>Highlights</Text>
+                  <Text style={styles.dropdownRowSubText}>Saved passages & quotes</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
