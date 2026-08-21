@@ -106,21 +106,26 @@ router.get("/official-messages/search-users", async (req, res) => {
   })));
 });
 
-async function findOrCreateOfficialConversation(officialAccountId: string, targetUserId: string): Promise<string> {
-  // Same dedupe rule as p2p_start_direct_conversation, replicated here
-  // rather than calling that RPC — it reads auth.uid() from a real
-  // session, and this route (like every other route in this codebase) has
-  // no per-request Supabase session, only a caller-supplied requesterId.
+// Same dedupe rule as p2p_start_direct_conversation, replicated here rather
+// than calling that RPC — it reads auth.uid() from a real session, and this
+// route (like every other route in this codebase) has no per-request
+// Supabase session, only a caller-supplied requesterId. Read-only: used both
+// by the create path below and by the thread-lookup endpoint (which must
+// never create a conversation just because an admin opened a read view).
+async function findOfficialConversation(officialAccountId: string, targetUserId: string): Promise<string | null> {
   const { data: existingMemberRows } = await db
     .from("p2p_conversation_members").select("conversation_id").eq("user_id", officialAccountId);
   const officialConvIds = (existingMemberRows ?? []).map((r) => r.conversation_id as string);
-  if (officialConvIds.length) {
-    const { data: targetMemberRows } = await db
-      .from("p2p_conversation_members").select("conversation_id")
-      .eq("user_id", targetUserId).in("conversation_id", officialConvIds);
-    const existing = targetMemberRows?.[0]?.conversation_id as string | undefined;
-    if (existing) return existing;
-  }
+  if (!officialConvIds.length) return null;
+  const { data: targetMemberRows } = await db
+    .from("p2p_conversation_members").select("conversation_id")
+    .eq("user_id", targetUserId).in("conversation_id", officialConvIds);
+  return (targetMemberRows?.[0]?.conversation_id as string | undefined) ?? null;
+}
+
+async function findOrCreateOfficialConversation(officialAccountId: string, targetUserId: string): Promise<string> {
+  const existing = await findOfficialConversation(officialAccountId, targetUserId);
+  if (existing) return existing;
 
   // conversation_type = 'support' (an already-defined, previously-unused
   // CHECK value) distinguishes this from plain peer 'direct' DMs without
@@ -199,6 +204,62 @@ router.post("/official-messages/send", async (req, res) => {
   });
 
   return res.status(201).json({ conversationId, messageId: message.id, sentAt: message.created_at });
+});
+
+// GET /official-messages/thread-with-user?requesterId=&targetUserId=&officialType=
+// Read-only lookup backing the Help Requests "Mail" screen (and reusable for
+// any admin surface that needs to read/reply to an existing official-account
+// thread with a specific peer). Admins are never members of these
+// conversations (only the synthetic official account + the peer are), so
+// there's no other way for an admin to read one — never creates a
+// conversation, unlike /official-messages/send.
+router.get("/official-messages/thread-with-user", async (req, res) => {
+  const { requesterId, targetUserId, officialType } = req.query as {
+    requesterId?: string; targetUserId?: string; officialType?: string;
+  };
+  if (!requesterId || !targetUserId || !officialType) {
+    return err(res, "requesterId, targetUserId, and officialType are required", 400);
+  }
+  if (!OFFICIAL_TYPES.includes(officialType as OfficialType)) return err(res, "Invalid officialType", 400);
+  const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
+  if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
+
+  const { data: officialAccount } = await db
+    .from("p2p_profiles").select("id")
+    .eq("is_official_account", true).eq("official_account_type", officialType).maybeSingle();
+  if (!officialAccount) return err(res, "Official account not configured", 500);
+
+  const conversationId = await findOfficialConversation(officialAccount.id as string, targetUserId);
+  if (!conversationId) return ok(res, { conversationId: null, subject: null, department: null, messages: [] });
+
+  const { data: rows, error } = await db
+    .from("p2p_messages")
+    .select("id, sender_id, body, created_at, subject, department, sent_by_admin_id")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+  if (error) return err(res, error.message, 500);
+
+  const adminIds = Array.from(new Set((rows ?? []).map((r) => r.sent_by_admin_id as string).filter(Boolean)));
+  const { data: adminProfiles } = adminIds.length
+    ? await db.from("p2p_profiles").select("id, username").in("id", adminIds)
+    : { data: [] as { id: string; username: string }[] };
+  const adminUsernameById = new Map((adminProfiles ?? []).map((a) => [a.id as string, a.username as string]));
+
+  const subjectRow = (rows ?? []).find((r) => r.subject);
+  const departmentRow = (rows ?? []).find((r) => r.department);
+
+  return ok(res, {
+    conversationId,
+    subject: subjectRow?.subject ?? null,
+    department: departmentRow?.department ?? null,
+    messages: (rows ?? []).map((r) => ({
+      id: r.id,
+      isFromOfficial: r.sender_id === officialAccount.id,
+      body: r.body,
+      createdAt: r.created_at,
+      sentByAdminUsername: r.sent_by_admin_id ? (adminUsernameById.get(r.sent_by_admin_id as string) ?? null) : null,
+    })),
+  });
 });
 
 // GET /official-messages/sent?requesterId= — every Compose message any

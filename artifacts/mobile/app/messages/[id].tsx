@@ -472,7 +472,7 @@ export default function ChatScreen() {
             {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
             {isDirect && otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
           </View>
-          {isDirect && otherUserId && (
+          {isDirect && otherUserId && !otherUserOfficialType && (
             <View style={styles.headerCallBtns}>
               <TouchableOpacity onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
                 {callingType === "audio" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="call-outline" size={20} color={colors.accentGreen} />}

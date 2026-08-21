@@ -533,6 +533,13 @@ export interface SentOfficialMessage {
 export interface ComposeUserSearchResult {
   userId: string; username: string; fullName: string | null; photoUrl: string | null; email: string | null;
 }
+export interface OfficialMailThreadMessage {
+  id: string; isFromOfficial: boolean; body: string; createdAt: string; sentByAdminUsername: string | null;
+}
+export interface OfficialMailThread {
+  conversationId: string | null; subject: string | null; department: ComposeDepartment | null;
+  messages: OfficialMailThreadMessage[];
+}
 
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
 export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
@@ -1267,6 +1274,7 @@ interface DataContextValue {
   getOfficialMailDrafts: () => Promise<OfficialMailDraft[]>;
   saveOfficialMailDraft: (data: OfficialMailDraftSaveData) => Promise<OfficialMailDraftSaveResult>;
   deleteOfficialMailDraft: (draftId: string) => Promise<string | null>;
+  getOfficialMailThreadWithUser: (targetUserId: string, officialType: OfficialAccountType) => Promise<OfficialMailThread>;
 }
 
 // Optimistic local mirror of a p2p_conversation_settings upsert, so the inbox
@@ -4894,6 +4902,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
+  const getOfficialMailThreadWithUser = useCallback(async (targetUserId: string, officialType: OfficialAccountType): Promise<OfficialMailThread> => {
+    const empty: OfficialMailThread = { conversationId: null, subject: null, department: null, messages: [] };
+    if (!profile?.id) return empty;
+    try {
+      const params = new URLSearchParams({ requesterId: profile.id, targetUserId, officialType });
+      const res = await fetch(`${getApiUrl()}/official-messages/thread-with-user?${params.toString()}`);
+      if (!res.ok) return empty;
+      return await res.json();
+    } catch (e) {
+      console.error("getOfficialMailThreadWithUser failed", e);
+      return empty;
+    }
+  }, [profile?.id]);
+
   const featuredPlans = plans.filter((p) => p.isFeatured);
 
   const refreshTreeData = useCallback(async () => {
@@ -4951,7 +4973,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       replyToContactMessage, forwardContactMessage, closeContactMessage, setContactMessagePriority,
       setContactMessageStatus, archiveContactMessage, starContactMessage, getContactAdminStats, getContactAllDepartmentStats,
       getOfficialMessageAllowedTypes, sendOfficialMessage, getSentOfficialMessages, searchUsersForCompose,
-      getOfficialMailDrafts, saveOfficialMailDraft, deleteOfficialMailDraft,
+      getOfficialMailDrafts, saveOfficialMailDraft, deleteOfficialMailDraft, getOfficialMailThreadWithUser,
     }}>
       {children}
     </DataContext.Provider>

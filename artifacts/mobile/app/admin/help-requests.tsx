@@ -37,7 +37,6 @@ export default function HelpRequestsScreen() {
   const router = useRouter();
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [messaging, setMessaging] = useState<string | null>(null);
   const [calling, setCalling] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<HelpRequestTier | "all">("all");
   const [statusFilter, setStatusFilter] = useState<HelpRequestStatus | "all">("all");
@@ -58,27 +57,20 @@ export default function HelpRequestsScreen() {
     }
   }
 
-  async function handleMessageThem(req: HelpRequest) {
+  // Opens the P2P Official Mail thread for this help request instead of a
+  // personal DM — pure navigation, no network call here. The mail screen
+  // owns loading any existing thread and sending (see
+  // app/admin/help-mail/[helpRequestId].tsx), including linking the
+  // conversation to this help request on first send.
+  function handleMessageThem(req: HelpRequest) {
     if (!req.userId) {
       Alert.alert("Account removed", "This user's account no longer exists and cannot be messaged.");
       return;
     }
-    setMessaging(req.id);
-    try {
-      const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
-      if (error || !data) {
-        console.error("p2p_start_direct_conversation failed", error);
-        Alert.alert("Couldn't start conversation", error?.message ?? "Please try again.");
-        return;
-      }
-      await linkConversationToHelpRequest(req.id, data as string);
-      router.push(`/messages/${data}` as any);
-    } catch (e: any) {
-      console.error("handleMessageThem threw", e);
-      Alert.alert("Couldn't start conversation", e?.message ?? "A network error occurred. Please try again.");
-    } finally {
-      setMessaging(null);
-    }
+    router.push({
+      pathname: "/admin/help-mail/[helpRequestId]",
+      params: { helpRequestId: req.id, targetUserId: req.userId, targetUserName: req.userName, tier: req.tier },
+    } as any);
   }
 
   async function handleCallThem(req: HelpRequest) {
@@ -167,11 +159,16 @@ export default function HelpRequestsScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ actionType: "case_resolved", targetUserId: req.userId, targetResourceId: req.id, targetResourceType: "help_request" }),
         });
-        const { data: conv } = await supabase
+        // Mail and Call are now two separate conversations, both of which
+        // can be linked to the same help request — .maybeSingle() would
+        // throw once both exist, so take the most recent instead.
+        const { data: convs } = await supabase
           .from("p2p_conversations")
           .select("id")
           .eq("help_request_id", req.id)
-          .maybeSingle();
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const conv = convs?.[0];
         if (conv?.id) {
           await fetch(`${getApiUrl()}/feedback/request`, {
             method: "POST",
@@ -241,21 +238,15 @@ export default function HelpRequestsScreen() {
                 <TouchableOpacity
                   style={[styles.messageBtn, styles.actionBtnHalf]}
                   onPress={() => handleMessageThem(item)}
-                  disabled={messaging === item.id || calling === item.id}
+                  disabled={calling === item.id}
                 >
-                  {messaging === item.id ? (
-                    <ActivityIndicator size="small" color={colors.accentGreen} />
-                  ) : (
-                    <>
-                      <Ionicons name="chatbubble-outline" size={14} color={colors.accentGreen} />
-                      <Text style={styles.messageBtnText}>Message them</Text>
-                    </>
-                  )}
+                  <Ionicons name="mail-outline" size={14} color={colors.accentGreen} />
+                  <Text style={styles.messageBtnText}>Mail</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.callBtn, styles.actionBtnHalf]}
                   onPress={() => handleCallThem(item)}
-                  disabled={messaging === item.id || calling === item.id}
+                  disabled={calling === item.id}
                 >
                   {calling === item.id ? (
                     <ActivityIndicator size="small" color="#fff" />
