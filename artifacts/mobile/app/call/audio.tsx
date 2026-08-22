@@ -34,6 +34,7 @@ export default function AudioCallScreen() {
   const params = useLocalSearchParams<{
     channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
+    autoStudyLessonId?: string; autoStudyModuleId?: string; autoStudyLessonTitle?: string;
   }>();
   const isInitiator = params.isInitiator === "true";
   const callType = (params.callType as CallType) || "audio";
@@ -53,6 +54,8 @@ export default function AudioCallScreen() {
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
   const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
   const study = useStudySession(params.channelName, params.otherUserId);
+  const [autoStudyDismissed, setAutoStudyDismissed] = useState(false);
+  const hasAutoStudy = !!(params.autoStudyLessonId && params.autoStudyModuleId);
 
   useEffect(() => {
     if (study.isActive) setMode("study");
@@ -61,6 +64,11 @@ export default function AudioCallScreen() {
   function handleChooseLesson(lesson: StudyLessonMeta) {
     setChooseLessonOpen(false);
     study.startStudy(lesson);
+  }
+
+  function handleStartAutoStudy() {
+    if (!params.autoStudyLessonId || !params.autoStudyModuleId) return;
+    study.startStudy({ id: params.autoStudyLessonId, moduleId: params.autoStudyModuleId, title: params.autoStudyLessonTitle ?? "" });
   }
   const connectedAtRef = useRef<number | null>(null);
 
@@ -232,7 +240,21 @@ export default function AudioCallScreen() {
           <Text style={styles.statusText}>Call ended</Text>
         )}
 
-        {callState === "connected" && (
+        {callState === "connected" && hasAutoStudy && !autoStudyDismissed && (
+          <View style={styles.autoStudyCard}>
+            <Text style={styles.autoStudyText}>Continue {params.autoStudyLessonTitle || "their current lesson"}?</Text>
+            <View style={styles.autoStudyRow}>
+              <TouchableOpacity style={styles.autoStudyDismiss} onPress={() => setAutoStudyDismissed(true)}>
+                <Text style={styles.autoStudyDismissText}>Not now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.autoStudyStartBtn} onPress={handleStartAutoStudy}>
+                <Text style={styles.autoStudyStartText}>Start Study</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {callState === "connected" && (!hasAutoStudy || autoStudyDismissed) && (
           <TouchableOpacity style={styles.studyBtn} onPress={() => setChooseLessonOpen(true)}>
             <Text style={styles.studyBtnEmoji}>📖</Text>
             <Text style={styles.studyBtnText}>Study Together</Text>
@@ -299,4 +321,14 @@ const styles = StyleSheet.create({
   studyMiniAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
   studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+  autoStudyCard: {
+    marginTop: 26, backgroundColor: "#141F19", borderWidth: 1, borderColor: "#1D9E75",
+    borderRadius: 14, padding: 14, gap: 10, width: "88%",
+  },
+  autoStudyText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
+  autoStudyRow: { flexDirection: "row", gap: 8 },
+  autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  autoStudyDismissText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1D9E75" },
+  autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

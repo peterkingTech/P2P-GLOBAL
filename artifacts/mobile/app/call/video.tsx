@@ -85,6 +85,7 @@ export default function VideoCallScreen() {
     channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
     sessionId?: string; lessonId?: string;
+    autoStudyLessonId?: string; autoStudyModuleId?: string; autoStudyLessonTitle?: string;
   }>();
   const isInitiator = params.isInitiator === "true";
   const markedInProgressRef = useRef(false);
@@ -125,6 +126,8 @@ export default function VideoCallScreen() {
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
   const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
   const study = useStudySession(params.channelName, params.otherUserId);
+  const [autoStudyDismissed, setAutoStudyDismissed] = useState(false);
+  const hasAutoStudy = !!(params.autoStudyLessonId && params.autoStudyModuleId);
 
   useEffect(() => {
     if (study.isActive) setMode("study");
@@ -133,6 +136,11 @@ export default function VideoCallScreen() {
   function handleChooseLesson(lessonMeta: StudyLessonMeta) {
     setChooseLessonOpen(false);
     study.startStudy(lessonMeta);
+  }
+
+  function handleStartAutoStudy() {
+    if (!params.autoStudyLessonId || !params.autoStudyModuleId) return;
+    study.startStudy({ id: params.autoStudyLessonId, moduleId: params.autoStudyModuleId, title: params.autoStudyLessonTitle ?? "" });
   }
 
   useEffect(() => {
@@ -357,6 +365,20 @@ export default function VideoCallScreen() {
           {callState === "connected" && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
         </View>
 
+        {callState === "connected" && hasAutoStudy && !autoStudyDismissed && (
+          <View style={styles.autoStudyCard}>
+            <Text style={styles.autoStudyText}>Continue {params.autoStudyLessonTitle || "their current lesson"}?</Text>
+            <View style={styles.autoStudyRow}>
+              <TouchableOpacity style={styles.autoStudyDismiss} onPress={() => setAutoStudyDismissed(true)}>
+                <Text style={styles.autoStudyDismissText}>Not now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.autoStudyStartBtn} onPress={handleStartAutoStudy}>
+                <Text style={styles.autoStudyStartText}>Start Study</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.controlsRow}>
           <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
             <Ionicons name={muted ? "mic-off" : "mic"} size={20} color="#fff" />
@@ -457,6 +479,16 @@ const styles = StyleSheet.create({
   },
   studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
   studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+  autoStudyCard: {
+    backgroundColor: "rgba(20,31,25,0.92)", borderWidth: 1, borderColor: "#1D9E75",
+    borderRadius: 14, padding: 12, gap: 10, marginBottom: 14,
+  },
+  autoStudyText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
+  autoStudyRow: { flexDirection: "row", gap: 8 },
+  autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  autoStudyDismissText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: "#1D9E75" },
+  autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 },

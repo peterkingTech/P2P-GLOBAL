@@ -179,7 +179,12 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
   return (
     <View style={{ gap: 10 }}>
       {disciples.map((d) => (
-        <View key={d.discipleId} style={s.relationshipCard}>
+        <TouchableOpacity
+          key={d.discipleId}
+          style={s.relationshipCard}
+          activeOpacity={0.85}
+          onPress={() => router.push(`/my-discipleship/disciple/${d.discipleId}` as any)}
+        >
           <View style={s.relationshipHeaderRow}>
             {d.disciplePhotoUrl ? (
               <Image source={{ uri: d.disciplePhotoUrl }} style={s.relationshipAvatar} />
@@ -215,7 +220,7 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );

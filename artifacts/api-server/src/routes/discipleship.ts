@@ -129,6 +129,174 @@ router.get("/:userId/disciples", async (req, res) => {
   }));
 });
 
+// GET /discipleship/:mentorId/disciple/:discipleId — Disciple Detail's single
+// data source (My Discipleship Phase 1). Authorization happens here, not on
+// the client: requires an ACTIVE p2p_discipleship_links row naming this exact
+// mentor/disciple pair before anything runs — the URL/ids are never trusted
+// directly, unlike every read-only GET elsewhere in this file.
+router.get("/:mentorId/disciple/:discipleId", async (req, res) => {
+  const { mentorId, discipleId } = req.params;
+
+  const { data: link } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("created_at, status")
+    .eq("mentor_id", mentorId).eq("disciple_id", discipleId).eq("active", true)
+    .maybeSingle();
+  if (!link) return res.status(403).json({ error: "No active discipleship relationship with this user" });
+
+  const { data: profile } = await supabaseWrite
+    .from("p2p_profiles")
+    .select("full_name, username, photo_url, country, last_active_at")
+    .eq("id", discipleId).maybeSingle();
+  const p = (profile ?? {}) as Record<string, unknown>;
+  const discipleName = (p.full_name as string) ?? "A disciple";
+
+  // ── Progress: the same current-module/current-lesson derivation
+  // progress.tsx/ChooseLessonSheet use client-side for the logged-in user,
+  // done here server-side for a DIFFERENT user — a mentor's client can't read
+  // another user's p2p_lesson_progress rows directly (RLS is self-only), same
+  // reasoning as Study Together's /calls/study-progress endpoint.
+  const { data: activeCurriculumId } = await supabaseWrite.rpc("p2p_active_curriculum_id");
+  let modules: { id: string; title: string }[] = [];
+  if (activeCurriculumId) {
+    const { data: mods } = await supabaseWrite
+      .from("p2p_modules").select("id, title").eq("curriculum_id", activeCurriculumId as string).order("order_index", { ascending: true });
+    modules = (mods ?? []) as { id: string; title: string }[];
+  }
+  const totalModules = modules.length;
+
+  let currentModuleIndex = -1;
+  for (let i = 0; i < modules.length; i++) {
+    const { data: done } = await supabaseWrite.rpc("p2p_module_fully_completed", { p_user_id: discipleId, p_module_id: modules[i].id });
+    if (!done) { currentModuleIndex = i; break; }
+  }
+  const isFoundationComplete = totalModules > 0 && currentModuleIndex === -1;
+  const currentModule = currentModuleIndex >= 0 ? modules[currentModuleIndex] : null;
+
+  let currentLessonId: string | null = null;
+  let currentLessonTitle: string | null = null;
+  let percentComplete: number | null = null;
+
+  if (currentModule) {
+    const { data: lessonsInModule } = await supabaseWrite
+      .from("p2p_lessons").select("id, title").eq("module_id", currentModule.id).order("order_index", { ascending: true });
+    const lessons = (lessonsInModule ?? []) as { id: string; title: string }[];
+    if (lessons.length) {
+      const { data: progressRows } = await supabaseWrite
+        .from("p2p_lesson_progress").select("lesson_id, completed").eq("user_id", discipleId).in("lesson_id", lessons.map((l) => l.id));
+      const completedSet = new Set((progressRows ?? []).filter((r) => r.completed).map((r) => r.lesson_id as string));
+      const firstIncomplete = lessons.find((l) => !completedSet.has(l.id));
+      currentLessonId = firstIncomplete?.id ?? null;
+      currentLessonTitle = firstIncomplete?.title ?? null;
+      percentComplete = Math.round((completedSet.size / lessons.length) * 100);
+    }
+  }
+  if (isFoundationComplete) percentComplete = 100;
+
+  const { count: progressRowCount } = await supabaseWrite
+    .from("p2p_lesson_progress").select("id", { count: "exact", head: true }).eq("user_id", discipleId);
+  const hasStarted = (progressRowCount ?? 0) > 0;
+
+  const lastActiveAt = (p.last_active_at as string) ?? null;
+  const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const isWilting = !!lastActiveAt && new Date(lastActiveAt).getTime() < fourteenDaysAgo;
+
+  // ── Recent activity: real lesson completions + real sessions only — no
+  // submission content, notes, or evaluation detail ever included. No FK
+  // relationship is registered between p2p_lesson_progress and p2p_lessons
+  // in PostgREST's schema cache (confirmed live — the embed-join syntax
+  // 400s), so lesson titles are resolved via a separate lookup, same pattern
+  // this file already uses for profile lookups. ──
+  const { data: completedLessonRows } = await supabaseWrite
+    .from("p2p_lesson_progress")
+    .select("lesson_id, updated_at")
+    .eq("user_id", discipleId).eq("completed", true)
+    .order("updated_at", { ascending: false }).limit(8);
+  const completedLessonIds = (completedLessonRows ?? []).map((r) => r.lesson_id as string);
+  let lessonTitleById = new Map<string, string>();
+  if (completedLessonIds.length) {
+    const { data: lessonTitles } = await supabaseWrite.from("p2p_lessons").select("id, title").in("id", completedLessonIds);
+    lessonTitleById = new Map((lessonTitles ?? []).map((l) => [l.id as string, l.title as string]));
+  }
+  const completedLessons = (completedLessonRows ?? []).map((r) => ({
+    lesson_id: r.lesson_id, updated_at: r.updated_at, p2p_lessons: { title: lessonTitleById.get(r.lesson_id as string) ?? null },
+  }));
+
+  const { data: sessionRows } = await supabaseWrite
+    .from("p2p_sessions")
+    .select("id, title, session_type, started_at, ended_at, status, created_at")
+    .or(`and(mentor_id.eq.${mentorId},participant_id.eq.${discipleId}),and(mentor_id.eq.${discipleId},participant_id.eq.${mentorId})`)
+    .order("created_at", { ascending: false }).limit(10);
+
+  const activity: { type: string; label: string; at: string }[] = [];
+  for (const row of (completedLessons ?? []) as Record<string, unknown>[]) {
+    const lessonTitle = ((row.p2p_lessons as Record<string, unknown> | null)?.title as string) ?? "a lesson";
+    activity.push({ type: "lesson_completed", label: `Completed ${lessonTitle}`, at: row.updated_at as string });
+  }
+  for (const row of (sessionRows ?? []) as Record<string, unknown>[]) {
+    if (row.status !== "completed") continue;
+    const started = row.started_at as string | null;
+    const ended = row.ended_at as string | null;
+    const minutes = started && ended ? Math.round((new Date(ended).getTime() - new Date(started).getTime()) / 60000) : null;
+    const label = row.session_type === "study_together"
+      ? `Studied ${(row.title as string) ?? "a lesson"} together${minutes !== null ? ` - ${minutes} min` : ""}`
+      : `Had a discipleship session${minutes !== null ? ` - ${minutes} min` : ""}`;
+    activity.push({ type: "session", label, at: (ended ?? (row.created_at as string)) as string });
+  }
+  activity.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  const recentSessions = ((sessionRows ?? []) as Record<string, unknown>[])
+    .filter((r) => r.status === "completed")
+    .map((r) => {
+      const started = r.started_at as string | null;
+      const ended = r.ended_at as string | null;
+      const durationMinutes = started && ended ? Math.round((new Date(ended).getTime() - new Date(started).getTime()) / 60000) : null;
+      return { id: r.id, title: (r.title as string) ?? "Discipleship Session", sessionType: r.session_type, startedAt: started, durationMinutes };
+    });
+
+  // ── Next step, deterministic. A 2-day recency window governs "recently
+  // completed" — read as a strict priority order, that tier would never be
+  // reachable, since "has a current lesson" is true whenever the curriculum
+  // isn't 100% done. ──
+  const mostRecentCompletion = activity.find((a) => a.type === "lesson_completed");
+  const recentlyCompleted = !!mostRecentCompletion && (Date.now() - new Date(mostRecentCompletion.at).getTime()) < 2 * 24 * 60 * 60 * 1000;
+
+  let nextStep: { message: string; action: "view_completion_letters" | "encourage" | "study_together" | "message" | "none" };
+  if (isFoundationComplete) {
+    nextStep = { message: `${discipleName} has completed the Foundation.`, action: "view_completion_letters" };
+  } else if (recentlyCompleted) {
+    nextStep = { message: `${discipleName} ${mostRecentCompletion!.label.toLowerCase()}.`, action: "encourage" };
+  } else if (!hasStarted) {
+    nextStep = { message: `Help ${discipleName} get started with Kingdom School.`, action: "study_together" };
+  } else if (currentModule) {
+    nextStep = { message: `${discipleName} is currently working through ${currentModule.title}.`, action: "study_together" };
+  } else if (isWilting) {
+    nextStep = { message: `${discipleName} hasn't been active in Kingdom School recently.`, action: "message" };
+  } else {
+    nextStep = { message: "No action needed right now.", action: "none" };
+  }
+
+  return res.json({
+    disciple: {
+      id: discipleId, name: discipleName, username: (p.username as string) ?? null,
+      photoUrl: (p.photo_url as string) ?? null, country: (p.country as string) ?? null,
+    },
+    relationship: { since: link.created_at, status: link.status ?? "active" },
+    progress: {
+      hasStarted,
+      currentModuleId: currentModule?.id ?? null,
+      currentModuleTitle: currentModule?.title ?? null,
+      currentModuleNumber: currentModuleIndex >= 0 ? currentModuleIndex + 1 : (isFoundationComplete ? totalModules : null),
+      totalModules: totalModules || null,
+      currentLessonId, currentLessonTitle, percentComplete,
+      isFoundationComplete, lastActiveAt, isWilting,
+    },
+    recentActivity: activity.slice(0, 8),
+    recentSessions,
+    nextStep,
+  });
+});
+
 // POST /discipleship
 router.post("/", async (req, res) => {
   const { mentorId, discipleId } = req.body as {
