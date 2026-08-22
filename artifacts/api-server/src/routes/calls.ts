@@ -248,6 +248,34 @@ router.post("/calls/sessions/:sessionId/reflection", async (req, res) => {
   return ok(res, { saved: true });
 });
 
+// GET /calls/study-progress?requesterId=&otherUserId=&lessonId= — Study
+// Together's individual-progress display. p2p_lesson_progress RLS is
+// self-only, so a participant's client can't read the other party's row
+// directly; this exposes only {status, completed} for the one lesson both
+// parties are already, mutually, studying together — never raw answers,
+// notes, or evaluations.
+router.get("/calls/study-progress", async (req, res) => {
+  const { requesterId, otherUserId, lessonId } = req.query as {
+    requesterId?: string; otherUserId?: string; lessonId?: string;
+  };
+  if (!requesterId || !otherUserId || !lessonId) {
+    return err(res, "requesterId, otherUserId, and lessonId are required", 400);
+  }
+  const { data, error } = await supabaseWrite
+    .from("p2p_lesson_progress")
+    .select("user_id, status, completed")
+    .eq("lesson_id", lessonId)
+    .in("user_id", [requesterId, otherUserId]);
+  if (error) return err(res, error.message, 500);
+
+  const byUser = new Map((data ?? []).map((r) => [r.user_id as string, r]));
+  const toProgress = (userId: string) => {
+    const row = byUser.get(userId);
+    return { status: (row?.status as string) ?? "not_started", completed: (row?.completed as boolean) ?? false };
+  };
+  return ok(res, { mine: toProgress(requesterId), theirs: toProgress(otherUserId) });
+});
+
 // ── Break Rooms ──────────────────────────────────────────────────────────────
 // Spontaneous audio community rooms (migrations 058 + 061). One named preset
 // per PLAN_CATEGORIES entry (see mobile/lib/planCategories.ts — duplicated

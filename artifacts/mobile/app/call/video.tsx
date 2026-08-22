@@ -8,9 +8,13 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
+import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { lookupVerseForAdmin, type VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
+import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
+import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
+import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 
 function formatClock(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -116,6 +120,20 @@ export default function VideoCallScreen() {
   const endedRef = useRef(false);
   const connectedAtRef = useRef<number | null>(null);
   const poorQualityStreakRef = useRef(0);
+
+  const [mode, setMode] = useState<"call" | "study">("call");
+  const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
+  const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
+  const study = useStudySession(params.channelName, params.otherUserId);
+
+  useEffect(() => {
+    if (study.isActive) setMode("study");
+  }, [study.isActive]);
+
+  function handleChooseLesson(lessonMeta: StudyLessonMeta) {
+    setChooseLessonOpen(false);
+    study.startStudy(lessonMeta);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -249,6 +267,54 @@ export default function VideoCallScreen() {
 
   const otherName = params.otherUserName || "Peer";
 
+  const participantStrip = (
+    <View style={styles.studyParticipantStrip}>
+      <View style={styles.studyMiniTile}>
+        {remoteUid !== null ? <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} /> : <Ionicons name="person" size={16} color="rgba(255,255,255,0.5)" />}
+      </View>
+      {cameraOn && (
+        <View style={styles.studyMiniTile}>
+          <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} zOrderMediaOverlay />
+        </View>
+      )}
+      <Text style={styles.studyMiniName} numberOfLines={1}>{otherName}</Text>
+      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleMute}>
+        <Ionicons name={muted ? "mic-off" : "mic"} size={16} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleCamera}>
+        <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={16} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={handleEndCall}>
+        <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (mode === "study") {
+    return (
+      <View style={{ flex: 1 }}>
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <StudyTogetherOverlay
+          session={study}
+          myId={profile?.id ?? ""}
+          myName={profile?.displayName || "Me"}
+          otherUserId={params.otherUserId}
+          otherUserName={otherName}
+          participantStrip={participantStrip}
+          onReturnToCall={() => setMode("call")}
+          onSessionEnded={(summary) => setStudySummary(summary)}
+        />
+        <StudySessionSummary
+          visible={!!studySummary}
+          summary={studySummary}
+          otherUserName={otherName}
+          onContinueCall={() => { setStudySummary(null); setMode("call"); }}
+          onEndCall={() => { setStudySummary(null); handleEndCall(); }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
@@ -304,6 +370,11 @@ export default function VideoCallScreen() {
           <TouchableOpacity style={styles.controlBtn} onPress={() => setScriptureVisible(true)}>
             <Ionicons name="book" size={20} color="#fff" />
           </TouchableOpacity>
+          {callState === "connected" && (
+            <TouchableOpacity style={styles.controlBtn} onPress={() => setChooseLessonOpen(true)}>
+              <Ionicons name="school" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
           {sessionQuestions.length > 0 && (
             <TouchableOpacity style={styles.controlBtn} onPress={() => setLessonSidebarVisible(true)}>
               <Ionicons name="list" size={20} color="#fff" />
@@ -316,6 +387,12 @@ export default function VideoCallScreen() {
       </View>
 
       <ScriptureModal visible={scriptureVisible} onClose={() => setScriptureVisible(false)} />
+
+      <ChooseLessonSheet
+        visible={chooseLessonOpen}
+        onClose={() => setChooseLessonOpen(false)}
+        onChooseLesson={handleChooseLesson}
+      />
 
       <Modal visible={lessonSidebarVisible} transparent animationType="slide" onRequestClose={() => setLessonSidebarVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -370,6 +447,16 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   endBtn: { backgroundColor: "#DC2626" },
+  studyParticipantStrip: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
+  },
+  studyMiniTile: {
+    width: 36, height: 36, borderRadius: 8, overflow: "hidden",
+    backgroundColor: "#1A241E", alignItems: "center", justifyContent: "center",
+  },
+  studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+  studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 },

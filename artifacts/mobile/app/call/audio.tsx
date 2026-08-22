@@ -7,8 +7,12 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
+import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
+import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
+import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 
 function formatClock(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -44,6 +48,20 @@ export default function AudioCallScreen() {
   const [speakerOn, setSpeakerOn] = useState(true);
   const [callState, setCallState] = useState<"connecting" | "ringing" | "connected" | "ended">("connecting");
   const endedRef = useRef(false);
+
+  const [mode, setMode] = useState<"call" | "study">("call");
+  const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
+  const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
+  const study = useStudySession(params.channelName, params.otherUserId);
+
+  useEffect(() => {
+    if (study.isActive) setMode("study");
+  }, [study.isActive]);
+
+  function handleChooseLesson(lesson: StudyLessonMeta) {
+    setChooseLessonOpen(false);
+    study.startStudy(lesson);
+  }
   const connectedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -147,6 +165,47 @@ export default function AudioCallScreen() {
 
   const otherName = params.otherUserName || "Peer";
 
+  const participantStrip = (
+    <View style={styles.studyParticipantStrip}>
+      <View style={styles.studyMiniAvatar}><Ionicons name="person" size={16} color="rgba(255,255,255,0.6)" /></View>
+      <Text style={styles.studyMiniName} numberOfLines={1}>{otherName}</Text>
+      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleMute}>
+        <Ionicons name={muted ? "mic-off" : "mic"} size={16} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleSpeaker}>
+        <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={16} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={handleEndCall}>
+        <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (mode === "study") {
+    return (
+      <View style={{ flex: 1 }}>
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <StudyTogetherOverlay
+          session={study}
+          myId={profile?.id ?? ""}
+          myName={profile?.displayName || "Me"}
+          otherUserId={params.otherUserId}
+          otherUserName={otherName}
+          participantStrip={participantStrip}
+          onReturnToCall={() => setMode("call")}
+          onSessionEnded={(summary) => setStudySummary(summary)}
+        />
+        <StudySessionSummary
+          visible={!!studySummary}
+          summary={studySummary}
+          otherUserName={otherName}
+          onContinueCall={() => { setStudySummary(null); setMode("call"); }}
+          onEndCall={() => { setStudySummary(null); handleEndCall(); }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 30, paddingBottom: insets.bottom + 30 }]}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
@@ -172,6 +231,13 @@ export default function AudioCallScreen() {
         ) : (
           <Text style={styles.statusText}>Call ended</Text>
         )}
+
+        {callState === "connected" && (
+          <TouchableOpacity style={styles.studyBtn} onPress={() => setChooseLessonOpen(true)}>
+            <Text style={styles.studyBtnEmoji}>📖</Text>
+            <Text style={styles.studyBtnText}>Study Together</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.controlsRow}>
@@ -188,6 +254,12 @@ export default function AudioCallScreen() {
           <Text style={styles.controlLabel}>End</Text>
         </TouchableOpacity>
       </View>
+
+      <ChooseLessonSheet
+        visible={chooseLessonOpen}
+        onClose={() => setChooseLessonOpen(false)}
+        onChooseLesson={handleChooseLesson}
+      />
     </View>
   );
 }
@@ -213,4 +285,18 @@ const styles = StyleSheet.create({
   },
   endBtn: { backgroundColor: "#DC2626" },
   controlLabel: { position: "absolute", bottom: -20, color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" },
+  studyBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8, marginTop: 26,
+    backgroundColor: "rgba(29,158,117,0.15)", borderWidth: 1, borderColor: "#1D9E75",
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
+  },
+  studyBtnEmoji: { fontSize: 16 },
+  studyBtnText: { color: "#1D9E75", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  studyParticipantStrip: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
+  },
+  studyMiniAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+  studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
 });

@@ -101,7 +101,9 @@ function makeTabStyles(c: AppColors) {
 }
 
 // ── Question response card ────────────────────────────────────────────────────
-function QuestionResponseCard({
+// Exported so Study Together's Questions tab can reuse the exact same
+// submission UI/logic (submitContent()) rather than re-implementing it.
+export function QuestionResponseCard({
   question,
   questionIndex,
   lessonId,
