@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -17,14 +17,7 @@ import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
-import {
-  useData,
-  KINGDOM_SCHOOL_STATUS_LABELS,
-  getModuleProgressCounts,
-  getFoundationProgress,
-  getKingdomSchoolStatus,
-  getFoundationCompletionDate,
-} from "@/contexts/DataContext";
+import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
@@ -249,24 +242,11 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, modules, treeData, getMyInviteLink } = useData();
+  const { submitHelpRequest, treeData, getMyInviteLink } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
-
-  const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
-  const foundationPct = getFoundationProgress(modulesCompleted, totalModules);
-  // See the same note in learn.tsx/index.tsx — no persistent mentee tracking
-  // exists yet, so this is always false.
-  const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
-  const isFoundationDone = kingdomSchoolStatus === "foundation_complete" || kingdomSchoolStatus === "guiding_others";
-
-  const [completionDate, setCompletionDate] = useState<string | null>(null);
-  useEffect(() => {
-    if (!profile?.id || !isFoundationDone) { setCompletionDate(null); return; }
-    getFoundationCompletionDate(profile.id).then(setCompletionDate);
-  }, [profile?.id, isFoundationDone]);
 
   const [grainSheetOpen, setGrainSheetOpen] = useState(false);
   const [invitingBusy, setInvitingBusy] = useState(false);
@@ -446,26 +426,6 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
-
-        {/* Kingdom School */}
-        <TouchableOpacity style={styles.ksCard} activeOpacity={0.85} onPress={() => router.push("/(tabs)/learn" as any)}>
-          <View style={styles.ksHeaderRow}>
-            <Text style={styles.ksHeading}>Kingdom School</Text>
-            <View style={[styles.ksPill, isFoundationDone && styles.ksPillGold]}>
-              <Text style={[styles.ksPillText, isFoundationDone && styles.ksPillTextGold]}>
-                {KINGDOM_SCHOOL_STATUS_LABELS[kingdomSchoolStatus]}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.ksLine}>Kingdom School Foundation — {foundationPct}% Complete</Text>
-          <Text style={styles.ksSubLine}>{modulesCompleted} of {totalModules} modules</Text>
-          {isFoundationDone && (
-            <Text style={styles.ksSubLine}>
-              {kingdomSchoolStatus === "guiding_others" ? "Foundation Complete · Guiding Others" : "Foundation Complete"}
-              {completionDate ? ` · ${new Date(completionDate).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}` : ""}
-            </Text>
-          )}
-        </TouchableOpacity>
 
         {/* Invite Someone */}
         <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={handleShareInvite} disabled={invitingBusy}>
