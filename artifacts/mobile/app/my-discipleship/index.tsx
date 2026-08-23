@@ -357,8 +357,8 @@ export default function MyDiscipleshipScreen() {
               </View>
             )}
 
-            {/* ── Link rows ── */}
-            <Text style={s.sectionHeader}>Requests</Text>
+            {/* ── My Relationships: requests/confirmations/letters ── */}
+            <Text style={s.sectionHeader}>My Relationships</Text>
             <TouchableOpacity style={s.linkRow} onPress={() => router.push("/peer-guide-requests" as any)}>
               <Ionicons name="people-circle-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
@@ -394,11 +394,13 @@ export default function MyDiscipleshipScreen() {
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/forest" as any)}>
-              <Ionicons name="git-branch-outline" size={20} color={colors.primaryGreen} />
+            {/* ── My Learning ── */}
+            <Text style={s.sectionHeader}>My Learning</Text>
+            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/(tabs)/learn" as any)}>
+              <Ionicons name="school-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
-                <Text style={s.linkRowTitle}>My Generational Forest</Text>
-                <Text style={s.linkRowSub}>Your discipleship lineage across the nations.</Text>
+                <Text style={s.linkRowTitle}>Kingdom School</Text>
+                <Text style={s.linkRowSub}>Continue your current lesson.</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
@@ -408,6 +410,26 @@ export default function MyDiscipleshipScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Fruit</Text>
                 <Text style={s.linkRowSub}>The observable outcomes of your growth and service.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/call/history" as any)}>
+              <Ionicons name="time-outline" size={20} color={colors.primaryGreen} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.linkRowTitle}>Sessions</Text>
+                <Text style={s.linkRowSub}>Your call and Study Together session history.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            {/* ── My Generational Forest ── */}
+            <Text style={s.sectionHeader}>My Generational Forest</Text>
+            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/forest" as any)}>
+              <Ionicons name="git-branch-outline" size={20} color={colors.primaryGreen} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.linkRowTitle}>View My Forest</Text>
+                <Text style={s.linkRowSub}>Your discipleship lineage across the nations.</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>

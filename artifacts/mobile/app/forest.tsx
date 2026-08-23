@@ -129,7 +129,12 @@ function ForestCanvas({ data, revealProgress, onTapPerson }: {
   const rootPaths = gen1Positions.map((p, i) => `M ${cx} ${GROUND_Y} Q ${(cx + p.x) / 2} ${GROUND_Y + 18} ${p.x} ${p.y}`);
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.canvasWrap}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.canvasScrollOuter}
+      contentContainerStyle={styles.canvasScrollContent}
+    >
       <Animated.View style={{ transform: [{ scale: revealProgress }] }}>
         <Svg width={Math.max(VIEW_W, gen1Count * 90)} height={VIEW_H} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
           {rootPaths.map((d, i) => (
@@ -405,6 +410,12 @@ const styles = StyleSheet.create({
   ancestryFlag: { fontSize: 12 },
 
   canvasWrap: { alignItems: "center", marginTop: 12 },
+  // ScrollView (unlike a plain View) can't take layout props like alignItems
+  // in `style` on web — RN Web throws "must be applied through
+  // contentContainerStyle." canvasWrap above is still used as-is by the
+  // empty-state plain <View>, which has no such restriction.
+  canvasScrollOuter: { marginTop: 12 },
+  canvasScrollContent: { alignItems: "center" },
   canvasEmptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
   findGuideBtn: { marginTop: 12, backgroundColor: colors.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
   findGuideBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },

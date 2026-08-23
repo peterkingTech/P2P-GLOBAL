@@ -840,23 +840,39 @@ router.get("/:userId/forest", async (req, res) => {
     return { userId: p.id, country: p.country ?? null, growthLevel: p.growth_level ?? 0 };
   }
 
+  // Each level is guarded against an orphaned/missing profile (e.g. a
+  // deleted account left behind an active discipleship link) the same way
+  // buildMinimalNode already guards generation 4 below — without this,
+  // profileById.get(id)! throws and the whole request 500s the moment any
+  // real lineage happens to include one broken link, which is exactly what
+  // was silently breaking this screen. A missing profile can't be rendered,
+  // so that node (and whatever's under it) is dropped rather than shown
+  // with fabricated data.
   const gen1Ids = childrenByMentor.get(userId) ?? [];
   const mentees = gen1Ids.map((g1Id) => {
+    const p1 = profileById.get(g1Id);
+    if (!p1) return null;
     const gen2Ids = childrenByMentor.get(g1Id) ?? [];
     return {
-      ...toPersonWithModules(profileById.get(g1Id)!),
+      ...toPersonWithModules(p1),
       mentees: gen2Ids.map((g2Id) => {
+        const p2 = profileById.get(g2Id);
+        if (!p2) return null;
         const gen3Ids = childrenByMentor.get(g2Id) ?? [];
         return {
-          ...toPersonWithModules(profileById.get(g2Id)!),
-          mentees: gen3Ids.map((g3Id) => ({
-            ...toPersonWithModules(profileById.get(g3Id)!),
-            mentees: (childrenByMentor.get(g3Id) ?? []).map(buildMinimalNode).filter(Boolean),
-          })),
+          ...toPersonWithModules(p2),
+          mentees: gen3Ids.map((g3Id) => {
+            const p3 = profileById.get(g3Id);
+            if (!p3) return null;
+            return {
+              ...toPersonWithModules(p3),
+              mentees: (childrenByMentor.get(g3Id) ?? []).map(buildMinimalNode).filter(Boolean),
+            };
+          }).filter(Boolean),
         };
-      }),
+      }).filter(Boolean),
     };
-  });
+  }).filter(Boolean);
 
   const countriesRepresented = Array.from(new Set(
     allLineageIds.map((id) => profileById.get(id)?.country).filter((c): c is string => !!c)

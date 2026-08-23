@@ -63,13 +63,6 @@ const GIFT_LABELS: Record<string, string> = {
 
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
 
-const PROFILE_ROWS = [
-  { key: "peers", labelKey: "profile.peers", icon: "people-outline" as const, route: "/connect" as const },
-  { key: "groups", labelKey: "profile.peerGroups", icon: "people-circle-outline" as const, route: "/connect/groups" as const },
-  { key: "notes", labelKey: "profile.notes", icon: "document-text-outline" as const, route: "/notes" as const },
-  { key: "highlights", labelKey: "profile.highlights", icon: "bookmark-outline" as const, route: "/highlights" as const },
-];
-
 const THEME_ORDER: ThemeName[] = ["light", "dark", "sepia", "midnight"];
 
 function makeStyles(c: AppColors) {
@@ -256,7 +249,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, pendingConfirmationCount, modules, treeData, getMyInviteLink } = useData();
+  const { submitHelpRequest, modules, treeData, getMyInviteLink } = useData();
   const { t } = useTranslation();
   const { colors, theme, setTheme } = useTheme();
   const styles = makeStyles(colors);
@@ -474,41 +467,6 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
 
-        {/* My Discipleship */}
-        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/my-discipleship" as any)}>
-          <Ionicons name="people-circle-outline" size={18} color={colors.primaryGreen} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dashboardTitle}>My Discipleship</Text>
-            <Text style={styles.dashboardSub}>Walk with others and see your impact</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-        </TouchableOpacity>
-
-        {/* Pending Confirmations */}
-        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/confirmations" as any)}>
-          <Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primaryGreen} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dashboardTitle}>Pending Confirmations</Text>
-            <Text style={styles.dashboardSub}>Confirm encouragement, prayer &amp; peer sessions</Text>
-          </View>
-          {pendingConfirmationCount > 0 && (
-            <View style={styles.confirmationBadge}>
-              <Text style={styles.confirmationBadgeText}>{pendingConfirmationCount}</Text>
-            </View>
-          )}
-          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-        </TouchableOpacity>
-
-        {/* My Generational Forest */}
-        <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/forest" as any)}>
-          <Ionicons name="git-branch-outline" size={18} color={colors.primaryGreen} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dashboardTitle}>My Generational Forest</Text>
-            <Text style={styles.dashboardSub}>Your discipleship lineage across the nations</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-        </TouchableOpacity>
-
         {/* Invite Someone */}
         <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={handleShareInvite} disabled={invitingBusy}>
           <View style={styles.inviteIconWrap}>
@@ -522,22 +480,6 @@ export default function ProfileScreen() {
           </View>
           {invitingBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="share-social-outline" size={20} color={colors.accentGreen} />}
         </TouchableOpacity>
-
-        {/* Peers / Groups / Notes / Highlights */}
-        <View style={styles.rowsList}>
-          {PROFILE_ROWS.map((row) => (
-            <TouchableOpacity
-              key={row.key}
-              style={styles.fullRow}
-              activeOpacity={0.8}
-              onPress={() => router.push(row.route)}
-            >
-              <Ionicons name={row.icon} size={20} color={colors.accentGreen} />
-              <Text style={styles.fullRowLabel}>{t(row.labelKey)}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* Spiritual Gifts */}
         <Text style={styles.sectionTitle}>{t("profile.spiritualGifts")}</Text>
