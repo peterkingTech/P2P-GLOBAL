@@ -661,6 +661,25 @@ export interface UserHighlight {
   color?: string;
 }
 
+export interface JournalReflection {
+  id: string;
+  rootId: string;
+  parentId: string | null;
+  prompt: string | null;
+  content: string;
+  linkedLessonId: string | null;
+  linkedLessonTitle?: string | null;
+  createdAt: string;
+}
+
+export interface JournalTimelineEntry {
+  type: "note" | "highlight" | "prayer" | "reflection";
+  id: string;
+  title: string;
+  preview: string;
+  at: string;
+}
+
 export interface StudySession {
   id: string;
   title: string;
@@ -1127,6 +1146,10 @@ interface DataContextValue {
     lessonId: string; sectionId: string; reference: string; quote: string;
     startOffset: number; endOffset: number; color?: string;
   }) => Promise<string | null>;
+  getMyReflections: () => Promise<JournalReflection[]>;
+  addReflection: (params: { prompt?: string | null; content: string; linkedLessonId?: string | null }) => Promise<string | null>;
+  addReflectionUpdate: (rootId: string, parentId: string, content: string) => Promise<string | null>;
+  getJournalTimeline: () => Promise<JournalTimelineEntry[]>;
   markLessonComplete: (lessonId: string) => Promise<void>;
   refreshCurriculumData: () => Promise<void>;
   refreshData: () => Promise<void>;
@@ -3533,6 +3556,111 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  // My Discipleship Journal — reflections are the one genuinely new
+  // subsystem; personal notes/highlights/prayer above and getMyPrayerJournal
+  // below already existed. root_id makes "the whole chain, oldest first" a
+  // single indexed lookup instead of a recursive parent walk (see
+  // migrations/082_journal_reflections.sql).
+  const getMyReflections = useCallback(async (): Promise<JournalReflection[]> => {
+    if (!profile) return [];
+    try {
+      const { data, error } = await supabase
+        .from("p2p_journal_reflections")
+        .select("id, root_id, parent_id, prompt, content, linked_lesson_id, created_at")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const rows = (data || []) as any[];
+      const lessonIds = Array.from(new Set(rows.map((r) => r.linked_lesson_id).filter(Boolean)));
+      let titleMap = new Map<string, string>();
+      if (lessonIds.length > 0) {
+        const { data: lessonsData } = await supabase.from("p2p_lessons").select("id, title").in("id", lessonIds);
+        titleMap = new Map((lessonsData || []).map((l: any) => [l.id, l.title]));
+      }
+      return rows.map((r) => ({
+        id: r.id, rootId: r.root_id, parentId: r.parent_id, prompt: r.prompt, content: r.content,
+        linkedLessonId: r.linked_lesson_id,
+        linkedLessonTitle: r.linked_lesson_id ? titleMap.get(r.linked_lesson_id) ?? null : null,
+        createdAt: r.created_at,
+      }));
+    } catch (e) {
+      console.error("getMyReflections failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const addReflection = useCallback(async (params: {
+    prompt?: string | null; content: string; linkedLessonId?: string | null;
+  }): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      // Two-step insert: root_id must equal the row's own id for an
+      // original, which Postgres only assigns once the insert runs — no
+      // client-side UUID generator needed.
+      const { data, error } = await supabase.from("p2p_journal_reflections").insert({
+        user_id: profile.id, root_id: "00000000-0000-0000-0000-000000000000",
+        prompt: params.prompt ?? null, content: params.content, linked_lesson_id: params.linkedLessonId ?? null,
+      }).select("id").single();
+      if (error || !data) throw error ?? new Error("No row returned");
+      const { error: fixupError } = await supabase.from("p2p_journal_reflections").update({ root_id: data.id }).eq("id", data.id);
+      if (fixupError) throw fixupError;
+      return null;
+    } catch (e: any) {
+      console.error("addReflection failed", e);
+      return e?.message || "Could not save reflection";
+    }
+  }, [profile]);
+
+  const addReflectionUpdate = useCallback(async (rootId: string, parentId: string, content: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_journal_reflections").insert({
+        user_id: profile.id, root_id: rootId, parent_id: parentId, content,
+      });
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("addReflectionUpdate failed", e);
+      return e?.message || "Could not save reflection update";
+    }
+  }, [profile]);
+
+  const getJournalTimeline = useCallback(async (): Promise<JournalTimelineEntry[]> => {
+    if (!profile) return [];
+    const [notes, highlights, reflections, prayerRes] = await Promise.all([
+      getMyNotes(), getMyHighlights(), getMyReflections(),
+      supabase.from("p2p_prayer_journal").select("id, prayer_text, category, created_at").eq("user_id", profile.id),
+    ]);
+
+    const noteEntries: JournalTimelineEntry[] = notes.map((n) => ({
+      type: "note", id: n.id, title: n.title ?? "Personal Note", preview: n.body, at: n.createdAt,
+    }));
+    const highlightEntries: JournalTimelineEntry[] = highlights.map((h) => ({
+      type: "highlight", id: h.id, title: h.lessonTitle ?? h.reference, preview: h.quote ?? h.reference, at: h.createdAt,
+    }));
+    const prayerRows = (prayerRes.data ?? []) as { id: string; prayer_text: string; category: string | null; created_at: string }[];
+    const prayerEntries: JournalTimelineEntry[] = prayerRows.map((p) => ({
+      type: "prayer", id: p.id, title: p.category ?? "Prayer Request", preview: p.prayer_text, at: p.created_at,
+    }));
+
+    // One timeline entry per reflection CHAIN (its latest update, or the
+    // original if it has none yet) — the full history lives on the
+    // reflection detail screen, not the top-level feed.
+    const latestByRoot = new Map<string, JournalReflection>();
+    for (const r of reflections) {
+      const current = latestByRoot.get(r.rootId);
+      if (!current || new Date(r.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+        latestByRoot.set(r.rootId, r);
+      }
+    }
+    const reflectionEntries: JournalTimelineEntry[] = Array.from(latestByRoot.values()).map((r) => ({
+      type: "reflection", id: r.rootId, title: r.prompt ?? "Reflection", preview: r.content, at: r.createdAt,
+    }));
+
+    return [...noteEntries, ...highlightEntries, ...prayerEntries, ...reflectionEntries]
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }, [profile, getMyNotes, getMyHighlights, getMyReflections]);
+
   const markLessonComplete = useCallback(async (lessonId: string) => {
     // Optimistic update first so the UI reacts immediately regardless of DB latency.
     setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, isCompleted: true } : l));
@@ -4945,6 +5073,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       getHighlightsForLesson, addSectionHighlight,
+      getMyReflections, addReflection, addReflectionUpdate, getJournalTimeline,
       markLessonComplete, refreshCurriculumData, refreshData,
       getAssignmentForLesson, getMySubmission, getSubmissionStatus,
       getQuestionSubmissionsForLesson, getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,

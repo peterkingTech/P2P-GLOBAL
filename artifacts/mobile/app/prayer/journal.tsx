@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
@@ -22,6 +22,7 @@ type Filter = "all" | "answered" | "unanswered";
 export default function PrayerJournalScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { compose } = useLocalSearchParams<{ compose?: string }>();
   const { profile } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -33,7 +34,9 @@ export default function PrayerJournalScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [answerNotesDraft, setAnswerNotesDraft] = useState<Record<string, string>>({});
 
-  const [writeOpen, setWriteOpen] = useState(false);
+  // Opened automatically via My Discipleship Journal's "+ New Entry" ->
+  // Prayer Request chooser (?compose=true); direct navigation is unaffected.
+  const [writeOpen, setWriteOpen] = useState(compose === "true");
   const [newCategory, setNewCategory] = useState("");
   const [newText, setNewText] = useState("");
   const [saving, setSaving] = useState(false);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, UserHighlight } from "@/contexts/DataContext";
@@ -17,10 +17,13 @@ const HIGHLIGHT_SWATCH: Record<string, string> = {
 export default function Highlights() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { compose } = useLocalSearchParams<{ compose?: string }>();
   const { getMyHighlights, addHighlight, deleteHighlight } = useData();
   const [items, setItems] = useState<UserHighlight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  // Opened automatically via My Discipleship Journal's "+ New Entry" ->
+  // Highlight chooser (?compose=true); direct navigation is unaffected.
+  const [modalOpen, setModalOpen] = useState(compose === "true");
   const [reference, setReference] = useState("");
   const [quote, setQuote] = useState("");
   const [saving, setSaving] = useState(false);

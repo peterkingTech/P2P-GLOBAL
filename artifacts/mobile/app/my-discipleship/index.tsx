@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,17 +9,9 @@ import { AppColors } from "@/constants/themes";
 // My Discipleship hub — My Discipleship Phase 2's top-level split. This
 // screen is intentionally thin: it only chooses between the two
 // discipleship experiences and holds no data-fetching of its own.
-// - Journey ("Where am I?") is the full dashboard that used to live here
-//   directly — moved unchanged to my-discipleship/journey.tsx.
-// - Journal ("What am I learning/remembering/praying about/becoming?") is
-//   the next slice; its card is honestly labeled "Coming Soon" until that
-//   screen exists rather than linking to a route that isn't real yet.
-
-function showComingSoon() {
-  const message = "My Discipleship Journal is coming soon — a private space to reflect, remember, and pray through your discipleship journey.";
-  if (Platform.OS === "web") window.alert(message);
-  else Alert.alert("Coming Soon", message);
-}
+// - Journey ("Where am I?") lives at my-discipleship/journey.tsx.
+// - Journal ("What am I learning/remembering/praying about/becoming?")
+//   lives at my-discipleship/journal.tsx.
 
 export default function MyDiscipleshipHubScreen() {
   const insets = useSafeAreaInsets();
@@ -50,12 +42,13 @@ export default function MyDiscipleshipHubScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={showComingSoon}>
+        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/my-discipleship/journal" as any)}>
           <Text style={s.hubCardEmoji}>📖</Text>
           <Text style={s.hubCardTitle}>My Discipleship Journal</Text>
           <Text style={s.hubCardSub}>Reflect, remember, pray and grow.</Text>
-          <View style={s.hubCardBtnMuted}>
-            <Text style={s.hubCardBtnMutedText}>Coming Soon</Text>
+          <View style={s.hubCardBtn}>
+            <Text style={s.hubCardBtnText}>Open Journal</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primaryGreen} />
           </View>
         </TouchableOpacity>
       </ScrollView>

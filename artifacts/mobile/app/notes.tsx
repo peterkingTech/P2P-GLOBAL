@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, UserNote } from "@/contexts/DataContext";
@@ -8,10 +8,14 @@ import colors from "@/constants/colors";
 
 export default function Notes() {
   const insets = useSafeAreaInsets();
+  const { compose } = useLocalSearchParams<{ compose?: string }>();
   const { getMyNotes, addNote, deleteNote } = useData();
   const [notes, setNotes] = useState<UserNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  // Opened automatically when reached via My Discipleship Journal's
+  // "+ New Entry" -> Personal Note chooser (?compose=true); direct
+  // navigation to /notes behaves exactly as before.
+  const [modalOpen, setModalOpen] = useState(compose === "true");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
