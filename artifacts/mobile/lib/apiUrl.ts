@@ -26,7 +26,12 @@ export function getApiUrl(): string {
     // The api-server mounts all routes at /api.
     resolved = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
   } else if (__DEV__) {
-    resolved = "http://localhost:5000/api";
+    // 127.0.0.1, not "localhost" — on Windows, browser fetches to "localhost"
+    // can pay a multi-second IPv6-then-IPv4 resolution/connection penalty per
+    // request (measured directly: ~2.3s vs ~180ms, and it compounds when
+    // several calls fire concurrently), which reads as a permanently-stuck
+    // loading spinner rather than a slow one. 127.0.0.1 skips the ambiguity.
+    resolved = "http://127.0.0.1:5000/api";
   }
 
   if (!resolved || !/^https?:\/\//.test(resolved)) {
