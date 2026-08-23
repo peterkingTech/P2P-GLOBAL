@@ -6,6 +6,7 @@ import { useData, HelpRequest, HelpRequestTier, HelpRequestStatus } from "@/cont
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
 
 const TIER_FILTERS: Array<{ value: HelpRequestTier | "all"; label: string }> = [
@@ -81,55 +82,20 @@ export default function HelpRequestsScreen() {
     if (!user) return;
     setCalling(req.id);
     try {
-      // Reuse the same eligibility check messaging uses (super_admin, or
-      // church_leader/regional_admin/moderator/peer_guide/admin_help
-      // responding to a help request — see migration 078) — /calls/start
-      // itself trusts the caller-supplied ids with no permission check of
-      // its own, so this RPC is the only gate.
-      const { data: conversationId, error: convErr } = await supabase.rpc("p2p_start_direct_conversation", { target_id: req.userId });
-      if (convErr || !conversationId) {
-        console.error("p2p_start_direct_conversation failed", convErr);
-        Alert.alert("Couldn't start call", convErr?.message ?? "Please try again.");
-        return;
-      }
-
-      const apiUrl = getApiUrl();
-      const channelRes = await fetch(`${apiUrl}/calls/peer-channel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentUserId: user.id, otherUserId: req.userId }),
+      const result = await startPeerCall({
+        supabase, currentUserId: user.id, otherUserId: req.userId,
+        onAlert: (title, message) => Alert.alert(title, message),
       });
-      const channelData = await channelRes.json();
-      if (!channelRes.ok) throw new Error(channelData.error || "Failed to start call");
-      const channelName = channelData.channelName as string;
+      if (!result) return;
 
-      const startRes = await fetch(`${apiUrl}/calls/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channelName, callType: "audio", callerId: user.id, recipientId: req.userId, conversationId,
-        }),
-      });
-      const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
-
-      await linkConversationToHelpRequest(req.id, conversationId as string);
+      await linkConversationToHelpRequest(req.id, result.conversationId);
       router.push({
         pathname: "/call/audio",
-        params: {
-          channelName,
-          otherUserId: req.userId,
-          otherUserName: req.userName || "this user",
-          callType: "audio",
-          isInitiator: "true",
-          callId: startData.incomingCallId,
-          conversationId,
-          callLogId: startData.callLogId,
-        },
+        params: buildCallRouteParams({
+          channelName: result.channelName, otherUserId: req.userId, otherUserName: req.userName || "this user",
+          callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+        }),
       } as any);
-    } catch (e: any) {
-      console.error("handleCallThem threw", e);
-      Alert.alert("Couldn't start call", e?.message ?? "Please try again.");
     } finally {
       setCalling(null);
     }

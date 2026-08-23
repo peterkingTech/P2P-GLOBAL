@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Linking,
+  Alert,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,6 +34,8 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { getLanguageName } from "@/lib/languageNames";
 import { shareLesson } from "@/lib/sharing";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
+import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
 
 interface LessonContent {
   title: string;
@@ -433,6 +436,12 @@ export default function LessonScreen() {
   >(null);
   const [editingHighlight, setEditingHighlight] = useState<UserHighlight | null>(null);
 
+  // Study Together — Kingdom School entry point (discoverability slice).
+  // Picker only resolves WHO; the current lesson (lessonMeta below) is
+  // preserved and passed through unchanged, never re-chosen.
+  const [studyPickerOpen, setStudyPickerOpen] = useState(false);
+  const [startingStudyWith, setStartingStudyWith] = useState<string | null>(null);
+
   const loadHighlights = useCallback(async () => {
     if (!id) return;
     setHighlights(await getHighlightsForLesson(id));
@@ -648,6 +657,32 @@ export default function LessonScreen() {
     finally { setCompleting(false); }
   }
 
+  async function handleSelectStudyPartner(person: { id: string; name: string }) {
+    if (!user?.id || !lessonMeta) return;
+    setStudyPickerOpen(false);
+    setStartingStudyWith(person.id);
+    try {
+      const result = await startPeerCall({
+        supabase, currentUserId: user.id, otherUserId: person.id,
+        onAlert: (title, message) => {
+          if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+          else Alert.alert(title, message);
+        },
+      });
+      if (!result) return;
+      router.push({
+        pathname: "/call/audio",
+        params: buildCallRouteParams({
+          channelName: result.channelName, otherUserId: person.id, otherUserName: person.name,
+          callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+          autoStudy: { lessonId: lessonMeta.id, moduleId: lessonMeta.moduleId, lessonTitle: lessonMeta.title },
+        }),
+      } as any);
+    } finally {
+      setStartingStudyWith(null);
+    }
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -801,6 +836,26 @@ export default function LessonScreen() {
             )
           )}
 
+          {lessonMeta && (
+            <TouchableOpacity
+              style={styles.studyTogetherCard}
+              onPress={() => setStudyPickerOpen(true)}
+              disabled={!!startingStudyWith}
+              activeOpacity={0.85}
+            >
+              {startingStudyWith ? <ActivityIndicator color={colors.cream} /> : (
+                <>
+                  <Text style={styles.studyTogetherEmoji}>📖</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.studyTogetherTitle}>Study Together</Text>
+                    <Text style={styles.studyTogetherSub}>Learn this lesson with someone.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.cream} />
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           {content.attribution ? (
             <View style={styles.attributionBlock}>
               <View style={styles.attributionRule} />
@@ -809,6 +864,12 @@ export default function LessonScreen() {
           ) : null}
         </ScrollView>
       )}
+
+      <StudyPartnerPicker
+        visible={studyPickerOpen}
+        onClose={() => setStudyPickerOpen(false)}
+        onSelectPerson={handleSelectStudyPartner}
+      />
 
       <Modal
         visible={!!pendingHighlight || !!editingHighlight}
@@ -914,6 +975,13 @@ function makeStyles(c: AppColors) {
     flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
   },
   completedBannerText: { color: c.accentGreen, fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  studyTogetherCard: {
+    backgroundColor: c.primaryGreen, borderRadius: 14, padding: 16, marginTop: 16,
+    flexDirection: "row", gap: 12, alignItems: "center",
+  },
+  studyTogetherEmoji: { fontSize: 22 },
+  studyTogetherTitle: { color: c.cream, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  studyTogetherSub: { color: c.cream, opacity: 0.85, fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   assignmentCard: {
     backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
     padding: 16, marginBottom: 20,

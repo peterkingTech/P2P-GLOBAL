@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform, Alert, Modal,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,16 +9,22 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
+import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
+import type { StudyLessonMeta } from "@/hooks/useStudySession";
 
 // Disciple Detail — My Discipleship Phase 1's primary workspace for an
 // active discipleship relationship. Single load of the new
 // GET /discipleship/:mentorId/disciple/:discipleId (authorization happens
-// server-side there, not here). Message/Call reuse the exact same
-// p2p_start_direct_conversation + /calls/peer-channel + /calls/start flow
-// already built in help-requests.tsx/help-mail — Study Together adds
-// autoStudyLessonId/ModuleId/Title params so the call screen can offer
-// "Continue their current lesson?" once connected (Phase 0's
-// useStudySession/StudyTogetherOverlay, unmodified).
+// server-side there, not here). Message/Call reuse the shared
+// startPeerCall/buildCallRouteParams helper (lib/callStart.ts) — the same
+// peer-channel + p2p_start_direct_conversation + calls/start flow also used
+// by help-requests.tsx/help-mail. Study Together first asks which lesson
+// (the disciple's current one, or another chosen via the shared
+// ChooseLessonSheet) before starting the call, then passes it as
+// autoStudyLessonId/ModuleId/Title so the call screen can offer "Continue
+// this lesson?" once connected (Phase 0's useStudySession/
+// StudyTogetherOverlay, unmodified).
 
 interface DiscipleDetailData {
   disciple: { id: string; name: string; username: string | null; photoUrl: string | null; country: string | null };
@@ -36,6 +42,7 @@ interface DiscipleDetailData {
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
 }
 
 function timeAgo(iso: string | null): string {
@@ -73,6 +80,8 @@ export default function DiscipleDetailScreen() {
   const [messaging, setMessaging] = useState(false);
   const [calling, setCalling] = useState(false);
   const [startingStudy, setStartingStudy] = useState(false);
+  const [studyPromptOpen, setStudyPromptOpen] = useState(false);
+  const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id || !discipleId) return;
@@ -115,52 +124,45 @@ export default function DiscipleDetailScreen() {
     }
   }
 
-  async function startCall(withAutoStudy: boolean) {
+  async function startCall(withAutoStudy: boolean, lessonOverride?: StudyLessonMeta) {
     if (!detail || !user?.id) return;
     withAutoStudy ? setStartingStudy(true) : setCalling(true);
     try {
-      const apiUrl = getApiUrl();
-      const channelRes = await fetch(`${apiUrl}/calls/peer-channel`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentUserId: user.id, otherUserId: detail.disciple.id }),
+      const result = await startPeerCall({
+        supabase, currentUserId: user.id, otherUserId: detail.disciple.id, onAlert: showAlert,
       });
-      const channelData = await channelRes.json();
-      if (!channelRes.ok) throw new Error(channelData.error || "Failed to start call");
-      const channelName = channelData.channelName as string;
+      if (!result) return;
 
-      const { data: conversationId, error: convErr } = await supabase.rpc("p2p_start_direct_conversation", { target_id: detail.disciple.id });
-      if (convErr || !conversationId) throw new Error(convErr?.message ?? "Couldn't start call");
+      const autoStudy = !withAutoStudy ? undefined
+        : lessonOverride
+          ? { lessonId: lessonOverride.id, moduleId: lessonOverride.moduleId, lessonTitle: lessonOverride.title }
+          : (detail.progress.currentLessonId && detail.progress.currentModuleId
+              ? { lessonId: detail.progress.currentLessonId, moduleId: detail.progress.currentModuleId, lessonTitle: detail.progress.currentLessonTitle ?? "" }
+              : undefined);
 
-      const startRes = await fetch(`${apiUrl}/calls/start`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelName, callType: "audio", callerId: user.id, recipientId: detail.disciple.id, conversationId }),
-      });
-      const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
-
-      const params: Record<string, string> = {
-        channelName, otherUserId: detail.disciple.id, otherUserName: detail.disciple.name,
-        callType: "audio", isInitiator: "true", callId: startData.incomingCallId,
-        conversationId, callLogId: startData.callLogId,
-      };
-      if (withAutoStudy && detail.progress.currentLessonId && detail.progress.currentModuleId) {
-        params.autoStudyLessonId = detail.progress.currentLessonId;
-        params.autoStudyModuleId = detail.progress.currentModuleId;
-        params.autoStudyLessonTitle = detail.progress.currentLessonTitle ?? "";
-      }
-      router.push({ pathname: "/call/audio", params } as any);
-    } catch (e: any) {
-      showAlert("Couldn't start call", e?.message ?? "Please try again.");
+      router.push({
+        pathname: "/call/audio",
+        params: buildCallRouteParams({
+          channelName: result.channelName, otherUserId: detail.disciple.id, otherUserName: detail.disciple.name,
+          callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+          autoStudy,
+        }),
+      } as any);
     } finally {
       setCalling(false);
       setStartingStudy(false);
     }
   }
 
+  function handleChooseLesson(lesson: StudyLessonMeta) {
+    setChooseLessonOpen(false);
+    startCall(true, lesson);
+  }
+
   function handleNextStepAction() {
     if (!detail) return;
     switch (detail.nextStep.action) {
-      case "study_together": startCall(true); break;
+      case "study_together": setStudyPromptOpen(true); break;
       case "encourage": handleMessage(); break;
       case "message": handleMessage(); break;
       case "view_completion_letters": router.push("/graduates" as any); break;
@@ -218,7 +220,7 @@ export default function DiscipleDetailScreen() {
                 <><Ionicons name="call-outline" size={16} color={colors.accentGreen} /><Text style={s.actionBtnText}>Call</Text></>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={[s.actionBtn, s.actionBtnPrimary]} onPress={() => startCall(true)} disabled={startingStudy}>
+            <TouchableOpacity style={[s.actionBtn, s.actionBtnPrimary]} onPress={() => setStudyPromptOpen(true)} disabled={startingStudy}>
               {startingStudy ? <ActivityIndicator size="small" color="#fff" /> : (
                 <><Text style={s.actionBtnEmoji}>📖</Text><Text style={[s.actionBtnText, s.actionBtnTextPrimary]}>Study Together</Text></>
               )}
@@ -305,6 +307,42 @@ export default function DiscipleDetailScreen() {
           )}
         </ScrollView>
       )}
+
+      <Modal visible={studyPromptOpen} transparent animationType="fade" onRequestClose={() => setStudyPromptOpen(false)}>
+        <View style={s.promptOverlay}>
+          <View style={s.promptBox}>
+            {detail?.progress.currentLessonId ? (
+              <>
+                <Text style={s.promptTitle}>Continue {detail.disciple.name}'s current lesson?</Text>
+                {detail.progress.currentLessonTitle && <Text style={s.promptSub}>{detail.progress.currentLessonTitle}</Text>}
+                <TouchableOpacity style={s.promptPrimaryBtn} onPress={() => { setStudyPromptOpen(false); startCall(true); }}>
+                  <Text style={s.promptPrimaryBtnText}>Start Study</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.promptSecondaryBtn} onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }}>
+                  <Text style={s.promptSecondaryBtnText}>Choose Another Lesson</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={s.promptTitle}>{detail?.disciple.name} hasn't started a Kingdom School lesson yet.</Text>
+                <TouchableOpacity style={s.promptPrimaryBtn} onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }}>
+                  <Text style={s.promptPrimaryBtnText}>Choose a Lesson</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity style={s.promptCancelBtn} onPress={() => setStudyPromptOpen(false)}>
+              <Text style={s.promptCancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <ChooseLessonSheet
+        visible={chooseLessonOpen}
+        onClose={() => setChooseLessonOpen(false)}
+        initialMode="browse"
+        onChooseLesson={handleChooseLesson}
+      />
     </View>
   );
 }
@@ -379,5 +417,16 @@ function makeStyles(c: AppColors) {
     sessionIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(29,158,117,0.1)", alignItems: "center", justifyContent: "center" },
     sessionTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     sessionSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+    promptOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 24 },
+    promptBox: { backgroundColor: c.card, borderRadius: 18, padding: 20, width: "100%", maxWidth: 360, gap: 10 },
+    promptTitle: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    promptSub: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", marginBottom: 4 },
+    promptPrimaryBtn: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 4 },
+    promptPrimaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    promptSecondaryBtn: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+    promptSecondaryBtnText: { color: c.accentGreen, fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    promptCancelBtn: { alignItems: "center", paddingVertical: 10 },
+    promptCancelBtnText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
   });
 }

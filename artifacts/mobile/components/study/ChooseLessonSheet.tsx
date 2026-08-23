@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
@@ -8,18 +8,50 @@ import type { StudyLessonMeta } from "@/hooks/useStudySession";
 // "current lesson" logic progress.tsx already uses (first lesson that's
 // neither completed nor locked) and the already-loaded modules/lessons
 // arrays from DataContext — no new curriculum browsing UI, no duplicate data.
+//
+// continueOverride/initialMode let other callers reuse this same picker
+// instead of building a second one: Disciple Detail passes initialMode=
+// "browse" (it shows its own confirm step first, so the sheet's menu screen
+// would be redundant) and could pass continueOverride to offer someone
+// else's current lesson (e.g. a disciple's) instead of the viewer's own.
 export function ChooseLessonSheet({
-  visible, onClose, onChooseLesson,
-}: { visible: boolean; onClose: () => void; onChooseLesson: (lesson: StudyLessonMeta) => void }) {
+  visible, onClose, onChooseLesson, continueOverride, initialMode = "menu",
+}: {
+  visible: boolean; onClose: () => void; onChooseLesson: (lesson: StudyLessonMeta) => void;
+  continueOverride?: { lesson: StudyLessonMeta; label: string };
+  initialMode?: "menu" | "browse";
+}) {
   const { modules, lessons } = useData();
-  const [browsing, setBrowsing] = useState(false);
+  const [browsing, setBrowsing] = useState(initialMode === "browse");
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
 
-  const currentLesson = lessons.find((l) => !l.isCompleted && !l.isLocked);
-  const currentModule = currentLesson ? modules.find((m) => m.id === currentLesson.moduleId) : null;
+  // Reset to the caller's requested starting screen each time the sheet is
+  // (re)opened — it stays mounted between opens, so state from a previous
+  // visit (e.g. left mid-browse) would otherwise leak into the next one.
+  useEffect(() => {
+    if (visible) setBrowsing(initialMode === "browse");
+  }, [visible, initialMode]);
 
-  function choose(lesson: { id: string; moduleId: string; title: string }) {
-    onChooseLesson({ id: lesson.id, moduleId: lesson.moduleId, title: lesson.title });
+  const ownCurrentLesson = lessons.find((l) => !l.isCompleted && !l.isLocked);
+  const ownCurrentModule = ownCurrentLesson ? modules.find((m) => m.id === ownCurrentLesson.moduleId) : null;
+  // Only offer the viewer's OWN current lesson when nobody else's lesson was
+  // supplied and the caller didn't already skip straight to browsing (a
+  // caller using initialMode="browse" with no override — e.g. Disciple
+  // Detail — has no meaningful "continue" option to show; it isn't the
+  // viewer's own progress that matters there).
+  const showOwnCurrentLesson = !continueOverride && initialMode !== "browse";
+  const currentLesson: StudyLessonMeta | null = continueOverride
+    ? continueOverride.lesson
+    : (showOwnCurrentLesson && ownCurrentLesson && ownCurrentModule
+        ? { id: ownCurrentLesson.id, moduleId: ownCurrentModule.id, title: ownCurrentLesson.title }
+        : null);
+  const continueLabel = continueOverride?.label ?? "Continue Your Current Lesson";
+  const continueSub = continueOverride
+    ? currentLesson?.title ?? ""
+    : (ownCurrentModule && ownCurrentLesson ? `${ownCurrentModule.title} · ${ownCurrentLesson.title}` : "");
+
+  function choose(lesson: StudyLessonMeta) {
+    onChooseLesson(lesson);
     setBrowsing(false);
   }
 
@@ -37,12 +69,12 @@ export function ChooseLessonSheet({
           {!browsing ? (
             <View style={{ gap: 12 }}>
               <Text style={styles.sub}>Learn together through Kingdom School.</Text>
-              {currentLesson && currentModule && (
-                <TouchableOpacity style={styles.optionCard} onPress={() => choose({ id: currentLesson.id, moduleId: currentModule.id, title: currentLesson.title })}>
+              {currentLesson && (
+                <TouchableOpacity style={styles.optionCard} onPress={() => choose(currentLesson)}>
                   <Ionicons name="play-circle" size={22} color="#1D9E75" />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.optionTitle}>Continue Your Current Lesson</Text>
-                    <Text style={styles.optionSub}>{currentModule.title} · {currentLesson.title}</Text>
+                    <Text style={styles.optionTitle}>{continueLabel}</Text>
+                    <Text style={styles.optionSub}>{continueSub}</Text>
                   </View>
                 </TouchableOpacity>
               )}

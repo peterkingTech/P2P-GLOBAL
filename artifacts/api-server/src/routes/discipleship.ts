@@ -56,6 +56,66 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
   });
 });
 
+// GET /discipleship/study-partners/:userId — Study Together's "Who would you
+// like to study with?" picker (Kingdom School entry point). Mirrors the real
+// eligibility branches of p2p_start_direct_conversation (migration 081) that
+// represent an actual relationship — active discipleship links either
+// direction, shared group membership — deliberately excluding the
+// super_admin/help-request branches, which are permissions, not
+// relationships worth surfacing here. This list is informational only: the
+// RPC is still the real gate at call-start time, so a stale/spoofed id
+// returned here can't grant anything it wouldn't already be entitled to.
+router.get("/study-partners/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  const relationshipById = new Map<string, "peer_guide" | "disciple" | "connection">();
+
+  const { data: peerGuideLinks } = await supabaseWrite
+    .from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", userId).eq("active", true);
+  for (const r of (peerGuideLinks ?? []) as Record<string, unknown>[]) {
+    relationshipById.set(r.mentor_id as string, "peer_guide");
+  }
+
+  const { data: discipleLinks } = await supabaseWrite
+    .from("p2p_discipleship_links").select("disciple_id").eq("mentor_id", userId).eq("active", true);
+  for (const r of (discipleLinks ?? []) as Record<string, unknown>[]) {
+    const id = r.disciple_id as string;
+    if (!relationshipById.has(id)) relationshipById.set(id, "disciple");
+  }
+
+  const { data: myGroups } = await supabaseWrite
+    .from("p2p_group_members").select("group_id").eq("user_id", userId);
+  const groupIds = ((myGroups ?? []) as Record<string, unknown>[]).map((g) => g.group_id as string);
+  if (groupIds.length) {
+    const { data: groupmates } = await supabaseWrite
+      .from("p2p_group_members").select("user_id").in("group_id", groupIds).neq("user_id", userId);
+    for (const r of (groupmates ?? []) as Record<string, unknown>[]) {
+      const id = r.user_id as string;
+      if (!relationshipById.has(id)) relationshipById.set(id, "connection");
+    }
+  }
+
+  const ids = Array.from(relationshipById.keys());
+  if (ids.length === 0) return res.json({ people: [] });
+
+  const { data: profiles } = await supabaseWrite
+    .from("p2p_profiles").select("id, full_name, username, photo_url, country").in("id", ids);
+
+  const rank = { peer_guide: 0, disciple: 1, connection: 2 } as const;
+  const people = ((profiles ?? []) as Record<string, unknown>[])
+    .map((p) => ({
+      id: p.id as string,
+      name: (p.full_name as string) ?? "Someone",
+      username: (p.username as string) ?? null,
+      photoUrl: (p.photo_url as string) ?? null,
+      country: (p.country as string) ?? null,
+      relationship: relationshipById.get(p.id as string) as "peer_guide" | "disciple" | "connection",
+    }))
+    .sort((a, b) => rank[a.relationship] - rank[b.relationship] || a.name.localeCompare(b.name));
+
+  return res.json({ people });
+});
+
 // GET /discipleship/:userId/disciples — powers My Discipleship's "My
 // Disciples" cards, so beyond the base link/profile info it also resolves
 // each disciple's current-module progress and last-activity/wilting status,
