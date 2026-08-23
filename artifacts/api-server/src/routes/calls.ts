@@ -3,6 +3,7 @@ import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
+import { isEligibleStudyPartner } from "../lib/studyPartnerAuth";
 
 const router = Router();
 
@@ -254,12 +255,23 @@ router.post("/calls/sessions/:sessionId/reflection", async (req, res) => {
 // directly; this exposes only {status, completed} for the one lesson both
 // parties are already, mutually, studying together — never raw answers,
 // notes, or evaluations.
+//
+// SECURITY: requesterId/otherUserId are caller-supplied query params, so
+// the mutual-relationship precondition described above must be verified
+// here, not assumed — see isEligibleStudyPartner. Without this check any
+// authenticated caller could substitute an arbitrary otherUserId and read
+// that stranger's real completion status for any lesson (confirmed live
+// during the Study Together Group Expansion investigation).
 router.get("/calls/study-progress", async (req, res) => {
   const { requesterId, otherUserId, lessonId } = req.query as {
     requesterId?: string; otherUserId?: string; lessonId?: string;
   };
   if (!requesterId || !otherUserId || !lessonId) {
     return err(res, "requesterId, otherUserId, and lessonId are required", 400);
+  }
+  const eligible = await isEligibleStudyPartner(supabaseWrite, requesterId, otherUserId);
+  if (!eligible) {
+    return err(res, "Not authorized to view this user's progress", 403);
   }
   const { data, error } = await supabaseWrite
     .from("p2p_lesson_progress")
