@@ -10,6 +10,7 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -43,7 +44,13 @@ export default function AudioCallScreen() {
   const [token, setToken] = useState<string | null>(null);
   const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
 
-  const [connected, setConnected] = useState(false);
+  // Study Together C1 — remoteUids replaces the old singular `connected`
+  // boolean so the call layer itself can hold more than one other party.
+  // `connected` is still derived here (below) so every existing effect
+  // that only ever needed "is someone else here" keeps working unchanged.
+  const [remoteUids, setRemoteUids] = useState<number[]>([]);
+  const connected = remoteUids.length > 0;
+  const [groupParticipants, setGroupParticipants] = useState<CallParticipant[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
@@ -76,7 +83,7 @@ export default function AudioCallScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid);
+        const t = await getToken(params.channelName, myUid, profile?.id);
         if (!cancelled) { setToken(t); setCallState((s) => (s === "connecting" ? "ringing" : s)); }
       } catch {
         if (!cancelled) setCallState("ended");
@@ -121,17 +128,35 @@ export default function AudioCallScreen() {
     uid: myUid,
     enableVideo: false,
     eventHandler: {
-      onUserJoined: () => {
+      onUserJoined: (_connection, uid) => {
         connectedAtRef.current = Date.now();
-        setConnected(true);
         setCallState("connected");
+        setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
       },
-      onUserOffline: () => {
-        setConnected(false);
-        handleEndCall();
+      // Study Together C1: the call now only ends when the LAST remote
+      // participant leaves, not simply "a" participant — for an existing
+      // 1:1 call that's the exact same moment as before (one remote uid
+      // going to zero), so this preserves current behavior unchanged
+      // while letting a group call continue for whoever's left.
+      onUserOffline: (_connection, uid) => {
+        setRemoteUids((prev) => {
+          const next = prev.filter((u) => u !== uid);
+          if (next.length === 0) handleEndCall();
+          return next;
+        });
       },
     },
   });
+
+  // Resolve real names for group calls only (>1 remote party) — the
+  // existing 1:1 path keeps using otherUserId/otherUserName from route
+  // params directly and never calls this.
+  useEffect(() => {
+    if (remoteUids.length <= 1) { setGroupParticipants([]); return; }
+    let cancelled = false;
+    resolveCallParticipants(params.channelName, remoteUids).then((list) => { if (!cancelled) setGroupParticipants(list); });
+    return () => { cancelled = true; };
+  }, [remoteUids, params.channelName]);
 
   // Ticking duration timer, only once the other party has actually joined.
   useEffect(() => {
@@ -220,10 +245,27 @@ export default function AudioCallScreen() {
       <Text style={styles.brand}>P2P Global</Text>
 
       <View style={styles.center}>
-        <View style={styles.avatarCircle}>
-          <Ionicons name="person" size={56} color="rgba(255,255,255,0.6)" />
-        </View>
-        <Text style={styles.name}>{otherName}</Text>
+        {remoteUids.length <= 1 ? (
+          <>
+            <View style={styles.avatarCircle}>
+              <Ionicons name="person" size={56} color="rgba(255,255,255,0.6)" />
+            </View>
+            <Text style={styles.name}>{otherName}</Text>
+          </>
+        ) : (
+          // Study Together C1 group-calling foundation — minimal reusable
+          // layout for >1 remote party. No group Study Together UI here;
+          // this is only the call-layer participant list.
+          <View style={styles.groupParticipantList}>
+            {groupParticipants.map((p) => (
+              <View key={p.uid} style={styles.groupParticipantRow}>
+                <View style={styles.groupParticipantAvatar}><Ionicons name="person" size={18} color="rgba(255,255,255,0.6)" /></View>
+                <Text style={styles.groupParticipantName} numberOfLines={1}>{p.name}</Text>
+              </View>
+            ))}
+            <Text style={styles.name}>{groupParticipants.length + 1} on this call</Text>
+          </View>
+        )}
         {callType !== "audio" && <Text style={styles.subLabel}>{CALL_TYPE_LABEL[callType]}</Text>}
 
         {callState === "connecting" || callState === "ringing" ? (
@@ -295,6 +337,10 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center", marginBottom: 18,
   },
   name: { fontSize: 24, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  groupParticipantList: { alignItems: "center", gap: 8, marginBottom: 10 },
+  groupParticipantRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  groupParticipantAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+  groupParticipantName: { color: "#fff", fontSize: 15, fontFamily: "Inter_500Medium" },
   subLabel: { fontSize: 13, color: "rgba(255,255,255,0.55)", fontFamily: "Inter_400Regular", marginTop: 2 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18 },
   statusText: { color: "rgba(255,255,255,0.7)", fontSize: 14, fontFamily: "Inter_400Regular" },

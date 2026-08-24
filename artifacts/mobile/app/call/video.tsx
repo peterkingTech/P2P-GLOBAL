@@ -12,6 +12,8 @@ import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary }
 import { uidFromUserId } from "@/lib/agoraUid";
 import { lookupVerseForAdmin, type VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
+import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
+import { ParticipantGrid } from "@/components/call/ParticipantGrid";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -109,7 +111,15 @@ export default function VideoCallScreen() {
   const [token, setToken] = useState<string | null>(null);
   const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
 
-  const [remoteUid, setRemoteUid] = useState<number | null>(null);
+  // Study Together C1 — remoteUid (singular) becomes remoteUids (array) so
+  // the call layer can hold more than one other party. `remoteUid` is kept
+  // as a derived single value for everything on the existing 1:1 render
+  // path (fullscreen remote view, poor-connection fallback, etc.), so
+  // that code is untouched when there's exactly one remote party.
+  const [remoteUids, setRemoteUids] = useState<number[]>([]);
+  const remoteUid = remoteUids.length === 1 ? remoteUids[0] : null;
+  const connected = remoteUids.length > 0;
+  const [groupParticipants, setGroupParticipants] = useState<CallParticipant[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
@@ -147,7 +157,7 @@ export default function VideoCallScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid);
+        const t = await getToken(params.channelName, myUid, profile?.id);
         if (!cancelled) { setToken(t); setCallState((s) => (s === "connecting" ? "ringing" : s)); }
       } catch {
         if (!cancelled) setCallState("ended");
@@ -194,16 +204,22 @@ export default function VideoCallScreen() {
     eventHandler: {
       onUserJoined: (_connection, uid) => {
         connectedAtRef.current = Date.now();
-        setRemoteUid(uid);
         setCallState("connected");
+        setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
         if (params.sessionId && !markedInProgressRef.current) {
           markedInProgressRef.current = true;
           void fetch(`${getApiUrl()}/calls/sessions/${params.sessionId}/mark-in-progress`, { method: "POST" });
         }
       },
-      onUserOffline: () => {
-        setRemoteUid(null);
-        handleEndCall();
+      // Study Together C1: ends only when the LAST remote participant
+      // leaves — for an existing 1:1 call that's the same single moment
+      // as before, preserving current behavior unchanged.
+      onUserOffline: (_connection, uid) => {
+        setRemoteUids((prev) => {
+          const next = prev.filter((u) => u !== uid);
+          if (next.length === 0) handleEndCall();
+          return next;
+        });
       },
       onNetworkQuality: (_connection, uid, txQuality, rxQuality) => {
         if (uid !== 0) return; // only the local user's own uplink/downlink
@@ -229,10 +245,20 @@ export default function VideoCallScreen() {
     if (!connectedAtRef.current) return;
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(interval);
-  }, [remoteUid]);
+  }, [connected]);
+
+  // Resolve real names for group calls only (>1 remote party) — the
+  // existing 1:1 path keeps using otherUserId/otherUserName from route
+  // params directly and never calls this.
+  useEffect(() => {
+    if (remoteUids.length <= 1) { setGroupParticipants([]); return; }
+    let cancelled = false;
+    resolveCallParticipants(params.channelName, remoteUids).then((list) => { if (!cancelled) setGroupParticipants(list); });
+    return () => { cancelled = true; };
+  }, [remoteUids, params.channelName]);
 
   useEffect(() => {
-    if (!isInitiator || !params.callId || remoteUid) return;
+    if (!isInitiator || !params.callId || connected) return;
     const channel = supabase
       .channel(`p2p_call_watch_${params.callId}`)
       .on(
@@ -245,7 +271,7 @@ export default function VideoCallScreen() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [isInitiator, params.callId, remoteUid, handleEndCall]);
+  }, [isInitiator, params.callId, connected, handleEndCall]);
 
   function toggleMute() {
     const next = !muted;
@@ -327,7 +353,21 @@ export default function VideoCallScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      {remoteUid !== null && !poorConnection ? (
+      {remoteUids.length > 1 ? (
+        // Study Together C1 group-calling foundation — minimal reusable
+        // grid, no group Study Together content here. The 1:1 fullscreen
+        // + PIP layout below is completely untouched for exactly one
+        // remote party.
+        <ParticipantGrid
+          tiles={[
+            { uid: 0, name: "You", isSelf: true, videoOn: cameraOn },
+            ...remoteUids.map((uid) => ({
+              uid, isSelf: false, videoOn: true,
+              name: groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone",
+            })),
+          ]}
+        />
+      ) : remoteUid !== null && !poorConnection ? (
         <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.remoteFallback]}>
@@ -341,7 +381,7 @@ export default function VideoCallScreen() {
         </View>
       )}
 
-      {cameraOn && (
+      {remoteUids.length <= 1 && cameraOn && (
         <TouchableOpacity style={[styles.pip, { top: insets.top + 16 }]} onPress={toggleBlur} activeOpacity={0.85}>
           <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} zOrderMediaOverlay />
           {blurOn && (

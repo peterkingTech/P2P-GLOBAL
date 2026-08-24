@@ -28,6 +28,33 @@ const APP_ID = process.env.AGORA_APP_ID ?? "";
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE ?? "";
 const TOKEN_EXPIRY_SECONDS = 3600; // 1 hour
 
+// Study Together C1 — Group Calling Foundation. Initial cap on how many
+// real people (including the caller) one p2p_ peer call can hold. Not
+// provider-imposed (Agora has no hard ceiling here) — chosen so the
+// eventual group Study Together UI (participant chips, adaptive video
+// grid) stays legible; see the Group Calling Foundation report for the
+// full reasoning. Raise only after that UI is proven at this size.
+const MAX_CALL_PARTICIPANTS = 6;
+
+// The currently-active (not yet ended) p2p_call_logs row for a peer
+// channel — the single source of truth for "who is actually allowed in
+// this specific call." A channel name is deterministic per pair
+// (`p2p_${sorted}`) and gets reused across every call two people ever
+// have, so this always takes the most recent row and requires
+// status = "initiated" (an ended/missed row is not "active").
+async function getActivePeerCallLog(channelName: string) {
+  const { data, error } = await supabaseWrite
+    .from("p2p_call_logs")
+    .select("id, initiated_by, participants")
+    .eq("channel_name", channelName)
+    .eq("status", "initiated")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { id: string; initiated_by: string; participants: string[] } | null;
+}
+
 function err(res: import("express").Response, message: string, status = 400) {
   return res.status(status).json({ error: message });
 }
@@ -39,14 +66,31 @@ function ok(res: import("express").Response, data: unknown) {
 // No requireAuth middleware exists in this codebase (see discipleship.ts,
 // circles.ts) — every route here trusts the caller-supplied identity the
 // same way the rest of the API does.
+//
+// SECURITY (Study Together C1): for p2p_ peer channels only, the caller
+// must be a recorded participant of that channel's active call log —
+// otherwise knowing/guessing a channelName would be enough to join an
+// unrelated call (see the Group Calling Foundation investigation, §14).
+// Peer Circle (circle_*) and Break Room (room_*) channels are untouched —
+// they already have their own separate membership/join authorization
+// upstream of ever requesting a token, and never write a p2p_call_logs
+// row, so this check does not apply to them.
 router.post("/calls/token", async (req, res) => {
   try {
-    const { channelName, uid } = req.body as { channelName?: string; uid?: number };
+    const { channelName, uid, userId } = req.body as { channelName?: string; uid?: number; userId?: string };
     if (!channelName || uid === undefined || uid === null) {
       return err(res, "channelName and uid required");
     }
     if (!APP_ID || !APP_CERTIFICATE) {
       return err(res, "Agora not configured on server", 500);
+    }
+
+    if (channelName.startsWith("p2p_")) {
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const activeLog = await getActivePeerCallLog(channelName);
+      if (!activeLog || !(activeLog.participants ?? []).includes(userId)) {
+        return err(res, "Not authorized to join this call", 403);
+      }
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;
@@ -64,6 +108,69 @@ router.post("/calls/token", async (req, res) => {
   } catch {
     return err(res, "Failed to generate token", 500);
   }
+});
+
+// GET /calls/participants?channelName= — the real user ids currently
+// authorized in an active p2p_ call. Call screens use this to resolve
+// Agora's numeric uids (via uidFromUserId) back to real participants once
+// a call has more than the one original party — there is no server-side
+// uid registry, so this is the only source of truth for "who is actually
+// in the call" beyond the single otherUserId route param the 1:1 flow
+// already carries.
+router.get("/calls/participants", async (req, res) => {
+  const { channelName } = req.query as { channelName?: string };
+  if (!channelName) return err(res, "channelName required", 400);
+  if (!channelName.startsWith("p2p_")) return ok(res, { participants: [] });
+  try {
+    const activeLog = await getActivePeerCallLog(channelName);
+    return ok(res, { participants: activeLog?.participants ?? [] });
+  } catch (e: any) {
+    return err(res, e?.message ?? "Failed to load participants", 500);
+  }
+});
+
+// POST /calls/join — Study Together C1's controlled participant-entry
+// mechanism: adds userId to an already-active p2p_ call's authorized
+// participant list. This is deliberately NOT an "Add People" feature —
+// there is no invitation/acceptance step here, no UI button calls this
+// yet, and it exists purely as the call-foundation's test/extension
+// point for a later phase to build a real invitation flow on top of.
+// Authorization reuses the same relationship rule as
+// GET /discipleship/study-partners/:userId (isEligibleStudyPartner) —
+// the joiner must have a real relationship with the call's original
+// caller. Idempotent for someone already listed (safe for reconnects).
+router.post("/calls/join", async (req, res) => {
+  const { channelName, userId } = req.body as { channelName?: string; userId?: string };
+  if (!channelName || !userId) return err(res, "channelName and userId required", 400);
+  if (!channelName.startsWith("p2p_")) return err(res, "This call type does not support joining", 400);
+
+  let activeLog;
+  try {
+    activeLog = await getActivePeerCallLog(channelName);
+  } catch (e: any) {
+    return err(res, e?.message ?? "Failed to load call", 500);
+  }
+  if (!activeLog) return err(res, "No active call found for this channel", 404);
+
+  const participants = activeLog.participants ?? [];
+  if (participants.includes(userId)) {
+    return ok(res, { joined: true, participants });
+  }
+  if (participants.length >= MAX_CALL_PARTICIPANTS) {
+    return err(res, "This call has reached its maximum number of participants", 409);
+  }
+
+  const eligible = await isEligibleStudyPartner(supabaseWrite, userId, activeLog.initiated_by);
+  if (!eligible) return err(res, "Not authorized to join this call", 403);
+
+  const nextParticipants = [...participants, userId];
+  const { error: updateErr } = await supabaseWrite
+    .from("p2p_call_logs")
+    .update({ participants: nextParticipants })
+    .eq("id", activeLog.id);
+  if (updateErr) return err(res, updateErr.message, 500);
+
+  return ok(res, { joined: true, participants: nextParticipants });
 });
 
 // POST /calls/peer-channel — deterministic channel name for a 1:1 pair,
