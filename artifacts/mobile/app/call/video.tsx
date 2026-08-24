@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +17,12 @@ import { ParticipantGrid } from "@/components/call/ParticipantGrid";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
+import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
 
 function formatClock(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -138,6 +144,21 @@ export default function VideoCallScreen() {
   const study = useStudySession(params.channelName, params.otherUserId);
   const [autoStudyDismissed, setAutoStudyDismissed] = useState(false);
   const hasAutoStudy = !!(params.autoStudyLessonId && params.autoStudyModuleId);
+  // Study Together C2 — Add People. Available once connected and while
+  // there's room for at least one more (6 total, including self).
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
+  const canAddPeople = callState === "connected" && remoteUids.length < 5;
+
+  // Same C1 integration gap closed here per C2 §25 as audio.tsx — Study
+  // Together only ever assumes exactly one other party; block it with a
+  // clear message for 3+ participants until Group Study Together (C3).
+  function handleOpenStudy() {
+    if (remoteUids.length > 1) {
+      showAlert("Group Study Together is coming soon", "Study Together is currently available for two-person calls.");
+      return;
+    }
+    setChooseLessonOpen(true);
+  }
 
   useEffect(() => {
     if (study.isActive) setMode("study");
@@ -433,13 +454,18 @@ export default function VideoCallScreen() {
             <Ionicons name="book" size={20} color="#fff" />
           </TouchableOpacity>
           {callState === "connected" && (
-            <TouchableOpacity style={styles.controlBtn} onPress={() => setChooseLessonOpen(true)}>
+            <TouchableOpacity style={styles.controlBtn} onPress={handleOpenStudy}>
               <Ionicons name="school" size={20} color="#fff" />
             </TouchableOpacity>
           )}
           {sessionQuestions.length > 0 && (
             <TouchableOpacity style={styles.controlBtn} onPress={() => setLessonSidebarVisible(true)}>
               <Ionicons name="list" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+          {canAddPeople && (
+            <TouchableOpacity style={styles.controlBtn} onPress={() => setAddPeopleOpen(true)}>
+              <Ionicons name="person-add" size={20} color="#fff" />
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleEndCall}>
@@ -449,6 +475,10 @@ export default function VideoCallScreen() {
       </View>
 
       <ScriptureModal visible={scriptureVisible} onClose={() => setScriptureVisible(false)} />
+
+      {params.callLogId && (
+        <AddPeopleSheet visible={addPeopleOpen} onClose={() => setAddPeopleOpen(false)} callId={params.callLogId} />
+      )}
 
       <ChooseLessonSheet
         visible={chooseLessonOpen}

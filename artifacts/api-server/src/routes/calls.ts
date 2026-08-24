@@ -3,7 +3,7 @@ import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
-import { isEligibleStudyPartner } from "../lib/studyPartnerAuth";
+import { isEligibleStudyPartner, getEligibleStudyPartners } from "../lib/studyPartnerAuth";
 
 const router = Router();
 
@@ -60,6 +60,25 @@ function err(res: import("express").Response, message: string, status = 400) {
 }
 function ok(res: import("express").Response, data: unknown) {
   return res.json(data);
+}
+
+// Study Together C2 — Add People + Invitations. Every other route in this
+// file (and this whole codebase — see the comment above) trusts a
+// caller-supplied id in the request body, since there's no requireAuth
+// middleware anywhere in this API. The C2 spec explicitly requires real
+// identity verification for who's allowed to invite/accept into a call —
+// never trust a client-supplied inviterId/inviteeId as proof of identity —
+// so these invitation endpoints alone verify the caller's actual Supabase
+// session via their access token. This is a scoped exception for this one
+// feature, not a codebase-wide auth overhaul.
+const authClient = createClient(SUPABASE_URL, ANON_KEY);
+async function verifyCaller(req: import("express").Request): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const { data, error } = await authClient.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
 }
 
 // POST /calls/token — mint an Agora RTC token for a channel + numeric uid.
@@ -173,6 +192,140 @@ router.post("/calls/join", async (req, res) => {
   return ok(res, { joined: true, participants: nextParticipants });
 });
 
+// GET /calls/:callId/inviteable-people — relationship-scoped, excludes
+// anyone already in the call. Reuses getEligibleStudyPartners (the same
+// relationship rule as GET /discipleship/study-partners/:userId) rather
+// than a second definition of "study partner."
+router.get("/calls/:callId/inviteable-people", async (req, res) => {
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("id, status, participants").eq("id", callId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  const participants = (callLog.participants as string[]) ?? [];
+  if (!participants.includes(requesterId)) return err(res, "Not authorized for this call", 403);
+
+  const relationshipById = await getEligibleStudyPartners(supabaseWrite, requesterId);
+  const eligibleIds = Array.from(relationshipById.keys()).filter((id) => !participants.includes(id));
+
+  const { data: pendingInvites } = await supabaseWrite
+    .from("p2p_call_invitations").select("invitee_id")
+    .eq("call_id", callId).eq("status", "pending").gt("expires_at", new Date().toISOString());
+  const pendingIds = new Set((pendingInvites ?? []).map((i) => i.invitee_id as string));
+
+  if (eligibleIds.length === 0) return ok(res, { people: [] });
+  const { data: profiles } = await supabaseWrite
+    .from("p2p_profiles").select("id, full_name, username, photo_url").in("id", eligibleIds);
+
+  const rank = { peer_guide: 0, disciple: 1, connection: 2 } as const;
+  const people = ((profiles ?? []) as Record<string, unknown>[])
+    .map((p) => ({
+      userId: p.id as string,
+      displayName: (p.full_name as string) ?? "Someone",
+      username: (p.username as string) ?? null,
+      photoUrl: (p.photo_url as string) ?? null,
+      relationship: relationshipById.get(p.id as string)!,
+      invitationPending: pendingIds.has(p.id as string),
+    }))
+    .sort((a, b) => rank[a.relationship] - rank[b.relationship] || a.displayName.localeCompare(b.displayName));
+
+  return ok(res, { people });
+});
+
+// POST /calls/:callId/invitations — body { inviteeId }. Inviter identity
+// comes from the verified session, never req.body. Eligibility reuses
+// isEligibleStudyPartner; capacity/duplicate/membership checks run
+// atomically in p2p_create_call_invitation (SQL, row-locked — see
+// migration 083) so concurrent invitations can't overrun the 6-person cap.
+// On success, also writes a p2p_incoming_calls row so the invitee is
+// notified through the app's existing ringing-call mechanism (realtime
+// subscription -> IncomingCallHost -> call/incoming.tsx) instead of a
+// second notification system.
+router.post("/calls/:callId/invitations", async (req, res) => {
+  const inviterId = await verifyCaller(req);
+  if (!inviterId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+  const { inviteeId } = req.body as { inviteeId?: string };
+  if (!inviteeId) return err(res, "inviteeId required", 400);
+
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("id, channel_name, call_type, conversation_id, status").eq("id", callId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  if (callLog.status !== "initiated") return err(res, "This call has ended", 410);
+
+  const eligible = await isEligibleStudyPartner(supabaseWrite, inviterId, inviteeId);
+  if (!eligible) return err(res, "This person cannot be added to this call", 403);
+
+  const { data: invitationId, error: rpcErr } = await supabaseWrite.rpc("p2p_create_call_invitation", {
+    p_call_id: callId, p_inviter_id: inviterId, p_invitee_id: inviteeId,
+  });
+  if (rpcErr) {
+    const reason = rpcErr.message ?? "";
+    if (reason.includes("call_full")) return err(res, "This call is already full.", 409);
+    if (reason.includes("invitation_pending")) return err(res, "An invitation is already pending.", 409);
+    if (reason.includes("already_in_call")) return err(res, "This person is already in the call.", 409);
+    if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
+    if (reason.includes("call_ended")) return err(res, "This call has ended", 410);
+    if (reason.includes("call_not_found")) return err(res, "Call not found", 404);
+    return err(res, "Unable to invite this person.", 500);
+  }
+
+  const { data: inviterProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", inviterId).maybeSingle();
+  await supabaseWrite.from("p2p_incoming_calls").insert({
+    channel_name: callLog.channel_name, call_type: callLog.call_type,
+    caller_id: inviterId, recipient_id: inviteeId, status: "ringing",
+    conversation_id: callLog.conversation_id ?? null, call_log_id: callLog.id, invitation_id: invitationId,
+  });
+  void inviterProfile; // name resolution happens client-side same as any other incoming call
+
+  return ok(res, { success: true, invitationId, status: "pending" });
+});
+
+// POST /calls/invitations/:id/accept — invitee identity from the verified
+// session, never req.body. All capacity/expiry/status checks happen
+// atomically in p2p_accept_call_invitation (SQL, row-locked).
+router.post("/calls/invitations/:id/accept", async (req, res) => {
+  const invitee = await verifyCaller(req);
+  if (!invitee) return err(res, "Unauthorized", 401);
+  const { id } = req.params;
+
+  const { data, error } = await supabaseWrite.rpc("p2p_accept_call_invitation", {
+    p_invitation_id: id, p_invitee_id: invitee,
+  });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("call_full")) return err(res, "This call is already full.", 409);
+    if (reason.includes("invitation_expired")) return err(res, "This invitation is no longer available.", 410);
+    if (reason.includes("invitation_already_used")) return err(res, "This invitation has already been handled.", 409);
+    if (reason.includes("not_your_invitation")) return err(res, "Not authorized", 403);
+    if (reason.includes("invitation_not_found")) return err(res, "Invitation not found", 404);
+    if (reason.includes("call_ended")) return err(res, "This call has ended", 410);
+    return err(res, "Unable to join this call.", 500);
+  }
+
+  return ok(res, data);
+});
+
+// POST /calls/invitations/:id/decline — invitee identity from the
+// verified session.
+router.post("/calls/invitations/:id/decline", async (req, res) => {
+  const invitee = await verifyCaller(req);
+  if (!invitee) return err(res, "Unauthorized", 401);
+  const { id } = req.params;
+
+  const { data: invitation } = await supabaseWrite.from("p2p_call_invitations").select("invitee_id, status").eq("id", id).maybeSingle();
+  if (!invitation) return err(res, "Invitation not found", 404);
+  if (invitation.invitee_id !== invitee) return err(res, "Not authorized", 403);
+  if (invitation.status !== "pending") return ok(res, { declined: true });
+
+  const { error } = await supabaseWrite
+    .from("p2p_call_invitations").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", id);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { declined: true });
+});
+
 // POST /calls/peer-channel — deterministic channel name for a 1:1 pair,
 // sorted so both sides compute the same name regardless of who initiates.
 router.post("/calls/peer-channel", async (req, res) => {
@@ -253,6 +406,17 @@ router.post("/calls/end", async (req, res) => {
     .update({ status: connected ? "ended" : "missed", ended_at: new Date().toISOString(), duration_seconds: duration })
     .eq("id", callLogId);
   if (updateErr) return err(res, updateErr.message, 500);
+
+  // Study Together C2 — a call ending invalidates every outstanding
+  // invitation for it; p2p_accept_call_invitation would also catch this
+  // lazily (it checks the call's status), but cancelling proactively means
+  // an invitee's incoming-call screen doesn't sit ringing for a call that
+  // no longer exists.
+  await supabaseWrite
+    .from("p2p_call_invitations")
+    .update({ status: "cancelled", responded_at: new Date().toISOString() })
+    .eq("call_id", callLogId)
+    .eq("status", "pending");
 
   if (conversationId) {
     const label = CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call";

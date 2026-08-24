@@ -1,10 +1,16 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Platform, Alert, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
+import { acceptCallInvitation, declineCallInvitation } from "@/lib/callInvitations";
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
 
 const RING_TIMEOUT_MS = 30000;
 
@@ -20,16 +26,23 @@ export default function IncomingCallScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     callId: string; channelName: string; callType: CallType; callerId: string; callerName?: string;
-    conversationId?: string; callLogId?: string;
+    conversationId?: string; callLogId?: string; invitationId?: string;
   }>();
   const callType = (params.callType as CallType) ?? "audio";
   const callerName = params.callerName || "Someone";
   // Crisis calls cannot be declined — accepting is the only option (see
   // Prompt 5 Watchtower integration). Every other call type can be.
   const isCrisis = callType === "crisis";
+  // Study Together C2 — this ringing screen is reused verbatim for both an
+  // ordinary 1:1 call AND an Add People invitation into an existing group
+  // call; invitationId (only set for the latter) is what tells Answer to
+  // run the real capacity/authorization check before joining, instead of
+  // just settling the row and navigating straight in.
+  const isInvitation = !!params.invitationId;
 
   const pulse = useRef(new Animated.Value(1)).current;
   const settledRef = useRef(false);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -64,10 +77,44 @@ export default function IncomingCallScreen() {
 
   async function handleDecline() {
     await settle("declined");
+    if (isInvitation && params.invitationId) {
+      declineCallInvitation(params.invitationId).catch(() => { /* the row is already settled locally either way */ });
+    }
     if (router.canGoBack()) router.back();
   }
 
   async function handleAnswer() {
+    if (joining) return;
+    // Invitation-derived ringing calls must run the real accept flow first
+    // — capacity/expiry/authorization are all re-checked atomically
+    // server-side (migration 083) — rather than settling and navigating
+    // straight in, which would let a stale or full-call invitation through.
+    if (isInvitation && params.invitationId) {
+      setJoining(true);
+      try {
+        const result = await acceptCallInvitation(params.invitationId);
+        settledRef.current = true; // this invitation flow owns settlement, not the plain p2p_incoming_calls update
+        const pathname = result.callType === "video" ? "/call/video" : "/call/audio";
+        router.replace({
+          pathname,
+          params: {
+            channelName: result.channelName,
+            otherUserId: params.callerId,
+            otherUserName: callerName,
+            callType: result.callType,
+            isInitiator: "false",
+            callId: params.callId,
+            conversationId: result.conversationId ?? "",
+            callLogId: result.callLogId,
+          },
+        } as any);
+      } catch (e: any) {
+        setJoining(false);
+        showAlert("Couldn't join", e?.message ?? "Please try again.");
+      }
+      return;
+    }
+
     await settle("accepted");
     const pathname = callType === "video" ? "/call/video" : "/call/audio";
     router.replace({
@@ -96,7 +143,9 @@ export default function IncomingCallScreen() {
         </View>
 
         <Text style={styles.callerName}>{callerName}</Text>
-        <Text style={styles.callingText}>{isCrisis ? "needs you now" : "is calling you..."}</Text>
+        <Text style={styles.callingText}>
+          {isCrisis ? "needs you now" : isInvitation ? "invited you to join a call" : "is calling you..."}
+        </Text>
 
         <View style={styles.typeChip}>
           <Ionicons name={callType === "video" ? "videocam" : "call"} size={14} color="#fff" />
@@ -111,8 +160,8 @@ export default function IncomingCallScreen() {
             <Text style={styles.circleBtnLabel}>Decline</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.circleBtn, styles.answerBtn]} onPress={handleAnswer} activeOpacity={0.85}>
-          <Ionicons name="checkmark" size={30} color="#fff" />
+        <TouchableOpacity style={[styles.circleBtn, styles.answerBtn]} onPress={handleAnswer} activeOpacity={0.85} disabled={joining}>
+          {joining ? <ActivityIndicator color="#fff" /> : <Ionicons name="checkmark" size={30} color="#fff" />}
           <Text style={styles.circleBtnLabel}>Answer</Text>
         </TouchableOpacity>
       </View>

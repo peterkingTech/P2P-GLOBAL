@@ -879,6 +879,10 @@ export interface IncomingCallInfo {
   callerName: string;
   conversationId: string | null;
   callLogId: string | null;
+  // Study Together C2 — set only when this ringing row was created by an
+  // Add People invitation (not an ordinary 1:1 call); tells
+  // call/incoming.tsx to run the invitation-accept flow before navigating.
+  invitationId: string | null;
 }
 
 // A Peer Circle "Start Session" invite banner for the current user — set the
@@ -2576,6 +2580,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             callerName: (callerProfile?.full_name as string) ?? "Someone",
             conversationId: (row.conversation_id as string) ?? null,
             callLogId: (row.call_log_id as string) ?? null,
+            invitationId: (row.invitation_id as string) ?? null,
           });
         }
       )

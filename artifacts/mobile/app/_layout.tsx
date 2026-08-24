@@ -223,6 +223,7 @@ function IncomingCallHost() {
         callerName: incomingCall.callerName,
         conversationId: incomingCall.conversationId ?? "",
         callLogId: incomingCall.callLogId ?? "",
+        invitationId: incomingCall.invitationId ?? "",
       },
     } as any);
     dismissIncomingCall();

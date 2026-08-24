@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { getEligibleStudyPartners } from "../lib/studyPartnerAuth";
 
 const router = Router();
 
@@ -68,32 +69,7 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
 router.get("/study-partners/:userId", async (req, res) => {
   const { userId } = req.params;
 
-  const relationshipById = new Map<string, "peer_guide" | "disciple" | "connection">();
-
-  const { data: peerGuideLinks } = await supabaseWrite
-    .from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", userId).eq("active", true);
-  for (const r of (peerGuideLinks ?? []) as Record<string, unknown>[]) {
-    relationshipById.set(r.mentor_id as string, "peer_guide");
-  }
-
-  const { data: discipleLinks } = await supabaseWrite
-    .from("p2p_discipleship_links").select("disciple_id").eq("mentor_id", userId).eq("active", true);
-  for (const r of (discipleLinks ?? []) as Record<string, unknown>[]) {
-    const id = r.disciple_id as string;
-    if (!relationshipById.has(id)) relationshipById.set(id, "disciple");
-  }
-
-  const { data: myGroups } = await supabaseWrite
-    .from("p2p_group_members").select("group_id").eq("user_id", userId);
-  const groupIds = ((myGroups ?? []) as Record<string, unknown>[]).map((g) => g.group_id as string);
-  if (groupIds.length) {
-    const { data: groupmates } = await supabaseWrite
-      .from("p2p_group_members").select("user_id").in("group_id", groupIds).neq("user_id", userId);
-    for (const r of (groupmates ?? []) as Record<string, unknown>[]) {
-      const id = r.user_id as string;
-      if (!relationshipById.has(id)) relationshipById.set(id, "connection");
-    }
-  }
+  const relationshipById = await getEligibleStudyPartners(supabaseWrite, userId);
 
   const ids = Array.from(relationshipById.keys());
   if (ids.length === 0) return res.json({ people: [] });
