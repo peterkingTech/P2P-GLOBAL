@@ -5,12 +5,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchCohort, ChurchAnnouncement, LearningGoal } from "@/contexts/DataContext";
 import { ChurchQRCode } from "@/components/ChurchQRCode";
+import { churchRoleLabel } from "@/constants/churchRoles";
 import colors from "@/constants/colors";
 
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userChurch, isChurchLeader, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData, getLearningGoalsDashboard } = useData();
+  const { userChurch, userChurchRole, isChurchLeader, isChurchCreator, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData, getLearningGoalsDashboard } = useData();
   const [loading, setLoading] = useState(true);
   const [cohorts, setCohorts] = useState<ChurchCohort[]>([]);
   const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>([]);
@@ -86,6 +87,10 @@ export default function ChurchHomeScreen() {
             {[userChurch.city, userChurch.country].filter(Boolean).join(", ")}
             {isChurchLeader ? ` · ${churchMemberCount} members` : ""}
           </Text>
+          <View style={[styles.roleBadge, isChurchCreator && styles.roleBadgeOverseer]}>
+            <Ionicons name={isChurchCreator ? "star" : "person"} size={11} color={isChurchCreator ? "#D97706" : colors.accentGreen} />
+            <Text style={[styles.roleBadgeText, isChurchCreator && styles.roleBadgeTextOverseer]}>{churchRoleLabel(userChurchRole)}</Text>
+          </View>
         </View>
       </View>
 
@@ -137,6 +142,9 @@ export default function ChurchHomeScreen() {
           <View style={{ gap: 10, marginTop: 16 }}>
             <NavRow icon="leaf-outline" label="Grove Dashboard" onPress={() => router.push("/church/grove" as any)} />
             <NavRow icon="people-outline" label="Members" onPress={() => router.push("/church/members" as any)} />
+            {isChurchCreator && (
+              <NavRow icon="shield-checkmark-outline" label="Church Admins" onPress={() => router.push("/church/settings/admins" as any)} />
+            )}
             <NavRow icon="school-outline" label="Cohorts" onPress={() => router.push("/church/cohorts" as any)} />
             <NavRow icon="megaphone-outline" label="Announcements" onPress={() => router.push("/church/announcements" as any)} />
             <NavRow icon="settings-outline" label="Church Settings" onPress={() => router.push("/church/settings" as any)} />
@@ -218,6 +226,13 @@ const styles = StyleSheet.create({
   logoPlaceholder: { width: 56, height: 56, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   churchName: { fontSize: 19, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
   churchLocation: { fontSize: 13, color: colors.lightGreen, opacity: 0.8, marginTop: 2, fontFamily: "Inter_400Regular" },
+  roleBadge: {
+    flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start",
+    backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6,
+  },
+  roleBadgeOverseer: { backgroundColor: "rgba(217,119,6,0.15)" },
+  roleBadgeText: { fontSize: 11, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
+  roleBadgeTextOverseer: { color: "#D97706" },
   sectionTitle: { fontSize: 12, fontWeight: "700", color: colors.lightGreen, opacity: 0.7, marginTop: 20, marginBottom: 10, textTransform: "uppercase", fontFamily: "Inter_700Bold" },
   statsCard: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", padding: 14, gap: 10 },
   statRow: { flexDirection: "row", alignItems: "center", gap: 10 },

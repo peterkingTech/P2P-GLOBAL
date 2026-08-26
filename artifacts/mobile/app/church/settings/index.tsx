@@ -20,6 +20,7 @@ const SECTIONS: Section[] = [
   { emoji: "📍", title: "Profile", subtitle: "Location, contact, website", route: "/church/settings/profile", creatorOnly: true },
   { emoji: "🎨", title: "Branding", subtitle: "Church logo", route: "/church/settings/branding", creatorOnly: true },
   { emoji: "🔗", title: "Social Media", subtitle: "Facebook, Instagram, YouTube, and more", route: "/church/settings/social-media", creatorOnly: true },
+  { emoji: "🛡️", title: "Church Admins", subtitle: "Add or remove church administrators", route: "/church/settings/admins", creatorOnly: true },
   { emoji: "🎯", title: "Learning", subtitle: "Lesson of the day/week/month, learning goals", route: "/church/settings/learning" },
   { emoji: "📢", title: "Announcements", subtitle: "Drafts, scheduled, and published posts", route: "/church/settings/announcements" },
   { emoji: "🔒", title: "Privacy", subtitle: "Location visibility", route: "/church/settings/privacy", creatorOnly: true },

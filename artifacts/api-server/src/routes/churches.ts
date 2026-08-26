@@ -1,14 +1,19 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
-// Same trust model as discipleship.ts/connections.ts/calls.ts — no
-// requireAuth/requireAdmin middleware exists for this non-admin surface
-// (church leadership is a per-church role in p2p_church_members, orthogonal
-// to the global admin_* role system admin.ts gates on), so every endpoint
-// takes a caller-supplied requesterId and authorizes inline against
-// p2p_church_members, same as the rest of this API.
+// Church Portal hardening — every endpoint below used to take a
+// caller-supplied requesterId from the body/query and trust it outright, the
+// same shape calls.ts/notifications.ts/groupStudy.ts moved away from via
+// verifyCaller (a real Supabase JWT check). That meant any authenticated
+// caller could impersonate any other user in every church-scoped action
+// (register a church as someone else, read/manage another church's members,
+// remove admins, etc.) just by knowing their uuid. Identity now always comes
+// from verifyCaller; authorization still runs inline against
+// p2p_church_members exactly as before, orthogonal to the global admin_*
+// role system admin.ts gates on.
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
     ? process.env.SUPABASE_DB_URL
@@ -123,13 +128,15 @@ const MAX_SOCIAL_ACCOUNTS = 8;
 // POST /churches — any authenticated user registers a church and becomes
 // its senior_pastor.
 router.post("/churches", async (req, res) => {
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const {
-    requesterId, name, description, city, country, country_code, timezone,
+    name, description, city, country, country_code, timezone,
     denomination, language_code, contact_email, contact_name, website,
     church_type, church_type_other, location_hidden, logo_url, social_accounts,
   } = req.body as Record<string, unknown>;
-  if (!requesterId || typeof name !== "string" || !name.trim() || typeof country !== "string" || !country.trim()) {
-    return err(res, "requesterId, name, and country are required", 400);
+  if (typeof name !== "string" || !name.trim() || typeof country !== "string" || !country.trim()) {
+    return err(res, "name and country are required", 400);
   }
   const socialAccounts = Array.isArray(social_accounts) ? social_accounts as { platform?: string; handleOrUrl?: string }[] : [];
   if (socialAccounts.length > MAX_SOCIAL_ACCOUNTS) return err(res, `A church may list at most ${MAX_SOCIAL_ACCOUNTS} social media accounts`, 400);
@@ -188,13 +195,14 @@ router.post("/churches", async (req, res) => {
   return res.status(201).json(mapChurch(church as Record<string, unknown>));
 });
 
-// GET /churches/check-duplicate?requesterId=&name=&city=&country=&website=
+// GET /churches/check-duplicate?name=&city=&country=&website= (identity from Bearer token)
 // Soft, non-blocking signal for the registration Review step — never
 // automatically merges or rejects, per the spec's explicit "many churches
 // can share names" guidance.
 router.get("/churches/check-duplicate", async (req, res) => {
-  const { requesterId, name, country, website } = req.query as Record<string, string | undefined>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { name, country, website } = req.query as Record<string, string | undefined>;
   if (!name?.trim() && !website?.trim()) return ok(res, { matches: [] });
 
   const orParts: string[] = [];
@@ -209,10 +217,10 @@ router.get("/churches/check-duplicate", async (req, res) => {
   return ok(res, { matches: (data ?? []).map((c) => ({ id: c.id, name: c.name, city: c.city, country: c.country, website: c.website })) });
 });
 
-// GET /churches/my-church?requesterId=
+// GET /churches/my-church (identity from Bearer token)
 router.get("/churches/my-church", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
 
   const { data: membership } = await db
     .from("p2p_church_members").select("church_id, role").eq("user_id", requesterId).eq("is_active", true).maybeSingle();
@@ -232,7 +240,7 @@ router.get("/churches/my-church", async (req, res) => {
   });
 });
 
-// GET /churches/:churchId?requesterId= — members only.
+// GET /churches/:churchId — members only (identity from Bearer token).
 // GET /churches/by-code/:inviteCode — public, no auth. Registered before the
 // /churches/:churchId route below so Express doesn't swallow "by-code" as a
 // churchId param. Powers the Netlify share-landing page a scanned QR/link
@@ -263,8 +271,8 @@ router.get("/churches/by-code/:inviteCode", async (req, res) => {
 
 router.get("/churches/:churchId", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const membership = await getMembership(churchId, requesterId);
   if (!membership?.is_active) return err(res, "Church not found", 404);
 
@@ -286,12 +294,13 @@ const CHURCH_EDITABLE_FIELDS: Record<string, string> = {
 };
 router.put("/churches/:churchId", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, ...fields } = req.body as Record<string, unknown>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const fields = req.body as Record<string, unknown>;
 
   const church = await getChurch(churchId);
   if (!church) return err(res, "Church not found", 404);
-  if (!isCreator(church, requesterId as string)) {
+  if (!isCreator(church, requesterId)) {
     return err(res, "Only the church's original creator can change these settings", 403);
   }
 
@@ -307,11 +316,11 @@ router.put("/churches/:churchId", async (req, res) => {
   return ok(res, mapChurch(data as Record<string, unknown>));
 });
 
-// GET /churches/:churchId/social-accounts?requesterId= — member-readable.
+// GET /churches/:churchId/social-accounts — member-readable (identity from Bearer token).
 router.get("/churches/:churchId/social-accounts", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 
@@ -326,8 +335,9 @@ router.get("/churches/:churchId/social-accounts", async (req, res) => {
 // list in the settings UI.
 router.put("/churches/:churchId/social-accounts", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, accounts } = req.body as { requesterId?: string; accounts?: { platform?: string; handleOrUrl?: string }[] };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { accounts } = req.body as { accounts?: { platform?: string; handleOrUrl?: string }[] };
   const church = await getChurch(churchId);
   if (!church) return err(res, "Church not found", 404);
   if (!isCreator(church, requesterId)) return err(res, "Only the church's original creator can manage social media accounts", 403);
@@ -350,10 +360,12 @@ router.put("/churches/:churchId/social-accounts", async (req, res) => {
   return ok(res, { ok: true });
 });
 
-// POST /churches/join — { requesterId, inviteCode }
+// POST /churches/join — { inviteCode } (identity from Bearer token)
 router.post("/churches/join", async (req, res) => {
-  const { requesterId, inviteCode } = req.body as { requesterId?: string; inviteCode?: string };
-  if (!requesterId || !inviteCode?.trim()) return err(res, "requesterId and inviteCode are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { inviteCode } = req.body as { inviteCode?: string };
+  if (!inviteCode?.trim()) return err(res, "inviteCode is required", 400);
 
   const { data: church } = await db.from("p2p_churches").select("*").eq("invite_code", inviteCode.trim()).eq("status", "active").maybeSingle();
   if (!church) return err(res, "Invalid invite code", 404);
@@ -373,20 +385,38 @@ router.post("/churches/join", async (req, res) => {
   return ok(res, mapChurch(church as Record<string, unknown>));
 });
 
-// PUT /churches/:churchId/members/:userId/role — senior_pastor only.
+// PUT /churches/:churchId/members/:userId/role — General Overseer (the
+// church's creator) only. This is the church's Church Admin management
+// action (assigning/revoking discipleship_pastor/small_group_leader —
+// labeled "Church Admin" in the UI, see constants/churchRoles.ts), so it's
+// gated on ownership (isCreator) rather than the broader senior_pastor role
+// check this used to have — a defense-in-depth distinction, since today
+// senior_pastor is structurally always the creator (nothing else can grant
+// or move that role), but ownership is the actually-intended authority axis
+// per the Church Portal spec ("only the General Overseer manages church
+// administrators"), not incidental role equivalence. Also blocks a caller
+// from changing their own role through this endpoint, and blocks targeting
+// the creator, so the General Overseer can never be demoted or reassigned
+// by this route.
 router.put("/churches/:churchId/members/:userId/role", async (req, res) => {
   const { churchId, userId } = req.params;
-  const { requesterId, role } = req.body as { requesterId?: string; role?: string };
-  if (!requesterId || !role) return err(res, "requesterId and role are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { role } = req.body as { role?: string };
+  if (!role) return err(res, "role is required", 400);
   const validRoles = ["discipleship_pastor", "small_group_leader", "peer_guide", "member"];
   if (!validRoles.includes(role)) return err(res, `role must be one of: ${validRoles.join(", ")}`, 400);
 
-  const requester = await getMembership(churchId, requesterId);
-  if (requester?.role !== "senior_pastor") return err(res, "Only the senior pastor can change roles", 403);
+  const church = await getChurch(churchId);
+  if (!church) return err(res, "Church not found", 404);
+  if (!isCreator(church, requesterId)) return err(res, "Only the General Overseer can change member roles", 403);
+  if (requesterId === userId) return err(res, "You cannot change your own role", 400);
 
   const target = await getMembership(churchId, userId);
   if (!target) return err(res, "Member not found", 404);
-  if (target.role === "senior_pastor") return err(res, "Cannot change the senior pastor's role", 400);
+  if (isCreator(church, userId) || target.role === "senior_pastor") {
+    return err(res, "The General Overseer's role cannot be changed", 400);
+  }
 
   const { error } = await db.from("p2p_church_members").update({ role }).eq("church_id", churchId).eq("user_id", userId);
   if (error) return err(res, error.message, 500);
@@ -394,11 +424,16 @@ router.put("/churches/:churchId/members/:userId/role", async (req, res) => {
 });
 
 // DELETE /churches/:churchId/members/:userId — senior/discipleship pastor
-// removing someone else, OR any member removing themselves (leaving).
+// removing someone else, OR any member removing themselves (leaving). A
+// Church Admin (discipleship_pastor/small_group_leader) may still remove an
+// ordinary member, but removing a FELLOW Church Admin is restricted to the
+// General Overseer — "GO manages admins" shouldn't mean admins manage each
+// other. The General Overseer themself can never be removed by anyone.
+const CHURCH_ADMIN_ROLES = ["discipleship_pastor", "small_group_leader"];
 router.delete("/churches/:churchId/members/:userId", async (req, res) => {
   const { churchId, userId } = req.params;
-  const { requesterId } = req.body as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const isSelf = requesterId === userId;
 
   const requester = await getMembership(churchId, requesterId);
@@ -406,9 +441,14 @@ router.delete("/churches/:churchId/members/:userId", async (req, res) => {
     return err(res, "Only church leadership can remove other members", 403);
   }
 
+  const church = await getChurch(churchId);
+  if (!church) return err(res, "Church not found", 404);
   const target = await getMembership(churchId, userId);
-  if (target?.role === "senior_pastor") {
-    return err(res, "The senior pastor cannot be removed — appoint a new senior pastor first", 400);
+  if (target?.role === "senior_pastor" || isCreator(church, userId)) {
+    return err(res, "The General Overseer cannot be removed", 400);
+  }
+  if (!isSelf && target && CHURCH_ADMIN_ROLES.includes(target.role) && !isCreator(church, requesterId)) {
+    return err(res, "Only the General Overseer can remove a Church Admin", 403);
   }
 
   const { error } = await db.from("p2p_church_members").update({ is_active: false }).eq("church_id", churchId).eq("user_id", userId);
@@ -450,11 +490,11 @@ async function getActiveChurchMemberIds(churchId: string): Promise<string[]> {
   return (data ?? []).map((m) => m.user_id as string);
 }
 
-// GET /churches/:churchId/grove?requesterId= — leadership only.
+// GET /churches/:churchId/grove — leadership only (identity from Bearer token).
 router.get("/churches/:churchId/grove", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -590,11 +630,12 @@ router.get("/churches/:churchId/grove", async (req, res) => {
 
 // ── Members list / profile ────────────────────────────────────────────────────
 
-// GET /churches/:churchId/members?requesterId=&search=&activeOnly=&cohortId=
+// GET /churches/:churchId/members?search=&activeOnly=&cohortId= (identity from Bearer token)
 router.get("/churches/:churchId/members", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, search } = req.query as { requesterId?: string; search?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { search } = req.query as { search?: string };
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -642,11 +683,11 @@ router.get("/churches/:churchId/members", async (req, res) => {
     }));
 });
 
-// GET /churches/:churchId/members/:userId?requesterId= — leadership only.
+// GET /churches/:churchId/members/:userId — leadership only (identity from Bearer token).
 router.get("/churches/:churchId/members/:userId", async (req, res) => {
   const { churchId, userId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -703,8 +744,9 @@ router.get("/churches/:churchId/members/:userId", async (req, res) => {
 // PUT /churches/:churchId/members/:userId/notes — leadership only.
 router.put("/churches/:churchId/members/:userId/notes", async (req, res) => {
   const { churchId, userId } = req.params;
-  const { requesterId, notes } = req.body as { requesterId?: string; notes?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { notes } = req.body as { notes?: string };
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -726,8 +768,10 @@ function mapCohort(row: Record<string, unknown>) {
 
 router.post("/churches/:churchId/cohorts", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, name, description, curriculumId, moduleId, leaderId, targetStartDate, targetEndDate, maxMembers } = req.body as Record<string, any>;
-  if (!requesterId || !name?.trim()) return err(res, "requesterId and name are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { name, description, curriculumId, moduleId, leaderId, targetStartDate, targetEndDate, maxMembers } = req.body as Record<string, any>;
+  if (!name?.trim()) return err(res, "name is required", 400);
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only senior/discipleship pastors can create cohorts", 403);
 
@@ -743,8 +787,8 @@ router.post("/churches/:churchId/cohorts", async (req, res) => {
 
 router.get("/churches/:churchId/cohorts", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 
@@ -772,8 +816,9 @@ router.get("/churches/:churchId/cohorts", async (req, res) => {
 
 router.put("/churches/:churchId/cohorts/:cohortId", async (req, res) => {
   const { churchId, cohortId } = req.params;
-  const { requesterId, ...fields } = req.body as Record<string, any>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const fields = req.body as Record<string, any>;
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only senior/discipleship pastors can update cohorts", 403);
 
@@ -794,8 +839,10 @@ router.put("/churches/:churchId/cohorts/:cohortId", async (req, res) => {
 
 router.post("/churches/:churchId/cohorts/:cohortId/members", async (req, res) => {
   const { churchId, cohortId } = req.params;
-  const { requesterId, userId, username } = req.body as { requesterId?: string; userId?: string; username?: string };
-  if (!requesterId || (!userId && !username?.trim())) return err(res, "requesterId and userId or username are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { userId, username } = req.body as { userId?: string; username?: string };
+  if (!userId && !username?.trim()) return err(res, "userId or username is required", 400);
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -819,8 +866,8 @@ router.post("/churches/:churchId/cohorts/:cohortId/members", async (req, res) =>
 
 router.delete("/churches/:churchId/cohorts/:cohortId/members/:userId", async (req, res) => {
   const { churchId, cohortId, userId } = req.params;
-  const { requesterId } = req.body as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -860,14 +907,16 @@ async function notifyChurchAnnouncement(churchId: string, authorId: string, titl
 
 router.post("/churches/:churchId/announcements", async (req, res) => {
   const { churchId } = req.params;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const {
-    requesterId, title, body, expiresAt, announcementType, announcementTypeOther,
+    title, body, expiresAt, announcementType, announcementTypeOther,
     imageUrl, videoUrl, publishAt, isFeatured,
   } = req.body as Record<string, unknown>;
-  if (!requesterId || typeof title !== "string" || !title.trim() || typeof body !== "string" || !body.trim()) {
-    return err(res, "requesterId, title, and body are required", 400);
+  if (typeof title !== "string" || !title.trim() || typeof body !== "string" || !body.trim()) {
+    return err(res, "title and body are required", 400);
   }
-  const requester = await getMembership(churchId, requesterId as string);
+  const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
   const type = typeof announcementType === "string" && ANNOUNCEMENT_TYPES.includes(announcementType) ? announcementType : "general";
@@ -899,9 +948,10 @@ router.post("/churches/:churchId/announcements", async (req, res) => {
 // The narrow existing .../pin route below is left unmodified for pin-only toggles.
 router.put("/churches/:churchId/announcements/:id", async (req, res) => {
   const { churchId, id } = req.params;
-  const { requesterId, ...fields } = req.body as Record<string, unknown>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
-  const requester = await getMembership(churchId, requesterId as string);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const fields = req.body as Record<string, unknown>;
+  const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
   if (fields.isFeatured === true) {
@@ -937,8 +987,9 @@ router.put("/churches/:churchId/announcements/:id", async (req, res) => {
 
 router.get("/churches/:churchId/announcements", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, includeAll } = req.query as { requesterId?: string; includeAll?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { includeAll } = req.query as { includeAll?: string };
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 
@@ -964,8 +1015,9 @@ router.get("/churches/:churchId/announcements", async (req, res) => {
 
 router.put("/churches/:churchId/announcements/:id/pin", async (req, res) => {
   const { churchId, id } = req.params;
-  const { requesterId, pinned } = req.body as { requesterId?: string; pinned?: boolean };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { pinned } = req.body as { pinned?: boolean };
   const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
@@ -1074,12 +1126,13 @@ async function computeGoalProgress(goal: Record<string, unknown>, memberIds: str
 
 router.post("/churches/:churchId/learning-goals", async (req, res) => {
   const { churchId } = req.params;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const {
-    requesterId, title, goalLevel, lessonId, moduleId, curriculumId,
+    title, goalLevel, lessonId, moduleId, curriculumId,
     timeframe, startsAt, endsAt, targetType, targetValue,
   } = req.body as Record<string, unknown>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
-  const requester = await getMembership(churchId, requesterId as string);
+  const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
   if (typeof title !== "string" || !title.trim()) return err(res, "title is required", 400);
@@ -1110,8 +1163,9 @@ router.post("/churches/:churchId/learning-goals", async (req, res) => {
 
 router.get("/churches/:churchId/learning-goals", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId, status } = req.query as { requesterId?: string; status?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { status } = req.query as { status?: string };
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 
@@ -1131,9 +1185,10 @@ router.get("/churches/:churchId/learning-goals", async (req, res) => {
 
 router.put("/churches/:churchId/learning-goals/:goalId", async (req, res) => {
   const { churchId, goalId } = req.params;
-  const { requesterId, title, targetType, targetValue, status } = req.body as Record<string, unknown>;
-  if (!requesterId) return err(res, "requesterId is required", 400);
-  const requester = await getMembership(churchId, requesterId as string);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { title, targetType, targetValue, status } = req.body as Record<string, unknown>;
+  const requester = await getMembership(churchId, requesterId);
   if (!requester || !LEADERSHIP_ROLES.includes(requester.role)) return err(res, "Leadership access required", 403);
 
   const updates: Record<string, unknown> = {};
@@ -1158,7 +1213,7 @@ router.put("/churches/:churchId/learning-goals/:goalId", async (req, res) => {
   return ok(res, mapLearningGoal(data as Record<string, unknown>));
 });
 
-// GET /churches/:churchId/learning-goals/dashboard?requesterId= — purpose-built
+// GET /churches/:churchId/learning-goals/dashboard — purpose-built (identity from Bearer token)
 // server-side aggregation for the church home card (today/this-week/this-month
 // active preset goals + progress, in one round trip). Keeping progress math
 // server-side here (rather than the client fetching the full list and
@@ -1166,8 +1221,8 @@ router.put("/churches/:churchId/learning-goals/:goalId", async (req, res) => {
 // bug" discipline is actually enforced going forward.
 router.get("/churches/:churchId/learning-goals/dashboard", async (req, res) => {
   const { churchId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const requester = await getMembership(churchId, requesterId);
   if (!requester?.is_active) return err(res, "Not a member of this church", 403);
 

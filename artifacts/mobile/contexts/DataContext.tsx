@@ -4437,7 +4437,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadUserChurch = useCallback(async () => {
     if (!profile?.id) { setUserChurch(null); setUserChurchRole(null); setChurchMemberCount(0); setChurchCohortCount(0); return; }
     try {
-      const res = await fetch(`${getApiUrl()}/churches/my-church?requesterId=${profile.id}`);
+      const res = await authedFetch("/churches/my-church");
       const body = await res.json();
       setUserChurch(body?.church ?? null);
       setUserChurchRole(body?.userRole ?? null);
@@ -4453,11 +4453,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const registerChurch = useCallback(async (data: ChurchRegistrationData): Promise<{ church: Church | null; error: string | null }> => {
     if (!profile?.id) return { church: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches`, {
+      const res = await authedFetch("/churches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: profile.id, name: data.name, description: data.description, city: data.city,
+          name: data.name, description: data.description, city: data.city,
           country: data.country, country_code: data.countryCode, timezone: data.timezone,
           denomination: data.denomination, language_code: data.languageCode,
           contact_email: data.contactEmail, contact_name: data.contactName, website: data.website,
@@ -4477,10 +4477,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateChurch = useCallback(async (churchId: string, data: ChurchUpdateData): Promise<{ church: Church | null; error: string | null }> => {
     if (!profile?.id) return { church: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}`, {
+      const res = await authedFetch(`/churches/${churchId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       if (!res.ok) return { church: null, error: body?.error ?? "Couldn't update church" };
@@ -4494,10 +4494,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const checkDuplicateChurch = useCallback(async (name: string, country?: string, website?: string) => {
     if (!profile?.id) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id, name });
+      const params = new URLSearchParams({ name });
       if (country) params.set("country", country);
       if (website) params.set("website", website);
-      const res = await fetch(`${getApiUrl()}/churches/check-duplicate?${params.toString()}`);
+      const res = await authedFetch(`/churches/check-duplicate?${params.toString()}`);
       if (!res.ok) return [];
       const body = await res.json();
       return (body?.matches ?? []) as { id: string; name: string; city: string | null; country: string; website: string | null }[];
@@ -4509,7 +4509,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getSocialAccounts = useCallback(async (churchId: string): Promise<ChurchSocialAccount[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/social-accounts?requesterId=${profile.id}`);
+      const res = await authedFetch(`/churches/${churchId}/social-accounts`);
       if (!res.ok) return [];
       return (await res.json()) as ChurchSocialAccount[];
     } catch {
@@ -4520,10 +4520,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateSocialAccounts = useCallback(async (churchId: string, accounts: ChurchSocialAccountData[]): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/social-accounts`, {
+      const res = await authedFetch(`/churches/${churchId}/social-accounts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, accounts }),
+        body: JSON.stringify({ accounts }),
       });
       if (!res.ok) { const body = await res.json(); return body?.error ?? "Couldn't update social media accounts"; }
       return null;
@@ -4535,10 +4535,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const joinChurch = useCallback(async (inviteCode: string): Promise<{ church: Church | null; error: string | null }> => {
     if (!profile?.id) return { church: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches/join`, {
+      const res = await authedFetch("/churches/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, inviteCode }),
+        body: JSON.stringify({ inviteCode }),
       });
       const body = await res.json();
       if (!res.ok) return { church: null, error: body?.error ?? "Couldn't join church" };
@@ -4552,10 +4552,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const leaveChurch = useCallback(async (): Promise<string | null> => {
     if (!profile?.id || !userChurch) return "Not in a church";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${userChurch.id}/members/${profile.id}`, {
+      const res = await authedFetch(`/churches/${userChurch.id}/members/${profile.id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id }),
       });
       const body = await res.json();
       if (!res.ok) return body?.error ?? "Couldn't leave church";
@@ -4569,7 +4567,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getGroveData = useCallback(async (churchId: string): Promise<GroveData | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/grove?requesterId=${profile.id}`);
+      const res = await authedFetch(`/churches/${churchId}/grove`);
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -4581,9 +4579,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getChurchMembers = useCallback(async (churchId: string, search?: string): Promise<ChurchMember[]> => {
     if (!profile?.id) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id });
+      const params = new URLSearchParams();
       if (search) params.set("search", search);
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members?${params.toString()}`);
+      const qs = params.toString();
+      const res = await authedFetch(`/churches/${churchId}/members${qs ? `?${qs}` : ""}`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4595,7 +4594,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getChurchMemberProfile = useCallback(async (churchId: string, userId: string): Promise<ChurchMemberProfile | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}?requesterId=${profile.id}`);
+      const res = await authedFetch(`/churches/${churchId}/members/${userId}`);
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -4607,10 +4606,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateChurchMemberNotes = useCallback(async (churchId: string, userId: string, notes: string): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}/notes`, {
+      const res = await authedFetch(`/churches/${churchId}/members/${userId}/notes`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, notes }),
+        body: JSON.stringify({ notes }),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't save note");
@@ -4622,10 +4621,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateMemberRole = useCallback(async (churchId: string, userId: string, role: ChurchRole): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}/role`, {
+      const res = await authedFetch(`/churches/${churchId}/members/${userId}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, role }),
+        body: JSON.stringify({ role }),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't update role");
@@ -4637,10 +4636,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const removeChurchMember = useCallback(async (churchId: string, userId: string): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/members/${userId}`, {
+      const res = await authedFetch(`/churches/${churchId}/members/${userId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id }),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't remove member");
@@ -4652,10 +4649,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const createCohort = useCallback(async (churchId: string, data: ChurchCohortData): Promise<{ cohort: ChurchCohort | null; error: string | null }> => {
     if (!profile?.id) return { cohort: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts`, {
+      const res = await authedFetch(`/churches/${churchId}/cohorts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       if (!res.ok) return { cohort: null, error: body?.error ?? "Couldn't create cohort" };
@@ -4668,7 +4665,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getChurchCohorts = useCallback(async (churchId: string): Promise<ChurchCohort[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts?requesterId=${profile.id}`);
+      const res = await authedFetch(`/churches/${churchId}/cohorts`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4680,10 +4677,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateCohort = useCallback(async (churchId: string, cohortId: string, data: Partial<ChurchCohortData> & { status?: string }): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}`, {
+      const res = await authedFetch(`/churches/${churchId}/cohorts/${cohortId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't update cohort");
@@ -4695,10 +4692,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const addMemberToCohort = useCallback(async (churchId: string, cohortId: string, target: { userId?: string; username?: string }): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}/members`, {
+      const res = await authedFetch(`/churches/${churchId}/cohorts/${cohortId}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...target }),
+        body: JSON.stringify(target),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't add member to cohort");
@@ -4710,10 +4707,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const removeMemberFromCohort = useCallback(async (churchId: string, cohortId: string, userId: string): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/cohorts/${cohortId}/members/${userId}`, {
+      const res = await authedFetch(`/churches/${churchId}/cohorts/${cohortId}/members/${userId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id }),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't remove member from cohort");
@@ -4725,10 +4720,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const createAnnouncement = useCallback(async (churchId: string, data: ChurchAnnouncementCreateData): Promise<{ announcement: ChurchAnnouncement | null; error: string | null }> => {
     if (!profile?.id) return { announcement: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements`, {
+      const res = await authedFetch(`/churches/${churchId}/announcements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const responseBody = await res.json();
       if (!res.ok) return { announcement: null, error: responseBody?.error ?? "Couldn't post announcement" };
@@ -4741,10 +4736,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateAnnouncement = useCallback(async (churchId: string, id: string, data: Partial<ChurchAnnouncementCreateData> & { status?: ChurchAnnouncementStatus }): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements/${id}`, {
+      const res = await authedFetch(`/churches/${churchId}/announcements/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't update announcement");
@@ -4756,9 +4751,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getAnnouncements = useCallback(async (churchId: string, includeAll?: boolean): Promise<ChurchAnnouncement[]> => {
     if (!profile?.id) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id });
+      const params = new URLSearchParams();
       if (includeAll) params.set("includeAll", "true");
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements?${params.toString()}`);
+      const qs = params.toString();
+      const res = await authedFetch(`/churches/${churchId}/announcements${qs ? `?${qs}` : ""}`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4770,10 +4766,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const pinAnnouncement = useCallback(async (churchId: string, id: string, pinned: boolean): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/announcements/${id}/pin`, {
+      const res = await authedFetch(`/churches/${churchId}/announcements/${id}/pin`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, pinned }),
+        body: JSON.stringify({ pinned }),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't update announcement");
@@ -4785,10 +4781,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const createLearningGoal = useCallback(async (churchId: string, data: LearningGoalCreateData): Promise<{ goal: LearningGoal | null; error: string | null }> => {
     if (!profile?.id) return { goal: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/learning-goals`, {
+      const res = await authedFetch(`/churches/${churchId}/learning-goals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       if (!res.ok) return { goal: null, error: body?.error ?? "Couldn't create learning goal" };
@@ -4801,9 +4797,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getLearningGoals = useCallback(async (churchId: string, status?: string): Promise<LearningGoal[]> => {
     if (!profile?.id) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id });
+      const params = new URLSearchParams();
       if (status) params.set("status", status);
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/learning-goals?${params.toString()}`);
+      const qs = params.toString();
+      const res = await authedFetch(`/churches/${churchId}/learning-goals${qs ? `?${qs}` : ""}`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4815,10 +4812,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateLearningGoal = useCallback(async (churchId: string, goalId: string, data: { title?: string; targetType?: LearningGoalTargetType; targetValue?: number; status?: string }): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/learning-goals/${goalId}`, {
+      const res = await authedFetch(`/churches/${churchId}/learning-goals/${goalId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, ...data }),
+        body: JSON.stringify(data),
       });
       const body = await res.json();
       return res.ok ? null : (body?.error ?? "Couldn't update learning goal");
@@ -4830,7 +4827,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getLearningGoalsDashboard = useCallback(async (churchId: string): Promise<LearningGoal[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/churches/${churchId}/learning-goals/dashboard?requesterId=${profile.id}`);
+      const res = await authedFetch(`/churches/${churchId}/learning-goals/dashboard`);
       if (!res.ok) return [];
       const body = await res.json();
       return (body?.goals ?? []) as LearningGoal[];
