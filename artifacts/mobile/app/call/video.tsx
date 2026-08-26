@@ -8,7 +8,7 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
-import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary } from "@/hooks/useStudySession";
+import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { lookupVerseForAdmin, type VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
@@ -141,7 +141,18 @@ export default function VideoCallScreen() {
   const [mode, setMode] = useState<"call" | "study">("call");
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
   const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
-  const study = useStudySession(params.channelName, params.otherUserId);
+  const otherName = params.otherUserName || "Peer";
+  // Study Together C3 — otherParticipants replaces the old single otherUserId
+  // param, same generalization as audio.tsx. remoteUids.length <= 1 keeps
+  // using the exact 1:1 route params (byte-identical to before C3).
+  const studyOtherParticipants: OtherParticipant[] = remoteUids.length > 1
+    ? groupParticipants.map((p) => ({ userId: p.userId, name: p.name }))
+    : [{ userId: params.otherUserId, name: otherName }];
+  const study = useStudySession(params.channelName, params.callLogId ?? "", studyOtherParticipants);
+  const studyRef = useRef(study);
+  studyRef.current = study;
+  const groupParticipantsRef = useRef(groupParticipants);
+  groupParticipantsRef.current = groupParticipants;
   const [autoStudyDismissed, setAutoStudyDismissed] = useState(false);
   const hasAutoStudy = !!(params.autoStudyLessonId && params.autoStudyModuleId);
   // Study Together C2 — Add People. Available once connected and while
@@ -149,15 +160,21 @@ export default function VideoCallScreen() {
   const [addPeopleOpen, setAddPeopleOpen] = useState(false);
   const canAddPeople = callState === "connected" && remoteUids.length < 5;
 
-  // Same C1 integration gap closed here per C2 §25 as audio.tsx — Study
-  // Together only ever assumes exactly one other party; block it with a
-  // clear message for 3+ participants until Group Study Together (C3).
-  function handleOpenStudy() {
-    if (remoteUids.length > 1) {
-      showAlert("Group Study Together is coming soon", "Study Together is currently available for two-person calls.");
-      return;
+  // Study Together C3 — mid-call join detection (spec §9), mirrors audio.tsx.
+  useEffect(() => {
+    if (remoteUids.length > 1 && !study.isActive) {
+      void study.checkActiveStudy();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteUids.length > 1, study.isActive]);
+
+  function handleOpenStudy() {
     setChooseLessonOpen(true);
+  }
+
+  async function handleJoinGroupStudy() {
+    const joined = await study.joinStudy();
+    if (!joined) showAlert("Couldn't join study", "This study session may have just ended.");
   }
 
   useEffect(() => {
@@ -241,6 +258,16 @@ export default function VideoCallScreen() {
           if (next.length === 0) handleEndCall();
           return next;
         });
+        // Study Together C3 — deterministic leader reassignment (spec §6),
+        // via refs since this handler is registered once at mount (see
+        // useAgoraEngine.native.ts) and would otherwise read stale state.
+        const liveStudy = studyRef.current;
+        if (liveStudy.isActive && liveStudy.isGroup && liveStudy.leaderId) {
+          const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
+          if (departed && departed.userId === liveStudy.leaderId) {
+            void liveStudy.reportLeaderDeparture(departed.userId);
+          }
+        }
       },
       onNetworkQuality: (_connection, uid, txQuality, rxQuality) => {
         if (uid !== 0) return; // only the local user's own uplink/downlink
@@ -320,7 +347,11 @@ export default function VideoCallScreen() {
     );
   }
 
-  const otherName = params.otherUserName || "Peer";
+  const studyStripLabel = studyOtherParticipants.length <= 1
+    ? otherName
+    : studyOtherParticipants.length === 2
+      ? `${studyOtherParticipants[0].name} & ${studyOtherParticipants[1].name}`
+      : `${studyOtherParticipants[0].name} & ${studyOtherParticipants.length - 1} others`;
 
   const participantStrip = (
     <View style={styles.studyParticipantStrip}>
@@ -332,7 +363,7 @@ export default function VideoCallScreen() {
           <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} zOrderMediaOverlay />
         </View>
       )}
-      <Text style={styles.studyMiniName} numberOfLines={1}>{otherName}</Text>
+      <Text style={styles.studyMiniName} numberOfLines={1}>{studyStripLabel}</Text>
       <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleMute}>
         <Ionicons name={muted ? "mic-off" : "mic"} size={16} color="#fff" />
       </TouchableOpacity>
@@ -353,8 +384,7 @@ export default function VideoCallScreen() {
           session={study}
           myId={profile?.id ?? ""}
           myName={profile?.displayName || "Me"}
-          otherUserId={params.otherUserId}
-          otherUserName={otherName}
+          otherParticipants={studyOtherParticipants}
           participantStrip={participantStrip}
           onReturnToCall={() => setMode("call")}
           onSessionEnded={(summary) => setStudySummary(summary)}
@@ -426,7 +456,23 @@ export default function VideoCallScreen() {
           {callState === "connected" && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
         </View>
 
-        {callState === "connected" && hasAutoStudy && !autoStudyDismissed && (
+        {callState === "connected" && study.pendingGroupStudy?.active && (
+          <View style={styles.autoStudyCard}>
+            <Text style={styles.autoStudyText}>
+              {studyStripLabel} {studyOtherParticipants.length > 2 ? "are" : "is"} studying {study.pendingGroupStudy.title || "a lesson"}.
+            </Text>
+            <View style={styles.autoStudyRow}>
+              <TouchableOpacity style={styles.autoStudyDismiss} onPress={study.dismissPendingGroupStudy}>
+                <Text style={styles.autoStudyDismissText}>Not now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.autoStudyStartBtn} onPress={handleJoinGroupStudy}>
+                <Text style={styles.autoStudyStartText}>Join Study</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {callState === "connected" && !study.pendingGroupStudy?.active && hasAutoStudy && !autoStudyDismissed && (
           <View style={styles.autoStudyCard}>
             <Text style={styles.autoStudyText}>Continue {params.autoStudyLessonTitle || "their current lesson"}?</Text>
             <View style={styles.autoStudyRow}>

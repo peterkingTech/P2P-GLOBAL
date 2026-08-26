@@ -28,10 +28,10 @@ function showConfirm(title: string, message: string, options: { text: string; on
 // Agora itself: the host screen (audio.tsx/video.tsx) passes in whatever
 // mini call-control strip fits its own medium via `participantStrip`.
 export function StudyTogetherOverlay({
-  session, myId, myName, otherUserId, otherUserName, participantStrip, onReturnToCall, onSessionEnded,
+  session, myId, myName, otherParticipants, participantStrip, onReturnToCall, onSessionEnded,
 }: {
   session: ReturnType<typeof useStudySession>;
-  myId: string; myName: string; otherUserId: string; otherUserName: string;
+  myId: string; myName: string; otherParticipants: { userId: string; name: string }[];
   participantStrip: React.ReactNode;
   onReturnToCall: () => void;
   onSessionEnded: (summary: Summary | null) => void;
@@ -58,7 +58,7 @@ export function StudyTogetherOverlay({
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>KINGDOM SCHOOL · STUDY TOGETHER</Text>
           <Text style={styles.title} numberOfLines={1}>{moduleLessonLabel}</Text>
-          <Text style={styles.participants}>{myName} • {otherUserName}</Text>
+          <Text style={styles.participants} numberOfLines={1}>{[myName, ...otherParticipants.map((p) => p.name)].join(" • ")}</Text>
         </View>
         <TouchableOpacity style={styles.returnBtn} onPress={onReturnToCall}>
           <Ionicons name="videocam-outline" size={16} color="#fff" />
@@ -79,9 +79,9 @@ export function StudyTogetherOverlay({
 
       <View style={{ flex: 1 }}>
         {tab === "lesson" && <StudyLessonTab session={session} />}
-        {tab === "questions" && <StudyQuestionsTab session={session} otherUserName={otherUserName} />}
+        {tab === "questions" && <StudyQuestionsTab session={session} otherParticipants={otherParticipants} />}
         {tab === "scripture" && <StudyScriptureTab session={session} />}
-        {tab === "people" && <StudyPeopleTab session={session} myId={myId} myName={myName} otherUserId={otherUserId} otherUserName={otherUserName} />}
+        {tab === "people" && <StudyPeopleTab session={session} myId={myId} myName={myName} otherParticipants={otherParticipants} />}
       </View>
 
       <TouchableOpacity style={styles.endStudyBtn} onPress={handleEndStudy}>

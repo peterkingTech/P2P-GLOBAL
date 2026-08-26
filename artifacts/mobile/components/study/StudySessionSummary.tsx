@@ -42,7 +42,7 @@ export function StudySessionSummary({
             </View>
           </View>
 
-          <Text style={styles.footnote}>Lesson progress was updated individually for both of you.</Text>
+          <Text style={styles.footnote}>Lesson progress was updated individually for everyone in the session.</Text>
 
           {!prayed ? (
             <TouchableOpacity style={styles.prayBtn} onPress={() => setPrayed(true)}>

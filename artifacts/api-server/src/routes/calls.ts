@@ -326,6 +326,165 @@ router.post("/calls/invitations/:id/decline", async (req, res) => {
   return ok(res, { declined: true });
 });
 
+// ── Study Together C3: Group Study Together ─────────────────────────────────
+// A group study session is server-authoritative (migration 084,
+// p2p_study_sessions / p2p_study_session_participants) precisely so a
+// mid-call joiner or a reconnecting participant can ask "what's actually
+// happening right now" — the Realtime Broadcast channel useStudySession
+// already used for section-sync/discussion/scripture-share has no memory
+// for anyone who wasn't listening at the moment a signal went out. Every
+// endpoint here verifies the real caller identity (verifyCaller, the same
+// scoped JWT exception C2 introduced) and never trusts a body-supplied
+// userId/leaderId, per C3 §20. The existing 1:1 Study Together path
+// (useStudySession.ts, isGroup === false) never calls any of these — it
+// keeps writing directly to p2p_sessions exactly as before.
+
+// POST /calls/:callId/study/start — body { lessonId, moduleId, title }.
+router.post("/calls/:callId/study/start", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+  const { lessonId, moduleId, title } = req.body as { lessonId?: string; moduleId?: string; title?: string };
+  if (!lessonId) return err(res, "lessonId required", 400);
+
+  const { data: sessionId, error } = await supabaseWrite.rpc("p2p_start_study_session", {
+    p_call_id: callId, p_user_id: userId, p_lesson_id: lessonId, p_module_id: moduleId ?? null, p_title: title ?? null,
+  });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("call_not_found")) return err(res, "Call not found", 404);
+    if (reason.includes("call_ended")) return err(res, "This call has ended", 410);
+    if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
+    if (reason.includes("session_already_active")) return err(res, "A study session is already active for this call.", 409);
+    return err(res, "Unable to start study together.", 500);
+  }
+  return ok(res, { sessionId, leaderId: userId });
+});
+
+// GET /calls/:callId/study/current — the mid-call-join / reconnect lookup
+// (spec §9, §18): "is there an active group study session for this call, and
+// what's its state." Returns { active: false } if none.
+router.get("/calls/:callId/study/current", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+
+  const { data: callLog } = await supabaseWrite.from("p2p_call_logs").select("participants").eq("id", callId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  if (!((callLog.participants as string[]) ?? []).includes(userId)) return err(res, "Not authorized for this call", 403);
+
+  const { data: session } = await supabaseWrite
+    .from("p2p_study_sessions")
+    .select("id, lesson_id, module_id, title, leader_id, current_section_index")
+    .eq("call_log_id", callId).eq("status", "active").maybeSingle();
+  if (!session) return ok(res, { active: false });
+
+  const { data: participantRows } = await supabaseWrite
+    .from("p2p_study_session_participants")
+    .select("user_id, joined_at")
+    .eq("study_session_id", session.id).is("left_at", null)
+    .order("joined_at", { ascending: true });
+  const ids = (participantRows ?? []).map((p) => p.user_id as string);
+  const { data: profiles } = ids.length
+    ? await supabaseWrite.from("p2p_profiles").select("id, full_name").in("id", ids)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+
+  return ok(res, {
+    active: true,
+    sessionId: session.id,
+    lessonId: session.lesson_id,
+    moduleId: session.module_id,
+    title: session.title,
+    leaderId: session.leader_id,
+    currentSectionIndex: session.current_section_index,
+    participants: (participantRows ?? []).map((p) => ({ userId: p.user_id, name: nameById.get(p.user_id as string) ?? "Someone" })),
+  });
+});
+
+// POST /calls/:callId/study/join — "Join Study" for a mid-call joiner, and
+// also the reconnect entry point (idempotent — clears left_at if rejoining).
+router.post("/calls/:callId/study/join", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+
+  const { data, error } = await supabaseWrite.rpc("p2p_join_study_session", { p_call_id: callId, p_user_id: userId });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("call_not_found")) return err(res, "Call not found", 404);
+    if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
+    if (reason.includes("no_active_session")) return err(res, "There is no active study session for this call.", 404);
+    return err(res, "Unable to join study together.", 500);
+  }
+  return ok(res, data);
+});
+
+// POST /calls/:callId/study/section — body { index }. Leader-only, enforced
+// in p2p_update_study_section itself (spec §17/§20) so a non-leader calling
+// this directly cannot move the shared group position.
+router.post("/calls/:callId/study/section", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+  const { index } = req.body as { index?: number };
+  if (index === undefined || index === null) return err(res, "index required", 400);
+
+  const { error } = await supabaseWrite.rpc("p2p_update_study_section", { p_call_id: callId, p_caller_id: userId, p_index: index });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("no_active_session")) return err(res, "There is no active study session for this call.", 404);
+    if (reason.includes("not_leader")) return err(res, "Only the study leader can move the shared position.", 403);
+    return err(res, "Unable to update the shared position.", 500);
+  }
+  return ok(res, { updated: true });
+});
+
+// POST /calls/:callId/study/leader/reassign — body { departedUserId }.
+// Called by any remaining study participant whose client observes (via
+// Agora's onUserOffline) that the current leader's connection dropped.
+// Deterministic (spec §6): the server, not the caller, computes the next
+// leader (earliest joined_at among remaining active participants) — the
+// caller only reports who appears to be gone. Safe under concurrent calls:
+// row-locked and idempotent, so if several remaining clients notice the
+// same departure and call this at once, only the first changes anything.
+router.post("/calls/:callId/study/leader/reassign", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+  const { departedUserId } = req.body as { departedUserId?: string };
+  if (!departedUserId) return err(res, "departedUserId required", 400);
+
+  const { data, error } = await supabaseWrite.rpc("p2p_reassign_study_leader", {
+    p_call_id: callId, p_departed_user_id: departedUserId, p_caller_id: userId,
+  });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("no_active_session")) return err(res, "There is no active study session for this call.", 404);
+    if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
+    return err(res, "Unable to reassign the study leader.", 500);
+  }
+  return ok(res, data);
+});
+
+// POST /calls/:callId/study/end — ends the group session for everyone (does
+// not end the call itself), matching the existing 1:1 "End Study" symmetry
+// where either participant can end study without ending the call.
+router.post("/calls/:callId/study/end", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+
+  const { error } = await supabaseWrite.rpc("p2p_end_study_session", { p_call_id: callId, p_caller_id: userId });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("no_active_session")) return ok(res, { ended: true });
+    if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
+    return err(res, "Unable to end study together.", 500);
+  }
+  return ok(res, { ended: true });
+});
+
 // POST /calls/peer-channel — deterministic channel name for a 1:1 pair,
 // sorted so both sides compute the same name regardless of who initiates.
 router.post("/calls/peer-channel", async (req, res) => {
@@ -557,6 +716,43 @@ router.get("/calls/study-progress", async (req, res) => {
     return { status: (row?.status as string) ?? "not_started", completed: (row?.completed as boolean) ?? false };
   };
   return ok(res, { mine: toProgress(requesterId), theirs: toProgress(otherUserId) });
+});
+
+// GET /calls/:callId/study-progress?requesterId=&lessonId= — the group
+// analog of the endpoint above, for Study Together C3. Deliberately a
+// separate route (not an extra branch of the pairwise one above) so the
+// already-fixed, already-tested 1:1 endpoint is never touched by this
+// change. Authorization here is call-membership, not pairwise
+// isEligibleStudyPartner: every participant in this specific active call
+// already passed a real relationship check to get there (C2's invitation
+// flow, gated by isEligibleStudyPartner), so being a recorded participant
+// of THIS call is what grants access to the group's progress context — not
+// ownership of any other participant's private submissions or answers,
+// only the same {status, completed} summary the 1:1 endpoint exposes.
+router.get("/calls/:callId/study-progress", async (req, res) => {
+  const { requesterId, lessonId } = req.query as { requesterId?: string; lessonId?: string };
+  const { callId } = req.params;
+  if (!requesterId || !lessonId) return err(res, "requesterId and lessonId are required", 400);
+
+  const { data: callLog } = await supabaseWrite.from("p2p_call_logs").select("participants").eq("id", callId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  const participants = (callLog.participants as string[]) ?? [];
+  if (!participants.includes(requesterId)) return err(res, "Not authorized to view this call's progress", 403);
+
+  const { data, error } = await supabaseWrite
+    .from("p2p_lesson_progress")
+    .select("user_id, status, completed")
+    .eq("lesson_id", lessonId)
+    .in("user_id", participants);
+  if (error) return err(res, error.message, 500);
+
+  const byUser = new Map((data ?? []).map((r) => [r.user_id as string, r]));
+  const result: Record<string, { status: string; completed: boolean }> = {};
+  for (const uid of participants) {
+    const row = byUser.get(uid);
+    result[uid] = { status: (row?.status as string) ?? "not_started", completed: (row?.completed as boolean) ?? false };
+  }
+  return ok(res, { participants: result });
 });
 
 // ── Break Rooms ──────────────────────────────────────────────────────────────
