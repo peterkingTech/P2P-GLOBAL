@@ -369,15 +369,26 @@ router.get("/calls/:callId/study/current", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { callId } = req.params;
 
-  const { data: callLog } = await supabaseWrite.from("p2p_call_logs").select("participants").eq("id", callId).maybeSingle();
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("participants, status, channel_name, call_type, conversation_id").eq("id", callId).maybeSingle();
   if (!callLog) return err(res, "Call not found", 404);
   if (!((callLog.participants as string[]) ?? []).includes(userId)) return err(res, "Not authorized for this call", 403);
+
+  // C7.6 — notification deep links need to tell "study ended, call still
+  // going" apart from "the whole call is over," so a stale notification
+  // gets an honest message instead of a silent failed navigation.
+  if (callLog.status !== "initiated") return ok(res, { active: false, callEnded: true });
 
   const { data: session } = await supabaseWrite
     .from("p2p_study_sessions")
     .select("id, lesson_id, module_id, title, leader_id, current_section_index")
     .eq("call_log_id", callId).eq("status", "active").maybeSingle();
-  if (!session) return ok(res, { active: false });
+  if (!session) {
+    return ok(res, {
+      active: false, callEnded: false,
+      channelName: callLog.channel_name, callType: callLog.call_type, conversationId: callLog.conversation_id ?? null,
+    });
+  }
 
   const { data: participantRows } = await supabaseWrite
     .from("p2p_study_session_participants")
@@ -392,6 +403,7 @@ router.get("/calls/:callId/study/current", async (req, res) => {
 
   return ok(res, {
     active: true,
+    callEnded: false,
     sessionId: session.id,
     lessonId: session.lesson_id,
     moduleId: session.module_id,
@@ -399,6 +411,9 @@ router.get("/calls/:callId/study/current", async (req, res) => {
     leaderId: session.leader_id,
     currentSectionIndex: session.current_section_index,
     participants: (participantRows ?? []).map((p) => ({ userId: p.user_id, name: nameById.get(p.user_id as string) ?? "Someone" })),
+    channelName: callLog.channel_name,
+    callType: callLog.call_type,
+    conversationId: callLog.conversation_id ?? null,
   });
 });
 
@@ -440,15 +455,18 @@ router.post("/calls/:callId/study/section", async (req, res) => {
   return ok(res, { updated: true });
 });
 
-// POST /calls/:callId/study/leader/reassign — body { departedUserId }.
-// Called by any remaining study participant whose client observes (via
-// Agora's onUserOffline) that the current leader's connection dropped.
-// Deterministic (spec §6): the server, not the caller, computes the next
-// leader (earliest joined_at among remaining active participants) — the
-// caller only reports who appears to be gone. Safe under concurrent calls:
-// row-locked and idempotent, so if several remaining clients notice the
-// same departure and call this at once, only the first changes anything.
-router.post("/calls/:callId/study/leader/reassign", async (req, res) => {
+// POST /calls/:callId/study/participant-departed — body { departedUserId }.
+// C4.7/C4.3 combined: called by any remaining study participant whose
+// client observes (via Agora's onUserOffline) that someone's connection
+// dropped — not just the leader (C3 only covered the leader-departure
+// case; a non-leader who left stayed listed as an active study
+// participant forever, which migration 085's updated
+// p2p_reassign_study_leader fixes: it always marks the departure, and only
+// computes a new leader — deterministically, earliest joined_at among the
+// remaining active participants, never arbitrary — when the departure
+// actually affects leadership). Safe under concurrent calls: row-locked
+// and idempotent.
+router.post("/calls/:callId/study/participant-departed", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { callId } = req.params;
@@ -462,8 +480,24 @@ router.post("/calls/:callId/study/leader/reassign", async (req, res) => {
     const reason = error.message ?? "";
     if (reason.includes("no_active_session")) return err(res, "There is no active study session for this call.", 404);
     if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
-    return err(res, "Unable to reassign the study leader.", 500);
+    return err(res, "Unable to update study participation.", 500);
   }
+
+  // C7 — a leader transfer is exactly the one Study Together event worth a
+  // notification (spec explicitly warns against notifying for every minor
+  // change): tell only the new leader, once, never the whole group.
+  if (data?.leaderChanged && data?.leaderId && !data?.ended) {
+    const { data: session } = await supabaseWrite
+      .from("p2p_study_sessions").select("title").eq("id", data.sessionId).maybeSingle();
+    await supabaseWrite.from("p2p_notifications").insert({
+      user_id: data.leaderId,
+      title: "You are now leading this study",
+      message: session?.title ? `You're now leading the group through "${session.title}."` : "You're now leading this group study session.",
+      notification_type: "study_leader_transfer",
+      data: { callId, studySessionId: data.sessionId },
+    });
+  }
+
   return ok(res, data);
 });
 

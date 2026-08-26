@@ -258,14 +258,15 @@ export default function VideoCallScreen() {
           if (next.length === 0) handleEndCall();
           return next;
         });
-        // Study Together C3 — deterministic leader reassignment (spec §6),
-        // via refs since this handler is registered once at mount (see
-        // useAgoraEngine.native.ts) and would otherwise read stale state.
+        // Study Together C4.7/C4.3 — report ANY departed study participant,
+        // not just the leader, via refs since this handler is registered
+        // once at mount (see useAgoraEngine.native.ts) and would otherwise
+        // read stale state.
         const liveStudy = studyRef.current;
-        if (liveStudy.isActive && liveStudy.isGroup && liveStudy.leaderId) {
+        if (liveStudy.isActive && liveStudy.isGroup) {
           const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
-          if (departed && departed.userId === liveStudy.leaderId) {
-            void liveStudy.reportLeaderDeparture(departed.userId);
+          if (departed) {
+            void liveStudy.reportParticipantDeparture(departed.userId);
           }
         }
       },

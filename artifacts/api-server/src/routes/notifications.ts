@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
@@ -31,6 +32,56 @@ function mapNotification(row: Record<string, unknown>) {
     data: row.data ?? null,
   };
 }
+
+// Study Together C7 — Notification Center. These two routes must be
+// registered BEFORE /:userId below — Express matches routes in
+// registration order, and "/me" would otherwise be captured as
+// :userId="me" by the older, param-trusting routes.
+//
+// GET /notifications/me — the caller's own notifications, identity from
+// the verified session, never a route param. The two legacy routes below
+// predate C7 and trust the :userId route param as identity, matching this
+// whole API's established "no requireAuth middleware" pattern (see
+// calls.ts) — that is a real pre-existing gap (documented, not silently
+// fixed here: changing their trust model could affect other, unrelated
+// features already calling them) but C7's own security requirement (never
+// let recipientId be spoofed) applies squarely to what's genuinely NEW
+// here, so the Notification Center built in this phase uses these
+// JWT-verified routes instead, following the same scoped verifyCaller
+// exception C2/C3 established.
+router.get("/me", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { data, error } = await supabase
+    .from("p2p_notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(((data ?? []) as Record<string, unknown>[]).map(mapNotification));
+});
+
+// POST /notifications/me/:id/read — scoped to the verified caller's own id,
+// never a route param, so a manipulated notification id can at most target
+// a notification that isn't the caller's own (404, not another user's data).
+router.post("/me/:id/read", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const { id } = req.params;
+
+  const { data, error } = await supabase
+    .from("p2p_notifications")
+    .update({ read: true })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: "Notification not found" });
+  return res.json(mapNotification(data as Record<string, unknown>));
+});
 
 // GET /notifications/:userId
 router.get("/:userId", async (req, res) => {

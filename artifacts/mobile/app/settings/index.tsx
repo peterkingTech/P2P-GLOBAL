@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { useData } from "@/contexts/DataContext";
 
 // Phone-style nested Settings — this screen shows only category rows, each
 // navigating to its own sub-screen (settings/account.tsx, settings/language.tsx,
@@ -19,6 +20,7 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
+  { emoji: "🔔", title: "Notification Center", subtitle: "See your notifications, including study leadership updates", route: "/notifications" },
   { emoji: "⚙️", title: "Account", subtitle: "Profile, Email, Password, Delete Account", route: "/settings/account" },
   { emoji: "🌍", title: "Language and Region", subtitle: "App Language, Content Language, Date Format", route: "/settings/language" },
   { emoji: "🔔", title: "Notifications", subtitle: "Session Reminders, Peer Guide Alerts, Fruit Awards, Weekly Encouragement, Elijah Protocol", route: "/settings/notifications" },
@@ -34,6 +36,7 @@ export default function SettingsIndexScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { unreadNotificationCount } = useData();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -58,6 +61,9 @@ export default function SettingsIndexScreen() {
               <Text style={styles.rowTitle}>{cat.title}</Text>
               <Text style={styles.rowSubtitle} numberOfLines={1}>{cat.subtitle}</Text>
             </View>
+            {cat.route === "/notifications" && unreadNotificationCount > 0 && (
+              <View style={styles.badge}><Text style={styles.badgeText}>{unreadNotificationCount}</Text></View>
+            )}
             <Ionicons name="chevron-forward" size={18} color={colors.borderBeige} />
           </TouchableOpacity>
         ))}
@@ -85,5 +91,7 @@ function makeStyles(c: AppColors) {
     rowEmoji: { fontSize: 24 },
     rowTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     rowSubtitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+    badge: { backgroundColor: "#C0392B", borderRadius: 10, minWidth: 20, height: 20, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 },
+    badgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

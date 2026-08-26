@@ -13,3 +13,18 @@ const supabaseUrl =
     : SUPABASE_URL;
 
 export const supabase = createClient(supabaseUrl, SUPABASE_ANON_KEY);
+
+// Study Together C2 introduced this as a scoped exception to the rest of
+// this API's "trust the caller-supplied id" pattern (see calls.ts):
+// verifies a real Supabase session via its access token rather than
+// trusting request.body/params. C7 needs the same real-identity guarantee
+// for notification access, so this is promoted here to be shared rather
+// than re-duplicated a third time.
+export async function verifyCaller(req: import("express").Request): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
+}

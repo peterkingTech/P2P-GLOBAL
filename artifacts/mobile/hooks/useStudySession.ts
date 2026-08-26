@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import {
-  startGroupStudy, joinGroupStudy, updateGroupStudySection, reassignGroupStudyLeader, endGroupStudy,
+  startGroupStudy, joinGroupStudy, updateGroupStudySection, reportStudyParticipantDeparted, endGroupStudy,
   getCurrentGroupStudy, getGroupStudyProgress, CurrentGroupStudy, GroupStudyProgress,
 } from "@/lib/groupStudy";
 
@@ -299,18 +299,21 @@ export function useStudySession(channelName: string, callId: string, otherPartic
     sendSignal("pass_lead", { newLeaderId });
   }, [sendSignal]);
 
-  // Called when a remaining group-study client observes (Agora onUserOffline)
-  // that the uid belonging to the current leader went offline. The server —
-  // not this client — computes who leads next (spec §6: deterministic, not
-  // arbitrary), and this is safe to call from multiple remaining clients at
-  // once (row-locked + idempotent server-side).
-  const reportLeaderDeparture = useCallback(async (departedUserId: string) => {
+// C4.7 — called when a remaining group-study client observes (Agora
+  // onUserOffline) that ANY study participant's uid went offline, not just
+  // the leader (C3 only reported leader departures, which left a departed
+  // non-leader listed as an active study participant forever). The server
+  // always clears the departed participant and — only when the departure
+  // actually affects leadership — computes who leads next itself (spec §6:
+  // deterministic, not arbitrary). Safe to call from multiple remaining
+  // clients at once (row-locked + idempotent server-side).
+  const reportParticipantDeparture = useCallback(async (departedUserId: string) => {
     if (!isGroup || !callId) return;
     try {
-      const data = await reassignGroupStudyLeader(callId, departedUserId);
+      const data = await reportStudyParticipantDeparted(callId, departedUserId);
       if (data.ended) {
         setIsActive(false);
-      } else if (data.leaderId) {
+      } else if (data.leaderChanged && data.leaderId) {
         setLeaderId(data.leaderId);
         sendSignal("pass_lead", { newLeaderId: data.leaderId });
       }
@@ -387,6 +390,6 @@ export function useStudySession(channelName: string, callId: string, otherPartic
     startStudy, changeSection, exploreIndependently, returnToGroup,
     discussQuestion, shareScripture, sendDiscussionMessage, passLead, endStudy,
     getSharedLessonData, getStudyProgress, getGroupProgress,
-    joinStudy, checkActiveStudy, dismissPendingGroupStudy, reportLeaderDeparture,
+    joinStudy, checkActiveStudy, dismissPendingGroupStudy, reportParticipantDeparture,
   };
 }

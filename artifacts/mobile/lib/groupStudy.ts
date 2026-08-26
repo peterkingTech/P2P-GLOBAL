@@ -25,6 +25,7 @@ export interface GroupStudyParticipant { userId: string; name: string }
 
 export interface CurrentGroupStudy {
   active: boolean;
+  callEnded?: boolean;
   sessionId?: string;
   lessonId?: string;
   moduleId?: string | null;
@@ -32,6 +33,9 @@ export interface CurrentGroupStudy {
   leaderId?: string;
   currentSectionIndex?: number;
   participants?: GroupStudyParticipant[];
+  channelName?: string;
+  callType?: string;
+  conversationId?: string | null;
 }
 
 export async function getCurrentGroupStudy(callId: string): Promise<CurrentGroupStudy> {
@@ -53,8 +57,12 @@ export async function updateGroupStudySection(callId: string, index: number): Pr
   await post(`/calls/${callId}/study/section`, { index });
 }
 
-export async function reassignGroupStudyLeader(callId: string, departedUserId: string): Promise<{ sessionId: string; leaderId: string | null; ended: boolean }> {
-  return post(`/calls/${callId}/study/leader/reassign`, { departedUserId });
+// C4.7/C4.3 — reports ANY departed study participant, not just the leader
+// (a rank-and-file departure still needs to be cleared from the active
+// roster); the server only recomputes a leader when the departure actually
+// affects leadership.
+export async function reportStudyParticipantDeparted(callId: string, departedUserId: string): Promise<{ sessionId: string; leaderId: string | null; ended: boolean; leaderChanged: boolean }> {
+  return post(`/calls/${callId}/study/participant-departed`, { departedUserId });
 }
 
 export async function endGroupStudy(callId: string): Promise<void> {

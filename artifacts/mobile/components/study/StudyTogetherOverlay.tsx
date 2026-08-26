@@ -6,12 +6,14 @@ import { StudyLessonTab } from "./StudyLessonTab";
 import { StudyQuestionsTab } from "./StudyQuestionsTab";
 import { StudyScriptureTab } from "./StudyScriptureTab";
 import { StudyPeopleTab } from "./StudyPeopleTab";
+import { StudyNotesTab } from "./StudyNotesTab";
 
-type Tab = "lesson" | "questions" | "scripture" | "people";
+type Tab = "lesson" | "questions" | "scripture" | "notes" | "people";
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "lesson", label: "Lesson", icon: "book-outline" },
   { key: "questions", label: "Questions", icon: "help-circle-outline" },
   { key: "scripture", label: "Scripture", icon: "book" },
+  { key: "notes", label: "Notes", icon: "create-outline" },
   { key: "people", label: "People", icon: "people-outline" },
 ];
 
@@ -51,6 +53,13 @@ export function StudyTogetherOverlay({
   }
 
   const moduleLessonLabel = session.lesson ? session.lesson.title : "";
+  // C5.7 — group learning context stays visible but light-touch: who's
+  // leading and the headcount, without turning the lesson screen into a
+  // call-first layout (spec: "the lesson remains primary").
+  const leaderName = session.leaderId === myId ? myName : otherParticipants.find((p) => p.userId === session.leaderId)?.name;
+  const groupContextLine = session.isGroup
+    ? `${leaderName ? `${leaderName} is leading` : "Leading"} · ${otherParticipants.length + 1} participants`
+    : null;
 
   return (
     <View style={styles.container}>
@@ -59,6 +68,7 @@ export function StudyTogetherOverlay({
           <Text style={styles.eyebrow}>KINGDOM SCHOOL · STUDY TOGETHER</Text>
           <Text style={styles.title} numberOfLines={1}>{moduleLessonLabel}</Text>
           <Text style={styles.participants} numberOfLines={1}>{[myName, ...otherParticipants.map((p) => p.name)].join(" • ")}</Text>
+          {groupContextLine && <Text style={styles.groupContext} numberOfLines={1}>{groupContextLine}</Text>}
         </View>
         <TouchableOpacity style={styles.returnBtn} onPress={onReturnToCall}>
           <Ionicons name="videocam-outline" size={16} color="#fff" />
@@ -81,6 +91,7 @@ export function StudyTogetherOverlay({
         {tab === "lesson" && <StudyLessonTab session={session} />}
         {tab === "questions" && <StudyQuestionsTab session={session} otherParticipants={otherParticipants} />}
         {tab === "scripture" && <StudyScriptureTab session={session} />}
+        {tab === "notes" && <StudyNotesTab session={session} />}
         {tab === "people" && <StudyPeopleTab session={session} myId={myId} myName={myName} otherParticipants={otherParticipants} />}
       </View>
 
@@ -104,6 +115,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: "#1D9E75", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
   title: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold", marginTop: 2 },
   participants: { color: "rgba(255,255,255,0.55)", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  groupContext: { color: "#1D9E75", fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 3 },
   returnBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "#1A241E", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,

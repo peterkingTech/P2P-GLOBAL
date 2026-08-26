@@ -646,6 +646,13 @@ export interface UserNote {
   title: string | null;
   body: string;
   createdAt: string;
+  // Study Together C6 — lesson-scoped notes. Optional/nullable: every note
+  // created before this addition (and every general note going forward)
+  // simply has none of these set, same as today.
+  lessonId: string | null;
+  lessonTitle: string | null;
+  moduleId: string | null;
+  studySessionId: string | null;
 }
 
 export interface UserHighlight {
@@ -670,6 +677,16 @@ export interface JournalReflection {
   linkedLessonId: string | null;
   linkedLessonTitle?: string | null;
   createdAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string | null;
+  isRead: boolean;
+  createdAt: string;
+  notificationType: string | null;
+  data: Record<string, unknown> | null;
 }
 
 export interface JournalTimelineEntry {
@@ -1140,7 +1157,7 @@ interface DataContextValue {
   addGroupMember: (groupId: string, userId: string) => Promise<string | null>;
   removeGroupMember: (groupId: string, userId: string) => Promise<string | null>;
   getMyNotes: () => Promise<UserNote[]>;
-  addNote: (title: string | null, body: string) => Promise<string | null>;
+  addNote: (title: string | null, body: string, context?: { lessonId?: string; moduleId?: string; studySessionId?: string }) => Promise<string | null>;
   deleteNote: (id: string) => Promise<string | null>;
   getMyHighlights: () => Promise<UserHighlight[]>;
   addHighlight: (reference: string, quote: string | null) => Promise<string | null>;
@@ -1190,6 +1207,15 @@ interface DataContextValue {
   dismissIncomingCall: () => void;
   circleSessionInvite: CircleSessionInvite | null;
   dismissCircleSessionInvite: () => void;
+  // Study Together C7 — Notification Center. unreadNotificationCount updates
+  // live via the same RLS-protected direct-client realtime subscription
+  // pattern already used for circleSessionInvite above; the list/read
+  // actions go through the new JWT-verified /notifications/me endpoints
+  // (never the legacy :userId-trusting ones) since identity here must come
+  // from the real authenticated session, not a route param.
+  unreadNotificationCount: number;
+  getMyNotifications: () => Promise<AppNotification[]>;
+  markNotificationRead: (id: string) => Promise<void>;
   searchUsersByUsername: (query: string) => Promise<UsernameSearchResult[]>;
   getProfileByUsername: (username: string) => Promise<PublicUserProfile | null>;
   sendConnectionRequest: (params: {
@@ -1462,6 +1488,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingPeerConfirmation[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
   const [circleSessionInvite, setCircleSessionInvite] = useState<CircleSessionInvite | null>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
@@ -2625,6 +2652,59 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setCircleSessionInvite(null);
   }, []);
 
+  // Study Together C7 — Notification Center unread badge. Reuses the exact
+  // RLS-protected direct-client realtime pattern above (auth.uid()=user_id
+  // on p2p_notifications), just for every notification type rather than
+  // one specific one, since a badge count has no reason to filter by type.
+  const getMyNotifications = useCallback(async (): Promise<AppNotification[]> => {
+    if (!profile) return [];
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const res = await fetch(`${getApiUrl()}/notifications/me`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return [];
+      const rows = await res.json();
+      return (rows as Record<string, unknown>[]).map((r) => ({
+        id: r.id as string, title: r.title as string, message: (r.message as string) ?? null,
+        isRead: (r.isRead as boolean) ?? false, createdAt: r.createdAt as string,
+        notificationType: (r.notificationType as string) ?? null, data: (r.data as Record<string, unknown>) ?? null,
+      }));
+    } catch (e) {
+      console.error("getMyNotifications failed", e);
+      return [];
+    }
+  }, [profile]);
+
+  const markNotificationRead = useCallback(async (id: string): Promise<void> => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      await fetch(`${getApiUrl()}/notifications/me/${id}/read`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      setUnreadNotificationCount((c) => Math.max(0, c - 1));
+    } catch (e) {
+      console.error("markNotificationRead failed", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    getMyNotifications().then((rows) => setUnreadNotificationCount(rows.filter((r) => !r.isRead).length));
+    const channel = supabase
+      .channel(`p2p_notifications_unread_${profile.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${profile.id}` },
+        () => setUnreadNotificationCount((c) => c + 1)
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id, getMyNotifications]);
+
   const checkGrowthEvents = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -3424,21 +3504,38 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from("p2p_user_notes")
-        .select("id, title, body, created_at")
+        .select("id, title, body, created_at, lesson_id, module_id, study_session_id, p2p_lessons(title)")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []).map((n: any) => ({ id: n.id, title: n.title, body: n.body, createdAt: n.created_at }));
+      return (data || []).map((n: any) => ({
+        id: n.id, title: n.title, body: n.body, createdAt: n.created_at,
+        lessonId: n.lesson_id ?? null, lessonTitle: n.p2p_lessons?.title ?? null,
+        moduleId: n.module_id ?? null, studySessionId: n.study_session_id ?? null,
+      }));
     } catch (e) {
       console.error("getMyNotes failed", e);
       return [];
     }
   }, [profile]);
 
-  const addNote = useCallback(async (title: string | null, body: string): Promise<string | null> => {
+  // Study Together C6 — context is optional so every existing caller (the
+  // general /notes screen) keeps working unchanged; only a note created
+  // from inside an active Study Together session passes lesson/module/
+  // studySessionId. Never shared: this always writes user_id = profile.id
+  // (the note's own owner, via RLS's owner-only policy) regardless of how
+  // many other people are in the same study session.
+  const addNote = useCallback(async (
+    title: string | null, body: string,
+    context?: { lessonId?: string; moduleId?: string; studySessionId?: string },
+  ): Promise<string | null> => {
     if (!profile) return "Not signed in";
     try {
-      const { error } = await supabase.from("p2p_user_notes").insert({ user_id: profile.id, title, body });
+      const { error } = await supabase.from("p2p_user_notes").insert({
+        user_id: profile.id, title, body,
+        lesson_id: context?.lessonId ?? null, module_id: context?.moduleId ?? null,
+        study_session_id: context?.studySessionId ?? null,
+      });
       if (error) throw error;
       return null;
     } catch (e: any) {
@@ -3638,7 +3735,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     ]);
 
     const noteEntries: JournalTimelineEntry[] = notes.map((n) => ({
-      type: "note", id: n.id, title: n.title ?? "Personal Note", preview: n.body, at: n.createdAt,
+      // Study Together C6 — a lesson-linked note surfaces its lesson as the
+      // timeline title ("Note from Lesson 5") so the Journal can point the
+      // user back to that learning context; a general note (no lessonId)
+      // keeps the exact original title fallback.
+      type: "note", id: n.id, title: n.title ?? (n.lessonTitle ? `Note from ${n.lessonTitle}` : "Personal Note"), preview: n.body, at: n.createdAt,
     }));
     const highlightEntries: JournalTimelineEntry[] = highlights.map((h) => ({
       type: "highlight", id: h.id, title: h.lessonTitle ?? h.reference, preview: h.quote ?? h.reference, at: h.createdAt,
@@ -5091,6 +5192,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
       incomingCall, dismissIncomingCall,
       circleSessionInvite, dismissCircleSessionInvite,
+      unreadNotificationCount, getMyNotifications, markNotificationRead,
       conversations, conversationsLoading, totalUnreadCount, mostRecentUnread, loadConversations,
       pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,
       submitAdminFeedback, pendingConnectionRequestCount,
