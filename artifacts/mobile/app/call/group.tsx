@@ -97,7 +97,7 @@ export default function GroupCallScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid);
+        const t = await getToken(params.channelName, myUid, profile?.id);
         if (!cancelled) setToken(t);
       } catch (e: any) {
         showAlert("Couldn't join", e.message ?? "Please try again.");
@@ -130,7 +130,29 @@ export default function GroupCallScreen() {
 
   useEffect(() => {
     if (!profile?.id) return;
-    const channel = supabase.channel(`circle_call_${params.channelName}`, { config: { broadcast: { self: false } } });
+    const myId = profile.id;
+    let cancelled = false;
+
+    // Security roadmap Phase 4 — private channel, matching Study Together's
+    // fix (migration 086/089): RLS on realtime.messages now scopes this
+    // topic to real, active p2p_peer_circle_members, so the JWT must be set
+    // before subscribing (awaited, not raced), and kept current so a long
+    // circle session doesn't get disconnected when the token expires.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "TOKEN_REFRESHED" && session?.access_token) supabase.realtime.setAuth(session.access_token);
+    });
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.access_token) supabase.realtime.setAuth(data.session.access_token);
+
+      channel = supabase.channel(`circle_call_${params.channelName}`, { config: { broadcast: { self: false }, private: true } });
+      attachHandlers(channel);
+    })();
+
+    function attachHandlers(channel: ReturnType<typeof supabase.channel>) {
     channel.on("broadcast", { event: "signal" }, ({ payload }: { payload: Signal }) => {
       switch (payload.type) {
         case "mute_all":
@@ -138,7 +160,7 @@ export default function GroupCallScreen() {
           engineRef.current?.muteLocalAudioStream(true);
           break;
         case "remove_user":
-          if (payload.data?.userId === profile.id) {
+          if (payload.data?.userId === myId) {
             showAlert("Removed", "The host removed you from this session.");
             handleLeave();
           }
@@ -163,9 +185,17 @@ export default function GroupCallScreen() {
           handleLeave();
           break;
       }
-    }).subscribe();
+    }).subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR") console.error("Peer Circle realtime channel authorization failed", err);
+    });
     signalChannelRef.current = channel;
-    return () => { supabase.removeChannel(channel); signalChannelRef.current = null; };
+    }
+
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+      if (channel) { supabase.removeChannel(channel); signalChannelRef.current = null; }
+    };
   }, [profile?.id, params.channelName, handleLeave]);
 
   const engineRef = useAgoraEngine({

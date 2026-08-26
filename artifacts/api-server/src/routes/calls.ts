@@ -110,6 +110,29 @@ router.post("/calls/token", async (req, res) => {
       if (!activeLog || !(activeLog.participants ?? []).includes(userId)) {
         return err(res, "Not authorized to join this call", 403);
       }
+    } else if (channelName.startsWith("circle_")) {
+      // Security roadmap Phase 4 — this Agora channel previously had no
+      // membership check at all (unlike p2p_ channels above): anyone who
+      // could compute or guess a circleId could get a real token and join
+      // a Peer Circle's live audio/video call, not just observe its
+      // signaling channel. Peer Circles are a closed membership model
+      // (p2p_peer_circle_members), so authorization here mirrors that.
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const circleId = channelName.slice("circle_".length);
+      const { data: membership } = await supabaseWrite
+        .from("p2p_peer_circle_members").select("id").eq("circle_id", circleId).eq("user_id", userId).eq("status", "active").maybeSingle();
+      if (!membership) return err(res, "Not authorized to join this circle call", 403);
+    } else if (channelName.startsWith("room_")) {
+      // Break Rooms are intentionally open-join (any authenticated user may
+      // join an open community room, per its own /calls/rooms/:roomId/join
+      // endpoint which already checks p2p_break_room_blocks) — so the bar
+      // here is "has an active participant row" (join always runs first),
+      // not a closed membership list like Peer Circles.
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const roomId = channelName.slice("room_".length);
+      const { data: participant } = await supabaseWrite
+        .from("p2p_break_room_participants").select("id").eq("room_id", roomId).eq("user_id", userId).is("left_at", null).maybeSingle();
+      if (!participant) return err(res, "Not authorized to join this room", 403);
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;

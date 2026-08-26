@@ -12,6 +12,20 @@ const router = Router();
 // All admin routes require an authenticated peer_guide, church_leader, regional_admin, moderator, or super_admin
 router.use(requireAdmin);
 
+// Route groups below reuse requireRole() to match product intent that
+// already existed in the frontend nav (app/admin/_layout.tsx's per-item
+// roles lists) but was never enforced server-side — confirmed live during
+// the admin.ts security audit: a real admin_marketing account (whose only
+// intended surface is P2P Official Mail) could force-change any user's
+// username and reach lesson-editing routes, since only the blanket
+// requireAdmin() (any non-student role) gated them. super_admin is not
+// listed explicitly in any of these — requireRole() already lets
+// super_admin through regardless (see adminAuth.ts).
+const requireContentAdmin = requireRole("peer_guide", "church_leader", "regional_admin", "admin_content");
+const requireRegistrationsAdmin = requireRole("church_leader", "regional_admin");
+const requireUsernameAdmin = requireRole("moderator", "church_leader", "regional_admin", "admin_username");
+const requireHelpAdmin = requireRole("peer_guide", "church_leader", "regional_admin", "moderator", "admin_help");
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function ok(res: any, data: unknown) { return res.json(data); }
@@ -21,7 +35,7 @@ function err(res: any, msg: string, status = 500) {
 
 // ── Languages ─────────────────────────────────────────────────────────────────
 
-router.get("/languages", async (_req, res) => {
+router.get("/languages", requireContentAdmin, async (_req, res) => {
   const { data, error } = await supabase
     .from("p2p_languages")
     .select("*")
@@ -33,7 +47,7 @@ router.get("/languages", async (_req, res) => {
 // ── Full Tree ─────────────────────────────────────────────────────────────────
 // Returns all curricula > modules > lessons (regardless of status)
 
-router.get("/tree", async (_req, res) => {
+router.get("/tree", requireContentAdmin, async (_req, res) => {
   const [
     { data: curricula, error: cErr },
     { data: modules, error: mErr },
@@ -71,7 +85,7 @@ router.get("/tree", async (_req, res) => {
 
 // ── Translation Coverage ──────────────────────────────────────────────────────
 
-router.get("/lesson/:id/translation-coverage", async (req, res) => {
+router.get("/lesson/:id/translation-coverage", requireContentAdmin, async (req, res) => {
   const { id } = req.params;
   const { data: langs } = await supabase.from("p2p_languages").select("code");
   const total = (langs ?? []).length;
@@ -99,7 +113,7 @@ router.get("/lesson/:id/translation-coverage", async (req, res) => {
 
 // ── Curriculum CRUD ───────────────────────────────────────────────────────────
 
-router.post("/curriculum", async (req, res) => {
+router.post("/curriculum", requireContentAdmin, async (req, res) => {
   const { title, description, status = "draft" } = req.body;
   if (!title?.trim()) return err(res, "Title is required", 400);
   const { data, error } = await supabase
@@ -111,7 +125,7 @@ router.post("/curriculum", async (req, res) => {
   return res.status(201).json(data);
 });
 
-router.put("/curriculum/:id", async (req, res) => {
+router.put("/curriculum/:id", requireContentAdmin, async (req, res) => {
   const { title, description, status } = req.body;
   const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
@@ -127,7 +141,7 @@ router.put("/curriculum/:id", async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/curriculum/:id", async (req, res) => {
+router.delete("/curriculum/:id", requireContentAdmin, async (req, res) => {
   const { error } = await supabase.from("p2p_curriculums").delete().eq("id", req.params.id);
   if (error) return err(res, error.message);
   return res.status(204).send();
@@ -135,7 +149,7 @@ router.delete("/curriculum/:id", async (req, res) => {
 
 // ── Module CRUD ───────────────────────────────────────────────────────────────
 
-router.post("/module", async (req, res) => {
+router.post("/module", requireContentAdmin, async (req, res) => {
   const { curriculum_id, title, description, status = "draft", sort_order = 0 } = req.body;
   if (!title?.trim()) return err(res, "Title is required", 400);
   if (!curriculum_id) return err(res, "curriculum_id is required", 400);
@@ -148,7 +162,7 @@ router.post("/module", async (req, res) => {
   return res.status(201).json(data);
 });
 
-router.put("/module/:id", async (req, res) => {
+router.put("/module/:id", requireContentAdmin, async (req, res) => {
   const { title, description, status, sort_order, curriculum_id } = req.body;
   const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
@@ -166,14 +180,14 @@ router.put("/module/:id", async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/module/:id", async (req, res) => {
+router.delete("/module/:id", requireContentAdmin, async (req, res) => {
   const { error } = await supabase.from("p2p_modules").delete().eq("id", req.params.id);
   if (error) return err(res, error.message);
   return res.status(204).send();
 });
 
 // Reorder module — PATCH /admin/module/:id/reorder { sort_order }
-router.patch("/module/:id/reorder", async (req, res) => {
+router.patch("/module/:id/reorder", requireContentAdmin, async (req, res) => {
   const { sort_order } = req.body;
   const { data, error } = await supabase
     .from("p2p_modules")
@@ -187,7 +201,7 @@ router.patch("/module/:id/reorder", async (req, res) => {
 
 // ── Lesson CRUD ───────────────────────────────────────────────────────────────
 
-router.post("/lesson", async (req, res) => {
+router.post("/lesson", requireContentAdmin, async (req, res) => {
   const { module_id, title, subtitle, status = "draft", sort_order = 0 } = req.body;
   if (!title?.trim()) return err(res, "Title is required", 400);
   if (!module_id) return err(res, "module_id is required", 400);
@@ -200,7 +214,7 @@ router.post("/lesson", async (req, res) => {
   return res.status(201).json(data);
 });
 
-router.put("/lesson/:id", async (req, res) => {
+router.put("/lesson/:id", requireContentAdmin, async (req, res) => {
   const { title, subtitle, status, sort_order, module_id } = req.body;
   const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
@@ -218,13 +232,13 @@ router.put("/lesson/:id", async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/lesson/:id", async (req, res) => {
+router.delete("/lesson/:id", requireContentAdmin, async (req, res) => {
   const { error } = await supabase.from("p2p_lessons").delete().eq("id", req.params.id);
   if (error) return err(res, error.message);
   return res.status(204).send();
 });
 
-router.patch("/lesson/:id/reorder", async (req, res) => {
+router.patch("/lesson/:id/reorder", requireContentAdmin, async (req, res) => {
   const { sort_order } = req.body;
   const { data, error } = await supabase
     .from("p2p_lessons")
@@ -238,7 +252,7 @@ router.patch("/lesson/:id/reorder", async (req, res) => {
 
 // ── Lesson Content (sections / scriptures / questions / assignments) ───────────
 
-router.get("/lesson/:id/content", async (req, res) => {
+router.get("/lesson/:id/content", requireContentAdmin, async (req, res) => {
   const { id } = req.params;
   const [
     { data: sections },
@@ -260,7 +274,7 @@ router.get("/lesson/:id/content", async (req, res) => {
 });
 
 // PUT /admin/lesson/:id/content — full upsert of all content
-router.put("/lesson/:id/content", async (req, res) => {
+router.put("/lesson/:id/content", requireContentAdmin, async (req, res) => {
   const { id } = req.params;
   const { sections = [], scriptures = [], questions = [], assignments = [] } = req.body;
 
@@ -322,7 +336,7 @@ router.put("/lesson/:id/content", async (req, res) => {
 // ── Lesson Translations ───────────────────────────────────────────────────────
 
 // GET /admin/lesson/:id/translations/:lang
-router.get("/lesson/:id/translations/:lang", async (req, res) => {
+router.get("/lesson/:id/translations/:lang", requireContentAdmin, async (req, res) => {
   const { id, lang } = req.params;
   const [
     { data: lessonTrans },
@@ -376,7 +390,7 @@ router.get("/lesson/:id/translations/:lang", async (req, res) => {
 });
 
 // PUT /admin/lesson/:id/translations/:lang — upsert all translations at once
-router.put("/lesson/:id/translations/:lang", async (req, res) => {
+router.put("/lesson/:id/translations/:lang", requireContentAdmin, async (req, res) => {
   const { id, lang } = req.params;
   const { lesson, sections = [], scriptures = [], questions = [] } = req.body;
 
@@ -426,7 +440,7 @@ router.put("/lesson/:id/translations/:lang", async (req, res) => {
 
 // ── Registrations ─────────────────────────────────────────────────────────────
 
-router.get("/registrations", async (req, res) => {
+router.get("/registrations", requireRegistrationsAdmin, async (req, res) => {
   const { status, search, page = "1" } = req.query as Record<string, string>;
   const pageNum = Math.max(1, parseInt(page, 10));
   const pageSize = 20;
@@ -445,7 +459,7 @@ router.get("/registrations", async (req, res) => {
   return ok(res, data ?? []);
 });
 
-router.get("/registrations/:id", async (req, res) => {
+router.get("/registrations/:id", requireRegistrationsAdmin, async (req, res) => {
   const { data, error } = await supabase
     .from("p2p_registration_profiles")
     .select("*")
@@ -455,7 +469,7 @@ router.get("/registrations/:id", async (req, res) => {
   return ok(res, data);
 });
 
-router.patch("/registrations/:id", async (req, res) => {
+router.patch("/registrations/:id", requireRegistrationsAdmin, async (req, res) => {
   const { follow_up_status, admin_notes } = req.body;
   const updates: Record<string, unknown> = {};
   if (follow_up_status !== undefined) updates.follow_up_status = follow_up_status;
@@ -505,7 +519,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // POST /admin/plans/upload-pdf — parse only, no writes. Lets the admin
 // preview (and edit) the extracted structure before anything is inserted.
-router.post("/plans/upload-pdf", upload.single("pdf"), async (req, res) => {
+router.post("/plans/upload-pdf", upload.single("pdf"), requireContentAdmin, async (req, res) => {
   if (!req.file) return err(res, "No file uploaded (expected field name 'pdf')", 400);
   try {
     const plan = await parsePlanPdf(req.file.buffer, req.file.originalname);
@@ -628,7 +642,7 @@ async function rollbackImport(curriculumId: string, lessonIds: string[], assignm
 
 // POST /admin/plans/confirm-import — actually inserts the (possibly
 // admin-edited) parsed plan as a draft.
-router.post("/plans/confirm-import", async (req, res) => {
+router.post("/plans/confirm-import", requireContentAdmin, async (req, res) => {
   const plan = req.body as ParsedPlan & { parentCategoryId?: string | null; topicNumber?: number | null };
   const title = plan?.title?.trim();
   if (!title) return err(res, "title is required", 400);
@@ -824,7 +838,7 @@ async function recalculateLockChain(categoryId: string) {
 }
 
 // GET /admin/plan-categories — all categories with live plan counts
-router.get("/plan-categories", async (_req, res) => {
+router.get("/plan-categories", requireContentAdmin, async (_req, res) => {
   const { data: categories, error } = await supabaseWrite
     .from("p2p_curriculums")
     .select("*")
@@ -845,7 +859,7 @@ router.get("/plan-categories", async (_req, res) => {
 });
 
 // POST /admin/plan-categories — create a new category
-router.post("/plan-categories", async (req, res) => {
+router.post("/plan-categories", requireContentAdmin, async (req, res) => {
   const { title, description, color_theme, icon } = req.body as { title?: string; description?: string; color_theme?: string; icon?: string };
   if (!title?.trim()) return err(res, "title is required", 400);
   const slug = slugifyCategoryTitle(title);
@@ -878,7 +892,7 @@ router.post("/plan-categories", async (req, res) => {
 });
 
 // PUT /admin/plan-categories/:categoryId — update a category
-router.put("/plan-categories/:categoryId", async (req, res) => {
+router.put("/plan-categories/:categoryId", requireContentAdmin, async (req, res) => {
   const { categoryId } = req.params;
   const { title, description, color_theme, icon, display_order, status } = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
@@ -899,7 +913,7 @@ router.put("/plan-categories/:categoryId", async (req, res) => {
 });
 
 // DELETE /admin/plan-categories/:categoryId — only when empty
-router.delete("/plan-categories/:categoryId", async (req, res) => {
+router.delete("/plan-categories/:categoryId", requireContentAdmin, async (req, res) => {
   const { categoryId } = req.params;
   const { count } = await supabaseWrite.from("p2p_curriculums").select("id", { count: "exact", head: true }).eq("type", "plan").eq("parent_category_id", categoryId);
   if (count && count > 0) {
@@ -911,7 +925,7 @@ router.delete("/plan-categories/:categoryId", async (req, res) => {
 });
 
 // PUT /admin/plan-categories/reorder — batch display_order update
-router.put("/plan-categories/reorder", async (req, res) => {
+router.put("/plan-categories/reorder", requireContentAdmin, async (req, res) => {
   const items = req.body as { id: string; display_order: number }[];
   if (!Array.isArray(items) || !items.length) return err(res, "Body must be a non-empty array of { id, display_order }", 400);
   for (const item of items) {
@@ -923,7 +937,7 @@ router.put("/plan-categories/reorder", async (req, res) => {
 });
 
 // GET /admin/plan-categories/:categoryId/stats
-router.get("/plan-categories/:categoryId/stats", async (req, res) => {
+router.get("/plan-categories/:categoryId/stats", requireContentAdmin, async (req, res) => {
   const { categoryId } = req.params;
   const { data: plans } = await supabaseWrite
     .from("p2p_curriculums").select("id,title,topic_number").eq("type", "plan").eq("parent_category_id", categoryId);
@@ -976,7 +990,7 @@ router.get("/plan-categories/:categoryId/stats", async (req, res) => {
 });
 
 // GET /admin/plans/uncategorized
-router.get("/plans/uncategorized", async (_req, res) => {
+router.get("/plans/uncategorized", requireContentAdmin, async (_req, res) => {
   const { data, error } = await supabaseWrite
     .from("p2p_curriculums").select("*").eq("type", "plan").is("parent_category_id", null).order("created_at", { ascending: true });
   if (error) return err(res, error.message);
@@ -984,7 +998,7 @@ router.get("/plans/uncategorized", async (_req, res) => {
 });
 
 // PUT /admin/plans/:planId/move-category
-router.put("/plans/:planId/move-category", async (req, res) => {
+router.put("/plans/:planId/move-category", requireContentAdmin, async (req, res) => {
   const { planId } = req.params;
   const { category_id } = req.body as { category_id?: string };
   if (!category_id) return err(res, "category_id is required", 400);
@@ -1012,8 +1026,8 @@ router.put("/plans/:planId/move-category", async (req, res) => {
 });
 
 // PUT /admin/plans/:planId/reorder — change position within its category
-router.put("/plans/:planId/reorder", async (req, res) => {
-  const { planId } = req.params;
+router.put("/plans/:planId/reorder", requireContentAdmin, async (req, res) => {
+  const { planId } = req.params as { planId: string };
   const { new_topic_number } = req.body as { new_topic_number?: number };
   if (!new_topic_number || new_topic_number < 1) return err(res, "new_topic_number must be a positive integer", 400);
 
@@ -1045,7 +1059,7 @@ router.put("/plans/:planId/reorder", async (req, res) => {
 });
 
 // PUT /admin/plans/:planId/toggle-lock — manual override
-router.put("/plans/:planId/toggle-lock", async (req, res) => {
+router.put("/plans/:planId/toggle-lock", requireContentAdmin, async (req, res) => {
   const { planId } = req.params;
   const { is_locked } = req.body as { is_locked?: boolean };
   if (typeof is_locked !== "boolean") return err(res, "is_locked (boolean) is required", 400);
@@ -1061,7 +1075,7 @@ router.put("/plans/:planId/toggle-lock", async (req, res) => {
 // POST /admin/plans/:planId/duplicate — full copy (modules, lessons, all
 // content tables + block-editor blocks), title suffixed "(Copy)", draft
 // status, appended as the next topic in the same category.
-router.post("/plans/:planId/duplicate", async (req, res) => {
+router.post("/plans/:planId/duplicate", requireContentAdmin, async (req, res) => {
   const { planId } = req.params;
   const { data: original } = await supabaseWrite.from("p2p_curriculums").select("*").eq("id", planId).eq("type", "plan").maybeSingle();
   if (!original) return err(res, "Plan not found", 404);
@@ -1184,7 +1198,7 @@ function mapReserved(row: Record<string, unknown>) {
 }
 
 // GET /admin/reserved-usernames
-router.get("/reserved-usernames", async (_req, res) => {
+router.get("/reserved-usernames", requireUsernameAdmin, async (_req, res) => {
   const { data, error } = await supabaseWrite
     .from("p2p_reserved_usernames").select("*").eq("is_active", true).order("username");
   if (error) return err(res, error.message);
@@ -1192,7 +1206,7 @@ router.get("/reserved-usernames", async (_req, res) => {
 });
 
 // POST /admin/reserved-usernames — { username, reason }
-router.post("/reserved-usernames", async (req, res) => {
+router.post("/reserved-usernames", requireUsernameAdmin, async (req, res) => {
   const { username, reason } = req.body as { username?: string; reason?: string };
   if (!username) return err(res, "username is required", 400);
   const validation = validateUsername(username);
@@ -1213,16 +1227,17 @@ router.post("/reserved-usernames", async (req, res) => {
 });
 
 // DELETE /admin/reserved-usernames/:username
-router.delete("/reserved-usernames/:username", async (req, res) => {
+router.delete("/reserved-usernames/:username", requireUsernameAdmin, async (req, res) => {
+  const { username } = req.params as { username: string };
   const { error } = await supabaseWrite
-    .from("p2p_reserved_usernames").delete().ilike("username", req.params.username);
+    .from("p2p_reserved_usernames").delete().ilike("username", username);
   if (error) return err(res, error.message);
   return res.status(204).send();
 });
 
 // GET /admin/username-search?q= — searches ALL profiles including private
 // ones (unlike the public GET /profiles/search, which filters those out).
-router.get("/username-search", async (req, res) => {
+router.get("/username-search", requireUsernameAdmin, async (req, res) => {
   const { q } = req.query as { q?: string };
   if (!q || q.trim().length < 2) return ok(res, []);
   const query = q.trim().replace(/^@/, "");
@@ -1248,7 +1263,7 @@ router.get("/username-search", async (req, res) => {
 // POST /admin/force-username-change/:userId — flags the account so the
 // client shows a mandatory username-setup screen on next load (see
 // mobile's app/_layout.tsx auth gate — Step 16).
-router.post("/force-username-change/:userId", async (req, res) => {
+router.post("/force-username-change/:userId", requireUsernameAdmin, async (req, res) => {
   const { data, error } = await supabaseWrite
     .from("p2p_profiles").update({ username_change_required: true }).eq("id", req.params.userId).select("id").maybeSingle();
   if (error) return err(res, error.message);
@@ -1260,7 +1275,7 @@ router.post("/force-username-change/:userId", async (req, res) => {
 // username change (set via force-username-change above, or the Step 16
 // admin/seed backfill). There's no separate "flag" table — the boolean on
 // p2p_profiles IS the flag, so this tab is just that filter.
-router.get("/flagged-usernames", async (_req, res) => {
+router.get("/flagged-usernames", requireUsernameAdmin, async (_req, res) => {
   const { data, error } = await supabaseWrite
     .from("p2p_profiles")
     .select("id,username,full_name,email,role,created_at")
@@ -1275,7 +1290,7 @@ router.get("/flagged-usernames", async (_req, res) => {
 
 // POST /admin/dismiss-username-flag/:userId — clears the forced-change flag
 // without requiring the user to actually change their username.
-router.post("/dismiss-username-flag/:userId", async (req, res) => {
+router.post("/dismiss-username-flag/:userId", requireUsernameAdmin, async (req, res) => {
   const { data, error } = await supabaseWrite
     .from("p2p_profiles").update({ username_change_required: false }).eq("id", req.params.userId).select("id").maybeSingle();
   if (error) return err(res, error.message);
@@ -1596,7 +1611,7 @@ router.get("/verification/stats", async (req, res) => {
 // and feedback flow key off. Client can't do this directly: p2p_conversations
 // has no UPDATE RLS policy for these columns (only messages_update_pin, for
 // pinning), by design — this is a privileged admin action.
-router.post("/help-requests/:id/link-conversation", async (req, res) => {
+router.post("/help-requests/:id/link-conversation", requireHelpAdmin, async (req, res) => {
   const { id } = req.params;
   const { conversationId } = req.body as { conversationId?: string };
   if (!conversationId) return err(res, "conversationId is required", 400);

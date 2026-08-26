@@ -110,7 +110,7 @@ export default function BreakRoomScreen() {
         return;
       }
       const { channelName } = await res.json();
-      const t = await getToken(channelName, myUid);
+      const t = await getToken(channelName, myUid, profile.id);
       setToken(t);
       setJoined(true);
     } catch {
@@ -152,19 +152,45 @@ export default function BreakRoomScreen() {
   const signalRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   useEffect(() => {
     if (!profile?.id || !params.roomId) return;
-    const channel = supabase.channel(`room_signal_${params.roomId}`, { config: { broadcast: { self: false } } });
-    channel.on("broadcast", { event: "signal" }, ({ payload }) => {
-      if (payload.type === "hand_raised" && payload.userId) {
-        setRaisedHands((prev) => new Set(prev).add(payload.userId));
-      } else if (payload.type === "hand_lowered" && payload.userId) {
-        setRaisedHands((prev) => { const n = new Set(prev); n.delete(payload.userId); return n; });
-      } else if (payload.type === "removed" && payload.userId === profile.id) {
-        showAlert("Removed", "The host removed you from this room.");
-        leaveRoom();
-      }
-    }).subscribe();
-    signalRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    const myId = profile.id;
+    let cancelled = false;
+
+    // Security roadmap Phase 4 — private channel, matching Study Together's
+    // fix (migration 086/089): RLS on realtime.messages now requires an
+    // active p2p_break_room_participants row for this room, so the JWT
+    // must be set before subscribing (awaited, not raced) and kept current
+    // via the refresh listener below.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "TOKEN_REFRESHED" && session?.access_token) supabase.realtime.setAuth(session.access_token);
+    });
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.access_token) supabase.realtime.setAuth(data.session.access_token);
+
+      channel = supabase.channel(`room_signal_${params.roomId}`, { config: { broadcast: { self: false }, private: true } });
+      channel.on("broadcast", { event: "signal" }, ({ payload }) => {
+        if (payload.type === "hand_raised" && payload.userId) {
+          setRaisedHands((prev) => new Set(prev).add(payload.userId));
+        } else if (payload.type === "hand_lowered" && payload.userId) {
+          setRaisedHands((prev) => { const n = new Set(prev); n.delete(payload.userId); return n; });
+        } else if (payload.type === "removed" && payload.userId === myId) {
+          showAlert("Removed", "The host removed you from this room.");
+          leaveRoom();
+        }
+      }).subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR") console.error("Break Room realtime channel authorization failed", err);
+      });
+      signalRef.current = channel;
+    })();
+
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+      if (channel) { supabase.removeChannel(channel); signalRef.current = null; }
+    };
   }, [profile?.id, params.roomId, leaveRoom]);
 
   const sendSignal = useCallback((type: string, data: Record<string, unknown> = {}) => {
