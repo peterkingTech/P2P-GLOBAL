@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { useStudySession, StudyLessonMeta, StudySessionSummary as Summary } from "@/hooks/useStudySession";
@@ -25,6 +25,11 @@ function showConfirm(title: string, message: string, options: { text: string; on
   }
 }
 
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
+
 // The dominant learning layout Study Together switches into — lesson primary,
 // participants as a small strip (spec section 8). Doesn't know anything about
 // Agora itself: the host screen (audio.tsx/video.tsx) passes in whatever
@@ -39,6 +44,38 @@ export function StudyTogetherOverlay({
   onSessionEnded: (summary: Summary | null) => void;
 }) {
   const [tab, setTab] = useState<Tab>("lesson");
+
+  // Study Together C6.3 — the removed client's own app acts on the
+  // cooperative "participant_removed" signal (session.wasRemoved) by
+  // returning to the plain call view; Agora itself gives no participant
+  // authority over another client's media stream, so this does not force
+  // an immediate Agora disconnect (same limitation the existing Break
+  // Room/Peer Circle "removed" pattern already has).
+  useEffect(() => {
+    if (session.wasRemoved) {
+      showAlert("Removed", "The study leader removed you from this Study Together session.");
+      onReturnToCall();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.wasRemoved]);
+
+  // C6.4 — distinct from "Return to Call" (a pure view toggle; you remain a
+  // study participant) and from "End Study" (ends it for everyone). This
+  // reuses the exact existing departure-reporting mechanism (C4.7) — a
+  // voluntary self-report is authorized identically to an Agora-detected
+  // departure, since the server only ever trusts the caller's own verified
+  // identity, never who they claim to be.
+  function handleLeaveStudy() {
+    showConfirm("Leave Study Together?", "You'll remain in the call, but will stop following the group's shared lesson position.", [
+      { text: "Stay", style: "cancel", onPress: () => {} },
+      {
+        text: "Leave Study", style: "destructive", onPress: async () => {
+          await session.reportParticipantDeparture(myId);
+          onReturnToCall();
+        },
+      },
+    ]);
+  }
 
   function handleEndStudy() {
     showConfirm("End Study Session?", "Ending study does not end the call.", [
@@ -95,10 +132,18 @@ export function StudyTogetherOverlay({
         {tab === "people" && <StudyPeopleTab session={session} myId={myId} myName={myName} otherParticipants={otherParticipants} />}
       </View>
 
-      <TouchableOpacity style={styles.endStudyBtn} onPress={handleEndStudy}>
-        <Ionicons name="checkmark-done" size={16} color="#fff" />
-        <Text style={styles.endStudyBtnText}>End Study</Text>
-      </TouchableOpacity>
+      <View style={styles.bottomActions}>
+        {session.isGroup && (
+          <TouchableOpacity style={styles.leaveStudyBtn} onPress={handleLeaveStudy}>
+            <Ionicons name="exit-outline" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.leaveStudyBtnText}>Leave Study Together</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.endStudyBtn, session.isGroup && { flex: 1 }]} onPress={handleEndStudy}>
+          <Ionicons name="checkmark-done" size={16} color="#fff" />
+          <Text style={styles.endStudyBtnText}>End Study</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -126,9 +171,17 @@ const styles = StyleSheet.create({
   tabBtnActive: { borderBottomWidth: 2, borderBottomColor: "#1D9E75" },
   tabLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   tabLabelActive: { color: "#1D9E75" },
+  bottomActions: {
+    flexDirection: "row", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)",
+  },
   endStudyBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: "#141F19", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#141F19", paddingVertical: 12,
   },
   endStudyBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  leaveStudyBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#0B120E", paddingVertical: 12, borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.08)",
+  },
+  leaveStudyBtnText: { color: "rgba(255,255,255,0.7)", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

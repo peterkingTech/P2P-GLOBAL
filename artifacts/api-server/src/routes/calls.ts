@@ -328,6 +328,23 @@ router.post("/calls/invitations/:id/accept", async (req, res) => {
     return err(res, "Unable to join this call.", 500);
   }
 
+  // C5 — notify the inviter, once, only on a genuine successful accept (the
+  // RPC above already rejects a second accept attempt with
+  // invitation_already_used before this line is ever reached, so a retry
+  // or double-tap can't produce a duplicate notification).
+  const { data: invitation } = await supabaseWrite
+    .from("p2p_call_invitations").select("inviter_id").eq("id", id).maybeSingle();
+  if (invitation?.inviter_id) {
+    const { data: inviteeProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", invitee).maybeSingle();
+    await supabaseWrite.from("p2p_notifications").insert({
+      user_id: invitation.inviter_id,
+      title: "Invitation accepted",
+      message: `${inviteeProfile?.full_name ?? "Someone"} accepted your Study Together invitation.`,
+      notification_type: "study_invitation_accepted",
+      data: { callId: (data as Record<string, unknown>)?.callLogId ?? null },
+    });
+  }
+
   return ok(res, data);
 });
 
@@ -338,14 +355,29 @@ router.post("/calls/invitations/:id/decline", async (req, res) => {
   if (!invitee) return err(res, "Unauthorized", 401);
   const { id } = req.params;
 
-  const { data: invitation } = await supabaseWrite.from("p2p_call_invitations").select("invitee_id, status").eq("id", id).maybeSingle();
+  const { data: invitation } = await supabaseWrite.from("p2p_call_invitations").select("invitee_id, inviter_id, status").eq("id", id).maybeSingle();
   if (!invitation) return err(res, "Invitation not found", 404);
   if (invitation.invitee_id !== invitee) return err(res, "Not authorized", 403);
+  // Idempotent: an already-handled invitation (including a previous decline)
+  // short-circuits here, before the notification insert below, so a
+  // duplicate/retry decline never produces a second notification.
   if (invitation.status !== "pending") return ok(res, { declined: true });
 
   const { error } = await supabaseWrite
     .from("p2p_call_invitations").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", id);
   if (error) return err(res, error.message, 500);
+
+  if (invitation.inviter_id) {
+    const { data: inviteeProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", invitee).maybeSingle();
+    await supabaseWrite.from("p2p_notifications").insert({
+      user_id: invitation.inviter_id,
+      title: "Invitation declined",
+      message: `${inviteeProfile?.full_name ?? "Someone"} declined your Study Together invitation.`,
+      notification_type: "study_invitation_declined",
+      data: {},
+    });
+  }
+
   return ok(res, { declined: true });
 });
 
@@ -540,6 +572,38 @@ router.post("/calls/:callId/study/end", async (req, res) => {
     return err(res, "Unable to end study together.", 500);
   }
   return ok(res, { ended: true });
+});
+
+// POST /calls/:callId/study/participants/:userId/remove — Study Together
+// C6. Leader-only (the current p2p_study_sessions.leader_id — the same
+// already-synchronized role the app already shows, not a new "call owner"
+// concept), enforced in p2p_remove_study_participant itself (migration
+// 094), not just client-side. Removes the target from the call's own
+// authorization list (p2p_call_logs.participants), which is what actually
+// revokes their ability to get a new Agora token or resubscribe to the
+// private Study Together realtime channel — Agora itself gives no
+// participant authority over another client's media stream, so the
+// removed client's own app must still act on the broadcast signal sent
+// below to actually leave the call (same cooperative-removal pattern
+// group.tsx/room.tsx already use for Peer Circles/Break Rooms).
+router.post("/calls/:callId/study/participants/:userId/remove", async (req, res) => {
+  const leaderId = await verifyCaller(req);
+  if (!leaderId) return err(res, "Unauthorized", 401);
+  const { callId, userId: targetUserId } = req.params;
+
+  const { error } = await supabaseWrite.rpc("p2p_remove_study_participant", {
+    p_call_id: callId, p_leader_id: leaderId, p_target_user_id: targetUserId,
+  });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("cannot_remove_self")) return err(res, "You can't remove yourself.", 400);
+    if (reason.includes("call_not_found")) return err(res, "Call not found", 404);
+    if (reason.includes("call_ended")) return err(res, "This call has ended", 410);
+    if (reason.includes("not_a_participant")) return err(res, "This person is not in the call.", 404);
+    if (reason.includes("not_leader")) return err(res, "Only the study leader can remove participants.", 403);
+    return err(res, "Unable to remove this participant.", 500);
+  }
+  return ok(res, { removed: true });
 });
 
 // POST /calls/peer-channel — deterministic channel name for a 1:1 pair,

@@ -3,7 +3,7 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import {
   startGroupStudy, joinGroupStudy, updateGroupStudySection, reportStudyParticipantDeparted, endGroupStudy,
-  getCurrentGroupStudy, getGroupStudyProgress, CurrentGroupStudy, GroupStudyProgress,
+  getCurrentGroupStudy, getGroupStudyProgress, removeStudyParticipant, CurrentGroupStudy, GroupStudyProgress,
 } from "@/lib/groupStudy";
 
 // Kingdom School "Study Together" — shared session state for an already-
@@ -74,7 +74,8 @@ type StudySignalType =
   | "scripture_share"
   | "pass_lead"
   | "discussion_message"
-  | "study_end";
+  | "study_end"
+  | "participant_removed";
 
 interface StudySignal {
   type: StudySignalType;
@@ -105,6 +106,7 @@ export function useStudySession(channelName: string, callId: string, otherPartic
   const [scripturesDiscussed, setScripturesDiscussed] = useState<SharedScripture[]>([]);
   const [discussionMessages, setDiscussionMessages] = useState<DiscussionMessage[]>([]);
   const [pendingGroupStudy, setPendingGroupStudy] = useState<CurrentGroupStudy | null>(null);
+  const [wasRemoved, setWasRemoved] = useState(false);
   const startedAtRef = useRef<number | null>(null);
 
   const isLeader = !!myId && leaderId === myId;
@@ -172,6 +174,16 @@ export function useStudySession(channelName: string, callId: string, otherPartic
         }
         case "study_end":
           setIsActive(false);
+          break;
+        case "participant_removed":
+          // Cooperative removal (spec: Agora gives no participant authority
+          // over another client's stream) — this client only acts when IT
+          // is the one named as removed; every other participant just sees
+          // a smaller roster next time they check.
+          if (payload.data?.userId === myId) {
+            setWasRemoved(true);
+            setIsActive(false);
+          }
           break;
       }
     }
@@ -358,6 +370,23 @@ export function useStudySession(channelName: string, callId: string, otherPartic
     }
   }, [isGroup, callId, sendSignal]);
 
+  // Study Together C6 — leader-only; authorization is enforced server-side
+  // in p2p_remove_study_participant (never trust this client's own
+  // isLeader flag, or the UI simply hiding the button from a non-leader, as
+  // the actual control). Broadcasting "participant_removed" is the
+  // cooperative signal the removed client's own app acts on — Agora itself
+  // gives no participant authority over another client's media stream.
+  const removeParticipant = useCallback(async (targetUserId: string): Promise<string | null> => {
+    if (!isGroup || !callId) return "Not available in a 1:1 session.";
+    try {
+      await removeStudyParticipant(callId, targetUserId);
+      sendSignal("participant_removed", { userId: targetUserId });
+      return null;
+    } catch (e: any) {
+      return e?.message ?? "Unable to remove this participant.";
+    }
+  }, [isGroup, callId, sendSignal]);
+
   const endStudy = useCallback(async (): Promise<StudySessionSummary | null> => {
     const durationSeconds = startedAtRef.current ? Math.round((Date.now() - startedAtRef.current) / 1000) : 0;
     const summary: StudySessionSummary = {
@@ -422,10 +451,10 @@ export function useStudySession(channelName: string, callId: string, otherPartic
   return {
     isActive, sessionId, lesson, leaderId, isLeader, isGroup,
     currentSectionIndex, isFollowing, discussingQuestionId, sharedScripture, scripturesDiscussed,
-    discussionMessages, pendingGroupStudy,
+    discussionMessages, pendingGroupStudy, wasRemoved,
     startStudy, changeSection, exploreIndependently, returnToGroup,
     discussQuestion, shareScripture, sendDiscussionMessage, passLead, endStudy,
     getSharedLessonData, getStudyProgress, getGroupProgress,
-    joinStudy, checkActiveStudy, dismissPendingGroupStudy, reportParticipantDeparture,
+    joinStudy, checkActiveStudy, dismissPendingGroupStudy, reportParticipantDeparture, removeParticipant,
   };
 }

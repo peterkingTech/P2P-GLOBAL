@@ -17,6 +17,8 @@ function showAlert(title: string, message: string) {
 const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   study_leader_transfer: "school-outline",
   circle_session_start: "people-outline",
+  study_invitation_accepted: "checkmark-circle-outline",
+  study_invitation_declined: "close-circle-outline",
 };
 
 // Study Together C7 — minimal production Notification Center. No prior

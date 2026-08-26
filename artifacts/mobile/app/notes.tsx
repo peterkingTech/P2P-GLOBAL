@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ActivityIndicator } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, UserNote } from "@/contexts/DataContext";
@@ -8,8 +8,9 @@ import colors from "@/constants/colors";
 
 export default function Notes() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { compose } = useLocalSearchParams<{ compose?: string }>();
-  const { getMyNotes, addNote, deleteNote } = useData();
+  const { getMyNotes, addNote, updateNote, deleteNote } = useData();
   const [notes, setNotes] = useState<UserNote[]>([]);
   const [loading, setLoading] = useState(true);
   // Opened automatically when reached via My Discipleship Journal's
@@ -19,6 +20,8 @@ export default function Notes() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +40,12 @@ export default function Notes() {
       setTitle(""); setBody(""); setModalOpen(false);
       load();
     }
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!editBody.trim()) return;
+    const err = await updateNote(id, editBody.trim());
+    if (!err) { setEditingId(null); load(); }
   }
 
   return (
@@ -59,9 +68,44 @@ export default function Notes() {
             renderItem={({ item }) => (
               <View style={styles.card}>
                 <View style={{ flex: 1 }}>
+                  {/* Study Together C4.4 — lesson context, when this note came from a lesson/Study Together session. */}
+                  {!!item.lessonTitle && (
+                    <View style={styles.lessonBadge}>
+                      <Ionicons name="book-outline" size={11} color={colors.primaryGreen} />
+                      <Text style={styles.lessonBadgeText} numberOfLines={1}>{item.lessonTitle}</Text>
+                    </View>
+                  )}
                   {!!item.title && <Text style={styles.title}>{item.title}</Text>}
-                  <Text style={styles.body}>{item.body}</Text>
-                  <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                  {editingId === item.id ? (
+                    <>
+                      <TextInput style={styles.editInput} value={editBody} onChangeText={setEditBody} multiline autoFocus />
+                      <View style={styles.editRow}>
+                        <TouchableOpacity onPress={() => setEditingId(null)}><Text style={styles.editCancel}>Cancel</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.editSaveBtn} onPress={() => handleSaveEdit(item.id)}>
+                          <Text style={styles.editSaveText}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.body}>{item.body}</Text>
+                      <View style={styles.footerRow}>
+                        <Text style={styles.date}>
+                          {item.updatedAt !== item.createdAt ? `Updated ${new Date(item.updatedAt).toLocaleDateString()}` : new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                        <View style={styles.footerActions}>
+                          {!!item.lessonId && (
+                            <TouchableOpacity onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: item.lessonId! } })}>
+                              <Text style={styles.actionLink}>Open Lesson</Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity onPress={() => { setEditingId(item.id); setEditBody(item.body); }}>
+                            <Text style={styles.actionLink}>Edit</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </View>
                 <TouchableOpacity onPress={async () => { await deleteNote(item.id); load(); }}>
                   <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
@@ -100,9 +144,22 @@ const styles = StyleSheet.create({
     flexDirection: "row", gap: 10, backgroundColor: colors.card, borderRadius: 14,
     borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 10,
   },
+  lessonBadge: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
+  lessonBadgeText: { fontSize: 11, color: colors.primaryGreen, fontFamily: "Inter_600SemiBold" },
   title: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   body: { fontSize: 13, color: colors.textMid, marginTop: 4, fontFamily: "Inter_400Regular", lineHeight: 18 },
-  date: { fontSize: 11, color: colors.textMuted, marginTop: 6, fontFamily: "Inter_400Regular" },
+  date: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  footerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
+  footerActions: { flexDirection: "row", gap: 14 },
+  actionLink: { fontSize: 11, color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
+  editInput: {
+    backgroundColor: colors.lightCream, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8,
+    padding: 8, marginTop: 4, color: colors.textDark, fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 60, textAlignVertical: "top",
+  },
+  editRow: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 6, alignItems: "center" },
+  editCancel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  editSaveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  editSaveText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", gap: 12, marginTop: 60 },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   fab: {

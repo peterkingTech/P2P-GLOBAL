@@ -1,21 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useData, UserNote } from "@/contexts/DataContext";
 import type { useStudySession } from "@/hooks/useStudySession";
 
-// Study Together C6 — lesson-scoped personal notes. Strictly personal: this
-// only ever reads/writes the CURRENT user's own p2p_user_notes rows (RLS is
-// owner-only), same as the existing /notes screen — Group Study Together
-// gives everyone the SAME lesson context, never a shared note. Extends the
-// existing Notes system (p2p_user_notes + DataContext.addNote/getMyNotes)
-// rather than creating a second notes table.
+// Study Together C4/C6 — lesson-scoped personal notes. Strictly personal:
+// this only ever reads/writes the CURRENT user's own p2p_user_notes rows
+// (RLS is owner-only), same as the existing /notes screen — Group Study
+// Together gives everyone the SAME lesson context, never a shared note.
+// Extends the existing Notes system (p2p_user_notes + DataContext.addNote/
+// updateNote/getMyNotes) rather than creating a second notes table.
+// Supports multiple notes per lesson (not forced to one), per spec.
 export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudySession> }) {
-  const { getMyNotes, addNote } = useData();
+  const { getMyNotes, addNote, updateNote } = useData();
   const [notes, setNotes] = useState<UserNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const lessonId = session.lesson?.id;
   const moduleId = session.lesson?.moduleId;
@@ -36,6 +39,19 @@ export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudy
     const error = await addNote(null, draft.trim(), { lessonId, moduleId, studySessionId: session.sessionId ?? undefined });
     setSaving(false);
     if (!error) { setDraft(""); load(); }
+  }
+
+  function startEdit(note: UserNote) {
+    setEditingId(note.id);
+    setEditDraft(note.body);
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!editDraft.trim()) return;
+    setEditSaving(true);
+    const error = await updateNote(id, editDraft.trim());
+    setEditSaving(false);
+    if (!error) { setEditingId(null); load(); }
   }
 
   if (!lessonId) return null;
@@ -65,8 +81,31 @@ export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudy
       ) : (
         notes.map((n) => (
           <View key={n.id} style={styles.noteCard}>
-            <Text style={styles.noteBody}>{n.body}</Text>
-            <Text style={styles.noteDate}>{new Date(n.createdAt).toLocaleDateString()}</Text>
+            {editingId === n.id ? (
+              <>
+                <TextInput style={styles.editInput} value={editDraft} onChangeText={setEditDraft} multiline autoFocus />
+                <View style={styles.editRow}>
+                  <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditingId(null)}>
+                    <Text style={styles.editCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.editSaveBtn} onPress={() => handleSaveEdit(n.id)} disabled={editSaving || !editDraft.trim()}>
+                    {editSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.noteBody}>{n.body}</Text>
+                <View style={styles.noteFooter}>
+                  <Text style={styles.noteDate}>
+                    {n.updatedAt !== n.createdAt ? `Updated ${new Date(n.updatedAt).toLocaleDateString()}` : new Date(n.createdAt).toLocaleDateString()}
+                  </Text>
+                  <TouchableOpacity onPress={() => startEdit(n)}>
+                    <Text style={styles.editLink}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         ))
       )}
@@ -84,5 +123,12 @@ const styles = StyleSheet.create({
   emptyText: { color: "rgba(255,255,255,0.5)", fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 16 },
   noteCard: { backgroundColor: "#141F19", borderRadius: 12, padding: 14, gap: 6 },
   noteBody: { color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  noteFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   noteDate: { color: "rgba(255,255,255,0.4)", fontSize: 11, fontFamily: "Inter_400Regular" },
+  editLink: { color: "#1D9E75", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  editInput: { color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 60, textAlignVertical: "top" },
+  editRow: { flexDirection: "row", gap: 8, justifyContent: "flex-end" },
+  editCancelBtn: { paddingHorizontal: 12, paddingVertical: 8, justifyContent: "center" },
+  editCancelText: { color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "Inter_500Medium" },
+  editSaveBtn: { backgroundColor: "#1D9E75", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 60, alignItems: "center" },
 });

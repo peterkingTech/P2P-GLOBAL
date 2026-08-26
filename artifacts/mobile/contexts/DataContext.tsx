@@ -646,6 +646,7 @@ export interface UserNote {
   title: string | null;
   body: string;
   createdAt: string;
+  updatedAt: string;
   // Study Together C6 — lesson-scoped notes. Optional/nullable: every note
   // created before this addition (and every general note going forward)
   // simply has none of these set, same as today.
@@ -1158,6 +1159,7 @@ interface DataContextValue {
   removeGroupMember: (groupId: string, userId: string) => Promise<string | null>;
   getMyNotes: () => Promise<UserNote[]>;
   addNote: (title: string | null, body: string, context?: { lessonId?: string; moduleId?: string; studySessionId?: string }) => Promise<string | null>;
+  updateNote: (id: string, body: string) => Promise<string | null>;
   deleteNote: (id: string) => Promise<string | null>;
   getMyHighlights: () => Promise<UserHighlight[]>;
   addHighlight: (reference: string, quote: string | null) => Promise<string | null>;
@@ -3504,12 +3506,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from("p2p_user_notes")
-        .select("id, title, body, created_at, lesson_id, module_id, study_session_id, p2p_lessons(title)")
+        .select("id, title, body, created_at, updated_at, lesson_id, module_id, study_session_id, p2p_lessons(title)")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []).map((n: any) => ({
-        id: n.id, title: n.title, body: n.body, createdAt: n.created_at,
+        id: n.id, title: n.title, body: n.body, createdAt: n.created_at, updatedAt: n.updated_at ?? n.created_at,
         lessonId: n.lesson_id ?? null, lessonTitle: n.p2p_lessons?.title ?? null,
         moduleId: n.module_id ?? null, studySessionId: n.study_session_id ?? null,
       }));
@@ -3553,6 +3555,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e: any) {
       console.error("deleteNote failed", e);
       return e?.message || "Could not delete note";
+    }
+  }, [profile]);
+
+  // Study Together C4.3 — "My Note ... Edit". Scoped by both id AND
+  // user_id (matching deleteNote's own pattern) so this can never touch
+  // another user's row even if an id were guessed/manipulated; RLS's
+  // owner-only policy is the actual backstop either way.
+  const updateNote = useCallback(async (id: string, body: string): Promise<string | null> => {
+    if (!profile) return "Not signed in";
+    try {
+      const { error } = await supabase.from("p2p_user_notes")
+        .update({ body, updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", profile.id);
+      if (error) throw error;
+      return null;
+    } catch (e: any) {
+      console.error("updateNote failed", e);
+      return e?.message || "Could not update note";
     }
   }, [profile]);
 
@@ -5177,7 +5196,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
       getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
-      getMyNotes, addNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
+      getMyNotes, addNote, updateNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       getHighlightsForLesson, addSectionHighlight,
       getMyReflections, addReflection, addReflectionUpdate, getJournalTimeline,
       markLessonComplete, refreshCurriculumData, refreshData,

@@ -69,6 +69,13 @@ export async function endGroupStudy(callId: string): Promise<void> {
   await post(`/calls/${callId}/study/end`);
 }
 
+// Study Together C6 — leader-only, enforced server-side in
+// p2p_remove_study_participant (never trust the client's own isLeader flag
+// as authorization).
+export async function removeStudyParticipant(callId: string, targetUserId: string): Promise<void> {
+  await post(`/calls/${callId}/study/participants/${targetUserId}/remove`);
+}
+
 export interface GroupStudyProgress { [userId: string]: { status: string; completed: boolean } }
 
 export async function getGroupStudyProgress(callId: string, requesterId: string, lessonId: string): Promise<GroupStudyProgress> {
