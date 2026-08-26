@@ -118,8 +118,23 @@ export function useStudySession(channelName: string, callId: string, otherPartic
 
   useEffect(() => {
     if (!channelName || !myId) return;
-    const channel = supabase.channel(`study_${channelName}`, { config: { broadcast: { self: false } } });
-    channel.on("broadcast", { event: "signal" }, ({ payload }: { payload: StudySignal }) => {
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    // Security hardening — this channel is now a Supabase Realtime private
+    // channel (see migration 086: RLS on realtime.messages, scoped to real
+    // p2p_call_logs participants). Private channels are authorized off the
+    // JWT attached to the realtime connection, so the token must be set
+    // BEFORE subscribing (awaited here, not raced against it). The
+    // onAuthStateChange listener is the documented mitigation for a real
+    // gotcha: Realtime disconnects a private channel if it never receives a
+    // fresh token, so a long-running study call needs the token kept
+    // current, not just set once at mount.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "TOKEN_REFRESHED" && session?.access_token) supabase.realtime.setAuth(session.access_token);
+    });
+
+    function handleSignal({ payload }: { payload: StudySignal }) {
       switch (payload.type) {
         case "study_start":
           setSessionId(payload.data?.sessionId ?? null);
@@ -159,9 +174,30 @@ export function useStudySession(channelName: string, callId: string, otherPartic
           setIsActive(false);
           break;
       }
-    }).subscribe();
-    channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+    }
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.access_token) supabase.realtime.setAuth(data.session.access_token);
+
+      channel = supabase.channel(`study_${channelName}`, { config: { broadcast: { self: false }, private: true } });
+      channel.on("broadcast", { event: "signal" }, handleSignal).subscribe((status, err) => {
+        // Production-grade: an authorization failure on a private channel
+        // surfaces here as CHANNEL_ERROR, not a thrown exception — log it
+        // rather than silently leaving the user with no realtime updates.
+        if (status === "CHANNEL_ERROR") {
+          console.error("Study Together realtime channel authorization failed", err);
+        }
+      });
+      channelRef.current = channel;
+    })();
+
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+      if (channel) { supabase.removeChannel(channel); channelRef.current = null; }
+    };
   }, [channelName, myId]);
 
   const startStudy1to1 = useCallback(async (lessonMeta: StudyLessonMeta) => {

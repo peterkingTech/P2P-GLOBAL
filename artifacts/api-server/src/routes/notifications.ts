@@ -4,12 +4,10 @@ import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
-// p2p_notifications' RLS policies both require auth.uid() = user_id (see
-// migrations) — the shared lib/supabase.ts client carries no forwarded
-// session, so every read/write through it was silently blocked (rows exist,
-// queries just return empty/no-op). Same fix as calls.ts/circles.ts: a local
-// service-role client, scoped by the trusted :userId route param instead of
-// a verified JWT (this API has no requireAuth middleware — see calls.ts).
+// p2p_notifications' RLS policies both require auth.uid() = user_id — the
+// shared lib/supabase.ts anon client carries no forwarded session, so a
+// service-role client is used here, with identity coming from verifyCaller
+// (a real Supabase JWT) rather than from RLS on this connection.
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
     ? process.env.SUPABASE_DB_URL
@@ -33,22 +31,18 @@ function mapNotification(row: Record<string, unknown>) {
   };
 }
 
-// Study Together C7 — Notification Center. These two routes must be
-// registered BEFORE /:userId below — Express matches routes in
-// registration order, and "/me" would otherwise be captured as
-// :userId="me" by the older, param-trusting routes.
-//
-// GET /notifications/me — the caller's own notifications, identity from
-// the verified session, never a route param. The two legacy routes below
-// predate C7 and trust the :userId route param as identity, matching this
-// whole API's established "no requireAuth middleware" pattern (see
-// calls.ts) — that is a real pre-existing gap (documented, not silently
-// fixed here: changing their trust model could affect other, unrelated
-// features already calling them) but C7's own security requirement (never
-// let recipientId be spoofed) applies squarely to what's genuinely NEW
-// here, so the Notification Center built in this phase uses these
-// JWT-verified routes instead, following the same scoped verifyCaller
-// exception C2/C3 established.
+// Security hardening phase — the legacy GET/POST /:userId routes that used
+// to live below this comment trusted the route param as identity (a real
+// vulnerability: any authenticated caller could substitute any userId and
+// read/mark-read a stranger's notifications). Before removing them, every
+// caller in this codebase was searched for (mobile app source, api-server,
+// and the mockup-sandbox package) — zero call sites use them; the only
+// consumer of p2p_notifications besides these was always the mobile
+// client's direct, RLS-protected Realtime subscription (DataContext.tsx,
+// filtered to circle_session_start) and, since C7, these /me routes below.
+// Confirmed dead code, not a guess, so removed outright rather than left as
+// a documented-but-live vulnerability — this is the "verify no callers
+// remain, then deprecate" path the hardening spec asked for.
 router.get("/me", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -80,39 +74,6 @@ router.post("/me/:id/read", async (req, res) => {
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
   if (!data) return res.status(404).json({ error: "Notification not found" });
-  return res.json(mapNotification(data as Record<string, unknown>));
-});
-
-// GET /notifications/:userId
-router.get("/:userId", async (req, res) => {
-  const { userId } = req.params;
-  const { data, error } = await supabase
-    .from("p2p_notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-  return res.json(((data ?? []) as Record<string, unknown>[]).map(mapNotification));
-});
-
-// POST /notifications/:userId/:id/read
-router.post("/:userId/:id/read", async (req, res) => {
-  const { userId, id } = req.params;
-  // Scope update by both id AND user_id to prevent cross-user modification
-  const { data, error } = await supabase
-    .from("p2p_notifications")
-    .update({ read: true })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .select()
-    .single();
-
-  if (error || !data) {
-    return res.status(404).json({ error: "Notification not found" });
-  }
   return res.json(mapNotification(data as Record<string, unknown>));
 });
 
