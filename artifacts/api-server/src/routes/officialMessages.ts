@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
@@ -72,8 +73,8 @@ function typesForRole(role: string): OfficialType[] {
   return [];
 }
 router.get("/official-messages/allowed-types", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const { data } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   const types = typesForRole((data?.role as string) ?? "");
   if (!types.length) return err(res, "Admin access required", 403);
@@ -87,8 +88,9 @@ router.get("/official-messages/allowed-types", async (req, res) => {
 // (an admin needs to be able to reach any registered user, not just
 // publicly-discoverable ones).
 router.get("/official-messages/search-users", async (req, res) => {
-  const { requesterId, q } = req.query as { requesterId?: string; q?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { q } = req.query as { q?: string };
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
   if (!q || q.trim().length < 2) return ok(res, []);
@@ -149,11 +151,13 @@ async function findOrCreateOfficialConversation(officialAccountId: string, targe
 // impersonate another user" and always sends "from the official P2P Global
 // identity").
 router.post("/official-messages/send", async (req, res) => {
-  const { requesterId, targetUserId, department, subject, body, draftId } = req.body as {
-    requesterId?: string; targetUserId?: string; department?: string; subject?: string; body?: string; draftId?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { targetUserId, department, subject, body, draftId } = req.body as {
+    targetUserId?: string; department?: string; subject?: string; body?: string; draftId?: string;
   };
-  if (!requesterId || !targetUserId || !department) {
-    return err(res, "requesterId, targetUserId, and department are required", 400);
+  if (!targetUserId || !department) {
+    return err(res, "targetUserId and department are required", 400);
   }
   if (!DEPARTMENTS.includes(department as Department)) return err(res, "Invalid department", 400);
   const trimmedSubject = subject?.trim() ?? "";
@@ -214,11 +218,13 @@ router.post("/official-messages/send", async (req, res) => {
 // there's no other way for an admin to read one — never creates a
 // conversation, unlike /official-messages/send.
 router.get("/official-messages/thread-with-user", async (req, res) => {
-  const { requesterId, targetUserId, officialType } = req.query as {
-    requesterId?: string; targetUserId?: string; officialType?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { targetUserId, officialType } = req.query as {
+    targetUserId?: string; officialType?: string;
   };
-  if (!requesterId || !targetUserId || !officialType) {
-    return err(res, "requesterId, targetUserId, and officialType are required", 400);
+  if (!targetUserId || !officialType) {
+    return err(res, "targetUserId and officialType are required", 400);
   }
   if (!OFFICIAL_TYPES.includes(officialType as OfficialType)) return err(res, "Invalid officialType", 400);
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
@@ -267,8 +273,8 @@ router.get("/official-messages/thread-with-user", async (req, res) => {
 // sees the full inbox" model Contact P2P Global's admin inbox already
 // uses) — recipient, department, subject, preview, date, read status.
 router.get("/official-messages/sent", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
 
@@ -329,8 +335,8 @@ router.get("/official-messages/sent", async (req, res) => {
 
 // GET /official-messages/drafts?requesterId=
 router.get("/official-messages/drafts", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
 
@@ -353,11 +359,12 @@ router.get("/official-messages/drafts", async (req, res) => {
 // own draft — verified by the .eq("admin_id", ...) below rather than
 // trusting the draftId alone).
 router.post("/official-messages/drafts", async (req, res) => {
-  const { requesterId, draftId, targetUserId, targetUsername, department, subject, body } = req.body as {
-    requesterId?: string; draftId?: string; targetUserId?: string; targetUsername?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { draftId, targetUserId, targetUsername, department, subject, body } = req.body as {
+    draftId?: string; targetUserId?: string; targetUsername?: string;
     department?: string; subject?: string; body?: string;
   };
-  if (!requesterId) return err(res, "requesterId is required", 400);
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
 
@@ -383,8 +390,8 @@ router.post("/official-messages/drafts", async (req, res) => {
 // DELETE /official-messages/drafts/:draftId — body { requesterId }
 router.delete("/official-messages/drafts/:draftId", async (req, res) => {
   const { draftId } = req.params;
-  const { requesterId } = req.body as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
 

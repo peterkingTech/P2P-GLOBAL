@@ -16,6 +16,14 @@ const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
   { value: "general_contact", label: "General Contact" },
 ];
 
+// Mirrors officialMessages.ts's DEPARTMENT_TO_OFFICIAL_TYPE exactly — the
+// FROM field must show whichever identity will actually send the message.
+// Crisis stays its own distinct, recognizable identity (a product decision,
+// not an oversight); every other department sends as "P2P Official".
+function fromIdentityForDepartment(department: ComposeDepartment | null): string {
+  return department === "crisis_safeguarding" ? "P2P Global Crisis Response" : "P2P Official";
+}
+
 const MAX_BODY_LENGTH = 2000;
 
 interface ComposeMessageModalProps {
@@ -137,7 +145,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
             <View style={styles.centerFill}>
               <Ionicons name="checkmark-circle" size={44} color={colors.accentGreen} />
               <Text style={styles.confirmTitle}>Message sent</Text>
-              <Text style={styles.confirmSub}>@{selectedUser.username} will see this in their Messages, clearly marked as coming from P2P Global.</Text>
+              <Text style={styles.confirmSub}>@{selectedUser.username} will see this in their Messages, clearly marked as coming from {fromIdentityForDepartment(department)}.</Text>
               <TouchableOpacity style={styles.sendBtn} onPress={resetForm}>
                 <Text style={styles.sendBtnText}>Compose Another</Text>
               </TouchableOpacity>
@@ -157,7 +165,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                     <Text style={styles.sectionLabel}>FROM</Text>
                     <View style={styles.fromRow}>
                       <View style={styles.fromIconWrap}><Ionicons name="checkmark-circle" size={16} color="#fff" /></View>
-                      <Text style={styles.fromText}>P2P Global</Text>
+                      <Text style={styles.fromText}>{fromIdentityForDepartment(department)}</Text>
                     </View>
                   </View>
 

@@ -44,7 +44,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
               <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
                 <Ionicons name={config.icon} size={16} color="#fff" />
               </View>
-              <Text style={styles.sheetTitle}>Official P2P Global Account</Text>
+              <Text style={styles.sheetTitle}>{accountType === "crisis_response" ? "Official Crisis Response Account" : "P2P Official Account"}</Text>
             </View>
             <Text style={styles.sheetBody}>
               This account is operated by the Amen Tech team. It is verified and trusted.
@@ -53,7 +53,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
               Messages from this account are genuine official communications from P2P Global.
             </Text>
             <Text style={styles.sheetWarning}>
-              If you receive a message claiming to be from P2P Global from a different account — report it immediately using the three-dot menu.
+              If you receive a message claiming to be from P2P Official from a different account — report it immediately using the three-dot menu.
             </Text>
             <TouchableOpacity style={styles.gotItBtn} onPress={() => setExplainOpen(false)}>
               <Text style={styles.gotItBtnText}>Got it</Text>

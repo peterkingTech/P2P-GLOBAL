@@ -4841,10 +4841,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const sendContactMessage = useCallback(async (data: ContactMessageSendData): Promise<ContactMessageSendResult> => {
     if (!profile?.id) return { success: false, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/contact/send`, {
+      const res = await authedFetch("/contact/send", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: profile.id, to_department: data.toDepartment, subject: data.subject, body: data.body,
+          to_department: data.toDepartment, subject: data.subject, body: data.body,
           attachment_url: data.attachmentUrl, attachment_type: data.attachmentType,
         }),
       });
@@ -4860,7 +4860,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getMyContactMessages = useCallback(async (): Promise<ContactMessageListItem[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/contact/my-messages?requesterId=${profile.id}`);
+      const res = await authedFetch("/contact/my-messages");
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4872,7 +4872,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getContactThread = useCallback(async (messageId: string): Promise<ContactThread | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/contact/my-messages/${messageId}?requesterId=${profile.id}`);
+      const res = await authedFetch(`/contact/my-messages/${messageId}`);
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -4884,12 +4884,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getAdminContactInbox = useCallback(async (filters?: { status?: string; priority?: string; search?: string; archived?: boolean }): Promise<ContactAdminInboxItem[]> => {
     if (!profile?.id) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id });
+      const params = new URLSearchParams();
       if (filters?.status) params.set("status", filters.status);
       if (filters?.priority) params.set("priority", filters.priority);
       if (filters?.search) params.set("search", filters.search);
       if (filters?.archived) params.set("archived", "true");
-      const res = await fetch(`${getApiUrl()}/contact/admin/inbox?${params.toString()}`);
+      const qs = params.toString();
+      const res = await authedFetch(`/contact/admin/inbox${qs ? `?${qs}` : ""}`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -4901,7 +4902,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getAdminContactMessage = useCallback(async (messageId: string): Promise<ContactAdminMessageDetail | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/inbox/${messageId}?requesterId=${profile.id}`);
+      const res = await authedFetch(`/contact/admin/inbox/${messageId}`);
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -4913,9 +4914,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const replyToContactMessage = useCallback(async (messageId: string, body: string, isInternalNote: boolean): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/reply/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/reply/${messageId}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, body, is_internal_note: isInternalNote }),
+        body: JSON.stringify({ body, is_internal_note: isInternalNote }),
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -4929,10 +4930,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const forwardContactMessage = useCallback(async (messageId: string, data: { toDepartment?: ContactDepartment; toAdminId?: string; toUsername?: string; note?: string }): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/forward/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/forward/${messageId}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: profile.id, to_department: data.toDepartment, to_admin_id: data.toAdminId,
+          to_department: data.toDepartment, to_admin_id: data.toAdminId,
           to_username: data.toUsername, note: data.note,
         }),
       });
@@ -4948,9 +4949,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const closeContactMessage = useCallback(async (messageId: string): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/close/${messageId}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id }),
+      const res = await authedFetch(`/contact/admin/close/${messageId}`, {
+        method: "PUT",
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -4964,9 +4964,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const setContactMessagePriority = useCallback(async (messageId: string, priority: ContactPriority): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/priority/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/priority/${messageId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, priority }),
+        body: JSON.stringify({ priority }),
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -4980,7 +4980,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getContactAdminStats = useCallback(async (): Promise<ContactDeptStats | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/stats?requesterId=${profile.id}`);
+      const res = await authedFetch("/contact/admin/stats");
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -4992,7 +4992,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getContactAllDepartmentStats = useCallback(async (): Promise<Record<ContactDepartment, ContactDeptStats> | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/all-departments?requesterId=${profile.id}`);
+      const res = await authedFetch("/contact/admin/all-departments");
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -5004,9 +5004,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const setContactMessageStatus = useCallback(async (messageId: string, status: ContactMessageStatus): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/status/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/status/${messageId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, status }),
+        body: JSON.stringify({ status }),
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -5020,9 +5020,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const archiveContactMessage = useCallback(async (messageId: string, archived: boolean): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/archive/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/archive/${messageId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, archived }),
+        body: JSON.stringify({ archived }),
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -5036,9 +5036,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const starContactMessage = useCallback(async (messageId: string, starred: boolean): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/contact/admin/star/${messageId}`, {
+      const res = await authedFetch(`/contact/admin/star/${messageId}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id, starred }),
+        body: JSON.stringify({ starred }),
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -5052,7 +5052,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getOfficialMessageAllowedTypes = useCallback(async (): Promise<OfficialAccountType[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/allowed-types?requesterId=${profile.id}`);
+      const res = await authedFetch("/official-messages/allowed-types");
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -5064,10 +5064,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const sendOfficialMessage = useCallback(async (data: OfficialMessageSendData): Promise<OfficialMessageSendResult> => {
     if (!profile?.id) return { success: false, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/send`, {
+      const res = await authedFetch("/official-messages/send", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: profile.id, targetUserId: data.targetUserId,
+          targetUserId: data.targetUserId,
           department: data.department, subject: data.subject, body: data.body, draftId: data.draftId,
         }),
       });
@@ -5083,7 +5083,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getSentOfficialMessages = useCallback(async (): Promise<SentOfficialMessage[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/sent?requesterId=${profile.id}`);
+      const res = await authedFetch("/official-messages/sent");
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -5095,8 +5095,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const searchUsersForCompose = useCallback(async (query: string): Promise<ComposeUserSearchResult[]> => {
     if (!profile?.id || query.trim().length < 2) return [];
     try {
-      const params = new URLSearchParams({ requesterId: profile.id, q: query.trim() });
-      const res = await fetch(`${getApiUrl()}/official-messages/search-users?${params.toString()}`);
+      const params = new URLSearchParams({ q: query.trim() });
+      const res = await authedFetch(`/official-messages/search-users?${params.toString()}`);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -5108,7 +5108,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getOfficialMailDrafts = useCallback(async (): Promise<OfficialMailDraft[]> => {
     if (!profile?.id) return [];
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/drafts?requesterId=${profile.id}`);
+      const res = await authedFetch("/official-messages/drafts");
       if (!res.ok) return [];
       return await res.json();
     } catch (e) {
@@ -5120,10 +5120,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const saveOfficialMailDraft = useCallback(async (data: OfficialMailDraftSaveData): Promise<OfficialMailDraftSaveResult> => {
     if (!profile?.id) return { draftId: null, error: "Not authenticated" };
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/drafts`, {
+      const res = await authedFetch("/official-messages/drafts", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: profile.id, draftId: data.draftId, targetUserId: data.targetUserId,
+          draftId: data.draftId, targetUserId: data.targetUserId,
           targetUsername: data.targetUsername, department: data.department, subject: data.subject, body: data.body,
         }),
       });
@@ -5139,9 +5139,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteOfficialMailDraft = useCallback(async (draftId: string): Promise<string | null> => {
     if (!profile?.id) return "Not authenticated";
     try {
-      const res = await fetch(`${getApiUrl()}/official-messages/drafts/${draftId}`, {
-        method: "DELETE", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requesterId: profile.id }),
+      const res = await authedFetch(`/official-messages/drafts/${draftId}`, {
+        method: "DELETE",
       });
       if (res.ok) return null;
       const err = await res.json().catch(() => ({}));
@@ -5156,8 +5155,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const empty: OfficialMailThread = { conversationId: null, subject: null, department: null, messages: [] };
     if (!profile?.id) return empty;
     try {
-      const params = new URLSearchParams({ requesterId: profile.id, targetUserId, officialType });
-      const res = await fetch(`${getApiUrl()}/official-messages/thread-with-user?${params.toString()}`);
+      const params = new URLSearchParams({ targetUserId, officialType });
+      const res = await authedFetch(`/official-messages/thread-with-user?${params.toString()}`);
       if (!res.ok) return empty;
       return await res.json();
     } catch (e) {

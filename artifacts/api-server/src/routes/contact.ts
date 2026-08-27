@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
+import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
-// Same trust model as churches.ts/discipleship.ts/connections.ts — no
-// requireAuth/requireAdmin middleware; every endpoint takes a caller-supplied
-// requesterId and authorizes inline against p2p_profiles.role, using the
-// service-role client for all real reads/writes (RLS is the backstop).
+// P2P Official / admin-contact hardening — every endpoint below used to
+// trust a caller-supplied requesterId outright (the same gap fixed in
+// churches.ts). Identity now always comes from verifyCaller (a real
+// Supabase JWT); authorization still runs inline against p2p_profiles.role
+// exactly as before.
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
     ? process.env.SUPABASE_DB_URL
@@ -122,11 +124,12 @@ async function notifyDepartmentAdmins(department: Department, title: string, mes
 
 // POST /contact/send — { requesterId, to_department, subject, body, attachment_url?, attachment_type? }
 router.post("/contact/send", async (req, res) => {
-  const { requesterId, to_department, subject, body, attachment_url, attachment_type } = req.body as {
-    requesterId?: string; to_department?: string; subject?: string; body?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { to_department, subject, body, attachment_url, attachment_type } = req.body as {
+    to_department?: string; subject?: string; body?: string;
     attachment_url?: string; attachment_type?: string;
   };
-  if (!requesterId) return err(res, "requesterId is required", 400);
   if (!to_department || !DEPARTMENTS.includes(to_department as Department)) {
     return err(res, `to_department must be one of: ${DEPARTMENTS.join(", ")}`, 400);
   }
@@ -162,8 +165,8 @@ router.post("/contact/send", async (req, res) => {
 
 // GET /contact/my-messages?requesterId=
 router.get("/contact/my-messages", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
 
   const { data, error } = await db.from("p2p_contact_messages").select("*").eq("from_user_id", requesterId).order("created_at", { ascending: false });
   if (error) return err(res, error.message, 500);
@@ -190,8 +193,8 @@ router.get("/contact/my-messages", async (req, res) => {
 // GET /contact/my-messages/:messageId?requesterId=
 router.get("/contact/my-messages/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
 
   const { data: message } = await db.from("p2p_contact_messages").select("*").eq("id", messageId).eq("from_user_id", requesterId).maybeSingle();
   if (!message) return err(res, "Message not found", 404);
@@ -204,10 +207,11 @@ router.get("/contact/my-messages/:messageId", async (req, res) => {
 
 // GET /contact/admin/inbox?requesterId=&status=&priority=&search=&includeAll=
 router.get("/contact/admin/inbox", async (req, res) => {
-  const { requesterId, status, priority, search, archived } = req.query as {
-    requesterId?: string; status?: string; priority?: string; search?: string; archived?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { status, priority, search, archived } = req.query as {
+    status?: string; priority?: string; search?: string; archived?: string;
   };
-  if (!requesterId) return err(res, "requesterId is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -268,8 +272,8 @@ router.get("/contact/admin/inbox", async (req, res) => {
 // GET /contact/admin/inbox/:messageId?requesterId=
 router.get("/contact/admin/inbox/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -339,8 +343,10 @@ async function getModulesCompletedForUser(userId: string): Promise<number> {
 // POST /contact/admin/reply/:messageId — { requesterId, body, is_internal_note }
 router.post("/contact/admin/reply/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, body, is_internal_note } = req.body as { requesterId?: string; body?: string; is_internal_note?: boolean };
-  if (!requesterId || !body?.trim()) return err(res, "requesterId and body are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { body, is_internal_note } = req.body as { body?: string; is_internal_note?: boolean };
+  if (!body?.trim()) return err(res, "body is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -374,10 +380,11 @@ router.post("/contact/admin/reply/:messageId", async (req, res) => {
 // POST /contact/admin/forward/:messageId — { requesterId, to_department?, to_admin_id?, to_username?, note? }
 router.post("/contact/admin/forward/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, to_department, to_admin_id, to_username, note } = req.body as {
-    requesterId?: string; to_department?: string; to_admin_id?: string; to_username?: string; note?: string;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { to_department, to_admin_id, to_username, note } = req.body as {
+    to_department?: string; to_admin_id?: string; to_username?: string; note?: string;
   };
-  if (!requesterId) return err(res, "requesterId is required", 400);
   if (!to_department && !to_admin_id && !to_username) return err(res, "to_department or to_admin_id/to_username is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
@@ -410,8 +417,8 @@ router.post("/contact/admin/forward/:messageId", async (req, res) => {
 // PUT /contact/admin/close/:messageId — { requesterId }
 router.put("/contact/admin/close/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId } = req.body as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -438,8 +445,10 @@ router.put("/contact/admin/close/:messageId", async (req, res) => {
 // PUT /contact/admin/priority/:messageId — { requesterId, priority }
 router.put("/contact/admin/priority/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, priority } = req.body as { requesterId?: string; priority?: string };
-  if (!requesterId || !priority) return err(res, "requesterId and priority are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { priority } = req.body as { priority?: string };
+  if (!priority) return err(res, "priority is required", 400);
   if (!["normal", "high", "urgent"].includes(priority)) return err(res, "Invalid priority", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
@@ -460,8 +469,10 @@ const MESSAGE_STATUSES = ["unread", "read", "replied", "forwarded", "closed"] as
 // outside the automatic transitions reply/forward/close already perform.
 router.put("/contact/admin/status/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, status } = req.body as { requesterId?: string; status?: string };
-  if (!requesterId || !status) return err(res, "requesterId and status are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { status } = req.body as { status?: string };
+  if (!status) return err(res, "status is required", 400);
   if (!MESSAGE_STATUSES.includes(status as (typeof MESSAGE_STATUSES)[number])) return err(res, "Invalid status", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
@@ -479,8 +490,10 @@ router.put("/contact/admin/status/:messageId", async (req, res) => {
 // default inbox view without deleting anything or touching status/feedback.
 router.put("/contact/admin/archive/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, archived } = req.body as { requesterId?: string; archived?: boolean };
-  if (!requesterId || typeof archived !== "boolean") return err(res, "requesterId and archived (boolean) are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { archived } = req.body as { archived?: boolean };
+  if (typeof archived !== "boolean") return err(res, "archived (boolean) is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -497,8 +510,10 @@ router.put("/contact/admin/archive/:messageId", async (req, res) => {
 // contact.ts mutation — starring is personal, not a shared department state.
 router.post("/contact/admin/star/:messageId", async (req, res) => {
   const { messageId } = req.params;
-  const { requesterId, starred } = req.body as { requesterId?: string; starred?: boolean };
-  if (!requesterId || typeof starred !== "boolean") return err(res, "requesterId and starred (boolean) are required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { starred } = req.body as { starred?: boolean };
+  if (typeof starred !== "boolean") return err(res, "starred (boolean) is required", 400);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
 
@@ -546,17 +561,17 @@ async function computeDeptStats(departments: Department[]) {
 
 // GET /contact/admin/stats?requesterId=
 router.get("/contact/admin/stats", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const access = await getAdminAccess(requesterId);
   if (!access) return err(res, "Admin access required", 403);
   return ok(res, await computeDeptStats(access.departments));
 });
 
-// GET /contact/admin/all-departments?requesterId= — super_admin only
+// GET /contact/admin/all-departments — super_admin only (identity from Bearer token)
 router.get("/contact/admin/all-departments", async (req, res) => {
-  const { requesterId } = req.query as { requesterId?: string };
-  if (!requesterId) return err(res, "requesterId is required", 400);
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
   const { data: profile } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
   if (profile?.role !== "super_admin") return err(res, "Super admin access required", 403);
 

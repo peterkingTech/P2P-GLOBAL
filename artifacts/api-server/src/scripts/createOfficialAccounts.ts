@@ -59,7 +59,7 @@ const OFFICIAL_ACCOUNTS: OfficialAccountSpec[] = [
   },
   {
     username: "p2pglobal_announcement",
-    displayName: "P2P Global",
+    displayName: "P2P Official",
     label: "Official P2P Global Announcements",
     type: "announcement",
     bio: "Official announcements from the P2P Global team.",
@@ -67,7 +67,7 @@ const OFFICIAL_ACCOUNTS: OfficialAccountSpec[] = [
   },
   {
     username: "support",
-    displayName: "P2P Global Support",
+    displayName: "P2P Official",
     label: "Official P2P Global Support",
     type: "support",
     bio: "Here to help with any questions or issues.",
@@ -75,7 +75,7 @@ const OFFICIAL_ACCOUNTS: OfficialAccountSpec[] = [
   },
   {
     username: "p2pglobal",
-    displayName: "P2P Global",
+    displayName: "P2P Official",
     label: "Official P2P Global Account",
     type: "general",
     bio: "Building Systems that serve God's Kingdom — Matthew 6:33.",
