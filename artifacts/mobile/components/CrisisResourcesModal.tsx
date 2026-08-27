@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 export const CRISIS_RESOURCES = [
@@ -43,7 +44,14 @@ export function CrisisResourcesModal({
     setCallingGuide(true);
     setGuideError(null);
     try {
-      const guideRes = await fetch(`${getApiUrl()}/discipleship/my-peer-guide/${profile.id}`);
+      const guideRes = await authedFetch(`/discipleship/my-peer-guide/${profile.id}`);
+      if (!guideRes.ok) {
+        // Safety-critical distinction: a request failure (auth/network) must
+        // never be presented as "you have no peer guide" — that's a false
+        // and potentially harmful message to show someone in crisis.
+        setGuideError("Couldn't reach your peer guide right now. Please try again or use a crisis resource below.");
+        return;
+      }
       const { peerGuideId, peerGuideName } = await guideRes.json();
       if (!peerGuideId) {
         setGuideError("You don't have an assigned peer guide yet.");

@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 const MIN_LENGTH = 50;
@@ -88,7 +88,7 @@ export default function WriteCompletionLetterScreen() {
       );
       if (error) throw error;
 
-      fetch(`${getApiUrl()}/discipleship/notify-user`, {
+      authedFetch("/discipleship/notify-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

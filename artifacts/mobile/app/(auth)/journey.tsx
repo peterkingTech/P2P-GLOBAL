@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
 import colors from "@/constants/colors";
 
@@ -166,7 +167,7 @@ export default function JourneyScreen() {
     if (yes && profile?.id) {
       setNotifyingPeerGuide(true);
       try {
-        await fetch(`${getApiUrl()}/discipleship/notify-peer-guide`, {
+        await authedFetch("/discipleship/notify-peer-guide", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -208,7 +209,7 @@ export default function JourneyScreen() {
     });
     await refreshProfile();
     if (peerGuide) {
-      fetch(`${getApiUrl()}/discipleship/notify-peer-guide`, {
+      authedFetch("/discipleship/notify-peer-guide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

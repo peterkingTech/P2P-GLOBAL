@@ -7,7 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import LivingTree from "@/components/LivingTree";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 // The Completion Moment — a 4-phase, mostly-non-skippable cinematic
@@ -247,7 +247,7 @@ function Phase2Letter({ learnerId, learnerName, onContinue }: { learnerId: strin
       try {
         const { data: link } = await supabase.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", learnerId).eq("active", true).maybeSingle();
         if (link?.mentor_id) {
-          await fetch(`${getApiUrl()}/discipleship/notify-user`, {
+          await authedFetch("/discipleship/notify-user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

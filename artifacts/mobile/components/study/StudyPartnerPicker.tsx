@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 
 // "Who would you like to study with?" — the Kingdom School lesson entry
 // point's person picker (Study Together Phase 1, discoverability slice).
@@ -36,7 +36,7 @@ export function StudyPartnerPicker({
     let cancelled = false;
     setLoading(true);
     setError(false);
-    fetch(`${getApiUrl()}/discipleship/study-partners/${user.id}`)
+    authedFetch(`/discipleship/study-partners/${user.id}`)
       .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((data) => { if (!cancelled) setPeople(data.people ?? []); })
       .catch(() => { if (!cancelled) setError(true); })

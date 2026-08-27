@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
@@ -88,7 +88,7 @@ export default function DiscipleDetailScreen() {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch(`${getApiUrl()}/discipleship/${user.id}/disciple/${discipleId}`);
+      const res = await authedFetch(`/discipleship/${user.id}/disciple/${discipleId}`);
       if (!res.ok) { setError(true); setLoading(false); return; }
       const data = await res.json();
       setDetail(data);

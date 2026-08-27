@@ -440,16 +440,50 @@ router.put("/lesson/:id/translations/:lang", requireContentAdmin, async (req, re
 
 // ── Registrations ─────────────────────────────────────────────────────────────
 
+// Registrations are church/region-scoped by design (RLS policy
+// "registrations_select_scoped", migration 012: church_leader sees only
+// students in their own church, regional_admin only their own region,
+// super_admin sees everyone). These three routes previously queried with
+// the bare anon-key `supabase` client (no caller session attached, so that
+// RLS policy never actually applied to them) and applied zero scoping of
+// their own — live-confirmed during the admin.ts security audit: any
+// church_leader/regional_admin account could see and edit every
+// registration platform-wide through this route, not just their own
+// church/region. Fixed by resolving the caller's own scope server-side
+// (same pattern /appointments/list already uses) and filtering to it
+// before querying, using supabaseWrite since the anon client can't see
+// this table's RLS-gated rows without a forwarded session anyway.
+async function scopedRegistrationUserIds(callerId: string): Promise<{ role: string; userIds: string[] | null }> {
+  const { data: caller } = await supabaseWrite.from("p2p_profiles").select("role, church_id, region").eq("id", callerId).maybeSingle();
+  const role = (caller?.role as string) ?? "";
+  if (role === "super_admin") return { role, userIds: null }; // null = unscoped, sees all
+  if (role === "church_leader") {
+    if (!caller?.church_id) return { role, userIds: [] };
+    const { data } = await supabaseWrite.from("p2p_profiles").select("id").eq("role", "student").eq("church_id", caller.church_id as string);
+    return { role, userIds: (data ?? []).map((p) => p.id as string) };
+  }
+  if (role === "regional_admin") {
+    if (!caller?.region) return { role, userIds: [] };
+    const { data } = await supabaseWrite.from("p2p_profiles").select("id").eq("role", "student").eq("region", caller.region as string);
+    return { role, userIds: (data ?? []).map((p) => p.id as string) };
+  }
+  return { role, userIds: [] };
+}
+
 router.get("/registrations", requireRegistrationsAdmin, async (req, res) => {
   const { status, search, page = "1" } = req.query as Record<string, string>;
   const pageNum = Math.max(1, parseInt(page, 10));
   const pageSize = 20;
 
-  let query = supabase
+  const { userIds } = await scopedRegistrationUserIds((req as any).adminUserId);
+  if (userIds !== null && userIds.length === 0) return ok(res, []);
+
+  let query = supabaseWrite
     .from("p2p_registration_profiles")
-    .select("id,full_name,email,location_city,location_country,faith_journey_stage,follow_up_status,submitted_at")
+    .select("id,user_id,full_name,email,location_city,location_country,faith_journey_stage,follow_up_status,submitted_at")
     .order("submitted_at", { ascending: false })
     .range((pageNum - 1) * pageSize, pageNum * pageSize - 1);
+  if (userIds !== null) query = query.in("user_id", userIds);
 
   if (status && status !== "all") query = query.eq("follow_up_status", status);
   if (search) query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
@@ -460,21 +494,28 @@ router.get("/registrations", requireRegistrationsAdmin, async (req, res) => {
 });
 
 router.get("/registrations/:id", requireRegistrationsAdmin, async (req, res) => {
-  const { data, error } = await supabase
+  const { userIds } = await scopedRegistrationUserIds((req as any).adminUserId);
+  const { data, error } = await supabaseWrite
     .from("p2p_registration_profiles")
     .select("*")
     .eq("id", req.params.id)
     .single();
   if (error) return err(res, error.message, 404);
+  if (userIds !== null && !userIds.includes(data.user_id as string)) return err(res, "Registration not found", 404);
   return ok(res, data);
 });
 
 router.patch("/registrations/:id", requireRegistrationsAdmin, async (req, res) => {
+  const { userIds } = await scopedRegistrationUserIds((req as any).adminUserId);
+  if (userIds !== null) {
+    const { data: existing } = await supabaseWrite.from("p2p_registration_profiles").select("user_id").eq("id", req.params.id).maybeSingle();
+    if (!existing || !userIds.includes(existing.user_id as string)) return err(res, "Registration not found", 404);
+  }
   const { follow_up_status, admin_notes } = req.body;
   const updates: Record<string, unknown> = {};
   if (follow_up_status !== undefined) updates.follow_up_status = follow_up_status;
   if (admin_notes !== undefined) updates.admin_notes = admin_notes;
-  const { data, error } = await supabase
+  const { data, error } = await supabaseWrite
     .from("p2p_registration_profiles")
     .update(updates)
     .eq("id", req.params.id)
@@ -1303,8 +1344,13 @@ router.post("/dismiss-username-flag/:userId", requireUsernameAdmin, async (req, 
 // peer_guide through) — reviewing someone's selfie/video is more sensitive
 // than the other admin actions in this file, so it's scoped to the same
 // moderator+ set p2p_content_flags already uses (migrations/013_moderation.sql,
-// matched by RLS in migration 065).
-const VERIFICATION_REVIEWER_ROLES = ["moderator", "church_leader", "regional_admin", "super_admin"];
+// matched by RLS in migration 065), plus admin_verification — a dedicated
+// role that exists specifically for this (mobile/app/admin/_layout.tsx
+// labels it "Verification Admin" and routes its dashboard home straight to
+// the Verification Queue), previously omitted here despite that, which made
+// the role completely non-functional: appointed accounts saw the Verification
+// tab and its own queue dashboard, but every single backend call 403'd.
+const VERIFICATION_REVIEWER_ROLES = ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"];
 const VERIFICATION_DECLINE_REAPPLY_MS = 7 * 24 * 60 * 60 * 1000;
 const VERIFICATION_REVOKE_REAPPLY_MS = 30 * 24 * 60 * 60 * 1000;
 const VERIFICATION_DELETE_AFTER_APPROVAL_MS = 48 * 60 * 60 * 1000;

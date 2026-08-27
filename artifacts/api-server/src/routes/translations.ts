@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAdmin } from "../middleware/adminAuth";
+import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import {
   getTranslation,
   getBatchTranslations,
@@ -18,6 +18,15 @@ import {
 import { createClient } from "@supabase/supabase-js";
 
 const router = Router();
+
+// Narrower than the blanket requireAdmin() gate (any of 17 non-student
+// roles) — matches the intended role set already demonstrated in
+// mobile/app/admin/_layout.tsx's nav ("Translations" tab:
+// peer_guide, church_leader, regional_admin, super_admin, admin_translation).
+// Previously every /admin/* route below used bare requireAdmin, so e.g. an
+// admin_finance or admin_church account (never shown this tab) could still
+// trigger/retry translation jobs via direct API call.
+const requireTranslationAdmin = requireRole("peer_guide", "church_leader", "regional_admin", "admin_translation");
 
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
@@ -245,7 +254,7 @@ router.get("/module/:moduleId", async (req, res) => {
 // ── Admin: trigger AI translation for a single item ───────────────────────────
 // POST /api/translations/admin/trigger { contentType, contentId, lang, force? }
 
-router.post("/admin/trigger", requireAdmin, async (req, res) => {
+router.post("/admin/trigger", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const { contentType, contentId, lang, force = false } = req.body as {
     contentType: string; contentId: string; lang: string; force?: boolean;
   };
@@ -267,7 +276,7 @@ router.post("/admin/trigger", requireAdmin, async (req, res) => {
 // ── Admin: retry a failed job ─────────────────────────────────────────────────
 // POST /api/translations/admin/retry/:jobId
 
-router.post("/admin/retry/:jobId", requireAdmin, async (req, res) => {
+router.post("/admin/retry/:jobId", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const jobId = String(req.params.jobId);
   try {
     const result = await retryJob(jobId);
@@ -280,7 +289,7 @@ router.post("/admin/retry/:jobId", requireAdmin, async (req, res) => {
 // ── Admin: paginated job history ──────────────────────────────────────────────
 // GET /api/translations/admin/jobs?status=&language=&content_type=&page=0&limit=50
 
-router.get("/admin/jobs", requireAdmin, async (req, res) => {
+router.get("/admin/jobs", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const {
     status, language, content_type,
     page = "0", limit = "50",
@@ -307,7 +316,7 @@ router.get("/admin/jobs", requireAdmin, async (req, res) => {
 // ── Admin: batch-translate a curriculum (SSE stream) ─────────────────────────
 // POST /api/translations/admin/batch-curriculum { curriculumId, lang, triggeredBy? }
 
-router.post("/admin/batch-curriculum", requireAdmin, async (req, res) => {
+router.post("/admin/batch-curriculum", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const { curriculumId, lang, triggeredBy = "batch" } = req.body as {
     curriculumId: string; lang: string; triggeredBy?: string;
   };
@@ -334,7 +343,7 @@ router.post("/admin/batch-curriculum", requireAdmin, async (req, res) => {
 // GET /api/translations/admin/coverage?lang=de   (single language breakdown)
 // GET /api/translations/admin/coverage           (all languages overview)
 
-router.get("/admin/coverage", requireAdmin, async (req, res) => {
+router.get("/admin/coverage", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const { lang } = req.query as { lang?: string };
   try {
     const coverage = await getCoverage(lang);
@@ -378,7 +387,7 @@ router.get("/:contentType/:contentId", async (req, res) => {
 // ── Admin: delete a cached translation (force re-translate next trigger) ──────
 // DELETE /api/translations/:contentType/:contentId?lang=de
 
-router.delete("/:contentType/:contentId", requireAdmin, async (req, res) => {
+router.delete("/:contentType/:contentId", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const { contentType, contentId } = req.params;
   const { lang } = req.query as { lang?: string };
 
@@ -399,7 +408,7 @@ router.delete("/:contentType/:contentId", requireAdmin, async (req, res) => {
 // PATCH /api/translations/:contentType/:contentId
 // Body: { lang, title?, subtitle?, description?, body?, metadata?, status? }
 
-router.patch("/:contentType/:contentId", requireAdmin, async (req, res) => {
+router.patch("/:contentType/:contentId", requireAdmin, requireTranslationAdmin, async (req, res) => {
   const { contentType, contentId } = req.params;
   const { lang, title, subtitle, description, body, metadata, status } = req.body as {
     lang: string; title?: string; subtitle?: string; description?: string;

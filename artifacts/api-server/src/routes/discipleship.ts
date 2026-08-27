@@ -1,8 +1,21 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { getEligibleStudyPartners } from "../lib/studyPartnerAuth";
+import { verifyCaller } from "../lib/supabase";
 
 const router = Router();
+
+// Security hardening — every route in this file used to trust a
+// client-supplied :userId/:mentorId/learnerId/peerGuideId directly, with no
+// check that the caller was actually that person (the same class of bug
+// already fixed in churches.ts/contact.ts/officialMessages.ts). Identity now
+// always comes from verifyCaller (a real Supabase JWT); URL params that
+// represent "whose data is this" are still accepted for URL-shape
+// compatibility with existing clients, but are now cross-checked against
+// the verified caller rather than trusted outright.
+function err(res: import("express").Response, message: string, status = 400) {
+  return res.status(status).json({ error: message });
+}
 
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
@@ -38,7 +51,10 @@ function mapLink(row: Record<string, unknown>) {
 // "Call My Peer Guide" button, which needs the id to call before it can even
 // build the Agora channel name.
 router.get("/my-peer-guide/:userId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId } = req.params;
+  if (caller !== userId) return err(res, "Not authorized", 403);
   const { data: link } = await supabaseWrite
     .from("p2p_discipleship_links")
     .select("mentor_id")
@@ -67,7 +83,10 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
 // RPC is still the real gate at call-start time, so a stale/spoofed id
 // returned here can't grant anything it wouldn't already be entitled to.
 router.get("/study-partners/:userId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId } = req.params;
+  if (caller !== userId) return err(res, "Not authorized", 403);
 
   const relationshipById = await getEligibleStudyPartners(supabaseWrite, userId);
 
@@ -100,7 +119,10 @@ router.get("/study-partners/:userId", async (req, res) => {
 // wilting threshold DataContext.loadTreeData() already uses client-side for
 // MenteeBranchInfo.
 router.get("/:userId/disciples", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId } = req.params;
+  if (caller !== userId) return err(res, "Not authorized", 403);
   const { data, error } = await supabaseWrite
     .from("p2p_discipleship_links")
     .select("*")
@@ -166,12 +188,19 @@ router.get("/:userId/disciples", async (req, res) => {
 });
 
 // GET /discipleship/:mentorId/disciple/:discipleId — Disciple Detail's single
-// data source (My Discipleship Phase 1). Authorization happens here, not on
-// the client: requires an ACTIVE p2p_discipleship_links row naming this exact
-// mentor/disciple pair before anything runs — the URL/ids are never trusted
-// directly, unlike every read-only GET elsewhere in this file.
+// data source (My Discipleship Phase 1). The original comment here claimed
+// "authorization happens here, not on the client" because it requires an
+// ACTIVE p2p_discipleship_links row naming this exact mentor/disciple pair —
+// but that only verified the RELATIONSHIP exists, never that the CALLER was
+// a party to it. Any authenticated stranger who knew (or guessed) two real
+// ids from an existing relationship between two OTHER people could read a
+// disciple's full progress/activity/sessions. Now requires the verified
+// caller to actually BE the named mentor.
 router.get("/:mentorId/disciple/:discipleId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { mentorId, discipleId } = req.params;
+  if (caller !== mentorId) return err(res, "Not authorized", 403);
 
   const { data: link } = await supabaseWrite
     .from("p2p_discipleship_links")
@@ -333,12 +362,24 @@ router.get("/:mentorId/disciple/:discipleId", async (req, res) => {
   });
 });
 
-// POST /discipleship
+// POST /discipleship — no current client caller found (the app's real
+// relationship-creation path is POST /request + PUT /request/:id/respond,
+// which goes through consent). Left in place rather than removed (minimal
+// fix, not a restructure) but was previously reachable by any authenticated
+// user to silently link two ARBITRARY other people with no consent from
+// either — now at minimum requires the caller to be one of the two parties.
+// Recommend deprecating this route in favor of the request/respond flow;
+// not done here since removing a route is a bigger behavior change than
+// closing the open authorization hole.
 router.post("/", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { mentorId, discipleId } = req.body as {
     mentorId: string;
     discipleId: string;
   };
+  if (!mentorId || !discipleId) return err(res, "mentorId and discipleId are required", 400);
+  if (caller !== mentorId && caller !== discipleId) return err(res, "Not authorized", 403);
 
   const { data, error } = await supabaseWrite
     .from("p2p_discipleship_links")
@@ -362,10 +403,13 @@ router.post("/", async (req, res) => {
 // guide with a caller-supplied title/message. Used by the Integration
 // Journey's "Pray Together" (step 3) and "Begin Module 1" (step 5) moments.
 router.post("/notify-peer-guide", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId, title, message } = req.body as { userId?: string; title?: string; message?: string };
   if (!userId || !title || !message) {
     return res.status(400).json({ error: "userId, title, and message are required" });
   }
+  if (caller !== userId) return err(res, "Not authorized", 403);
 
   const { data: link } = await supabaseWrite
     .from("p2p_discipleship_links")
@@ -384,17 +428,33 @@ router.post("/notify-peer-guide", async (req, res) => {
   return res.json({ notified: true });
 });
 
-// POST /discipleship/notify-user — direct, caller-supplied-userId
-// notification (no lookup). Same trust model as the rest of this non-admin
-// API (e.g. /plans/:planId/progress/:userId) — the caller's own client
-// already knows who they mean to notify (e.g. a peer guide sending their
-// learner the completion letter). Needed because p2p_notifications has no
-// client-facing INSERT policy for writing to someone else's user_id.
+// POST /discipleship/notify-user — sends an arbitrary title/message to a
+// target user. Previously trusted the caller-supplied userId with NO check
+// on the caller at all — any authenticated (or even unauthenticated) HTTP
+// caller could spam arbitrary notification content to any real user, a
+// straightforward phishing/spam vector given p2p_notifications is also used
+// for legitimate account-security-adjacent messages. Both real callers
+// (completion.tsx: a learner notifying their own mentor; write-completion-
+// letter.tsx: a mentor notifying their own disciple) always have an ACTIVE
+// discipleship link with the target in one direction or the other — that's
+// now the enforced authorization boundary, closing the hole without
+// changing either legitimate call site's behavior.
 router.post("/notify-user", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId, title, message } = req.body as { userId?: string; title?: string; message?: string };
   if (!userId || !title || !message) {
     return res.status(400).json({ error: "userId, title, and message are required" });
   }
+  if (caller === userId) return err(res, "Not authorized", 403);
+  const { data: link } = await supabaseWrite
+    .from("p2p_discipleship_links")
+    .select("id")
+    .eq("active", true)
+    .or(`and(mentor_id.eq.${caller},disciple_id.eq.${userId}),and(mentor_id.eq.${userId},disciple_id.eq.${caller})`)
+    .maybeSingle();
+  if (!link) return err(res, "No active discipleship relationship with this user", 403);
+
   const { error } = await supabaseWrite.from("p2p_notifications").insert({ user_id: userId, title, message });
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ notified: true });
@@ -719,7 +779,10 @@ async function scoreCandidates(requesterId: string, excludeCandidateIds: string[
 // GET /discipleship/find-peer-guide/:userId — top 5 eligible peer guide
 // matches for this learner, scored and with human-readable match reasons.
 router.get("/find-peer-guide/:userId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId } = req.params;
+  if (caller !== userId) return err(res, "Not authorized", 403);
   try {
     const scored = await scoreCandidates(userId);
     return res.json(scored.slice(0, 5));
@@ -734,10 +797,13 @@ router.get("/find-peer-guide/:userId", async (req, res) => {
 // screen or "Choose Someone I Know" search, optionally with a personal
 // message).
 router.post("/request", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { learnerId, peerGuideId, message, source } = req.body as {
     learnerId?: string; peerGuideId?: string; message?: string; source?: "smart_match" | "direct";
   };
   if (!learnerId || !peerGuideId) return res.status(400).json({ error: "learnerId and peerGuideId are required" });
+  if (caller !== learnerId) return err(res, "Not authorized", 403);
   if (learnerId === peerGuideId) return res.status(400).json({ error: "You cannot request yourself as a peer guide." });
   const requestSource: "smart_match" | "direct" = source === "direct" ? "direct" : "smart_match";
   const trimmedMessage = message?.trim().slice(0, 500) || null;
@@ -807,7 +873,10 @@ router.post("/request", async (req, res) => {
 // GET /discipleship/pending-requests/:userId — incoming Connect requests
 // this user (as a prospective peer guide) can Accept/Decline.
 router.get("/pending-requests/:userId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { userId } = req.params;
+  if (caller !== userId) return err(res, "Not authorized", 403);
   const { data: links, error } = await supabaseWrite
     .from("p2p_discipleship_links")
     .select("id, disciple_id, requested_at, expires_at, message, source")
@@ -847,11 +916,14 @@ router.get("/pending-requests/:userId", async (req, res) => {
 
 // PUT /discipleship/request/:linkId/respond — peer guide accepts or declines.
 router.put("/request/:linkId/respond", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
   const { linkId } = req.params;
   const { userId, decision } = req.body as { userId?: string; decision?: "accept" | "decline" };
   if (!userId || (decision !== "accept" && decision !== "decline")) {
     return res.status(400).json({ error: "userId and decision ('accept'|'decline') are required" });
   }
+  if (caller !== userId) return err(res, "Not authorized", 403);
 
   const { data: link } = await supabaseWrite
     .from("p2p_discipleship_links")

@@ -4,7 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
 
@@ -43,7 +43,7 @@ export default function SmartMatch() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`${getApiUrl()}/discipleship/find-peer-guide/${profile.id}`);
+      const res = await authedFetch(`/discipleship/find-peer-guide/${profile.id}`);
       const data = (await res.json()) as Candidate[];
       setCandidates(Array.isArray(data) ? data : []);
     } catch {
@@ -58,7 +58,7 @@ export default function SmartMatch() {
     if (!profile?.id) return;
     setConnecting(candidate.id);
     try {
-      await fetch(`${getApiUrl()}/discipleship/request`, {
+      await authedFetch("/discipleship/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ learnerId: profile.id, peerGuideId: candidate.id }),

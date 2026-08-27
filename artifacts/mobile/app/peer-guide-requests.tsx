@@ -4,7 +4,7 @@ import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 // Where a peer guide sees and Accept/Decline's incoming "Connect" requests
@@ -36,8 +36,9 @@ export default function PeerGuideRequestsScreen() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`${getApiUrl()}/discipleship/pending-requests/${profile.id}`);
-      setRequests(await res.json());
+      const res = await authedFetch(`/discipleship/pending-requests/${profile.id}`);
+      const data = res.ok ? await res.json() : [];
+      setRequests(Array.isArray(data) ? data : []);
     } catch {
       setRequests([]);
     } finally {
@@ -51,7 +52,7 @@ export default function PeerGuideRequestsScreen() {
     if (!profile?.id) return;
     setRespondingId(requestId);
     try {
-      await fetch(`${getApiUrl()}/discipleship/request/${requestId}/respond`, {
+      await authedFetch(`/discipleship/request/${requestId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id, decision }),

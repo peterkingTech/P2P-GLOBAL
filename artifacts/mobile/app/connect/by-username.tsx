@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import colors from "@/constants/colors";
 
@@ -73,7 +74,7 @@ export default function ConnectByUsernameScreen() {
     setSending(true);
     try {
       if (requestType === "peer_guide") {
-        const res = await fetch(`${getApiUrl()}/discipleship/request`, {
+        const res = await authedFetch("/discipleship/request", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ learnerId: profile.id, peerGuideId: found.userId, message: message.trim() || undefined, source: "direct" }),
         });

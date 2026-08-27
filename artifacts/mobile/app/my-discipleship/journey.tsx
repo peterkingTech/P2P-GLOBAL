@@ -16,7 +16,7 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 
 // My Discipleship Journey — "Where am I in my discipleship?" This is the
 // screen that used to live directly at my-discipleship/index.tsx; the hub
@@ -249,18 +249,17 @@ export default function MyDiscipleshipJourneyScreen() {
   const load = useCallback(async () => {
     if (!profile?.id) return;
     setLoading(true);
-    const apiUrl = getApiUrl();
     await Promise.all([
-      fetch(`${apiUrl}/discipleship/my-peer-guide/${profile.id}`)
-        .then((r) => r.json())
+      authedFetch(`/discipleship/my-peer-guide/${profile.id}`)
+        .then((r) => (r.ok ? r.json() : null))
         .then((data) => setMyPeerGuide(data?.peerGuideId ? data : null))
         .catch(() => setMyPeerGuide(null)),
-      fetch(`${apiUrl}/discipleship/${profile.id}/disciples`)
-        .then((r) => r.json())
+      authedFetch(`/discipleship/${profile.id}/disciples`)
+        .then((r) => (r.ok ? r.json() : []))
         .then((data) => setMyDisciples(Array.isArray(data) ? data : []))
         .catch(() => setMyDisciples([])),
-      fetch(`${apiUrl}/discipleship/pending-requests/${profile.id}`)
-        .then((r) => r.json())
+      authedFetch(`/discipleship/pending-requests/${profile.id}`)
+        .then((r) => (r.ok ? r.json() : []))
         .then((data) => setPendingRequestCount(Array.isArray(data) ? data.length : 0))
         .catch(() => setPendingRequestCount(0)),
     ]);
