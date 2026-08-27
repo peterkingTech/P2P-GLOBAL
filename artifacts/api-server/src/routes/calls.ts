@@ -301,7 +301,18 @@ router.post("/calls/:callId/invitations", async (req, res) => {
     caller_id: inviterId, recipient_id: inviteeId, status: "ringing",
     conversation_id: callLog.conversation_id ?? null, call_log_id: callLog.id, invitation_id: invitationId,
   });
-  void inviterProfile; // name resolution happens client-side same as any other incoming call
+
+  // Study Together notification center — the live "ringing" row above only
+  // reaches the invitee while they're actively watching the incoming-call
+  // screen; a durable p2p_notifications record is what lets them find the
+  // invitation later (notification center, eventually push) if they weren't.
+  await supabaseWrite.from("p2p_notifications").insert({
+    user_id: inviteeId,
+    title: "Study Together invitation",
+    message: `${inviterProfile?.full_name ?? "Someone"} invited you to study together.`,
+    notification_type: "study_invitation_received",
+    data: { callId, invitationId },
+  });
 
   return ok(res, { success: true, invitationId, status: "pending" });
 });
@@ -564,6 +575,17 @@ router.post("/calls/:callId/study/end", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { callId } = req.params;
 
+  // Fetched before ending — once p2p_end_study_session marks the session
+  // 'ended' there's no clean way to ask "who was actively in this" anymore.
+  const { data: sessionBefore } = await supabaseWrite
+    .from("p2p_study_sessions").select("id, title").eq("call_log_id", callId).eq("status", "active").maybeSingle();
+  const participantIds = sessionBefore
+    ? (await supabaseWrite
+        .from("p2p_study_session_participants").select("user_id")
+        .eq("study_session_id", sessionBefore.id).is("left_at", null)
+      ).data?.map((p) => p.user_id as string) ?? []
+    : [];
+
   const { error } = await supabaseWrite.rpc("p2p_end_study_session", { p_call_id: callId, p_caller_id: userId });
   if (error) {
     const reason = error.message ?? "";
@@ -571,6 +593,22 @@ router.post("/calls/:callId/study/end", async (req, res) => {
     if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
     return err(res, "Unable to end study together.", 500);
   }
+
+  // Notify every other participant who was actively in the session — not
+  // the caller who just ended it, and not participants who'd already left.
+  const recipients = participantIds.filter((id) => id !== userId);
+  if (recipients.length) {
+    await supabaseWrite.from("p2p_notifications").insert(
+      recipients.map((id) => ({
+        user_id: id,
+        title: "Study Together ended",
+        message: sessionBefore?.title ? `The group study "${sessionBefore.title}" has ended.` : "This group study session has ended.",
+        notification_type: "study_ended",
+        data: { callId, studySessionId: sessionBefore?.id ?? null },
+      }))
+    );
+  }
+
   return ok(res, { ended: true });
 });
 
@@ -603,6 +641,19 @@ router.post("/calls/:callId/study/participants/:userId/remove", async (req, res)
     if (reason.includes("not_leader")) return err(res, "Only the study leader can remove participants.", 403);
     return err(res, "Unable to remove this participant.", 500);
   }
+
+  // Durable record alongside the realtime "participant_removed" broadcast
+  // signal the client already sends — the broadcast only reaches the
+  // removed participant if their client is actively connected right now;
+  // this is what lets them find out (and, later, get pushed) otherwise.
+  await supabaseWrite.from("p2p_notifications").insert({
+    user_id: targetUserId,
+    title: "Removed from Study Together",
+    message: "The study leader removed you from a Study Together session.",
+    notification_type: "study_participant_removed",
+    data: { callId },
+  });
+
   return ok(res, { removed: true });
 });
 

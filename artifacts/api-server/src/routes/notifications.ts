@@ -77,4 +77,20 @@ router.post("/me/:id/read", async (req, res) => {
   return res.json(mapNotification(data as Record<string, unknown>));
 });
 
+// POST /notifications/me/read-all — same identity/scoping model as the
+// single-notification route above; only ever touches the caller's own
+// unread rows.
+router.post("/me/read-all", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { error } = await supabase
+    .from("p2p_notifications")
+    .update({ read: true })
+    .eq("user_id", userId)
+    .eq("read", false);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ ok: true });
+});
+
 export default router;

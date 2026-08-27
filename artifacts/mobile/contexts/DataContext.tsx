@@ -1218,6 +1218,7 @@ interface DataContextValue {
   unreadNotificationCount: number;
   getMyNotifications: () => Promise<AppNotification[]>;
   markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   searchUsersByUsername: (query: string) => Promise<UsernameSearchResult[]>;
   getProfileByUsername: (username: string) => Promise<PublicUserProfile | null>;
   sendConnectionRequest: (params: {
@@ -2690,6 +2691,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setUnreadNotificationCount((c) => Math.max(0, c - 1));
     } catch (e) {
       console.error("markNotificationRead failed", e);
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async (): Promise<void> => {
+    try {
+      await authedFetch("/notifications/me/read-all", { method: "POST" });
+      setUnreadNotificationCount(0);
+    } catch (e) {
+      console.error("markAllNotificationsRead failed", e);
     }
   }, []);
 
@@ -5207,7 +5217,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
       incomingCall, dismissIncomingCall,
       circleSessionInvite, dismissCircleSessionInvite,
-      unreadNotificationCount, getMyNotifications, markNotificationRead,
+      unreadNotificationCount, getMyNotifications, markNotificationRead, markAllNotificationsRead,
       conversations, conversationsLoading, totalUnreadCount, mostRecentUnread, loadConversations,
       pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,
       submitAdminFeedback, pendingConnectionRequestCount,
