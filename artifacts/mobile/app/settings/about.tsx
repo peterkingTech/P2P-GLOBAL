@@ -79,7 +79,7 @@ export default function AboutSettingsScreen() {
         </View>
 
         <View style={styles.brandingWrap}>
-          <Text style={styles.brandingText}>Built with ❤️ by AMEN TECH</Text>
+          <Text style={styles.brandingText}>POWERED BY AMEN KINGDOM TECH MINISTRY</Text>
         </View>
       </ScrollView>
     </View>
