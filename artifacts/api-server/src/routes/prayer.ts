@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase } from "../lib/supabase";
 
 const router = Router();
 

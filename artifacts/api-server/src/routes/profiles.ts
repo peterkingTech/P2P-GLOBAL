@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
-import { supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase } from "../lib/supabase";
 import { validateUsername, formatUsername } from "../lib/username";
 
 const router = Router();

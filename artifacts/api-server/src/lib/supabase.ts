@@ -14,6 +14,17 @@ const supabaseUrl =
 
 export const supabase = createClient(supabaseUrl, SUPABASE_ANON_KEY);
 
+// p2p_lesson_progress, p2p_modules, and several other tables' RLS policies
+// are scoped to the `authenticated` role only (owner/auth checks via
+// auth.uid()) — the anon client above carries no forwarded user session, so
+// routes doing real data reads/writes need this instead, matching the
+// service-role-for-server-reads pattern already used throughout this
+// codebase (curriculum.ts's supabaseRead, calls.ts's supabaseWrite, etc.).
+export const supabaseServiceRole = createClient(
+  supabaseUrl,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY
+);
+
 // Study Together C2 introduced this as a scoped exception to the rest of
 // this API's "trust the caller-supplied id" pattern (see calls.ts):
 // verifies a real Supabase session via its access token rather than

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase } from "../lib/supabase";
 
 const router = Router();
 

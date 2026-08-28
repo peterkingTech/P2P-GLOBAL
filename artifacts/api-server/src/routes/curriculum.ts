@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
 import { getTranslation, translateAndStore, withTimeout, type StoredTranslation } from "../lib/translationEngine";
 
@@ -157,7 +157,7 @@ router.get("/curriculum/:curriculumId/modules", async (req, res) => {
     .from("p2p_modules")
     .select("*")
     .eq("curriculum_id", curriculumId)
-    .order("sort_order", { ascending: true });
+    .order("order_index", { ascending: true });
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -170,7 +170,7 @@ router.get("/modules", async (_req, res) => {
   const { data, error } = await supabase
     .from("p2p_modules")
     .select("*")
-    .order("sort_order", { ascending: true });
+    .order("order_index", { ascending: true });
 
   if (error) {
     return res.status(500).json({ error: error.message });
@@ -189,7 +189,7 @@ router.get("/modules/:moduleId", async (req, res) => {
         .from("p2p_lessons")
         .select("*")
         .eq("module_id", moduleId)
-        .order("sort_order", { ascending: true }),
+        .order("order_index", { ascending: true }),
     ]);
 
   if (modErr || !moduleData) {

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import { computeReportStats } from "../lib/adminReports";
 import { parsePlanPdf, type ParsedLesson, type ParsedPlan } from "../lib/planPdfParser";
