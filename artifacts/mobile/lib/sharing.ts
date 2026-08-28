@@ -49,7 +49,7 @@ export async function shareLesson(lesson: { id: string; title: string; moduleTit
 
   await Share.share({
     title: lesson.title,
-    message: `📖 "${lesson.title}"${desc ? ` — ${desc}` : ""}\n${byLine}\nI'm studying this on P2P Global Bible Study Network. Join me:\n${webUrl}`,
+    message: `📖 "${lesson.title}"${desc ? ` — ${desc}` : ""}\n${byLine}\nI'm studying this on Peer to Peer Global Discipleship Network. Join me:\n${webUrl}`,
   });
 }
 
@@ -71,7 +71,7 @@ export async function shareProfile(username: string) {
 
   await Share.share({
     title: `@${username} on P2P Global`,
-    message: `Connect with @${username} on P2P Global Bible Study Network:\n${webUrl}`,
+    message: `Connect with @${username} on Peer to Peer Global Discipleship Network:\n${webUrl}`,
   });
 }
 
@@ -107,7 +107,7 @@ export async function shareChurchInvite(church: { name: string; inviteLink: stri
 
 export async function shareApp() {
   await Share.share({
-    title: "P2P Global Bible Study Network",
+    title: "Peer to Peer Global Discipleship Network",
     message: `🌳 P2P Global — a peer-to-peer Bible discipleship network.\n\nGo through the Kingdom School curriculum with a personal peer guide. Connect with believers worldwide.\n\nDownload free: ${PLAY_STORE_URL}`,
   });
 }

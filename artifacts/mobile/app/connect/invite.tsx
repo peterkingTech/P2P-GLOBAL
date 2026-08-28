@@ -14,7 +14,7 @@ export default function InvitePeer() {
   const [copied, setCopied] = useState(false);
 
   const inviteCode = profile?.id ? profile.id.slice(0, 8).toUpperCase() : "------";
-  const inviteMessage = `Join me on the P2P Global Bible Study Network! Use my invite code ${inviteCode} when you sign up so we can study together.`;
+  const inviteMessage = `Join me on the Peer to Peer Global Discipleship Network! Use my invite code ${inviteCode} when you sign up so we can study together.`;
 
   async function handleCopy() {
     await Clipboard.setStringAsync(inviteMessage);

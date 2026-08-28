@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "P2P Global Bible Study Network",
+    "name": "Peer to Peer Global Discipleship Network",
     "slug": "p2p-global-bible-study",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#06110D"
     },
