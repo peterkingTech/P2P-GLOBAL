@@ -752,8 +752,9 @@ const CALL_TYPE_SUMMARY_LABEL: Record<string, string> = {
 // message (sender_id = null; see migration 059 and the same RLS reasoning
 // as /calls/start).
 router.post("/calls/end", async (req, res) => {
-  const { callLogId, conversationId, callType, connected, durationSeconds } = req.body as {
-    callLogId?: string; conversationId?: string | null; callType?: string; connected?: boolean; durationSeconds?: number;
+  const { callLogId, incomingCallId, conversationId, callType, connected, durationSeconds } = req.body as {
+    callLogId?: string; incomingCallId?: string; conversationId?: string | null; callType?: string;
+    connected?: boolean; durationSeconds?: number;
   };
   if (!callLogId) return err(res, "callLogId required");
 
@@ -763,6 +764,21 @@ router.post("/calls/end", async (req, res) => {
     .update({ status: connected ? "ended" : "missed", ended_at: new Date().toISOString(), duration_seconds: duration })
     .eq("id", callLogId);
   if (updateErr) return err(res, updateErr.message, 500);
+
+  // A call that never connected (caller gave up, hung up, or the no-answer
+  // timeout fired) leaves its p2p_incoming_calls "ringing" row stuck there
+  // forever otherwise — only the recipient's own client can normally update
+  // it (RLS: "Recipients update own incoming calls"), and if the recipient
+  // never opened the ringing screen at all, nothing ever would. Guarded to
+  // only touch a row still "ringing", so this can't clobber a real
+  // accept/decline that landed in the same instant.
+  if (incomingCallId && !connected) {
+    await supabaseWrite
+      .from("p2p_incoming_calls")
+      .update({ status: "cancelled", responded_at: new Date().toISOString() })
+      .eq("id", incomingCallId)
+      .eq("status", "ringing");
+  }
 
   // Study Together C2 — a call ending invalidates every outstanding
   // invitation for it; p2p_accept_call_invitation would also catch this

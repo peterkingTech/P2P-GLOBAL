@@ -173,6 +173,7 @@ export default function VideoCallScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             callLogId: params.callLogId,
+            incomingCallId: params.callId,
             conversationId: params.conversationId || null,
             callType: "video",
             connected: wasConnected,
@@ -185,7 +186,7 @@ export default function VideoCallScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/messages" as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.callLogId, params.conversationId]);
+  }, [params.callLogId, params.callId, params.conversationId]);
 
   const engineRef = useAgoraEngine({
     channelName: params.channelName,

@@ -158,6 +158,7 @@ export default function AudioCallScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             callLogId: params.callLogId,
+            incomingCallId: params.callId,
             conversationId: params.conversationId || null,
             callType,
             connected: wasConnected,
@@ -170,7 +171,7 @@ export default function AudioCallScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/messages" as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.callLogId, params.conversationId, callType]);
+  }, [params.callLogId, params.callId, params.conversationId, callType]);
 
   const engineRef = useAgoraEngine({
     channelName: params.channelName,
