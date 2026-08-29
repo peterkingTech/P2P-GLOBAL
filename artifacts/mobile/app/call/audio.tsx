@@ -16,9 +16,18 @@ import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
+// Alert.alert on native is fire-and-forget — it returns immediately rather
+// than waiting for the user to dismiss it. Callers that need cleanup/
+// navigation to happen only AFTER the user has actually seen and dismissed
+// the dialog (not racing it) must pass onDismiss rather than run that logic
+// right after calling showAlert.
+function showAlert(title: string, message: string, onDismiss?: () => void) {
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n\n${message}`);
+    onDismiss?.();
+  } else {
+    Alert.alert(title, message, onDismiss ? [{ text: "OK", onPress: onDismiss }] : undefined);
+  }
 }
 
 function formatClock(totalSeconds: number): string {
@@ -251,12 +260,15 @@ export default function AudioCallScreen() {
   }, [isInitiator, params.callId, connected, handleEndCall]);
 
   // Caller side only — if nobody answers within NO_ANSWER_TIMEOUT_MS, stop
-  // waiting instead of leaving "Calling…" on screen forever.
+  // waiting instead of leaving "Calling…" on screen forever. handleEndCall
+  // (state reset, /calls/end, navigation) runs from the dialog's onDismiss,
+  // not right after showAlert() returns — Alert.alert doesn't block, so
+  // running cleanup/navigation immediately after calling it would race the
+  // dialog still being shown instead of actually being triggered by it.
   useEffect(() => {
     if (!isInitiator || connected) return;
     const timer = setTimeout(() => {
-      showAlert("No answer", `${otherName} didn't pick up.`);
-      handleEndCall();
+      showAlert("No answer", `${otherName} didn't pick up.`, handleEndCall);
     }, NO_ANSWER_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [isInitiator, connected, handleEndCall, otherName]);
