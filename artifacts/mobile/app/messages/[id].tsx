@@ -25,6 +25,7 @@ import AudioRecorder from "@/components/AudioRecorder";
 import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 
 interface Message {
   id: string;
@@ -253,10 +254,10 @@ export default function ChatScreen() {
       // table has an INSERT policy for the anon key (see calls.ts), by
       // design: who's allowed to start a call and log it server-side, not
       // client-spoofable.
-      const startRes = await fetch(`${apiUrl}/calls/start`, {
+      const startRes = await authedFetch("/calls/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelName, callType, callerId: user.id, recipientId: otherUserId, conversationId: id }),
+        body: JSON.stringify({ channelName, callType, recipientId: otherUserId, conversationId: id }),
       });
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || "Failed to start call");

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,7 +10,6 @@ import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
-import { lookupVerseForAdmin, type VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { ParticipantGrid } from "@/components/call/ParticipantGrid";
@@ -32,58 +31,13 @@ function formatClock(totalSeconds: number): string {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-// ── Scripture lookup modal — search a reference without leaving the call ────
-function ScriptureModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const [ref, setRef] = useState("");
-  const [result, setResult] = useState<VerseResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleLookup() {
-    if (!ref.trim()) return;
-    setLoading(true); setError(""); setResult(null);
-    const data = await lookupVerseForAdmin(ref.trim());
-    setLoading(false);
-    if (!data) setError("Couldn't find that reference. Try e.g. \"John 3:16\".");
-    else setResult(data);
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalBox}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Look Up a Verse</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
-          </View>
-          <View style={styles.modalSearchRow}>
-            <TextInput
-              style={styles.modalInput}
-              value={ref}
-              onChangeText={setRef}
-              placeholder="e.g. John 3:16"
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              autoCapitalize="words"
-              onSubmitEditing={handleLookup}
-            />
-            <TouchableOpacity style={styles.modalSearchBtn} onPress={handleLookup} disabled={loading}>
-              {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={18} color="#fff" />}
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ maxHeight: 160 }}>
-            {error ? <Text style={styles.modalError}>{error}</Text> : null}
-            {result ? (
-              <View style={styles.modalResult}>
-                <Text style={styles.modalResultText}>"{result.text}"</Text>
-                <Text style={styles.modalResultRef}>— {ref.trim()}</Text>
-              </View>
-            ) : null}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
+// Caller side only — mirrors incoming.tsx's RING_TIMEOUT_MS (30s) on the
+// recipient's screen. Without this, "Calling…" only ever ends via Agora
+// connecting or a status UPDATE written by the recipient's own device (see
+// the realtime watch effect below) — if the recipient's app never opens
+// incoming.tsx (backgrounded, killed, or just never received the signal),
+// the caller would otherwise wait indefinitely.
+const NO_ANSWER_TIMEOUT_MS = 40000;
 
 export default function VideoCallScreen() {
   const insets = useSafeAreaInsets();
@@ -130,7 +84,6 @@ export default function VideoCallScreen() {
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [blurOn, setBlurOn] = useState(false);
-  const [scriptureVisible, setScriptureVisible] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
   const [videoAutoDisabled, setVideoAutoDisabled] = useState(false);
   const [callState, setCallState] = useState<"connecting" | "ringing" | "connected" | "ended">("connecting");
@@ -322,6 +275,17 @@ export default function VideoCallScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [isInitiator, params.callId, connected, handleEndCall]);
 
+  // Caller side only — if nobody answers within NO_ANSWER_TIMEOUT_MS, stop
+  // waiting instead of leaving "Calling…" on screen forever.
+  useEffect(() => {
+    if (!isInitiator || connected) return;
+    const timer = setTimeout(() => {
+      showAlert("No answer", `${otherName} didn't pick up.`);
+      handleEndCall();
+    }, NO_ANSWER_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isInitiator, connected, handleEndCall, otherName]);
+
   function toggleMute() {
     const next = !muted;
     setMuted(next);
@@ -497,9 +461,6 @@ export default function VideoCallScreen() {
           <TouchableOpacity style={styles.controlBtn} onPress={flipCamera} disabled={!cameraOn}>
             <Ionicons name="camera-reverse" size={20} color={cameraOn ? "#fff" : "rgba(255,255,255,0.35)"} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.controlBtn} onPress={() => setScriptureVisible(true)}>
-            <Ionicons name="book" size={20} color="#fff" />
-          </TouchableOpacity>
           {callState === "connected" && (
             <TouchableOpacity style={styles.controlBtn} onPress={handleOpenStudy}>
               <Ionicons name="school" size={20} color="#fff" />
@@ -520,8 +481,6 @@ export default function VideoCallScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <ScriptureModal visible={scriptureVisible} onClose={() => setScriptureVisible(false)} />
 
       {params.callLogId && (
         <AddPeopleSheet visible={addPeopleOpen} onClose={() => setAddPeopleOpen(false)} callId={params.callLogId} />

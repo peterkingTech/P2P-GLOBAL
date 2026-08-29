@@ -686,13 +686,34 @@ router.post("/calls/room-channel", async (req, res) => {
 // the p2p_incoming_calls row that signals the recipient. Both writes go
 // through the service-role client because neither table has an INSERT RLS
 // policy for the anon key (see migration 058) — call/message system writes
-// are meant to be server-owned, not client-owned with a spoofable actor id.
+// are server-owned, not client-owned. The caller's identity, however, is
+// verified from the JWT (not a body-supplied id) and recipientId is
+// confirmed to be a real, live account before either insert: both
+// caller_id and recipient_id on p2p_incoming_calls are FKs to auth.users
+// (migration 058), but every client call site sources recipientId from a
+// p2p_profiles-scoped relationship (conversation members, discipleship
+// links, etc.) — never from auth.users directly. p2p_profiles.id equals
+// auth.users.id only by convention (set once at signup), so a stale/
+// orphaned profile whose auth.users row no longer exists would otherwise
+// blow up the second insert with a raw p2p_incoming_calls_recipient_id_fkey
+// violation instead of a clean error.
 router.post("/calls/start", async (req, res) => {
-  const { channelName, callType, callerId, recipientId, conversationId } = req.body as {
-    channelName?: string; callType?: string; callerId?: string; recipientId?: string; conversationId?: string;
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+
+  const { channelName, callType, recipientId, conversationId } = req.body as {
+    channelName?: string; callType?: string; recipientId?: string; conversationId?: string;
   };
-  if (!channelName || !callType || !callerId || !recipientId) {
-    return err(res, "channelName, callType, callerId, recipientId required");
+  if (!channelName || !callType || !recipientId) {
+    return err(res, "channelName, callType, recipientId required");
+  }
+
+  const [{ data: profileRow }, { data: authUserData, error: authUserErr }] = await Promise.all([
+    supabaseWrite.from("p2p_profiles").select("id").eq("id", recipientId).maybeSingle(),
+    supabaseWrite.auth.admin.getUserById(recipientId),
+  ]);
+  if (!profileRow || authUserErr || !authUserData?.user) {
+    return err(res, "This person's account is no longer available", 404);
   }
 
   const { data: callLog, error: logErr } = await supabaseWrite
@@ -712,7 +733,12 @@ router.post("/calls/start", async (req, res) => {
       status: "ringing", conversation_id: conversationId ?? null, call_log_id: callLog.id,
     })
     .select("id").single();
-  if (incomingErr || !incomingCall) return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
+  if (incomingErr || !incomingCall) {
+    // Don't leave an orphaned "initiated" call log behind if the ringing
+    // row couldn't be created.
+    await supabaseWrite.from("p2p_call_logs").delete().eq("id", callLog.id);
+    return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
+  }
 
   return ok(res, { callLogId: callLog.id as string, incomingCallId: incomingCall.id as string });
 });

@@ -34,6 +34,14 @@ const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
   crisis: "Crisis call",
 };
 
+// Caller side only — mirrors incoming.tsx's RING_TIMEOUT_MS (30s) on the
+// recipient's screen. Without this, "Calling…" only ever ends via Agora
+// connecting or a status UPDATE written by the recipient's own device (see
+// the realtime watch effect below) — if the recipient's app never opens
+// incoming.tsx (backgrounded, killed, or just never received the signal),
+// the caller would otherwise wait indefinitely.
+const NO_ANSWER_TIMEOUT_MS = 40000;
+
 export default function AudioCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -240,6 +248,17 @@ export default function AudioCallScreen() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [isInitiator, params.callId, connected, handleEndCall]);
+
+  // Caller side only — if nobody answers within NO_ANSWER_TIMEOUT_MS, stop
+  // waiting instead of leaving "Calling…" on screen forever.
+  useEffect(() => {
+    if (!isInitiator || connected) return;
+    const timer = setTimeout(() => {
+      showAlert("No answer", `${otherName} didn't pick up.`);
+      handleEndCall();
+    }, NO_ANSWER_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isInitiator, connected, handleEndCall, otherName]);
 
   function toggleMute() {
     const next = !muted;

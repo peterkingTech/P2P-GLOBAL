@@ -42,9 +42,18 @@ export async function startPeerCall(args: StartPeerCallArgs): Promise<StartPeerC
     );
     if (convErr || !conversationId) throw new Error(convErr?.message ?? "Couldn't start call");
 
+    // /calls/start verifies the real caller from this session's access
+    // token server-side (see calls.ts's verifyCaller) — the same pattern
+    // callInvitations.ts's authHeaders() uses, not a body-supplied id.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
     const startRes = await fetch(`${apiUrl}/calls/start`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channelName, callType, callerId: currentUserId, recipientId: otherUserId, conversationId }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ channelName, callType, recipientId: otherUserId, conversationId }),
     });
     const startData = await startRes.json();
     if (!startRes.ok) throw new Error(startData.error || "Failed to start call");

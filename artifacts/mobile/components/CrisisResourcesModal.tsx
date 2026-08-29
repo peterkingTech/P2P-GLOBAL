@@ -66,9 +66,9 @@ export function CrisisResourcesModal({
       });
       const { channelName } = await channelRes.json();
 
-      const startRes = await fetch(`${getApiUrl()}/calls/start`, {
+      const startRes = await authedFetch("/calls/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelName, callType: "crisis", callerId: profile.id, recipientId: peerGuideId }),
+        body: JSON.stringify({ channelName, callType: "crisis", recipientId: peerGuideId }),
       });
       const { callLogId, incomingCallId } = await startRes.json();
 

@@ -261,7 +261,7 @@ export default function LivingTreeScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.introLabel}>P2P GLOBAL BIBLE STUDY NETWORK</Text>
+          <Text style={styles.introLabel}>PEER TO PEER GLOBAL DISCIPLESHIP NETWORK</Text>
           <Text style={styles.pageTitle}>The Living Tree</Text>
           <Text style={styles.pageDesc}>
             Your tree grows only from what you actually do — every lesson finished, prayer offered,

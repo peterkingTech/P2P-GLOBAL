@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { useData } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 // The REAL p2p_sessions row — distinct from DataContext's `sessions` array,
@@ -115,9 +116,9 @@ export default function SessionScreen() {
         body: JSON.stringify({ currentUserId: user.id, otherUserId }),
       });
       const { channelName } = await channelRes.json();
-      const startRes = await fetch(`${getApiUrl()}/calls/start`, {
+      const startRes = await authedFetch("/calls/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelName, callType: "video", callerId: user.id, recipientId: otherUserId }),
+        body: JSON.stringify({ channelName, callType: "video", recipientId: otherUserId }),
       });
       const { callLogId, incomingCallId } = await startRes.json();
       justJoinedCallRef.current = true;
