@@ -18,7 +18,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import type { OfficialAccountType } from "@/contexts/AuthContext";
-import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import AudioRecorder from "@/components/AudioRecorder";
@@ -124,7 +123,6 @@ export default function ChatScreen() {
   const [startersVisible, setStartersVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [showCrisisModal, setShowCrisisModal] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
@@ -404,7 +402,7 @@ export default function ChatScreen() {
       return;
     }
     if (data?.flagged_self_harm) {
-      setShowCrisisModal(true);
+      Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
     }
   }
 
@@ -449,7 +447,9 @@ export default function ChatScreen() {
         Alert.alert("Voice message not sent", error.message);
         return;
       }
-      if (data?.flagged_self_harm) setShowCrisisModal(true);
+      if (data?.flagged_self_harm) {
+        Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
+      }
     } catch (e: any) {
       Alert.alert("Voice message not sent", e?.message ?? "Please try again.");
       setShowRecorder(false);
@@ -649,12 +649,6 @@ export default function ChatScreen() {
           </View>
         )}
       </View>
-
-      <CrisisResourcesModal
-        visible={showCrisisModal}
-        onClose={() => setShowCrisisModal(false)}
-        statusText="A crisis responder from our team has also been notified and will reach out to you directly."
-      />
     </KeyboardAvoidingView>
   );
 }
