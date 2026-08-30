@@ -28,6 +28,23 @@ const APP_ID = process.env.AGORA_APP_ID ?? "";
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE ?? "";
 const TOKEN_EXPIRY_SECONDS = 3600; // 1 hour
 
+// Admin Identity Separation — the roles treated as "P2P Admin" for calling
+// purposes. Deliberately NOT the same set as adminAuth.ts's ADMIN_ROLES
+// (which also includes peer_guide and church_leader, since those gate
+// admin-panel access) — peer guides are meant to be discoverable and
+// callable by their disciples, and Church Portal is its own separate
+// permission domain (never conflate the two). This set matches migration
+// 069's admin hierarchy plus the two pre-existing admin-ish roles.
+const P2P_ADMIN_ROLES = new Set([
+  "super_admin", "regional_admin", "moderator",
+  "admin_supervisor", "admin_zone", "admin_national", "admin_content",
+  "admin_translation", "admin_moderation", "admin_verification",
+  "admin_help", "admin_username", "admin_finance", "admin_marketing", "admin_church",
+]);
+function isAdminOrOfficial(profile: { role?: string | null; is_official_account?: boolean | null } | null | undefined): boolean {
+  return !!profile?.is_official_account || P2P_ADMIN_ROLES.has(profile?.role ?? "");
+}
+
 // Study Together C1 — Group Calling Foundation. Initial cap on how many
 // real people (including the caller) one p2p_ peer call can hold. Not
 // provider-imposed (Agora has no hard ceiling here) — chosen so the
@@ -708,12 +725,25 @@ router.post("/calls/start", async (req, res) => {
     return err(res, "channelName, callType, recipientId required");
   }
 
-  const [{ data: profileRow }, { data: authUserData, error: authUserErr }] = await Promise.all([
-    supabaseWrite.from("p2p_profiles").select("id").eq("id", recipientId).maybeSingle(),
+  const [{ data: profileRow }, { data: authUserData, error: authUserErr }, { data: callerProfile }] = await Promise.all([
+    supabaseWrite.from("p2p_profiles").select("id, role, is_official_account").eq("id", recipientId).maybeSingle(),
     supabaseWrite.auth.admin.getUserById(recipientId),
+    supabaseWrite.from("p2p_profiles").select("role, is_official_account").eq("id", callerId).maybeSingle(),
   ]);
   if (!profileRow || authUserErr || !authUserData?.user) {
     return err(res, "This person's account is no longer available", 404);
+  }
+
+  // Admin Identity Separation: a P2P admin or official account can call an
+  // ordinary user, but not the other way around — a normal user must not be
+  // able to ring an admin's personal account or a "P2P Official" identity
+  // directly. Peer guides and church leaders are deliberately NOT covered
+  // by this (see isAdminOrOfficial) — calling one's own peer guide, or a
+  // church leader, remains unaffected. Mirrored in RLS on
+  // p2p_incoming_calls (migration 101) so a direct PostgREST insert can't
+  // bypass this check.
+  if (isAdminOrOfficial(profileRow) && !isAdminOrOfficial(callerProfile)) {
+    return err(res, "You can't call this account directly.", 403);
   }
 
   const { data: callLog, error: logErr } = await supabaseWrite

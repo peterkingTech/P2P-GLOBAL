@@ -166,12 +166,22 @@ router.post("/official-messages/send", async (req, res) => {
   if (trimmedBody.length < 5 || trimmedBody.length > 2000) return err(res, "Message must be between 5 and 2,000 characters", 400);
 
   const { data: requester } = await db.from("p2p_profiles").select("role").eq("id", requesterId).maybeSingle();
-  if (!canCompose((requester?.role as string) ?? "")) return err(res, "Admin access required", 403);
+  const requesterRole = (requester?.role as string) ?? "";
+  if (!canCompose(requesterRole)) return err(res, "Admin access required", 403);
+
+  const officialType = DEPARTMENT_TO_OFFICIAL_TYPE[department as Department];
+  // canCompose is a flat "can use Compose at all" gate; it does NOT mean an
+  // admin may send as every department. typesForRole encodes the real
+  // per-role mapping (e.g. admin_marketing may only send as "announcement")
+  // — without this check any compose-authorized admin could pick any
+  // department and therefore impersonate any of the 4 official identities.
+  if (!typesForRole(requesterRole).includes(officialType)) {
+    return err(res, "Not authorized to send from this department", 403);
+  }
 
   const { data: target } = await db.from("p2p_profiles").select("id").eq("id", targetUserId).maybeSingle();
   if (!target) return err(res, "Target user not found", 404);
 
-  const officialType = DEPARTMENT_TO_OFFICIAL_TYPE[department as Department];
   const { data: officialAccount } = await db
     .from("p2p_profiles").select("id, official_account_label")
     .eq("is_official_account", true).eq("official_account_type", officialType).maybeSingle();

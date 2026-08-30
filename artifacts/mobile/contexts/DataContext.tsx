@@ -3336,10 +3336,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getDiscoverablePeers = useCallback(async (search?: string, skillKeys?: string[]): Promise<DiscoverablePeer[]> => {
     if (!profile) return [];
     try {
+      // Admin Identity Separation: admin/official accounts must not appear
+      // in Discover. The real enforcement is RLS (profiles_select_scoped,
+      // migration 101) — a direct query can't see them regardless of this
+      // filter — this just keeps the query's own intent explicit.
       let query = supabase
         .from("p2p_profiles")
         .select("id, full_name, country, role, gifts, skills, photo_url")
         .neq("id", profile.id)
+        .eq("is_official_account", false)
         .order("full_name", { ascending: true })
         .limit(50);
       if (search && search.trim()) query = query.ilike("full_name", `%${search.trim()}%`);
@@ -4214,7 +4219,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           lastMessageAt: lastMsg?.created_at ?? null,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           isPinnedBySystem: c.is_pinned_by_system ?? false,
-          isPinnedByUser: settings?.is_pinned ?? false,
+          // P2P Official conversations default to pinned until the user
+          // explicitly acts on it: no settings row yet -> pinned iff
+          // official, matching "auto-pinned initially, but respect an
+          // explicit unpin forever after." Once a settings row exists
+          // (created by the very first pin/unpin tap), its stored value is
+          // used as-is regardless of official status, so an explicit unpin
+          // is never silently overridden by this default again.
+          isPinnedByUser: settings ? !!settings.is_pinned : !!otherProfile?.is_official_account,
           isFavourite: settings?.is_favourite ?? false,
           isMuted: settings?.is_muted ?? false,
         };

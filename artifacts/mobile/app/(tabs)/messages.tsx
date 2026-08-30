@@ -101,6 +101,7 @@ function makeStyles(c: AppColors) {
     rowTitleUnread: { fontWeight: "700" },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen, marginRight: 6 },
     systemPin: { marginLeft: 4 },
+    userPin: { transform: [{ rotate: "45deg" }] },
     rowSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
     rowSubUnread: { color: c.textDark, fontFamily: "Inter_500Medium" },
     rowRight: { alignItems: "flex-end", gap: 4 },
@@ -152,7 +153,7 @@ export default function MessagesTab() {
     });
     if (!item.isPinnedBySystem) {
       options.push({
-        text: item.isPinnedByUser ? "Unpin" : "Pin to top",
+        text: item.isPinnedByUser ? "Unpin" : "Pin",
         onPress: () => (item.isPinnedByUser ? unpinConversation(item.id) : pinConversation(item.id)).then(loadConversations),
       });
     }
@@ -275,6 +276,9 @@ export default function MessagesTab() {
                   </Text>
                 </View>
                 <View style={styles.rowRight}>
+                  {item.isPinnedByUser && (
+                    <Ionicons name="pin" size={12} color={colors.textMuted} style={styles.userPin} />
+                  )}
                   <Text style={styles.timeText}>{timeAgo(item.lastMessageAt)}</Text>
                   {unread && (
                     <View style={styles.unreadBadge}>
