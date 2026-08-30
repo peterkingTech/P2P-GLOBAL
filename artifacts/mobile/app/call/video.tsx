@@ -11,6 +11,7 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { ParticipantGrid } from "@/components/call/ParticipantGrid";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
@@ -177,7 +178,7 @@ export default function VideoCallScreen() {
 
     if (params.callLogId) {
       try {
-        await fetch(`${getApiUrl()}/calls/end`, {
+        await authedFetch("/calls/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

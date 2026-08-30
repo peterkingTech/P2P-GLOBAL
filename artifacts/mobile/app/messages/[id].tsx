@@ -40,6 +40,34 @@ interface Message {
   crisis_context?: string | null;
   media_url?: string | null;
   media_duration_seconds?: number | null;
+  call_log_id?: string | null;
+}
+
+// Call History / Call Information — the fields a call_summary message's
+// card needs, joined from p2p_call_logs (already has everything: no new
+// columns on p2p_messages). RLS on p2p_call_logs ("Users see own call
+// logs") already restricts this to a real participant.
+interface CallLogInfo {
+  call_type: string;
+  duration_seconds: number | null;
+  status: string;
+  participants: string[];
+}
+
+function formatCallDuration(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  return `${Math.round(totalSeconds / 60)} min`;
+}
+
+// Mirrors call/history.tsx's existing "today = time, else short date"
+// convention rather than inventing a new one.
+function formatCallTimestamp(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 type CrisisThreadType = "watchtower" | "help_request" | "pastoral_checkin" | "support";
@@ -124,6 +152,27 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const [callLogsById, setCallLogsById] = useState<Record<string, CallLogInfo>>({});
+
+  const fetchCallLogs = useCallback(async (callLogIds: string[]) => {
+    const missing = callLogIds.filter((cid) => !!cid);
+    if (!missing.length) return;
+    const { data, error } = await supabase
+      .from("p2p_call_logs")
+      .select("id, call_type, duration_seconds, status, participants")
+      .in("id", missing);
+    if (error || !data) return;
+    setCallLogsById((prev) => {
+      const next = { ...prev };
+      for (const row of data as any[]) {
+        next[row.id] = {
+          call_type: row.call_type, duration_seconds: row.duration_seconds,
+          status: row.status, participants: (row.participants as string[]) ?? [],
+        };
+      }
+      return next;
+    });
+  }, [supabase]);
 
   const load = useCallback(async () => {
     if (!id || !user) return;
@@ -166,7 +215,7 @@ export default function ChatScreen() {
         // checked for .error). Disambiguating by FK constraint name is the
         // same pattern already used elsewhere in this codebase, e.g.
         // DataContext's getModerationQueue.
-        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, p2p_profiles!p2p_messages_sender_id_fkey(full_name)")
+        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, call_log_id, p2p_profiles!p2p_messages_sender_id_fkey(full_name)")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -190,19 +239,22 @@ export default function ChatScreen() {
       crisis_context: m.crisis_context,
       media_url: m.media_url,
       media_duration_seconds: m.media_duration_seconds,
+      call_log_id: m.call_log_id,
     });
     if (msgsErr) console.error("Failed to load messages", msgsErr);
     if (pinnedErr) console.error("Failed to load pinned messages", pinnedErr);
-    setMessages((msgs ?? []).map(mapMsg));
+    const mappedMsgs = (msgs ?? []).map(mapMsg);
+    setMessages(mappedMsgs);
     setPinnedMessages((pinned ?? []).map(mapMsg));
     setLoading(false);
+    void fetchCallLogs(mappedMsgs.filter((m) => m.message_type === "call_summary" && m.call_log_id).map((m) => m.call_log_id as string));
 
     await supabase
       .from("p2p_conversation_members")
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", id)
       .eq("user_id", user.id);
-  }, [id, supabase, user]);
+  }, [id, supabase, user, fetchCallLogs]);
 
   useEffect(() => {
     load();
@@ -226,13 +278,14 @@ export default function ChatScreen() {
         (payload) => {
           const m = payload.new as any;
           setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
+          if (m.message_type === "call_summary" && m.call_log_id) void fetchCallLogs([m.call_log_id]);
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, supabase]);
+  }, [id, supabase, fetchCallLogs]);
 
   async function initiateCall(callType: "audio" | "video") {
     if (!user || !otherUserId || !id || callingType) return;
@@ -542,9 +595,39 @@ export default function ChatScreen() {
             onScrollToIndexFailed={() => {}}
             renderItem={({ item }) => {
               if (item.message_type === "call_summary") {
+                // sender_id is the real call initiator (calls.ts /calls/end)
+                // — reusing the exact same direction rule as an ordinary
+                // message, per spec, rather than a centered system notice.
+                const callMine = item.sender_id === user?.id;
+                const callLog = item.call_log_id ? callLogsById[item.call_log_id] : undefined;
+                const isVideo = callLog?.call_type === "video";
+                const isGroup = (callLog?.participants?.length ?? 0) > 2;
+                const iconName = isGroup ? "people" : isVideo ? "videocam" : "call";
+                const callTitle = isGroup ? "Group call" : isVideo ? "Video call" : "Voice call";
+                let statusText = "Call";
+                if (callLog) {
+                  if (callLog.status === "ended") {
+                    statusText = callLog.duration_seconds ? formatCallDuration(callLog.duration_seconds) : "Ended";
+                  } else if (callLog.status === "declined") statusText = "Declined";
+                  else if (callLog.status === "cancelled") statusText = "Cancelled";
+                  else statusText = "No answer";
+                }
                 return (
-                  <View style={styles.callSummaryRow}>
-                    <Text style={styles.callSummaryText}>{item.body}</Text>
+                  <View style={[styles.bubbleRow, callMine && styles.bubbleRowMine]}>
+                    <View style={[styles.callCard, callMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      <Ionicons name={iconName as any} size={18} color={callMine ? "#fff" : colors.accentGreen} />
+                      <View style={styles.callCardBody}>
+                        <Text style={[styles.callCardTitle, callMine && styles.bubbleTextMine]}>{callTitle}</Text>
+                        <View style={styles.callCardStatusRow}>
+                          <Text style={[styles.callCardStatus, callMine && styles.callCardStatusMine]} numberOfLines={1}>
+                            {callLog ? statusText : item.body}
+                          </Text>
+                          <Text style={[styles.callCardTime, callMine && styles.callCardStatusMine]}>
+                            {formatCallTimestamp(item.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
                   </View>
                 );
               }
@@ -665,11 +748,16 @@ const styles = StyleSheet.create({
   headerCallBtns: { flexDirection: "row", gap: 4 },
   headerIconBtn: { padding: 6, width: 34, alignItems: "center" },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
-  callSummaryRow: { alignItems: "center", paddingVertical: 4 },
-  callSummaryText: {
-    fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium",
-    backgroundColor: colors.cardBeige, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5,
+  callCard: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, minWidth: 170,
   },
+  callCardBody: { flex: 1 },
+  callCardTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  callCardStatusRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2, gap: 8 },
+  callCardStatus: { flex: 1, fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  callCardStatusMine: { color: "rgba(255,255,255,0.85)" },
+  callCardTime: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   bubbleRow: { flexDirection: "row" },
   bubbleRowMine: { justifyContent: "flex-end" },
   bubbleStack: { maxWidth: "78%" },

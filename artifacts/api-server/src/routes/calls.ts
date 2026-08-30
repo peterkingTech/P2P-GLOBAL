@@ -777,21 +777,57 @@ const CALL_TYPE_SUMMARY_LABEL: Record<string, string> = {
   audio: "Audio call", video: "Video call", pastoral: "Pastoral check-in", crisis: "Crisis call", group: "Group call",
 };
 
+// Call History / Call Information audit fix — the wording a call-summary
+// message uses for a call that never connected. p2p_call_logs.status has
+// always documented 'missed'/'declined' as valid values (migration 058's
+// comment) but the code only ever wrote 'missed' — collapsing "the
+// recipient declined," "nobody answered," and "the caller gave up first"
+// into one indistinguishable string. p2p_incoming_calls.status already
+// captures the real distinction (declined/missed/cancelled, written by
+// incoming.tsx's settle() and the caller-side timeout/hangup paths) — this
+// reuses that existing data instead of inventing a new column.
+const UNANSWERED_LABEL: Record<string, string> = {
+  declined: "Declined", missed: "No answer", cancelled: "Cancelled",
+};
+
 // POST /calls/end — closes out the call_log row and, if this call belonged
-// to a DM conversation, posts the read-only "📞 Audio call · 4m 32s" system
-// message (sender_id = null; see migration 059 and the same RLS reasoning
-// as /calls/start).
+// to a DM conversation, posts a read-only call-information system message
+// (see migration 059 for the message_type/call_log_id columns, and
+// migration 102 for the idempotency guard). Caller identity is verified
+// (like every other route in this file that touches a specific call) and
+// the message's sender_id is the real initiator, not null — the mobile
+// thread screen uses this to render the card on the correct side, the
+// exact same way it decides direction for an ordinary message.
 router.post("/calls/end", async (req, res) => {
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+
   const { callLogId, incomingCallId, conversationId, callType, connected, durationSeconds } = req.body as {
     callLogId?: string; incomingCallId?: string; conversationId?: string | null; callType?: string;
     connected?: boolean; durationSeconds?: number;
   };
   if (!callLogId) return err(res, "callLogId required");
 
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("initiated_by, participants").eq("id", callLogId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  const participants = (callLog.participants as string[]) ?? [];
+  if (!participants.includes(requesterId)) return err(res, "Not authorized for this call", 403);
+
   const duration = Math.max(0, Math.round(durationSeconds ?? 0));
+
+  // Only look this up for a call that never connected — a completed call's
+  // incoming_calls row is already 'accepted' and tells us nothing new.
+  let finalStatus = connected ? "ended" : "missed";
+  if (!connected && incomingCallId) {
+    const { data: incoming } = await supabaseWrite
+      .from("p2p_incoming_calls").select("status").eq("id", incomingCallId).maybeSingle();
+    if (incoming?.status === "declined" || incoming?.status === "cancelled") finalStatus = incoming.status;
+  }
+
   const { error: updateErr } = await supabaseWrite
     .from("p2p_call_logs")
-    .update({ status: connected ? "ended" : "missed", ended_at: new Date().toISOString(), duration_seconds: duration })
+    .update({ status: finalStatus, ended_at: new Date().toISOString(), duration_seconds: duration })
     .eq("id", callLogId);
   if (updateErr) return err(res, updateErr.message, 500);
 
@@ -822,13 +858,29 @@ router.post("/calls/end", async (req, res) => {
     .eq("status", "pending");
 
   if (conversationId) {
-    const label = CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call";
+    // A call that grew past 2 participants via the invite flow is a group
+    // call — the label should say so rather than "Audio/Video call" (the
+    // "group" entry in CALL_TYPE_SUMMARY_LABEL already existed but was
+    // never reachable before this fix).
+    const isGroup = participants.length > 2;
+    const label = isGroup ? CALL_TYPE_SUMMARY_LABEL.group : (CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call");
     const icon = callType === "video" ? "📹" : "📞";
-    const body = connected ? `${icon} ${label} · ${formatDuration(duration)}` : `📞 Missed call · ${label}`;
+    const body = connected
+      ? `${icon} ${label} · ${formatDuration(duration)}`
+      : `${icon} ${label} · ${UNANSWERED_LABEL[finalStatus] ?? "Missed call"}`;
     const { error: msgErr } = await supabaseWrite
       .from("p2p_messages")
-      .insert({ conversation_id: conversationId, sender_id: null, body, message_type: "call_summary", call_log_id: callLogId });
-    if (msgErr) return err(res, msgErr.message, 500);
+      .insert({
+        conversation_id: conversationId, sender_id: callLog.initiated_by, body,
+        message_type: "call_summary", call_log_id: callLogId,
+      });
+    // A partial unique index on call_log_id (migration 102) makes this
+    // insert idempotent: both parties' clients can independently reach
+    // /calls/end for the same call (button press + the other side's
+    // onUserOffline both fire handleEndCall, neither gated by isInitiator)
+    // — the second insert hits 23505 and is treated as already-done, not
+    // an error, instead of producing two identical bubbles.
+    if (msgErr && (msgErr as { code?: string }).code !== "23505") return err(res, msgErr.message, 500);
   }
 
   return ok(res, { ended: true });
