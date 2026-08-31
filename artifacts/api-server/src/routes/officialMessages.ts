@@ -209,10 +209,14 @@ router.post("/official-messages/send", async (req, res) => {
     await db.from("p2p_official_mail_drafts").delete().eq("id", draftId).eq("admin_id", requesterId);
   }
 
+  // Notification title is the official identity, never the admin's name or
+  // raw subject line alone -- matches the recipient's-eye view everywhere
+  // else in the app (OfficialBadge, thread header): "P2P Global Support",
+  // not "Sarah" or an unlabeled subject.
   await db.from("p2p_notifications").insert({
     user_id: targetUserId,
-    title: trimmedSubject,
-    message: trimmedBody.slice(0, 120),
+    title: officialAccount.official_account_label ?? "P2P Global",
+    message: `New message: ${trimmedSubject}`,
     notification_type: "official_message_received",
     data: { conversationId, messageId: message.id, department },
   });

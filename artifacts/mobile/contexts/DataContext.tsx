@@ -479,7 +479,11 @@ export interface ContactAdminInboxItem extends ContactMessage {
   fromIsVerified: boolean; fromAccountAgeDays: number | null; isStarredByMe: boolean;
 }
 export interface ContactReply {
-  id: string; messageId: string; fromAdminId: string; fromAdminUsername: string | null;
+  // fromAdminId/fromAdminUsername are only present in admin-facing responses
+  // (ContactAdminMessageDetail) -- the peer-facing thread (ContactThread)
+  // never receives the real admin's identity, only fromDepartment (rendered
+  // as an official identity badge, never a personal name).
+  id: string; messageId: string; fromAdminId?: string; fromAdminUsername?: string | null;
   fromDepartment: string; body: string; isInternalNote: boolean; createdAt: string;
 }
 export interface ContactNote {

@@ -100,9 +100,15 @@ function mapMessage(row: Record<string, unknown>) {
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
-function mapReply(row: Record<string, unknown>, adminUsername?: string | null) {
+// revealAdmin is true only for admin-facing callers (the inbox/detail
+// views admins use to see which colleague handled a message) — the
+// peer-facing thread (GET /contact/my-messages/:messageId) must never
+// receive the real admin's id or username, only the department/official
+// identity the UI already renders instead.
+function mapReply(row: Record<string, unknown>, revealAdmin: boolean, adminUsername?: string | null) {
   return {
-    id: row.id, messageId: row.message_id, fromAdminId: row.from_admin_id, fromAdminUsername: adminUsername ?? null,
+    id: row.id, messageId: row.message_id,
+    ...(revealAdmin ? { fromAdminId: row.from_admin_id, fromAdminUsername: adminUsername ?? null } : {}),
     fromDepartment: row.from_department, body: row.body, isInternalNote: row.is_internal_note ?? false,
     createdAt: row.created_at,
   };
@@ -200,7 +206,7 @@ router.get("/contact/my-messages/:messageId", async (req, res) => {
   if (!message) return err(res, "Message not found", 404);
 
   const { data: replies } = await db.from("p2p_contact_replies").select("*").eq("message_id", messageId).eq("is_internal_note", false).order("created_at", { ascending: true });
-  return ok(res, { message: mapMessage(message as Record<string, unknown>), replies: (replies ?? []).map((r) => mapReply(r as Record<string, unknown>)) });
+  return ok(res, { message: mapMessage(message as Record<string, unknown>), replies: (replies ?? []).map((r) => mapReply(r as Record<string, unknown>, false)) });
 });
 
 // ── Admin-facing ──────────────────────────────────────────────────────────────
@@ -310,7 +316,7 @@ router.get("/contact/admin/inbox/:messageId", async (req, res) => {
       isStarredByMe: !!starRow,
       fromModulesCompleted: modulesCompletedTotal,
     },
-    replies: (replies ?? []).map((r) => mapReply(r as Record<string, unknown>, adminUsernameById.get(r.from_admin_id as string))),
+    replies: (replies ?? []).map((r) => mapReply(r as Record<string, unknown>, true, adminUsernameById.get(r.from_admin_id as string))),
     notes: (notes ?? []).map((n) => mapNote(n as Record<string, unknown>, adminUsernameById.get(n.admin_id as string))),
   });
 });
@@ -374,7 +380,7 @@ router.post("/contact/admin/reply/:messageId", async (req, res) => {
     data: { messageId, referenceNumber: message.reference_number },
   });
 
-  return res.status(201).json(mapReply(reply as Record<string, unknown>));
+  return res.status(201).json(mapReply(reply as Record<string, unknown>, true));
 });
 
 // POST /contact/admin/forward/:messageId — { requesterId, to_department?, to_admin_id?, to_username?, note? }
