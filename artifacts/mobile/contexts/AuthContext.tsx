@@ -8,6 +8,7 @@ import React, {
 import { createClient, SupabaseClient, Session, User } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/apiUrl";
+import { unregisterCurrentPushToken } from "@/lib/push";
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -424,6 +425,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, fetchProfile]);
 
   const signOut = useCallback(async () => {
+    // Unregister the device's push token BEFORE the session is torn down —
+    // the call needs a valid JWT to authorize it, and it must run every
+    // time regardless of success/failure so a shared/reused device never
+    // keeps receiving the outgoing user's pushes after signOut() resolves.
+    await unregisterCurrentPushToken().catch(() => {});
     await supabase.auth.signOut();
     setProfile(null);
   }, []);

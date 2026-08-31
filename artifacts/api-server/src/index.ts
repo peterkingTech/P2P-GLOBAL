@@ -7,6 +7,7 @@ import { cleanupVerificationFiles } from "./lib/verificationCleanup";
 import { generateWeeklyReportDrafts, notifyAdminsToSubmitReports, flagOverdueReports, sendSuperAdminDailyDigest } from "./lib/adminReports";
 import { publishScheduledAnnouncements } from "./lib/churchAnnouncements";
 import { flagOverdueContactMessages } from "./lib/contactOverdue";
+import { dispatchPendingPushes } from "./lib/pushDispatch";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -144,5 +145,17 @@ cron.schedule("0 * * * *", async () => {
     if (result.overdue) logger.warn(result, "Overdue Contact P2P Global messages flagged");
   } catch (err) {
     logger.error({ err }, "Contact P2P Global overdue sweep failed");
+  }
+});
+
+// Push notification dispatch — every minute, matching the crisis-call
+// escalation sweep's cadence. Turns any p2p_notifications row not yet
+// pushed into device deliveries via Expo's push relay.
+cron.schedule("*/1 * * * *", async () => {
+  try {
+    const result = await dispatchPendingPushes();
+    if (result.notifications) logger.info(result, "Push dispatch tick");
+  } catch (err) {
+    logger.error({ err }, "Push dispatch failed");
   }
 });
