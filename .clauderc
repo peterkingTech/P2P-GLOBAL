@@ -1,0 +1,37 @@
+model: claude-3-5-sonnet-20241022
+max_tokens: 8000
+temperature: 0
+
+tools:
+  - file_search
+  - grep_search
+  - read_file
+  - replace_string_in_file
+  - run_in_terminal
+  - get_errors
+
+context:
+  workspace: "P2P-GLOBAL monorepo (Node.js 24, TypeScript, Express, PostgreSQL)"
+  workspace_type: "pnpm monorepo"
+  language: TypeScript
+  
+  packages:
+    - api-server: "@workspace/api-server (Express API on port 5000)"
+    - api-spec: "@workspace/api-spec (OpenAPI spec with Orval codegen)"
+    - api-zod: "@workspace/api-zod (Zod validation schemas)"
+    - db: "@workspace/db (Drizzle ORM + PostgreSQL)"
+
+instructions:
+  - "Always run git fetch and git status before starting work"
+  - "After completing work, commit with clear message and push to origin/main"
+  - "Use pnpm workspaces - run tasks with --filter flag"
+  - "Verify DATABASE_URL env var is set before running DB commands"
+  - "Follow TypeScript strict mode - no implicit any"
+  - "Run pnpm typecheck and pnpm build before committing"
+
+common_commands:
+  dev: "pnpm --filter @workspace/api-server run dev"
+  typecheck: "pnpm run typecheck"
+  build: "pnpm run build"
+  db_push: "pnpm --filter @workspace/db run push"
+  codegen: "pnpm --filter @workspace/api-spec run codegen"
