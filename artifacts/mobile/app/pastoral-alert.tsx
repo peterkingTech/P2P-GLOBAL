@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 interface PendingAlert {
@@ -61,9 +62,9 @@ export default function PastoralAlertScreen() {
       });
       const { channelName } = await channelRes.json();
 
-      const startRes = await fetch(`${getApiUrl()}/calls/start`, {
+      const startRes = await authedFetch("/calls/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelName, callType: "pastoral", callerId: profile.id, recipientId: alert.discipleId }),
+        body: JSON.stringify({ channelName, callType: "pastoral", recipientId: alert.discipleId }),
       });
       const { callLogId, incomingCallId } = await startRes.json();
 

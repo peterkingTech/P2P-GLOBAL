@@ -36,7 +36,8 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.BLUETOOTH_CONNECT"
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -65,6 +66,13 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to save your Kingdom School completion card to your photos.",
           "savePhotosPermission": "Allow $(PRODUCT_NAME) to save your Kingdom School completion card to your photos."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1D9E75"
+        }
       ]
     ],
     "experiments": {
@@ -76,6 +84,6 @@
         "projectId": "85d871bf-45ba-401c-88e9-077929ab7bd4"
       }
     },
-    "owner": "peter_king_tech"
+    "owner": "amen-tech.projects"
   }
 }

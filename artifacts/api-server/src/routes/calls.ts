@@ -28,6 +28,23 @@ const APP_ID = process.env.AGORA_APP_ID ?? "";
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE ?? "";
 const TOKEN_EXPIRY_SECONDS = 3600; // 1 hour
 
+// Admin Identity Separation — the roles treated as "P2P Admin" for calling
+// purposes. Deliberately NOT the same set as adminAuth.ts's ADMIN_ROLES
+// (which also includes peer_guide and church_leader, since those gate
+// admin-panel access) — peer guides are meant to be discoverable and
+// callable by their disciples, and Church Portal is its own separate
+// permission domain (never conflate the two). This set matches migration
+// 069's admin hierarchy plus the two pre-existing admin-ish roles.
+const P2P_ADMIN_ROLES = new Set([
+  "super_admin", "regional_admin", "moderator",
+  "admin_supervisor", "admin_zone", "admin_national", "admin_content",
+  "admin_translation", "admin_moderation", "admin_verification",
+  "admin_help", "admin_username", "admin_finance", "admin_marketing", "admin_church",
+]);
+function isAdminOrOfficial(profile: { role?: string | null; is_official_account?: boolean | null } | null | undefined): boolean {
+  return !!profile?.is_official_account || P2P_ADMIN_ROLES.has(profile?.role ?? "");
+}
+
 // Study Together C1 — Group Calling Foundation. Initial cap on how many
 // real people (including the caller) one p2p_ peer call can hold. Not
 // provider-imposed (Agora has no hard ceiling here) — chosen so the
@@ -686,13 +703,47 @@ router.post("/calls/room-channel", async (req, res) => {
 // the p2p_incoming_calls row that signals the recipient. Both writes go
 // through the service-role client because neither table has an INSERT RLS
 // policy for the anon key (see migration 058) — call/message system writes
-// are meant to be server-owned, not client-owned with a spoofable actor id.
+// are server-owned, not client-owned. The caller's identity, however, is
+// verified from the JWT (not a body-supplied id) and recipientId is
+// confirmed to be a real, live account before either insert: both
+// caller_id and recipient_id on p2p_incoming_calls are FKs to auth.users
+// (migration 058), but every client call site sources recipientId from a
+// p2p_profiles-scoped relationship (conversation members, discipleship
+// links, etc.) — never from auth.users directly. p2p_profiles.id equals
+// auth.users.id only by convention (set once at signup), so a stale/
+// orphaned profile whose auth.users row no longer exists would otherwise
+// blow up the second insert with a raw p2p_incoming_calls_recipient_id_fkey
+// violation instead of a clean error.
 router.post("/calls/start", async (req, res) => {
-  const { channelName, callType, callerId, recipientId, conversationId } = req.body as {
-    channelName?: string; callType?: string; callerId?: string; recipientId?: string; conversationId?: string;
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+
+  const { channelName, callType, recipientId, conversationId } = req.body as {
+    channelName?: string; callType?: string; recipientId?: string; conversationId?: string;
   };
-  if (!channelName || !callType || !callerId || !recipientId) {
-    return err(res, "channelName, callType, callerId, recipientId required");
+  if (!channelName || !callType || !recipientId) {
+    return err(res, "channelName, callType, recipientId required");
+  }
+
+  const [{ data: profileRow }, { data: authUserData, error: authUserErr }, { data: callerProfile }] = await Promise.all([
+    supabaseWrite.from("p2p_profiles").select("id, role, is_official_account").eq("id", recipientId).maybeSingle(),
+    supabaseWrite.auth.admin.getUserById(recipientId),
+    supabaseWrite.from("p2p_profiles").select("role, is_official_account").eq("id", callerId).maybeSingle(),
+  ]);
+  if (!profileRow || authUserErr || !authUserData?.user) {
+    return err(res, "This person's account is no longer available", 404);
+  }
+
+  // Admin Identity Separation: a P2P admin or official account can call an
+  // ordinary user, but not the other way around — a normal user must not be
+  // able to ring an admin's personal account or a "P2P Official" identity
+  // directly. Peer guides and church leaders are deliberately NOT covered
+  // by this (see isAdminOrOfficial) — calling one's own peer guide, or a
+  // church leader, remains unaffected. Mirrored in RLS on
+  // p2p_incoming_calls (migration 101) so a direct PostgREST insert can't
+  // bypass this check.
+  if (isAdminOrOfficial(profileRow) && !isAdminOrOfficial(callerProfile)) {
+    return err(res, "You can't call this account directly.", 403);
   }
 
   const { data: callLog, error: logErr } = await supabaseWrite
@@ -712,7 +763,12 @@ router.post("/calls/start", async (req, res) => {
       status: "ringing", conversation_id: conversationId ?? null, call_log_id: callLog.id,
     })
     .select("id").single();
-  if (incomingErr || !incomingCall) return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
+  if (incomingErr || !incomingCall) {
+    // Don't leave an orphaned "initiated" call log behind if the ringing
+    // row couldn't be created.
+    await supabaseWrite.from("p2p_call_logs").delete().eq("id", callLog.id);
+    return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
+  }
 
   return ok(res, { callLogId: callLog.id as string, incomingCallId: incomingCall.id as string });
 });
@@ -721,22 +777,74 @@ const CALL_TYPE_SUMMARY_LABEL: Record<string, string> = {
   audio: "Audio call", video: "Video call", pastoral: "Pastoral check-in", crisis: "Crisis call", group: "Group call",
 };
 
+// Call History / Call Information audit fix — the wording a call-summary
+// message uses for a call that never connected. p2p_call_logs.status has
+// always documented 'missed'/'declined' as valid values (migration 058's
+// comment) but the code only ever wrote 'missed' — collapsing "the
+// recipient declined," "nobody answered," and "the caller gave up first"
+// into one indistinguishable string. p2p_incoming_calls.status already
+// captures the real distinction (declined/missed/cancelled, written by
+// incoming.tsx's settle() and the caller-side timeout/hangup paths) — this
+// reuses that existing data instead of inventing a new column.
+const UNANSWERED_LABEL: Record<string, string> = {
+  declined: "Declined", missed: "No answer", cancelled: "Cancelled",
+};
+
 // POST /calls/end — closes out the call_log row and, if this call belonged
-// to a DM conversation, posts the read-only "📞 Audio call · 4m 32s" system
-// message (sender_id = null; see migration 059 and the same RLS reasoning
-// as /calls/start).
+// to a DM conversation, posts a read-only call-information system message
+// (see migration 059 for the message_type/call_log_id columns, and
+// migration 102 for the idempotency guard). Caller identity is verified
+// (like every other route in this file that touches a specific call) and
+// the message's sender_id is the real initiator, not null — the mobile
+// thread screen uses this to render the card on the correct side, the
+// exact same way it decides direction for an ordinary message.
 router.post("/calls/end", async (req, res) => {
-  const { callLogId, conversationId, callType, connected, durationSeconds } = req.body as {
-    callLogId?: string; conversationId?: string | null; callType?: string; connected?: boolean; durationSeconds?: number;
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+
+  const { callLogId, incomingCallId, conversationId, callType, connected, durationSeconds } = req.body as {
+    callLogId?: string; incomingCallId?: string; conversationId?: string | null; callType?: string;
+    connected?: boolean; durationSeconds?: number;
   };
   if (!callLogId) return err(res, "callLogId required");
 
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("initiated_by, participants").eq("id", callLogId).maybeSingle();
+  if (!callLog) return err(res, "Call not found", 404);
+  const participants = (callLog.participants as string[]) ?? [];
+  if (!participants.includes(requesterId)) return err(res, "Not authorized for this call", 403);
+
   const duration = Math.max(0, Math.round(durationSeconds ?? 0));
+
+  // Only look this up for a call that never connected — a completed call's
+  // incoming_calls row is already 'accepted' and tells us nothing new.
+  let finalStatus = connected ? "ended" : "missed";
+  if (!connected && incomingCallId) {
+    const { data: incoming } = await supabaseWrite
+      .from("p2p_incoming_calls").select("status").eq("id", incomingCallId).maybeSingle();
+    if (incoming?.status === "declined" || incoming?.status === "cancelled") finalStatus = incoming.status;
+  }
+
   const { error: updateErr } = await supabaseWrite
     .from("p2p_call_logs")
-    .update({ status: connected ? "ended" : "missed", ended_at: new Date().toISOString(), duration_seconds: duration })
+    .update({ status: finalStatus, ended_at: new Date().toISOString(), duration_seconds: duration })
     .eq("id", callLogId);
   if (updateErr) return err(res, updateErr.message, 500);
+
+  // A call that never connected (caller gave up, hung up, or the no-answer
+  // timeout fired) leaves its p2p_incoming_calls "ringing" row stuck there
+  // forever otherwise — only the recipient's own client can normally update
+  // it (RLS: "Recipients update own incoming calls"), and if the recipient
+  // never opened the ringing screen at all, nothing ever would. Guarded to
+  // only touch a row still "ringing", so this can't clobber a real
+  // accept/decline that landed in the same instant.
+  if (incomingCallId && !connected) {
+    await supabaseWrite
+      .from("p2p_incoming_calls")
+      .update({ status: "cancelled", responded_at: new Date().toISOString() })
+      .eq("id", incomingCallId)
+      .eq("status", "ringing");
+  }
 
   // Study Together C2 — a call ending invalidates every outstanding
   // invitation for it; p2p_accept_call_invitation would also catch this
@@ -750,13 +858,29 @@ router.post("/calls/end", async (req, res) => {
     .eq("status", "pending");
 
   if (conversationId) {
-    const label = CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call";
+    // A call that grew past 2 participants via the invite flow is a group
+    // call — the label should say so rather than "Audio/Video call" (the
+    // "group" entry in CALL_TYPE_SUMMARY_LABEL already existed but was
+    // never reachable before this fix).
+    const isGroup = participants.length > 2;
+    const label = isGroup ? CALL_TYPE_SUMMARY_LABEL.group : (CALL_TYPE_SUMMARY_LABEL[callType ?? ""] ?? "Call");
     const icon = callType === "video" ? "📹" : "📞";
-    const body = connected ? `${icon} ${label} · ${formatDuration(duration)}` : `📞 Missed call · ${label}`;
+    const body = connected
+      ? `${icon} ${label} · ${formatDuration(duration)}`
+      : `${icon} ${label} · ${UNANSWERED_LABEL[finalStatus] ?? "Missed call"}`;
     const { error: msgErr } = await supabaseWrite
       .from("p2p_messages")
-      .insert({ conversation_id: conversationId, sender_id: null, body, message_type: "call_summary", call_log_id: callLogId });
-    if (msgErr) return err(res, msgErr.message, 500);
+      .insert({
+        conversation_id: conversationId, sender_id: callLog.initiated_by, body,
+        message_type: "call_summary", call_log_id: callLogId,
+      });
+    // A partial unique index on call_log_id (migration 102) makes this
+    // insert idempotent: both parties' clients can independently reach
+    // /calls/end for the same call (button press + the other side's
+    // onUserOffline both fire handleEndCall, neither gated by isInitiator)
+    // — the second insert hits 23505 and is treated as already-done, not
+    // an error, instead of producing two identical bubbles.
+    if (msgErr && (msgErr as { code?: string }).code !== "23505") return err(res, msgErr.message, 500);
   }
 
   return ok(res, { ended: true });

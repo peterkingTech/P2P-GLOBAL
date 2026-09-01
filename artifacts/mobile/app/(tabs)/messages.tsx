@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useData, ConversationSummary } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -101,6 +101,7 @@ function makeStyles(c: AppColors) {
     rowTitleUnread: { fontWeight: "700" },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen, marginRight: 6 },
     systemPin: { marginLeft: 4 },
+    userPin: { marginRight: 4 },
     rowSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
     rowSubUnread: { color: c.textDark, fontFamily: "Inter_500Medium" },
     rowRight: { alignItems: "flex-end", gap: 4 },
@@ -152,7 +153,7 @@ export default function MessagesTab() {
     });
     if (!item.isPinnedBySystem) {
       options.push({
-        text: item.isPinnedByUser ? "Unpin" : "Pin to top",
+        text: item.isPinnedByUser ? "Unpin" : "Pin",
         onPress: () => (item.isPinnedByUser ? unpinConversation(item.id) : pinConversation(item.id)).then(loadConversations),
       });
     }
@@ -268,13 +269,16 @@ export default function MessagesTab() {
                       {item.name ?? "Conversation"}
                     </Text>
                     {item.otherUserOfficialType && <OfficialBadge accountType={item.otherUserOfficialType} size="small" />}
-                    {item.isPinnedBySystem && !item.otherUserOfficialType && <Ionicons name="pin" size={13} color="#C0392B" style={styles.systemPin} />}
+                    {item.isPinnedBySystem && !item.otherUserOfficialType && <MaterialIcons name="push-pin" size={13} color="#C0392B" style={styles.systemPin} />}
                   </View>
                   <Text style={[styles.rowSub, unread && styles.rowSubUnread]} numberOfLines={1}>
                     {item.lastMessage ?? "No messages yet"}
                   </Text>
                 </View>
                 <View style={styles.rowRight}>
+                  {item.isPinnedByUser && (
+                    <MaterialIcons name="push-pin" size={13} color={colors.textMuted} style={styles.userPin} />
+                  )}
                   <Text style={styles.timeText}>{timeAgo(item.lastMessageAt)}</Text>
                   {unread && (
                     <View style={styles.unreadBadge}>

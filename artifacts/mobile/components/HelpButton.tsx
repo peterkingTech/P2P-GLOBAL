@@ -1,50 +1,49 @@
-import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import React from "react";
+import { StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import { CrisisResourcesModal } from "@/components/CrisisResourcesModal";
 
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
+
+// "You Are Not Alone" (a modal listing crisis-line phone numbers) has been
+// removed — those numbers were unverified placeholders
+// ("[INSERT REGIONAL CRISIS LINE]" etc.), not real, region-appropriate
+// contacts, and shipping them would have been unsafe. This button's actual
+// job — submitting a real, tier="crisis" p2p_help_requests row that pages a
+// crisis-responder admin (see the trg_notify_on_help_request trigger) — is
+// independent, functioning infrastructure and is preserved unchanged; it
+// now just confirms with a plain alert instead of opening that modal.
+// Deferred: a future pass should replace this with verified,
+// country/region-aware crisis contacts and real dialing.
 export function HelpButton({ variant = "fab" }: { variant?: "fab" | "inline" }) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
   const { submitHelpRequest } = useData();
-  const [open, setOpen] = useState(false);
-  const [sent, setSent] = useState(false);
 
   if (!isAuthenticated) return null;
 
   async function handlePress() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    setOpen(true);
-    setSent(false);
     const err = await submitHelpRequest({ tier: "crisis" });
-    setSent(!err);
+    if (err) showAlert("Couldn't send", "Please try again.");
+    else showAlert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
   }
 
   return (
-    <>
-      <TouchableOpacity
-        style={variant === "fab" ? [styles.fab, { bottom: insets.bottom + (Platform.OS === "web" ? 24 : 90) }] : styles.inlineBtn}
-        onPress={handlePress}
-        activeOpacity={0.85}
-        accessibilityLabel="I need help now"
-      >
-        <Ionicons name="heart" size={variant === "fab" ? 22 : 20} color={variant === "fab" ? "#fff" : "#B91C1C"} />
-      </TouchableOpacity>
-
-      <CrisisResourcesModal
-        visible={open}
-        onClose={() => setOpen(false)}
-        statusText={
-          sent
-            ? "A crisis responder from our team has also been notified and will reach out to you directly."
-            : "Notifying a crisis responder..."
-        }
-      />
-    </>
+    <TouchableOpacity
+      style={variant === "fab" ? [styles.fab, { bottom: insets.bottom + (Platform.OS === "web" ? 24 : 90) }] : styles.inlineBtn}
+      onPress={handlePress}
+      activeOpacity={0.85}
+      accessibilityLabel="I need help now"
+    >
+      <Ionicons name="heart" size={variant === "fab" ? 22 : 20} color={variant === "fab" ? "#fff" : "#B91C1C"} />
+    </TouchableOpacity>
   );
 }
 

@@ -1,0 +1,14 @@
+-- One-time backfill for migration 104's pushed_at column: every
+-- notification that already existed before push delivery went live (616
+-- rows found live, oldest from 2026-08-13 -- real historical events like
+-- contact_message_overdue, admin_report_ready, etc., not test debris) must
+-- never be pushed to a device now. Delivering a weeks-old "your message is
+-- overdue" push on first rollout would be actively wrong, and worse, a
+-- large historical backlog would starve genuinely new notifications behind
+-- it in the dispatcher's FIFO/LIMIT-50-per-tick queue (confirmed live: a
+-- fresh test notification took multiple minutes to be reached behind 616
+-- older rows during testing). Marking existing rows pushed_at = now() is
+-- purely an operational metadata update -- no notification content, read
+-- state, or row is touched or deleted -- so every one of these remains
+-- fully visible in the in-app Notification Center exactly as before.
+update public.p2p_notifications set pushed_at = now() where pushed_at is null;

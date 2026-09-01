@@ -15,6 +15,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import { registerForPushNotificationsAsync, pathForNotification } from "@/lib/push";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { CircleSessionBanner } from "@/components/CircleSessionBanner";
@@ -304,6 +306,50 @@ function MessageBannerHost() {
   );
 }
 
+// Push notification device registration + tap handling. Registration only
+// runs once a real session exists (registering to an anonymous auth.uid()
+// would be meaningless); tap routing reuses pathForNotification's narrow
+// map — a direct link for message-family types, the Notification Center
+// for everything else, letting its existing handlePress logic (already
+// built for the in-app row-tap case) do the "is this still valid" checks
+// rather than duplicating them here. Cold-start taps (app was fully killed)
+// arrive via getLastNotificationResponseAsync; taps while JS is already
+// running (foreground or backgrounded-but-alive) arrive via the live
+// listener — both funnel through the same handleResponse so a tap is never
+// handled twice or missed depending on app state.
+function PushNotificationHost() {
+  const { isAuthenticated, profile } = useAuth();
+  const router = useRouter();
+  const registeredForUserId = useRef<string | null>(null);
+  const handledNotificationIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isAuthenticated || !profile?.id) return;
+    if (registeredForUserId.current === profile.id) return;
+    registeredForUserId.current = profile.id;
+    void registerForPushNotificationsAsync();
+  }, [isAuthenticated, profile?.id]);
+
+  useEffect(() => {
+    function handleResponse(response: Notifications.NotificationResponse) {
+      const id = response.notification.request.identifier;
+      if (handledNotificationIds.current.has(id)) return;
+      handledNotificationIds.current.add(id);
+      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+      const notificationType = (data?.notificationType as string | undefined) ?? null;
+      router.push(pathForNotification(notificationType, data) as any);
+    }
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handleResponse(response);
+    });
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    return () => subscription.remove();
+  }, [router]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
@@ -314,6 +360,7 @@ function RootLayoutNav() {
         <CircleSessionBannerHost />
         <CompletionMomentHost />
         <MessageBannerHost />
+        <PushNotificationHost />
       </DataProvider>
     </AuthProvider>
   );

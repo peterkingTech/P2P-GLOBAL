@@ -21,6 +21,7 @@ import feedbackRouter from "./feedback";
 import churchesRouter from "./churches";
 import contactRouter from "./contact";
 import officialMessagesRouter from "./officialMessages";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use("/feedback", feedbackRouter);
 router.use(churchesRouter); // church + members + grove + cohorts + announcements (paths differ, handled internally)
 router.use(contactRouter); // Contact P2P Global — peer messages + admin inbox (paths differ, handled internally)
 router.use(officialMessagesRouter); // Admin → User official "P2P Global" messages (paths differ, handled internally)
+router.use(pushRouter); // Push notification device-token registration (paths differ, handled internally)
 
 export default router;

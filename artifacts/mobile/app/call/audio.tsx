@@ -10,15 +10,25 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
+// Alert.alert on native is fire-and-forget — it returns immediately rather
+// than waiting for the user to dismiss it. Callers that need cleanup/
+// navigation to happen only AFTER the user has actually seen and dismissed
+// the dialog (not racing it) must pass onDismiss rather than run that logic
+// right after calling showAlert.
+function showAlert(title: string, message: string, onDismiss?: () => void) {
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n\n${message}`);
+    onDismiss?.();
+  } else {
+    Alert.alert(title, message, onDismiss ? [{ text: "OK", onPress: onDismiss }] : undefined);
+  }
 }
 
 function formatClock(totalSeconds: number): string {
@@ -33,6 +43,14 @@ const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
   pastoral: "Pastoral check-in",
   crisis: "Crisis call",
 };
+
+// Caller side only — mirrors incoming.tsx's RING_TIMEOUT_MS (30s) on the
+// recipient's screen. Without this, "Calling…" only ever ends via Agora
+// connecting or a status UPDATE written by the recipient's own device (see
+// the realtime watch effect below) — if the recipient's app never opens
+// incoming.tsx (backgrounded, killed, or just never received the signal),
+// the caller would otherwise wait indefinitely.
+const NO_ANSWER_TIMEOUT_MS = 40000;
 
 export default function AudioCallScreen() {
   const insets = useSafeAreaInsets();
@@ -145,11 +163,12 @@ export default function AudioCallScreen() {
 
     if (params.callLogId) {
       try {
-        await fetch(`${getApiUrl()}/calls/end`, {
+        await authedFetch("/calls/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             callLogId: params.callLogId,
+            incomingCallId: params.callId,
             conversationId: params.conversationId || null,
             callType,
             connected: wasConnected,
@@ -162,7 +181,7 @@ export default function AudioCallScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/messages" as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.callLogId, params.conversationId, callType]);
+  }, [params.callLogId, params.callId, params.conversationId, callType]);
 
   const engineRef = useAgoraEngine({
     channelName: params.channelName,
@@ -240,6 +259,20 @@ export default function AudioCallScreen() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [isInitiator, params.callId, connected, handleEndCall]);
+
+  // Caller side only — if nobody answers within NO_ANSWER_TIMEOUT_MS, stop
+  // waiting instead of leaving "Calling…" on screen forever. handleEndCall
+  // (state reset, /calls/end, navigation) runs from the dialog's onDismiss,
+  // not right after showAlert() returns — Alert.alert doesn't block, so
+  // running cleanup/navigation immediately after calling it would race the
+  // dialog still being shown instead of actually being triggered by it.
+  useEffect(() => {
+    if (!isInitiator || connected) return;
+    const timer = setTimeout(() => {
+      showAlert("No answer", `${otherName} didn't pick up.`, handleEndCall);
+    }, NO_ANSWER_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isInitiator, connected, handleEndCall, otherName]);
 
   function toggleMute() {
     const next = !muted;
