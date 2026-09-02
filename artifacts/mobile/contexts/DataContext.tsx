@@ -31,6 +31,24 @@ export interface Module {
   imageUrl?: string;
 }
 
+// Curriculum redesign — a stand-alone curriculum tile, as opposed to a
+// numbered "level." One p2p_curriculums row (type='core'), summarized with
+// real module/lesson counts computed from its own modules only (never
+// fabricated). Used by the new curriculum.tsx list screen and
+// curriculum/[id].tsx detail screen — deliberately separate from the
+// existing modules/lessons global state (which stays scoped to the single
+// "active" curriculum other features like Continue Learning already
+// depend on) so this addition can't regress anything already working.
+export interface CurriculumCatalogItem {
+  id: string;
+  title: string;
+  description: string;
+  colorTheme: string;
+  moduleCount: number;
+  lessonCount: number;
+  estimatedMinutes: number;
+}
+
 // Unified plans system — a Plan IS a p2p_curriculums row (type='plan'), the
 // same table/API as core curriculum (see migration 041_unify_plans_system.sql
 // and curriculum.ts's GET /plans). There is no second table/system anymore.
@@ -1093,6 +1111,9 @@ export interface GenerationalForestData {
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
+  getCurriculumCatalog: () => Promise<CurriculumCatalogItem[]>;
+  loadModuleWithLessons: (moduleId: string, userId?: string) => Promise<{ module: Module; lessons: Lesson[] } | null>;
+  loadCurriculumDetail: (curriculumId: string, userId?: string) => Promise<{ curriculum: { id: string; title: string; description: string }; modules: Module[] } | null>;
   plans: Plan[];
   featuredPlans: Plan[];
   plansLoading: boolean;
@@ -1952,6 +1973,212 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setLessons(builtLessons);
     } catch {
       setModules(FALLBACK_MODULES); setLessons([]);
+    }
+  }, []);
+
+  // Curriculum redesign — lists every stand-alone core curriculum (never
+  // Kingdom School Plans, type='plan') with real counts computed from its
+  // own rows. Deliberately independent of loadCurriculum's single-"active"-
+  // curriculum state above.
+  const getCurriculumCatalog = useCallback(async (): Promise<CurriculumCatalogItem[]> => {
+    try {
+      const { data: curriculumsRaw } = await supabase
+        .from("p2p_curriculums")
+        .select("id,title,description,color_theme,display_order")
+        .eq("status", "published")
+        .neq("type", "plan")
+        .neq("type", "plan_category");
+      const curriculums = (curriculumsRaw ?? []) as Record<string, unknown>[];
+      if (!curriculums.length) return [];
+
+      const curriculumIds = curriculums.map((c) => c.id as string);
+      const { data: modulesRaw } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id")
+        .in("curriculum_id", curriculumIds);
+      const modules = (modulesRaw ?? []) as Record<string, unknown>[];
+      const moduleIds = modules.map((m) => m.id as string);
+
+      const { data: lessonsRaw } = moduleIds.length
+        ? await supabase.from("p2p_lessons").select("id,module_id,estimated_minutes").in("module_id", moduleIds)
+        : { data: [] as Record<string, unknown>[] };
+      const lessons = (lessonsRaw ?? []) as Record<string, unknown>[];
+
+      const moduleCurriculumById = new Map(modules.map((m) => [m.id as string, m.curriculum_id as string]));
+
+      return curriculums
+        .map((c) => {
+          const cId = c.id as string;
+          const cModuleIds = modules.filter((m) => m.curriculum_id === cId).map((m) => m.id as string);
+          const cLessons = lessons.filter((l) => moduleCurriculumById.get(l.module_id as string) === cId);
+          return {
+            id: cId,
+            title: c.title as string,
+            description: (c.description as string) ?? "",
+            colorTheme: (c.color_theme as string) ?? "#1D9E75",
+            moduleCount: cModuleIds.length,
+            lessonCount: cLessons.length,
+            estimatedMinutes: cLessons.reduce((sum, l) => sum + ((l.estimated_minutes as number) ?? 0), 0),
+            displayOrder: (c.display_order as number) ?? 999,
+          };
+        })
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map(({ displayOrder: _displayOrder, ...rest }) => rest);
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Curriculum redesign — fetches a single module and its lessons directly
+  // by module id, independent of which curriculum is currently "active" in
+  // the global modules/lessons state. Needed because module/[id].tsx used
+  // to only ever look a module up inside that global array, which only ever
+  // held one curriculum's modules — any module belonging to a different
+  // stand-alone curriculum (Peer-to-Peer Orientation, Identity in Christ,
+  // The Gospel & Salvation) would never be found. Mirrors loadCurriculum's
+  // real progress/evaluation-status/sequential-locking logic exactly (same
+  // rules, just scoped to one module) rather than a simplified stand-in, so
+  // existing lessons with real peer-evaluated assignments (Orientation,
+  // Identity in Christ) keep behaving identically to before.
+  const loadModuleWithLessons = useCallback(async (
+    moduleId: string, userId?: string
+  ): Promise<{ module: Module; lessons: Lesson[] } | null> => {
+    try {
+      const { data: moduleRow } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id,title,description,order_index,image_url")
+        .eq("id", moduleId)
+        .maybeSingle();
+      if (!moduleRow) return null;
+
+      const { data: lessonsRaw } = await supabase
+        .from("p2p_lessons")
+        .select("id,module_id,title,subtitle,order_index")
+        .eq("module_id", moduleId)
+        .order("order_index", { ascending: true });
+      const moduleLessons = ((lessonsRaw ?? []) as Record<string, unknown>[])
+        .sort((a, b) => (a.order_index as number) - (b.order_index as number));
+
+      const progressByLesson = new Map<string, boolean>();
+      const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
+      const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
+      if (userId && moduleLessons.length) {
+        const lessonIds = moduleLessons.map((l) => l.id as string);
+        const [{ data: progressRows }, { data: myEvals }] = await Promise.all([
+          supabase.from("p2p_lesson_progress").select("lesson_id,completed,status").eq("user_id", userId).in("lesson_id", lessonIds),
+          supabase.from("p2p_lesson_evaluations").select("lesson_id,status").eq("submitter_id", userId).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
+        ]);
+        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+          progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+          statusByLesson.set(p.lesson_id as string, (p.status as "not_started" | "submitted" | "completed") ?? "not_started");
+        }
+        for (const e of (myEvals ?? []) as Record<string, unknown>[]) {
+          const lessonId = e.lesson_id as string;
+          const status = e.status as "pending" | "needs_revision";
+          if (status === "needs_revision" || !evalStatusByLesson.has(lessonId)) evalStatusByLesson.set(lessonId, status);
+        }
+      }
+
+      const lessonCount = moduleLessons.length;
+      const completedLessons = moduleLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+      const submittedLessons = moduleLessons.filter((l) => {
+        const st = statusByLesson.get(l.id as string);
+        return st === "submitted" || st === "completed";
+      }).length;
+
+      const module: Module = {
+        id: moduleRow.id as string, curriculumId: (moduleRow.curriculum_id as string) ?? "",
+        title: moduleRow.title as string, description: (moduleRow.description as string) ?? "",
+        level: 1, lessonCount, completedLessons, submittedLessons, isLocked: false,
+        imageUrl: (moduleRow.image_url as string) ?? undefined,
+      };
+
+      const builtLessons: Lesson[] = [];
+      let prevPassedForUnlock = true;
+      let allPrevCompleted = true;
+      moduleLessons.forEach((l, lessonIdx) => {
+        const isCompleted = Boolean(progressByLesson.get(l.id as string));
+        const lessonStatus = statusByLesson.get(l.id as string) ?? "not_started";
+        const evalSt = isCompleted
+          ? undefined
+          : evalStatusByLesson.get(l.id as string) === "needs_revision"
+            ? "needs_revision"
+            : lessonStatus === "submitted" ? "pending" : undefined;
+        const passedForUnlock = isCompleted || lessonStatus === "submitted";
+        const isReviewLesson = (l.order_index as number) >= 999;
+        const isThisLocked = lessonIdx === 0 ? false : isReviewLesson ? !allPrevCompleted : !prevPassedForUnlock;
+        builtLessons.push({
+          id: l.id as string, moduleId: moduleId,
+          title: l.title as string, content: (l.subtitle as string) ?? "",
+          isCompleted, isLocked: isThisLocked, order: l.order_index as number, evaluationStatus: evalSt,
+        });
+        prevPassedForUnlock = passedForUnlock;
+        allPrevCompleted = allPrevCompleted && isCompleted;
+      });
+
+      return { module, lessons: builtLessons };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Curriculum redesign — a single stand-alone curriculum's own detail:
+  // its title/description plus its modules (with real lesson/completion
+  // counts, no per-lesson detail — the detail screen's module list doesn't
+  // need it). Independent of the global "active curriculum" state for the
+  // same reason loadModuleWithLessons is.
+  const loadCurriculumDetail = useCallback(async (
+    curriculumId: string, userId?: string
+  ): Promise<{ curriculum: { id: string; title: string; description: string }; modules: Module[] } | null> => {
+    try {
+      const { data: curriculumRow } = await supabase
+        .from("p2p_curriculums")
+        .select("id,title,description")
+        .eq("id", curriculumId)
+        .maybeSingle();
+      if (!curriculumRow) return null;
+
+      const { data: modulesRaw } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id,title,description,order_index,image_url")
+        .eq("curriculum_id", curriculumId)
+        .order("order_index", { ascending: true });
+      const modulesRows = ((modulesRaw ?? []) as Record<string, unknown>[]).sort(
+        (a, b) => (a.order_index as number) - (b.order_index as number)
+      );
+      const moduleIds = modulesRows.map((m) => m.id as string);
+
+      const { data: lessonsRaw } = moduleIds.length
+        ? await supabase.from("p2p_lessons").select("id,module_id").in("module_id", moduleIds)
+        : { data: [] as Record<string, unknown>[] };
+      const lessonRows = (lessonsRaw ?? []) as Record<string, unknown>[];
+
+      const progressByLesson = new Map<string, boolean>();
+      if (userId && lessonRows.length) {
+        const lessonIds = lessonRows.map((l) => l.id as string);
+        const { data: progressRows } = await supabase
+          .from("p2p_lesson_progress").select("lesson_id,completed").eq("user_id", userId).in("lesson_id", lessonIds);
+        for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
+          progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
+        }
+      }
+
+      const modules: Module[] = modulesRows.map((m, idx) => {
+        const mLessons = lessonRows.filter((l) => l.module_id === m.id);
+        const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
+        return {
+          id: m.id as string, curriculumId, title: m.title as string, description: (m.description as string) ?? "",
+          level: idx + 1, lessonCount: mLessons.length, completedLessons, isLocked: false,
+          imageUrl: (m.image_url as string) ?? undefined,
+        };
+      });
+
+      return {
+        curriculum: { id: curriculumRow.id as string, title: curriculumRow.title as string, description: (curriculumRow.description as string) ?? "" },
+        modules,
+      };
+    } catch {
+      return null;
     }
   }, []);
 
@@ -5201,7 +5428,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
+      modules, lessons, getCurriculumCatalog, loadModuleWithLessons, loadCurriculumDetail, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
       planCategories, loadPlanCategories, getCategoryPlans, searchPlans, getAllPlansAZ,
       prayers, sessions, forestNodes, forestStats, forestData, forestDataLoading, loadForestData,
       treeData, treeMentees, refreshTreeData, pendingCompletionMoment, dismissPendingCompletionMoment,

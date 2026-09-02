@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { useTranslation } from "react-i18next";
 
@@ -40,7 +42,8 @@ export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modules, lessons, refreshCurriculumData } = useData();
+  const { modules, lessons, refreshCurriculumData, loadModuleWithLessons } = useData();
+  const { profile } = useAuth();
 
   // This screen only ever renders a core-curriculum module — Plans (System A,
   // p2p_curriculums.type='plan') have their own dedicated screen at
@@ -48,17 +51,39 @@ export default function ModuleDetailScreen() {
   // straight to lesson/[id].tsx. DataContext.loadCurriculum also excludes
   // type='plan' rows from the global modules/lessons arrays, so `id` here can
   // only ever resolve against a real core-curriculum module.
-  const coreModule = modules.find((m) => m.id === id);
+  const globalModule = modules.find((m) => m.id === id);
+
+  // Curriculum redesign — the global modules/lessons state only ever holds
+  // ONE "active" curriculum's modules (still Foundations of Christianity,
+  // unchanged). A module belonging to any other stand-alone curriculum
+  // (Peer-to-Peer Orientation, Identity in Christ, The Gospel & Salvation)
+  // won't be in that array, so fall back to fetching it directly by id —
+  // same real progress/locking rules, just fetched on demand instead of
+  // from the shared "active curriculum" snapshot.
+  const [fallback, setFallback] = useState<{ module: typeof globalModule; lessons: typeof lessons } | null>(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
+
+  const loadFallback = useCallback(async () => {
+    if (!id || globalModule) return;
+    setFallbackLoading(true);
+    const result = await loadModuleWithLessons(id, profile?.id);
+    setFallback(result);
+    setFallbackLoading(false);
+  }, [id, globalModule, profile?.id, loadModuleWithLessons]);
+
+  useFocusEffect(useCallback(() => { loadFallback(); }, [loadFallback]));
+
+  const coreModule = globalModule ?? fallback?.module;
   const coreLessons = coreModule
-    ? lessons.filter((l) => l.moduleId === coreModule.id).sort((a, b) => a.order - b.order)
+    ? (globalModule ? lessons : (fallback?.lessons ?? [])).filter((l) => l.moduleId === coreModule.id).sort((a, b) => a.order - b.order)
     : [];
 
   // Refresh core curriculum lock state on every focus — covers the case where
   // an evaluator approved a submission while the user had the app backgrounded
   // and the realtime event was missed (OS suspended the network connection).
   useFocusEffect(useCallback(() => {
-    refreshCurriculumData();
-  }, [refreshCurriculumData]));
+    if (globalModule) refreshCurriculumData();
+  }, [refreshCurriculumData, globalModule]));
 
   // Count submitted (pending review) lessons toward the progress bar — same
   // rule as unlock: a submitted lesson counts as done for progress purposes.
@@ -74,6 +99,14 @@ export default function ModuleDetailScreen() {
   const heroImageUri = coreModule?.imageUrl;
 
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  if (!coreModule && fallbackLoading) {
+    return (
+      <View style={[styles.container, styles.centerFill]}>
+        <ActivityIndicator color={colors.accentGreen} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -197,6 +230,7 @@ export default function ModuleDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.lightCream },
+  centerFill: { alignItems: "center", justifyContent: "center" },
 
   hero: {
     width: "100%",

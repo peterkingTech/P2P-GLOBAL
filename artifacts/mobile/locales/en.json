@@ -319,7 +319,7 @@
   "module": {
     "module": "Module",
     "studyPlan": "Study Plan",
-    "level": "Level {{n}}",
+    "level": "Module {{n}}",
     "lessons": "Lessons",
     "modules": "Modules",
     "pctComplete": "{{pct}}% complete",
