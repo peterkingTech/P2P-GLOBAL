@@ -896,7 +896,6 @@ export default function HomeTab() {
       <Text style={styles.sectionTitle}>{t("home.more")}</Text>
       <View style={styles.moreList}>
         {[
-          { icon: "library", label: t("home.curriculum"), sub: t("home.curriculumSub"), route: "/curriculum" },
           { icon: "leaf", label: t("home.livingTree"), sub: t("home.livingTreeSub"), route: "/living-tree" },
           { icon: "people", label: t("home.peerReview"), sub: t("home.peerReviewSub"), route: "/evaluations" },
           { icon: "stats-chart", label: t("home.myProgress"), sub: t("home.myProgressSub"), route: "/progress" },

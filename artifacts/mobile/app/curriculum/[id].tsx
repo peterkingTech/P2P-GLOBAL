@@ -19,6 +19,27 @@ import colors from "@/constants/colors";
 
 type CurriculumDetailInfo = { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string };
 
+function ModuleCardImage({ uri }: { uri: string | null | undefined }) {
+  const [failed, setFailed] = useState(false);
+  if (!uri || failed) {
+    return (
+      <View style={[styles.moduleCardImage, styles.moduleCardImageFallback]}>
+        <Ionicons name="book-outline" size={26} color={colors.accentGreen} />
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.moduleCardImage}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    />
+  );
+}
+
 function CoverBanner({ curriculum }: { curriculum: CurriculumDetailInfo }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = !!curriculum.coverImage && !imageFailed;
@@ -97,34 +118,37 @@ export default function CurriculumDetailScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>MODULES</Text>
-          {detail.modules.map((m, idx) => {
+          {detail.modules.map((m) => {
             const pct = m.lessonCount > 0 ? Math.round((m.completedLessons / m.lessonCount) * 100) : 0;
             const stateLabel = m.lessonCount === 0 ? null : m.completedLessons === 0 ? "Not started" : m.completedLessons === m.lessonCount ? "Completed" : "In progress";
+            const countsLabel = `${m.lessonCount} ${m.lessonCount === 1 ? "lesson" : "lessons"}`;
             return (
               <TouchableOpacity
                 key={m.id}
-                style={styles.moduleRow}
+                style={styles.moduleCard}
                 onPress={() => router.push(`/module/${m.id}` as any)}
-                activeOpacity={0.85}
+                activeOpacity={0.9}
                 accessibilityRole="button"
-                accessibilityLabel={`Module ${idx + 1}: ${m.title}. ${stateLabel ?? ""} ${m.completedLessons} of ${m.lessonCount} lessons complete.`}
+                accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}
               >
-                <View style={styles.moduleNumberBadge}>
-                  <Text style={styles.moduleNumberText}>{String(idx + 1).padStart(2, "0")}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.moduleTitle}>{m.title}</Text>
+                <ModuleCardImage uri={m.imageUrl} />
+                <View style={styles.moduleCardBody}>
+                  <Text style={styles.moduleTitle} numberOfLines={2}>{m.title}</Text>
                   {!!m.description && <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>}
-                  {m.lessonCount > 0 && (
-                    <View style={styles.moduleProgress}>
-                      <View style={styles.progressBg}>
-                        <View style={[styles.progressFill, { width: `${pct}%` }]} />
+                  <View style={styles.moduleCardFooterRow}>
+                    {m.lessonCount > 0 ? (
+                      <View style={styles.moduleProgress}>
+                        <View style={styles.progressBg}>
+                          <View style={[styles.progressFill, { width: `${pct}%` }]} />
+                        </View>
+                        <Text style={styles.progressText}>{stateLabel} · {m.completedLessons}/{m.lessonCount}</Text>
                       </View>
-                      <Text style={styles.progressText}>{stateLabel} · {m.completedLessons}/{m.lessonCount}</Text>
-                    </View>
-                  )}
+                    ) : (
+                      <Text style={styles.progressText}>{countsLabel}</Text>
+                    )}
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </View>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </TouchableOpacity>
             );
           })}
@@ -160,19 +184,18 @@ const styles = StyleSheet.create({
   statNumber: { fontSize: 22, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   statLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginBottom: 12 },
-  moduleRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 14, marginBottom: 10,
+  moduleCard: {
+    backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
+    marginBottom: 12, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
   },
-  moduleNumberBadge: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(29,158,117,0.12)",
-    alignItems: "center", justifyContent: "center",
-  },
-  moduleNumberText: { fontSize: 13, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
+  moduleCardImage: { width: "100%", height: 110 },
+  moduleCardImageFallback: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
+  moduleCardBody: { padding: 14 },
+  moduleCardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
   moduleTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
   moduleDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 6 },
-  moduleProgress: { flexDirection: "row", alignItems: "center", gap: 8 },
+  moduleProgress: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
   progressBg: { flex: 1, height: 4, backgroundColor: colors.progressTrack, borderRadius: 2, maxWidth: 100 },
   progressFill: { height: 4, backgroundColor: colors.progressFill, borderRadius: 2 },
   progressText: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" },

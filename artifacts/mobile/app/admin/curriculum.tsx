@@ -945,9 +945,14 @@ function ModuleEditor({
         {imageUrl ? (
           <View style={{ gap: 8 }}>
             <Image source={{ uri: imageUrl }} style={{ width: "100%", height: 120, borderRadius: 10 }} resizeMode="cover" />
-            <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadImage} disabled={uploading}>
-              {uploading ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={pickAndUploadImage} disabled={uploading}>
+                {uploading ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={() => setImageUrl(null)} disabled={uploading}>
+                <Ionicons name="trash-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadImage} disabled={uploading}>

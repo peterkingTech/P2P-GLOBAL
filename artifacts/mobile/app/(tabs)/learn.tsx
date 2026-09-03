@@ -20,8 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import {
   useData,
-  Module,
   KingdomSchoolStatus,
+  CurriculumCatalogItem,
   getModuleProgressCounts,
   getFoundationProgress,
   getKingdomSchoolStatus,
@@ -31,6 +31,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
+import { LinearGradient } from "expo-linear-gradient";
 
 const LOGO = require("@/assets/images/logo.png");
 const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
@@ -119,98 +120,90 @@ function splashStyles(c: AppColors) {
   });
 }
 
-function ModuleThumbnail({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const [err, setErr] = useState(false);
-  if (uri && !err) {
-    return (
-      <Image
-        source={{ uri }}
-        style={[styles.thumb, isLocked && styles.thumbLocked]}
-        resizeMode="cover"
-        onError={() => setErr(true)}
-      />
-    );
-  }
+function foundationsIconForTitle(title: string): keyof typeof Ionicons.glyphMap {
+  if (title.includes("Peer-to-Peer") || title.includes("Orientation")) return "people-circle-outline";
+  if (title.includes("Gospel")) return "sunny-outline";
+  if (title.includes("Foundation")) return "leaf-outline";
+  return "library-outline";
+}
+
+function FoundationCategoryImage({ uri }: { uri: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!uri || failed) return null;
   return (
-    <View style={[styles.thumb, styles.thumbPlaceholder, isLocked && styles.thumbLocked]}>
-      <Ionicons name="book-outline" size={18} color={isLocked ? colors.borderBeige : colors.accentGreen} />
-    </View>
+    <Image
+      source={{ uri }}
+      style={StyleSheet.absoluteFill}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    />
   );
 }
 
-function ModuleCard({ module, isCurrent, onPress }: { module: Module; isCurrent: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const submitted = module.submittedLessons ?? module.completedLessons;
-  const pct = module.lessonCount > 0 ? (module.completedLessons / module.lessonCount) * 100 : 0;
-  const submittedPct = module.lessonCount > 0 ? (submitted / module.lessonCount) * 100 : 0;
-  const isStarted = submitted > 0;
-  const isComplete = pct === 100;
-  const isLocked = module.isLocked;
-
+// One stand-alone Foundations category, rendered as a photo card — same
+// visual language as app/curriculum.tsx's card (which remains reachable
+// directly too), reused here inline so Kingdom School -> Foundations is a
+// single self-contained experience rather than an extra navigation hop.
+function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCatalogItem; colors: AppColors; onPress: () => void }) {
+  const styles = foundationCardStyles(colors);
+  const icon = (item.icon as keyof typeof Ionicons.glyphMap) || foundationsIconForTitle(item.title);
+  const countsLabel = `${item.moduleCount} ${item.moduleCount === 1 ? "module" : "modules"} · ${item.lessonCount} ${item.lessonCount === 1 ? "lesson" : "lessons"}`;
   return (
     <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.borderBeige },
-        isLocked && styles.cardLocked,
-        isCurrent && { borderColor: colors.accentGreen, borderWidth: 2, backgroundColor: `${colors.accentGreen}0D` },
-      ]}
+      style={styles.card}
       onPress={onPress}
-      activeOpacity={isLocked ? 1 : 0.85}
-      disabled={isLocked}
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. Tap to open.`}
     >
-      <View style={styles.cardLeft}>
-        <ModuleThumbnail uri={module.imageUrl} isLocked={isLocked} />
-        <View style={[styles.levelBadge, { backgroundColor: isLocked ? colors.borderBeige : isComplete ? colors.accentGreen : isStarted ? colors.amber : colors.borderBeige }]}>
-          <Text style={[styles.levelText, { color: isComplete || isStarted ? colors.cream : colors.textMuted }]}>
-            L{module.level}
-          </Text>
+      <View style={StyleSheet.absoluteFill}>
+        <FoundationCategoryImage uri={item.coverImage} />
+        <LinearGradient
+          colors={[colors.card, colors.card, `${colors.card}00`]}
+          locations={[0, 0.42, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+      <View style={styles.content}>
+        <View style={[styles.iconBadge, { backgroundColor: `${item.colorTheme}1f` }]}>
+          <Ionicons name={icon} size={20} color={item.colorTheme} />
+        </View>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.metaRow}>
+          <Ionicons name="book-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.metaText}>{countsLabel}</Text>
         </View>
       </View>
-      <View style={styles.cardBody}>
-        <View style={styles.moduleTitleRow}>
-          <Text style={[styles.moduleTitle, { color: colors.textDark }, isLocked && { color: colors.textMuted }]}>{module.title}</Text>
-          {isCurrent && (
-            <View style={styles.currentPill}>
-              <Text style={styles.currentPillText}>Current</Text>
-            </View>
-          )}
-        </View>
-        <Text style={[styles.moduleDesc, { color: colors.textMuted }]}>{module.description}</Text>
-        {!isLocked && (
-          <>
-            <View style={styles.progressRow}>
-              {/* Two-layer bar: amber = submitted, green overlay = approved */}
-              <View style={[styles.progressBg, { backgroundColor: colors.progressTrack, position: "relative", overflow: "hidden" }]}>
-                <View style={[styles.progressFill, { position: "absolute", left: 0, top: 0, width: `${submittedPct}%` as any, backgroundColor: colors.amber, opacity: 0.55 }]} />
-                <View style={[styles.progressFill, { position: "absolute", left: 0, top: 0, width: `${pct}%` as any, backgroundColor: colors.progressFill }]} />
-              </View>
-              <Text style={[styles.progressText, { color: colors.textMuted }]}>
-                {submitted}/{module.lessonCount}
-              </Text>
-            </View>
-            {submitted > module.completedLessons && (
-              <Text style={[styles.progressSubText, { color: colors.textMuted }]}>
-                {module.completedLessons} approved · {submitted - module.completedLessons} awaiting review
-              </Text>
-            )}
-          </>
-        )}
-      </View>
-      <View style={styles.cardRight}>
-        {isLocked ? (
-          <Ionicons name="lock-closed" size={18} color={colors.textMuted} />
-        ) : isComplete ? (
-          <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />
-        ) : (
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        )}
+      <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
+        <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
       </View>
     </TouchableOpacity>
   );
+}
+
+function foundationCardStyles(c: AppColors) {
+  return StyleSheet.create({
+    card: {
+      minHeight: 150, borderRadius: 18, overflow: "hidden",
+      borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+    },
+    content: { padding: 16, paddingRight: "42%", flex: 1, justifyContent: "center" },
+    iconBadge: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+    title: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
+    desc: { fontSize: 12, color: c.textMid, lineHeight: 17, fontFamily: "Inter_400Regular", marginBottom: 8 },
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    metaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium" },
+    arrowBadge: {
+      position: "absolute", top: 14, right: 14, width: 28, height: 28, borderRadius: 14,
+      backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
+    },
+  });
 }
 
 type KingdomSchoolSection = "foundation" | null;
@@ -245,7 +238,7 @@ function KingdomSchoolCards({
         onPress={() => onSelect(selected === "foundation" ? null : "foundation")}
       >
         <Ionicons name="book" size={22} color="#fff" />
-        <Text style={cardSelectorStyles.cardTitle}>Foundation</Text>
+        <Text style={cardSelectorStyles.cardTitle}>Foundations</Text>
         <Text style={cardSelectorStyles.cardSubtitle}>Core Curriculum</Text>
         <Text style={cardSelectorStyles.cardInfo}>{modulesCompleted} of {totalModules} modules</Text>
         <View style={cardSelectorStyles.progressBg}>
@@ -346,6 +339,7 @@ function makeStyles(c: AppColors) {
     continueBtnText: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
 
     allModulesHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 24, marginBottom: 12 },
+    foundationsIntro: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, marginTop: -6, marginBottom: 14 },
     modulesList: { gap: 8 },
 
     loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 },
@@ -386,7 +380,7 @@ export default function LearnTab() {
   // Title/description arrive already translated — DataContext.loadPlans
   // does the on-demand translation fetch itself (parallel, English fallback
   // always), so there's nothing left for this screen to fetch.
-  const { modules, isLoading, plans } = useData();
+  const { modules, plans, getCurriculumCatalog } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -396,6 +390,25 @@ export default function LearnTab() {
   const [completionCard, setCompletionCard] = useState<{ date: string } | null>(null);
   const [selectedSection, setSelectedSection] = useState<KingdomSchoolSection>("foundation");
   const [enrolledCount, setEnrolledCount] = useState(0);
+
+  // Foundations — the three stand-alone curriculum categories (Peer-to-Peer
+  // Orientation, The Gospel & Salvation, The Christian Foundation), loaded
+  // the same database-driven way app/curriculum.tsx does. Kingdom School ->
+  // Foundations is now the only in-app entry point to this browsing
+  // experience; Home no longer links to it directly.
+  const [foundationsCatalog, setFoundationsCatalog] = useState<CurriculumCatalogItem[]>([]);
+  const [foundationsLoading, setFoundationsLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const catalog = await getCurriculumCatalog();
+      if (!cancelled) {
+        setFoundationsCatalog(catalog);
+        setFoundationsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [getCurriculumCatalog]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -555,19 +568,22 @@ export default function LearnTab() {
               </TouchableOpacity>
             )}
 
-            <Text style={styles.allModulesHeading}>{t("learn.allModules")}</Text>
-            {isLoading ? (
+            <Text style={styles.allModulesHeading}>Foundations</Text>
+            <Text style={styles.foundationsIntro}>
+              Three stand-alone journeys — study one, return to another later, or explore several at once. There's no required order.
+            </Text>
+            {foundationsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator color={colors.accentGreen} />
               </View>
             ) : (
-              <View style={styles.modulesList}>
-                {modules.map((item) => (
-                  <ModuleCard
+              <View>
+                {foundationsCatalog.map((item) => (
+                  <FoundationCategoryCard
                     key={item.id}
-                    module={item}
-                    isCurrent={currentModule?.id === item.id}
-                    onPress={() => router.push(`/module/${item.id}`)}
+                    item={item}
+                    colors={colors}
+                    onPress={() => router.push(`/curriculum/${item.id}` as any)}
                   />
                 ))}
               </View>
