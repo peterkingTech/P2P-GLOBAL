@@ -44,6 +44,8 @@ export interface CurriculumCatalogItem {
   title: string;
   description: string;
   colorTheme: string;
+  coverImage: string | null;
+  icon: string | null;
   moduleCount: number;
   lessonCount: number;
   estimatedMinutes: number;
@@ -1113,7 +1115,7 @@ interface DataContextValue {
   lessons: Lesson[];
   getCurriculumCatalog: () => Promise<CurriculumCatalogItem[]>;
   loadModuleWithLessons: (moduleId: string, userId?: string) => Promise<{ module: Module; lessons: Lesson[] } | null>;
-  loadCurriculumDetail: (curriculumId: string, userId?: string) => Promise<{ curriculum: { id: string; title: string; description: string }; modules: Module[] } | null>;
+  loadCurriculumDetail: (curriculumId: string, userId?: string) => Promise<{ curriculum: { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string }; modules: Module[] } | null>;
   plans: Plan[];
   featuredPlans: Plan[];
   plansLoading: boolean;
@@ -1984,7 +1986,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: curriculumsRaw } = await supabase
         .from("p2p_curriculums")
-        .select("id,title,description,color_theme,display_order")
+        .select("id,title,description,color_theme,display_order,cover_image,icon")
         .eq("status", "published")
         .neq("type", "plan")
         .neq("type", "plan_category");
@@ -2016,6 +2018,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             title: c.title as string,
             description: (c.description as string) ?? "",
             colorTheme: (c.color_theme as string) ?? "#1D9E75",
+            coverImage: (c.cover_image as string) ?? null,
+            icon: (c.icon as string) ?? null,
             moduleCount: cModuleIds.length,
             lessonCount: cLessons.length,
             estimatedMinutes: cLessons.reduce((sum, l) => sum + ((l.estimated_minutes as number) ?? 0), 0),
@@ -2129,11 +2133,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // same reason loadModuleWithLessons is.
   const loadCurriculumDetail = useCallback(async (
     curriculumId: string, userId?: string
-  ): Promise<{ curriculum: { id: string; title: string; description: string }; modules: Module[] } | null> => {
+  ): Promise<{ curriculum: { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string }; modules: Module[] } | null> => {
     try {
       const { data: curriculumRow } = await supabase
         .from("p2p_curriculums")
-        .select("id,title,description")
+        .select("id,title,description,cover_image,icon,color_theme")
         .eq("id", curriculumId)
         .maybeSingle();
       if (!curriculumRow) return null;
@@ -2174,7 +2178,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       });
 
       return {
-        curriculum: { id: curriculumRow.id as string, title: curriculumRow.title as string, description: (curriculumRow.description as string) ?? "" },
+        curriculum: {
+          id: curriculumRow.id as string, title: curriculumRow.title as string, description: (curriculumRow.description as string) ?? "",
+          coverImage: (curriculumRow.cover_image as string) ?? null, icon: (curriculumRow.icon as string) ?? null,
+          colorTheme: (curriculumRow.color_theme as string) ?? "#1D9E75",
+        },
         modules,
       };
     } catch {

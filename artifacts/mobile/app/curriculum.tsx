@@ -7,68 +7,66 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useData, CurriculumCatalogItem } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
-// Curriculum redesign — a library of stand-alone journeys, not a numbered
-// staircase. No "Level 1/2/3", no locked-until-you-finish-the-last-one
-// gating between curricula: each is independent, and a learner can move
-// between them in any order. Categories with no real content yet show as
-// "Coming Soon" (no fabricated lessons) rather than being hidden outright,
-// so the full intended shape of the curriculum is visible even before
-// every category is built out.
-type CatalogEntry = CurriculumCatalogItem & { icon: keyof typeof Ionicons.glyphMap; comingSoon?: false };
-type ComingSoonEntry = { id: string; title: string; description: string; icon: keyof typeof Ionicons.glyphMap; comingSoon: true };
-
-// Categories this redesign intentionally leaves for a future, dedicated
-// pass (see the session's product decision) — shown so the full intended
-// shape of "P2P Global Curriculum" is visible, never populated with
-// invented lesson content.
-const COMING_SOON: ComingSoonEntry[] = [
-  { id: "coming-soon-bible", title: "The Bible", description: "Understand, read, interpret, and live according to Scripture.", icon: "book-outline", comingSoon: true },
-  { id: "coming-soon-prayer", title: "Prayer & Communion with God", description: "Develop a deeper relationship with God through prayer.", icon: "hand-left-outline", comingSoon: true },
-  { id: "coming-soon-spirit", title: "The Holy Spirit", description: "Know the person and work of the Holy Spirit and learn to walk by the Spirit.", icon: "flame-outline", comingSoon: true },
-  { id: "coming-soon-growth", title: "Spiritual Growth & Transformation", description: "Become increasingly like Christ through repentance, holiness, and spiritual disciplines.", icon: "leaf-outline", comingSoon: true },
-  { id: "coming-soon-relationships", title: "Christian Relationships & Community", description: "Live faithfully with other believers, family, friends, and church.", icon: "people-outline", comingSoon: true },
-  { id: "coming-soon-discipleship", title: "Discipleship", description: "Following Jesus, being discipled, discipling others, and generational growth.", icon: "git-network-outline", comingSoon: true },
-  { id: "coming-soon-mission", title: "Kingdom Life & Mission", description: "Live for God's Kingdom through mission, evangelism, service, and calling.", icon: "globe-outline", comingSoon: true },
-  { id: "coming-soon-leadership", title: "Christian Leadership", description: "Servant leadership, responsibility, stewardship, and Kingdom leadership.", icon: "compass-outline", comingSoon: true },
-];
-
+// Three-category curriculum — a small, fixed library of stand-alone
+// journeys, not a numbered staircase and not an open-ended list. No
+// "Level 1/2/3", no locked-until-you-finish-the-last-one gating between
+// categories: each is independent, and a learner can move between them in
+// any order. The catalog itself (title/description/cover image/counts) is
+// entirely database-driven (see DataContext.getCurriculumCatalog) — this
+// screen renders whatever is actually published, it doesn't hard-code the
+// three titles, so a future fourth category needs only a new published
+// p2p_curriculums row, never a mobile release.
 function iconForTitle(title: string): keyof typeof Ionicons.glyphMap {
   if (title.includes("Peer-to-Peer") || title.includes("Orientation")) return "people-circle-outline";
   if (title.includes("Gospel")) return "sunny-outline";
-  if (title.includes("Identity")) return "person-outline";
+  if (title.includes("Foundation")) return "leaf-outline";
   return "library-outline";
+}
+
+function CardImage({ uri }: { uri: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!uri || failed) return null;
+  return (
+    <Image
+      source={{ uri }}
+      style={StyleSheet.absoluteFill}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    />
+  );
 }
 
 export default function CurriculumScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getCurriculumCatalog } = useData();
-  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [catalog, setCatalog] = useState<CurriculumCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const rows = await getCurriculumCatalog();
-    setCatalog(rows.map((r) => ({ ...r, icon: iconForTitle(r.title) })));
+    setCatalog(await getCurriculumCatalog());
     setLoading(false);
   }, [getCurriculumCatalog]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const data: (CatalogEntry | ComingSoonEntry)[] = [...catalog, ...COMING_SOON];
-
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Curriculum</Text>
@@ -84,42 +82,58 @@ export default function CurriculumScreen() {
         <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 30 }} />
       ) : (
         <FlatList
-          data={data}
+          data={catalog}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            if (item.comingSoon) {
-              return (
-                <View style={[styles.currCard, styles.currCardComingSoon]}>
-                  <View style={styles.cardTop}>
-                    <View style={styles.iconBadgeMuted}>
-                      <Ionicons name={item.icon} size={20} color={colors.textMuted} />
-                    </View>
-                    <View style={styles.comingSoonPill}>
-                      <Text style={styles.comingSoonPillText}>Coming Soon</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.currTitleMuted}>{item.title}</Text>
-                  <Text style={styles.currDesc}>{item.description}</Text>
-                </View>
-              );
-            }
+            const icon = (item.icon as keyof typeof Ionicons.glyphMap) || iconForTitle(item.title);
+            const countsLabel = `${item.moduleCount} ${item.moduleCount === 1 ? "module" : "modules"} · ${item.lessonCount} ${item.lessonCount === 1 ? "lesson" : "lessons"}`;
             return (
               <TouchableOpacity
                 style={styles.currCard}
                 onPress={() => router.push(`/curriculum/${item.id}` as any)}
-                activeOpacity={0.85}
+                activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. Tap to open.`}
               >
-                <View style={styles.cardTop}>
-                  <View style={[styles.iconBadge, { backgroundColor: `${item.colorTheme}1f` }]}>
-                    <Ionicons name={item.icon} size={20} color={item.colorTheme} />
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                {/* Cover image, when the admin has set one, fills the right
+                    two-thirds of the card behind a left-to-right gradient so
+                    the icon/title/description on the left stay fully
+                    readable regardless of the photo underneath. No image at
+                    all is a completely normal, supported state — the card
+                    still looks intentional via the icon + color wash. */}
+                <View style={StyleSheet.absoluteFill}>
+                  <CardImage uri={item.coverImage} />
+                  <LinearGradient
+                    colors={[colors.card, colors.card, `${colors.card}00`]}
+                    locations={[0, 0.42, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
                 </View>
-                <Text style={styles.currTitle}>{item.title}</Text>
-                <Text style={styles.currDesc} numberOfLines={2}>{item.description}</Text>
-                <Text style={styles.metaText}>
-                  {item.moduleCount} {item.moduleCount === 1 ? "module" : "modules"} · {item.lessonCount} {item.lessonCount === 1 ? "lesson" : "lessons"}
-                </Text>
+
+                <View style={styles.cardContent}>
+                  <View style={styles.cardTop}>
+                    <View style={[styles.iconBadge, { backgroundColor: `${item.colorTheme}1f` }]}>
+                      <Ionicons name={icon} size={20} color={item.colorTheme} />
+                    </View>
+                  </View>
+                  <Text style={styles.currTitle}>{item.title}</Text>
+                  <Text style={styles.currDesc} numberOfLines={3}>{item.description}</Text>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="book-outline" size={13} color={colors.textMuted} />
+                    <Text style={styles.metaText}>{countsLabel}</Text>
+                  </View>
+                </View>
+
+                {/* The arrow is a visual affordance, never the only signal
+                    that this card is tappable — the whole card carries an
+                    accessibilityRole of "button" with a full descriptive
+                    label above, and the entire card surface (not just the
+                    arrow) is the touch target. */}
+                <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
+                  <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+                </View>
               </TouchableOpacity>
             );
           }}
@@ -149,18 +163,20 @@ const styles = StyleSheet.create({
   introText: { fontSize: 13, color: colors.textMid, lineHeight: 20, fontFamily: "Inter_400Regular" },
   list: { paddingHorizontal: 16 },
   currCard: {
-    backgroundColor: colors.card, borderRadius: 16,
+    minHeight: 168, borderRadius: 20, overflow: "hidden",
     borderWidth: 1, borderColor: colors.borderBeige,
-    padding: 16, marginBottom: 12,
+    marginBottom: 14, backgroundColor: colors.card,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
-  currCardComingSoon: { opacity: 0.6 },
-  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  cardContent: { padding: 18, paddingRight: "42%", flex: 1, justifyContent: "center" },
+  cardTop: { flexDirection: "row", marginBottom: 10 },
   iconBadge: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  iconBadgeMuted: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.borderBeige },
-  comingSoonPill: { backgroundColor: colors.borderBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  comingSoonPillText: { fontSize: 11, color: colors.textMuted, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  currTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  currTitleMuted: { fontSize: 16, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  currDesc: { fontSize: 13, color: colors.textMuted, lineHeight: 20, fontFamily: "Inter_400Regular", marginBottom: 8 },
+  currTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 6 },
+  currDesc: { fontSize: 13, color: colors.textMid, lineHeight: 19, fontFamily: "Inter_400Regular", marginBottom: 10 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   metaText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  arrowBadge: {
+    position: "absolute", top: 16, right: 16, width: 32, height: 32, borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
+  },
 });

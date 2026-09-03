@@ -7,13 +7,38 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useData, Module } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+
+type CurriculumDetailInfo = { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string };
+
+function CoverBanner({ curriculum }: { curriculum: CurriculumDetailInfo }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = !!curriculum.coverImage && !imageFailed;
+  return (
+    <View style={styles.banner}>
+      {showImage ? (
+        <Image source={{ uri: curriculum.coverImage! }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setImageFailed(true)} />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: `${curriculum.colorTheme}22` }]} />
+      )}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.55)"]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.bannerIconBadge}>
+        <Ionicons name={(curriculum.icon as keyof typeof Ionicons.glyphMap) || "book-outline"} size={22} color="#fff" />
+      </View>
+    </View>
+  );
+}
 
 export default function CurriculumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,7 +47,7 @@ export default function CurriculumDetailScreen() {
   const { loadCurriculumDetail } = useData();
   const { profile } = useAuth();
 
-  const [detail, setDetail] = useState<{ curriculum: { id: string; title: string; description: string }; modules: Module[] } | null>(null);
+  const [detail, setDetail] = useState<{ curriculum: CurriculumDetailInfo; modules: Module[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -35,12 +60,14 @@ export default function CurriculumDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const totalLessons = detail?.modules.reduce((sum, m) => sum + m.lessonCount, 0) ?? 0;
+  const totalCompleted = detail?.modules.reduce((sum, m) => sum + m.completedLessons, 0) ?? 0;
+  const overallPct = totalLessons > 0 ? Math.round((totalCompleted / totalLessons) * 100) : 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{detail?.curriculum.title ?? "Curriculum"}</Text>
@@ -49,7 +76,9 @@ export default function CurriculumDetailScreen() {
       {loading || !detail ? (
         <View style={styles.loadingContainer}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+          <CoverBanner curriculum={detail.curriculum} />
+          <View style={styles.content}>
           <Text style={styles.description}>{detail.curriculum.description}</Text>
 
           <View style={styles.statsRow}>
@@ -61,17 +90,24 @@ export default function CurriculumDetailScreen() {
               <Text style={styles.statNumber}>{totalLessons}</Text>
               <Text style={styles.statLabel}>{totalLessons === 1 ? "Lesson" : "Lessons"}</Text>
             </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>{overallPct}%</Text>
+              <Text style={styles.statLabel}>Complete</Text>
+            </View>
           </View>
 
           <Text style={styles.sectionLabel}>MODULES</Text>
           {detail.modules.map((m, idx) => {
             const pct = m.lessonCount > 0 ? Math.round((m.completedLessons / m.lessonCount) * 100) : 0;
+            const stateLabel = m.lessonCount === 0 ? null : m.completedLessons === 0 ? "Not started" : m.completedLessons === m.lessonCount ? "Completed" : "In progress";
             return (
               <TouchableOpacity
                 key={m.id}
                 style={styles.moduleRow}
                 onPress={() => router.push(`/module/${m.id}` as any)}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Module ${idx + 1}: ${m.title}. ${stateLabel ?? ""} ${m.completedLessons} of ${m.lessonCount} lessons complete.`}
               >
                 <View style={styles.moduleNumberBadge}>
                   <Text style={styles.moduleNumberText}>{String(idx + 1).padStart(2, "0")}</Text>
@@ -84,7 +120,7 @@ export default function CurriculumDetailScreen() {
                       <View style={styles.progressBg}>
                         <View style={[styles.progressFill, { width: `${pct}%` }]} />
                       </View>
-                      <Text style={styles.progressText}>{m.completedLessons}/{m.lessonCount}</Text>
+                      <Text style={styles.progressText}>{stateLabel} · {m.completedLessons}/{m.lessonCount}</Text>
                     </View>
                   )}
                 </View>
@@ -92,6 +128,7 @@ export default function CurriculumDetailScreen() {
               </TouchableOpacity>
             );
           })}
+          </View>
         </ScrollView>
       )}
     </View>
@@ -107,6 +144,11 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", flex: 1 },
+  banner: { width: "100%", height: 140, overflow: "hidden" },
+  bannerIconBadge: {
+    position: "absolute", bottom: 12, left: 16, width: 44, height: 44, borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center",
+  },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: 16, paddingTop: 16 },
   description: { fontSize: 14, color: colors.textMid, lineHeight: 21, fontFamily: "Inter_400Regular", marginBottom: 20 },

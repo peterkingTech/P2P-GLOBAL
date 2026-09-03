@@ -730,12 +730,11 @@ function CurriculumEditor({
     if (!title.trim()) { setError("Title is required."); return; }
     setSaving(true); setError(null);
 
-    const update: Record<string, unknown> = { title: title.trim(), description: description.trim() || null, status };
+    const update: Record<string, unknown> = { title: title.trim(), description: description.trim() || null, status, cover_image: coverImage };
     if (isPlan) {
       const weeks = parseInt(estimatedWeeks, 10);
       Object.assign(update, {
         subtitle: subtitle.trim() || null,
-        cover_image: coverImage,
         color_theme: colorTheme,
         difficulty_level: difficultyLevel,
         estimated_weeks: Number.isFinite(weeks) && estimatedWeeks.trim() ? weeks : null,
@@ -775,23 +774,34 @@ function CurriculumEditor({
         <TextInput style={[styles.edInput, { minHeight: 80 }]} value={description} onChangeText={setDescription} placeholder="Short description" placeholderTextColor={colors.textMuted} multiline textAlignVertical="top" />
       </EditorField>
 
+      {/* Cover image applies to every curriculum type, not just Plans — the
+          three top-level core curricula (Peer-to-Peer Orientation, The
+          Gospel & Salvation, The Christian Foundation) need administrator-
+          managed photos too. Reuses the exact same curriculum-media Storage
+          bucket and p2p_curriculums.cover_image column Plans already used;
+          nothing new was created. */}
+      <EditorField label="Cover Image">
+        {coverImage ? (
+          <View style={{ gap: 8 }}>
+            <Image source={{ uri: coverImage }} style={{ width: "100%", height: 130, borderRadius: 10 }} resizeMode="cover" />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={pickAndUploadCover} disabled={uploadingCover}>
+                {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={() => setCoverImage(null)} disabled={uploadingCover}>
+                <Ionicons name="trash-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
+            {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload cover image</Text></>}
+          </TouchableOpacity>
+        )}
+      </EditorField>
+
       {isPlan && (
         <>
-          <EditorField label="Cover Image">
-            {coverImage ? (
-              <View style={{ gap: 8 }}>
-                <Image source={{ uri: coverImage }} style={{ width: "100%", height: 130, borderRadius: 10 }} resizeMode="cover" />
-                <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
-                  {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
-                {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload cover image</Text></>}
-              </TouchableOpacity>
-            )}
-          </EditorField>
-
           <EditorField label="Color Theme">
             <View style={styles.colorRow}>
               {MODULE_COLOR_PALETTE.map((clr) => (
