@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { acceptCallInvitation, declineCallInvitation } from "@/lib/callInvitations";
+import { useRingtone } from "@/hooks/useRingtone";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -43,6 +44,7 @@ export default function IncomingCallScreen() {
   const pulse = useRef(new Animated.Value(1)).current;
   const settledRef = useRef(false);
   const [joining, setJoining] = useState(false);
+  const ringtone = useRingtone();
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -54,6 +56,19 @@ export default function IncomingCallScreen() {
     loop.start();
     return () => loop.stop();
   }, [pulse]);
+
+  // Real ringing (audio + vibration), not just the pulse animation above.
+  // Starts the moment this screen mounts (a call invitation has been
+  // received) and stops on every exit path: answer, decline, timeout,
+  // remote cancellation, or an unexpected unmount (useRingtone's own
+  // cleanup effect covers that last case even if none of the explicit
+  // stop() calls below ever run).
+  useEffect(() => {
+    console.log("CALL DEBUG incoming: screen mounted, starting ringtone", { callId: params.callId, channelName: params.channelName, callType });
+    void ringtone.start();
+    return () => { void ringtone.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function settle(status: "accepted" | "declined" | "missed") {
     if (settledRef.current) return;
@@ -68,6 +83,8 @@ export default function IncomingCallScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log("CALL DEBUG incoming: ring timeout, marking missed", { callId: params.callId });
+      void ringtone.stop();
       settle("missed");
       if (router.canGoBack()) router.back();
     }, RING_TIMEOUT_MS);
@@ -75,7 +92,38 @@ export default function IncomingCallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The caller can hang up before this device answers (e.g. they tap End
+  // while still on their own "Calling…" screen) — /calls/end updates this
+  // row to 'cancelled' server-side, but without watching for that update
+  // here, this screen would keep ringing for the full 30s regardless. Also
+  // covers a remote 'declined'/'missed' write from any other path that
+  // might settle this same row first.
+  useEffect(() => {
+    if (!params.callId) return;
+    const channel = supabase
+      .channel(`p2p_incoming_call_watch_${params.callId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_incoming_calls", filter: `id=eq.${params.callId}` },
+        (payload) => {
+          const status = (payload.new as Record<string, unknown>).status as string;
+          if (settledRef.current) return;
+          if (status === "cancelled" || status === "declined" || status === "missed") {
+            console.log("CALL DEBUG incoming: remote settled the call first", { callId: params.callId, status });
+            settledRef.current = true;
+            void ringtone.stop();
+            if (router.canGoBack()) router.back();
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.callId]);
+
   async function handleDecline() {
+    console.log("CALL DEBUG incoming: declined", { callId: params.callId });
+    await ringtone.stop();
     await settle("declined");
     if (isInvitation && params.invitationId) {
       declineCallInvitation(params.invitationId).catch(() => { /* the row is already settled locally either way */ });
@@ -85,6 +133,8 @@ export default function IncomingCallScreen() {
 
   async function handleAnswer() {
     if (joining) return;
+    console.log("CALL DEBUG incoming: answer pressed", { callId: params.callId, isInvitation });
+    await ringtone.stop();
     // Invitation-derived ringing calls must run the real accept flow first
     // — capacity/expiry/authorization are all re-checked atomically
     // server-side (migration 083) — rather than settling and navigating

@@ -40,7 +40,10 @@ export default function GroupCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
-  const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
+  // CALL DEBUG fix — same fix as audio.tsx/video.tsx: useRef froze this at
+  // whatever profile.id was on the first render, permanently, even after
+  // profile loaded later. useMemo recomputes reactively instead.
+  const myUid = useMemo(() => (profile?.id ? uidFromUserId(profile.id) : null), [profile?.id]);
 
   const [remoteUids, setRemoteUids] = useState<number[]>([]);
   const [muted, setMuted] = useState(false);
@@ -94,10 +97,11 @@ export default function GroupCallScreen() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    if (!myUid || !profile?.id) return;
     let cancelled = false;
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile?.id);
+        const t = await getToken(params.channelName, myUid, profile.id);
         if (!cancelled) setToken(t);
       } catch (e: any) {
         showAlert("Couldn't join", e.message ?? "Please try again.");
@@ -105,7 +109,7 @@ export default function GroupCallScreen() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.channelName]);
+  }, [params.channelName, myUid, profile?.id]);
 
   // ── Signaling channel — host controls, raise-hand, and question sync all
   // ride on a Supabase realtime broadcast channel alongside the Agora media

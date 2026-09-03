@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -79,7 +79,13 @@ export default function VideoCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
-  const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
+  // CALL DEBUG fix — see audio.tsx's identical comment: useRef-with-a-
+  // fallback froze this uid at whatever profile.id was on the FIRST render,
+  // permanently, even after profile loaded — a real Agora uid-collision
+  // risk when two devices both hit that race and both end up on the
+  // generic fallback. useMemo recomputes reactively; the token-request
+  // effect below now gates on profile.id actually existing.
+  const myUid = useMemo(() => (profile?.id ? uidFromUserId(profile.id) : null), [profile?.id]);
 
   // Study Together C1 — remoteUid (singular) becomes remoteUids (array) so
   // the call layer can hold more than one other party. `remoteUid` is kept
@@ -96,7 +102,10 @@ export default function VideoCallScreen() {
   const [blurOn, setBlurOn] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
   const [videoAutoDisabled, setVideoAutoDisabled] = useState(false);
-  const [callState, setCallState] = useState<"connecting" | "ringing" | "connected" | "ended">("connecting");
+  // CALL DEBUG fix — same explicit state machine as audio.tsx.
+  const [callState, setCallState] = useState<
+    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "ended"
+  >("requesting_token");
   const endedRef = useRef(false);
   const connectedAtRef = useRef<number | null>(null);
   const poorQualityStreakRef = useRef(0);
@@ -154,19 +163,31 @@ export default function VideoCallScreen() {
     study.startStudy({ id: params.autoStudyLessonId, moduleId: params.autoStudyModuleId, title: params.autoStudyLessonTitle ?? "" });
   }
 
+  // CALL DEBUG fix — gated on myUid/profile.id, same as audio.tsx: never
+  // requests a token with a placeholder identity, and the real failure
+  // reason is logged rather than silently swallowed into "ended".
   useEffect(() => {
+    if (!myUid || !profile?.id) {
+      console.log("CALL DEBUG video: waiting for authenticated profile before requesting token", { hasProfile: !!profile?.id });
+      return;
+    }
     let cancelled = false;
+    console.log("CALL DEBUG video: requesting token", {
+      channelName: params.channelName, uid: myUid, isInitiator, callId: params.callId, callLogId: params.callLogId,
+    });
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile?.id);
-        if (!cancelled) { setToken(t); setCallState((s) => (s === "connecting" ? "ringing" : s)); }
-      } catch {
+        const t = await getToken(params.channelName, myUid, profile.id);
+        console.log("CALL DEBUG video: token acquired", { channelName: params.channelName, uid: myUid });
+        if (!cancelled) { setToken(t); setCallState((s) => (s === "requesting_token" ? "joining_channel" : s)); }
+      } catch (e) {
+        console.warn("CALL DEBUG video: token request FAILED", { channelName: params.channelName, uid: myUid, error: e instanceof Error ? e.message : String(e) });
         if (!cancelled) setCallState("ended");
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.channelName]);
+  }, [params.channelName, myUid, profile?.id]);
 
   const handleEndCall = useCallback(async () => {
     if (endedRef.current) return;
@@ -204,7 +225,24 @@ export default function VideoCallScreen() {
     uid: myUid,
     enableVideo: true,
     eventHandler: {
-      onUserJoined: (_connection, uid) => {
+      // CALL DEBUG fix — see audio.tsx's identical handlers/comments: this
+      // device joining the channel is NOT "connected," and previously had
+      // zero visibility (no onError/onConnectionStateChanged at all).
+      onJoinChannelSuccess: (connection) => {
+        console.log("CALL DEBUG video: onJoinChannelSuccess", { channelName: connection.channelId, uid: connection.localUid });
+        setCallState((s) => (s === "connected" ? s : "waiting_for_peer"));
+      },
+      onConnectionStateChanged: (connection, state, reason) => {
+        console.log("CALL DEBUG video: onConnectionStateChanged", { channelName: connection.channelId, state, reason });
+      },
+      onError: (err, msg) => {
+        console.warn("CALL DEBUG video: onError", { err, msg });
+      },
+      onTokenPrivilegeWillExpire: () => {
+        console.warn("CALL DEBUG video: token privilege about to expire", { channelName: params.channelName });
+      },
+      onUserJoined: (connection, uid) => {
+        console.log("CALL DEBUG video: onUserJoined", { channelName: connection.channelId, remoteUid: uid });
         connectedAtRef.current = Date.now();
         setCallState("connected");
         setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
@@ -216,7 +254,8 @@ export default function VideoCallScreen() {
       // Study Together C1: ends only when the LAST remote participant
       // leaves — for an existing 1:1 call that's the same single moment
       // as before, preserving current behavior unchanged.
-      onUserOffline: (_connection, uid) => {
+      onUserOffline: (connection, uid) => {
+        console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         setRemoteUids((prev) => {
           const next = prev.filter((u) => u !== uid);
           if (next.length === 0) handleEndCall();
@@ -402,10 +441,12 @@ export default function VideoCallScreen() {
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.remoteFallback]}>
           <Ionicons name="person" size={64} color="rgba(255,255,255,0.3)" />
-          {(callState === "connecting" || callState === "ringing") && (
+          {callState !== "connected" && callState !== "ended" && (
             <View style={styles.statusRow}>
               <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.statusText}>{callState === "connecting" ? "Connecting…" : "Calling…"}</Text>
+              <Text style={styles.statusText}>
+                {callState === "waiting_for_peer" && isInitiator ? "Calling…" : "Connecting…"}
+              </Text>
             </View>
           )}
         </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -66,7 +66,16 @@ export default function AudioCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
-  const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
+  // CALL DEBUG fix — this was previously `useRef(profile?.id ? uidFromUserId(profile.id) : 1).current`,
+  // which freezes on the FIRST render only. If profile hadn't loaded yet at
+  // that exact moment (a real race on a cold start / fast navigation into a
+  // call), this device's uid silently locked to the generic fallback `1`
+  // forever, even once profile arrived — two devices hitting this at once
+  // both become uid 1, an actual Agora join collision. useMemo instead
+  // recomputes whenever profile?.id changes, and every effect that uses
+  // myUid below is gated on profile.id existing at all (see requestToken
+  // effect), so a token is never requested with a placeholder identity.
+  const myUid = useMemo(() => (profile?.id ? uidFromUserId(profile.id) : null), [profile?.id]);
 
   // Study Together C1 — remoteUids replaces the old singular `connected`
   // boolean so the call layer itself can hold more than one other party.
@@ -78,7 +87,17 @@ export default function AudioCallScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
-  const [callState, setCallState] = useState<"connecting" | "ringing" | "connected" | "ended">("connecting");
+  // CALL DEBUG fix — explicit state machine (was "connecting" | "ringing" |
+  // "connected" | "ended", where "ringing" ambiguously meant "Calling…" for
+  // BOTH the caller and, after answering, the recipient too). Now:
+  //   requesting_token -> joining_channel -> waiting_for_peer -> connected -> ended
+  // "waiting_for_peer" is the only state where the UI's label differs by
+  // role (isInitiator shows "Calling…", the recipient shows "Connecting…")
+  // — see the render below. Nothing here is set to "connected" except the
+  // real onUserJoined callback from Agora itself (never a UI shortcut).
+  const [callState, setCallState] = useState<
+    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "ended"
+  >("requesting_token");
   const endedRef = useRef(false);
 
   const [mode, setMode] = useState<"call" | "study">("call");
@@ -139,19 +158,35 @@ export default function AudioCallScreen() {
   }
   const connectedAtRef = useRef<number | null>(null);
 
+  // CALL DEBUG fix — gated on myUid (derived from profile?.id) actually
+  // existing. Previously this ran unconditionally on mount with whatever
+  // uid was available at that instant (possibly the frozen "1" fallback)
+  // and, on failure, silently moved straight to "ended" with zero surfaced
+  // reason (matches the reported bug's exact "swallowed token error"
+  // symptom). Now: never requests a token with a placeholder identity, and
+  // logs the real failure before giving up.
   useEffect(() => {
+    if (!myUid || !profile?.id) {
+      console.log("CALL DEBUG audio: waiting for authenticated profile before requesting token", { hasProfile: !!profile?.id });
+      return;
+    }
     let cancelled = false;
+    console.log("CALL DEBUG audio: requesting token", {
+      channelName: params.channelName, uid: myUid, isInitiator, callId: params.callId, callLogId: params.callLogId,
+    });
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile?.id);
-        if (!cancelled) { setToken(t); setCallState((s) => (s === "connecting" ? "ringing" : s)); }
-      } catch {
+        const t = await getToken(params.channelName, myUid, profile.id);
+        console.log("CALL DEBUG audio: token acquired", { channelName: params.channelName, uid: myUid });
+        if (!cancelled) { setToken(t); setCallState((s) => (s === "requesting_token" ? "joining_channel" : s)); }
+      } catch (e) {
+        console.warn("CALL DEBUG audio: token request FAILED", { channelName: params.channelName, uid: myUid, error: e instanceof Error ? e.message : String(e) });
         if (!cancelled) setCallState("ended");
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.channelName]);
+  }, [params.channelName, myUid, profile?.id]);
 
   const handleEndCall = useCallback(async () => {
     if (endedRef.current) return;
@@ -189,7 +224,33 @@ export default function AudioCallScreen() {
     uid: myUid,
     enableVideo: false,
     eventHandler: {
-      onUserJoined: (_connection, uid) => {
+      // CALL DEBUG fix — this device successfully joined the Agora channel.
+      // This is NOT "connected" (see section 5 of the audit): it only means
+      // *this* device is in the channel, with no guarantee the other party
+      // is. Previously nothing distinguished this from "waiting," and there
+      // was no visibility at all into whether joinChannel ever actually
+      // succeeded or silently failed (no onError/onConnectionStateChanged
+      // were registered) — exactly the kind of failure that would present
+      // as a permanent "Calling…" on both ends with zero diagnostic trail.
+      onJoinChannelSuccess: (connection) => {
+        console.log("CALL DEBUG audio: onJoinChannelSuccess", { channelName: connection.channelId, uid: connection.localUid });
+        setCallState((s) => (s === "connected" ? s : "waiting_for_peer"));
+      },
+      onConnectionStateChanged: (connection, state, reason) => {
+        console.log("CALL DEBUG audio: onConnectionStateChanged", { channelName: connection.channelId, state, reason });
+      },
+      onError: (err, msg) => {
+        console.warn("CALL DEBUG audio: onError", { err, msg });
+      },
+      onTokenPrivilegeWillExpire: () => {
+        console.warn("CALL DEBUG audio: token privilege about to expire", { channelName: params.channelName });
+      },
+      // Another participant has actually joined and is available — THIS is
+      // the real, only correct signal for "connected." Never set by
+      // answering/pressing a button; only by Agora itself confirming the
+      // remote party is present.
+      onUserJoined: (connection, uid) => {
+        console.log("CALL DEBUG audio: onUserJoined", { channelName: connection.channelId, remoteUid: uid });
         connectedAtRef.current = Date.now();
         setCallState("connected");
         setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
@@ -199,7 +260,8 @@ export default function AudioCallScreen() {
       // 1:1 call that's the exact same moment as before (one remote uid
       // going to zero), so this preserves current behavior unchanged
       // while letting a group call continue for whoever's left.
-      onUserOffline: (_connection, uid) => {
+      onUserOffline: (connection, uid) => {
+        console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         setRemoteUids((prev) => {
           const next = prev.filter((u) => u !== uid);
           if (next.length === 0) handleEndCall();
@@ -360,10 +422,17 @@ export default function AudioCallScreen() {
         )}
         {callType !== "audio" && <Text style={styles.subLabel}>{CALL_TYPE_LABEL[callType]}</Text>}
 
-        {callState === "connecting" || callState === "ringing" ? (
+        {callState !== "connected" && callState !== "ended" ? (
           <View style={styles.statusRow}>
             <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.statusText}>{callState === "connecting" ? "Connecting…" : "Calling…"}</Text>
+            {/* "Calling…" is only ever accurate for the person who placed
+                the call while genuinely still waiting on the other side —
+                the recipient, even at this same waiting_for_peer state
+                right after answering, sees "Connecting…" instead (section 3:
+                "Calling…" must never be the recipient's catch-all label). */}
+            <Text style={styles.statusText}>
+              {callState === "waiting_for_peer" && isInitiator ? "Calling…" : "Connecting…"}
+            </Text>
           </View>
         ) : callState === "connected" ? (
           <View style={styles.statusRow}>

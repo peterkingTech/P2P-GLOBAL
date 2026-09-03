@@ -11,7 +11,7 @@ import type { IRtcEngine, IRtcEngineEventHandler } from "react-native-agora";
 interface UseAgoraEngineOptions {
   channelName: string;
   token: string | null;
-  uid: number;
+  uid: number | null;
   enableVideo: boolean;
   eventHandler: IRtcEngineEventHandler;
 }

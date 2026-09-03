@@ -49,7 +49,10 @@ export default function BreakRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [joined, setJoined] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const myUid = useRef(profile?.id ? uidFromUserId(profile.id) : 1).current;
+  // CALL DEBUG fix — same fix as audio.tsx/video.tsx: useRef froze this at
+  // whatever profile.id was on the first render, permanently, even after
+  // profile loaded later. useMemo recomputes reactively instead.
+  const myUid = useMemo(() => (profile?.id ? uidFromUserId(profile.id) : null), [profile?.id]);
 
   const [muted, setMuted] = useState(true);
   const [handRaised, setHandRaised] = useState(false);
@@ -97,7 +100,7 @@ export default function BreakRoomScreen() {
   }, [profile?.id, params.roomId, router]);
 
   const doJoin = useCallback(async () => {
-    if (!profile?.id || !params.roomId) return;
+    if (!profile?.id || !params.roomId || !myUid) return;
     try {
       const res = await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/join`, {
         method: "POST", headers: { "Content-Type": "application/json" },

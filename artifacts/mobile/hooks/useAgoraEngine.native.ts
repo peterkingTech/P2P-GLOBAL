@@ -22,7 +22,11 @@ const APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID || "";
 interface UseAgoraEngineOptions {
   channelName: string;
   token: string | null;
-  uid: number;
+  // CALL DEBUG fix — nullable: the caller (a call screen) now only has a
+  // uid once the authenticated profile has actually loaded (no more
+  // frozen-at-mount placeholder value). This effect simply waits for a
+  // real uid instead of ever joining with one.
+  uid: number | null;
   enableVideo: boolean;
   eventHandler: IRtcEngineEventHandler;
 }
@@ -31,8 +35,9 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
   const engineRef = useRef<IRtcEngine | null>(null);
 
   useEffect(() => {
-    if (!token || !channelName) return;
+    if (!token || !channelName || uid === null) return;
 
+    console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo });
     const engine = createAgoraRtcEngine();
     engineRef.current = engine;
     engine.initialize({ appId: APP_ID, channelProfile: ChannelProfileType.ChannelProfileCommunication });
@@ -41,6 +46,15 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
     if (enableVideo) engine.enableVideo();
     else engine.disableVideo();
     engine.enableAudio();
+    // Default audio route for a normal call (section 11): speakerphone on,
+    // microphone on. Previously this was never set at all here — only ever
+    // toggled from the user's own mute/speaker buttons — so a fresh call
+    // started in whatever route Android happened to default to (usually
+    // the earpiece), silently disagreeing with the UI's speakerOn=true
+    // initial state.
+    engine.setEnableSpeakerphone(true);
+    engine.muteLocalAudioStream(false);
+    console.log("CALL DEBUG engine: configured, calling joinChannel", { channelName, uid });
 
     engine.joinChannel(token, channelName, uid, {
       channelProfile: ChannelProfileType.ChannelProfileCommunication,
@@ -52,6 +66,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
     });
 
     return () => {
+      console.log("CALL DEBUG engine: leaving channel and releasing", { channelName, uid });
       engine.leaveChannel();
       engine.unregisterEventHandler(eventHandler);
       engine.release();
