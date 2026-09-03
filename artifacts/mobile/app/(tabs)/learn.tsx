@@ -30,6 +30,7 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
+import StyleAccent from "@/components/StyleAccent";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
 
 const LOGO = require("@/assets/images/logo.png");
@@ -77,6 +78,10 @@ function KingdomSchoolSplash({ status, foundationPct, onEnter, colors }: {
 
   return (
     <View style={styles.root}>
+      {/* App Style's decorative accent — Kingdom School is one of the few
+          explicitly-approved illustration zones (welcome/splash screens).
+          Renders nothing at Minimal, respects the user's chosen style. */}
+      <StyleAccent size={64} />
       <Animated.View style={{ opacity: logoOpacity }}>
         <Image source={LOGO} style={styles.logo} resizeMode="contain" />
       </Animated.View>

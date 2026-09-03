@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { AppColors, ThemeName, THEME_META, THEMES } from "@/constants/themes";
+import { AppColors } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
 import { shareInviteLink } from "@/lib/sharing";
 import { Avatar } from "@/components/Avatar";
@@ -55,8 +55,6 @@ const GIFT_LABELS: Record<string, string> = {
 };
 
 const ADMIN_ROLES = new Set(["church_leader", "regional_admin", "moderator", "super_admin"]);
-
-const THEME_ORDER: ThemeName[] = ["light", "dark", "sepia", "midnight"];
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -221,20 +219,15 @@ function makeStyles(c: AppColors) {
       alignItems: "center", justifyContent: "center", marginTop: 16,
     },
     submitReachOutText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-    // Theme picker
-    themeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 28 },
-    themeOption: {
-      flex: 1, minWidth: "45%", borderRadius: 14, padding: 12,
-      borderWidth: 2, borderColor: "transparent",
-      backgroundColor: c.card,
-      alignItems: "center", gap: 8,
+    // Appearance shortcut (full picker lives at Settings -> Appearance)
+    appearanceRow: {
+      flexDirection: "row", alignItems: "center", gap: 14,
+      backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
+      padding: 16, marginBottom: 28,
     },
-    themeOptionActive: { borderColor: c.accentGreen },
-    themeSwatches: { flexDirection: "row", gap: 4 },
-    themeSwatch: { width: 18, height: 18, borderRadius: 9 },
-    themeLabel: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    themeLabelActive: { color: c.accentGreen },
-    themeCheck: { position: "absolute", top: 8, right: 8 },
+    appearanceEmoji: { fontSize: 26 },
+    appearanceTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    appearanceSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
   });
 }
 
@@ -244,7 +237,7 @@ export default function ProfileScreen() {
   const { profile, signOut, updateProfile } = useAuth();
   const { submitHelpRequest, treeData, getMyInviteLink } = useData();
   const { t } = useTranslation();
-  const { colors, theme, setTheme } = useTheme();
+  const { colors, style } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
 
@@ -493,37 +486,25 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ── Appearance (Theme Picker) ── */}
+        {/* ── Appearance ── */}
+        {/* Full picker (theme mode + all 19 App Styles, favorites, preview)
+            lives at Settings -> Appearance now; this row is just the
+            shortcut, avoiding a second, duplicate picker on this screen. */}
         <Text style={styles.sectionTitle}>Appearance</Text>
-        <View style={styles.themeGrid}>
-          {THEME_ORDER.map((name) => {
-            const meta = THEME_META[name];
-            const isActive = theme === name;
-            const t_colors = THEMES[name];
-            return (
-              <TouchableOpacity
-                key={name}
-                style={[styles.themeOption, isActive && styles.themeOptionActive]}
-                onPress={() => setTheme(name)}
-                activeOpacity={0.8}
-              >
-                {isActive && (
-                  <View style={styles.themeCheck}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />
-                  </View>
-                )}
-                <View style={styles.themeSwatches}>
-                  {meta.preview.map((hex, i) => (
-                    <View key={i} style={[styles.themeSwatch, { backgroundColor: hex }]} />
-                  ))}
-                </View>
-                <Text style={[styles.themeLabel, isActive && styles.themeLabelActive]}>
-                  {meta.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <TouchableOpacity
+          style={styles.appearanceRow}
+          activeOpacity={0.85}
+          onPress={() => router.push("/settings/appearance" as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`Appearance. Currently ${style.name}. Tap to change your App Style.`}
+        >
+          <Text style={styles.appearanceEmoji}>{style.emoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.appearanceTitle}>{style.name}</Text>
+            <Text style={styles.appearanceSub}>Theme mode, App Style & illustrations</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+        </TouchableOpacity>
 
         {/* Account */}
         <Text style={styles.sectionTitle}>{t("profile.account")}</Text>

@@ -21,6 +21,7 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   { emoji: "🔔", title: "Notification Center", subtitle: "See your notifications, including study leadership updates", route: "/notifications" },
+  { emoji: "🎨", title: "Appearance", subtitle: "Theme mode and App Style", route: "/settings/appearance" },
   { emoji: "⚙️", title: "Account", subtitle: "Profile, Email, Password, Delete Account", route: "/settings/account" },
   { emoji: "🌍", title: "Language and Region", subtitle: "App Language, Content Language, Date Format", route: "/settings/language" },
   { emoji: "🔔", title: "Notifications", subtitle: "Session Reminders, Peer Guide Alerts, Fruit Awards, Weekly Encouragement, Elijah Protocol", route: "/settings/notifications" },
