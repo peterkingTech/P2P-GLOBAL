@@ -142,6 +142,33 @@ function FoundationCategoryImage({ uri }: { uri: string | null }) {
   );
 }
 
+// A small square crop of the actual cover photo, in place of an abstract
+// icon, so the card gives a real preview of the image before the user taps
+// in — falls back to the icon + color wash exactly as before when there is
+// no photo yet or it fails to load.
+function SquarePhotoBadge({
+  uri, icon, colorTheme, style,
+}: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string; style: any }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={style}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+    );
+  }
+  return (
+    <View style={[style, { backgroundColor: `${colorTheme}1f`, alignItems: "center", justifyContent: "center" }]}>
+      <Ionicons name={icon} size={20} color={colorTheme} />
+    </View>
+  );
+}
+
 // One stand-alone Foundations category, rendered as a photo card — same
 // visual language as app/curriculum.tsx's card (which remains reachable
 // directly too), reused here inline so Kingdom School -> Foundations is a
@@ -169,9 +196,7 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
         />
       </View>
       <View style={styles.content}>
-        <View style={[styles.iconBadge, { backgroundColor: `${item.colorTheme}1f` }]}>
-          <Ionicons name={icon} size={20} color={item.colorTheme} />
-        </View>
+        <SquarePhotoBadge uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.iconBadge} />
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
         <View style={styles.metaRow}>

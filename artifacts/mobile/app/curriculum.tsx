@@ -47,6 +47,33 @@ function CardImage({ uri }: { uri: string | null }) {
   );
 }
 
+// A small square crop of the actual cover photo, in place of an abstract
+// icon, so the card gives a real preview of the image before the user taps
+// in — falls back to the icon + color wash exactly as before when there is
+// no photo yet or it fails to load.
+function SquarePhotoBadge({
+  uri, icon, colorTheme,
+}: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.iconBadge}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+    );
+  }
+  return (
+    <View style={[styles.iconBadge, { backgroundColor: `${colorTheme}1f` }]}>
+      <Ionicons name={icon} size={20} color={colorTheme} />
+    </View>
+  );
+}
+
 export default function CurriculumScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -114,9 +141,7 @@ export default function CurriculumScreen() {
 
                 <View style={styles.cardContent}>
                   <View style={styles.cardTop}>
-                    <View style={[styles.iconBadge, { backgroundColor: `${item.colorTheme}1f` }]}>
-                      <Ionicons name={icon} size={20} color={item.colorTheme} />
-                    </View>
+                    <SquarePhotoBadge uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} />
                   </View>
                   <Text style={styles.currTitle}>{item.title}</Text>
                   <Text style={styles.currDesc} numberOfLines={3}>{item.description}</Text>
