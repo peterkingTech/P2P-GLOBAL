@@ -88,6 +88,7 @@ export interface PlanCategory {
   description: string | null;
   category: string | null;
   colorTheme: string;
+  coverImage: string | null;
   displayOrder: number | null;
   planCount: number;
   totalLessons: number;

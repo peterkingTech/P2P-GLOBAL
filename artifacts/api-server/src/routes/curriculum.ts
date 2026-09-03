@@ -448,6 +448,7 @@ router.get("/plans/categories", async (_req, res) => {
       description: c.description ?? null,
       category: (c.tags as string[] | null)?.[0] ?? null,
       colorTheme: c.color_theme ?? "#1D9E75",
+      coverImage: c.cover_image ?? null,
       displayOrder: c.display_order ?? null,
       planCount: planCountByCategory.get(c.id as string) ?? 0,
       totalLessons: totalLessonsByCategory.get(c.id as string) ?? 0,

@@ -47,18 +47,67 @@ function alertLocked(message: string) {
 // (the database is authoritative for those); label/icon/color/order come
 // from the shared PLAN_CATEGORIES constant (lib/planCategories.ts) so
 // they're defined in exactly one place across the app.
+// Same split-layout card design used for the Foundations/Curriculum
+// category cards: a fixed-width text column on the left and a large,
+// dedicated photo block on the right, as two independent flex children
+// rather than an image the text overlaps — so the photo can be as large as
+// the design wants without ever compressing the title/count. Falls back to
+// this category's emoji + color wash (its existing icon system, unchanged)
+// when there's no cover photo yet or it fails to load.
+function CategoryPhotoBlock({
+  uri, emoji, color, style, fallbackStyle,
+}: { uri: string | null; emoji: string; color: string; style: any; fallbackStyle: any }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={style}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+    );
+  }
+  return (
+    <View style={[style, fallbackStyle, { backgroundColor: color }]}>
+      <Text style={{ fontSize: 30 }}>{emoji}</Text>
+    </View>
+  );
+}
+
 function CategoryCard({ category, colors, onPress }: { category: PlanCategory; colors: AppColors; onPress: () => void }) {
   const styles = makeStyles(colors);
   const meta = getPlanCategoryMeta(category.category);
+  const color = meta?.color ?? category.colorTheme;
+  const emoji = meta?.icon ?? "📖";
+  const title = meta?.label ?? category.title;
+  const countLabel = `${category.planCount} plan${category.planCount === 1 ? "" : "s"}`;
   return (
     <TouchableOpacity
-      style={[styles.categoryCard, { backgroundColor: meta?.color ?? category.colorTheme }]}
-      activeOpacity={0.88}
+      style={styles.categoryCard}
+      activeOpacity={0.9}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${countLabel}. Tap to open.`}
     >
-      <Text style={styles.categoryCardEmoji}>{meta?.icon ?? "📖"}</Text>
-      <Text style={styles.categoryCardTitle} numberOfLines={2}>{meta?.label ?? category.title}</Text>
-      <Text style={styles.categoryCardCount}>{category.planCount} plan{category.planCount === 1 ? "" : "s"}</Text>
+      <View style={styles.categoryCardContent}>
+        <Text style={styles.categoryCardTitle} numberOfLines={2}>{title}</Text>
+        <Text style={styles.categoryCardCount}>{countLabel}</Text>
+      </View>
+      <View style={styles.categoryCardPhotoWrap}>
+        <CategoryPhotoBlock
+          uri={category.coverImage}
+          emoji={emoji}
+          color={color}
+          style={styles.categoryCardPhoto}
+          fallbackStyle={styles.categoryCardPhotoFallback}
+        />
+        <View style={styles.categoryCardArrow} accessibilityElementsHidden importantForAccessibility="no">
+          <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -641,11 +690,9 @@ export default function PlansHubScreen() {
               ) : planCategories.length === 0 ? (
                 <EmptyState colors={colors} icon="albums-outline" text="Plan collections are not available yet." />
               ) : (
-                <View style={styles.categoryCardGrid}>
+                <View>
                   {orderedCategories.map((c) => (
-                    <View key={c.id} style={styles.categoryCardWrap}>
-                      <CategoryCard category={c} colors={colors} onPress={() => router.push(`/plans/category/${c.id}` as any)} />
-                    </View>
+                    <CategoryCard key={c.id} category={c} colors={colors} onPress={() => router.push(`/plans/category/${c.id}` as any)} />
                   ))}
                 </View>
               )}
@@ -850,12 +897,25 @@ function makeStyles(c: AppColors) {
     alphabetStripLetter: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     alphabetStripLetterMuted: { color: c.borderBeige },
 
-    categoryCardGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 },
-    categoryCardWrap: { width: "50%", paddingHorizontal: 6, marginBottom: 12 },
-    categoryCard: { borderRadius: 16, padding: 16, minHeight: 120, justifyContent: "space-between" },
-    categoryCardEmoji: { fontSize: 26 },
-    categoryCardTitle: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10, lineHeight: 19 },
-    categoryCardCount: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_500Medium", marginTop: 4 },
+    // Same split-layout design as the Foundations/Curriculum category
+    // cards: a fixed-width text column and a large, dedicated photo block
+    // as independent flex children, so the photo can never compress the
+    // text.
+    categoryCard: {
+      flexDirection: "row", minHeight: 120, borderRadius: 16, overflow: "hidden",
+      borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+    },
+    categoryCardContent: { flex: 1, padding: 16, justifyContent: "center" },
+    categoryCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 20 },
+    categoryCardCount: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 4 },
+    categoryCardPhotoWrap: { width: 120, alignSelf: "stretch" },
+    categoryCardPhoto: { width: "100%", height: "100%" },
+    categoryCardPhotoFallback: { alignItems: "center", justifyContent: "center" },
+    categoryCardArrow: {
+      position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
+      backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
+    },
 
     filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
     filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
