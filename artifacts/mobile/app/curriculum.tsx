@@ -12,7 +12,6 @@ import {
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useData, CurriculumCatalogItem } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
@@ -32,26 +31,13 @@ function iconForTitle(title: string): keyof typeof Ionicons.glyphMap {
   return "library-outline";
 }
 
-function CardImage({ uri }: { uri: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!uri || failed) return null;
-  return (
-    <Image
-      source={{ uri }}
-      style={StyleSheet.absoluteFill}
-      resizeMode="cover"
-      onError={() => setFailed(true)}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-    />
-  );
-}
-
-// A small square crop of the actual cover photo, in place of an abstract
-// icon, so the card gives a real preview of the image before the user taps
-// in — falls back to the icon + color wash exactly as before when there is
-// no photo yet or it fails to load.
-function SquarePhotoBadge({
+// The cover photo as its own large square block on the right of the card —
+// a real flex column next to the text column (not an overlapping full-bleed
+// background with a fade), so growing the photo can never encroach on or
+// compress the text: the two live in separate, fixed layout regions.
+// Falls back to the icon + color wash exactly as before when there is no
+// photo yet or it fails to load.
+function CategoryPhotoBlock({
   uri, icon, colorTheme,
 }: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string }) {
   const [failed, setFailed] = useState(false);
@@ -59,7 +45,7 @@ function SquarePhotoBadge({
     return (
       <Image
         source={{ uri }}
-        style={styles.iconBadge}
+        style={styles.photoBlock}
         resizeMode="cover"
         onError={() => setFailed(true)}
         accessibilityElementsHidden
@@ -68,8 +54,8 @@ function SquarePhotoBadge({
     );
   }
   return (
-    <View style={[styles.iconBadge, { backgroundColor: `${colorTheme}1f` }]}>
-      <Ionicons name={icon} size={20} color={colorTheme} />
+    <View style={[styles.photoBlock, styles.photoBlockFallback, { backgroundColor: `${colorTheme}1f` }]}>
+      <Ionicons name={icon} size={30} color={colorTheme} />
     </View>
   );
 }
@@ -122,27 +108,7 @@ export default function CurriculumScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. Tap to open.`}
               >
-                {/* Cover image, when the admin has set one, fills the right
-                    two-thirds of the card behind a left-to-right gradient so
-                    the icon/title/description on the left stay fully
-                    readable regardless of the photo underneath. No image at
-                    all is a completely normal, supported state — the card
-                    still looks intentional via the icon + color wash. */}
-                <View style={StyleSheet.absoluteFill}>
-                  <CardImage uri={item.coverImage} />
-                  <LinearGradient
-                    colors={[colors.card, colors.card, `${colors.card}00`]}
-                    locations={[0, 0.42, 1]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                </View>
-
                 <View style={styles.cardContent}>
-                  <View style={styles.cardTop}>
-                    <SquarePhotoBadge uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} />
-                  </View>
                   <Text style={styles.currTitle}>{item.title}</Text>
                   <Text style={styles.currDesc} numberOfLines={3}>{item.description}</Text>
                   <View style={styles.metaRow}>
@@ -151,13 +117,19 @@ export default function CurriculumScreen() {
                   </View>
                 </View>
 
-                {/* The arrow is a visual affordance, never the only signal
-                    that this card is tappable — the whole card carries an
-                    accessibilityRole of "button" with a full descriptive
-                    label above, and the entire card surface (not just the
-                    arrow) is the touch target. */}
-                <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
-                  <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+                {/* A dedicated block, not an overlapping background — the
+                    text column above is never affected no matter how large
+                    this photo is. */}
+                <View style={styles.photoWrap}>
+                  <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} />
+                  {/* The arrow is a visual affordance, never the only signal
+                      that this card is tappable — the whole card carries an
+                      accessibilityRole of "button" with a full descriptive
+                      label above, and the entire card surface (not just the
+                      arrow) is the touch target. */}
+                  <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
+                    <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -188,20 +160,27 @@ const styles = StyleSheet.create({
   introText: { fontSize: 13, color: colors.textMid, lineHeight: 20, fontFamily: "Inter_400Regular" },
   list: { paddingHorizontal: 16 },
   currCard: {
-    minHeight: 168, borderRadius: 20, overflow: "hidden",
+    flexDirection: "row", minHeight: 168, borderRadius: 20, overflow: "hidden",
     borderWidth: 1, borderColor: colors.borderBeige,
     marginBottom: 14, backgroundColor: colors.card,
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
-  cardContent: { padding: 18, paddingRight: "42%", flex: 1, justifyContent: "center" },
-  cardTop: { flexDirection: "row", marginBottom: 10 },
-  iconBadge: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  // A fixed, protected text column — its width never changes no matter how
+  // the photo block next to it is sized, so the photo can be made as large
+  // as the design wants without ever compressing or wrapping the text.
+  cardContent: { flex: 1, padding: 18, justifyContent: "center" },
   currTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 6 },
   currDesc: { fontSize: 13, color: colors.textMid, lineHeight: 19, fontFamily: "Inter_400Regular", marginBottom: 10 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   metaText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  // The photo's own dedicated region — large and square-ish, taking up the
+  // maximum width the card can spare on the right without shrinking
+  // cardContent below.
+  photoWrap: { width: 148, alignSelf: "stretch" },
+  photoBlock: { width: "100%", height: "100%" },
+  photoBlockFallback: { alignItems: "center", justifyContent: "center" },
   arrowBadge: {
-    position: "absolute", top: 16, right: 16, width: 32, height: 32, borderRadius: 16,
+    position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
   },
 });

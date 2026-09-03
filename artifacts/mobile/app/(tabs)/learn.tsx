@@ -31,7 +31,6 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
-import { LinearGradient } from "expo-linear-gradient";
 
 const LOGO = require("@/assets/images/logo.png");
 const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
@@ -127,28 +126,15 @@ function foundationsIconForTitle(title: string): keyof typeof Ionicons.glyphMap 
   return "library-outline";
 }
 
-function FoundationCategoryImage({ uri }: { uri: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!uri || failed) return null;
-  return (
-    <Image
-      source={{ uri }}
-      style={StyleSheet.absoluteFill}
-      resizeMode="cover"
-      onError={() => setFailed(true)}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-    />
-  );
-}
-
-// A small square crop of the actual cover photo, in place of an abstract
-// icon, so the card gives a real preview of the image before the user taps
-// in — falls back to the icon + color wash exactly as before when there is
-// no photo yet or it fails to load.
-function SquarePhotoBadge({
-  uri, icon, colorTheme, style,
-}: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string; style: any }) {
+// The cover photo as its own large square block on the right of the card —
+// a real flex column next to the text column (not an overlapping full-bleed
+// background with a fade), so growing the photo can never encroach on or
+// compress the text: the two live in separate, fixed layout regions. Falls
+// back to the icon + color wash exactly as before when there is no photo
+// yet or it fails to load.
+function CategoryPhotoBlock({
+  uri, icon, colorTheme, style, fallbackStyle,
+}: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string; style: any; fallbackStyle: any }) {
   const [failed, setFailed] = useState(false);
   if (uri && !failed) {
     return (
@@ -163,8 +149,8 @@ function SquarePhotoBadge({
     );
   }
   return (
-    <View style={[style, { backgroundColor: `${colorTheme}1f`, alignItems: "center", justifyContent: "center" }]}>
-      <Ionicons name={icon} size={20} color={colorTheme} />
+    <View style={[style, fallbackStyle, { backgroundColor: `${colorTheme}1f` }]}>
+      <Ionicons name={icon} size={30} color={colorTheme} />
     </View>
   );
 }
@@ -185,18 +171,7 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
       accessibilityRole="button"
       accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. Tap to open.`}
     >
-      <View style={StyleSheet.absoluteFill}>
-        <FoundationCategoryImage uri={item.coverImage} />
-        <LinearGradient
-          colors={[colors.card, colors.card, `${colors.card}00`]}
-          locations={[0, 0.42, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
       <View style={styles.content}>
-        <SquarePhotoBadge uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.iconBadge} />
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
         <View style={styles.metaRow}>
@@ -204,8 +179,14 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
           <Text style={styles.metaText}>{countsLabel}</Text>
         </View>
       </View>
-      <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
-        <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+
+      {/* A dedicated block, not an overlapping background — the text
+          column above is never affected no matter how large this photo is. */}
+      <View style={styles.photoWrap}>
+        <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.photoBlock} fallbackStyle={styles.photoBlockFallback} />
+        <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
+          <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -214,18 +195,25 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
 function foundationCardStyles(c: AppColors) {
   return StyleSheet.create({
     card: {
-      minHeight: 150, borderRadius: 18, overflow: "hidden",
+      flexDirection: "row", minHeight: 150, borderRadius: 18, overflow: "hidden",
       borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
       shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
     },
-    content: { padding: 16, paddingRight: "42%", flex: 1, justifyContent: "center" },
-    iconBadge: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+    // A fixed, protected text column — its width never changes no matter
+    // how the photo block next to it is sized.
+    content: { flex: 1, padding: 16, justifyContent: "center" },
     title: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
     desc: { fontSize: 12, color: c.textMid, lineHeight: 17, fontFamily: "Inter_400Regular", marginBottom: 8 },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     metaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium" },
+    // The photo's own dedicated region — large and square-ish, taking up
+    // the maximum width the card can spare on the right without shrinking
+    // the text column below.
+    photoWrap: { width: 132, alignSelf: "stretch" },
+    photoBlock: { width: "100%", height: "100%" },
+    photoBlockFallback: { alignItems: "center", justifyContent: "center" },
     arrowBadge: {
-      position: "absolute", top: 14, right: 14, width: 28, height: 28, borderRadius: 14,
+      position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
       backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
     },
   });
