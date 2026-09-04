@@ -28,6 +28,35 @@ const COVER_HEIGHT = 200;
 type PlanLessonDetail = { id: string; moduleId: string | null; title: string; subtitle: string | null; sortOrder: number; status: string };
 type PlanModuleDetail = { id: string; title: string; description: string | null; coverImageUrl: string | null; colorTheme: string | null; sortOrder: number; status: string; lessons: PlanLessonDetail[] };
 type PlanCategoryRef = { id: string; title: string; colorTheme: string };
+// Same split-layout card design used for the Foundations/Curriculum category
+// and module cards: a fixed-width text column on the left and a dedicated,
+// cropped photo block on the right, so the photo can never compress the
+// title/lesson-count text. Falls back to a color wash + icon (this module's
+// own colorTheme, or the plan's if the module has none) when there's no
+// cover photo yet or it fails to load.
+function ModuleHeaderPhoto({
+  uri, color, style, fallbackStyle,
+}: { uri: string | null; color: string; style: any; fallbackStyle: any }) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={style}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+    );
+  }
+  return (
+    <View style={[style, fallbackStyle, { backgroundColor: `${color}1A` }]}>
+      <Ionicons name="book-outline" size={22} color={color} />
+    </View>
+  );
+}
+
 type PlanDetail = {
   id: string; title: string; description: string | null; subtitle: string | null;
   coverImageUrl: string | null; colorTheme: string; difficultyLevel: string; estimatedWeeks: number | null;
@@ -260,14 +289,26 @@ export default function PlanDetailScreen() {
             <Text style={styles.sectionHeading}>Modules</Text>
             {plan.modules.map((m, idx) => (
               <View key={m.id} style={styles.moduleCard}>
-                <View style={styles.moduleNameRow}>
-                  <View style={[styles.moduleBadge, { backgroundColor: plan.colorTheme }]}>
-                    <Text style={styles.moduleBadgeText}>{idx + 1}</Text>
+                <View style={styles.moduleHeaderCard}>
+                  <View style={styles.moduleHeaderContent}>
+                    <View style={styles.moduleNameRow}>
+                      <View style={[styles.moduleBadge, { backgroundColor: plan.colorTheme }]}>
+                        <Text style={styles.moduleBadgeText}>{idx + 1}</Text>
+                      </View>
+                      <Text style={styles.moduleName} numberOfLines={2}>{m.title}</Text>
+                    </View>
+                    <Text style={styles.moduleLessonCount}>
+                      {m.lessons.length} lesson{m.lessons.length === 1 ? "" : "s"}
+                    </Text>
                   </View>
-                  <Text style={styles.moduleName} numberOfLines={2}>{m.title}</Text>
-                  <Text style={styles.moduleLessonCount}>
-                    {m.lessons.length} lesson{m.lessons.length === 1 ? "" : "s"}
-                  </Text>
+                  <View style={styles.moduleHeaderPhotoWrap}>
+                    <ModuleHeaderPhoto
+                      uri={m.coverImageUrl}
+                      color={m.colorTheme ?? plan.colorTheme}
+                      style={styles.moduleHeaderPhoto}
+                      fallbackStyle={styles.moduleHeaderPhotoFallback}
+                    />
+                  </View>
                 </View>
                 {m.lessons.map((lesson) => (
                   <TouchableOpacity
@@ -370,7 +411,20 @@ function makeStyles(c: AppColors) {
 
     lessonsBlock: { marginTop: 24 },
     moduleCard: { marginBottom: 18 },
-    moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+    // Same split-layout convention as the category cards: a fixed-width
+    // text column on the left, a dedicated cropped photo block on the
+    // right — as two independent flex children, never an overlapping
+    // background, so the photo can be as large as the design wants without
+    // ever compressing the title/lesson-count text.
+    moduleHeaderCard: {
+      flexDirection: "row", minHeight: 88, backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.borderBeige, overflow: "hidden", marginBottom: 10,
+    },
+    moduleHeaderContent: { flex: 1, padding: 12, justifyContent: "center" },
+    moduleHeaderPhotoWrap: { width: 96, alignSelf: "stretch" },
+    moduleHeaderPhoto: { width: "100%", height: "100%" },
+    moduleHeaderPhotoFallback: { alignItems: "center", justifyContent: "center" },
+    moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
     moduleBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
     moduleBadgeText: { fontSize: 11, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     moduleName: { flex: 1, fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },

@@ -25,11 +25,15 @@ function showAlert(title: string, message: string) {
 
 type CurriculumDetailInfo = { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string };
 
+// Same split-layout card design used for the Foundations/Curriculum category
+// cards: a fixed-width text column on the left and a dedicated, cropped
+// photo block on the right (never an image the text overlaps), so a large
+// photo can never compress the title/progress row.
 function ModuleCardImage({ uri }: { uri: string | null | undefined }) {
   const [failed, setFailed] = useState(false);
   if (!uri || failed) {
     return (
-      <View style={[styles.moduleCardImage, styles.moduleCardImageFallback]}>
+      <View style={[styles.moduleCardPhoto, styles.moduleCardImageFallback]}>
         <Ionicons name="book-outline" size={26} color={colors.accentGreen} />
       </View>
     );
@@ -37,7 +41,7 @@ function ModuleCardImage({ uri }: { uri: string | null | undefined }) {
   return (
     <Image
       source={{ uri }}
-      style={styles.moduleCardImage}
+      style={styles.moduleCardPhoto}
       resizeMode="cover"
       onError={() => setFailed(true)}
       accessibilityElementsHidden
@@ -143,14 +147,6 @@ export default function CurriculumDetailScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.isLocked ? "Locked — complete the previous lesson to continue." : `${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}`}
               >
-                <View style={m.isLocked && styles.moduleCardImageLockedWrap}>
-                  <ModuleCardImage uri={m.imageUrl} />
-                  {m.isLocked && (
-                    <View style={styles.moduleLockOverlay}>
-                      <Ionicons name="lock-closed" size={20} color="#fff" />
-                    </View>
-                  )}
-                </View>
                 <View style={styles.moduleCardBody}>
                   <Text style={styles.moduleTitle} numberOfLines={2}>{m.title}</Text>
                   {!!m.description && <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>}
@@ -167,8 +163,23 @@ export default function CurriculumDetailScreen() {
                     ) : (
                       <Text style={styles.progressText}>{countsLabel}</Text>
                     )}
-                    <Ionicons name={m.isLocked ? "lock-closed" : "chevron-forward"} size={16} color={colors.textMuted} />
                   </View>
+                </View>
+
+                {/* A dedicated block, not an overlapping background — the
+                    text column above is never affected no matter how large
+                    this photo is. */}
+                <View style={styles.moduleCardPhotoWrap}>
+                  <ModuleCardImage uri={m.imageUrl} />
+                  {m.isLocked ? (
+                    <View style={styles.moduleLockOverlay} accessibilityElementsHidden importantForAccessibility="no">
+                      <Ionicons name="lock-closed" size={20} color="#fff" />
+                    </View>
+                  ) : (
+                    <View style={styles.moduleCardArrow} accessibilityElementsHidden importantForAccessibility="no">
+                      <Ionicons name="chevron-forward" size={16} color={colors.textDark} />
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -206,19 +217,26 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginBottom: 12 },
   moduleCard: {
-    backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
-    marginBottom: 12, overflow: "hidden",
+    flexDirection: "row", minHeight: 120, backgroundColor: colors.card, borderRadius: 16,
+    borderWidth: 1, borderColor: colors.borderBeige, marginBottom: 12, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
   },
   moduleCardLocked: { opacity: 0.6 },
-  moduleCardImageLockedWrap: { position: "relative" },
   moduleLockOverlay: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center",
   },
-  moduleCardImage: { width: "100%", height: 110 },
+  // The photo's own dedicated region on the right — same split-layout
+  // convention as the category cards, so it can be as large as the design
+  // wants without ever compressing moduleCardBody's text.
+  moduleCardPhotoWrap: { width: 120, alignSelf: "stretch" },
+  moduleCardPhoto: { width: "100%", height: "100%" },
   moduleCardImageFallback: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
-  moduleCardBody: { padding: 14 },
+  moduleCardArrow: {
+    position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
+  },
+  moduleCardBody: { flex: 1, padding: 14, justifyContent: "center" },
   moduleCardFooterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
   moduleTitle: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
   moduleDesc: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17, marginBottom: 6 },
