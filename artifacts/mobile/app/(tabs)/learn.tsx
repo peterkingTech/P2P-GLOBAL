@@ -248,6 +248,13 @@ function KingdomSchoolCards({
   enrolledCount: number;
 }) {
   const router = useRouter();
+  // Foundations/Electives are a two-tone selector, not a fixed brand
+  // moment — they must reflect whichever App Style the user has elected,
+  // the same way every other useTheme() screen does, using that style's
+  // own primary/accent tokens (already engineered to keep hardcoded white
+  // text legible on both — see constants/appStyles.ts's buildTokens).
+  const { colors } = useTheme();
+  const cardSelectorStyles = makeCardSelectorStyles(colors);
   return (
     <View style={cardSelectorStyles.row}>
       <TouchableOpacity
@@ -285,18 +292,20 @@ function KingdomSchoolCards({
   );
 }
 
-const cardSelectorStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 20 },
-  card: { flex: 1, borderRadius: 18, padding: 16, minHeight: 148, justifyContent: "space-between" },
-  cardSelected: { borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" },
-  foundationCard: { backgroundColor: "#1D4E2B" },
-  electivesCard: { backgroundColor: "#B8860B" },
-  cardTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10 },
-  cardSubtitle: { fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_500Medium", marginTop: 2 },
-  cardInfo: { fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", marginTop: 8 },
-  progressBg: { height: 4, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, marginTop: 8, overflow: "hidden" },
-  progressFill: { height: 4, backgroundColor: "#fff", borderRadius: 2 },
-});
+function makeCardSelectorStyles(c: AppColors) {
+  return StyleSheet.create({
+    row: { flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 20 },
+    card: { flex: 1, borderRadius: 18, padding: 16, minHeight: 148, justifyContent: "space-between" },
+    cardSelected: { borderWidth: 2, borderColor: "rgba(255,255,255,0.6)" },
+    foundationCard: { backgroundColor: c.primaryGreen },
+    electivesCard: { backgroundColor: c.accentGreen },
+    cardTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 10 },
+    cardSubtitle: { fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_500Medium", marginTop: 2 },
+    cardInfo: { fontSize: 12, color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", marginTop: 8 },
+    progressBg: { height: 4, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, marginTop: 8, overflow: "hidden" },
+    progressFill: { height: 4, backgroundColor: "#fff", borderRadius: 2 },
+  });
+}
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
