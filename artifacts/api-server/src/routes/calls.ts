@@ -802,14 +802,14 @@ router.post("/calls/end", async (req, res) => {
   const requesterId = await verifyCaller(req);
   if (!requesterId) return err(res, "Unauthorized", 401);
 
-  const { callLogId, incomingCallId, conversationId, callType, connected, durationSeconds } = req.body as {
+  const { callLogId, incomingCallId, conversationId, callType, connected, durationSeconds, connectedAt } = req.body as {
     callLogId?: string; incomingCallId?: string; conversationId?: string | null; callType?: string;
-    connected?: boolean; durationSeconds?: number;
+    connected?: boolean; durationSeconds?: number; connectedAt?: string | null;
   };
   if (!callLogId) return err(res, "callLogId required");
 
   const { data: callLog } = await supabaseWrite
-    .from("p2p_call_logs").select("initiated_by, participants").eq("id", callLogId).maybeSingle();
+    .from("p2p_call_logs").select("initiated_by, participants, connected_at").eq("id", callLogId).maybeSingle();
   if (!callLog) return err(res, "Call not found", 404);
   const participants = (callLog.participants as string[]) ?? [];
   if (!participants.includes(requesterId)) return err(res, "Not authorized for this call", 403);
@@ -825,9 +825,17 @@ router.post("/calls/end", async (req, res) => {
     if (incoming?.status === "declined" || incoming?.status === "cancelled") finalStatus = incoming.status;
   }
 
+  // Forensic calling audit — this is the only place a call's real
+  // onUserJoined moment (see app/call/audio.tsx's connectedAtRef) ever gets
+  // persisted. Either party's device can report it (both reach /calls/end
+  // independently, same as the call_summary message below), so this only
+  // writes it once, taking whichever value arrives first.
+  const updatePayload: Record<string, unknown> = { status: finalStatus, ended_at: new Date().toISOString(), duration_seconds: duration };
+  if (connectedAt && !callLog.connected_at) updatePayload.connected_at = connectedAt;
+
   const { error: updateErr } = await supabaseWrite
     .from("p2p_call_logs")
-    .update({ status: finalStatus, ended_at: new Date().toISOString(), duration_seconds: duration })
+    .update(updatePayload)
     .eq("id", callLogId);
   if (updateErr) return err(res, updateErr.message, 500);
 

@@ -209,6 +209,7 @@ export default function VideoCallScreen() {
             callType: "video",
             connected: wasConnected,
             durationSeconds,
+            connectedAt: connectedAtRef.current ? new Date(connectedAtRef.current).toISOString() : null,
           }),
         });
       } catch { /* the call is ending either way; a lost summary message isn't worth blocking on */ }

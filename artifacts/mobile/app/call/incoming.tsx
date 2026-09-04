@@ -70,14 +70,24 @@ export default function IncomingCallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Forensic calling audit — settle() previously had no timeout of its own:
+  // a hung network request (not even necessarily a thrown error — mobile
+  // networks can stall a fetch indefinitely without ever rejecting) would
+  // leave the caller of settle() awaiting forever. Racing against a bounded
+  // timeout guarantees this specific step can never be the reason a call
+  // rings/waits indefinitely, per the "no infinite transitional state"
+  // requirement.
+  const SETTLE_TIMEOUT_MS = 10000;
   async function settle(status: "accepted" | "declined" | "missed") {
     if (settledRef.current) return;
     settledRef.current = true;
     if (params.callId) {
-      await supabase
+      const update = supabase
         .from("p2p_incoming_calls")
         .update({ status, responded_at: new Date().toISOString() })
         .eq("id", params.callId);
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("settle timed out")), SETTLE_TIMEOUT_MS));
+      await Promise.race([update, timeout]);
     }
   }
 
@@ -124,7 +134,16 @@ export default function IncomingCallScreen() {
   async function handleDecline() {
     console.log("CALL DEBUG incoming: declined", { callId: params.callId });
     await ringtone.stop();
-    await settle("declined");
+    try {
+      await settle("declined");
+    } catch (e: any) {
+      // Unlike Accept, a failed decline write must not trap the user on
+      // this screen — declining is a purely local "get me out of here"
+      // action from the recipient's perspective; the caller's own
+      // NO_ANSWER_TIMEOUT_MS (audio.tsx) is the fallback if this write
+      // never lands.
+      console.warn("CALL DEBUG incoming: decline write failed, exiting anyway", { callId: params.callId, error: e?.message });
+    }
     if (isInvitation && params.invitationId) {
       declineCallInvitation(params.invitationId).catch(() => { /* the row is already settled locally either way */ });
     }
@@ -165,7 +184,29 @@ export default function IncomingCallScreen() {
       return;
     }
 
-    await settle("accepted");
+    // Forensic calling audit ROOT CAUSE — this plain (non-invitation) 1:1
+    // accept path previously had NO error handling around settle(): if that
+    // write threw or hung (a real risk on a mobile network — a backgrounded
+    // app, a network handoff, a stalled fetch that never even rejects), the
+    // exception propagated out of handleAnswer with nothing to catch it.
+    // The ringtone had already been stopped a few lines above, but
+    // router.replace() into the actual call screen never ran — this
+    // recipient's device would sit on this exact ringing screen forever,
+    // silently, with no error shown and no way to retry, while the caller's
+    // side waited on an Agora onUserJoined that could now never fire
+    // (this device never even requests a token). Matches the reported
+    // symptom exactly on both ends. The invitation branch above already had
+    // this try/catch; this mirrors it.
+    setJoining(true);
+    try {
+      await settle("accepted");
+    } catch (e: any) {
+      console.warn("CALL DEBUG incoming: accept FAILED, offering retry", { callId: params.callId, error: e?.message });
+      settledRef.current = false; // allow a genuine retry, not a silent no-op
+      setJoining(false);
+      showAlert("Couldn't connect", "There was a problem answering this call. Please try again.");
+      return;
+    }
     const pathname = callType === "video" ? "/call/video" : "/call/audio";
     router.replace({
       pathname,

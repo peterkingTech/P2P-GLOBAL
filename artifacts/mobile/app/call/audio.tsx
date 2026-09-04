@@ -208,6 +208,10 @@ export default function AudioCallScreen() {
             callType,
             connected: wasConnected,
             durationSeconds,
+            // Forensic calling audit — the only persisted record of the real
+            // Agora onUserJoined moment (see migration 110). Never a UI
+            // shortcut: this ref is only ever set from that exact callback.
+            connectedAt: connectedAtRef.current ? new Date(connectedAtRef.current).toISOString() : null,
           }),
         });
       } catch { /* the call is ending either way; a lost summary message isn't worth blocking on */ }
