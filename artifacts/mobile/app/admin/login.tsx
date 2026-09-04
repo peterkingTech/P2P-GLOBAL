@@ -128,7 +128,7 @@ export default function AdminLoginScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoWrap}>
-          <Image source={LOGO} style={styles.logo} />
+          <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           <View style={styles.adminBadge}>
             <Ionicons name="shield-checkmark" size={12} color="#fff" />
             <Text style={styles.adminBadgeText}>Admin</Text>
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
 
   header: { alignItems: "center", marginBottom: 36 },
   logoWrap: { position: "relative", marginBottom: 16 },
-  logo: { width: 72, height: 72, borderRadius: 16 },
+  logo: { width: 108, height: 72 },
   adminBadge: {
     position: "absolute",
     bottom: -6,

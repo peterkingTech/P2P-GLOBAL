@@ -108,7 +108,7 @@ export default function OnboardingScreen() {
       <View style={styles.langRow}>
         {current > 0 && (
           <View style={styles.headerLogo}>
-            <Image source={LOGO} style={styles.headerLogoImg} />
+            <Image source={LOGO} style={styles.headerLogoImg} resizeMode="contain" />
           </View>
         )}
         <TouchableOpacity
@@ -137,7 +137,7 @@ export default function OnboardingScreen() {
       >
         {SLIDES[current].icon === null ? (
           <View style={styles.logoWrap}>
-            <Image source={LOGO} style={[styles.logoImg, isSmallPhone && styles.logoImgSmall]} />
+            <Image source={LOGO} style={[styles.logoImg, isSmallPhone && styles.logoImgSmall]} resizeMode="contain" />
           </View>
         ) : (
           <View style={[styles.iconRing, isSmallPhone && styles.iconRingSmall]}>
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   headerLogo: { alignItems: "center" },
-  headerLogoImg: { width: 40, height: 40, borderRadius: 8 },
+  headerLogoImg: { width: 60, height: 40 },
   langBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,8 +293,8 @@ const styles = StyleSheet.create({
   logoWrap: {
     marginBottom: 36,
   },
-  logoImg: { width: 140, height: 140, borderRadius: 32 },
-  logoImgSmall: { width: 100, height: 100, borderRadius: 24 },
+  logoImg: { width: 200, height: 133 },
+  logoImgSmall: { width: 150, height: 100 },
   iconRing: {
     width: 110, height: 110, borderRadius: 55,
     backgroundColor: "rgba(29,158,117,0.12)",

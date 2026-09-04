@@ -112,7 +112,7 @@ function KingdomSchoolSplash({ status, foundationPct, onEnter, colors }: {
 function splashStyles(c: AppColors) {
   return StyleSheet.create({
     root: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 22, backgroundColor: c.lightCream },
-    logo: { width: 84, height: 84 },
+    logo: { width: 132, height: 88 },
     eyebrow: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 2 },
     title: { fontSize: 26, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 4 },
     mission: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21, marginBottom: 14 },

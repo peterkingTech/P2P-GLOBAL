@@ -26,7 +26,7 @@
       "package": "com.amentech.p2pglobalbiblestudy",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/icon-adaptive.png",
         "backgroundColor": "#06110D"
       },
       "permissions": [
