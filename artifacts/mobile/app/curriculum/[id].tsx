@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +17,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useData, Module } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
 
 type CurriculumDetailInfo = { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string };
 
@@ -120,23 +126,38 @@ export default function CurriculumDetailScreen() {
           <Text style={styles.sectionLabel}>MODULES</Text>
           {detail.modules.map((m) => {
             const pct = m.lessonCount > 0 ? Math.round((m.completedLessons / m.lessonCount) * 100) : 0;
-            const stateLabel = m.lessonCount === 0 ? null : m.completedLessons === 0 ? "Not started" : m.completedLessons === m.lessonCount ? "Completed" : "In progress";
+            const stateLabel = m.isLocked ? "Locked" : m.lessonCount === 0 ? null : m.completedLessons === 0 ? "Not started" : m.completedLessons === m.lessonCount ? "Completed" : "In progress";
             const countsLabel = `${m.lessonCount} ${m.lessonCount === 1 ? "lesson" : "lessons"}`;
             return (
               <TouchableOpacity
                 key={m.id}
-                style={styles.moduleCard}
-                onPress={() => router.push(`/module/${m.id}` as any)}
+                style={[styles.moduleCard, m.isLocked && styles.moduleCardLocked]}
+                onPress={() => {
+                  if (m.isLocked) {
+                    showAlert("Locked", "Complete the previous lesson to continue.");
+                    return;
+                  }
+                  router.push(`/module/${m.id}` as any);
+                }}
                 activeOpacity={0.9}
                 accessibilityRole="button"
-                accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}
+                accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.isLocked ? "Locked — complete the previous lesson to continue." : `${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}`}
               >
-                <ModuleCardImage uri={m.imageUrl} />
+                <View style={m.isLocked && styles.moduleCardImageLockedWrap}>
+                  <ModuleCardImage uri={m.imageUrl} />
+                  {m.isLocked && (
+                    <View style={styles.moduleLockOverlay}>
+                      <Ionicons name="lock-closed" size={20} color="#fff" />
+                    </View>
+                  )}
+                </View>
                 <View style={styles.moduleCardBody}>
                   <Text style={styles.moduleTitle} numberOfLines={2}>{m.title}</Text>
                   {!!m.description && <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>}
                   <View style={styles.moduleCardFooterRow}>
-                    {m.lessonCount > 0 ? (
+                    {m.isLocked ? (
+                      <Text style={styles.progressText}>Complete the previous lesson to continue</Text>
+                    ) : m.lessonCount > 0 ? (
                       <View style={styles.moduleProgress}>
                         <View style={styles.progressBg}>
                           <View style={[styles.progressFill, { width: `${pct}%` }]} />
@@ -146,7 +167,7 @@ export default function CurriculumDetailScreen() {
                     ) : (
                       <Text style={styles.progressText}>{countsLabel}</Text>
                     )}
-                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                    <Ionicons name={m.isLocked ? "lock-closed" : "chevron-forward"} size={16} color={colors.textMuted} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -188,6 +209,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
     marginBottom: 12, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+  },
+  moduleCardLocked: { opacity: 0.6 },
+  moduleCardImageLockedWrap: { position: "relative" },
+  moduleLockOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center",
   },
   moduleCardImage: { width: "100%", height: 110 },
   moduleCardImageFallback: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },

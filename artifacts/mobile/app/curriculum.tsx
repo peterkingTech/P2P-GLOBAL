@@ -13,17 +13,20 @@ import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, CurriculumCatalogItem } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
 // Three-category curriculum — a small, fixed library of stand-alone
-// journeys, not a numbered staircase and not an open-ended list. No
-// "Level 1/2/3", no locked-until-you-finish-the-last-one gating between
-// categories: each is independent, and a learner can move between them in
-// any order. The catalog itself (title/description/cover image/counts) is
-// entirely database-driven (see DataContext.getCurriculumCatalog) — this
-// screen renders whatever is actually published, it doesn't hard-code the
-// three titles, so a future fourth category needs only a new published
-// p2p_curriculums row, never a mobile release.
+// journeys, presented in a deliberate sequence: Kingdom School unlocks them
+// one at a time, in display_order, as the learner completes each one (see
+// DataContext.getKingdomSchoolLockState) — starting with "Peer-to-Peer
+// Orientation" for every brand-new learner regardless of which category
+// happens to render first in this list. The catalog itself (title/
+// description/cover image/counts) is entirely database-driven (see
+// DataContext.getCurriculumCatalog) — this screen renders whatever is
+// actually published, it doesn't hard-code the three titles, so a future
+// fourth category needs only a new published p2p_curriculums row (appended
+// after the existing display_order values), never a mobile release.
 function iconForTitle(title: string): keyof typeof Ionicons.glyphMap {
   if (title.includes("Peer-to-Peer") || title.includes("Orientation")) return "people-circle-outline";
   if (title.includes("Gospel")) return "sunny-outline";
@@ -64,14 +67,15 @@ export default function CurriculumScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getCurriculumCatalog } = useData();
+  const { profile } = useAuth();
   const [catalog, setCatalog] = useState<CurriculumCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setCatalog(await getCurriculumCatalog());
+    setCatalog(await getCurriculumCatalog(profile?.id));
     setLoading(false);
-  }, [getCurriculumCatalog]);
+  }, [getCurriculumCatalog, profile?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -87,7 +91,7 @@ export default function CurriculumScreen() {
 
       <View style={styles.intro}>
         <Text style={styles.introText}>
-          Explore stand-alone journeys to grow in your faith and life with Christ. Study one, return to another later, or explore several at once — there's no required order.
+          Kingdom School opens one journey at a time, starting with Peer-to-Peer Orientation. Complete a category to unlock the next.
         </Text>
       </View>
 
@@ -102,18 +106,18 @@ export default function CurriculumScreen() {
             const countsLabel = `${item.moduleCount} ${item.moduleCount === 1 ? "module" : "modules"} · ${item.lessonCount} ${item.lessonCount === 1 ? "lesson" : "lessons"}`;
             return (
               <TouchableOpacity
-                style={styles.currCard}
+                style={[styles.currCard, item.isLocked && styles.currCardLocked]}
                 onPress={() => router.push(`/curriculum/${item.id}` as any)}
                 activeOpacity={0.9}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. Tap to open.`}
+                accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. ${item.isLocked ? "Locked — complete the current category first." : "Tap to open."}`}
               >
                 <View style={styles.cardContent}>
                   <Text style={styles.currTitle}>{item.title}</Text>
                   <Text style={styles.currDesc} numberOfLines={3}>{item.description}</Text>
                   <View style={styles.metaRow}>
-                    <Ionicons name="book-outline" size={13} color={colors.textMuted} />
-                    <Text style={styles.metaText}>{countsLabel}</Text>
+                    <Ionicons name={item.isLocked ? "lock-closed" : "book-outline"} size={13} color={colors.textMuted} />
+                    <Text style={styles.metaText}>{item.isLocked ? "Locked — complete the current category first" : countsLabel}</Text>
                   </View>
                 </View>
 
@@ -122,6 +126,11 @@ export default function CurriculumScreen() {
                     this photo is. */}
                 <View style={styles.photoWrap}>
                   <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} />
+                  {item.isLocked && (
+                    <View style={styles.categoryLockOverlay} accessibilityElementsHidden importantForAccessibility="no">
+                      <Ionicons name="lock-closed" size={22} color="#fff" />
+                    </View>
+                  )}
                   {/* The arrow is a visual affordance, never the only signal
                       that this card is tappable — the whole card carries an
                       accessibilityRole of "button" with a full descriptive
@@ -179,6 +188,11 @@ const styles = StyleSheet.create({
   photoWrap: { width: 148, alignSelf: "stretch" },
   photoBlock: { width: "100%", height: "100%" },
   photoBlockFallback: { alignItems: "center", justifyContent: "center" },
+  currCardLocked: { opacity: 0.65 },
+  categoryLockOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center",
+  },
   arrowBadge: {
     position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",

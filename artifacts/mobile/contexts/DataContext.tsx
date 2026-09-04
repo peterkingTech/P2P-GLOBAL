@@ -49,6 +49,20 @@ export interface CurriculumCatalogItem {
   moduleCount: number;
   lessonCount: number;
   estimatedMinutes: number;
+  // Whether this whole curriculum is reachable yet under Kingdom School's
+  // sequential progression (see getKingdomSchoolLockState) — false for the
+  // curriculum the learner is currently on or has already finished, true
+  // for anything still ahead of them in curriculum display_order.
+  isLocked: boolean;
+}
+
+// One deterministic Kingdom School progression model spanning every
+// published core curriculum, keyed by id — see getKingdomSchoolLockState.
+export interface KingdomSchoolLockState {
+  lessonLocked: Map<string, boolean>;
+  moduleLocked: Map<string, boolean>;
+  curriculumLocked: Map<string, boolean>;
+  curriculumOrder: string[];
 }
 
 // Unified plans system — a Plan IS a p2p_curriculums row (type='plan'), the
@@ -1114,9 +1128,10 @@ export interface GenerationalForestData {
 interface DataContextValue {
   modules: Module[];
   lessons: Lesson[];
-  getCurriculumCatalog: () => Promise<CurriculumCatalogItem[]>;
+  getCurriculumCatalog: (userId?: string) => Promise<CurriculumCatalogItem[]>;
   loadModuleWithLessons: (moduleId: string, userId?: string) => Promise<{ module: Module; lessons: Lesson[] } | null>;
   loadCurriculumDetail: (curriculumId: string, userId?: string) => Promise<{ curriculum: { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string }; modules: Module[] } | null>;
+  getKingdomSchoolLockState: (userId?: string) => Promise<KingdomSchoolLockState>;
   plans: Plan[];
   featuredPlans: Plan[];
   plansLoading: boolean;
@@ -1771,15 +1786,140 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile?.id]);
 
+  // ONE Kingdom School progression model, shared by every screen that needs
+  // to know what's unlocked: the legacy single-"active"-curriculum state
+  // below (loadCurriculum), the multi-curriculum catalog (getCurriculumCatalog),
+  // a single module's lesson list (loadModuleWithLessons), and a single
+  // curriculum's module list (loadCurriculumDetail). Previously each of
+  // those computed its own sequential-lock logic independently, and none of
+  // them spanned curriculum boundaries — a module in "The Christian
+  // Foundation" always showed as unlocked at the top of its own module
+  // list regardless of whether "Peer-to-Peer Orientation" or "The Gospel &
+  // Salvation" had been completed. This walks every published core
+  // curriculum's modules/lessons in one deterministic global order
+  // (curriculum.display_order → module.order_index → lesson.order_index)
+  // and applies the exact same sequential-unlock rule loadCurriculum always
+  // used within a single curriculum (a lesson unlocks once the immediately
+  // preceding lesson in that order is submitted or completed; a module's
+  // "Discussion & Review" lesson, order_index >= 999, additionally requires
+  // every earlier lesson in that same module to be fully approved) — just
+  // extended in scope so "immediately preceding" can now cross a module or
+  // curriculum boundary. Nothing about the unlock rule itself is new.
+  const getKingdomSchoolLockState = useCallback(async (userId?: string): Promise<KingdomSchoolLockState> => {
+    const empty: KingdomSchoolLockState = {
+      lessonLocked: new Map(), moduleLocked: new Map(), curriculumLocked: new Map(), curriculumOrder: [],
+    };
+    try {
+      const { data: curriculumsRaw } = await supabase
+        .from("p2p_curriculums")
+        .select("id,display_order")
+        .eq("status", "published")
+        .neq("type", "plan")
+        .neq("type", "plan_category");
+      const curricula = ((curriculumsRaw ?? []) as Record<string, unknown>[])
+        .sort((a, b) => ((a.display_order as number) ?? 999) - ((b.display_order as number) ?? 999));
+      if (!curricula.length) return empty;
+      const curriculumIds = curricula.map((c) => c.id as string);
+
+      const { data: modulesRaw } = await supabase
+        .from("p2p_modules")
+        .select("id,curriculum_id,order_index")
+        .in("curriculum_id", curriculumIds);
+      const modulesByCurriculum = new Map<string, Record<string, unknown>[]>();
+      for (const m of (modulesRaw ?? []) as Record<string, unknown>[]) {
+        const cid = m.curriculum_id as string;
+        if (!modulesByCurriculum.has(cid)) modulesByCurriculum.set(cid, []);
+        modulesByCurriculum.get(cid)!.push(m);
+      }
+      for (const list of modulesByCurriculum.values()) {
+        list.sort((a, b) => (a.order_index as number) - (b.order_index as number));
+      }
+
+      const allModuleIds: string[] = [];
+      for (const cid of curriculumIds) for (const m of modulesByCurriculum.get(cid) ?? []) allModuleIds.push(m.id as string);
+
+      const lessonsRaw = allModuleIds.length
+        ? await selectInChunks<Record<string, unknown>>("p2p_lessons", "id,module_id,order_index", "module_id", allModuleIds)
+        : [];
+      const lessonsByModule = new Map<string, Record<string, unknown>[]>();
+      for (const l of lessonsRaw) {
+        const mid = l.module_id as string;
+        if (!lessonsByModule.has(mid)) lessonsByModule.set(mid, []);
+        lessonsByModule.get(mid)!.push(l);
+      }
+      for (const list of lessonsByModule.values()) {
+        list.sort((a, b) => (a.order_index as number) - (b.order_index as number));
+      }
+
+      const completedByLesson = new Map<string, boolean>();
+      const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
+      if (userId) {
+        const allLessonIds = lessonsRaw.map((l) => l.id as string);
+        const progressRows = await selectInChunks<Record<string, unknown>>(
+          "p2p_lesson_progress", "lesson_id,completed,status", "lesson_id", allLessonIds,
+          (q) => q.eq("user_id", userId)
+        );
+        for (const p of progressRows) {
+          completedByLesson.set(p.lesson_id as string, Boolean(p.completed));
+          statusByLesson.set(p.lesson_id as string, (p.status as "not_started" | "submitted" | "completed") ?? "not_started");
+        }
+      }
+
+      const lessonLocked = new Map<string, boolean>();
+      const moduleLocked = new Map<string, boolean>();
+      const curriculumLocked = new Map<string, boolean>();
+
+      let previousModuleComplete = true;
+      for (const cid of curriculumIds) {
+        const cModules = modulesByCurriculum.get(cid) ?? [];
+        let curriculumHadModule = false;
+        cModules.forEach((m) => {
+          curriculumHadModule = true;
+          const moduleId = m.id as string;
+          const mLessons = lessonsByModule.get(moduleId) ?? [];
+          const thisModuleLocked = !previousModuleComplete;
+          moduleLocked.set(moduleId, thisModuleLocked);
+          if (!curriculumLocked.has(cid)) curriculumLocked.set(cid, thisModuleLocked);
+
+          let prevPassedForUnlock = true;
+          let allPrevCompletedInModule = true;
+          let completedCount = 0;
+          mLessons.forEach((l, lessonIdx) => {
+            const lessonId = l.id as string;
+            const isCompleted = Boolean(completedByLesson.get(lessonId));
+            const status = statusByLesson.get(lessonId) ?? "not_started";
+            const isReviewLesson = (l.order_index as number) >= 999;
+            const isThisLocked = thisModuleLocked || (
+              lessonIdx === 0 ? false
+              : isReviewLesson ? !allPrevCompletedInModule
+              : !prevPassedForUnlock
+            );
+            lessonLocked.set(lessonId, isThisLocked);
+            prevPassedForUnlock = isCompleted || status === "submitted";
+            allPrevCompletedInModule = allPrevCompletedInModule && isCompleted;
+            if (isCompleted) completedCount++;
+          });
+          previousModuleComplete = mLessons.length > 0 && completedCount === mLessons.length;
+        });
+        if (!curriculumHadModule) curriculumLocked.set(cid, !previousModuleComplete);
+      }
+
+      return { lessonLocked, moduleLocked, curriculumLocked, curriculumOrder: curriculumIds };
+    } catch {
+      return empty;
+    }
+  }, []);
+
   const loadCurriculum = useCallback(async (userId?: string, languageCode?: string) => {
     try {
       const { data: allCurriculumsRaw } = await supabase
         .from("p2p_curriculums")
         .select("*")
         .eq("status", "published");
-      const curriculums = (allCurriculumsRaw ?? []).filter(
-        (c: Record<string, unknown>) => (c.type as string) !== "plan"
-      );
+      const curriculums = (allCurriculumsRaw ?? [])
+        .filter((c: Record<string, unknown>) => (c.type as string) !== "plan")
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+          ((a.display_order as number) ?? 999) - ((b.display_order as number) ?? 999));
       if (!curriculums || curriculums.length === 0) {
         setModules(FALLBACK_MODULES); setLessons([]); return;
       }
@@ -1792,15 +1932,50 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (!allModules || allModules.length === 0) {
         setModules(FALLBACK_MODULES); setLessons([]); return;
       }
-      const countsByCurriculum = new Map<string, number>();
-      for (const m of allModules as Record<string, unknown>[]) {
-        const cId = m.curriculum_id as string;
-        countsByCurriculum.set(cId, (countsByCurriculum.get(cId) ?? 0) + 1);
-      }
-      let activeCurriculumId = curriculumIds[0];
-      let bestCount = -1;
-      for (const [cId, count] of countsByCurriculum) {
-        if (count > bestCount) { bestCount = count; activeCurriculumId = cId; }
+      // "Active curriculum" used to be whichever one happened to have the
+      // most modules — a leftover of the pre-redesign single-curriculum era
+      // that made "The Christian Foundation" always win, silently ignoring
+      // "Peer-to-Peer Orientation" and "The Gospel & Salvation" entirely.
+      // Kingdom School's curricula now form ONE sequential progression
+      // (display_order), so "active" must mean "the first one this learner
+      // hasn't finished yet" — the same completed/submitted signal the
+      // sequential lock logic below already uses, just checked per
+      // curriculum first to decide which one's modules/lessons to load.
+      let activeCurriculumId = curriculumIds[curriculumIds.length - 1];
+      {
+        const allModuleIdsAllCurricula = (allModules as Record<string, unknown>[]).map((m) => m.id as string);
+        const allLessonsAllCurricula = allModuleIdsAllCurricula.length
+          ? await selectInChunks<Record<string, unknown>>(
+              "p2p_lessons", "id,module_id", "module_id", allModuleIdsAllCurricula
+            )
+          : [];
+        const moduleCurriculumById = new Map(
+          (allModules as Record<string, unknown>[]).map((m) => [m.id as string, m.curriculum_id as string])
+        );
+        const completedLessonIds = new Set<string>();
+        if (userId && allLessonsAllCurricula.length) {
+          const allLessonIdsAllCurricula = allLessonsAllCurricula.map((l) => l.id as string);
+          const progressRows = await selectInChunks<Record<string, unknown>>(
+            "p2p_lesson_progress", "lesson_id,completed", "lesson_id", allLessonIdsAllCurricula,
+            (q) => q.eq("user_id", userId)
+          );
+          for (const p of progressRows) if (p.completed) completedLessonIds.add(p.lesson_id as string);
+        }
+        const totalByCurriculum = new Map<string, number>();
+        const completedByCurriculum = new Map<string, number>();
+        for (const l of allLessonsAllCurricula) {
+          const cId = moduleCurriculumById.get(l.module_id as string);
+          if (!cId) continue;
+          totalByCurriculum.set(cId, (totalByCurriculum.get(cId) ?? 0) + 1);
+          if (completedLessonIds.has(l.id as string)) {
+            completedByCurriculum.set(cId, (completedByCurriculum.get(cId) ?? 0) + 1);
+          }
+        }
+        for (const cId of curriculumIds) {
+          const total = totalByCurriculum.get(cId) ?? 0;
+          const done = completedByCurriculum.get(cId) ?? 0;
+          if (total === 0 || done < total) { activeCurriculumId = cId; break; }
+        }
       }
       const activeModulesRaw = (allModules as Record<string, unknown>[])
         .filter((m) => (m.curriculum_id as string) === activeCurriculumId)
@@ -1983,7 +2158,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Kingdom School Plans, type='plan') with real counts computed from its
   // own rows. Deliberately independent of loadCurriculum's single-"active"-
   // curriculum state above.
-  const getCurriculumCatalog = useCallback(async (): Promise<CurriculumCatalogItem[]> => {
+  const getCurriculumCatalog = useCallback(async (userId?: string): Promise<CurriculumCatalogItem[]> => {
     try {
       const { data: curriculumsRaw } = await supabase
         .from("p2p_curriculums")
@@ -1993,6 +2168,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .neq("type", "plan_category");
       const curriculums = (curriculumsRaw ?? []) as Record<string, unknown>[];
       if (!curriculums.length) return [];
+
+      const lockState = await getKingdomSchoolLockState(userId);
 
       const curriculumIds = curriculums.map((c) => c.id as string);
       const { data: modulesRaw } = await supabase
@@ -2025,6 +2202,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             lessonCount: cLessons.length,
             estimatedMinutes: cLessons.reduce((sum, l) => sum + ((l.estimated_minutes as number) ?? 0), 0),
             displayOrder: (c.display_order as number) ?? 999,
+            isLocked: lockState.curriculumLocked.get(cId) ?? false,
           };
         })
         .sort((a, b) => a.displayOrder - b.displayOrder)
@@ -2064,6 +2242,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const moduleLessons = ((lessonsRaw ?? []) as Record<string, unknown>[])
         .sort((a, b) => (a.order_index as number) - (b.order_index as number));
 
+      // Whether this module itself is even reachable yet — depends on every
+      // earlier module/curriculum in Kingdom School's global sequence, not
+      // just lessons within this one module (see getKingdomSchoolLockState).
+      const lockState = await getKingdomSchoolLockState(userId);
+      const thisModuleLocked = lockState.moduleLocked.get(moduleId) ?? false;
+
       const progressByLesson = new Map<string, boolean>();
       const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
       const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
@@ -2094,7 +2278,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const module: Module = {
         id: moduleRow.id as string, curriculumId: (moduleRow.curriculum_id as string) ?? "",
         title: moduleRow.title as string, description: (moduleRow.description as string) ?? "",
-        level: 1, lessonCount, completedLessons, submittedLessons, isLocked: false,
+        level: 1, lessonCount, completedLessons, submittedLessons, isLocked: thisModuleLocked,
         imageUrl: (moduleRow.image_url as string) ?? undefined,
       };
 
@@ -2111,7 +2295,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             : lessonStatus === "submitted" ? "pending" : undefined;
         const passedForUnlock = isCompleted || lessonStatus === "submitted";
         const isReviewLesson = (l.order_index as number) >= 999;
-        const isThisLocked = lessonIdx === 0 ? false : isReviewLesson ? !allPrevCompleted : !prevPassedForUnlock;
+        const isThisLocked = thisModuleLocked || (
+          lessonIdx === 0 ? false : isReviewLesson ? !allPrevCompleted : !prevPassedForUnlock
+        );
         builtLessons.push({
           id: l.id as string, moduleId: moduleId,
           title: l.title as string, content: (l.subtitle as string) ?? "",
@@ -2168,12 +2354,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Whether each module is reachable yet under Kingdom School's global
+      // sequential progression (see getKingdomSchoolLockState) — this used
+      // to always be false, meaning any module in any category showed as
+      // open regardless of whether earlier categories/modules were done.
+      const lockState = await getKingdomSchoolLockState(userId);
+
       const modules: Module[] = modulesRows.map((m, idx) => {
         const mLessons = lessonRows.filter((l) => l.module_id === m.id);
         const completedLessons = mLessons.filter((l) => progressByLesson.get(l.id as string)).length;
         return {
           id: m.id as string, curriculumId, title: m.title as string, description: (m.description as string) ?? "",
-          level: idx + 1, lessonCount: mLessons.length, completedLessons, isLocked: false,
+          level: idx + 1, lessonCount: mLessons.length, completedLessons,
+          isLocked: lockState.moduleLocked.get(m.id as string) ?? false,
           imageUrl: (m.image_url as string) ?? undefined,
         };
       });
@@ -5437,7 +5630,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider value={{
-      modules, lessons, getCurriculumCatalog, loadModuleWithLessons, loadCurriculumDetail, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
+      modules, lessons, getCurriculumCatalog, loadModuleWithLessons, loadCurriculumDetail, getKingdomSchoolLockState, plans, featuredPlans, plansLoading, loadPlans, getPlanById, getPlanProgress,
       planCategories, loadPlanCategories, getCategoryPlans, searchPlans, getAllPlansAZ,
       prayers, sessions, forestNodes, forestStats, forestData, forestDataLoading, loadForestData,
       treeData, treeMentees, refreshTreeData, pendingCompletionMoment, dismissPendingCompletionMoment,

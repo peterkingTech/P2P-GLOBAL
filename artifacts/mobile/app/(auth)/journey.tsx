@@ -15,7 +15,6 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
@@ -50,7 +49,6 @@ export default function JourneyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, updateProfile, refreshProfile } = useAuth();
-  const { modules, lessons } = useData();
 
   const [step, setStep] = useState<Step>(1);
 
@@ -192,11 +190,6 @@ export default function JourneyScreen() {
     goNext();
   }
 
-  const module1 = modules.find((m) => m.level === 1) ?? modules[0] ?? null;
-  const module1FirstLesson = module1
-    ? [...lessons].filter((l) => l.moduleId === module1.id).sort((a, b) => a.order - b.order)[0] ?? null
-    : null;
-
   // Shared completion side-effects — marks onboarding done and notifies the
   // peer guide. Called from the normal step-5 path (non-leaders) and from
   // both step-6 buttons (ministry leaders), so it only runs once per user
@@ -233,11 +226,7 @@ export default function JourneyScreen() {
     } finally {
       setBeginning(false);
     }
-    if (module1FirstLesson) {
-      router.replace(`/lesson/${module1FirstLesson.id}` as any);
-    } else {
-      router.replace("/(tabs)/learn" as any);
-    }
+    router.replace("/(tabs)" as any);
   }
 
   async function handleRegisterChurchNow() {
@@ -507,11 +496,9 @@ export default function JourneyScreen() {
             <Text style={styles.subtitle}>Your journey begins now</Text>
 
             <View style={styles.moduleCard}>
-              <Text style={styles.moduleCardTitle}>
-                {module1 ? module1.title : "Module 1: Your New Identity in Christ"}
-              </Text>
+              <Text style={styles.moduleCardTitle}>Peer-to-Peer Orientation</Text>
               <Text style={styles.moduleCardDesc}>
-                {module1?.description || "Discover who you truly are in Christ. This is where everything begins."}
+                Kingdom School is ready for you, starting with Peer-to-Peer Orientation. Head to Home, then open Kingdom School whenever you're ready to begin.
               </Text>
             </View>
 
@@ -520,7 +507,7 @@ export default function JourneyScreen() {
             )}
 
             <TouchableOpacity style={styles.primaryBtn} onPress={handleStep5Continue} disabled={beginning}>
-              {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Begin Module 1</Text>}
+              {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Continue to Home</Text>}
             </TouchableOpacity>
 
             <Text style={styles.footerVerse}>Romans 15:7 — Accept one another, just as Christ accepted you.</Text>

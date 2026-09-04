@@ -411,6 +411,7 @@ export default function LessonScreen() {
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
     getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
     getHighlightsForLesson, addSectionHighlight, deleteHighlight,
+    getKingdomSchoolLockState,
   } = useData();
   const contentLanguage = authProfile?.contentLanguage ?? "en";
 
@@ -524,6 +525,29 @@ export default function LessonScreen() {
 
   const lessonMeta = lessons.find((l) => l.id === id);
   const completed = lessonMeta?.isCompleted ?? false;
+
+  // Kingdom School's sequential progression must hold even when this screen
+  // is reached directly (typed URL, deep link, stale bookmark, or simply
+  // because this lesson doesn't happen to be in the global "active
+  // curriculum" state lessonMeta above reads from) — not just when reached
+  // by tapping through an already-locked module list. This is the same
+  // cross-curriculum lock computation every Kingdom School screen uses (see
+  // getKingdomSchoolLockState), checked independently here so there is no
+  // path into a locked lesson's content or submission UI.
+  const [lockChecked, setLockChecked] = useState(false);
+  const [isLessonLocked, setIsLessonLocked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!id) return;
+      const state = await getKingdomSchoolLockState(user?.id);
+      if (!cancelled) {
+        setIsLessonLocked(state.lessonLocked.get(id) ?? false);
+        setLockChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, user?.id, getKingdomSchoolLockState]);
 
   // Load lesson content
   useEffect(() => {
@@ -681,6 +705,29 @@ export default function LessonScreen() {
     } finally {
       setStartingStudyWith(null);
     }
+  }
+
+  if (lockChecked && isLessonLocked) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerLabel}>{t("lesson.title")}</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 }}>
+          <Ionicons name="lock-closed" size={40} color={colors.textMuted} />
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center" }}>
+            This lesson is locked
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" }}>
+            {t("module.finishPrevious")}
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   return (
