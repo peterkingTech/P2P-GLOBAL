@@ -14,15 +14,21 @@ import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
+import { getTreeStage, getTreeStageProgress } from "@/constants/treeStages";
+import { readTreeEnvironment } from "@/lib/hemisphereSeason";
 import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VIDEO_STAGE_INDEX } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
-import LivingTree, { stageLabel } from "@/components/LivingTree";
+import LivingTree, { stageLabel, FruitInfo } from "@/components/LivingTree";
+import { EnvironmentSetting } from "@/components/tree/TreeEnvironment";
+import EnvironmentPicker from "@/components/tree/EnvironmentPicker";
+import FruitDetailCard from "@/components/tree/FruitDetailCard";
+import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -99,7 +105,7 @@ export default function LivingTreeScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const { isTablet } = useLayout();
   const { profile } = useAuth();
-  const { forestNodes, forestStats, isLoading, treeData } = useData();
+  const { forestNodes, forestStats, isLoading, treeData, treeMentees, fruitCatalog, userFruits, refreshTreeData } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
   const [tab, setTab] = useState<"tree" | "forest">(params.tab === "forest" ? "forest" : "tree");
   const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
@@ -108,6 +114,34 @@ export default function LivingTreeScreen() {
   const autoTriggeredRef = useRef(false);
   const heroVideoRef = useRef<Video>(null);
   const heroSeekedRef = useRef(false);
+
+  // ── My Tree redesign — real fruit data, environment, and the new
+  // granular 8-stage progression (separate from the growth_level-based
+  // stage/video block above, which is untouched). ──
+  const [selectedFruitKey, setSelectedFruitKey] = useState<string | null>(null);
+  const [showAccessibleSummary, setShowAccessibleSummary] = useState(false);
+  const [environmentOverride, setEnvironmentOverride] = useState<EnvironmentSetting | null>(null);
+
+  const fruitsForTree: FruitInfo[] = userFruits.map((f) => {
+    const entry = fruitCatalog.find((c) => c.fruitKey === f.fruitKey);
+    return { fruitKey: f.fruitKey, category: entry?.category ?? "personal_growth", awardedAt: f.awardedAt };
+  });
+  const selectedCatalogEntry = selectedFruitKey ? fruitCatalog.find((c) => c.fruitKey === selectedFruitKey) ?? null : null;
+  const selectedEarnedFruit = selectedFruitKey ? userFruits.find((f) => f.fruitKey === selectedFruitKey) ?? null : null;
+
+  const treeEnvironment = readTreeEnvironment({ latitude: profile?.latitude ?? null, countryCode: profile?.countryCode ?? null });
+  const environmentSetting: EnvironmentSetting =
+    environmentOverride ?? (treeData?.treeEnvironmentPreference as EnvironmentSetting | undefined) ?? "auto";
+  const newTreeStage = getTreeStage(treeData?.treeGrowthScore ?? 0);
+  const newTreeStageProgress = getTreeStageProgress(treeData?.treeGrowthScore ?? 0);
+
+  async function handleEnvironmentChange(setting: EnvironmentSetting) {
+    setEnvironmentOverride(setting);
+    if (!profile?.id) return;
+    // Purely cosmetic — never touches growth score, stage, or fruit.
+    await supabase.from("p2p_profiles").update({ tree_environment_preference: setting === "auto" ? null : setting }).eq("id", profile.id);
+    refreshTreeData();
+  }
 
   const growthPoints = profile?.growthLevel ?? 0;
   const stageIndex = getStageFromPoints(growthPoints);
@@ -268,6 +302,60 @@ export default function LivingTreeScreen() {
             session shared, and disciple invited. No shortcuts, just organic growth from a seed to a
             forest of nations.
           </Text>
+
+          {/* The interactive tree — real fruit, real growth, explorable */}
+          {treeData && (
+            <View style={styles.treeSceneCard}>
+              <Text style={styles.treeStageName}>{newTreeStage.name}</Text>
+              <Text style={styles.treeStageDesc}>{newTreeStage.description}</Text>
+              <View style={styles.treeStageProgressBg}>
+                <View style={[styles.treeStageProgressFill, { width: `${Math.round(newTreeStageProgress * 100)}%` }]} />
+              </View>
+
+              {!showAccessibleSummary ? (
+                <View style={styles.treeSceneWrap}>
+                  <LivingTree
+                    treeData={treeData}
+                    userId={profile?.id}
+                    mentees={treeMentees}
+                    fruits={fruitsForTree}
+                    onTapFruit={setSelectedFruitKey}
+                    season={treeEnvironment.season}
+                    weather={treeEnvironment.weather}
+                    environmentSetting={environmentSetting}
+                    reducedMotion={profile?.id ? undefined : true}
+                    interactive
+                  />
+                </View>
+              ) : (
+                <TreeAccessibleSummary stage={newTreeStage} earnedFruits={userFruits} fruitCatalog={fruitCatalog} />
+              )}
+
+              <TouchableOpacity
+                style={styles.accessibleToggle}
+                onPress={() => setShowAccessibleSummary((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={showAccessibleSummary ? "Show visual tree" : "Show list view"}
+              >
+                <Ionicons name={showAccessibleSummary ? "image-outline" : "list-outline"} size={14} color={colors.accentGreen} />
+                <Text style={styles.accessibleToggleText}>{showAccessibleSummary ? "Show visual tree" : "Show as list"}</Text>
+              </TouchableOpacity>
+
+              {!showAccessibleSummary && (
+                <View style={styles.environmentPickerWrap}>
+                  <Text style={styles.environmentPickerLabel}>Setting</Text>
+                  <EnvironmentPicker value={environmentSetting} onChange={handleEnvironmentChange} />
+                </View>
+              )}
+            </View>
+          )}
+
+          <FruitDetailCard
+            visible={!!selectedFruitKey}
+            catalogEntry={selectedCatalogEntry}
+            earnedFruit={selectedEarnedFruit}
+            onClose={() => setSelectedFruitKey(null)}
+          />
 
           {/* Vertical stat rows */}
           <View style={styles.statRowsCard}>
@@ -437,6 +525,20 @@ export default function LivingTreeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.lightCream },
   content: { paddingHorizontal: 20 },
+
+  treeSceneCard: {
+    backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.borderBeige,
+    padding: 16, alignItems: "center", marginBottom: 20,
+  },
+  treeStageName: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  treeStageDesc: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 2, marginBottom: 10 },
+  treeStageProgressBg: { width: "80%", height: 5, backgroundColor: colors.progressTrack, borderRadius: 3, overflow: "hidden", marginBottom: 12 },
+  treeStageProgressFill: { height: 5, backgroundColor: colors.accentGreen, borderRadius: 3 },
+  treeSceneWrap: { alignItems: "center", justifyContent: "center" },
+  accessibleToggle: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 12 },
+  accessibleToggleText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  environmentPickerWrap: { width: "100%", marginTop: 14 },
+  environmentPickerLabel: { fontSize: 11, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.4, marginBottom: 6, textTransform: "uppercase" },
 
   back: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, marginLeft: 20, marginBottom: 8, alignSelf: "flex-start" },
   backLabel: { fontSize: 15, color: colors.primaryGreen, fontFamily: "Inter_500Medium" },

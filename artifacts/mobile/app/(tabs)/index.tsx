@@ -701,7 +701,7 @@ export default function HomeTab() {
           />
         ) : treeData ? (
           <View style={styles.treePhotoFallback}>
-            <LivingTree treeData={treeData} compact />
+            <LivingTree treeData={treeData} userId={profile?.id} compact />
           </View>
         ) : (
           <ActivityIndicator color={colors.accentGreen} />

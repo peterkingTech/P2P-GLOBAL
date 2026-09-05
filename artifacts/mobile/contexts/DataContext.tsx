@@ -791,6 +791,11 @@ export interface TreeData {
   growthStage: GrowthStage;
   healthStatus: HealthStatus;
   daysInactive: number;
+  // My Tree redesign — a dedicated, granular score (migration 113/114),
+  // independent of growthStage above (which existing screens still read
+  // unchanged). Drives constants/treeStages.ts's 8-stage visual ladder.
+  treeGrowthScore: number;
+  treeEnvironmentPreference: string | null;
 }
 
 function computeGrowthStage(modulesCompleted: number, activeMentees: number, fruitCount: number, secondGenDisciples: number): GrowthStage {
@@ -844,6 +849,8 @@ function buildTreeData(raw: Record<string, unknown>): TreeData {
     growthStage: computeGrowthStage(modulesCompleted, activeMentees, fruitCount, secondGenDisciples),
     healthStatus: computeHealthStatus(daysInactive),
     daysInactive,
+    treeGrowthScore: (raw.treeGrowthScore as number) ?? 0,
+    treeEnvironmentPreference: (raw.treeEnvironmentPreference as string) ?? null,
   };
 }
 

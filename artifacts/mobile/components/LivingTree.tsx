@@ -1,16 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, Easing, Modal, TouchableOpacity } from "react-native";
-import Svg, { Circle, Ellipse, Path, Rect, G, Defs, RadialGradient, Stop } from "react-native-svg";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, AccessibilityInfo } from "react-native";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming,
+} from "react-native-reanimated";
+import Svg, { Circle, Ellipse, Path, Rect, G, Defs, RadialGradient, LinearGradient, Stop } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
-import type { TreeData, GrowthStage } from "@/contexts/DataContext";
+import type { TreeData, GrowthStage, MenteeBranchInfo } from "@/contexts/DataContext";
+import { getTreeStageIndex } from "@/constants/treeStages";
+import { useSmoothedGrowth } from "@/hooks/useSmoothedGrowth";
+import { generateTreeGeometry, placeFruits } from "@/lib/treeGeometry";
+import TreeEnvironment, { EnvironmentSetting } from "./tree/TreeEnvironment";
+import type { Season, Weather } from "@/lib/hemisphereSeason";
 import colors from "@/constants/colors";
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// Fruit category -> color, per Prompt 5. kingdom_influence isn't in the
-// original 6-color list but is a real 7th category in p2p_fruits_catalog
-// (migration 032) — given a color here too rather than silently rendering
-// fruit from that category uncolored.
+// Fruit category -> color, reused from the existing p2p_fruits_catalog
+// taxonomy (migration 032) — never a new/invented fruit type.
 const FRUIT_CATEGORY_COLOR: Record<string, string> = {
   personal_growth: "#F4A261",
   faithfulness: "#E9C46A",
@@ -20,14 +25,6 @@ const FRUIT_CATEGORY_COLOR: Record<string, string> = {
   legendary: "#FFD700",
   kingdom_influence: "#588157",
 };
-
-export interface MenteeBranchInfo {
-  id: string;
-  name: string;
-  currentModule: string | null;
-  daysAgo: number;
-  isWilting: boolean;
-}
 
 export interface FruitInfo {
   fruitKey: string;
@@ -41,6 +38,20 @@ interface LivingTreeProps {
   mentees?: MenteeBranchInfo[];
   fruits?: FruitInfo[];
   onTapFruit?: (fruitKey: string) => void;
+  /** Seeds the deterministic branch/root skeleton — pass the tree owner's
+   * own user id so the same user always gets the same tree shape. Falls
+   * back to a fixed seed if omitted (still deterministic, just not
+   * per-user-unique) so existing call sites that don't pass it yet don't
+   * break. */
+  userId?: string;
+  season?: Season;
+  weather?: Weather;
+  environmentSetting?: EnvironmentSetting;
+  reducedMotion?: boolean;
+  /** Full gesture/environment experience. Defaults to the opposite of
+   * `compact` so existing thumbnail embeds (Home card, profile mini) keep
+   * their current lightweight behavior unchanged. */
+  interactive?: boolean;
 }
 
 const VIEW_W = 300;
@@ -62,72 +73,120 @@ export function stageLabel(stage: GrowthStage): string {
   }
 }
 
-export default function LivingTree({ treeData, compact = false, mentees = [], fruits = [], onTapFruit }: LivingTreeProps) {
+// Per-stage visual "envelope" — the ceiling each continuous size parameter
+// can reach at that stage. The real, granular activity signals already on
+// TreeData (modules completed, active days, mentees) then determine how
+// *full* the current stage's tree looks within that ceiling, so the tree
+// reflects both "how far along the journey" (stage) and "how active lately"
+// (fullness) — never a single flat number driving everything.
+const STAGE_ENVELOPE = [
+  { trunkH: 0, trunkW: 0, canopy: 0, roots: 0 },      // Seed
+  { trunkH: 18, trunkW: 8, canopy: 0, roots: 3 },      // Root
+  { trunkH: 42, trunkW: 14, canopy: 26, roots: 5 },    // Sprout
+  { trunkH: 90, trunkW: 24, canopy: 50, roots: 7 },    // Young Tree
+  { trunkH: 130, trunkW: 32, canopy: 72, roots: 9 },   // Growing Tree
+  { trunkH: 160, trunkW: 40, canopy: 92, roots: 10 },  // Developing Tree
+  { trunkH: 185, trunkW: 48, canopy: 112, roots: 11 }, // Mature Tree
+  { trunkH: 205, trunkW: 56, canopy: 130, roots: 12 }, // Flourishing Tree
+];
+
+export default function LivingTree({
+  treeData, compact = false, mentees = [], fruits = [], onTapFruit,
+  userId, season = "spring", weather = "sunny", environmentSetting = "auto",
+  reducedMotion: reducedMotionProp, interactive,
+}: LivingTreeProps) {
+  const isInteractive = interactive ?? !compact;
   const [tooltip, setTooltip] = useState<{ title: string; lines: string[] } | null>(null);
+  const [osReducedMotion, setOsReducedMotion] = useState(false);
+  const [rootsFocused, setRootsFocused] = useState(false);
 
-  const swayAnim = useRef(new Animated.Value(0)).current;
-  const fruitPulse = useRef(new Animated.Value(1)).current;
-  const dormantGlow = useRef(new Animated.Value(0.3)).current;
+  React.useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled?.().then(setOsReducedMotion).catch(() => {});
+  }, []);
+  const reducedMotion = reducedMotionProp ?? osReducedMotion;
 
-  const isHealthySway = treeData.healthStatus === "healthy";
+  const displayedScore = useSmoothedGrowth(treeData.treeGrowthScore ?? 0);
+  const stageIndex = getTreeStageIndex(displayedScore);
+  const envelope = STAGE_ENVELOPE[stageIndex];
+
+  const activityFullness = clamp(
+    (clamp(treeData.trunkHeight, 0, 100) / 100) * 0.5 + (clamp(treeData.activeMentees + treeData.secondGenDisciples, 0, 12) / 12) * 0.5,
+    0.35, // never so thin it looks unhealthy at a stage the user has genuinely reached
+    1
+  );
+
+  const trunkHeightPx = 60 + envelope.trunkH * activityFullness;
+  const trunkWidthPx = 8 + envelope.trunkW * activityFullness;
+  const canopyRadius = 20 + envelope.canopy * activityFullness;
+  const rootCount = Math.round(clamp(treeData.rootDepth, 0, envelope.roots));
+  const branchCount = stageIndex <= 2 ? 0 : clamp(treeData.branchCount, stageIndex >= 3 ? 2 : 0, 8);
+  const trunkTopY = TRUNK_BASE_Y - trunkHeightPx;
+
+  const treeSeed = userId ?? "p2p-global-default-tree-seed";
+  const geometry = useMemo(
+    () => generateTreeGeometry({
+      userId: treeSeed, stageIndex, rootDepth: rootCount,
+      trunkHeightPx, trunkWidthPx, branchCount, canopyRadius,
+      cx: CX, trunkBaseY: TRUNK_BASE_Y, trunkTopY,
+    }),
+    [treeSeed, stageIndex, rootCount, Math.round(trunkHeightPx), Math.round(trunkWidthPx), branchCount, Math.round(canopyRadius)]
+  );
+
+  const fruitPlacements = useMemo(
+    () => placeFruits(fruits.map((f) => f.fruitKey), geometry.canopyTips),
+    [fruits, geometry.canopyTips]
+  );
+
+  // ── Gestures — rotate (pan) + zoom (pinch), whole-scene transforms. Not
+  // true 3D, but a real, working "explore the tree" interaction using
+  // already-installed, proven libraries (no WebGL). ──
+  const viewAngle = useSharedValue(0);
+  const zoomScale = useSharedValue(1);
+  const rootsFocusAnim = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .enabled(isInteractive && !compact)
+    .onChange((e) => {
+      "worklet";
+      viewAngle.value = clamp(viewAngle.value - e.changeX * 0.4, -55, 55);
+    })
+    .onEnd(() => {
+      "worklet";
+      viewAngle.value = withTiming(viewAngle.value * 0.6, { duration: 400 });
+    });
+
+  const pinchGesture = Gesture.Pinch()
+    .enabled(isInteractive && !compact)
+    .onChange((e) => {
+      "worklet";
+      zoomScale.value = clamp(zoomScale.value * e.scaleChange, 0.7, 1.8);
+    });
+
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  const sceneStyle = useAnimatedStyle(() => ({
+    transform: [
+      { perspective: 900 },
+      { rotateY: `${viewAngle.value}deg` },
+      { scale: zoomScale.value },
+      { translateY: rootsFocusAnim.value * 70 },
+    ],
+  }));
+
+  function resetView() {
+    viewAngle.value = withTiming(0, { duration: 400 });
+    zoomScale.value = withTiming(1, { duration: 400 });
+  }
+
+  function toggleRoots() {
+    const next = !rootsFocused;
+    setRootsFocused(next);
+    rootsFocusAnim.value = withTiming(next ? 1 : 0, { duration: 700 });
+  }
+
+  const activeToday = treeData.lastActiveAt ? new Date(treeData.lastActiveAt).toDateString() === new Date().toDateString() : false;
   const isDormant = treeData.healthStatus === "dormant";
   const isDrought = treeData.healthStatus === "drought";
-
-  useEffect(() => {
-    if (!isHealthySway) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(swayAnim, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(swayAnim, { toValue: -1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(swayAnim, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isHealthySway]);
-
-  useEffect(() => {
-    const hasNewFruit = fruits.some((f) => Date.now() - new Date(f.awardedAt).getTime() < 24 * 60 * 60 * 1000);
-    if (!hasNewFruit) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fruitPulse, { toValue: 1.2, duration: 300, useNativeDriver: true }),
-        Animated.timing(fruitPulse, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.delay(1200),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [fruits]);
-
-  useEffect(() => {
-    if (!isDormant) return;
-    // A once-per-day glow is meaningless client-side without a persisted
-    // timestamp to gate it against — this instead gives a slow, sparse pulse
-    // (long delay between pulses) that reads as "resting," not literally
-    // once every 24 real hours.
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(dormantGlow, { toValue: 0.8, duration: 2000, useNativeDriver: true }),
-        Animated.timing(dormantGlow, { toValue: 0.3, duration: 2000, useNativeDriver: true }),
-        Animated.delay(20000),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isDormant]);
-
-  const swayRotate = swayAnim.interpolate({ inputRange: [-1, 1], outputRange: ["-3deg", "3deg"] });
-
-  const rootDepth = clamp(treeData.rootDepth, 0, 12);
-  const trunkHeightPx = 80 + (clamp(treeData.trunkHeight, 0, 100) / 100) * 120; // 80-200
-  const trunkWidthPx = 20 + (clamp(treeData.trunkHeight, 0, 100) / 100) * 30; // 20-50
-  const branchCount = clamp(treeData.branchCount, 0, 8);
-  const canopyRadius = 40 + (clamp(treeData.canopySize, 0, 20) / 20) * 80; // 40-120, canopySize soft-capped at 20
-  const activeToday = treeData.lastActiveAt ? new Date(treeData.lastActiveAt).toDateString() === new Date().toDateString() : false;
-
-  const trunkTopY = TRUNK_BASE_Y - trunkHeightPx;
-  const canopyCenterY = trunkTopY - canopyRadius * 0.5;
 
   function handleTap(area: "roots" | "trunk" | "canopy" | number) {
     if (compact) return;
@@ -162,175 +221,162 @@ export default function LivingTree({ treeData, compact = false, mentees = [], fr
     }
   }
 
-  // ── Dormant state: only a resting seed in the soil ──
-  if (isDormant) {
-    return (
-      <View style={[styles.wrap, compact && styles.wrapCompact]}>
-        <Svg width={compact ? VIEW_W * 0.5 : VIEW_W} height={compact ? VIEW_H * 0.5 : VIEW_H} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
-          <Rect x={0} y={340} width={VIEW_W} height={60} fill="#3D2A16" />
-          <Defs>
-            <RadialGradient id="dormantSeedGlow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#8B6914" stopOpacity={0.9} />
-              <Stop offset="100%" stopColor="#8B6914" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <AnimatedCircle cx={CX} cy={355} r={30} fill="url(#dormantSeedGlow)" opacity={dormantGlow} />
-          <Ellipse cx={CX} cy={355} rx={12} ry={16} fill="#8B6914" />
-        </Svg>
-        {!compact && <Text style={styles.captionText}>Resting. Ready when you are.</Text>}
-      </View>
-    );
-  }
+  const w = compact ? VIEW_W * 0.5 : VIEW_W;
+  const h = compact ? VIEW_H * 0.5 : VIEW_H;
 
-  // ── Seed stage: tiny sprouting shoot ──
-  if (treeData.growthStage === "seed") {
-    return (
-      <Animated.View style={[styles.wrap, compact && styles.wrapCompact, { transform: [{ rotate: swayRotate }] }]}>
-        <Svg width={compact ? VIEW_W * 0.5 : VIEW_W} height={compact ? VIEW_H * 0.5 : VIEW_H} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
-          <Rect x={0} y={340} width={VIEW_W} height={60} fill="#3D2A16" />
-          <Path d={`M ${CX} 340 L ${CX - 6} 355 M ${CX} 340 L ${CX + 8} 358`} stroke="#8B6914" strokeWidth={3} />
-          <Rect x={CX - 5} y={300} width={10} height={40} rx={5} fill="#4A7C59" />
-          <Ellipse cx={CX - 10} cy={298} rx={12} ry={7} fill="#4A7C59" />
-          <Ellipse cx={CX + 10} cy={298} rx={12} ry={7} fill="#4A7C59" />
-        </Svg>
-        {!compact && <Text style={styles.captionText}>A seed has been planted.</Text>}
-      </Animated.View>
-    );
-  }
+  const soilGradientId = "soilGrad";
+  const barkGradientId = "barkGrad";
+  const canopyGradientId = "canopyGrad";
 
-  const roots = Array.from({ length: rootDepth }, (_, i) => {
-    const spread = (i - (rootDepth - 1) / 2) * 12;
-    const endX = CX + spread * 1.6;
-    return `M ${CX} ${TRUNK_BASE_Y} Q ${CX + spread * 0.5} ${TRUNK_BASE_Y + 15} ${endX} ${TRUNK_BASE_Y + 35}`;
-  });
+  const treeScene = (
+    <Svg width={w} height={h} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
+      <Defs>
+        <LinearGradient id={soilGradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#4A3319" />
+          <Stop offset="100%" stopColor="#2A1D0F" />
+        </LinearGradient>
+        <LinearGradient id={barkGradientId} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0%" stopColor="#4A3018" />
+          <Stop offset="50%" stopColor="#6B4A28" />
+          <Stop offset="100%" stopColor="#3D2914" />
+        </LinearGradient>
+        <RadialGradient id={canopyGradientId} cx="40%" cy="35%" r="65%">
+          <Stop offset="0%" stopColor={activeToday ? "#5A9468" : "#3D7A54"} />
+          <Stop offset="100%" stopColor={activeToday ? "#2D6A4F" : "#1F4E39"} />
+        </RadialGradient>
+        <RadialGradient id="rootGlow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor={activeToday ? "#FFD700" : "#8B6914"} stopOpacity={0.45} />
+          <Stop offset="100%" stopColor={activeToday ? "#FFD700" : "#8B6914"} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
 
-  const branches: { x1: number; y1: number; x2: number; y2: number; wilting: boolean; menteeIndex: number }[] = [];
-  for (let i = 0; i < branchCount; i++) {
-    const pairIndex = Math.floor(i / 2);
-    const side: "l" | "r" = i % 2 === 0 ? "l" : "r";
-    const heightFrac = 0.7 + pairIndex * 0.15;
-    const y1 = TRUNK_BASE_Y - trunkHeightPx * clamp(heightFrac, 0, 1);
-    const dir = side === "l" ? -1 : 1;
-    const wilting = i < treeData.wiltingMentees;
-    branches.push({
-      x1: CX, y1,
-      x2: CX + dir * 55, y2: y1 - (wilting ? 10 : 30),
-      wilting, menteeIndex: i,
-    });
-  }
+      {/* Soil */}
+      <Rect x={0} y={TRUNK_BASE_Y + 20} width={VIEW_W} height={VIEW_H - TRUNK_BASE_Y - 20} fill={`url(#${soilGradientId})`} />
+      <Ellipse cx={CX} cy={TRUNK_BASE_Y + 22} rx={VIEW_W * 0.42} ry={10} fill="#5C4426" opacity={0.5} />
 
-  const fruitPositions = fruits.slice(0, 8).map((f, i) => {
-    const angle = (i / Math.max(1, Math.min(fruits.length, 8))) * Math.PI * 2 - Math.PI / 2;
-    const r = canopyRadius * 0.75;
-    return { ...f, x: CX + Math.cos(angle) * r, y: canopyCenterY + Math.sin(angle) * r * 0.7 };
-  });
-
-  const droughtCrackPath = `M ${CX} ${trunkTopY + trunkHeightPx * 0.25} L ${CX - 2} ${trunkTopY + trunkHeightPx * 0.5} L ${CX + 2} ${trunkTopY + trunkHeightPx * 0.7} L ${CX - 1} ${trunkTopY + trunkHeightPx * 0.9}`;
-
-  return (
-    <View style={[styles.wrap, compact && styles.wrapCompact]}>
-      <Animated.View style={{ transform: [{ rotate: isHealthySway ? swayRotate : "0deg" }] }}>
-        <Svg width={compact ? VIEW_W * 0.5 : VIEW_W} height={compact ? VIEW_H * 0.5 : VIEW_H} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}>
-          <Defs>
-            <RadialGradient id="rootGlow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor={activeToday ? "#FFD700" : "#8B6914"} stopOpacity={0.5} />
-              <Stop offset="100%" stopColor={activeToday ? "#FFD700" : "#8B6914"} stopOpacity={0} />
-            </RadialGradient>
-            <RadialGradient id="trunkGlow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#F4A261" stopOpacity={0.35} />
-              <Stop offset="100%" stopColor="#F4A261" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-
-          {/* Soil */}
-          <Rect x={0} y={340} width={VIEW_W} height={60} fill="#3D2A16" />
-
+      {stageIndex === 0 ? (
+        // ── Seed stage — genuinely just a seed in soil, no plant at all. ──
+        <G>
+          <Ellipse cx={CX} cy={TRUNK_BASE_Y + 8} rx={11} ry={15} fill="#8B6914" />
+          <Ellipse cx={CX - 3} cy={TRUNK_BASE_Y + 4} rx={4} ry={6} fill="#A67D1E" opacity={0.6} />
+        </G>
+      ) : (
+        <>
           {/* Roots */}
           <G onPress={() => handleTap("roots")}>
             {activeToday && <Circle cx={CX} cy={TRUNK_BASE_Y + 15} r={45} fill="url(#rootGlow)" />}
-            {roots.map((d, i) => (
-              <Path key={i} d={d} stroke="#8B6914" strokeWidth={3} fill="none" strokeLinecap="round" />
+            {geometry.roots.map((d, i) => (
+              <Path key={i} d={d} stroke="#6B4A28" strokeWidth={stageIndex >= 5 ? 3.5 : 2.5} fill="none" strokeLinecap="round" />
             ))}
-            {/* Invisible wider hit-area so a thin root fan is still easy to tap */}
-            <Rect x={CX - 70} y={TRUNK_BASE_Y - 10} width={140} height={70} fill="transparent" />
+            <Rect x={CX - 80} y={TRUNK_BASE_Y - 10} width={160} height={70} fill="transparent" />
           </G>
 
-          {/* Trunk */}
-          <G onPress={() => handleTap("trunk")}>
-            {treeData.streakDays > 7 && <Circle cx={CX} cy={trunkTopY + trunkHeightPx / 2} r={trunkWidthPx + 20} fill="url(#trunkGlow)" />}
-            <Rect
-              x={CX - trunkWidthPx / 2} y={trunkTopY}
-              width={trunkWidthPx} height={trunkHeightPx}
-              rx={trunkWidthPx / 4}
-              fill="#5C3D1E"
-            />
-            {isDrought && (
-              <Path d={droughtCrackPath} stroke="#3D2009" strokeWidth={1.5} fill="none" />
-            )}
-          </G>
-
-          {/* Branches */}
-          {branches.map((b, i) => (
-            <G key={i} onPress={() => handleTap(b.menteeIndex)}>
-              <Path
-                d={`M ${b.x1} ${b.y1} Q ${(b.x1 + b.x2) / 2} ${(b.y1 + b.y2) / 2 + (b.wilting ? 15 : -10)} ${b.x2} ${b.y2}`}
-                stroke={b.wilting ? "#8B9467" : "#4A7C59"}
-                strokeWidth={8}
-                strokeLinecap="round"
-                fill="none"
-              />
-            </G>
-          ))}
-          {mentees.length > branchCount && (
-            <Ellipse cx={CX} cy={trunkTopY + trunkHeightPx * 0.6} rx={6} ry={4} fill="#3D2009" />
-          )}
-          {branchCount === 0 && (
-            <Path d={`M ${CX} ${trunkTopY} L ${CX} ${trunkTopY - 20}`} stroke="#5C3D1E" strokeWidth={trunkWidthPx * 0.5} strokeLinecap="round" />
-          )}
-
-          {/* Canopy */}
-          <G onPress={() => handleTap("canopy")}>
-            <Ellipse
-              cx={CX} cy={canopyCenterY}
-              rx={treeData.growthStage === "forest_builder" ? canopyRadius * 1.1 : canopyRadius}
-              ry={(treeData.growthStage === "forest_builder" ? canopyRadius * 1.1 : canopyRadius) * 0.75}
-              fill={activeToday ? "#4A7C59" : "#2D6A4F"}
-              opacity={0.9}
-            />
-            {Array.from({ length: 10 }, (_, i) => {
-              const a = (i / 10) * Math.PI * 2;
-              const r = canopyRadius * 0.6;
-              return (
-                <Ellipse
-                  key={i}
-                  cx={CX + Math.cos(a) * r}
-                  cy={canopyCenterY + Math.sin(a) * r * 0.75}
-                  rx={10} ry={6}
-                  fill="#3D8361"
-                  opacity={0.5}
+          {stageIndex === 1 ? (
+            // ── Root stage — a tiny emerging shoot above the developing roots. ──
+            <Path d={`M ${CX} ${TRUNK_BASE_Y} L ${CX} ${TRUNK_BASE_Y - 14}`} stroke="#4A7C59" strokeWidth={3} strokeLinecap="round" />
+          ) : (
+            <>
+              {/* Trunk — tapered, not a rectangle */}
+              <G onPress={() => handleTap("trunk")}>
+                <Path
+                  d={`M ${CX - trunkWidthPx / 2} ${TRUNK_BASE_Y} C ${CX - trunkWidthPx / 2.3} ${TRUNK_BASE_Y - trunkHeightPx * 0.5}, ${CX - trunkWidthPx / 3} ${trunkTopY + 10}, ${CX - trunkWidthPx / 4} ${trunkTopY} L ${CX + trunkWidthPx / 4} ${trunkTopY} C ${CX + trunkWidthPx / 3} ${trunkTopY + 10}, ${CX + trunkWidthPx / 2.3} ${TRUNK_BASE_Y - trunkHeightPx * 0.5}, ${CX + trunkWidthPx / 2} ${TRUNK_BASE_Y} Z`}
+                  fill={`url(#${barkGradientId})`}
                 />
-              );
-            })}
-          </G>
+                {isDrought && (
+                  <Path
+                    d={`M ${CX} ${trunkTopY + trunkHeightPx * 0.25} L ${CX - 2} ${trunkTopY + trunkHeightPx * 0.5} L ${CX + 2} ${trunkTopY + trunkHeightPx * 0.7}`}
+                    stroke="#2A1D0F" strokeWidth={1.2} fill="none"
+                  />
+                )}
+              </G>
 
-          {/* Fruit */}
-          {fruitPositions.map((f) => {
-            const isNew = Date.now() - new Date(f.awardedAt).getTime() < 24 * 60 * 60 * 1000;
-            const color = FRUIT_CATEGORY_COLOR[f.category] ?? "#F4A261";
-            return (
-              <AnimatedCircle
-                key={f.fruitKey}
-                cx={f.x} cy={f.y} r={8}
-                fill={color}
-                stroke="#fff" strokeWidth={1}
-                onPress={() => onTapFruit?.(f.fruitKey)}
-                transform={isNew ? [{ scale: fruitPulse }] : undefined}
-                origin={`${f.x}, ${f.y}`}
-              />
-            );
-          })}
-        </Svg>
-      </Animated.View>
+              {/* Branches — procedurally generated, natural asymmetry */}
+              {geometry.branches.map((b, i) => (
+                <Path
+                  key={i}
+                  d={b.path}
+                  stroke={b.generation === 0 ? "#5C3D1E" : "#4A7C59"}
+                  strokeWidth={b.thickness}
+                  strokeLinecap="round"
+                  fill="none"
+                  onPress={() => mentees[i] && handleTap(i)}
+                />
+              ))}
+
+              {/* Leaf clusters — many small irregular shapes, not one ellipse */}
+              <G onPress={() => handleTap("canopy")}>
+                {geometry.leafClusters.map((lc, i) => (
+                  <Ellipse
+                    key={i}
+                    cx={lc.cx} cy={lc.cy} rx={lc.rx} ry={lc.ry}
+                    fill={`url(#${canopyGradientId})`}
+                    opacity={lc.opacity}
+                    transform={`rotate(${lc.rotationDeg} ${lc.cx} ${lc.cy})`}
+                  />
+                ))}
+              </G>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Fruit — from the real earned catalog only, attached at real leaf-cluster locations */}
+      {stageIndex >= 3 && fruits.map((f) => {
+        const placement = fruitPlacements.get(f.fruitKey);
+        if (!placement) return null;
+        const daysSinceEarned = (Date.now() - new Date(f.awardedAt).getTime()) / (24 * 60 * 60 * 1000);
+        // Bud -> small -> mature over the fruit's first ~2 weeks, never
+        // popping into existence instantly.
+        const maturity = clamp(daysSinceEarned / 14, 0.15, 1);
+        const radius = 3 + maturity * 5;
+        const color = FRUIT_CATEGORY_COLOR[f.category] ?? "#F4A261";
+        // Fruit facing roughly toward the current view angle renders full
+        // strength; fruit facing away dims/shrinks slightly, as if partly
+        // behind the foliage — real discovery via rotation, no depth buffer.
+        const facingDelta = Math.abs(((placement.angleDeg % 360) + 360) % 360 - 180);
+        const frontness = clamp(1 - facingDelta / 180, 0.35, 1);
+        return (
+          <Circle
+            key={f.fruitKey}
+            cx={placement.x} cy={placement.y} r={radius}
+            fill={color}
+            stroke="#fff" strokeWidth={0.75}
+            opacity={0.5 + frontness * 0.5}
+            onPress={() => onTapFruit?.(f.fruitKey)}
+          />
+        );
+      })}
+    </Svg>
+  );
+
+  return (
+    <View style={[styles.wrap, compact && styles.wrapCompact, !compact && { width: VIEW_W, height: VIEW_H }]}>
+      {!compact && (
+        <TreeEnvironment width={VIEW_W} height={VIEW_H} season={season} weather={weather} setting={environmentSetting} reducedMotion={reducedMotion} />
+      )}
+
+      {isInteractive && !compact ? (
+        <GestureDetector gesture={composedGesture}>
+          <Animated.View style={reducedMotion ? undefined : sceneStyle}>{treeScene}</Animated.View>
+        </GestureDetector>
+      ) : (
+        treeScene
+      )}
+
+      {!compact && isInteractive && (
+        <View style={styles.controlsRow}>
+          <TouchableOpacity style={styles.controlBtn} onPress={toggleRoots} accessibilityRole="button" accessibilityLabel={rootsFocused ? "View canopy" : "View roots"}>
+            <Ionicons name={rootsFocused ? "leaf-outline" : "git-branch-outline"} size={16} color={colors.textDark} />
+            <Text style={styles.controlBtnText}>{rootsFocused ? "View Canopy" : "View Roots"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.controlBtn} onPress={resetView} accessibilityRole="button" accessibilityLabel="Reset view">
+            <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
+            <Text style={styles.controlBtnText}>Reset View</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isDormant && !compact && <Text style={styles.captionText}>Resting. Ready when you are.</Text>}
 
       {treeData.fruitCount > 0 && (
         <View style={styles.fruitBadge}>
@@ -354,7 +400,7 @@ export default function LivingTree({ treeData, compact = false, mentees = [], fr
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: "center", justifyContent: "center", position: "relative" },
+  wrap: { alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", borderRadius: 20 },
   wrapCompact: {},
   captionText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic", marginTop: 8, textAlign: "center" },
   fruitBadge: {
@@ -363,6 +409,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.amber, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3,
   },
   fruitBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  controlsRow: { position: "absolute", bottom: 8, flexDirection: "row", gap: 8 },
+  controlBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(255,255,255,0.85)", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  controlBtnText: { fontSize: 11, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   tooltipOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 30 },
   tooltipCard: { backgroundColor: colors.card, borderRadius: 16, padding: 20, width: "100%", maxWidth: 320, gap: 6 },
   tooltipTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },

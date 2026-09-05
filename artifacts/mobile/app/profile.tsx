@@ -399,7 +399,7 @@ export default function ProfileScreen() {
             viewer's). */}
         {treeData && (
           <View style={styles.treeMiniCard}>
-            <LivingTree treeData={treeData} compact />
+            <LivingTree treeData={treeData} userId={profile?.id} compact />
             <Text style={styles.treeMiniLabel}>{stageLabel(treeData.growthStage)}</Text>
           </View>
         )}
