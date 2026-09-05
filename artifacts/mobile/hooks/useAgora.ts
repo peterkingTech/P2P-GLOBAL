@@ -31,7 +31,18 @@ export function useAgora() {
   // channels (Study Together C1's group-calling authorization) — Peer
   // Circle/Break Room callers (group.tsx, room.tsx) don't need to pass it
   // and are completely unaffected.
-  const getToken = useCallback(async (channelName: string, uid: number, userId?: string): Promise<string> => {
+  // CALL DEBUG fix — previously returned only `data.token`, silently
+  // discarding the server's own `appId` (and `expiresAt`). The engine was
+  // then always initialized with the CLIENT's own EXPO_PUBLIC_AGORA_APP_ID
+  // env constant, with nothing to detect or recover from it ever diverging
+  // from whatever Agora project the server actually signed the token for
+  // (e.g. eas.json's baked-in literal going stale relative to the API
+  // server's real environment variable) — Agora reports that exact
+  // mismatch as onConnectionStateChanged(..., ConnectionStateFailed,
+  // ConnectionChangedInvalidAppId), so the fix is to always initialize the
+  // engine with the server-authoritative appId the token was minted for,
+  // never a locally-guessed one.
+  const getToken = useCallback(async (channelName: string, uid: number, userId?: string): Promise<{ token: string; appId: string; expiresAt: number }> => {
     const apiUrl = getApiUrl();
     const response = await fetch(`${apiUrl}/calls/token`, {
       method: "POST",
@@ -40,12 +51,12 @@ export function useAgora() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Failed to get token");
-    return data.token as string;
+    return { token: data.token as string, appId: (data.appId as string) || APP_ID, expiresAt: data.expiresAt as number };
   }, []);
 
   const startCall = useCallback(async (channelName: string, uid: number) => {
-    const token = await getToken(channelName, uid);
-    setConfig({ channelName, token, uid, appId: APP_ID });
+    const { token, appId } = await getToken(channelName, uid);
+    setConfig({ channelName, token, uid, appId });
     setIsInCall(true);
   }, [getToken]);
 

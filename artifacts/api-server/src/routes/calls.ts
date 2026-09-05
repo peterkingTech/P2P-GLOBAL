@@ -164,7 +164,13 @@ router.post("/calls/token", async (req, res) => {
     );
 
     return ok(res, { token, channelName, uid, appId: APP_ID, expiresAt: expirationTime });
-  } catch {
+  } catch (e) {
+    // CALL DEBUG forensic fix — this previously swallowed the real error
+    // entirely (not even a server log), so a genuine failure here (e.g. a
+    // Supabase read inside getActivePeerCallLog throwing) was invisible in
+    // production logs and indistinguishable from a client bug. Never logs
+    // the token/certificate/channel — only what stage failed.
+    console.error("[CALL ERROR] stage=token_generation", e instanceof Error ? e.message : String(e));
     return err(res, "Failed to generate token", 500);
   }
 });

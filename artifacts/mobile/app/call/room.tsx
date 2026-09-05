@@ -49,6 +49,7 @@ export default function BreakRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [joined, setJoined] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [tokenAppId, setTokenAppId] = useState<string | undefined>(undefined);
   // CALL DEBUG fix — same fix as audio.tsx/video.tsx: useRef froze this at
   // whatever profile.id was on the first render, permanently, even after
   // profile loaded later. useMemo recomputes reactively instead.
@@ -113,8 +114,9 @@ export default function BreakRoomScreen() {
         return;
       }
       const { channelName } = await res.json();
-      const t = await getToken(channelName, myUid, profile.id);
+      const { token: t, appId } = await getToken(channelName, myUid, profile.id);
       setToken(t);
+      setTokenAppId(appId);
       setJoined(true);
     } catch {
       showAlert("Couldn't join room", "Please try again.");
@@ -205,6 +207,7 @@ export default function BreakRoomScreen() {
     token,
     uid: myUid,
     enableVideo: false,
+    appId: tokenAppId,
     eventHandler: {
       onAudioVolumeIndication: (_c, speakers) => {
         setSpeakingUids(new Set((speakers ?? []).filter((s) => (s.volume ?? 0) > 40).map((s) => s.uid ?? 0)));

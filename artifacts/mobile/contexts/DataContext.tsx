@@ -3030,31 +3030,71 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!profile?.id) return;
     const userId = profile.id;
+    const seenCallIds = new Set<string>();
+
+    async function applyIncomingCallRow(row: Record<string, unknown>, source: "realtime" | "fallback") {
+      if (row.status !== "ringing") return;
+      const callId = row.id as string;
+      if (seenCallIds.has(callId)) return; // realtime + fallback both firing for the same row
+      seenCallIds.add(callId);
+      console.log("CALL DEBUG incoming: applying ringing call", { callId, source });
+
+      const { data: callerProfile } = await supabase
+        .from("p2p_profiles").select("full_name").eq("id", row.caller_id as string).maybeSingle();
+
+      setIncomingCall({
+        callId,
+        channelName: row.channel_name as string,
+        callType: row.call_type as CallType,
+        callerId: row.caller_id as string,
+        callerName: (callerProfile?.full_name as string) ?? "Someone",
+        conversationId: (row.conversation_id as string) ?? null,
+        callLogId: (row.call_log_id as string) ?? null,
+        invitationId: (row.invitation_id as string) ?? null,
+      });
+    }
+
+    // CALL DEBUG forensic fix — missed-realtime-event protection (a
+    // confirmed gap, not hypothetical): this subscription only starts once
+    // profile.id has loaded (a real window on cold start/relaunch), never
+    // waits for the channel to actually reach "SUBSCRIBED" before
+    // considering itself live, and has no way to recover an INSERT that
+    // landed in that gap or during a dropped/reconnecting socket — the
+    // recipient's device would simply never ring, with the caller's only
+    // symptom being the 40s "no answer" timeout looking identical to a
+    // real non-answer. Once the channel actually reports SUBSCRIBED, do
+    // one fallback read for any still-ringing call this user is the
+    // recipient of. Bounded to the last RING_TIMEOUT_MS-equivalent window
+    // (30s, matching incoming.tsx's own ring timeout) so a long-abandoned
+    // "ringing" row from an app that was killed mid-call can never be
+    // resurrected as a fresh incoming call.
+    console.log("CALL DEBUG incoming: subscribing", { userId });
     const channel = supabase
       .channel(`p2p_incoming_calls_${userId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "p2p_incoming_calls", filter: `recipient_id=eq.${userId}` },
-        async (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          if (row.status !== "ringing") return;
-
-          const { data: callerProfile } = await supabase
-            .from("p2p_profiles").select("full_name").eq("id", row.caller_id as string).maybeSingle();
-
-          setIncomingCall({
-            callId: row.id as string,
-            channelName: row.channel_name as string,
-            callType: row.call_type as CallType,
-            callerId: row.caller_id as string,
-            callerName: (callerProfile?.full_name as string) ?? "Someone",
-            conversationId: (row.conversation_id as string) ?? null,
-            callLogId: (row.call_log_id as string) ?? null,
-            invitationId: (row.invitation_id as string) ?? null,
-          });
-        }
+        (payload) => { void applyIncomingCallRow(payload.new as Record<string, unknown>, "realtime"); }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("CALL DEBUG incoming: subscription status", { userId, status });
+        if (status !== "SUBSCRIBED") return;
+        (async () => {
+          const { data: recentRinging, error } = await supabase
+            .from("p2p_incoming_calls")
+            .select("*")
+            .eq("recipient_id", userId)
+            .eq("status", "ringing")
+            .order("created_at", { ascending: false })
+            .limit(3);
+          console.log("CALL DEBUG incoming: fallback query result", { userId, count: recentRinging?.length ?? 0, error: error?.message });
+          const cutoff = Date.now() - 30000;
+          for (const row of (recentRinging ?? []) as Record<string, unknown>[]) {
+            const createdAt = row.created_at ? new Date(row.created_at as string).getTime() : 0;
+            if (createdAt >= cutoff) void applyIncomingCallRow(row, "fallback");
+          }
+        })();
+      });
     return () => { supabase.removeChannel(channel); };
   }, [profile?.id]);
 

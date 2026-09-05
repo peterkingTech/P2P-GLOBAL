@@ -14,6 +14,7 @@ interface UseAgoraEngineOptions {
   uid: number | null;
   enableVideo: boolean;
   eventHandler: IRtcEngineEventHandler;
+  appId?: string;
 }
 
 export function useAgoraEngine(_options: UseAgoraEngineOptions) {

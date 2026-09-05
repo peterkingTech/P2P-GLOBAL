@@ -40,6 +40,7 @@ export default function GroupCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
+  const [tokenAppId, setTokenAppId] = useState<string | undefined>(undefined);
   // CALL DEBUG fix — same fix as audio.tsx/video.tsx: useRef froze this at
   // whatever profile.id was on the first render, permanently, even after
   // profile loaded later. useMemo recomputes reactively instead.
@@ -101,8 +102,8 @@ export default function GroupCallScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile.id);
-        if (!cancelled) setToken(t);
+        const { token: t, appId } = await getToken(params.channelName, myUid, profile.id);
+        if (!cancelled) { setToken(t); setTokenAppId(appId); }
       } catch (e: any) {
         showAlert("Couldn't join", e.message ?? "Please try again.");
       }
@@ -207,6 +208,7 @@ export default function GroupCallScreen() {
     token,
     uid: myUid,
     enableVideo: true,
+    appId: tokenAppId,
     eventHandler: {
       onUserJoined: (_c, uid) => setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid])),
       onUserOffline: (_c, uid) => setRemoteUids((prev) => prev.filter((u) => u !== uid)),

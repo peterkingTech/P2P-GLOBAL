@@ -52,6 +52,31 @@ const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
 // the caller would otherwise wait indefinitely.
 const NO_ANSWER_TIMEOUT_MS = 40000;
 
+// CALL DEBUG forensic fix — two gaps the prior audit missed:
+//   1. Nothing timed out "joining_channel" itself. If Agora's joinChannel()
+//      call never reaches onJoinChannelSuccess (silent SDK-level stall —
+//      no onError, no state change), the UI sat there forever. This bounds
+//      that specific step for BOTH caller and recipient.
+//   2. NO_ANSWER_TIMEOUT_MS above only ever applied to the caller
+//      (isInitiator-gated). A recipient who taps Accept and then has their
+//      OWN joinChannel/onUserJoined sequence stall had — and until this
+//      fix, still has — literally zero timeout of any kind. This bounds
+//      "waiting_for_peer" for whichever party doesn't already have a
+//      timer covering it.
+const JOIN_CHANNEL_TIMEOUT_MS = 15000;
+const PEER_WAIT_TIMEOUT_MS = 45000;
+
+// react-native-agora's ConnectionStateType.ConnectionStateFailed (=5). Not
+// imported as a value from "react-native-agora" here on purpose — that
+// package statically pulls in native-only RN internals
+// (codegenNativeComponent) that break Metro's web bundle the instant any
+// file importing it is reachable from a route (see useAgoraEngine.native.ts
+// / .web.ts's platform split, which exists specifically to keep the real
+// package out of the web bundle). The numeric value itself is stable/
+// documented Agora SDK API, confirmed against node_modules/react-native-agora's
+// own type definitions.
+const AGORA_CONNECTION_STATE_FAILED = 5;
+
 export default function AudioCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -66,6 +91,10 @@ export default function AudioCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
+  // CALL DEBUG fix — the appId the token was actually minted for, always
+  // used to initialize the engine instead of the client's own local env
+  // constant (see useAgoraEngine.native.ts).
+  const [tokenAppId, setTokenAppId] = useState<string | undefined>(undefined);
   // CALL DEBUG fix — this was previously `useRef(profile?.id ? uidFromUserId(profile.id) : 1).current`,
   // which freezes on the FIRST render only. If profile hadn't loaded yet at
   // that exact moment (a real race on a cold start / fast navigation into a
@@ -91,12 +120,19 @@ export default function AudioCallScreen() {
   // "connected" | "ended", where "ringing" ambiguously meant "Calling…" for
   // BOTH the caller and, after answering, the recipient too). Now:
   //   requesting_token -> joining_channel -> waiting_for_peer -> connected -> ended
+  //                                                            \-> failed
   // "waiting_for_peer" is the only state where the UI's label differs by
   // role (isInitiator shows "Calling…", the recipient shows "Connecting…")
   // — see the render below. Nothing here is set to "connected" except the
   // real onUserJoined callback from Agora itself (never a UI shortcut).
+  // "failed" is distinct from "ended": it means Agora itself reported the
+  // connection could never be established (onConnectionStateChanged ->
+  // ConnectionStateFailed) or a join-step timeout elapsed — as opposed to
+  // "ended", which means the call genuinely connected or was deliberately
+  // stopped (hangup/decline/cancel). Both still funnel through the same
+  // handleEndCall for cleanup/reporting/navigation (see below).
   const [callState, setCallState] = useState<
-    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "ended"
+    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended"
   >("requesting_token");
   const endedRef = useRef(false);
 
@@ -157,6 +193,11 @@ export default function AudioCallScreen() {
     study.startStudy({ id: params.autoStudyLessonId, moduleId: params.autoStudyModuleId, title: params.autoStudyLessonTitle ?? "" });
   }
   const connectedAtRef = useRef<number | null>(null);
+  // CALL DEBUG forensic fix — set immediately before transitioning to
+  // "failed" at every failure site, read once by the dedicated "failed"
+  // handling effect below. A ref (not state) since it only needs to be
+  // read once, synchronously, when that effect runs.
+  const failureMessageRef = useRef<string>("Unable to connect. Please try again.");
 
   // CALL DEBUG fix — gated on myUid (derived from profile?.id) actually
   // existing. Previously this ran unconditionally on mount with whatever
@@ -176,19 +217,37 @@ export default function AudioCallScreen() {
     });
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile.id);
+        const { token: t, appId } = await getToken(params.channelName, myUid, profile.id);
         console.log("CALL DEBUG audio: token acquired", { channelName: params.channelName, uid: myUid });
-        if (!cancelled) { setToken(t); setCallState((s) => (s === "requesting_token" ? "joining_channel" : s)); }
+        if (!cancelled) {
+          setToken(t);
+          setTokenAppId(appId);
+          setCallState((s) => (s === "requesting_token" ? "joining_channel" : s));
+        }
       } catch (e) {
         console.warn("CALL DEBUG audio: token request FAILED", { channelName: params.channelName, uid: myUid, error: e instanceof Error ? e.message : String(e) });
-        if (!cancelled) setCallState("ended");
+        // CALL DEBUG forensic fix — previously went straight to "ended" with
+        // no alert and no /calls/end report, leaving a dead-end "Call ended"
+        // screen with no way forward except the OS back gesture. "failed"
+        // routes through the same handleEndCall as every other failure path
+        // (see the dedicated effect below) — reports connected=false,
+        // navigates back, and tells the user what happened.
+        if (!cancelled) { failureMessageRef.current = "Couldn't connect this call. Please try again."; setCallState("failed"); }
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.channelName, myUid, profile?.id]);
 
-  const handleEndCall = useCallback(async () => {
+  // CALL DEBUG forensic fix — handleEndCall now takes an optional reason so
+  // a genuine connection failure can still report accurately to /calls/end
+  // (connected is always derived from connectedAtRef, never guessed) while
+  // also surfacing a real, honest message to the user instead of silently
+  // vanishing into "Call ended". Every failure source in this file
+  // (token-fetch failure, join-channel timeout, peer-wait timeout, Agora's
+  // own ConnectionStateFailed) sets failureMessageRef and calls this with
+  // reason="failed" rather than inventing its own cleanup path.
+  const handleEndCall = useCallback(async (reason: "user" | "failed" = "user") => {
     if (endedRef.current) return;
     endedRef.current = true;
     setCallState("ended");
@@ -217,8 +276,19 @@ export default function AudioCallScreen() {
       } catch { /* the call is ending either way; a lost summary message isn't worth blocking on */ }
     }
 
-    if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)/messages" as any);
+    function navigateBack() {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tabs)/messages" as any);
+    }
+    // A connection failure (never connected) is surfaced to the user with a
+    // real reason before navigating away — a deliberate hangup needs no
+    // such dialog. Alert.alert doesn't block, so navigation runs from its
+    // onDismiss, matching the existing NO_ANSWER_TIMEOUT_MS pattern below.
+    if (reason === "failed" && !wasConnected) {
+      showAlert("Call failed", failureMessageRef.current, navigateBack);
+    } else {
+      navigateBack();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.callLogId, params.callId, params.conversationId, callType]);
 
@@ -227,6 +297,7 @@ export default function AudioCallScreen() {
     token,
     uid: myUid,
     enableVideo: false,
+    appId: tokenAppId,
     eventHandler: {
       // CALL DEBUG fix — this device successfully joined the Agora channel.
       // This is NOT "connected" (see section 5 of the audit): it only means
@@ -240,8 +311,19 @@ export default function AudioCallScreen() {
         console.log("CALL DEBUG audio: onJoinChannelSuccess", { channelName: connection.channelId, uid: connection.localUid });
         setCallState((s) => (s === "connected" ? s : "waiting_for_peer"));
       },
+      // CALL DEBUG forensic fix — this was pure logging. Agora's own
+      // ConnectionStateFailed is the SDK's authoritative "this can never
+      // connect" signal (fired for, among other things, an App ID/token/
+      // channel mismatch — see ConnectionChangedReasonType's
+      // InvalidAppId/InvalidToken/InvalidChannelName/BannedByServer/
+      // JoinFailed values) — previously nothing here ever left "Connecting…"
+      // when the SDK itself already knew the join had permanently failed.
       onConnectionStateChanged: (connection, state, reason) => {
         console.log("CALL DEBUG audio: onConnectionStateChanged", { channelName: connection.channelId, state, reason });
+        if (state === AGORA_CONNECTION_STATE_FAILED) {
+          failureMessageRef.current = "The call connection failed. Please try again.";
+          setCallState((s) => (s === "ended" ? s : "failed"));
+        }
       },
       onError: (err, msg) => {
         console.warn("CALL DEBUG audio: onError", { err, msg });
@@ -340,6 +422,42 @@ export default function AudioCallScreen() {
     return () => clearTimeout(timer);
   }, [isInitiator, connected, handleEndCall, otherName]);
 
+  // CALL DEBUG forensic fix — bounds the "joining_channel" step itself
+  // (waiting on Agora's onJoinChannelSuccess) for BOTH caller and
+  // recipient. Previously nothing did: a silent SDK-level stall (no
+  // onError, no onConnectionStateChanged — a genuine possibility, not just
+  // a hypothetical) left the UI on "Connecting…"/"Calling…" forever.
+  useEffect(() => {
+    if (callState !== "joining_channel") return;
+    const timer = setTimeout(() => {
+      failureMessageRef.current = "Couldn't connect this call. Please check your connection and try again.";
+      setCallState((s) => (s === "joining_channel" ? "failed" : s));
+    }, JOIN_CHANNEL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [callState]);
+
+  // CALL DEBUG forensic fix — the recipient side of the exact gap the
+  // forensic audit confirmed: NO_ANSWER_TIMEOUT_MS above only ever applied
+  // to the caller. A recipient who tapped Accept and then had their own
+  // join/onUserJoined sequence stall had zero timeout of any kind. This
+  // does not touch the caller's existing 40s behavior at all.
+  useEffect(() => {
+    if (isInitiator || callState !== "waiting_for_peer") return;
+    const timer = setTimeout(() => {
+      failureMessageRef.current = "Unable to reach the other person. Please try again.";
+      setCallState((s) => (s === "waiting_for_peer" ? "failed" : s));
+    }, PEER_WAIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isInitiator, callState]);
+
+  // CALL DEBUG forensic fix — the single place "failed" actually resolves:
+  // reports connected=false to /calls/end, shows the real reason, and
+  // navigates away — the same cleanup every other end-of-call path uses,
+  // so there is no separate/duplicate ending logic to keep in sync.
+  useEffect(() => {
+    if (callState === "failed") handleEndCall("failed");
+  }, [callState, handleEndCall]);
+
   function toggleMute() {
     const next = !muted;
     setMuted(next);
@@ -367,7 +485,7 @@ export default function AudioCallScreen() {
       <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleSpeaker}>
         <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={16} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={handleEndCall}>
+      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={() => handleEndCall()}>
         <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
       </TouchableOpacity>
     </View>
@@ -500,7 +618,7 @@ export default function AudioCallScreen() {
             <Text style={styles.controlLabel}>Add</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleEndCall}>
+        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={() => handleEndCall()}>
           <Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
           <Text style={styles.controlLabel}>End</Text>
         </TouchableOpacity>

@@ -7,7 +7,14 @@ import {
   type IRtcEngineEventHandler,
 } from "react-native-agora";
 
-const APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID || "";
+// CALL DEBUG fix — this local env constant is now only a fallback. The
+// authoritative value is whatever appId the token-minting server actually
+// echoed back for this specific token (see useAgora.ts's getToken) — using
+// anything else risks a silent App ID mismatch between what the token was
+// signed for and what the engine joins with, which Agora reports via
+// onConnectionStateChanged (ConnectionStateFailed / ConnectionChangedInvalidAppId)
+// rather than a JS exception, so it must not be possible to construct at all.
+const FALLBACK_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID || "";
 
 // Shared engine lifecycle for every call screen (audio/video/group/room) —
 // they differ only in enableVideo and their own event callbacks, so this
@@ -29,18 +36,22 @@ interface UseAgoraEngineOptions {
   uid: number | null;
   enableVideo: boolean;
   eventHandler: IRtcEngineEventHandler;
+  /** The appId the token was actually minted for (see useAgora.ts's
+   * getToken) — always preferred over the local env fallback. */
+  appId?: string;
 }
 
-export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler }: UseAgoraEngineOptions) {
+export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId }: UseAgoraEngineOptions) {
   const engineRef = useRef<IRtcEngine | null>(null);
 
   useEffect(() => {
     if (!token || !channelName || uid === null) return;
 
-    console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo });
+    const resolvedAppId = appId || FALLBACK_APP_ID;
+    console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo, usingServerAppId: !!appId });
     const engine = createAgoraRtcEngine();
     engineRef.current = engine;
-    engine.initialize({ appId: APP_ID, channelProfile: ChannelProfileType.ChannelProfileCommunication });
+    engine.initialize({ appId: resolvedAppId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
     engine.registerEventHandler(eventHandler);
 
     if (enableVideo) engine.enableVideo();
@@ -73,7 +84,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       if (engineRef.current === engine) engineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelName, token, uid, enableVideo]);
+  }, [channelName, token, uid, enableVideo, appId]);
 
   return engineRef;
 }

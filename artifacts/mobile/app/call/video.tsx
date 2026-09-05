@@ -49,6 +49,18 @@ function formatClock(totalSeconds: number): string {
 // the caller would otherwise wait indefinitely.
 const NO_ANSWER_TIMEOUT_MS = 40000;
 
+// CALL DEBUG forensic fix — see audio.tsx's identical comment: bounds the
+// "joining_channel" step itself (both roles) and the recipient's side of
+// "waiting_for_peer" (previously unbounded — the 40s timer above only ever
+// applied to the caller).
+const JOIN_CHANNEL_TIMEOUT_MS = 15000;
+const PEER_WAIT_TIMEOUT_MS = 45000;
+
+// See audio.tsx's identical constant for why this isn't imported as a value
+// from "react-native-agora" (that package breaks Metro's web bundle the
+// instant it's imported by any file reachable from a route).
+const AGORA_CONNECTION_STATE_FAILED = 5;
+
 export default function VideoCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -79,6 +91,7 @@ export default function VideoCallScreen() {
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
+  const [tokenAppId, setTokenAppId] = useState<string | undefined>(undefined);
   // CALL DEBUG fix — see audio.tsx's identical comment: useRef-with-a-
   // fallback froze this uid at whatever profile.id was on the FIRST render,
   // permanently, even after profile loaded — a real Agora uid-collision
@@ -102,13 +115,15 @@ export default function VideoCallScreen() {
   const [blurOn, setBlurOn] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
   const [videoAutoDisabled, setVideoAutoDisabled] = useState(false);
-  // CALL DEBUG fix — same explicit state machine as audio.tsx.
+  // CALL DEBUG fix — same explicit state machine as audio.tsx, including
+  // the "failed" addition (see that file's comment for the full rationale).
   const [callState, setCallState] = useState<
-    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "ended"
+    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended"
   >("requesting_token");
   const endedRef = useRef(false);
   const connectedAtRef = useRef<number | null>(null);
   const poorQualityStreakRef = useRef(0);
+  const failureMessageRef = useRef<string>("Unable to connect. Please try again.");
 
   const [mode, setMode] = useState<"call" | "study">("call");
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
@@ -177,19 +192,26 @@ export default function VideoCallScreen() {
     });
     (async () => {
       try {
-        const t = await getToken(params.channelName, myUid, profile.id);
+        const { token: t, appId } = await getToken(params.channelName, myUid, profile.id);
         console.log("CALL DEBUG video: token acquired", { channelName: params.channelName, uid: myUid });
-        if (!cancelled) { setToken(t); setCallState((s) => (s === "requesting_token" ? "joining_channel" : s)); }
+        if (!cancelled) {
+          setToken(t);
+          setTokenAppId(appId);
+          setCallState((s) => (s === "requesting_token" ? "joining_channel" : s));
+        }
       } catch (e) {
         console.warn("CALL DEBUG video: token request FAILED", { channelName: params.channelName, uid: myUid, error: e instanceof Error ? e.message : String(e) });
-        if (!cancelled) setCallState("ended");
+        if (!cancelled) { failureMessageRef.current = "Couldn't connect this call. Please try again."; setCallState("failed"); }
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.channelName, myUid, profile?.id]);
 
-  const handleEndCall = useCallback(async () => {
+  // CALL DEBUG forensic fix — see audio.tsx's identical comment: "failed"
+  // routes through this same function (reason="failed") so every failure
+  // source shares one cleanup/report/navigate path.
+  const handleEndCall = useCallback(async (reason: "user" | "failed" = "user") => {
     if (endedRef.current) return;
     endedRef.current = true;
     setCallState("ended");
@@ -215,8 +237,15 @@ export default function VideoCallScreen() {
       } catch { /* the call is ending either way; a lost summary message isn't worth blocking on */ }
     }
 
-    if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)/messages" as any);
+    function navigateBack() {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tabs)/messages" as any);
+    }
+    if (reason === "failed" && !wasConnected) {
+      showAlert("Call failed", failureMessageRef.current, navigateBack);
+    } else {
+      navigateBack();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.callLogId, params.callId, params.conversationId]);
 
@@ -225,6 +254,7 @@ export default function VideoCallScreen() {
     token,
     uid: myUid,
     enableVideo: true,
+    appId: tokenAppId,
     eventHandler: {
       // CALL DEBUG fix — see audio.tsx's identical handlers/comments: this
       // device joining the channel is NOT "connected," and previously had
@@ -233,8 +263,16 @@ export default function VideoCallScreen() {
         console.log("CALL DEBUG video: onJoinChannelSuccess", { channelName: connection.channelId, uid: connection.localUid });
         setCallState((s) => (s === "connected" ? s : "waiting_for_peer"));
       },
+      // CALL DEBUG forensic fix — see audio.tsx's identical comment: this
+      // was pure logging; ConnectionStateFailed is Agora's authoritative
+      // "this can never connect" signal and previously never left
+      // "Connecting…" when the SDK itself already knew the join failed.
       onConnectionStateChanged: (connection, state, reason) => {
         console.log("CALL DEBUG video: onConnectionStateChanged", { channelName: connection.channelId, state, reason });
+        if (state === AGORA_CONNECTION_STATE_FAILED) {
+          failureMessageRef.current = "The call connection failed. Please try again.";
+          setCallState((s) => (s === "ended" ? s : "failed"));
+        }
       },
       onError: (err, msg) => {
         console.warn("CALL DEBUG video: onError", { err, msg });
@@ -340,6 +378,29 @@ export default function VideoCallScreen() {
     return () => clearTimeout(timer);
   }, [isInitiator, connected, handleEndCall, otherName]);
 
+  // CALL DEBUG forensic fix — see audio.tsx's identical effects/comments.
+  useEffect(() => {
+    if (callState !== "joining_channel") return;
+    const timer = setTimeout(() => {
+      failureMessageRef.current = "Couldn't connect this call. Please check your connection and try again.";
+      setCallState((s) => (s === "joining_channel" ? "failed" : s));
+    }, JOIN_CHANNEL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [callState]);
+
+  useEffect(() => {
+    if (isInitiator || callState !== "waiting_for_peer") return;
+    const timer = setTimeout(() => {
+      failureMessageRef.current = "Unable to reach the other person. Please try again.";
+      setCallState((s) => (s === "waiting_for_peer" ? "failed" : s));
+    }, PEER_WAIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isInitiator, callState]);
+
+  useEffect(() => {
+    if (callState === "failed") handleEndCall("failed");
+  }, [callState, handleEndCall]);
+
   function toggleMute() {
     const next = !muted;
     setMuted(next);
@@ -389,7 +450,7 @@ export default function VideoCallScreen() {
       <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleCamera}>
         <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={16} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={handleEndCall}>
+      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={() => handleEndCall()}>
         <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
       </TouchableOpacity>
     </View>
@@ -532,7 +593,7 @@ export default function VideoCallScreen() {
               <Ionicons name="person-add" size={20} color="#fff" />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleEndCall}>
+          <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={() => handleEndCall()}>
             <Ionicons name="call" size={20} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
           </TouchableOpacity>
         </View>
