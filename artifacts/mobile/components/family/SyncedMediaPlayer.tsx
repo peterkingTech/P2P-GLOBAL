@@ -22,9 +22,16 @@ interface Props {
   // caller. Ramped locally (see the effect below) so a big Audio Balance
   // move lands as a quick fade, never an audible pop.
   mediaVolume?: number;
+  // "Return to Live" — bumped by the worship screen on a tap; forces an
+  // immediate reconcile instead of waiting for the next periodic check.
+  resyncNonce?: number;
+  onDriftStatus?: (isBehind: boolean) => void;
+  onEnded?: () => void;
 }
 
-export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
+const NOTICEABLE_DRIFT_THRESHOLD_MS = 4000;
+
+export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonce, onDriftStatus, onEnded }: Props) {
   const videoRef = useRef<Video | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastMediaUrl = useRef<string | null>(null);
@@ -53,6 +60,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
         if (drift > DRIFT_THRESHOLD_MS) await videoRef.current.setPositionAsync(Math.max(0, targetMs));
         if (session.isPlaying && !status.isPlaying) await videoRef.current.playAsync();
         if (!session.isPlaying && status.isPlaying) await videoRef.current.pauseAsync();
+        onDriftStatus?.(drift > NOTICEABLE_DRIFT_THRESHOLD_MS);
       } else if (session.mediaType === "audio" && soundRef.current) {
         const status = await soundRef.current.getStatusAsync();
         if (!status.isLoaded) return;
@@ -60,6 +68,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
         if (drift > DRIFT_THRESHOLD_MS) await soundRef.current.setPositionAsync(Math.max(0, targetMs));
         if (session.isPlaying && !status.isPlaying) await soundRef.current.playAsync();
         if (!session.isPlaying && status.isPlaying) await soundRef.current.pauseAsync();
+        onDriftStatus?.(drift > NOTICEABLE_DRIFT_THRESHOLD_MS);
       }
     } catch {
       // A drift-correction tick failing (e.g. the underlying stream
@@ -77,6 +86,13 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.mediaProvider, session.isPlaying, session.playbackBaseServerTime, session.playbackBasePositionMs, session.mediaUrl]);
 
+  // "Return to Live" for the legacy raw-file path.
+  useEffect(() => {
+    if (resyncNonce === undefined || session.mediaProvider === "youtube") return;
+    reconcile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resyncNonce]);
+
   useEffect(() => {
     if (session.mediaProvider === "youtube" || session.mediaType !== "audio" || !session.mediaUrl) return;
     let cancelled = false;
@@ -87,7 +103,8 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
         await soundRef.current?.unloadAsync().catch(() => {});
         const { sound } = await Audio.Sound.createAsync(
           { uri: session.mediaUrl! },
-          { shouldPlay: session.isPlaying, positionMillis: Math.max(0, computeWorshipPositionMs(session)), volume: displayedVolume }
+          { shouldPlay: session.isPlaying, positionMillis: Math.max(0, computeWorshipPositionMs(session)), volume: displayedVolume },
+          (status) => { if (status.isLoaded && status.didJustFinish) onEnded?.(); }
         );
         if (!cancelled) { soundRef.current = sound; setErrorMessage(null); }
         else await sound.unloadAsync();
@@ -117,6 +134,9 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
           baseServerTimeIso={session.playbackBaseServerTime}
           playbackRate={session.playbackRate}
           volume={displayedVolume}
+          resyncNonce={resyncNonce}
+          onDriftStatus={onDriftStatus}
+          onEnded={onEnded}
           onError={setErrorMessage}
         />
         {errorMessage && (
@@ -157,6 +177,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
         useNativeControls={false}
         onLoad={() => reconcile()}
         onError={() => setErrorMessage("This video couldn't be loaded. Check the link and try again.")}
+        onPlaybackStatusUpdate={(status) => { if (status.isLoaded && status.didJustFinish) onEnded?.(); }}
         shouldPlay={session.isPlaying}
         volume={displayedVolume}
       />

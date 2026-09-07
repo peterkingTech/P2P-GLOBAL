@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import { computePositionFromClock } from "@/lib/familyApi";
 import type { YouTubePlayerProps } from "./youTubePlayerTypes";
-import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
+import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS, NOTICEABLE_DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
 
 declare global {
   interface Window {
@@ -29,7 +29,7 @@ function loadYouTubeApi(): Promise<void> {
   return apiReadyPromise;
 }
 
-export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, onError }: YouTubePlayerProps) {
+export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, resyncNonce, onDriftStatus, onEnded, onError }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
   const readyRef = useRef(false);
@@ -60,6 +60,7 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
             if (clockRef.current.isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
           },
           onError: (e: { data: number }) => onError(describeYouTubeError(e.data)),
+          onStateChange: (e: { data: number }) => { if (e.data === 0) onEnded?.(); }, // 0 = YT.PlayerState.ENDED
         },
       });
     });
@@ -88,19 +89,34 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     playerRef.current.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
   }, [volume]);
 
+  // "Return to Live" — the worship screen bumps resyncNonce when the user
+  // taps it; forces the exact same immediate seek/play-pause the mount and
+  // command paths already do, using whatever's expected right now.
+  useEffect(() => {
+    if (resyncNonce === undefined || !readyRef.current || !playerRef.current) return;
+    playerRef.current.seekTo(Math.max(0, expectedNowMs()) / 1000, true);
+    if (isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resyncNonce]);
+
   // Ongoing drift correction — the actual fix for section 7/8: without
   // this, a Companion who buffered or manually scrubbed the embed would
-  // simply stay out of sync until the Guide's next command.
+  // simply stay out of sync until the Guide's next command. Also reports
+  // "noticeably behind" status up for the visible Return to Live banner —
+  // a coarser, separate threshold from the silent auto-correct one.
   useEffect(() => {
     const interval = setInterval(() => {
       if (!readyRef.current || !playerRef.current || typeof playerRef.current.getCurrentTime !== "function") return;
       const actualMs = playerRef.current.getCurrentTime() * 1000;
       const expectedMs = expectedNowMs();
-      if (Math.abs(actualMs - expectedMs) > DRIFT_THRESHOLD_MS) {
+      const gap = Math.abs(actualMs - expectedMs);
+      if (gap > DRIFT_THRESHOLD_MS) {
         playerRef.current.seekTo(Math.max(0, expectedMs) / 1000, true);
       }
+      onDriftStatus?.(gap > NOTICEABLE_DRIFT_THRESHOLD_MS);
     }, DRIFT_CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <View style={styles.wrap}><div ref={containerRef} style={{ width: "100%", height: "100%" }} /></View>;

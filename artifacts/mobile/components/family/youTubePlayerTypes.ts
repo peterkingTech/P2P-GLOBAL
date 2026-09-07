@@ -12,8 +12,22 @@ export interface YouTubePlayerProps {
   baseServerTimeIso: string;
   playbackRate: number;
   volume: number; // 0-1 — TogetherAudio's effective Media volume
+  // Bumping this forces an immediate resync to the currently-computed
+  // expected position — the "Return to Live" tap target's actual effect.
+  // A plain number rather than a callback/ref so it composes with the
+  // same prop-driven resync effect the mount/command paths already use.
+  resyncNonce?: number;
+  // Fires true when a periodic check finds a large-enough gap to be
+  // user-visible (drives the worship screen's "Return to Live" banner),
+  // false once back in sync. Distinct from the smaller auto-correct
+  // threshold below — the banner is for "you clearly fell behind
+  // (backgrounded, buffered)", not every few-hundred-ms wobble.
+  onDriftStatus?: (isBehind: boolean) => void;
+  onEnded?: () => void;
   onError: (message: string) => void;
 }
+
+export const NOTICEABLE_DRIFT_THRESHOLD_MS = 4000;
 
 // Companions' embedded players naturally drift from buffering, ads, or a
 // manual scrub — checked periodically and corrected only when the gap is

@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
 import { computePositionFromClock } from "@/lib/familyApi";
 import type { YouTubePlayerProps } from "./youTubePlayerTypes";
-import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
+import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS, NOTICEABLE_DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
 
 // A self-contained page loaded into the WebView — this is the standard,
 // documented way to embed a controllable YouTube player natively (there is
@@ -29,7 +29,8 @@ function buildHtml(externalId: string, autoplay: boolean, startSeconds: number, 
       playerVars: { playsinline: 1, modestbranding: 1, rel: 0, autoplay: ${autoplay ? 1 : 0}, start: ${Math.max(0, Math.round(startSeconds))} },
       events: {
         onReady: function () { player.setVolume(${Math.round(Math.min(1, Math.max(0, initialVolume)) * 100)}); window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ready" })); },
-        onError: function (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "error", code: e.data })); }
+        onError: function (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "error", code: e.data })); },
+        onStateChange: function (e) { if (e.data === 0) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ended" })); }
       }
     });
     setInterval(function () {
@@ -49,7 +50,7 @@ function buildHtml(externalId: string, autoplay: boolean, startSeconds: number, 
 </body></html>`;
 }
 
-export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, onError }: YouTubePlayerProps) {
+export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, resyncNonce, onDriftStatus, onEnded, onError }: YouTubePlayerProps) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
   const lastReportedMs = useRef<number | null>(null);
@@ -71,6 +72,7 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
       const payload = JSON.parse(event.nativeEvent.data);
       if (payload.type === "ready") readyRef.current = true;
       else if (payload.type === "error") onError(describeYouTubeError(payload.code));
+      else if (payload.type === "ended") onEnded?.();
       else if (payload.type === "time") lastReportedMs.current = payload.ms;
     } catch { /* ignore malformed bridge messages */ }
   }
@@ -90,17 +92,30 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     webviewRef.current?.injectJavaScript(`window.p2pCommand("volume", ${Math.round(Math.min(1, Math.max(0, volume)) * 100)}); true;`);
   }, [volume]);
 
+  // "Return to Live" — same immediate-resync-on-command path as above,
+  // triggered by the worship screen bumping resyncNonce on a tap.
+  useEffect(() => {
+    if (resyncNonce === undefined || !readyRef.current) return;
+    webviewRef.current?.injectJavaScript(`window.p2pCommand("seek", ${Math.max(0, expectedNowMs()) / 1000}); true;`);
+    webviewRef.current?.injectJavaScript(`window.p2pCommand("${isPlaying ? "play" : "pause"}"); true;`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resyncNonce]);
+
   // Ongoing drift correction, using the page's own self-reported position
   // (see buildHtml's "time" postMessage) rather than blindly reseeking.
+  // Also reports "noticeably behind" status for the Return to Live banner.
   useEffect(() => {
     const interval = setInterval(() => {
       if (!readyRef.current || lastReportedMs.current == null) return;
       const expectedMs = expectedNowMs();
-      if (Math.abs(lastReportedMs.current - expectedMs) > DRIFT_THRESHOLD_MS) {
+      const gap = Math.abs(lastReportedMs.current - expectedMs);
+      if (gap > DRIFT_THRESHOLD_MS) {
         webviewRef.current?.injectJavaScript(`window.p2pCommand("seek", ${Math.max(0, expectedMs) / 1000}); true;`);
       }
+      onDriftStatus?.(gap > NOTICEABLE_DRIFT_THRESHOLD_MS);
     }, DRIFT_CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

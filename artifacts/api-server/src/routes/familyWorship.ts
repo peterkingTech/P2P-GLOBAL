@@ -10,6 +10,7 @@ function err(res: import("express").Response, message: string, status = 400) {
 
 const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "thanksgiving"] as const;
 const VALID_PROVIDERS = ["youtube"] as const;
+const VALID_MEDIA_PERMISSIONS = ["guide_only", "trusted", "everyone"] as const;
 
 function mapSession(row: Record<string, unknown>) {
   return {
@@ -20,7 +21,23 @@ function mapSession(row: Record<string, unknown>) {
     playbackBaseServerTime: row.playback_base_server_time, playbackRate: Number(row.playback_rate ?? 1),
     isPlaying: row.is_playing ?? false, currentScripture: row.current_scripture ?? null,
     channelName: row.channel_name, startedAt: row.started_at, endedAt: row.ended_at,
+    mediaPermission: row.media_permission ?? "guide_only",
+    trustedUserIds: row.trusted_user_ids ?? [],
+    autoAdvance: row.auto_advance ?? false,
   };
+}
+
+// Media Permissions — the server-side authority behind "Guide Only /
+// Guide + trusted participants / Everyone". Called on every mutating
+// media action (state PUT, queue add/remove/reorder/next) so a client
+// can never escalate itself by just not showing a disabled button — this
+// is re-checked here regardless of what the client sent or displayed.
+function canControlMedia(session: Record<string, unknown>, userId: string): boolean {
+  if (session.host_id === userId) return true;
+  const permission = (session.media_permission as string) ?? "guide_only";
+  if (permission === "everyone") return true; // caller is already confirmed an active participant by every call site
+  if (permission === "trusted") return ((session.trusted_user_ids as string[]) ?? []).includes(userId);
+  return false;
 }
 
 async function isActiveFamilyMember(familyId: string, userId: string): Promise<boolean> {
@@ -130,18 +147,29 @@ router.post("/worship/sessions/:sessionId/leave", async (req, res) => {
   return ok(res, { left: true });
 });
 
-// PUT /family/worship/sessions/:sessionId/state — host-only. Handles
-// PLAY/PAUSE/SEEK/MEDIA_CHANGED/MODE_CHANGED as one state write; the
-// mobile client broadcasts the specific event name on its private realtime
-// channel after this succeeds, this endpoint just owns the source-of-truth
-// row (and re-anchors the server playback clock whenever position/play
-// state actually changes, per the sync formula).
+// PUT /family/worship/sessions/:sessionId/state — gated by Media
+// Permissions (canControlMedia), not just the host. currentMode (switching
+// to Scripture/Prayer/etc.) stays Guide-only regardless of the media
+// permission tier — that's a room-flow decision, not a "who can touch
+// what's playing" one. Handles PLAY/PAUSE/SEEK/MEDIA_CHANGED/MODE_CHANGED
+// as one state write; the mobile client broadcasts the specific event
+// name on its private realtime channel after this succeeds, this endpoint
+// just owns the source-of-truth row (and re-anchors the server playback
+// clock whenever position/play state actually changes, per the sync
+// formula).
 router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
-  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  const { session, isMember } = await getSessionAndCheckMembership(req.params.sessionId, userId);
   if (!session) return err(res, "Session not found", 404);
-  if (session.host_id !== userId) return err(res, "Only the current Worship Host can control this session", 403);
+  if (!isMember) return err(res, "You're not a member of this family", 403);
+  const bodyHasModeChange = req.body?.currentMode !== undefined;
+  if (bodyHasModeChange && session.host_id !== userId) {
+    return err(res, "Only the current Guide can change the Gathering's mode", 403);
+  }
+  if (!canControlMedia(session as Record<string, unknown>, userId)) {
+    return err(res, "You don't have permission to control Shared Media right now", 403);
+  }
 
   const body = req.body as {
     status?: string; currentMode?: string; mediaProvider?: "youtube" | null;
@@ -203,6 +231,176 @@ router.post("/worship/sessions/:sessionId/transfer-host", async (req, res) => {
 
   await db.from("p2p_family_worship_sessions").update({ host_id: newHostId }).eq("id", session.id);
   return ok(res, { hostId: newHostId });
+});
+
+// PUT /family/worship/sessions/:sessionId/media-permission — { mediaPermission, autoAdvance? }
+// Guide-only — changing WHO can control media is itself a media-control-
+// adjacent decision, restricted to the Guide (not "trusted" participants,
+// who could otherwise grant themselves everyone-level access).
+router.put("/worship/sessions/:sessionId/media-permission", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  if (session.host_id !== userId) return err(res, "Only the current Guide can change Media Permissions", 403);
+
+  const { mediaPermission, autoAdvance } = req.body as { mediaPermission?: string; autoAdvance?: boolean };
+  const update: Record<string, unknown> = {};
+  if (mediaPermission !== undefined) {
+    if (!VALID_MEDIA_PERMISSIONS.includes(mediaPermission as (typeof VALID_MEDIA_PERMISSIONS)[number])) {
+      return err(res, `mediaPermission must be one of: ${VALID_MEDIA_PERMISSIONS.join(", ")}`);
+    }
+    update.media_permission = mediaPermission;
+  }
+  if (autoAdvance !== undefined) update.auto_advance = autoAdvance;
+  if (Object.keys(update).length === 0) return err(res, "Nothing to update");
+
+  const { data: updated, error } = await db.from("p2p_family_worship_sessions").update(update).eq("id", session.id).select().single();
+  if (error || !updated) return err(res, error?.message ?? "Failed to update", 500);
+  return ok(res, mapSession(updated as Record<string, unknown>));
+});
+
+// POST /family/worship/sessions/:sessionId/trusted — { userId, trusted } —
+// Guide-only. Adds/removes one user from the trusted list; only meaningful
+// when mediaPermission is "trusted", but stored independently so toggling
+// the tier back and forth doesn't lose who was trusted.
+router.post("/worship/sessions/:sessionId/trusted", async (req, res) => {
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, callerId);
+  if (!session) return err(res, "Session not found", 404);
+  if (session.host_id !== callerId) return err(res, "Only the current Guide can manage trusted Companions", 403);
+
+  const { userId: targetUserId, trusted } = req.body as { userId?: string; trusted?: boolean };
+  if (!targetUserId || trusted === undefined) return err(res, "userId and trusted are required");
+
+  const current = (session.trusted_user_ids as string[]) ?? [];
+  const next = trusted ? Array.from(new Set([...current, targetUserId])) : current.filter((id) => id !== targetUserId);
+
+  const { data: updated, error } = await db.from("p2p_family_worship_sessions").update({ trusted_user_ids: next }).eq("id", session.id).select().single();
+  if (error || !updated) return err(res, error?.message ?? "Failed to update", 500);
+  return ok(res, mapSession(updated as Record<string, unknown>));
+});
+
+function mapQueueItem(row: Record<string, unknown>, addedByName: string) {
+  return {
+    id: row.id, sessionId: row.session_id, mediaProvider: row.media_provider, mediaId: row.media_id,
+    title: row.title ?? null, thumbnailUrl: row.thumbnail_url ?? null,
+    addedBy: row.added_by, addedByName, position: row.position, createdAt: row.created_at,
+  };
+}
+
+async function mapQueueItems(rows: Record<string, unknown>[]) {
+  const userIds = Array.from(new Set(rows.map((r) => r.added_by as string)));
+  const { data: profiles } = userIds.length
+    ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+  return rows.map((r) => mapQueueItem(r, nameById.get(r.added_by as string) ?? "Someone"));
+}
+
+// GET /family/worship/sessions/:sessionId/queue — Media Shelf, any active participant can view.
+router.get("/worship/sessions/:sessionId/queue", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { sessionId } = req.params;
+  if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
+
+  const { data, error } = await db.from("p2p_family_worship_queue").select("*").eq("session_id", sessionId).order("position", { ascending: true });
+  if (error) return err(res, error.message, 500);
+  return ok(res, await mapQueueItems((data ?? []) as Record<string, unknown>[]));
+});
+
+// POST /family/worship/sessions/:sessionId/queue — { mediaProvider, mediaId, title?, thumbnailUrl? }
+router.post("/worship/sessions/:sessionId/queue", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to add to the Media Shelf", 403);
+
+  const { mediaProvider, mediaId, title, thumbnailUrl } = req.body as { mediaProvider?: string; mediaId?: string; title?: string; thumbnailUrl?: string };
+  if (!mediaProvider || !VALID_PROVIDERS.includes(mediaProvider as (typeof VALID_PROVIDERS)[number])) return err(res, `mediaProvider must be one of: ${VALID_PROVIDERS.join(", ")}`);
+  if (!mediaId) return err(res, "mediaId is required");
+
+  const { data: last } = await db.from("p2p_family_worship_queue").select("position").eq("session_id", session.id).order("position", { ascending: false }).limit(1).maybeSingle();
+  const nextPosition = ((last?.position as number) ?? -1) + 1;
+
+  const { data: item, error } = await db.from("p2p_family_worship_queue").insert({
+    session_id: session.id, media_provider: mediaProvider, media_id: mediaId,
+    title: title ?? null, thumbnail_url: thumbnailUrl ?? null, added_by: userId, position: nextPosition,
+  }).select().single();
+  if (error || !item) return err(res, error?.message ?? "Failed to add to queue", 500);
+
+  const { data: profile } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
+  return ok(res, mapQueueItem(item as Record<string, unknown>, (profile?.full_name as string) ?? "Someone"));
+});
+
+// DELETE /family/worship/sessions/:sessionId/queue/:itemId — media-control
+// permission OR the person who originally added it (suggesting something
+// and then changing your mind shouldn't require Guide/trusted status).
+router.delete("/worship/sessions/:sessionId/queue/:itemId", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+
+  const { data: item } = await db.from("p2p_family_worship_queue").select("added_by").eq("id", req.params.itemId).eq("session_id", session.id).maybeSingle();
+  if (!item) return err(res, "Queue item not found", 404);
+  if (item.added_by !== userId && !canControlMedia(session as Record<string, unknown>, userId)) {
+    return err(res, "You don't have permission to remove this item", 403);
+  }
+
+  const { error } = await db.from("p2p_family_worship_queue").delete().eq("id", req.params.itemId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { removed: true });
+});
+
+// PUT /family/worship/sessions/:sessionId/queue/reorder — { orderedItemIds: string[] }
+router.put("/worship/sessions/:sessionId/queue/reorder", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to reorder the Media Shelf", 403);
+
+  const { orderedItemIds } = req.body as { orderedItemIds?: string[] };
+  if (!Array.isArray(orderedItemIds) || orderedItemIds.length === 0) return err(res, "orderedItemIds is required");
+
+  for (let i = 0; i < orderedItemIds.length; i++) {
+    await db.from("p2p_family_worship_queue").update({ position: i }).eq("id", orderedItemIds[i]).eq("session_id", session.id);
+  }
+  const { data, error } = await db.from("p2p_family_worship_queue").select("*").eq("session_id", session.id).order("position", { ascending: true });
+  if (error) return err(res, error.message, 500);
+  return ok(res, await mapQueueItems((data ?? []) as Record<string, unknown>[]));
+});
+
+// POST /family/worship/sessions/:sessionId/queue/next — pulls the front of
+// the Media Shelf and makes it the current Shared Media (same re-anchor
+// logic as PUT .../state's MEDIA_CHANGED path), then removes it from the
+// queue. Used both for an explicit "Play Next" tap and for automatic
+// advance (client-triggered only by the Guide's own client when a video
+// ends and auto_advance is on — this endpoint itself doesn't care who
+// triggers it beyond the normal media-control permission check, so a
+// trusted/everyone-tier Companion could also legitimately advance).
+router.post("/worship/sessions/:sessionId/queue/next", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to control Shared Media right now", 403);
+
+  const { data: next } = await db.from("p2p_family_worship_queue").select("*").eq("session_id", session.id).order("position", { ascending: true }).limit(1).maybeSingle();
+  if (!next) return err(res, "The Media Shelf is empty", 404);
+
+  const { data: updatedSession, error } = await db.from("p2p_family_worship_sessions").update({
+    media_provider: next.media_provider, media_id: next.media_id, media_type: null, media_url: null,
+    is_playing: true, playback_base_position_ms: 0, playback_base_server_time: new Date().toISOString(),
+  }).eq("id", session.id).select().single();
+  if (error || !updatedSession) return err(res, error?.message ?? "Failed to advance", 500);
+
+  await db.from("p2p_family_worship_queue").delete().eq("id", next.id);
+  return ok(res, mapSession(updatedSession as Record<string, unknown>));
 });
 
 async function endSessionInternal(session: Record<string, unknown>) {

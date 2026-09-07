@@ -73,6 +73,7 @@ export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "sile
 // are unused. When null, mediaType/mediaUrl carry the legacy raw-file
 // shape exactly as before this feature — nothing about that path changed.
 export type SharedMediaProvider = "youtube";
+export type MediaPermission = "guide_only" | "trusted" | "everyone";
 export interface WorshipSession {
   id: string; familyId: string; hostId: string; status: string; currentMode: WorshipMode;
   mediaProvider: SharedMediaProvider | null;
@@ -80,7 +81,20 @@ export interface WorshipSession {
   playbackBasePositionMs: number; playbackBaseServerTime: string; playbackRate: number; isPlaying: boolean;
   currentScripture: { reference: string; verseIndex?: number } | null;
   channelName: string; startedAt: string | null; endedAt: string | null;
+  mediaPermission: MediaPermission; trustedUserIds: string[]; autoAdvance: boolean;
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
+}
+
+// Client-side mirror of the server's canControlMedia() — used only to
+// decide which controls to SHOW. The server re-checks this independently
+// on every mutating call (familyWorship.ts), so this can never be the only
+// gate; it's a UX convenience, not the actual security boundary.
+export function canControlMedia(session: Pick<WorshipSession, "hostId" | "mediaPermission" | "trustedUserIds">, userId: string | undefined): boolean {
+  if (!userId) return false;
+  if (session.hostId === userId) return true;
+  if (session.mediaPermission === "everyone") return true;
+  if (session.mediaPermission === "trusted") return session.trustedUserIds.includes(userId);
+  return false;
 }
 
 export function startFamilyWorship(familyId: string): Promise<WorshipSession> {
@@ -107,6 +121,32 @@ export function transferWorshipHost(sessionId: string, newHostId: string) {
 }
 export function endWorshipSession(sessionId: string) {
   return authedFetch(`/family/worship/sessions/${sessionId}/end`, { method: "POST" });
+}
+export function updateMediaPermission(sessionId: string, patch: { mediaPermission?: MediaPermission; autoAdvance?: boolean }): Promise<WorshipSession> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/media-permission`, { method: "PUT", body: JSON.stringify(patch) });
+}
+export function setTrustedParticipant(sessionId: string, userId: string, trusted: boolean): Promise<WorshipSession> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/trusted`, { method: "POST", body: JSON.stringify({ userId, trusted }) });
+}
+
+export interface WorshipQueueItem {
+  id: string; sessionId: string; mediaProvider: SharedMediaProvider; mediaId: string;
+  title: string | null; thumbnailUrl: string | null; addedBy: string; addedByName: string; position: number; createdAt: string;
+}
+export function getWorshipQueue(sessionId: string): Promise<WorshipQueueItem[]> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/queue`);
+}
+export function addToWorshipQueue(sessionId: string, item: { mediaProvider: SharedMediaProvider; mediaId: string; title?: string; thumbnailUrl?: string | null }): Promise<WorshipQueueItem> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/queue`, { method: "POST", body: JSON.stringify(item) });
+}
+export function removeFromWorshipQueue(sessionId: string, itemId: string) {
+  return authedFetch(`/family/worship/sessions/${sessionId}/queue/${itemId}`, { method: "DELETE" });
+}
+export function reorderWorshipQueue(sessionId: string, orderedItemIds: string[]): Promise<WorshipQueueItem[]> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/queue/reorder`, { method: "PUT", body: JSON.stringify({ orderedItemIds }) });
+}
+export function playNextInWorshipQueue(sessionId: string): Promise<WorshipSession> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/queue/next`, { method: "POST" });
 }
 export interface WorshipHistoryEntry {
   id: string; family_id: string; session_id: string; duration_seconds: number;

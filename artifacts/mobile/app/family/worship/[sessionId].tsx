@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Modal, Alert, Platform, Animated } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Modal, Alert, Platform, Animated, AppState } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,14 +9,18 @@ import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
   getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
-  getWorshipMessages, sendWorshipMessage, removeWorshipParticipant,
+  getWorshipMessages, sendWorshipMessage, removeWorshipParticipant, canControlMedia,
+  getWorshipQueue, addToWorshipQueue, removeFromWorshipQueue, reorderWorshipQueue, playNextInWorshipQueue,
+  updateMediaPermission, setTrustedParticipant,
   computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider, type WorshipMessage,
+  type WorshipQueueItem, type MediaPermission,
 } from "@/lib/familyApi";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { useTogetherAudio } from "@/hooks/useTogetherAudio";
 import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
 import AudioBalancePanel from "@/components/family/AudioBalancePanel";
 import ChatPanel from "@/components/family/ChatPanel";
+import MediaShelfPanel from "@/components/family/MediaShelfPanel";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
@@ -71,6 +75,10 @@ export default function FamilyWorshipScreen() {
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<WorshipMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
+  const [mediaShelfOpen, setMediaShelfOpen] = useState(false);
+  const [queue, setQueue] = useState<WorshipQueueItem[]>([]);
+  const [isBehind, setIsBehind] = useState(false);
+  const [resyncNonce, setResyncNonce] = useState(0);
   const leftRef = useRef(false);
   const togetherAudio = useTogetherAudio();
   const voiceCompanions = React.useMemo(
@@ -81,7 +89,23 @@ export default function FamilyWorshipScreen() {
 
   const isHost = session?.hostId === profile?.id;
   const isShepherd = shepherdId === profile?.id;
+  // Media Permissions — the client-side mirror used only to decide which
+  // controls to show; familyWorship.ts's canControlMedia() re-checks this
+  // independently on every mutating call, so this can never be the only
+  // gate (no arbitrary client-side permission escalation is possible even
+  // if this value were wrong or tampered with).
+  const canControl = session ? canControlMedia(session, profile?.id) : false;
 
+  // Reconnect (spec steps 1-3 + 5): always refetches fresh from the server
+  // rather than trusting whatever local state survived a background/
+  // foreground cycle — session state (which carries Shared Media + the
+  // clock needed to compute the current expected position, step 2-3) and
+  // participant state (step 5) both come from this one call. Voice state
+  // (step 4) is intentionally NOT force-restarted here — the Agora engine
+  // has its own reconnect/onConnectionStateChanged handling (useVoiceSpace),
+  // and forcing a rejoin on every foreground tap would be more disruptive
+  // than helpful; a genuinely dropped voice connection surfaces on its own
+  // via that existing "failed" phase + Retry.
   const load = useCallback(async () => {
     if (!params.sessionId) return;
     try {
@@ -98,6 +122,7 @@ export default function FamilyWorshipScreen() {
       // Chat history — a late joiner or reconnecting client catches up here;
       // new messages after that arrive live over the signal broadcast below.
       getWorshipMessages(params.sessionId).then(setMessages).catch(() => {});
+      getWorshipQueue(params.sessionId).then(setQueue).catch(() => {});
     } catch (e: any) {
       showAlert("Couldn't load Family Worship", e.message ?? "Please try again.");
     } finally {
@@ -107,6 +132,18 @@ export default function FamilyWorshipScreen() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (params.sessionId) joinWorshipSession(params.sessionId).catch(() => {}); }, [params.sessionId]);
+
+  // Reconnect trigger — foreground resume is the one moment this app can
+  // reliably observe "we might have missed something" (the socket itself
+  // recovers on its own; stale LOCAL state is the actual risk this guards
+  // against, per this task's explicit "do not blindly restore stale local
+  // state" instruction).
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") load();
+    });
+    return () => sub.remove();
+  }, [load]);
 
   // Ticking re-render so the displayed playback position keeps advancing
   // between session-row updates, without writing anything to the DB.
@@ -296,7 +333,7 @@ export default function FamilyWorshipScreen() {
   }
 
   async function togglePlay() {
-    if (!session || !isHost) return;
+    if (!session || !canControl) return;
     try {
       const positionMs = Math.max(0, computeWorshipPositionMs(session));
       const updated = await updateWorshipState(session.id, { isPlaying: !session.isPlaying, positionMs });
@@ -306,7 +343,7 @@ export default function FamilyWorshipScreen() {
   }
 
   async function setMedia() {
-    if (!session || !isHost || !mediaUrlInput.trim()) return;
+    if (!session || !canControl || !mediaUrlInput.trim()) return;
     const input = mediaUrlInput.trim();
     try {
       if (youtubeProvider.matches(input)) {
@@ -332,6 +369,69 @@ export default function FamilyWorshipScreen() {
       broadcastState(updated);
       setMediaUrlInput("");
     } catch (e: any) { showAlert("Couldn't set media", e.message ?? "Please try again."); }
+  }
+
+  // Media Shelf — Guide/trusted/everyone (per canControl) can queue,
+  // remove (or anyone can remove their own suggestion — enforced
+  // server-side), and reorder; only canControl can Play Next.
+  async function handleAddToQueue(mediaId: string, title: string | null, thumbnailUrl: string | null) {
+    if (!session) return;
+    try {
+      const item = await addToWorshipQueue(session.id, { mediaProvider: "youtube", mediaId, title: title ?? undefined, thumbnailUrl: thumbnailUrl ?? undefined });
+      setQueue((prev) => [...prev, item]);
+    } catch (e: any) { showAlert("Couldn't add to the Media Shelf", e.message ?? "Please try again."); }
+  }
+  async function handleRemoveFromQueue(itemId: string) {
+    if (!session) return;
+    try { await removeFromWorshipQueue(session.id, itemId); setQueue((prev) => prev.filter((q) => q.id !== itemId)); }
+    catch (e: any) { showAlert("Couldn't remove that item", e.message ?? "Please try again."); }
+  }
+  async function handleReorderQueue(orderedItemIds: string[]) {
+    if (!session) return;
+    try { setQueue(await reorderWorshipQueue(session.id, orderedItemIds)); }
+    catch (e: any) { showAlert("Couldn't reorder the Media Shelf", e.message ?? "Please try again."); }
+  }
+  async function handlePlayNext() {
+    if (!session) return;
+    try {
+      const updated = await playNextInWorshipQueue(session.id);
+      setSession(updated);
+      broadcastState(updated);
+      setQueue(await getWorshipQueue(session.id));
+    } catch (e: any) { showAlert("Couldn't play the next item", e.message ?? "Please try again."); }
+  }
+  async function handleChangeMediaPermission(permission: MediaPermission) {
+    if (!session) return;
+    try { const updated = await updateMediaPermission(session.id, { mediaPermission: permission }); setSession(updated); broadcastState(updated); }
+    catch (e: any) { showAlert("Couldn't update Media Permissions", e.message ?? "Please try again."); }
+  }
+  async function handleChangeAutoAdvance(v: boolean) {
+    if (!session) return;
+    try { const updated = await updateMediaPermission(session.id, { autoAdvance: v }); setSession(updated); broadcastState(updated); }
+    catch (e: any) { showAlert("Couldn't update", e.message ?? "Please try again."); }
+  }
+  async function handleToggleTrusted(userId: string) {
+    if (!session) return;
+    const nowTrusted = !session.trustedUserIds.includes(userId);
+    try { const updated = await setTrustedParticipant(session.id, userId, nowTrusted); setSession(updated); broadcastState(updated); }
+    catch (e: any) { showAlert("Couldn't update", e.message ?? "Please try again."); }
+  }
+
+  // Return to Live — an immediate resync rather than waiting for the next
+  // periodic drift check; SyncedMediaPlayer/YouTubePlayer both react to
+  // resyncNonce changing.
+  function handleReturnToLive() {
+    setResyncNonce((n) => n + 1);
+    setIsBehind(false);
+  }
+
+  // Automatic next — deliberately Guide-only (not the full canControl
+  // tier) so multiple trusted/everyone Companions whose players all detect
+  // "ended" within moments of each other can't race to advance the queue
+  // more than once.
+  function handleMediaEnded() {
+    if (!session || !session.autoAdvance || !isHost || queue.length === 0) return;
+    handlePlayNext();
   }
 
   async function loadScripture() {
@@ -424,9 +524,28 @@ export default function FamilyWorshipScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {session.currentMode === "worship" && (
           <View style={styles.panel}>
-            <Text style={styles.panelLabel}>SHARED MEDIA</Text>
-            <SyncedMediaPlayer session={session} mediaVolume={effectiveMediaVolume(togetherAudio.prefs)} />
-            {isHost && (
+            <View style={styles.panelLabelRow}>
+              <Text style={styles.panelLabel}>SHARED MEDIA</Text>
+              <TouchableOpacity onPress={() => setMediaShelfOpen(true)}>
+                <Text style={styles.shelfLink}>Media Shelf{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
+              </TouchableOpacity>
+            </View>
+            <View>
+              <SyncedMediaPlayer
+                session={session}
+                mediaVolume={effectiveMediaVolume(togetherAudio.prefs)}
+                resyncNonce={resyncNonce}
+                onDriftStatus={setIsBehind}
+                onEnded={handleMediaEnded}
+              />
+              {isBehind && (
+                <TouchableOpacity style={styles.returnToLiveBadge} onPress={handleReturnToLive}>
+                  <Ionicons name="refresh" size={12} color="#fff" />
+                  <Text style={styles.returnToLiveText}>Return to Live</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {canControl && (
               <View style={styles.hostRow}>
                 <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
                   <Ionicons name={session.isPlaying ? "pause" : "play"} size={20} color="#fff" />
@@ -642,6 +761,26 @@ export default function FamilyWorshipScreen() {
         onChangeDraft={setChatDraft}
         onSend={sendChatMessage}
       />
+
+      <MediaShelfPanel
+        visible={mediaShelfOpen}
+        onClose={() => setMediaShelfOpen(false)}
+        queue={queue}
+        canControl={canControl}
+        isGuide={isHost}
+        onAdd={handleAddToQueue}
+        onRemove={handleRemoveFromQueue}
+        onReorder={handleReorderQueue}
+        onPlayNext={handlePlayNext}
+        mediaPermission={session.mediaPermission}
+        onChangePermission={handleChangeMediaPermission}
+        autoAdvance={session.autoAdvance}
+        onChangeAutoAdvance={handleChangeAutoAdvance}
+        myUserId={profile?.id}
+        companions={voiceCompanions}
+        trustedUserIds={session.trustedUserIds}
+        onToggleTrusted={handleToggleTrusted}
+      />
     </View>
   );
 }
@@ -667,6 +806,13 @@ const styles = StyleSheet.create({
 
   panel: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 16, padding: 16, gap: 6 },
   panelLabel: { color: "#B8860B", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  panelLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  shelfLink: { color: "#5B8DEF", fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  returnToLiveBadge: {
+    position: "absolute", bottom: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(0,0,0,0.8)", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: "#5B8DEF",
+  },
+  returnToLiveText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   scriptureRef: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", marginTop: 6 },
   scriptureText: { color: "rgba(255,255,255,0.85)", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 24, marginTop: 6, fontStyle: "italic" },
   silentHint: { color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 4 },
