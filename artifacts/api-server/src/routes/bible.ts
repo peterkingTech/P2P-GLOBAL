@@ -4,6 +4,8 @@ import {
   getVerseText,
   getBatchVerseText,
   getAvailableTranslations,
+  getVerseTextForTranslation,
+  getTranslationByCode,
   parseVerseRef,
 } from "../lib/bibleService";
 
@@ -62,6 +64,39 @@ router.post("/batch", async (req, res) => {
     return ok(res, Object.fromEntries(map));
   } catch (e: any) {
     return err(res, e.message ?? "Batch verse lookup failed", 500);
+  }
+});
+
+// ── POST /bible/passage ───────────────────────────────────────────────────────
+// P2P Together Phase 6 — a Scripture "passage" (book/chapter/verse-range) in
+// an EXPLICITLY chosen translation, not the language-default GET /verse
+// resolves. Reuses getVerseTextForTranslation per verse (same per-verse
+// cache as everywhere else in this file — no bulk translation storage).
+// Body: { book, chapter, startVerse, endVerse, translationCode }
+router.post("/passage", async (req, res) => {
+  const { book, chapter, startVerse, endVerse, translationCode } = req.body as {
+    book?: string; chapter?: number; startVerse?: number; endVerse?: number; translationCode?: string;
+  };
+  if (!book || !chapter || !startVerse || !translationCode) {
+    return err(res, "book, chapter, startVerse, and translationCode are required");
+  }
+  const end = endVerse ?? startVerse;
+  if (end < startVerse) return err(res, "endVerse must not be before startVerse");
+  if (end - startVerse > 29) return err(res, "A passage can span at most 30 verses at a time");
+
+  const translation = await getTranslationByCode(translationCode);
+  if (!translation) return err(res, "That translation isn't available", 404);
+
+  try {
+    const verses: { verse: number; text: string }[] = [];
+    for (let v = startVerse; v <= end; v++) {
+      const result = await getVerseTextForTranslation(`${book} ${chapter}:${v}`, translationCode);
+      if (result) verses.push({ verse: v, text: result.text });
+    }
+    if (verses.length === 0) return err(res, "No verses found for that passage", 404);
+    return ok(res, { translationCode: translation.translation_code, translationName: translation.translation_name, book, chapter, verses });
+  } catch (e: any) {
+    return err(res, e.message ?? "Passage lookup failed", 500);
   }
 });
 

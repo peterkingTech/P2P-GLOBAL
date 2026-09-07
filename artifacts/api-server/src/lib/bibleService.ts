@@ -213,6 +213,22 @@ async function getDefaultTranslation(languageCode: string): Promise<TranslationR
   return data as TranslationRow | null;
 }
 
+// P2P Together Phase 6 — Scripture mode needs the Guide's EXPLICITLY chosen
+// translation, not just "whatever's default for this language" (the only
+// thing getVerseText/getDefaultTranslation above support). Same licensing
+// gate (is_licensed_confirmed) as every other lookup in this file — a
+// translation code that isn't confirmed-licensed simply won't resolve here,
+// same as it wouldn't as a language default.
+export async function getTranslationByCode(translationCode: string): Promise<(TranslationRow & { translation_name: string }) | null> {
+  const { data } = await supabaseRead
+    .from("p2p_bible_translations")
+    .select("translation_code,translation_name,api_bible_id,provider,is_licensed_confirmed")
+    .eq("translation_code", translationCode)
+    .eq("is_licensed_confirmed", true)
+    .maybeSingle();
+  return data as (TranslationRow & { translation_name: string }) | null;
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 export interface VerseResult {
@@ -263,6 +279,36 @@ export async function getVerseText(
     }
   }
 
+  return null;
+}
+
+// Same cache-first / live-fetch shape as getVerseText above, but resolves
+// the translation by its EXPLICIT code (Phase 6's Scripture mode) instead
+// of "default for this language" — a separate function rather than
+// changing getVerseText's signature, since that function already has other
+// callers elsewhere in the app that must keep working unchanged.
+export async function getVerseTextForTranslation(
+  rawRef: string,
+  translationCode: string
+): Promise<VerseResult | null> {
+  const parsed = parseVerseRef(rawRef);
+  if (!parsed) return null;
+  const { bookCode, chapter, verse } = parsed;
+
+  const translation = await getTranslationByCode(translationCode);
+  if (!translation) return null;
+  const { translation_code: tCode, api_bible_id: apiBibleId } = translation;
+
+  const cached = await getCachedVerse(tCode, bookCode, chapter, verse);
+  if (cached) return { text: cached, translationCode: tCode, language: "", fromCache: true, fallback: false };
+
+  if (apiBibleId) {
+    const live = await fetchFromApiBible(apiBibleId, parsed.verseId);
+    if (live) {
+      await cacheVerse(tCode, bookCode, chapter, verse, live);
+      return { text: live, translationCode: tCode, language: "", fromCache: false, fallback: false };
+    }
+  }
   return null;
 }
 

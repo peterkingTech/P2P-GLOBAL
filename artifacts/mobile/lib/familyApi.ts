@@ -74,15 +74,27 @@ export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "sile
 // shape exactly as before this feature — nothing about that path changed.
 export type SharedMediaProvider = "youtube";
 export type MediaPermission = "guide_only" | "trusted" | "everyone";
+// Structured, not a free-text reference — P2P Together Phase 6's explicit
+// "prefer storing translation/book/chapter/startVerse/endVerse rather than
+// duplicating an entire Bible translation inside the session" requirement.
+export interface WorshipScripture {
+  translation: string; translationName?: string;
+  book: string; chapter: number; startVerse: number; endVerse: number;
+}
 export interface WorshipSession {
   id: string; familyId: string; hostId: string; status: string; currentMode: WorshipMode;
   mediaProvider: SharedMediaProvider | null;
   mediaType: "video" | "audio" | null; mediaId: string | null; mediaUrl: string | null;
   playbackBasePositionMs: number; playbackBaseServerTime: string; playbackRate: number; isPlaying: boolean;
-  currentScripture: { reference: string; verseIndex?: number } | null;
+  currentScripture: WorshipScripture | null;
   channelName: string; startedAt: string | null; endedAt: string | null;
   mediaPermission: MediaPermission; trustedUserIds: string[]; autoAdvance: boolean;
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
+}
+
+export function formatScriptureReference(s: WorshipScripture): string {
+  const verses = s.startVerse === s.endVerse ? `${s.startVerse}` : `${s.startVerse}-${s.endVerse}`;
+  return `${s.book} ${s.chapter}:${verses}${s.translationName ? ` (${s.translation})` : ""}`;
 }
 
 // Client-side mirror of the server's canControlMedia() — used only to
@@ -112,7 +124,7 @@ export function leaveWorshipSession(sessionId: string) {
 export function updateWorshipState(sessionId: string, patch: {
   status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
   mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
-  isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: { reference: string; verseIndex?: number } | null;
+  isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: WorshipScripture | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });
 }
@@ -154,6 +166,26 @@ export interface WorshipHistoryEntry {
 }
 export function getWorshipHistory(familyId: string): Promise<WorshipHistoryEntry[]> {
   return authedFetch(`/family/worship/history?familyId=${familyId}`);
+}
+
+// Bible endpoints (routes/bible.ts) are deliberately public — no auth
+// middleware, same as the app's existing pre-Together Scripture lookups —
+// so these use plain fetch, not authedFetch.
+export interface BibleTranslation { translation_code: string; translation_name: string; provider: string; is_licensed_confirmed: boolean }
+export async function getBibleTranslations(languageCode: string): Promise<BibleTranslation[]> {
+  const res = await fetch(`${getApiUrl()}/bible/translations?lang=${encodeURIComponent(languageCode)}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+export interface BiblePassage { translationCode: string; translationName: string; book: string; chapter: number; verses: { verse: number; text: string }[] }
+export async function getBiblePassage(book: string, chapter: number, startVerse: number, endVerse: number, translationCode: string): Promise<BiblePassage> {
+  const res = await fetch(`${getApiUrl()}/bible/passage`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ book, chapter, startVerse, endVerse, translationCode }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? "Couldn't load that passage");
+  return body;
 }
 
 export interface WorshipMessage {

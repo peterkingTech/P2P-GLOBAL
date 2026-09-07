@@ -4,7 +4,6 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
 import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
   getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState,
@@ -21,6 +20,7 @@ import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
 import AudioBalancePanel from "@/components/family/AudioBalancePanel";
 import ChatPanel from "@/components/family/ChatPanel";
 import MediaShelfPanel from "@/components/family/MediaShelfPanel";
+import ScripturePanel from "@/components/family/ScripturePanel";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
@@ -65,8 +65,6 @@ export default function FamilyWorshipScreen() {
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
   const [prayers, setPrayers] = useState<FamilyPrayerRequest[]>([]);
   const [newPrayer, setNewPrayer] = useState("");
-  const [scriptureRef, setScriptureRef] = useState("");
-  const [scriptureText, setScriptureText] = useState<string | null>(null);
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
@@ -114,7 +112,6 @@ export default function FamilyWorshipScreen() {
       setParticipants(s.participants ?? []);
       setMembers(family.members);
       setShepherdId(family.family?.shepherdId ?? null);
-      if (s.currentScripture?.reference) setScriptureRef(s.currentScripture.reference);
       if (family.family) {
         const p = await getFamilyPrayerRequests(family.family.id);
         setPrayers(p);
@@ -180,7 +177,7 @@ export default function FamilyWorshipScreen() {
           mediaType: row.media_type as "video" | "audio" | null, mediaId: row.media_id as string | null, mediaUrl: row.media_url as string | null,
           playbackBasePositionMs: Number(row.playback_base_position_ms ?? 0), playbackBaseServerTime: row.playback_base_server_time as string,
           playbackRate: Number(row.playback_rate ?? 1), isPlaying: !!row.is_playing,
-          currentScripture: (row.current_scripture as { reference: string } | null) ?? null, hostId: row.host_id as string,
+          currentScripture: (row.current_scripture as WorshipSession["currentScripture"]) ?? null, hostId: row.host_id as string,
         } : prev);
       })
       .subscribe();
@@ -434,25 +431,14 @@ export default function FamilyWorshipScreen() {
     handlePlayNext();
   }
 
-  async function loadScripture() {
-    if (!session || !isHost || !scriptureRef.trim()) return;
+  async function selectScripture(scripture: WorshipSession["currentScripture"]) {
+    if (!session || !isHost) return;
     try {
-      const res = await fetch(`${getApiUrl()}/bible/verse?ref=${encodeURIComponent(scriptureRef.trim())}`);
-      const body = await res.json();
-      if (!res.ok) { showAlert("Couldn't find that passage", body.error ?? "Check the reference and try again."); return; }
-      setScriptureText(body.text);
-      const updated = await updateWorshipState(session.id, { currentMode: "scripture", currentScripture: { reference: scriptureRef.trim() } });
+      const updated = await updateWorshipState(session.id, { currentMode: "scripture", currentScripture: scripture });
       setSession(updated);
       broadcastState(updated);
-    } catch (e: any) { showAlert("Couldn't load Scripture", e.message ?? "Please try again."); }
+    } catch (e: any) { showAlert("Couldn't share that passage", e.message ?? "Please try again."); }
   }
-
-  useEffect(() => {
-    if (session?.currentMode === "scripture" && session.currentScripture?.reference && !scriptureText) {
-      fetch(`${getApiUrl()}/bible/verse?ref=${encodeURIComponent(session.currentScripture.reference)}`)
-        .then((r) => r.json()).then((b) => setScriptureText(b.text ?? null)).catch(() => {});
-    }
-  }, [session?.currentMode, session?.currentScripture?.reference, scriptureText]);
 
   async function addPrayer() {
     if (!session || !newPrayer.trim()) return;
@@ -567,20 +553,7 @@ export default function FamilyWorshipScreen() {
         {session.currentMode === "scripture" && (
           <View style={styles.panel}>
             <Text style={styles.panelLabel}>SCRIPTURE</Text>
-            {isHost && (
-              <View style={styles.hostRow}>
-                <TextInput
-                  style={[styles.mediaInput, { flex: 1 }]}
-                  placeholder="e.g. Psalm 23:1"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={scriptureRef}
-                  onChangeText={setScriptureRef}
-                />
-                <TouchableOpacity style={styles.smallBtn} onPress={loadScripture}><Text style={styles.smallBtnText}>Go</Text></TouchableOpacity>
-              </View>
-            )}
-            <Text style={styles.scriptureRef}>{session.currentScripture?.reference ?? "No passage selected"}</Text>
-            {scriptureText && <Text style={styles.scriptureText}>{scriptureText}</Text>}
+            <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
           </View>
         )}
 

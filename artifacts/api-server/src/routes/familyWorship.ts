@@ -167,15 +167,34 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (bodyHasModeChange && session.host_id !== userId) {
     return err(res, "Only the current Guide can change the Gathering's mode", 403);
   }
-  if (!canControlMedia(session as Record<string, unknown>, userId)) {
+  // Scripture selection/navigation is Guide-only, same as mode changes —
+  // checked independently of currentMode (a Guide already in Scripture
+  // mode navigating to the next passage sends currentScripture without
+  // currentMode, which must not fall through to the Media Permissions
+  // tier below; Scripture was never part of that tier's grant).
+  const bodyHasScriptureChange = req.body?.currentScripture !== undefined;
+  if (bodyHasScriptureChange && session.host_id !== userId) {
+    return err(res, "Only the current Guide can select Scripture", 403);
+  }
+  const bodyHasMediaChange =
+    req.body?.mediaProvider !== undefined || req.body?.mediaType !== undefined || req.body?.mediaId !== undefined ||
+    req.body?.mediaUrl !== undefined || req.body?.isPlaying !== undefined || req.body?.positionMs !== undefined ||
+    req.body?.playbackRate !== undefined;
+  if (bodyHasMediaChange && !canControlMedia(session as Record<string, unknown>, userId)) {
     return err(res, "You don't have permission to control Shared Media right now", 403);
   }
 
   const body = req.body as {
     status?: string; currentMode?: string; mediaProvider?: "youtube" | null;
     mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
-    isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: Record<string, unknown> | null;
+    isPlaying?: boolean; positionMs?: number; playbackRate?: number;
+    currentScripture?: { translation?: string; translationName?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
   };
+
+  if (body.currentScripture !== undefined && body.currentScripture !== null) {
+    const s = body.currentScripture;
+    if (!s.book || !s.chapter || !s.translation) return err(res, "currentScripture requires book, chapter, and translation");
+  }
 
   const update: Record<string, unknown> = {};
   if (body.status) update.status = body.status;
