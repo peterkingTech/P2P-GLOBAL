@@ -8,9 +8,10 @@ function err(res: import("express").Response, message: string, status = 400) {
   return res.status(status).json({ error: message });
 }
 
-const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "thanksgiving"] as const;
+const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "thanksgiving", "teaching"] as const;
 const VALID_PROVIDERS = ["youtube"] as const;
 const VALID_MEDIA_PERMISSIONS = ["guide_only", "trusted", "everyone"] as const;
+const VALID_PRESENCE_STATUSES = ["joined", "listening", "praying", "away"] as const;
 
 function mapSession(row: Record<string, unknown>) {
   return {
@@ -24,6 +25,9 @@ function mapSession(row: Record<string, unknown>) {
     mediaPermission: row.media_permission ?? "guide_only",
     trustedUserIds: row.trusted_user_ids ?? [],
     autoAdvance: row.auto_advance ?? false,
+    currentFocusPrayerRequestId: row.current_focus_prayer_request_id ?? null,
+    prayerTimerDurationSeconds: row.prayer_timer_duration_seconds ?? null,
+    prayerTimerStartedAt: row.prayer_timer_started_at ?? null,
   };
 }
 
@@ -147,6 +151,25 @@ router.post("/worship/sessions/:sessionId/leave", async (req, res) => {
   return ok(res, { left: true });
 });
 
+// PUT /family/worship/sessions/:sessionId/presence — { presenceStatus } —
+// self-only, backed by migration 116's existing "Users manage their own
+// participation row" policy (auth.uid() = user_id). Prayer participation
+// ("I'm praying") is just this: no new signal, the 'praying' value the
+// enum already reserved. Broadcasting it for instant delivery to other
+// clients is the caller's job (same persist+broadcast pattern as chat).
+router.put("/worship/sessions/:sessionId/presence", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { presenceStatus } = req.body as { presenceStatus?: string };
+  if (!presenceStatus || !VALID_PRESENCE_STATUSES.includes(presenceStatus as (typeof VALID_PRESENCE_STATUSES)[number])) {
+    return err(res, `presenceStatus must be one of: ${VALID_PRESENCE_STATUSES.join(", ")}`);
+  }
+  const { error } = await db.from("p2p_family_worship_participants")
+    .update({ presence_status: presenceStatus }).eq("session_id", req.params.sessionId).eq("user_id", userId).is("left_at", null);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { presenceStatus });
+});
+
 // PUT /family/worship/sessions/:sessionId/state — gated by Media
 // Permissions (canControlMedia), not just the host. currentMode (switching
 // to Scripture/Prayer/etc.) stays Guide-only regardless of the media
@@ -176,6 +199,14 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (bodyHasScriptureChange && session.host_id !== userId) {
     return err(res, "Only the current Guide can select Scripture", 403);
   }
+  // Prayer Space: focusing a request and starting/stopping the shared
+  // timer are Guide-only room-flow decisions, same category as mode and
+  // Scripture changes — not gated by Media Permissions.
+  const bodyHasPrayerFocusChange = req.body?.focusPrayerRequestId !== undefined;
+  const bodyHasPrayerTimerChange = req.body?.prayerTimerDurationSeconds !== undefined;
+  if ((bodyHasPrayerFocusChange || bodyHasPrayerTimerChange) && session.host_id !== userId) {
+    return err(res, "Only the current Guide can control Prayer Space", 403);
+  }
   const bodyHasMediaChange =
     req.body?.mediaProvider !== undefined || req.body?.mediaType !== undefined || req.body?.mediaId !== undefined ||
     req.body?.mediaUrl !== undefined || req.body?.isPlaying !== undefined || req.body?.positionMs !== undefined ||
@@ -189,11 +220,28 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
     isPlaying?: boolean; positionMs?: number; playbackRate?: number;
     currentScripture?: { translation?: string; translationName?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
+    focusPrayerRequestId?: string | null;
+    prayerTimerDurationSeconds?: number | null;
   };
 
   if (body.currentScripture !== undefined && body.currentScripture !== null) {
     const s = body.currentScripture;
     if (!s.book || !s.chapter || !s.translation) return err(res, "currentScripture requires book, chapter, and translation");
+  }
+
+  // A focused prayer request must belong to this family and must not be
+  // 'private' — the Guide focusing a request can never surface someone
+  // else's private prayer to the whole Gathering, even by mistake.
+  if (bodyHasPrayerFocusChange && body.focusPrayerRequestId) {
+    const { data: request } = await db
+      .from("p2p_family_prayer_requests").select("family_id,visibility").eq("id", body.focusPrayerRequestId).maybeSingle();
+    if (!request || request.family_id !== session.family_id) return err(res, "That prayer request wasn't found", 404);
+    if (request.visibility !== "family") return err(res, "Only a shared prayer request can be focused", 400);
+  }
+  if (bodyHasPrayerTimerChange && body.prayerTimerDurationSeconds !== null) {
+    if (!Number.isFinite(body.prayerTimerDurationSeconds) || (body.prayerTimerDurationSeconds as number) <= 0) {
+      return err(res, "prayerTimerDurationSeconds must be a positive number of seconds");
+    }
   }
 
   const update: Record<string, unknown> = {};
@@ -213,6 +261,14 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (body.mediaUrl !== undefined) update.media_url = body.mediaUrl;
   if (body.currentScripture !== undefined) update.current_scripture = body.currentScripture;
   if (body.playbackRate !== undefined) update.playback_rate = body.playbackRate;
+  if (bodyHasPrayerFocusChange) update.current_focus_prayer_request_id = body.focusPrayerRequestId;
+  // Setting a duration (re)starts the timer, anchored to now — same
+  // "recompute from a fixed point" idea as the media playback clock.
+  // Sending null explicitly stops/clears it.
+  if (bodyHasPrayerTimerChange) {
+    update.prayer_timer_duration_seconds = body.prayerTimerDurationSeconds;
+    update.prayer_timer_started_at = body.prayerTimerDurationSeconds === null ? null : new Date().toISOString();
+  }
 
   // Any play/pause/seek/media-change re-anchors the server clock: position
   // and "now" move together, so every client recomputes from the same
@@ -432,10 +488,22 @@ async function endSessionInternal(session: Record<string, unknown>) {
   const { count: participantCount } = await db
     .from("p2p_family_worship_participants").select("id", { count: "exact", head: true }).eq("session_id", session.id as string);
 
+  // Counts only, never content — "do not record sensitive information
+  // unnecessarily". Prayer requests aren't session-scoped (they're a
+  // standing family list), so this counts what was shared during this
+  // Gathering's time window rather than joining through a foreign key.
+  const { count: prayerRequestCount } = startedAt
+    ? await db.from("p2p_family_prayer_requests").select("id", { count: "exact", head: true })
+        .eq("family_id", session.family_id as string).gte("created_at", startedAt.toISOString()).lte("created_at", endedAt.toISOString())
+    : { count: 0 };
+  const { count: notesCount } = await db.from("p2p_family_worship_notes").select("id", { count: "exact", head: true }).eq("session_id", session.id as string);
+
   const { data: history } = await db.from("p2p_family_worship_history").insert({
     family_id: session.family_id, session_id: session.id, duration_seconds: durationSeconds,
     modes_visited: session.modes_visited ?? [], participant_count: participantCount ?? 0,
     scripture_reference: (session.current_scripture as Record<string, unknown> | null)?.reference ?? null,
+    media_provider: session.media_provider ?? null, media_id: session.media_id ?? null,
+    prayer_request_count: prayerRequestCount ?? 0, notes_count: notesCount ?? 0,
   }).select().single();
 
   // The explicit, minimal "clean integration point" for a future family
@@ -509,24 +577,138 @@ router.get("/worship/sessions/:sessionId/messages", async (req, res) => {
   return ok(res, (messages ?? []).map((m) => mapMessage(m as Record<string, unknown>, nameById.get(m.user_id as string) ?? "Someone")));
 });
 
-// POST /family/worship/sessions/:sessionId/messages — { content }. Identity
-// always from verifyCaller, never a client-supplied userId — the RLS in
-// migration 122 enforces the same rule again independently at the DB layer.
+// P2P Together Phase 7 — Conversation's "Scripture references / media
+// references / questions" is exactly the context column migration 122
+// reserved for this. Light validation only (a known type tag) — the
+// payload shape itself is intentionally not deep-validated field-by-field,
+// same "don't over-engineer" restraint as the rest of this phase.
+const VALID_MESSAGE_CONTEXT_TYPES = ["scripture", "media", "question"] as const;
+
+// POST /family/worship/sessions/:sessionId/messages — { content, context? }.
+// Identity always from verifyCaller, never a client-supplied userId — the
+// RLS in migration 122 enforces the same rule again independently at the
+// DB layer.
 router.post("/worship/sessions/:sessionId/messages", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { sessionId } = req.params;
-  const { content } = req.body as { content?: string };
+  const { content, context } = req.body as { content?: string; context?: { type?: string } | null };
   if (!content?.trim()) return err(res, "content is required");
   if (content.length > 2000) return err(res, "Message is too long");
+  if (context && !VALID_MESSAGE_CONTEXT_TYPES.includes(context.type as (typeof VALID_MESSAGE_CONTEXT_TYPES)[number])) {
+    return err(res, `context.type must be one of: ${VALID_MESSAGE_CONTEXT_TYPES.join(", ")}`);
+  }
   if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
 
   const { data: message, error } = await db
-    .from("p2p_family_worship_messages").insert({ session_id: sessionId, user_id: userId, content: content.trim() }).select().single();
+    .from("p2p_family_worship_messages").insert({ session_id: sessionId, user_id: userId, content: content.trim(), context: context ?? null }).select().single();
   if (error || !message) return err(res, error?.message ?? "Failed to send message", 500);
 
   const { data: profile } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
   return ok(res, mapMessage(message as Record<string, unknown>, (profile?.full_name as string) ?? "Someone"));
+});
+
+// ── Shared / Private / Scripture-linked Notes ───────────────────────────────────
+// Deliberately minimal CRUD — "prepare architecture... do not
+// over-engineer". Same active-participant boundary as messages/queue.
+const VALID_NOTE_VISIBILITY = ["shared", "private"] as const;
+
+function mapNote(row: Record<string, unknown>, authorName: string) {
+  return {
+    id: row.id, sessionId: row.session_id, authorId: row.author_id, authorName,
+    visibility: row.visibility, content: row.content, scriptureReference: row.scripture_reference ?? null,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+// GET /family/worship/sessions/:sessionId/notes — shared notes plus the
+// caller's own private ones (same "or" query shape as prayer-requests, so
+// a private note from someone else can never leak even if a future caller
+// forgets the visibility filter).
+router.get("/worship/sessions/:sessionId/notes", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { sessionId } = req.params;
+  if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
+
+  const { data: notes, error } = await db
+    .from("p2p_family_worship_notes").select("*").eq("session_id", sessionId)
+    .or(`visibility.eq.shared,author_id.eq.${userId}`)
+    .order("created_at", { ascending: true });
+  if (error) return err(res, error.message, 500);
+
+  const userIds = Array.from(new Set((notes ?? []).map((n) => n.author_id as string)));
+  const { data: profiles } = userIds.length
+    ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+  return ok(res, (notes ?? []).map((n) => mapNote(n as Record<string, unknown>, nameById.get(n.author_id as string) ?? "Someone")));
+});
+
+// POST /family/worship/sessions/:sessionId/notes — { content, visibility?, scriptureReference? }
+router.post("/worship/sessions/:sessionId/notes", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { sessionId } = req.params;
+  const { content, visibility, scriptureReference } = req.body as {
+    content?: string; visibility?: string;
+    scriptureReference?: { translation?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
+  };
+  if (!content?.trim()) return err(res, "content is required");
+  if (visibility !== undefined && !VALID_NOTE_VISIBILITY.includes(visibility as (typeof VALID_NOTE_VISIBILITY)[number])) {
+    return err(res, `visibility must be one of: ${VALID_NOTE_VISIBILITY.join(", ")}`);
+  }
+  if (scriptureReference && (!scriptureReference.book || !scriptureReference.chapter || !scriptureReference.translation)) {
+    return err(res, "scriptureReference requires book, chapter, and translation");
+  }
+  if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
+
+  const { data: note, error } = await db.from("p2p_family_worship_notes").insert({
+    session_id: sessionId, author_id: userId, content: content.trim(),
+    visibility: visibility ?? "shared", scripture_reference: scriptureReference ?? null,
+  }).select().single();
+  if (error || !note) return err(res, error?.message ?? "Failed to save note", 500);
+
+  const { data: profile } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
+  return ok(res, mapNote(note as Record<string, unknown>, (profile?.full_name as string) ?? "Someone"));
+});
+
+// PUT /family/worship/sessions/:sessionId/notes/:noteId — author-only.
+router.put("/worship/sessions/:sessionId/notes/:noteId", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { content, visibility } = req.body as { content?: string; visibility?: string };
+  const { data: existing } = await db.from("p2p_family_worship_notes").select("author_id").eq("id", req.params.noteId).eq("session_id", req.params.sessionId).maybeSingle();
+  if (!existing) return err(res, "Note not found", 404);
+  if (existing.author_id !== userId) return err(res, "Only the author can edit this note", 403);
+
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (content !== undefined) {
+    if (!content.trim()) return err(res, "content cannot be empty");
+    update.content = content.trim();
+  }
+  if (visibility !== undefined) {
+    if (!VALID_NOTE_VISIBILITY.includes(visibility as (typeof VALID_NOTE_VISIBILITY)[number])) return err(res, `visibility must be one of: ${VALID_NOTE_VISIBILITY.join(", ")}`);
+    update.visibility = visibility;
+  }
+
+  const { data: note, error } = await db.from("p2p_family_worship_notes").update(update).eq("id", req.params.noteId).select().single();
+  if (error || !note) return err(res, error?.message ?? "Failed to update note", 500);
+  const { data: profile } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
+  return ok(res, mapNote(note as Record<string, unknown>, (profile?.full_name as string) ?? "Someone"));
+});
+
+// DELETE /family/worship/sessions/:sessionId/notes/:noteId — author-only.
+router.delete("/worship/sessions/:sessionId/notes/:noteId", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { data: existing } = await db.from("p2p_family_worship_notes").select("author_id").eq("id", req.params.noteId).eq("session_id", req.params.sessionId).maybeSingle();
+  if (!existing) return err(res, "Note not found", 404);
+  if (existing.author_id !== userId) return err(res, "Only the author can delete this note", 403);
+
+  const { error } = await db.from("p2p_family_worship_notes").delete().eq("id", req.params.noteId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { deleted: true });
 });
 
 // POST /family/worship/sessions/:sessionId/remove — { userId } — Guide or

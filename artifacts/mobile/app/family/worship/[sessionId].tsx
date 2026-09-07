@@ -6,13 +6,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
-  getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState,
+  getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState, updateWorshipPresence,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
   getWorshipMessages, sendWorshipMessage, removeWorshipParticipant, canControlMedia,
   getWorshipQueue, addToWorshipQueue, removeFromWorshipQueue, reorderWorshipQueue, playNextInWorshipQueue,
-  updateMediaPermission, setTrustedParticipant,
+  updateMediaPermission, setTrustedParticipant, getWorshipNotes, createWorshipNote, deleteWorshipNote,
   computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider, type WorshipMessage,
-  type WorshipQueueItem, type MediaPermission,
+  type WorshipQueueItem, type MediaPermission, type WorshipNote, type MessageContext, type WorshipScripture,
 } from "@/lib/familyApi";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { useTogetherAudio } from "@/hooks/useTogetherAudio";
@@ -21,6 +21,8 @@ import AudioBalancePanel from "@/components/family/AudioBalancePanel";
 import ChatPanel from "@/components/family/ChatPanel";
 import MediaShelfPanel from "@/components/family/MediaShelfPanel";
 import ScripturePanel from "@/components/family/ScripturePanel";
+import PrayerSpacePanel from "@/components/family/PrayerSpacePanel";
+import NotesPanel from "@/components/family/NotesPanel";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
@@ -35,6 +37,7 @@ const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "sharing", label: "Sharing", icon: "🎤" },
   { key: "silent_prayer", label: "Silent", icon: "🕊️" },
   { key: "thanksgiving", label: "Thanks", icon: "❤️" },
+  { key: "teaching", label: "Teaching", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
 
@@ -64,7 +67,6 @@ export default function FamilyWorshipScreen() {
   const [, forceTick] = useState(0);
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
   const [prayers, setPrayers] = useState<FamilyPrayerRequest[]>([]);
-  const [newPrayer, setNewPrayer] = useState("");
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
@@ -73,6 +75,9 @@ export default function FamilyWorshipScreen() {
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<WorshipMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
+  const [pendingChatContext, setPendingChatContext] = useState<MessageContext | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notes, setNotes] = useState<WorshipNote[]>([]);
   const [mediaShelfOpen, setMediaShelfOpen] = useState(false);
   const [queue, setQueue] = useState<WorshipQueueItem[]>([]);
   const [isBehind, setIsBehind] = useState(false);
@@ -120,6 +125,7 @@ export default function FamilyWorshipScreen() {
       // new messages after that arrive live over the signal broadcast below.
       getWorshipMessages(params.sessionId).then(setMessages).catch(() => {});
       getWorshipQueue(params.sessionId).then(setQueue).catch(() => {});
+      getWorshipNotes(params.sessionId).then(setNotes).catch(() => {});
     } catch (e: any) {
       showAlert("Couldn't load Family Worship", e.message ?? "Please try again.");
     } finally {
@@ -218,6 +224,16 @@ export default function FamilyWorshipScreen() {
       .on("broadcast", { event: "chat_message" }, ({ payload }: { payload: WorshipMessage }) => {
         setMessages((prev) => (prev.some((m) => m.id === payload.id) ? prev : [...prev, payload]));
       })
+      .on("broadcast", { event: "note" }, ({ payload }: { payload: WorshipNote }) => {
+        setNotes((prev) => (prev.some((n) => n.id === payload.id) ? prev : [...prev, payload]));
+      })
+      // Prayer participation — persisted via presence_status (see the
+      // PUT .../presence route comment), broadcast here purely for instant
+      // delivery to already-connected clients; a reconnect picks it up
+      // from the normal GET regardless.
+      .on("broadcast", { event: "presence" }, ({ payload }: { payload: { userId: string; presenceStatus: string } }) => {
+        setParticipants((prev) => prev.map((p) => (p.user_id === payload.userId ? { ...p, presence_status: payload.presenceStatus } : p)));
+      })
       .on("broadcast", { event: "removed" }, ({ payload }: { payload: { userId: string } }) => {
         if (payload.userId === profile?.id) {
           showAlert("Removed", "The Guide removed you from this Gathering.");
@@ -290,9 +306,11 @@ export default function FamilyWorshipScreen() {
   async function sendChatMessage() {
     if (!session || !chatDraft.trim()) return;
     const content = chatDraft.trim();
+    const context = pendingChatContext;
     setChatDraft("");
+    setPendingChatContext(null);
     try {
-      const message = await sendWorshipMessage(session.id, content);
+      const message = await sendWorshipMessage(session.id, content, context);
       setMessages((prev) => [...prev, message]);
       signalRef.current?.send({ type: "broadcast", event: "chat_message", payload: message });
     } catch (e: any) {
@@ -440,11 +458,10 @@ export default function FamilyWorshipScreen() {
     } catch (e: any) { showAlert("Couldn't share that passage", e.message ?? "Please try again."); }
   }
 
-  async function addPrayer() {
-    if (!session || !newPrayer.trim()) return;
+  async function addPrayer(content: string, visibility: "private" | "family", scriptureReference: WorshipScripture | null) {
+    if (!session) return;
     try {
-      await createFamilyPrayerRequest(session.familyId, newPrayer.trim(), "family");
-      setNewPrayer("");
+      await createFamilyPrayerRequest(session.familyId, content, visibility, scriptureReference);
       setPrayers(await getFamilyPrayerRequests(session.familyId));
     } catch (e: any) { showAlert("Couldn't share this prayer", e.message ?? "Please try again."); }
   }
@@ -452,6 +469,64 @@ export default function FamilyWorshipScreen() {
     if (!session) return;
     try { await updateFamilyPrayerRequestStatus(session.familyId, id, "prayed"); setPrayers(await getFamilyPrayerRequests(session.familyId)); }
     catch (e: any) { showAlert("Couldn't update this prayer", e.message ?? "Please try again."); }
+  }
+  async function markAnswered(id: string) {
+    if (!session) return;
+    try { await updateFamilyPrayerRequestStatus(session.familyId, id, "answered"); setPrayers(await getFamilyPrayerRequests(session.familyId)); }
+    catch (e: any) { showAlert("Couldn't update this prayer", e.message ?? "Please try again."); }
+  }
+
+  // Prayer Focus and the Prayer Timer both ride the session row (Guide-only,
+  // same authorization + broadcast pattern as Scripture and mode changes) —
+  // no separate realtime channel needed.
+  async function setPrayerFocus(requestId: string | null) {
+    if (!session || !isHost) return;
+    try {
+      const updated = await updateWorshipState(session.id, { focusPrayerRequestId: requestId });
+      setSession(updated);
+      broadcastState(updated);
+    } catch (e: any) { showAlert("Couldn't focus this request", e.message ?? "Please try again."); }
+  }
+  async function startPrayerTimer(durationSeconds: number) {
+    if (!session || !isHost) return;
+    try {
+      const updated = await updateWorshipState(session.id, { prayerTimerDurationSeconds: durationSeconds });
+      setSession(updated);
+      broadcastState(updated);
+    } catch (e: any) { showAlert("Couldn't start the timer", e.message ?? "Please try again."); }
+  }
+  async function stopPrayerTimer() {
+    if (!session || !isHost) return;
+    try {
+      const updated = await updateWorshipState(session.id, { prayerTimerDurationSeconds: null });
+      setSession(updated);
+      broadcastState(updated);
+    } catch (e: any) { showAlert("Couldn't stop the timer", e.message ?? "Please try again."); }
+  }
+
+  // "I'm praying" — persists to the participant row (reconnect-safe) and
+  // broadcasts for instant delivery, same dual-path as chat.
+  const myPresenceStatus = participants.find((p) => p.user_id === profile?.id)?.presence_status;
+  async function togglePraying() {
+    if (!session || !profile?.id) return;
+    const next = myPresenceStatus === "praying" ? "joined" : "praying";
+    setParticipants((prev) => prev.map((p) => (p.user_id === profile.id ? { ...p, presence_status: next } : p)));
+    signalRef.current?.send({ type: "broadcast", event: "presence", payload: { userId: profile.id, presenceStatus: next } });
+    try { await updateWorshipPresence(session.id, next); } catch { /* ephemeral UI already updated; next reconnect resyncs from GET */ }
+  }
+
+  async function addNote(content: string, visibility: "shared" | "private", scriptureReference: WorshipScripture | null) {
+    if (!session) return;
+    try {
+      const note = await createWorshipNote(session.id, content, visibility, scriptureReference);
+      setNotes((prev) => [...prev, note]);
+      if (visibility === "shared") signalRef.current?.send({ type: "broadcast", event: "note", payload: note });
+    } catch (e: any) { showAlert("Couldn't save this note", e.message ?? "Please try again."); }
+  }
+  async function deleteNote(noteId: string) {
+    if (!session) return;
+    try { await deleteWorshipNote(session.id, noteId); setNotes((prev) => prev.filter((n) => n.id !== noteId)); }
+    catch (e: any) { showAlert("Couldn't delete this note", e.message ?? "Please try again."); }
   }
 
   async function handleTransfer(newHostId: string) {
@@ -559,26 +634,63 @@ export default function FamilyWorshipScreen() {
 
         {(session.currentMode === "prayer" || session.currentMode === "silent_prayer") && (
           <View style={styles.panel}>
-            <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "SILENT PRAYER" : "FAMILY PRAYER"}</Text>
+            <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "SILENT PRAYER" : "PRAYER SPACE"}</Text>
             {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Microphones are muted.</Text>}
-            {prayers.filter((p) => p.status !== "answered").map((p) => (
-              <View key={p.id} style={styles.prayerRow}>
-                <Text style={styles.prayerText}>🙏 {p.content}</Text>
-                {p.status === "open" && (
-                  <TouchableOpacity onPress={() => markPrayed(p.id)}><Text style={styles.prayerAction}>Prayed</Text></TouchableOpacity>
+            <PrayerSpacePanel
+              session={session}
+              prayers={prayers}
+              isGuide={isHost}
+              myUserId={profile?.id}
+              praying={myPresenceStatus === "praying"}
+              prayingCount={activeParticipants.filter((p) => p.presence_status === "praying").length}
+              onTogglePraying={togglePraying}
+              onAdd={addPrayer}
+              onMarkPrayed={markPrayed}
+              onMarkAnswered={markAnswered}
+              onSetFocus={setPrayerFocus}
+              onStartTimer={startPrayerTimer}
+              onStopTimer={stopPrayerTimer}
+            />
+          </View>
+        )}
+
+        {session.currentMode === "teaching" && (
+          <View style={styles.panel}>
+            <View style={styles.panelLabelRow}>
+              <Text style={styles.panelLabel}>TEACHING</Text>
+              <TouchableOpacity onPress={() => setNotesOpen(true)}>
+                <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
+            <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
+            {(session.mediaId || canControl) && (
+              <View>
+                <SyncedMediaPlayer
+                  session={session}
+                  mediaVolume={effectiveMediaVolume(togetherAudio.prefs)}
+                  resyncNonce={resyncNonce}
+                  onDriftStatus={setIsBehind}
+                  onEnded={handleMediaEnded}
+                />
+                {canControl && (
+                  <View style={styles.hostRow}>
+                    <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
+                      <Ionicons name={session.isPlaying ? "pause" : "play"} size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={styles.mediaInput}
+                      placeholder="Paste a YouTube link…"
+                      placeholderTextColor="rgba(255,255,255,0.4)"
+                      value={mediaUrlInput}
+                      onChangeText={setMediaUrlInput}
+                      autoCapitalize="none"
+                    />
+                    <TouchableOpacity style={styles.smallBtn} onPress={setMedia}><Text style={styles.smallBtnText}>Set</Text></TouchableOpacity>
+                  </View>
                 )}
               </View>
-            ))}
-            <View style={styles.hostRow}>
-              <TextInput
-                style={[styles.mediaInput, { flex: 1 }]}
-                placeholder="Share a prayer request…"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                value={newPrayer}
-                onChangeText={setNewPrayer}
-              />
-              <TouchableOpacity style={styles.smallBtn} onPress={addPrayer}><Text style={styles.smallBtnText}>Share</Text></TouchableOpacity>
-            </View>
+            )}
           </View>
         )}
 
@@ -609,6 +721,7 @@ export default function FamilyWorshipScreen() {
                 >
                   <Text style={styles.participantInitial}>{name.charAt(0).toUpperCase()}</Text>
                   <Text style={styles.participantName} numberOfLines={1}>{name}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
+                  {p.presence_status === "praying" && <Text style={{ fontSize: 10 }}>🙏</Text>}
                   {voice?.connected && voice.muted && <Ionicons name="mic-off" size={10} color="rgba(255,255,255,0.6)" />}
                   {handUp && (
                     <TouchableOpacity
@@ -669,6 +782,14 @@ export default function FamilyWorshipScreen() {
           accessibilityLabel="Together Chat"
         >
           <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.transferBtn}
+          onPress={() => setNotesOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Notes"
+        >
+          <Ionicons name="document-text-outline" size={16} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.transferBtn}
@@ -733,6 +854,10 @@ export default function FamilyWorshipScreen() {
         draft={chatDraft}
         onChangeDraft={setChatDraft}
         onSend={sendChatMessage}
+        currentScripture={session.currentScripture}
+        currentMedia={session.mediaProvider && session.mediaId ? { mediaProvider: session.mediaProvider, mediaId: session.mediaId, positionMs: Math.max(0, computeWorshipPositionMs(session)) } : null}
+        pendingContext={pendingChatContext}
+        onSetPendingContext={setPendingChatContext}
       />
 
       <MediaShelfPanel
@@ -753,6 +878,16 @@ export default function FamilyWorshipScreen() {
         companions={voiceCompanions}
         trustedUserIds={session.trustedUserIds}
         onToggleTrusted={handleToggleTrusted}
+      />
+
+      <NotesPanel
+        visible={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        notes={notes}
+        myUserId={profile?.id}
+        currentScripture={session.currentScripture}
+        onAdd={addNote}
+        onDelete={deleteNote}
       />
     </View>
   );

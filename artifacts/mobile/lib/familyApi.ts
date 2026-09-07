@@ -56,18 +56,21 @@ export function removeFamilyMember(familyId: string, userId: string) {
 export interface FamilyPrayerRequest {
   id: string; family_id: string; user_id: string; content: string;
   visibility: "private" | "family"; status: "open" | "prayed" | "answered"; created_at: string;
+  scripture_reference?: WorshipScripture | null;
 }
 export function getFamilyPrayerRequests(familyId: string): Promise<FamilyPrayerRequest[]> {
   return authedFetch(`/family/${familyId}/prayer-requests`);
 }
-export function createFamilyPrayerRequest(familyId: string, content: string, visibility: "private" | "family") {
-  return authedFetch(`/family/${familyId}/prayer-requests`, { method: "POST", body: JSON.stringify({ content, visibility }) });
+export function createFamilyPrayerRequest(
+  familyId: string, content: string, visibility: "private" | "family", scriptureReference?: WorshipScripture | null
+) {
+  return authedFetch(`/family/${familyId}/prayer-requests`, { method: "POST", body: JSON.stringify({ content, visibility, scriptureReference }) });
 }
 export function updateFamilyPrayerRequestStatus(familyId: string, id: string, status: "prayed" | "answered") {
   return authedFetch(`/family/${familyId}/prayer-requests/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) });
 }
 
-export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "silent_prayer" | "thanksgiving";
+export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "silent_prayer" | "thanksgiving" | "teaching";
 // mediaProvider is the new provider boundary (lib/mediaProviders) — when
 // set, mediaId holds that provider's external id and mediaType/mediaUrl
 // are unused. When null, mediaType/mediaUrl carry the legacy raw-file
@@ -90,6 +93,18 @@ export interface WorshipSession {
   channelName: string; startedAt: string | null; endedAt: string | null;
   mediaPermission: MediaPermission; trustedUserIds: string[]; autoAdvance: boolean;
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
+  currentFocusPrayerRequestId: string | null;
+  prayerTimerDurationSeconds: number | null;
+  prayerTimerStartedAt: string | null;
+}
+
+// Remaining seconds on the Guide's shared Prayer Timer, same
+// anchor-clock derivation as computeWorshipPositionMs — never persisted
+// per-tick, just recomputed on every render/tick from a fixed point.
+export function computePrayerTimerRemainingSeconds(session: WorshipSession): number | null {
+  if (session.prayerTimerDurationSeconds == null || !session.prayerTimerStartedAt) return null;
+  const elapsedSeconds = (Date.now() - new Date(session.prayerTimerStartedAt).getTime()) / 1000;
+  return Math.max(0, Math.round(session.prayerTimerDurationSeconds - elapsedSeconds));
 }
 
 export function formatScriptureReference(s: WorshipScripture): string {
@@ -125,8 +140,16 @@ export function updateWorshipState(sessionId: string, patch: {
   status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
   mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
   isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: WorshipScripture | null;
+  focusPrayerRequestId?: string | null; prayerTimerDurationSeconds?: number | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });
+}
+// Prayer participation ("I'm praying") — persists via the existing
+// participant row (presence_status), so a late joiner/reconnect sees it
+// on their next GET; the worship screen also broadcasts it for instant
+// delivery to already-connected clients, same dual-path as chat.
+export function updateWorshipPresence(sessionId: string, presenceStatus: "joined" | "listening" | "praying" | "away") {
+  return authedFetch(`/family/worship/sessions/${sessionId}/presence`, { method: "PUT", body: JSON.stringify({ presenceStatus }) });
 }
 export function transferWorshipHost(sessionId: string, newHostId: string) {
   return authedFetch(`/family/worship/sessions/${sessionId}/transfer-host`, { method: "POST", body: JSON.stringify({ newHostId }) });
@@ -163,6 +186,26 @@ export function playNextInWorshipQueue(sessionId: string): Promise<WorshipSessio
 export interface WorshipHistoryEntry {
   id: string; family_id: string; session_id: string; duration_seconds: number;
   modes_visited: string[]; participant_count: number; scripture_reference: string | null; created_at: string;
+  media_provider: string | null; media_id: string | null; prayer_request_count: number; notes_count: number;
+}
+
+// ── Shared / Private / Scripture-linked Notes ───────────────────────────────────
+// Deliberately minimal — see components/family/NotesPanel.tsx.
+export interface WorshipNote {
+  id: string; sessionId: string; authorId: string; authorName: string;
+  visibility: "shared" | "private"; content: string; scriptureReference: WorshipScripture | null;
+  createdAt: string; updatedAt: string;
+}
+export function getWorshipNotes(sessionId: string): Promise<WorshipNote[]> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/notes`);
+}
+export function createWorshipNote(
+  sessionId: string, content: string, visibility: "shared" | "private", scriptureReference?: WorshipScripture | null
+): Promise<WorshipNote> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/notes`, { method: "POST", body: JSON.stringify({ content, visibility, scriptureReference }) });
+}
+export function deleteWorshipNote(sessionId: string, noteId: string) {
+  return authedFetch(`/family/worship/sessions/${sessionId}/notes/${noteId}`, { method: "DELETE" });
 }
 export function getWorshipHistory(familyId: string): Promise<WorshipHistoryEntry[]> {
   return authedFetch(`/family/worship/history?familyId=${familyId}`);
@@ -188,14 +231,22 @@ export async function getBiblePassage(book: string, chapter: number, startVerse:
   return body;
 }
 
+// P2P Together Phase 7 — Conversation's "Scripture references / media
+// references / questions" ride the messages table's context column
+// (reserved since migration 122, unused until now).
+export type MessageContext =
+  | ({ type: "scripture" } & WorshipScripture)
+  | { type: "media"; mediaProvider: SharedMediaProvider; mediaId: string; positionMs: number }
+  | { type: "question" };
+
 export interface WorshipMessage {
-  id: string; sessionId: string; userId: string; authorName: string; content: string; context: unknown | null; createdAt: string;
+  id: string; sessionId: string; userId: string; authorName: string; content: string; context: MessageContext | null; createdAt: string;
 }
 export function getWorshipMessages(sessionId: string): Promise<WorshipMessage[]> {
   return authedFetch(`/family/worship/sessions/${sessionId}/messages`);
 }
-export function sendWorshipMessage(sessionId: string, content: string): Promise<WorshipMessage> {
-  return authedFetch(`/family/worship/sessions/${sessionId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+export function sendWorshipMessage(sessionId: string, content: string, context?: MessageContext | null): Promise<WorshipMessage> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/messages`, { method: "POST", body: JSON.stringify({ content, context }) });
 }
 export function removeWorshipParticipant(sessionId: string, userId: string) {
   return authedFetch(`/family/worship/sessions/${sessionId}/remove`, { method: "POST", body: JSON.stringify({ userId }) });

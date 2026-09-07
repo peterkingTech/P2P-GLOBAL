@@ -233,19 +233,29 @@ router.get("/:familyId/prayer-requests", async (req, res) => {
   return ok(res, data ?? []);
 });
 
-// POST /family/:familyId/prayer-requests — { content, visibility }
+// POST /family/:familyId/prayer-requests — { content, visibility, scriptureReference? }
+// scriptureReference is the same structured {translation, book, chapter,
+// startVerse, endVerse} shape used by p2p_family_worship_sessions'
+// current_scripture — never a second copy of translation text.
 router.post("/:familyId/prayer-requests", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { familyId } = req.params;
-  const { content, visibility } = req.body as { content?: string; visibility?: "private" | "family" };
+  const { content, visibility, scriptureReference } = req.body as {
+    content?: string; visibility?: "private" | "family";
+    scriptureReference?: { translation?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
+  };
   if (!content?.trim()) return err(res, "content is required");
+  if (scriptureReference && (!scriptureReference.book || !scriptureReference.chapter || !scriptureReference.translation)) {
+    return err(res, "scriptureReference requires book, chapter, and translation");
+  }
 
   const membership = await getActiveMembership(userId);
   if (membership?.family_id !== familyId) return err(res, "You're not a member of this family", 403);
 
   const { data, error } = await db.from("p2p_family_prayer_requests").insert({
     family_id: familyId, user_id: userId, content: content.trim(), visibility: visibility === "private" ? "private" : "family",
+    scripture_reference: scriptureReference ?? null,
   }).select().single();
   if (error) return err(res, error.message, 500);
   return ok(res, data);
