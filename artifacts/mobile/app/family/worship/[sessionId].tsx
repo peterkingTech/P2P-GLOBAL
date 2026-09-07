@@ -9,12 +9,14 @@ import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
   getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
-  computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider,
+  getWorshipMessages, sendWorshipMessage, removeWorshipParticipant,
+  computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider, type WorshipMessage,
 } from "@/lib/familyApi";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { useTogetherAudio } from "@/hooks/useTogetherAudio";
 import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
 import AudioBalancePanel from "@/components/family/AudioBalancePanel";
+import ChatPanel from "@/components/family/ChatPanel";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
@@ -30,7 +32,7 @@ const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "silent_prayer", label: "Silent", icon: "🕊️" },
   { key: "thanksgiving", label: "Thanks", icon: "❤️" },
 ];
-const REACTIONS = ["🙏", "❤️", "🙌", "🕊️", "📖"];
+const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
 
 function FloatingReaction({ emoji }: { emoji: string }) {
   const translateY = useRef(new Animated.Value(0)).current;
@@ -64,6 +66,11 @@ export default function FamilyWorshipScreen() {
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
   const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<string>>(new Set());
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState<WorshipMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
   const leftRef = useRef(false);
   const togetherAudio = useTogetherAudio();
   const voiceCompanions = React.useMemo(
@@ -88,6 +95,9 @@ export default function FamilyWorshipScreen() {
         const p = await getFamilyPrayerRequests(family.family.id);
         setPrayers(p);
       }
+      // Chat history — a late joiner or reconnecting client catches up here;
+      // new messages after that arrive live over the signal broadcast below.
+      getWorshipMessages(params.sessionId).then(setMessages).catch(() => {});
     } catch (e: any) {
       showAlert("Couldn't load Family Worship", e.message ?? "Please try again.");
     } finally {
@@ -140,7 +150,11 @@ export default function FamilyWorshipScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [params.sessionId, leave]);
 
-  // Private signaling channel — reactions only (ephemeral, never persisted).
+  // Private signaling channel — Expressions (reactions), Hand Up, Together
+  // Chat's live delivery, moderation, and session-state sync all ride the
+  // same channel (migration 121's realtime.messages RLS already scopes it
+  // to active participants of this exact session — a removed participant
+  // is blocked here the instant their participant row is marked left).
   const signalRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   useEffect(() => {
     if (!params.sessionId) return;
@@ -155,6 +169,26 @@ export default function FamilyWorshipScreen() {
         const id = Date.now() + Math.random();
         setReactions((prev) => [...prev, { id, emoji: payload.emoji }]);
         setTimeout(() => setReactions((prev) => prev.filter((r) => r.id !== id)), 1500);
+      })
+      .on("broadcast", { event: "hand_raised" }, ({ payload }: { payload: { userId: string } }) => {
+        setRaisedHandUserIds((prev) => new Set(prev).add(payload.userId));
+      })
+      .on("broadcast", { event: "hand_allowed" }, ({ payload }: { payload: { userId: string } }) => {
+        setRaisedHandUserIds((prev) => { const n = new Set(prev); n.delete(payload.userId); return n; });
+        if (payload.userId === profile?.id) { setHandRaised(false); showAlert("You're up!", "The Guide invited you to share."); }
+      })
+      .on("broadcast", { event: "hand_dismissed" }, ({ payload }: { payload: { userId: string } }) => {
+        setRaisedHandUserIds((prev) => { const n = new Set(prev); n.delete(payload.userId); return n; });
+        if (payload.userId === profile?.id) setHandRaised(false);
+      })
+      .on("broadcast", { event: "chat_message" }, ({ payload }: { payload: WorshipMessage }) => {
+        setMessages((prev) => (prev.some((m) => m.id === payload.id) ? prev : [...prev, payload]));
+      })
+      .on("broadcast", { event: "removed" }, ({ payload }: { payload: { userId: string } }) => {
+        if (payload.userId === profile?.id) {
+          showAlert("Removed", "The Guide removed you from this Gathering.");
+          leave();
+        }
       })
       // Primary state-sync path — see the broadcastState() comment above
       // its definition for why this exists alongside postgres_changes.
@@ -193,6 +227,63 @@ export default function FamilyWorshipScreen() {
     const id = Date.now();
     setReactions((prev) => [...prev, { id, emoji }]);
     setTimeout(() => setReactions((prev) => prev.filter((r) => r.id !== id)), 1500);
+  }
+
+  // Hand Up — ephemeral, like reactions: nothing is persisted, "complex
+  // stage functionality" (an actual speaking-turn system) is explicitly
+  // out of scope for this pass. Mirrors app/call/group.tsx's proven
+  // hand_raised/hand_acknowledged pattern for the exact same reason it
+  // works there: a Guide/host acknowledging is a cooperative signal, not
+  // something the sender can force onto another client.
+  function toggleRaiseHand() {
+    if (!profile?.id) return;
+    const next = !handRaised;
+    setHandRaised(next);
+    if (next) signalRef.current?.send({ type: "broadcast", event: "hand_raised", payload: { userId: profile.id } });
+  }
+  function allowHand(userId: string) {
+    signalRef.current?.send({ type: "broadcast", event: "hand_allowed", payload: { userId } });
+    setRaisedHandUserIds((prev) => { const n = new Set(prev); n.delete(userId); return n; });
+  }
+  function dismissHand(userId: string) {
+    signalRef.current?.send({ type: "broadcast", event: "hand_dismissed", payload: { userId } });
+    setRaisedHandUserIds((prev) => { const n = new Set(prev); n.delete(userId); return n; });
+  }
+
+  // Together Chat — persisted (POST) so a late joiner/reconnect has real
+  // history via GET, broadcast (proven-reliable path, same as reaction/
+  // state) for instant delivery to whoever's already connected.
+  async function sendChatMessage() {
+    if (!session || !chatDraft.trim()) return;
+    const content = chatDraft.trim();
+    setChatDraft("");
+    try {
+      const message = await sendWorshipMessage(session.id, content);
+      setMessages((prev) => [...prev, message]);
+      signalRef.current?.send({ type: "broadcast", event: "chat_message", payload: message });
+    } catch (e: any) {
+      showAlert("Couldn't send message", e.message ?? "Please try again.");
+    }
+  }
+
+  // Moderation — server-enforced (see POST .../remove's comment: RLS on
+  // both messages and this signal channel independently requires an
+  // active, left_at-null participant row, so this isn't just cosmetic).
+  function handleRemoveParticipant(userId: string, name: string) {
+    if (!session || !isHost) return;
+    Alert.alert(`Remove ${name}?`, "They'll be disconnected from this Gathering.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove", style: "destructive", onPress: async () => {
+          try {
+            await removeWorshipParticipant(session.id, userId);
+            signalRef.current?.send({ type: "broadcast", event: "removed", payload: { userId } });
+          } catch (e: any) {
+            showAlert("Couldn't remove", e.message ?? "Please try again.");
+          }
+        },
+      },
+    ]);
   }
 
   async function changeMode(mode: WorshipMode) {
@@ -414,12 +505,31 @@ export default function FamilyWorshipScreen() {
             {activeParticipants.map((p) => {
               const m = memberById.get(p.user_id);
               const voice = voiceSpace.companionStates.find((c) => c.userId === p.user_id);
+              const name = m?.name ?? "Someone";
+              const handUp = raisedHandUserIds.has(p.user_id);
+              const canModerate = isHost && p.user_id !== session.hostId && p.user_id !== profile?.id;
               return (
-                <View key={p.user_id} style={[styles.participantChip, voice?.speaking && styles.participantChipSpeaking]}>
-                  <Text style={styles.participantInitial}>{(m?.name ?? "?").charAt(0).toUpperCase()}</Text>
-                  <Text style={styles.participantName} numberOfLines={1}>{m?.name ?? "Someone"}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
+                <TouchableOpacity
+                  key={p.user_id}
+                  style={[styles.participantChip, voice?.speaking && styles.participantChipSpeaking]}
+                  onLongPress={() => canModerate && handleRemoveParticipant(p.user_id, name)}
+                  activeOpacity={canModerate ? 0.7 : 1}
+                >
+                  <Text style={styles.participantInitial}>{name.charAt(0).toUpperCase()}</Text>
+                  <Text style={styles.participantName} numberOfLines={1}>{name}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
                   {voice?.connected && voice.muted && <Ionicons name="mic-off" size={10} color="rgba(255,255,255,0.6)" />}
-                </View>
+                  {handUp && (
+                    <TouchableOpacity
+                      onPress={() => isHost && Alert.alert(`${name} — Hand Up`, "", [
+                        { text: "Dismiss", onPress: () => dismissHand(p.user_id) },
+                        { text: "Allow", onPress: () => allowHand(p.user_id) },
+                      ])}
+                      disabled={!isHost}
+                    >
+                      <Text style={styles.handUpBadge}>✋</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -441,12 +551,33 @@ export default function FamilyWorshipScreen() {
         </View>
       )}
 
-      <View style={[styles.bottomRow, { paddingBottom: insets.bottom + 12 }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bottomRowScroll}
+        contentContainerStyle={[styles.bottomRow, { paddingBottom: insets.bottom + 12 }]}
+      >
         {REACTIONS.map((emoji) => (
           <TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => sendReaction(emoji)}>
             <Text style={styles.reactionEmoji}>{emoji}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={[styles.transferBtn, handRaised && styles.transferBtnActive]}
+          onPress={toggleRaiseHand}
+          accessibilityRole="button"
+          accessibilityLabel={handRaised ? "Lower hand" : "Raise hand"}
+        >
+          <Text style={{ fontSize: 16 }}>✋</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.transferBtn}
+          onPress={() => setChatOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Together Chat"
+        >
+          <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.transferBtn}
           onPress={() => setAudioBalanceOpen(true)}
@@ -460,7 +591,7 @@ export default function FamilyWorshipScreen() {
             <Ionicons name="swap-horizontal" size={16} color="#fff" />
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
 
       <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <View style={styles.sheetOverlay}>
@@ -500,6 +631,16 @@ export default function FamilyWorshipScreen() {
         onToggleMic={voiceSpace.toggleMic}
         listening={voiceSpace.listening}
         onToggleListening={voiceSpace.toggleListening}
+      />
+
+      <ChatPanel
+        visible={chatOpen}
+        onClose={() => setChatOpen(false)}
+        messages={messages}
+        myUserId={profile?.id}
+        draft={chatDraft}
+        onChangeDraft={setChatDraft}
+        onSend={sendChatMessage}
       />
     </View>
   );
@@ -556,10 +697,13 @@ const styles = StyleSheet.create({
   modeIcon: { fontSize: 16 },
   modeLabel: { color: "rgba(255,255,255,0.7)", fontSize: 9, fontFamily: "Inter_500Medium" },
 
-  bottomRow: { flexDirection: "row", justifyContent: "center", gap: 14, paddingTop: 10 },
+  bottomRowScroll: { flexGrow: 0 },
+  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingTop: 10, paddingHorizontal: 16, minWidth: "100%" },
   reactionBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   reactionEmoji: { fontSize: 18 },
   transferBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" },
+  transferBtnActive: { backgroundColor: "#B8860B" },
+  handUpBadge: { fontSize: 12, marginLeft: 2 },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheetBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },

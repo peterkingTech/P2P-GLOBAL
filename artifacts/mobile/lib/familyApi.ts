@@ -116,6 +116,19 @@ export function getWorshipHistory(familyId: string): Promise<WorshipHistoryEntry
   return authedFetch(`/family/worship/history?familyId=${familyId}`);
 }
 
+export interface WorshipMessage {
+  id: string; sessionId: string; userId: string; authorName: string; content: string; context: unknown | null; createdAt: string;
+}
+export function getWorshipMessages(sessionId: string): Promise<WorshipMessage[]> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/messages`);
+}
+export function sendWorshipMessage(sessionId: string, content: string): Promise<WorshipMessage> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+}
+export function removeWorshipParticipant(sessionId: string, userId: string) {
+  return authedFetch(`/family/worship/sessions/${sessionId}/remove`, { method: "POST", body: JSON.stringify({ userId }) });
+}
+
 // The one place the server-anchored-clock formula is written — both
 // computeWorshipPositionMs below and YouTubePlayer's own drift-correction
 // loop call this, so there's a single source of truth for "expected

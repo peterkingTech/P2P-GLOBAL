@@ -259,4 +259,83 @@ router.get("/worship/history", async (req, res) => {
   return ok(res, data ?? []);
 });
 
+async function isActiveParticipant(sessionId: string, userId: string): Promise<boolean> {
+  const { data } = await db
+    .from("p2p_family_worship_participants").select("id").eq("session_id", sessionId).eq("user_id", userId).is("left_at", null).maybeSingle();
+  return !!data;
+}
+
+function mapMessage(row: Record<string, unknown>, authorName: string) {
+  return { id: row.id, sessionId: row.session_id, userId: row.user_id, authorName, content: row.content, context: row.context ?? null, createdAt: row.created_at };
+}
+
+// GET /family/worship/sessions/:sessionId/messages — Together chat history
+// for this Gathering. Active-participant-only, same boundary as everything
+// else in this session (mirrors realtime.messages' RLS in migration 122,
+// so a removed participant is blocked here AND on the broadcast channel).
+router.get("/worship/sessions/:sessionId/messages", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { sessionId } = req.params;
+  if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
+
+  const { data: messages, error } = await db
+    .from("p2p_family_worship_messages").select("*").eq("session_id", sessionId).order("created_at", { ascending: true }).limit(200);
+  if (error) return err(res, error.message, 500);
+
+  const userIds = Array.from(new Set((messages ?? []).map((m) => m.user_id as string)));
+  const { data: profiles } = userIds.length
+    ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds)
+    : { data: [] as { id: string; full_name: string }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
+
+  return ok(res, (messages ?? []).map((m) => mapMessage(m as Record<string, unknown>, nameById.get(m.user_id as string) ?? "Someone")));
+});
+
+// POST /family/worship/sessions/:sessionId/messages — { content }. Identity
+// always from verifyCaller, never a client-supplied userId — the RLS in
+// migration 122 enforces the same rule again independently at the DB layer.
+router.post("/worship/sessions/:sessionId/messages", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { sessionId } = req.params;
+  const { content } = req.body as { content?: string };
+  if (!content?.trim()) return err(res, "content is required");
+  if (content.length > 2000) return err(res, "Message is too long");
+  if (!(await isActiveParticipant(sessionId, userId))) return err(res, "You're not currently in this session", 403);
+
+  const { data: message, error } = await db
+    .from("p2p_family_worship_messages").insert({ session_id: sessionId, user_id: userId, content: content.trim() }).select().single();
+  if (error || !message) return err(res, error?.message ?? "Failed to send message", 500);
+
+  const { data: profile } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
+  return ok(res, mapMessage(message as Record<string, unknown>, (profile?.full_name as string) ?? "Someone"));
+});
+
+// POST /family/worship/sessions/:sessionId/remove — { userId } — Guide or
+// Family Shepherd only (same authorization as /end). Marks the target's
+// participant row left, which is what actually enforces the removal: RLS
+// on both p2p_family_worship_messages and the signal broadcast channel
+// (migration 121/122) require an active (left_at is null) participant row,
+// so a removed participant is blocked from Expressions/Hand Up/Chat
+// immediately, not just cosmetically signaled.
+router.post("/worship/sessions/:sessionId/remove", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  const { userId: targetUserId } = req.body as { userId?: string };
+  if (!targetUserId) return err(res, "userId is required");
+  if (targetUserId === session.host_id) return err(res, "The current Guide can't remove themselves this way", 400);
+
+  const { data: family } = await db.from("p2p_families").select("shepherd_id").eq("id", session.family_id as string).maybeSingle();
+  if (session.host_id !== userId && family?.shepherd_id !== userId) {
+    return err(res, "Only the Guide or the Family Shepherd can remove a participant", 403);
+  }
+
+  await db.from("p2p_family_worship_participants").update({ left_at: new Date().toISOString() })
+    .eq("session_id", session.id).eq("user_id", targetUserId).is("left_at", null);
+  return ok(res, { removed: true });
+});
+
 export default router;
