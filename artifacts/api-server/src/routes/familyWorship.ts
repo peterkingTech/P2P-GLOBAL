@@ -9,10 +9,12 @@ function err(res: import("express").Response, message: string, status = 400) {
 }
 
 const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "thanksgiving"] as const;
+const VALID_PROVIDERS = ["youtube"] as const;
 
 function mapSession(row: Record<string, unknown>) {
   return {
     id: row.id, familyId: row.family_id, hostId: row.host_id, status: row.status, currentMode: row.current_mode,
+    mediaProvider: row.media_provider ?? null,
     mediaType: row.media_type ?? null, mediaId: row.media_id ?? null, mediaUrl: row.media_url ?? null,
     playbackBasePositionMs: Number(row.playback_base_position_ms ?? 0),
     playbackBaseServerTime: row.playback_base_server_time, playbackRate: Number(row.playback_rate ?? 1),
@@ -142,7 +144,8 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (session.host_id !== userId) return err(res, "Only the current Worship Host can control this session", 403);
 
   const body = req.body as {
-    status?: string; currentMode?: string; mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
+    status?: string; currentMode?: string; mediaProvider?: "youtube" | null;
+    mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
     isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: Record<string, unknown> | null;
   };
 
@@ -154,6 +157,10 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     const visited = new Set([...(session.modes_visited as string[] ?? []), body.currentMode]);
     update.modes_visited = Array.from(visited);
   }
+  if (body.mediaProvider !== undefined) {
+    if (body.mediaProvider !== null && !VALID_PROVIDERS.includes(body.mediaProvider)) return err(res, `mediaProvider must be one of: ${VALID_PROVIDERS.join(", ")}`);
+    update.media_provider = body.mediaProvider;
+  }
   if (body.mediaType !== undefined) update.media_type = body.mediaType;
   if (body.mediaId !== undefined) update.media_id = body.mediaId;
   if (body.mediaUrl !== undefined) update.media_url = body.mediaUrl;
@@ -163,7 +170,7 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   // Any play/pause/seek/media-change re-anchors the server clock: position
   // and "now" move together, so every client recomputes from the same
   // fixed point rather than drifting relative to when they last polled.
-  if (body.isPlaying !== undefined || body.positionMs !== undefined || body.mediaType !== undefined) {
+  if (body.isPlaying !== undefined || body.positionMs !== undefined || body.mediaType !== undefined || body.mediaProvider !== undefined) {
     update.is_playing = body.isPlaying ?? session.is_playing;
     update.playback_base_position_ms = body.positionMs ?? session.playback_base_position_ms;
     update.playback_base_server_time = new Date().toISOString();

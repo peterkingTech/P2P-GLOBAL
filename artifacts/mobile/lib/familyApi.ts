@@ -68,8 +68,14 @@ export function updateFamilyPrayerRequestStatus(familyId: string, id: string, st
 }
 
 export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "silent_prayer" | "thanksgiving";
+// mediaProvider is the new provider boundary (lib/mediaProviders) — when
+// set, mediaId holds that provider's external id and mediaType/mediaUrl
+// are unused. When null, mediaType/mediaUrl carry the legacy raw-file
+// shape exactly as before this feature — nothing about that path changed.
+export type SharedMediaProvider = "youtube";
 export interface WorshipSession {
   id: string; familyId: string; hostId: string; status: string; currentMode: WorshipMode;
+  mediaProvider: SharedMediaProvider | null;
   mediaType: "video" | "audio" | null; mediaId: string | null; mediaUrl: string | null;
   playbackBasePositionMs: number; playbackBaseServerTime: string; playbackRate: number; isPlaying: boolean;
   currentScripture: { reference: string; verseIndex?: number } | null;
@@ -90,7 +96,8 @@ export function leaveWorshipSession(sessionId: string) {
   return authedFetch(`/family/worship/sessions/${sessionId}/leave`, { method: "POST" });
 }
 export function updateWorshipState(sessionId: string, patch: {
-  status?: string; currentMode?: WorshipMode; mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
+  status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
+  mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
   isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: { reference: string; verseIndex?: number } | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });

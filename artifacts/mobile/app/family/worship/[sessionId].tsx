@@ -9,8 +9,9 @@ import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
   getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
-  computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest,
+  computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider,
 } from "@/lib/familyApi";
+import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -116,6 +117,7 @@ export default function FamilyWorshipScreen() {
         }
         setSession((prev) => prev ? {
           ...prev, status: row.status as string, currentMode: row.current_mode as WorshipMode,
+          mediaProvider: row.media_provider as SharedMediaProvider | null,
           mediaType: row.media_type as "video" | "audio" | null, mediaId: row.media_id as string | null, mediaUrl: row.media_url as string | null,
           playbackBasePositionMs: Number(row.playback_base_position_ms ?? 0), playbackBaseServerTime: row.playback_base_server_time as string,
           playbackRate: Number(row.playback_rate ?? 1), isPlaying: !!row.is_playing,
@@ -173,10 +175,25 @@ export default function FamilyWorshipScreen() {
 
   async function setMedia() {
     if (!session || !isHost || !mediaUrlInput.trim()) return;
-    const isAudio = /\.(mp3|m4a|wav|aac)(\?|$)/i.test(mediaUrlInput.trim());
+    const input = mediaUrlInput.trim();
     try {
+      if (youtubeProvider.matches(input)) {
+        const videoId = youtubeProvider.extractId(input);
+        if (!videoId) {
+          showAlert("Couldn't recognize that link", "That doesn't look like a valid YouTube video link.");
+          return;
+        }
+        const updated = await updateWorshipState(session.id, {
+          mediaProvider: "youtube", mediaId: videoId, mediaType: null, mediaUrl: null, isPlaying: true, positionMs: 0,
+        });
+        setSession(updated);
+        setMediaUrlInput("");
+        return;
+      }
+      // Fallback: a direct audio/video file link (the pre-YouTube behavior, unchanged).
+      const isAudio = /\.(mp3|m4a|wav|aac)(\?|$)/i.test(input);
       const updated = await updateWorshipState(session.id, {
-        mediaUrl: mediaUrlInput.trim(), mediaType: isAudio ? "audio" : "video", isPlaying: true, positionMs: 0,
+        mediaProvider: null, mediaId: null, mediaUrl: input, mediaType: isAudio ? "audio" : "video", isPlaying: true, positionMs: 0,
       });
       setSession(updated);
       setMediaUrlInput("");
@@ -261,7 +278,8 @@ export default function FamilyWorshipScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {session.currentMode === "worship" && (
-          <>
+          <View style={styles.panel}>
+            <Text style={styles.panelLabel}>SHARED MEDIA</Text>
             <SyncedMediaPlayer session={session} />
             {isHost && (
               <View style={styles.hostRow}>
@@ -270,7 +288,7 @@ export default function FamilyWorshipScreen() {
                 </TouchableOpacity>
                 <TextInput
                   style={styles.mediaInput}
-                  placeholder="Paste a worship video/audio URL…"
+                  placeholder="Paste a YouTube link…"
                   placeholderTextColor="rgba(255,255,255,0.4)"
                   value={mediaUrlInput}
                   onChangeText={setMediaUrlInput}
@@ -279,7 +297,7 @@ export default function FamilyWorshipScreen() {
                 <TouchableOpacity style={styles.smallBtn} onPress={setMedia}><Text style={styles.smallBtnText}>Set</Text></TouchableOpacity>
               </View>
             )}
-          </>
+          </View>
         )}
 
         {session.currentMode === "scripture" && (
@@ -336,16 +354,19 @@ export default function FamilyWorshipScreen() {
           </View>
         )}
 
-        <View style={styles.participantsRow}>
-          {activeParticipants.map((p) => {
-            const m = memberById.get(p.user_id);
-            return (
-              <View key={p.user_id} style={styles.participantChip}>
-                <Text style={styles.participantInitial}>{(m?.name ?? "?").charAt(0).toUpperCase()}</Text>
-                <Text style={styles.participantName} numberOfLines={1}>{m?.name ?? "Someone"}{p.user_id === session.hostId ? " · Host" : ""}</Text>
-              </View>
-            );
-          })}
+        <View>
+          <Text style={styles.companionsLabel}>COMPANIONS</Text>
+          <View style={styles.participantsRow}>
+            {activeParticipants.map((p) => {
+              const m = memberById.get(p.user_id);
+              return (
+                <View key={p.user_id} style={styles.participantChip}>
+                  <Text style={styles.participantInitial}>{(m?.name ?? "?").charAt(0).toUpperCase()}</Text>
+                  <Text style={styles.participantName} numberOfLines={1}>{m?.name ?? "Someone"}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
 
@@ -380,7 +401,7 @@ export default function FamilyWorshipScreen() {
       <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <View style={styles.sheetOverlay}>
           <View style={styles.sheetBox}>
-            <Text style={styles.sheetTitle}>Transfer Host</Text>
+            <Text style={styles.sheetTitle}>Transfer Guide</Text>
             {activeParticipants.filter((p) => p.user_id !== session.hostId).map((p) => {
               const m = memberById.get(p.user_id);
               return (
@@ -428,6 +449,7 @@ const styles = StyleSheet.create({
   prayerText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, marginRight: 8 },
   prayerAction: { color: "#1D9E75", fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
+  companionsLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6, marginBottom: 8 },
   participantsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   participantChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 150 },
   participantInitial: { color: "#1D9E75", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
