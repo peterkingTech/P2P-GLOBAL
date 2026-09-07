@@ -901,6 +901,7 @@ export default function HomeTab() {
           { icon: "stats-chart", label: t("home.myProgress"), sub: t("home.myProgressSub"), route: "/progress" },
           { icon: "people", label: t("home.peerConnect"), sub: t("home.peerConnectSub"), route: "/connect" },
           { icon: "people-circle", label: t("home.myDiscipleship"), sub: t("home.myDiscipleshipSub"), route: "/my-discipleship" },
+          { icon: "people-circle", label: t("home.myFamily", "My Family"), sub: t("home.myFamilySub", "Worship & prayer together"), route: "/family" },
           { icon: "person-circle", label: t("home.myProfile"), sub: t("home.myProfileSub"), route: "/profile" },
           ...(profile?.role && profile.role !== "student"
             ? [{ icon: "settings", label: t("home.admin"), sub: t("home.adminSub"), route: "/admin/curriculum" }]

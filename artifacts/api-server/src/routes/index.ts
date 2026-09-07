@@ -22,6 +22,8 @@ import churchesRouter from "./churches";
 import contactRouter from "./contact";
 import officialMessagesRouter from "./officialMessages";
 import pushRouter from "./push";
+import familyRouter from "./family";
+import familyWorshipRouter from "./familyWorship";
 
 const router: IRouter = Router();
 
@@ -48,5 +50,7 @@ router.use(churchesRouter); // church + members + grove + cohorts + announcement
 router.use(contactRouter); // Contact P2P Global — peer messages + admin inbox (paths differ, handled internally)
 router.use(officialMessagesRouter); // Admin → User official "P2P Global" messages (paths differ, handled internally)
 router.use(pushRouter); // Push notification device-token registration (paths differ, handled internally)
+router.use("/family", familyRouter);
+router.use("/family", familyWorshipRouter); // worship sessions live under /family/worship/* (paths differ, handled internally)
 
 export default router;

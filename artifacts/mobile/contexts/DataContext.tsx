@@ -960,6 +960,18 @@ export interface CircleSessionInvite {
   channelName: string;
 }
 
+// Family Worship invite banner — same shape/purpose as CircleSessionInvite
+// above, sourced from a p2p_notifications row of type family_worship_invite
+// (inserted by POST /family/worship/start for every other active family
+// member). Dismissible, not a ringing call — a member can join whenever
+// they're ready, or never, with no "missed call" consequence.
+export interface FamilyWorshipInvite {
+  notificationId: string;
+  sessionId: string;
+  familyId: string;
+  hostName: string;
+}
+
 export interface Mission {
   id: string;
   title: string;
@@ -1259,6 +1271,8 @@ interface DataContextValue {
   dismissIncomingCall: () => void;
   circleSessionInvite: CircleSessionInvite | null;
   dismissCircleSessionInvite: () => void;
+  familyWorshipInvite: FamilyWorshipInvite | null;
+  dismissFamilyWorshipInvite: () => void;
   // Study Together C7 — Notification Center. unreadNotificationCount updates
   // live via the same RLS-protected direct-client realtime subscription
   // pattern already used for circleSessionInvite above; the list/read
@@ -1541,6 +1555,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingPeerConfirmation[]>([]);
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
   const [circleSessionInvite, setCircleSessionInvite] = useState<CircleSessionInvite | null>(null);
+  const [familyWorshipInvite, setFamilyWorshipInvite] = useState<FamilyWorshipInvite | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
@@ -3133,6 +3148,38 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const dismissCircleSessionInvite = useCallback(() => {
     setCircleSessionInvite(null);
+  }, []);
+
+  // Family Worship invite — same shape/source pattern as the Peer Circle
+  // invite above, filtered to notification_type family_worship_invite
+  // instead. A dismissible banner, not a ringing call.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const userId = profile.id;
+    const channel = supabase
+      .channel(`p2p_notifications_family_worship_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row.notification_type !== "family_worship_invite") return;
+          const data = row.data as Record<string, unknown> | null;
+          if (!data?.sessionId || !data?.familyId) return;
+          setFamilyWorshipInvite({
+            notificationId: row.id as string,
+            sessionId: data.sessionId as string,
+            familyId: data.familyId as string,
+            hostName: (data.hostName as string) ?? "Someone",
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id]);
+
+  const dismissFamilyWorshipInvite = useCallback(() => {
+    setFamilyWorshipInvite(null);
   }, []);
 
   // Study Together C7 — Notification Center unread badge. Reuses the exact
@@ -5709,6 +5756,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       pendingConfirmations, pendingConfirmationCount: pendingConfirmations.length, confirmPeer, declinePeer,
       incomingCall, dismissIncomingCall,
       circleSessionInvite, dismissCircleSessionInvite,
+      familyWorshipInvite, dismissFamilyWorshipInvite,
       unreadNotificationCount, getMyNotifications, markNotificationRead, markAllNotificationsRead,
       conversations, conversationsLoading, totalUnreadCount, mostRecentUnread, loadConversations,
       pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,

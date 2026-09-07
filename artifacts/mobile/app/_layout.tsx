@@ -20,6 +20,7 @@ import { registerForPushNotificationsAsync, pathForNotification } from "@/lib/pu
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { CircleSessionBanner } from "@/components/CircleSessionBanner";
+import { FamilyWorshipBanner } from "@/components/FamilyWorshipBanner";
 import { MessageBanner } from "@/components/MessageBanner";
 import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
@@ -259,6 +260,30 @@ function CircleSessionBannerHost() {
   );
 }
 
+// Family Worship invite — same non-navigating, dismissible-banner pattern
+// as CircleSessionBannerHost above.
+function FamilyWorshipBannerHost() {
+  const { familyWorshipInvite, dismissFamilyWorshipInvite } = useData();
+  const router = useRouter();
+
+  if (!familyWorshipInvite) return null;
+
+  return (
+    <FamilyWorshipBanner
+      hostName={familyWorshipInvite.hostName}
+      onPress={() => {
+        const invite = familyWorshipInvite;
+        dismissFamilyWorshipInvite();
+        router.push({
+          pathname: "/family/worship/[sessionId]",
+          params: { sessionId: invite.sessionId },
+        } as any);
+      }}
+      onDismiss={dismissFamilyWorshipInvite}
+    />
+  );
+}
+
 // The Completion Moment (Prompt 6) — DataContext sets pendingCompletionMoment
 // the instant a user's 12th Core Curriculum module is detected complete, but
 // navigation must never interrupt a lesson mid-session. This host just waits
@@ -358,6 +383,7 @@ function RootLayoutNav() {
         <GrowthCelebrationHost />
         <IncomingCallHost />
         <CircleSessionBannerHost />
+        <FamilyWorshipBannerHost />
         <CompletionMomentHost />
         <MessageBannerHost />
         <PushNotificationHost />
