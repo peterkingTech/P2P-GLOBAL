@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { View, StyleSheet } from "react-native";
+import { computePositionFromClock } from "@/lib/familyApi";
 import type { YouTubePlayerProps } from "./youTubePlayerTypes";
-import { describeYouTubeError } from "./youTubePlayerTypes";
+import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
 
 declare global {
   interface Window {
@@ -28,10 +29,19 @@ function loadYouTubeApi(): Promise<void> {
   return apiReadyPromise;
 }
 
-export default function YouTubePlayer({ externalId, isPlaying, syncPositionMs, syncKey, onError }: YouTubePlayerProps) {
+export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, onError }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
   const readyRef = useRef(false);
+  // Always holds the latest clock — read by the periodic drift-check
+  // interval, which is created once and must never see a stale closure.
+  const clockRef = useRef({ basePositionMs, baseServerTimeIso, playbackRate, isPlaying });
+  clockRef.current = { basePositionMs, baseServerTimeIso, playbackRate, isPlaying };
+
+  function expectedNowMs() {
+    const c = clockRef.current;
+    return computePositionFromClock(c.basePositionMs, c.baseServerTimeIso, c.playbackRate, c.isPlaying);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -39,12 +49,14 @@ export default function YouTubePlayer({ externalId, isPlaying, syncPositionMs, s
       if (cancelled || !containerRef.current) return;
       playerRef.current = new window.YT!.Player(containerRef.current, {
         videoId: externalId,
-        playerVars: { playsinline: 1, modestbranding: 1, rel: 0, autoplay: isPlaying ? 1 : 0 },
+        playerVars: { playsinline: 1, modestbranding: 1, rel: 0, autoplay: clockRef.current.isPlaying ? 1 : 0 },
         events: {
           onReady: () => {
             readyRef.current = true;
-            playerRef.current.seekTo(Math.max(0, syncPositionMs) / 1000, true);
-            if (isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
+            // Join-in-progress: the position computed right now already
+            // accounts for however long the gathering has been playing.
+            playerRef.current.seekTo(Math.max(0, expectedNowMs()) / 1000, true);
+            if (clockRef.current.isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
           },
           onError: (e: { data: number }) => onError(describeYouTubeError(e.data)),
         },
@@ -59,18 +71,29 @@ export default function YouTubePlayer({ externalId, isPlaying, syncPositionMs, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalId]);
 
-  // Resync exactly when a real command happened (syncKey change), not on a
-  // continuous timer — see youTubePlayerTypes.ts's YouTubePlayerProps doc.
+  // Resync immediately whenever a real command happened (a new
+  // baseServerTimeIso means the Guide played/paused/sought/changed media).
   useEffect(() => {
     if (!readyRef.current || !playerRef.current) return;
-    playerRef.current.seekTo(Math.max(0, syncPositionMs) / 1000, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncKey]);
-
-  useEffect(() => {
-    if (!readyRef.current || !playerRef.current) return;
+    playerRef.current.seekTo(Math.max(0, expectedNowMs()) / 1000, true);
     if (isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
-  }, [isPlaying]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseServerTimeIso, isPlaying]);
+
+  // Ongoing drift correction — the actual fix for section 7/8: without
+  // this, a Companion who buffered or manually scrubbed the embed would
+  // simply stay out of sync until the Guide's next command.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!readyRef.current || !playerRef.current || typeof playerRef.current.getCurrentTime !== "function") return;
+      const actualMs = playerRef.current.getCurrentTime() * 1000;
+      const expectedMs = expectedNowMs();
+      if (Math.abs(actualMs - expectedMs) > DRIFT_THRESHOLD_MS) {
+        playerRef.current.seekTo(Math.max(0, expectedMs) / 1000, true);
+      }
+    }, DRIFT_CHECK_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   return <View style={styles.wrap}><div ref={containerRef} style={{ width: "100%", height: "100%" }} /></View>;
 }

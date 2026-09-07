@@ -116,10 +116,20 @@ export function getWorshipHistory(familyId: string): Promise<WorshipHistoryEntry
   return authedFetch(`/family/worship/history?familyId=${familyId}`);
 }
 
+// The one place the server-anchored-clock formula is written — both
+// computeWorshipPositionMs below and YouTubePlayer's own drift-correction
+// loop call this, so there's a single source of truth for "expected
+// position right now" rather than two copies that could drift apart.
+export function computePositionFromClock(
+  basePositionMs: number, baseServerTimeIso: string, playbackRate: number, isPlaying: boolean
+): number {
+  if (!isPlaying) return basePositionMs;
+  const elapsedMs = Date.now() - new Date(baseServerTimeIso).getTime();
+  return basePositionMs + elapsedMs * playbackRate;
+}
+
 // current playback position derived from the session's server-anchored
 // clock — recompute on every render/tick, never persisted per-frame.
 export function computeWorshipPositionMs(session: WorshipSession): number {
-  if (!session.isPlaying) return session.playbackBasePositionMs;
-  const elapsedMs = Date.now() - new Date(session.playbackBaseServerTime).getTime();
-  return session.playbackBasePositionMs + elapsedMs * session.playbackRate;
+  return computePositionFromClock(session.playbackBasePositionMs, session.playbackBaseServerTime, session.playbackRate, session.isPlaying);
 }

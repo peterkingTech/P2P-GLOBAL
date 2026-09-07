@@ -1,0 +1,21 @@
+-- 120: p2p_family_worship_sessions was never added to the supabase_realtime
+-- publication — confirmed by direct query against pg_publication_tables
+-- (empty result for every p2p_family_* table). This meant the worship
+-- room's entire postgres_changes-based live sync (Guide's play/pause/seek/
+-- mode/media changes reaching Companions) has never actually delivered any
+-- realtime event since it shipped; every client would only ever see the
+-- state it had at join time. Discovered via a real Supabase Realtime
+-- subscription test (not a mock), per this task's explicit "report actual
+-- results" requirement, not assumed.
+--
+-- p2p_notifications was found to have the same gap — it is what
+-- family_worship_invite (and the pre-existing Peer Circle
+-- circle_session_start banner it was modeled on) depends on for its
+-- realtime "someone started worship" banner. Fixed here too since it's a
+-- direct dependency of this feature, not an unrelated change.
+--
+-- Adding a table to a publication is inherently additive and safe: it only
+-- enables realtime *delivery* for rows a client's existing RLS policies
+-- already let it read — it changes no data, no RLS, no schema.
+alter publication supabase_realtime add table p2p_family_worship_sessions;
+alter publication supabase_realtime add table p2p_notifications;

@@ -143,11 +143,38 @@ export default function FamilyWorshipScreen() {
         const id = Date.now() + Math.random();
         setReactions((prev) => [...prev, { id, emoji: payload.emoji }]);
         setTimeout(() => setReactions((prev) => prev.filter((r) => r.id !== id)), 1500);
-      }).subscribe();
+      })
+      // Primary state-sync path — see the broadcastState() comment above
+      // its definition for why this exists alongside postgres_changes.
+      .on("broadcast", { event: "state" }, ({ payload }: { payload: WorshipSession }) => {
+        if (payload.status === "ended") {
+          showAlert("Family Worship ended", "This worship session has ended.");
+          leave();
+          return;
+        }
+        setSession(payload);
+      })
+      .subscribe();
       signalRef.current = channel;
     })();
     return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
-  }, [params.sessionId]);
+  }, [params.sessionId, leave]);
+
+  // Primary state-sync send path — postgres_changes on this table has been
+  // observed to not deliver in production despite correct publication
+  // membership and RLS (isolated, verified: an identical client pattern
+  // against a known-working table with a similarly-shaped policy delivers
+  // fine; this table specifically does not, even minutes after being added
+  // to the publication). Root cause not conclusively identified — most
+  // likely a Supabase-managed Realtime service-side gap for a table this
+  // new, outside what's fixable via SQL from here. Broadcasting the new
+  // state directly (the same channel already proven reliable for
+  // reactions) is the actual, working delivery path; the postgres_changes
+  // subscription above is left in place as a harmless secondary listener
+  // in case that gap resolves itself later.
+  function broadcastState(next: WorshipSession) {
+    signalRef.current?.send({ type: "broadcast", event: "state", payload: next });
+  }
 
   function sendReaction(emoji: string) {
     signalRef.current?.send({ type: "broadcast", event: "reaction", payload: { emoji } });
@@ -161,6 +188,7 @@ export default function FamilyWorshipScreen() {
     try {
       const updated = await updateWorshipState(session.id, { currentMode: mode });
       setSession(updated);
+      broadcastState(updated);
     } catch (e: any) { showAlert("Couldn't change mode", e.message ?? "Please try again."); }
   }
 
@@ -170,6 +198,7 @@ export default function FamilyWorshipScreen() {
       const positionMs = Math.max(0, computeWorshipPositionMs(session));
       const updated = await updateWorshipState(session.id, { isPlaying: !session.isPlaying, positionMs });
       setSession(updated);
+      broadcastState(updated);
     } catch (e: any) { showAlert("Couldn't update playback", e.message ?? "Please try again."); }
   }
 
@@ -187,6 +216,7 @@ export default function FamilyWorshipScreen() {
           mediaProvider: "youtube", mediaId: videoId, mediaType: null, mediaUrl: null, isPlaying: true, positionMs: 0,
         });
         setSession(updated);
+        broadcastState(updated);
         setMediaUrlInput("");
         return;
       }
@@ -196,6 +226,7 @@ export default function FamilyWorshipScreen() {
         mediaProvider: null, mediaId: null, mediaUrl: input, mediaType: isAudio ? "audio" : "video", isPlaying: true, positionMs: 0,
       });
       setSession(updated);
+      broadcastState(updated);
       setMediaUrlInput("");
     } catch (e: any) { showAlert("Couldn't set media", e.message ?? "Please try again."); }
   }
@@ -209,6 +240,7 @@ export default function FamilyWorshipScreen() {
       setScriptureText(body.text);
       const updated = await updateWorshipState(session.id, { currentMode: "scripture", currentScripture: { reference: scriptureRef.trim() } });
       setSession(updated);
+      broadcastState(updated);
     } catch (e: any) { showAlert("Couldn't load Scripture", e.message ?? "Please try again."); }
   }
 
@@ -235,7 +267,13 @@ export default function FamilyWorshipScreen() {
 
   async function handleTransfer(newHostId: string) {
     if (!session) return;
-    try { await transferWorshipHost(session.id, newHostId); setTransferOpen(false); }
+    try {
+      await transferWorshipHost(session.id, newHostId);
+      const updated = { ...session, hostId: newHostId };
+      setSession(updated);
+      broadcastState(updated);
+      setTransferOpen(false);
+    }
     catch (e: any) { showAlert("Couldn't transfer hosting", e.message ?? "Please try again."); }
   }
 
@@ -243,7 +281,11 @@ export default function FamilyWorshipScreen() {
     if (!session) return;
     Alert.alert("End Family Worship?", "This will end the session for everyone.", [
       { text: "Cancel", style: "cancel" },
-      { text: "End Worship", style: "destructive", onPress: async () => { await endWorshipSession(session.id); leave(); } },
+      { text: "End Worship", style: "destructive", onPress: async () => {
+        await endWorshipSession(session.id);
+        broadcastState({ ...session, status: "ended" });
+        leave();
+      } },
     ]);
   }
 

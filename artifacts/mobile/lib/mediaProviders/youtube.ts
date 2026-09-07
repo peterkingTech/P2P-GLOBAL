@@ -42,6 +42,7 @@ async function getMetadata(externalId: string): Promise<SharedMediaMetadata | nu
       title: body.title ?? "Untitled video",
       thumbnailUrl: body.thumbnail_url ?? null,
       authorName: body.author_name ?? null,
+      durationSeconds: null, // oEmbed doesn't include duration; see types.ts
     };
   } catch {
     return null;

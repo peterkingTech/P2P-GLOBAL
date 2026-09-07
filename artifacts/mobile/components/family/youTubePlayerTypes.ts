@@ -1,17 +1,27 @@
 export interface YouTubePlayerProps {
   externalId: string;
   isPlaying: boolean;
-  // The position (ms) to seek to, and a key that changes exactly when a
-  // real server-side command happened (session.playbackBaseServerTime) —
-  // the player resyncs when syncKey changes, not on a continuous polling
-  // loop. That's a deliberate v1 simplification: correct on every real
-  // PLAY/PAUSE/SEEK/MEDIA_CHANGE event (including the first mount, which
-  // covers late-join sync) rather than fighting the embedded YouTube
-  // player's own position continuously.
-  syncPositionMs: number;
-  syncKey: string;
+  // The raw server-anchored clock (matches p2p_family_worship_sessions'
+  // own fields exactly) — the player computes "expected position right
+  // now" itself, both immediately (on mount / whenever a real command
+  // changes baseServerTimeIso or isPlaying — this also covers join-in-
+  // progress, since mounting always computes the current expected
+  // position) and periodically thereafter (see DRIFT_* below), rather
+  // than being handed a single stale snapshot.
+  basePositionMs: number;
+  baseServerTimeIso: string;
+  playbackRate: number;
   onError: (message: string) => void;
 }
+
+// Companions' embedded players naturally drift from buffering, ads, or a
+// manual scrub — checked periodically and corrected only when the gap is
+// large enough to matter, so ordinary network jitter never causes a
+// visible seek. The interval is longer and the threshold looser than the
+// legacy raw-file player's (4s / 1.5s) because a YouTube embed has more
+// inherent latency than a direct file stream.
+export const DRIFT_CHECK_INTERVAL_MS = 5000;
+export const DRIFT_THRESHOLD_MS = 2500;
 
 // YouTube's own documented iframe API error codes.
 export function describeYouTubeError(code: number): string {

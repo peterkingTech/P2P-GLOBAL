@@ -23,6 +23,11 @@ export interface SharedMediaMetadata {
   title: string;
   thumbnailUrl: string | null;
   authorName: string | null;
+  // Not every provider adapter can supply this without a keyed/paid API —
+  // YouTube's credential-free oEmbed endpoint doesn't return it, so the
+  // youtube adapter always reports null here rather than pulling in the
+  // YouTube Data API just for a duration label.
+  durationSeconds: number | null;
 }
 
 export interface MediaProviderAdapter {

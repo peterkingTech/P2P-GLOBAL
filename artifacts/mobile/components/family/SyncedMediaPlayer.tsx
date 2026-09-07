@@ -95,8 +95,9 @@ export default function SyncedMediaPlayer({ session }: Props) {
         <YouTubePlayer
           externalId={session.mediaId}
           isPlaying={session.isPlaying}
-          syncPositionMs={computeWorshipPositionMs(session)}
-          syncKey={session.playbackBaseServerTime}
+          basePositionMs={session.playbackBasePositionMs}
+          baseServerTimeIso={session.playbackBaseServerTime}
+          playbackRate={session.playbackRate}
           onError={setErrorMessage}
         />
         {errorMessage && (
