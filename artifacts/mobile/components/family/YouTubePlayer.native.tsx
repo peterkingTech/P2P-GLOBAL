@@ -14,7 +14,7 @@ import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS } fro
 // time every 3s — injectJavaScript can't return a value back to RN on
 // every platform, so periodic drift-checking needs the page to push its
 // position rather than RN pulling it.
-function buildHtml(externalId: string, autoplay: boolean, startSeconds: number) {
+function buildHtml(externalId: string, autoplay: boolean, startSeconds: number, initialVolume: number) {
   return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0;background:#000;">
 <div id="player"></div>
@@ -28,7 +28,7 @@ function buildHtml(externalId: string, autoplay: boolean, startSeconds: number) 
       videoId: "${externalId}",
       playerVars: { playsinline: 1, modestbranding: 1, rel: 0, autoplay: ${autoplay ? 1 : 0}, start: ${Math.max(0, Math.round(startSeconds))} },
       events: {
-        onReady: function () { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ready" })); },
+        onReady: function () { player.setVolume(${Math.round(Math.min(1, Math.max(0, initialVolume)) * 100)}); window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ready" })); },
         onError: function (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "error", code: e.data })); }
       }
     });
@@ -43,12 +43,13 @@ function buildHtml(externalId: string, autoplay: boolean, startSeconds: number) 
     if (name === "play") player.playVideo();
     else if (name === "pause") player.pauseVideo();
     else if (name === "seek") player.seekTo(arg, true);
+    else if (name === "volume") player.setVolume(arg);
   };
 </script>
 </body></html>`;
 }
 
-export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, onError }: YouTubePlayerProps) {
+export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, onError }: YouTubePlayerProps) {
   const webviewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
   const lastReportedMs = useRef<number | null>(null);
@@ -63,7 +64,7 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
   // Join-in-progress: the initial HTML embeds the expected position at
   // mount time directly (autoplay + start=), so the first paint already
   // starts near the shared position rather than at 0.
-  const html = useMemo(() => buildHtml(externalId, clockRef.current.isPlaying, expectedNowMs() / 1000), [externalId]);
+  const html = useMemo(() => buildHtml(externalId, clockRef.current.isPlaying, expectedNowMs() / 1000, volume), [externalId]);
 
   function handleMessage(event: { nativeEvent: { data: string } }) {
     try {
@@ -81,6 +82,13 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     webviewRef.current?.injectJavaScript(`window.p2pCommand("${isPlaying ? "play" : "pause"}"); true;`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseServerTimeIso, isPlaying]);
+
+  // TogetherAudio's Media volume — SyncedMediaPlayer already ramps the
+  // value it hands down here, so this just applies it directly.
+  useEffect(() => {
+    if (!readyRef.current) return;
+    webviewRef.current?.injectJavaScript(`window.p2pCommand("volume", ${Math.round(Math.min(1, Math.max(0, volume)) * 100)}); true;`);
+  }, [volume]);
 
   // Ongoing drift correction, using the page's own self-reported position
   // (see buildHtml's "time" postMessage) rather than blindly reseeking.

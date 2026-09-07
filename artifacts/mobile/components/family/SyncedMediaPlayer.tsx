@@ -3,6 +3,7 @@ import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
 import { Audio, Video, ResizeMode } from "expo-av";
 import colors from "@/constants/colors";
 import { computeWorshipPositionMs, type WorshipSession } from "@/lib/familyApi";
+import { rampVolume } from "@/lib/togetherAudio/mixer";
 import YouTubePlayer from "./YouTubePlayer";
 
 // Reconciles local playback against the session's server-anchored clock
@@ -17,13 +18,30 @@ const DRIFT_THRESHOLD_MS = 1500;
 
 interface Props {
   session: WorshipSession;
+  // TogetherAudio's Media layer — effectiveMediaVolume(prefs) from the
+  // caller. Ramped locally (see the effect below) so a big Audio Balance
+  // move lands as a quick fade, never an audible pop.
+  mediaVolume?: number;
 }
 
-export default function SyncedMediaPlayer({ session }: Props) {
+export default function SyncedMediaPlayer({ session, mediaVolume = 1 }: Props) {
   const videoRef = useRef<Video | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastMediaUrl = useRef<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [displayedVolume, setDisplayedVolume] = useState(mediaVolume);
+  const rampCancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    rampCancelRef.current?.();
+    rampCancelRef.current = rampVolume(displayedVolume, mediaVolume, 150, setDisplayedVolume);
+    return () => rampCancelRef.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaVolume]);
+
+  useEffect(() => {
+    soundRef.current?.setVolumeAsync(displayedVolume).catch(() => {});
+  }, [displayedVolume]);
 
   async function reconcile() {
     const targetMs = computeWorshipPositionMs(session);
@@ -69,7 +87,7 @@ export default function SyncedMediaPlayer({ session }: Props) {
         await soundRef.current?.unloadAsync().catch(() => {});
         const { sound } = await Audio.Sound.createAsync(
           { uri: session.mediaUrl! },
-          { shouldPlay: session.isPlaying, positionMillis: Math.max(0, computeWorshipPositionMs(session)) }
+          { shouldPlay: session.isPlaying, positionMillis: Math.max(0, computeWorshipPositionMs(session)), volume: displayedVolume }
         );
         if (!cancelled) { soundRef.current = sound; setErrorMessage(null); }
         else await sound.unloadAsync();
@@ -98,6 +116,7 @@ export default function SyncedMediaPlayer({ session }: Props) {
           basePositionMs={session.playbackBasePositionMs}
           baseServerTimeIso={session.playbackBaseServerTime}
           playbackRate={session.playbackRate}
+          volume={displayedVolume}
           onError={setErrorMessage}
         />
         {errorMessage && (
@@ -139,6 +158,7 @@ export default function SyncedMediaPlayer({ session }: Props) {
         onLoad={() => reconcile()}
         onError={() => setErrorMessage("This video couldn't be loaded. Check the link and try again.")}
         shouldPlay={session.isPlaying}
+        volume={displayedVolume}
       />
     );
   }

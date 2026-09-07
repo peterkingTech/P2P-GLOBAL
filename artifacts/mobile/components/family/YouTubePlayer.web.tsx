@@ -29,7 +29,7 @@ function loadYouTubeApi(): Promise<void> {
   return apiReadyPromise;
 }
 
-export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, onError }: YouTubePlayerProps) {
+export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, onError }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
   const readyRef = useRef(false);
@@ -56,6 +56,7 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
             // Join-in-progress: the position computed right now already
             // accounts for however long the gathering has been playing.
             playerRef.current.seekTo(Math.max(0, expectedNowMs()) / 1000, true);
+            playerRef.current.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
             if (clockRef.current.isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
           },
           onError: (e: { data: number }) => onError(describeYouTubeError(e.data)),
@@ -79,6 +80,13 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     if (isPlaying) playerRef.current.playVideo(); else playerRef.current.pauseVideo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseServerTimeIso, isPlaying]);
+
+  // TogetherAudio's Media volume — SyncedMediaPlayer already ramps the
+  // value it hands down here, so this just applies it directly.
+  useEffect(() => {
+    if (!readyRef.current || !playerRef.current) return;
+    playerRef.current.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
+  }, [volume]);
 
   // Ongoing drift correction — the actual fix for section 7/8: without
   // this, a Companion who buffered or manually scrubbed the embed would

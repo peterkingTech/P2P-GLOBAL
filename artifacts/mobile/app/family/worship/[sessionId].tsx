@@ -12,6 +12,9 @@ import {
   computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider,
 } from "@/lib/familyApi";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
+import { useTogetherAudio } from "@/hooks/useTogetherAudio";
+import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
+import AudioBalancePanel from "@/components/family/AudioBalancePanel";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -59,7 +62,9 @@ export default function FamilyWorshipScreen() {
   const [scriptureText, setScriptureText] = useState<string | null>(null);
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
   const leftRef = useRef(false);
+  const togetherAudio = useTogetherAudio();
 
   const isHost = session?.hostId === profile?.id;
   const isShepherd = shepherdId === profile?.id;
@@ -322,7 +327,7 @@ export default function FamilyWorshipScreen() {
         {session.currentMode === "worship" && (
           <View style={styles.panel}>
             <Text style={styles.panelLabel}>SHARED MEDIA</Text>
-            <SyncedMediaPlayer session={session} />
+            <SyncedMediaPlayer session={session} mediaVolume={effectiveMediaVolume(togetherAudio.prefs)} />
             {isHost && (
               <View style={styles.hostRow}>
                 <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
@@ -433,6 +438,14 @@ export default function FamilyWorshipScreen() {
             <Text style={styles.reactionEmoji}>{emoji}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={styles.transferBtn}
+          onPress={() => setAudioBalanceOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Audio Balance"
+        >
+          <Ionicons name="options-outline" size={16} color="#fff" />
+        </TouchableOpacity>
         {isHost && (
           <TouchableOpacity style={styles.transferBtn} onPress={() => setTransferOpen(true)}>
             <Ionicons name="swap-horizontal" size={16} color="#fff" />
@@ -458,6 +471,21 @@ export default function FamilyWorshipScreen() {
           </View>
         </View>
       </Modal>
+
+      <AudioBalancePanel
+        visible={audioBalanceOpen}
+        onClose={() => setAudioBalanceOpen(false)}
+        prefs={togetherAudio.prefs}
+        onSetOutput={togetherAudio.setOutputVolume}
+        onSetMedia={togetherAudio.setMediaVolume}
+        onSetRoom={togetherAudio.setRoomVolume}
+        onSetParticipant={togetherAudio.setParticipantVolume}
+        onToggleMute={togetherAudio.toggleMuteParticipant}
+        companions={activeParticipants
+          .filter((p) => p.user_id !== profile?.id)
+          .map((p) => ({ userId: p.user_id, name: memberById.get(p.user_id)?.name ?? "Someone" }))}
+        voiceConnected={false}
+      />
     </View>
   );
 }

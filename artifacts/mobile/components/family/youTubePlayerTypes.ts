@@ -11,6 +11,7 @@ export interface YouTubePlayerProps {
   basePositionMs: number;
   baseServerTimeIso: string;
   playbackRate: number;
+  volume: number; // 0-1 — TogetherAudio's effective Media volume
   onError: (message: string) => void;
 }
 
