@@ -35,7 +35,7 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>NOTES</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Notes">
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -49,7 +49,9 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
                   <View style={styles.noteHeader}>
                     <Text style={styles.noteAuthor}>{n.authorName}{n.visibility === "private" ? " · Private" : ""}</Text>
                     {n.authorId === myUserId && (
-                      <TouchableOpacity onPress={() => onDelete(n.id)}><Ionicons name="trash-outline" size={14} color="rgba(255,255,255,0.5)" /></TouchableOpacity>
+                      <TouchableOpacity onPress={() => onDelete(n.id)} accessibilityRole="button" accessibilityLabel="Delete this note" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="trash-outline" size={14} color="rgba(255,255,255,0.5)" />
+                      </TouchableOpacity>
                     )}
                   </View>
                   <Text style={styles.noteContent}>{n.content}</Text>
@@ -79,7 +81,7 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
                   <Switch value={attachPassage} onValueChange={setAttachPassage} />
                 </View>
               )}
-              <TouchableOpacity style={styles.addBtn} onPress={submit} disabled={!draft.trim()}>
+              <TouchableOpacity style={styles.addBtn} onPress={submit} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel="Add note">
                 <Text style={styles.addBtnText}>Add</Text>
               </TouchableOpacity>
             </View>

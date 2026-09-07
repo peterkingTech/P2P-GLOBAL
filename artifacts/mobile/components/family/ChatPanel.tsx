@@ -20,6 +20,9 @@ interface Props {
   currentMedia: { mediaProvider: SharedMediaProvider; mediaId: string; positionMs: number } | null;
   pendingContext: MessageContext | null;
   onSetPendingContext: (c: MessageContext | null) => void;
+  // Desktop composition's "optional conversation panel" — docks to the
+  // right edge as a tall panel instead of sliding up from the bottom.
+  dockRight?: boolean;
 }
 
 function contextLabel(c: MessageContext): string {
@@ -37,7 +40,7 @@ function formatTime(iso: string) {
 // colors, not styled after any messaging app's chrome.
 export default function ChatPanel({
   visible, onClose, messages, myUserId, draft, onChangeDraft, onSend,
-  currentScripture, currentMedia, pendingContext, onSetPendingContext,
+  currentScripture, currentMedia, pendingContext, onSetPendingContext, dockRight,
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
 
@@ -46,12 +49,12 @@ export default function ChatPanel({
   }, [visible, messages.length]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={styles.sheet}>
+    <Modal visible={visible} transparent animationType={dockRight ? "fade" : "slide"} onRequestClose={onClose}>
+      <KeyboardAvoidingView style={[styles.overlay, dockRight && styles.overlayDockRight]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={[styles.sheet, dockRight && styles.sheetDockRight]}>
           <View style={styles.header}>
             <Text style={styles.title}>TOGETHER CHAT</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Together Chat">
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -79,22 +82,24 @@ export default function ChatPanel({
           {pendingContext && (
             <View style={styles.pendingRow}>
               <Text style={styles.pendingText}>{contextLabel(pendingContext)}</Text>
-              <TouchableOpacity onPress={() => onSetPendingContext(null)}><Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.6)" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => onSetPendingContext(null)} accessibilityRole="button" accessibilityLabel="Remove attachment" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
             </View>
           )}
           {!pendingContext && (
             <View style={styles.attachRow}>
               {currentScripture && (
-                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "scripture", ...currentScripture })}>
+                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "scripture", ...currentScripture })} accessibilityRole="button" accessibilityLabel="Attach the current passage">
                   <Text style={styles.attachChipText}>📖 Passage</Text>
                 </TouchableOpacity>
               )}
               {currentMedia && (
-                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "media", ...currentMedia })}>
+                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "media", ...currentMedia })} accessibilityRole="button" accessibilityLabel="Attach this moment in Shared Media">
                   <Text style={styles.attachChipText}>🎬 Moment</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "question" })}>
+              <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "question" })} accessibilityRole="button" accessibilityLabel="Tag this message as a question">
                 <Text style={styles.attachChipText}>❓ Question</Text>
               </TouchableOpacity>
             </View>
@@ -122,7 +127,9 @@ export default function ChatPanel({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  overlayDockRight: { flexDirection: "row", justifyContent: "flex-end", alignItems: "stretch" },
   sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, height: "70%" },
+  sheetDockRight: { borderTopLeftRadius: 20, borderTopRightRadius: 0, borderBottomLeftRadius: 20, width: 360, height: "100%" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, paddingBottom: 10 },
   title: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
 
@@ -156,5 +163,5 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
     color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", maxHeight: 100,
   },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
 });

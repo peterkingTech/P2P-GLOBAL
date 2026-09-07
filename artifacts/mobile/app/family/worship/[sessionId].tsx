@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Modal, Alert, Platform, Animated, AppState } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, Alert, Platform, Animated, AppState, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
-import SyncedMediaPlayer from "@/components/family/SyncedMediaPlayer";
 import {
   getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState, updateWorshipPresence,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
@@ -17,9 +15,15 @@ import {
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { useTogetherAudio } from "@/hooks/useTogetherAudio";
 import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
-import AudioBalancePanel from "@/components/family/AudioBalancePanel";
+import { colors, radii, spacing, type, DESKTOP_BREAKPOINT } from "@/lib/togetherTheme";
+import TogetherHeader from "@/components/family/TogetherHeader";
+import CompanionCard from "@/components/family/CompanionCard";
+import SharedMedia from "@/components/family/SharedMedia";
+import GuideControls from "@/components/family/GuideControls";
+import GatheringFooter from "@/components/family/GatheringFooter";
+import AudioBalance from "@/components/family/AudioBalance";
 import ChatPanel from "@/components/family/ChatPanel";
-import MediaShelfPanel from "@/components/family/MediaShelfPanel";
+import MediaShelf from "@/components/family/MediaShelf";
 import ScripturePanel from "@/components/family/ScripturePanel";
 import PrayerSpacePanel from "@/components/family/PrayerSpacePanel";
 import NotesPanel from "@/components/family/NotesPanel";
@@ -40,6 +44,7 @@ const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
+const MODE_BY_KEY = new Map(MODES.map((m) => [m.key, m]));
 
 function FloatingReaction({ emoji }: { emoji: string }) {
   const translateY = useRef(new Animated.Value(0)).current;
@@ -58,6 +63,12 @@ export default function FamilyWorshipScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const params = useLocalSearchParams<{ sessionId: string }>();
+  const { width } = useWindowDimensions();
+  // Below the breakpoint: mobile composition (large content area, simple
+  // stacked bottom controls). At/above it: desktop composition
+  // (content-focused center + a companion gathering area side by side,
+  // Together Chat docks to the right instead of sliding from the bottom).
+  const isDesktop = width >= DESKTOP_BREAKPOINT;
 
   const [session, setSession] = useState<WorshipSession | null>(null);
   const [participants, setParticipants] = useState<{ user_id: string; presence_status: string }[]>([]);
@@ -557,254 +568,167 @@ export default function FamilyWorshipScreen() {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.textPrimary} />
       </View>
     );
   }
 
   const memberById = new Map(members.map((m) => [m.userId, m]));
   const activeParticipants = participants.filter((p) => p.presence_status !== "away");
+  const currentModeMeta = MODE_BY_KEY.get(session.currentMode) ?? MODES[0];
+
+  const sharedMediaProps = {
+    session, mediaVolume: effectiveMediaVolume(togetherAudio.prefs), resyncNonce, onDriftStatus: setIsBehind, onEnded: handleMediaEnded,
+    isBehind, onReturnToLive: handleReturnToLive, canControl, urlInput: mediaUrlInput, onChangeUrlInput: setMediaUrlInput,
+    onSetMedia: setMedia, onTogglePlay: togglePlay,
+  };
+
+  const modeContent = (
+    <>
+      {session.currentMode === "worship" && (
+        <View style={styles.panel}>
+          <View style={styles.panelLabelRow}>
+            <Text style={styles.panelLabel}>SHARED MEDIA</Text>
+            <TouchableOpacity onPress={() => setMediaShelfOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Media Shelf${queue.length > 0 ? `, ${queue.length} items` : ""}`}>
+              <Text style={styles.shelfLink}>Media Shelf{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
+            </TouchableOpacity>
+          </View>
+          <SharedMedia {...sharedMediaProps} />
+        </View>
+      )}
+
+      {session.currentMode === "scripture" && (
+        <View style={styles.panel}>
+          <Text style={styles.panelLabel}>SCRIPTURE</Text>
+          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
+        </View>
+      )}
+
+      {(session.currentMode === "prayer" || session.currentMode === "silent_prayer") && (
+        <View style={styles.panel}>
+          <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "SILENT PRAYER" : "PRAYER SPACE"}</Text>
+          {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Microphones are muted.</Text>}
+          <PrayerSpacePanel
+            session={session}
+            prayers={prayers}
+            isGuide={isHost}
+            myUserId={profile?.id}
+            praying={myPresenceStatus === "praying"}
+            prayingCount={activeParticipants.filter((p) => p.presence_status === "praying").length}
+            onTogglePraying={togglePraying}
+            onAdd={addPrayer}
+            onMarkPrayed={markPrayed}
+            onMarkAnswered={markAnswered}
+            onSetFocus={setPrayerFocus}
+            onStartTimer={startPrayerTimer}
+            onStopTimer={stopPrayerTimer}
+          />
+        </View>
+      )}
+
+      {session.currentMode === "teaching" && (
+        <View style={styles.panel}>
+          <View style={styles.panelLabelRow}>
+            <Text style={styles.panelLabel}>TEACHING</Text>
+            <TouchableOpacity onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Notes${notes.length > 0 ? `, ${notes.length} notes` : ""}`}>
+              <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
+          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
+          {(session.mediaId || canControl) && <SharedMedia {...sharedMediaProps} />}
+        </View>
+      )}
+
+      {(session.currentMode === "sharing" || session.currentMode === "thanksgiving") && (
+        <View style={styles.panel}>
+          <Text style={styles.panelLabel}>{session.currentMode === "thanksgiving" ? "THANKSGIVING" : "SHARING"}</Text>
+          <Text style={styles.silentHint}>
+            {session.currentMode === "thanksgiving" ? "Take turns sharing something you're thankful for." : "Take turns sharing with the family."}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const companionsArea = (
+    <View>
+      <Text style={styles.companionsLabel}>COMPANIONS</Text>
+      <View style={styles.companionsGrid}>
+        {activeParticipants.map((p) => {
+          const m = memberById.get(p.user_id);
+          const voice = voiceSpace.companionStates.find((c) => c.userId === p.user_id);
+          const name = m?.name ?? "Someone";
+          const handUp = raisedHandUserIds.has(p.user_id);
+          const canModerate = isHost && p.user_id !== session.hostId && p.user_id !== profile?.id;
+          return (
+            <CompanionCard
+              key={p.user_id}
+              name={name}
+              isGuide={p.user_id === session.hostId}
+              speaking={!!voice?.speaking}
+              muted={!!(voice?.connected && voice.muted)}
+              praying={p.presence_status === "praying"}
+              handUp={handUp}
+              canModerate={canModerate}
+              onLongPress={() => canModerate && handleRemoveParticipant(p.user_id, name)}
+              onHandUpPress={isHost ? () => Alert.alert(`${name} — Hand Up`, "", [
+                { text: "Dismiss", onPress: () => dismissHand(p.user_id) },
+                { text: "Allow", onPress: () => allowHand(p.user_id) },
+              ]) : undefined}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={leave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="chevron-down" size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={styles.topBarTitle}>🕊️ Family Worship</Text>
-          <Text style={styles.topBarSub}>{activeParticipants.length} together</Text>
-        </View>
-        {(isHost || isShepherd) && (
-          <TouchableOpacity onPress={handleEnd} style={styles.endBtn}><Text style={styles.endBtnText}>End</Text></TouchableOpacity>
-        )}
+      <View style={{ paddingTop: insets.top + 10 }}>
+        <TogetherHeader
+          onBack={leave}
+          title="Family Worship"
+          modeIcon={currentModeMeta.icon}
+          modeLabel={currentModeMeta.label}
+          participantCount={activeParticipants.length}
+          showEnd={isHost || isShepherd}
+          onEnd={handleEnd}
+        />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {session.currentMode === "worship" && (
-          <View style={styles.panel}>
-            <View style={styles.panelLabelRow}>
-              <Text style={styles.panelLabel}>SHARED MEDIA</Text>
-              <TouchableOpacity onPress={() => setMediaShelfOpen(true)}>
-                <Text style={styles.shelfLink}>Media Shelf{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
-              </TouchableOpacity>
-            </View>
-            <View>
-              <SyncedMediaPlayer
-                session={session}
-                mediaVolume={effectiveMediaVolume(togetherAudio.prefs)}
-                resyncNonce={resyncNonce}
-                onDriftStatus={setIsBehind}
-                onEnded={handleMediaEnded}
-              />
-              {isBehind && (
-                <TouchableOpacity style={styles.returnToLiveBadge} onPress={handleReturnToLive}>
-                  <Ionicons name="refresh" size={12} color="#fff" />
-                  <Text style={styles.returnToLiveText}>Return to Live</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {canControl && (
-              <View style={styles.hostRow}>
-                <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
-                  <Ionicons name={session.isPlaying ? "pause" : "play"} size={20} color="#fff" />
-                </TouchableOpacity>
-                <TextInput
-                  style={styles.mediaInput}
-                  placeholder="Paste a YouTube link…"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={mediaUrlInput}
-                  onChangeText={setMediaUrlInput}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity style={styles.smallBtn} onPress={setMedia}><Text style={styles.smallBtnText}>Set</Text></TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-
-        {session.currentMode === "scripture" && (
-          <View style={styles.panel}>
-            <Text style={styles.panelLabel}>SCRIPTURE</Text>
-            <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
-          </View>
-        )}
-
-        {(session.currentMode === "prayer" || session.currentMode === "silent_prayer") && (
-          <View style={styles.panel}>
-            <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "SILENT PRAYER" : "PRAYER SPACE"}</Text>
-            {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Microphones are muted.</Text>}
-            <PrayerSpacePanel
-              session={session}
-              prayers={prayers}
-              isGuide={isHost}
-              myUserId={profile?.id}
-              praying={myPresenceStatus === "praying"}
-              prayingCount={activeParticipants.filter((p) => p.presence_status === "praying").length}
-              onTogglePraying={togglePraying}
-              onAdd={addPrayer}
-              onMarkPrayed={markPrayed}
-              onMarkAnswered={markAnswered}
-              onSetFocus={setPrayerFocus}
-              onStartTimer={startPrayerTimer}
-              onStopTimer={stopPrayerTimer}
-            />
-          </View>
-        )}
-
-        {session.currentMode === "teaching" && (
-          <View style={styles.panel}>
-            <View style={styles.panelLabelRow}>
-              <Text style={styles.panelLabel}>TEACHING</Text>
-              <TouchableOpacity onPress={() => setNotesOpen(true)}>
-                <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
-            <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
-            {(session.mediaId || canControl) && (
-              <View>
-                <SyncedMediaPlayer
-                  session={session}
-                  mediaVolume={effectiveMediaVolume(togetherAudio.prefs)}
-                  resyncNonce={resyncNonce}
-                  onDriftStatus={setIsBehind}
-                  onEnded={handleMediaEnded}
-                />
-                {canControl && (
-                  <View style={styles.hostRow}>
-                    <TouchableOpacity style={styles.playBtn} onPress={togglePlay}>
-                      <Ionicons name={session.isPlaying ? "pause" : "play"} size={20} color="#fff" />
-                    </TouchableOpacity>
-                    <TextInput
-                      style={styles.mediaInput}
-                      placeholder="Paste a YouTube link…"
-                      placeholderTextColor="rgba(255,255,255,0.4)"
-                      value={mediaUrlInput}
-                      onChangeText={setMediaUrlInput}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity style={styles.smallBtn} onPress={setMedia}><Text style={styles.smallBtnText}>Set</Text></TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
-        {(session.currentMode === "sharing" || session.currentMode === "thanksgiving") && (
-          <View style={styles.panel}>
-            <Text style={styles.panelLabel}>{session.currentMode === "thanksgiving" ? "THANKSGIVING" : "SHARING"}</Text>
-            <Text style={styles.silentHint}>
-              {session.currentMode === "thanksgiving" ? "Take turns sharing something you're thankful for." : "Take turns sharing with the family."}
-            </Text>
-          </View>
-        )}
-
-        <View>
-          <Text style={styles.companionsLabel}>COMPANIONS</Text>
-          <View style={styles.participantsRow}>
-            {activeParticipants.map((p) => {
-              const m = memberById.get(p.user_id);
-              const voice = voiceSpace.companionStates.find((c) => c.userId === p.user_id);
-              const name = m?.name ?? "Someone";
-              const handUp = raisedHandUserIds.has(p.user_id);
-              const canModerate = isHost && p.user_id !== session.hostId && p.user_id !== profile?.id;
-              return (
-                <TouchableOpacity
-                  key={p.user_id}
-                  style={[styles.participantChip, voice?.speaking && styles.participantChipSpeaking]}
-                  onLongPress={() => canModerate && handleRemoveParticipant(p.user_id, name)}
-                  activeOpacity={canModerate ? 0.7 : 1}
-                >
-                  <Text style={styles.participantInitial}>{name.charAt(0).toUpperCase()}</Text>
-                  <Text style={styles.participantName} numberOfLines={1}>{name}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
-                  {p.presence_status === "praying" && <Text style={{ fontSize: 10 }}>🙏</Text>}
-                  {voice?.connected && voice.muted && <Ionicons name="mic-off" size={10} color="rgba(255,255,255,0.6)" />}
-                  {handUp && (
-                    <TouchableOpacity
-                      onPress={() => isHost && Alert.alert(`${name} — Hand Up`, "", [
-                        { text: "Dismiss", onPress: () => dismissHand(p.user_id) },
-                        { text: "Allow", onPress: () => allowHand(p.user_id) },
-                      ])}
-                      disabled={!isHost}
-                    >
-                      <Text style={styles.handUpBadge}>✋</Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      {isDesktop ? (
+        <View style={styles.desktopRow}>
+          <ScrollView style={styles.desktopContentPane} contentContainerStyle={styles.scroll}>{modeContent}</ScrollView>
+          <ScrollView style={styles.desktopCompanionsPane} contentContainerStyle={styles.desktopCompanionsPaneContent}>{companionsArea}</ScrollView>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {modeContent}
+          {companionsArea}
+        </ScrollView>
+      )}
 
       <View style={styles.reactionsOverlay} pointerEvents="none">
         {reactions.map((r) => <FloatingReaction key={r.id} emoji={r.emoji} />)}
       </View>
 
-      {isHost && (
-        <View style={styles.modeRow}>
-          {MODES.map((m) => (
-            <TouchableOpacity key={m.key} style={[styles.modeBtn, session.currentMode === m.key && styles.modeBtnActive]} onPress={() => changeMode(m.key)}>
-              <Text style={styles.modeIcon}>{m.icon}</Text>
-              <Text style={styles.modeLabel}>{m.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      {isHost && <GuideControls modes={MODES} currentMode={session.currentMode} onChange={changeMode} />}
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.bottomRowScroll}
-        contentContainerStyle={[styles.bottomRow, { paddingBottom: insets.bottom + 12 }]}
-      >
-        {REACTIONS.map((emoji) => (
-          <TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => sendReaction(emoji)}>
-            <Text style={styles.reactionEmoji}>{emoji}</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity
-          style={[styles.transferBtn, handRaised && styles.transferBtnActive]}
-          onPress={toggleRaiseHand}
-          accessibilityRole="button"
-          accessibilityLabel={handRaised ? "Lower hand" : "Raise hand"}
-        >
-          <Text style={{ fontSize: 16 }}>✋</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.transferBtn}
-          onPress={() => setChatOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Together Chat"
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.transferBtn}
-          onPress={() => setNotesOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Notes"
-        >
-          <Ionicons name="document-text-outline" size={16} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.transferBtn}
-          onPress={() => setAudioBalanceOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Audio Balance"
-        >
-          <Ionicons name="options-outline" size={16} color="#fff" />
-        </TouchableOpacity>
-        {isHost && (
-          <TouchableOpacity style={styles.transferBtn} onPress={() => setTransferOpen(true)}>
-            <Ionicons name="swap-horizontal" size={16} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+      <GatheringFooter
+        reactionEmojis={REACTIONS}
+        onSendReaction={sendReaction}
+        handRaised={handRaised}
+        onToggleRaiseHand={toggleRaiseHand}
+        onOpenChat={() => setChatOpen(true)}
+        onOpenNotes={() => setNotesOpen(true)}
+        onOpenAudioBalance={() => setAudioBalanceOpen(true)}
+        isHost={isHost}
+        onOpenTransfer={() => setTransferOpen(true)}
+        bottomInset={insets.bottom}
+      />
 
       <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <View style={styles.sheetOverlay}>
@@ -813,19 +737,19 @@ export default function FamilyWorshipScreen() {
             {activeParticipants.filter((p) => p.user_id !== session.hostId).map((p) => {
               const m = memberById.get(p.user_id);
               return (
-                <TouchableOpacity key={p.user_id} style={styles.transferRow} onPress={() => handleTransfer(p.user_id)}>
+                <TouchableOpacity key={p.user_id} style={styles.transferRow} onPress={() => handleTransfer(p.user_id)} accessibilityRole="button" accessibilityLabel={`Make ${m?.name ?? "Someone"} the Guide`}>
                   <Text style={styles.transferName}>{m?.name ?? "Someone"}</Text>
                 </TouchableOpacity>
               );
             })}
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setTransferOpen(false)}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setTransferOpen(false)} accessibilityRole="button" accessibilityLabel="Cancel transferring Guide">
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      <AudioBalancePanel
+      <AudioBalance
         visible={audioBalanceOpen}
         onClose={() => setAudioBalanceOpen(false)}
         prefs={togetherAudio.prefs}
@@ -858,9 +782,10 @@ export default function FamilyWorshipScreen() {
         currentMedia={session.mediaProvider && session.mediaId ? { mediaProvider: session.mediaProvider, mediaId: session.mediaId, positionMs: Math.max(0, computeWorshipPositionMs(session)) } : null}
         pendingContext={pendingChatContext}
         onSetPendingContext={setPendingChatContext}
+        dockRight={isDesktop}
       />
 
-      <MediaShelfPanel
+      <MediaShelf
         visible={mediaShelfOpen}
         onClose={() => setMediaShelfOpen(false)}
         queue={queue}
@@ -894,76 +819,35 @@ export default function FamilyWorshipScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E" },
-  topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-  topBarTitle: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  topBarSub: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  endBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  endBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  screen: { flex: 1, backgroundColor: colors.background },
 
-  scroll: { paddingHorizontal: 16, paddingBottom: 20, gap: 16 },
+  scroll: { paddingHorizontal: spacing.lg, paddingBottom: 20, gap: spacing.lg },
 
-  hostRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
-  playBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
-  mediaInput: {
-    flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
-    color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular",
-  },
-  smallBtn: { backgroundColor: "#1D9E75", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  smallBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
-  panel: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 16, padding: 16, gap: 6 },
-  panelLabel: { color: "#B8860B", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  panel: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.lg, gap: spacing.xs },
+  panelLabel: { color: colors.light, ...type.label },
   panelLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  shelfLink: { color: "#5B8DEF", fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  returnToLiveBadge: {
-    position: "absolute", bottom: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(0,0,0,0.8)", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: "#5B8DEF",
-  },
-  returnToLiveText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  scriptureRef: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", marginTop: 6 },
-  scriptureText: { color: "rgba(255,255,255,0.85)", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 24, marginTop: 6, fontStyle: "italic" },
-  silentHint: { color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 4 },
+  shelfLink: { color: colors.connection, ...type.caption, fontFamily: "Inter_600SemiBold" },
+  silentHint: { color: colors.textSecondary, ...type.body, marginTop: spacing.xs },
 
-  prayerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  prayerText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, marginRight: 8 },
-  prayerAction: { color: "#1D9E75", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  companionsLabel: { color: colors.textTertiary, ...type.label, marginBottom: spacing.sm },
+  companionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 
-  companionsLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6, marginBottom: 8 },
-  participantsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  participantChip: {
-    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 6, maxWidth: 150, borderWidth: 1.5, borderColor: "transparent",
-  },
-  // A subtle border pulse, not an animated ring/wave — original, low-key
-  // "Speaking" affordance per this feature's own instruction not to copy
-  // another product's speaking animation.
-  participantChipSpeaking: { borderColor: "#1D9E75" },
-  participantInitial: { color: "#1D9E75", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  participantName: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontFamily: "Inter_400Regular" },
+  // Desktop composition — content-focused center + a companion gathering
+  // area beside it, each independently scrollable. An original split, not
+  // a copy of any call/chat app's sidebar-plus-stage layout.
+  desktopRow: { flex: 1, flexDirection: "row" },
+  desktopContentPane: { flex: 2 },
+  desktopCompanionsPane: { flex: 1, maxWidth: 320, borderLeftWidth: 1, borderLeftColor: colors.borderFaint },
+  desktopCompanionsPaneContent: { padding: spacing.lg },
 
   reactionsOverlay: { position: "absolute", bottom: 140, alignSelf: "center", alignItems: "center" },
   floatingReaction: { position: "absolute", fontSize: 26 },
 
-  modeRow: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 10, paddingTop: 6 },
-  modeBtn: { alignItems: "center", gap: 2, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 10 },
-  modeBtnActive: { backgroundColor: "rgba(184,134,11,0.25)" },
-  modeIcon: { fontSize: 16 },
-  modeLabel: { color: "rgba(255,255,255,0.7)", fontSize: 9, fontFamily: "Inter_500Medium" },
-
-  bottomRowScroll: { flexGrow: 0 },
-  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, paddingTop: 10, paddingHorizontal: 16, minWidth: "100%" },
-  reactionBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  reactionEmoji: { fontSize: 18 },
-  transferBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" },
-  transferBtnActive: { backgroundColor: "#B8860B" },
-  handUpBadge: { fontSize: 12, marginLeft: 2 },
-
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
-  sheetTitle: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 8 },
-  transferRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  transferName: { color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular" },
-  cancelBtn: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
-  cancelBtnText: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  sheetBox: { backgroundColor: colors.sheet, borderTopLeftRadius: radii.xl + 4, borderTopRightRadius: radii.xl + 4, padding: spacing.xl, gap: spacing.xs },
+  sheetTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: spacing.sm },
+  transferRow: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderFaint, minHeight: 44, justifyContent: "center" },
+  transferName: { color: colors.textPrimary, ...type.body },
+  cancelBtn: { alignItems: "center", paddingVertical: spacing.md, marginTop: spacing.xs, minHeight: 44, justifyContent: "center" },
+  cancelBtnText: { color: colors.textSecondary, ...type.bodyEmph },
 });
