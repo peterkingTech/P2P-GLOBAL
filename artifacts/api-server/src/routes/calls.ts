@@ -150,6 +150,19 @@ router.post("/calls/token", async (req, res) => {
       const { data: participant } = await supabaseWrite
         .from("p2p_break_room_participants").select("id").eq("room_id", roomId).eq("user_id", userId).is("left_at", null).maybeSingle();
       if (!participant) return err(res, "Not authorized to join this room", 403);
+    } else if (channelName.startsWith("family_worship_")) {
+      // P2P Together Phase 3 — Voice Space. Same additive pattern as
+      // circle_/room_ above: a closed-membership channel (only active
+      // participants of that exact worship session), checked against
+      // p2p_family_worship_participants the same way room_ checks
+      // p2p_break_room_participants. Without this branch this channel
+      // prefix fell through with no check at all, same gap circle_/room_
+      // had before their own fixes.
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const sessionId = channelName.slice("family_worship_".length);
+      const { data: participant } = await supabaseWrite
+        .from("p2p_family_worship_participants").select("id").eq("session_id", sessionId).eq("user_id", userId).is("left_at", null).maybeSingle();
+      if (!participant) return err(res, "Not authorized to join this worship session", 403);
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;

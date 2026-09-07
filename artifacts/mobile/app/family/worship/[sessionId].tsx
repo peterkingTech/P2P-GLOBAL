@@ -15,6 +15,7 @@ import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { useTogetherAudio } from "@/hooks/useTogetherAudio";
 import { effectiveMediaVolume } from "@/lib/togetherAudio/mixer";
 import AudioBalancePanel from "@/components/family/AudioBalancePanel";
+import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -65,6 +66,11 @@ export default function FamilyWorshipScreen() {
   const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
   const leftRef = useRef(false);
   const togetherAudio = useTogetherAudio();
+  const voiceCompanions = React.useMemo(
+    () => members.filter((m) => m.userId !== profile?.id).map((m) => ({ userId: m.userId, name: m.name })),
+    [members, profile?.id]
+  );
+  const voiceSpace = useVoiceSpace(session?.channelName ?? "", profile?.id, voiceCompanions, togetherAudio.prefs);
 
   const isHost = session?.hostId === profile?.id;
   const isShepherd = shepherdId === profile?.id;
@@ -102,10 +108,11 @@ export default function FamilyWorshipScreen() {
   const leave = useCallback(async () => {
     if (leftRef.current || !params.sessionId) return;
     leftRef.current = true;
+    voiceSpace.leave();
     await leaveWorshipSession(params.sessionId).catch(() => {});
     if (router.canGoBack()) router.back();
     else router.replace("/family" as any);
-  }, [params.sessionId, router]);
+  }, [params.sessionId, router, voiceSpace.leave]);
 
   // Session row is the source of truth for state/mode/media/scripture/
   // playback anchor — every client just reconciles to it, no polling.
@@ -406,10 +413,12 @@ export default function FamilyWorshipScreen() {
           <View style={styles.participantsRow}>
             {activeParticipants.map((p) => {
               const m = memberById.get(p.user_id);
+              const voice = voiceSpace.companionStates.find((c) => c.userId === p.user_id);
               return (
-                <View key={p.user_id} style={styles.participantChip}>
+                <View key={p.user_id} style={[styles.participantChip, voice?.speaking && styles.participantChipSpeaking]}>
                   <Text style={styles.participantInitial}>{(m?.name ?? "?").charAt(0).toUpperCase()}</Text>
                   <Text style={styles.participantName} numberOfLines={1}>{m?.name ?? "Someone"}{p.user_id === session.hostId ? " · Guide" : ""}</Text>
+                  {voice?.connected && voice.muted && <Ionicons name="mic-off" size={10} color="rgba(255,255,255,0.6)" />}
                 </View>
               );
             })}
@@ -481,10 +490,16 @@ export default function FamilyWorshipScreen() {
         onSetRoom={togetherAudio.setRoomVolume}
         onSetParticipant={togetherAudio.setParticipantVolume}
         onToggleMute={togetherAudio.toggleMuteParticipant}
-        companions={activeParticipants
-          .filter((p) => p.user_id !== profile?.id)
-          .map((p) => ({ userId: p.user_id, name: memberById.get(p.user_id)?.name ?? "Someone" }))}
-        voiceConnected={false}
+        companions={voiceSpace.companionStates}
+        voicePhase={voiceSpace.phase}
+        voiceError={voiceSpace.errorMessage}
+        onJoinVoice={voiceSpace.join}
+        onRetryVoice={voiceSpace.retry}
+        onLeaveVoice={voiceSpace.leave}
+        micMuted={voiceSpace.micMuted}
+        onToggleMic={voiceSpace.toggleMic}
+        listening={voiceSpace.listening}
+        onToggleListening={voiceSpace.toggleListening}
       />
     </View>
   );
@@ -521,7 +536,14 @@ const styles = StyleSheet.create({
 
   companionsLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6, marginBottom: 8 },
   participantsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  participantChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 150 },
+  participantChip: {
+    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 6, maxWidth: 150, borderWidth: 1.5, borderColor: "transparent",
+  },
+  // A subtle border pulse, not an animated ring/wave — original, low-key
+  // "Speaking" affordance per this feature's own instruction not to copy
+  // another product's speaking animation.
+  participantChipSpeaking: { borderColor: "#1D9E75" },
   participantInitial: { color: "#1D9E75", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   participantName: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontFamily: "Inter_400Regular" },
 
