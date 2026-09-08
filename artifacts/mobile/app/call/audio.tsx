@@ -346,6 +346,21 @@ export default function AudioCallScreen() {
       // 1:1 call that's the exact same moment as before (one remote uid
       // going to zero), so this preserves current behavior unchanged
       // while letting a group call continue for whoever's left.
+      // Objective evidence that real audio (not just a connected channel)
+      // is actually flowing in each direction — volume is Agora's own
+      // measurement of the captured/decoded signal, not something derived
+      // from mute state, so a nonzero reading here means real sound was
+      // detected on that uid's mic. Logged, not surfaced in the UI (no
+      // existing speaking indicator on this screen, unlike group.tsx).
+      onAudioVolumeIndication: (connection, speakers) => {
+        const nonzero = (speakers ?? []).filter((s) => (s.volume ?? 0) > 5);
+        if (nonzero.length > 0) {
+          console.log("CALL DEBUG audio: onAudioVolumeIndication", {
+            channelName: connection.channelId,
+            levels: nonzero.map((s) => ({ uid: s.uid ?? 0, volume: s.volume })),
+          });
+        }
+      },
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         setRemoteUids((prev) => {
@@ -370,6 +385,10 @@ export default function AudioCallScreen() {
       },
     },
   });
+
+  useEffect(() => {
+    engineRef.current?.enableAudioVolumeIndication(500, 3, true);
+  }, [engineRef, token]);
 
   // Resolve real names for group calls only (>1 remote party) — the
   // existing 1:1 path keeps using otherUserId/otherUserName from route
