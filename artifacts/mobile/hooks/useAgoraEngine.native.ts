@@ -67,7 +67,12 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
     engine.muteLocalAudioStream(false);
     console.log("CALL DEBUG engine: configured, calling joinChannel", { channelName, uid });
 
-    engine.joinChannel(token, channelName, uid, {
+    // joinChannel returns synchronously: 0 means the native call was
+    // accepted (actual join/failure still arrives async via eventHandler),
+    // but a negative code means the SDK rejected the call outright and
+    // will NEVER fire onJoinChannelSuccess/onError/onConnectionStateChanged
+    // for it at all — that path was previously invisible at this layer.
+    const joinResult = engine.joinChannel(token, channelName, uid, {
       channelProfile: ChannelProfileType.ChannelProfileCommunication,
       clientRoleType: ClientRoleType.ClientRoleBroadcaster,
       publishMicrophoneTrack: true,
@@ -75,6 +80,11 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       autoSubscribeAudio: true,
       autoSubscribeVideo: enableVideo,
     });
+    if (joinResult !== 0) {
+      console.warn("CALL DEBUG engine: joinChannel rejected synchronously", { channelName, uid, joinResult });
+    } else {
+      console.log("CALL DEBUG engine: joinChannel accepted, awaiting async result", { channelName, uid });
+    }
 
     return () => {
       console.log("CALL DEBUG engine: leaving channel and releasing", { channelName, uid });

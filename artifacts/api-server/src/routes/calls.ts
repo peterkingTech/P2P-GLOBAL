@@ -695,12 +695,20 @@ router.post("/calls/:callId/study/participants/:userId/remove", async (req, res)
 
 // POST /calls/peer-channel — deterministic channel name for a 1:1 pair,
 // sorted so both sides compute the same name regardless of who initiates.
+// Agora channel names must be <= 64 bytes (confirmed from the installed
+// react-native-agora SDK's own joinChannel docs); two raw UUIDs joined
+// together is 77 bytes, which the native SDK silently rejects with -102
+// (invalid channel name) at joinChannel() time with no JS-level callback
+// at all. Hashing the sorted pair keeps the name deterministic per pair
+// (same two users always land on the same channel) while comfortably
+// fitting the limit.
 router.post("/calls/peer-channel", async (req, res) => {
   const { currentUserId, otherUserId } = req.body as { currentUserId?: string; otherUserId?: string };
   if (!currentUserId || !otherUserId) return err(res, "currentUserId and otherUserId required");
 
   const sorted = [currentUserId, otherUserId].sort();
-  const channelName = `p2p_${sorted[0]}_${sorted[1]}`;
+  const pairHash = crypto.createHash("sha256").update(`${sorted[0]}_${sorted[1]}`).digest("hex").slice(0, 48);
+  const channelName = `p2p_${pairHash}`;
   return ok(res, { channelName });
 });
 
