@@ -8,7 +8,7 @@ function err(res: import("express").Response, message: string, status = 400) {
   return res.status(status).json({ error: message });
 }
 
-const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "thanksgiving", "teaching"] as const;
+const VALID_MODES = ["worship", "scripture", "prayer", "sharing", "silent_prayer", "teaching"] as const;
 const VALID_PROVIDERS = ["youtube"] as const;
 const VALID_MEDIA_PERMISSIONS = ["guide_only", "trusted", "everyone"] as const;
 const VALID_PRESENCE_STATUSES = ["joined", "listening", "praying", "away"] as const;
@@ -89,8 +89,8 @@ router.post("/worship/start", async (req, res) => {
   if (members?.length) {
     await db.from("p2p_notifications").insert(
       members.map((m) => ({
-        user_id: m.user_id, title: "🕊️ Family Worship",
-        message: `${(hostProfile?.full_name as string) ?? "Someone"} started Family Worship.`,
+        user_id: m.user_id, title: "📺 Family Media",
+        message: `${(hostProfile?.full_name as string) ?? "Someone"} started Family Media.`,
         notification_type: "family_worship_invite",
         data: { sessionId, familyId, hostName: (hostProfile?.full_name as string) ?? "Someone" },
       }))

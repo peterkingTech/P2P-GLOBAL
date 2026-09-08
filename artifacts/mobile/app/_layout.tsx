@@ -14,6 +14,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+// Real-device forensic fix for the Android 7.1/API 25 (Nox) launch crash
+// — see index.js for the actual fix and why it has to live there, not
+// here. Calling enableScreens(false) at the top of this file was tried
+// first (simpler, more localized) and confirmed via real-device retest
+// to NOT resolve the crash: expo-router/entry already finishes
+// initializing react-native-screens' native navigator before this
+// module is ever evaluated, so the call landed too late to matter.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync, pathForNotification } from "@/lib/push";

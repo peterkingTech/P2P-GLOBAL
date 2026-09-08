@@ -23,12 +23,12 @@ interface Props {
 export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, micMuted, onToggleMic, listening, onToggleListening }: Props) {
   return (
     <View>
-      <Text style={styles.sectionLabel}>VOICE SPACE</Text>
+      <Text style={styles.sectionLabel}>VOICE</Text>
 
       {phase === "idle" && (
-        <TouchableOpacity style={styles.joinBtn} onPress={onJoin} accessibilityRole="button" accessibilityLabel="Join Voice Space">
+        <TouchableOpacity style={styles.joinBtn} onPress={onJoin} accessibilityRole="button" accessibilityLabel="Join Voice">
           <Text style={styles.joinIcon}>🎙️</Text>
-          <Text style={styles.joinText}>Join Voice Space</Text>
+          <Text style={styles.joinText}>Join Voice</Text>
         </TouchableOpacity>
       )}
 
@@ -41,12 +41,12 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
 
       {phase === "failed" && (
         <View style={styles.failBox}>
-          <Text style={styles.failText}>{error ?? "Unable to connect to Voice Space"}</Text>
+          <Text style={styles.failText}>{error ?? "Unable to connect to Voice"}</Text>
           <View style={styles.failBtnRow}>
             <TouchableOpacity style={styles.secondaryBtn} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Together">
               <Text style={styles.secondaryBtnText}>Leave Together</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry connecting to Voice Space">
+            <TouchableOpacity style={styles.primaryBtn} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry connecting to Voice">
               <Text style={styles.primaryBtnText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -72,13 +72,13 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
               style={[styles.iconBtn, !listening && styles.iconBtnActive]}
               onPress={onToggleListening}
               accessibilityRole="button"
-              accessibilityLabel={listening ? "Stop listening to Voice Space" : "Resume listening to Voice Space"}
+              accessibilityLabel={listening ? "Stop Voice Audio" : "Resume Voice Audio"}
               accessibilityState={{ selected: !listening }}
             >
               <Ionicons name={listening ? "ear" : "ear-outline"} size={16} color={colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryBtnSmall} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Voice Space">
-              <Text style={styles.secondaryBtnText}>Leave Voice Space</Text>
+            <TouchableOpacity style={styles.secondaryBtnSmall} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Voice">
+              <Text style={styles.secondaryBtnText}>Leave Voice</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -35,12 +35,11 @@ function showAlert(title: string, message: string) {
 }
 
 const MODES: { key: WorshipMode; label: string; icon: string }[] = [
-  { key: "worship", label: "Worship", icon: "🎵" },
+  { key: "worship", label: "Media", icon: "📺" },
   { key: "scripture", label: "Scripture", icon: "📖" },
   { key: "prayer", label: "Prayer", icon: "🙏" },
   { key: "sharing", label: "Sharing", icon: "🎤" },
   { key: "silent_prayer", label: "Silent", icon: "🕊️" },
-  { key: "thanksgiving", label: "Thanks", icon: "❤️" },
   { key: "teaching", label: "Teaching", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
@@ -138,7 +137,7 @@ export default function FamilyWorshipScreen() {
       getWorshipQueue(params.sessionId).then(setQueue).catch(() => {});
       getWorshipNotes(params.sessionId).then(setNotes).catch(() => {});
     } catch (e: any) {
-      showAlert("Couldn't load Family Worship", e.message ?? "Please try again.");
+      showAlert("Couldn't load Family Media", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -184,7 +183,7 @@ export default function FamilyWorshipScreen() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "p2p_family_worship_sessions", filter: `id=eq.${params.sessionId}` }, (payload) => {
         const row = payload.new as Record<string, unknown>;
         if (row.status === "ended") {
-          showAlert("Family Worship ended", "This worship session has ended.");
+          showAlert("Family Media ended", "This session has ended.");
           leave();
           return;
         }
@@ -255,7 +254,7 @@ export default function FamilyWorshipScreen() {
       // its definition for why this exists alongside postgres_changes.
       .on("broadcast", { event: "state" }, ({ payload }: { payload: WorshipSession }) => {
         if (payload.status === "ended") {
-          showAlert("Family Worship ended", "This worship session has ended.");
+          showAlert("Family Media ended", "This session has ended.");
           leave();
           return;
         }
@@ -405,7 +404,7 @@ export default function FamilyWorshipScreen() {
     try {
       const item = await addToWorshipQueue(session.id, { mediaProvider: "youtube", mediaId, title: title ?? undefined, thumbnailUrl: thumbnailUrl ?? undefined });
       setQueue((prev) => [...prev, item]);
-    } catch (e: any) { showAlert("Couldn't add to the Media Shelf", e.message ?? "Please try again."); }
+    } catch (e: any) { showAlert("Couldn't add to the Queue", e.message ?? "Please try again."); }
   }
   async function handleRemoveFromQueue(itemId: string) {
     if (!session) return;
@@ -415,7 +414,7 @@ export default function FamilyWorshipScreen() {
   async function handleReorderQueue(orderedItemIds: string[]) {
     if (!session) return;
     try { setQueue(await reorderWorshipQueue(session.id, orderedItemIds)); }
-    catch (e: any) { showAlert("Couldn't reorder the Media Shelf", e.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't reorder the Queue", e.message ?? "Please try again."); }
   }
   async function handlePlayNext() {
     if (!session) return;
@@ -554,9 +553,9 @@ export default function FamilyWorshipScreen() {
 
   async function handleEnd() {
     if (!session) return;
-    Alert.alert("End Family Worship?", "This will end the session for everyone.", [
+    Alert.alert("End Family Media?", "This will end the session for everyone.", [
       { text: "Cancel", style: "cancel" },
-      { text: "End Worship", style: "destructive", onPress: async () => {
+      { text: "End", style: "destructive", onPress: async () => {
         await endWorshipSession(session.id);
         broadcastState({ ...session, status: "ended" });
         leave();
@@ -588,9 +587,9 @@ export default function FamilyWorshipScreen() {
       {session.currentMode === "worship" && (
         <View style={styles.panel}>
           <View style={styles.panelLabelRow}>
-            <Text style={styles.panelLabel}>SHARED MEDIA</Text>
-            <TouchableOpacity onPress={() => setMediaShelfOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Media Shelf${queue.length > 0 ? `, ${queue.length} items` : ""}`}>
-              <Text style={styles.shelfLink}>Media Shelf{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
+            <Text style={styles.panelLabel}>MEDIA</Text>
+            <TouchableOpacity onPress={() => setMediaShelfOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Queue${queue.length > 0 ? `, ${queue.length} items` : ""}`}>
+              <Text style={styles.shelfLink}>Queue{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
             </TouchableOpacity>
           </View>
           <SharedMedia {...sharedMediaProps} />
@@ -640,12 +639,10 @@ export default function FamilyWorshipScreen() {
         </View>
       )}
 
-      {(session.currentMode === "sharing" || session.currentMode === "thanksgiving") && (
+      {session.currentMode === "sharing" && (
         <View style={styles.panel}>
-          <Text style={styles.panelLabel}>{session.currentMode === "thanksgiving" ? "THANKSGIVING" : "SHARING"}</Text>
-          <Text style={styles.silentHint}>
-            {session.currentMode === "thanksgiving" ? "Take turns sharing something you're thankful for." : "Take turns sharing with the family."}
-          </Text>
+          <Text style={styles.panelLabel}>SHARING</Text>
+          <Text style={styles.silentHint}>Take turns sharing with the family.</Text>
         </View>
       )}
     </>
@@ -672,7 +669,7 @@ export default function FamilyWorshipScreen() {
               handUp={handUp}
               canModerate={canModerate}
               onLongPress={() => canModerate && handleRemoveParticipant(p.user_id, name)}
-              onHandUpPress={isHost ? () => Alert.alert(`${name} — Hand Up`, "", [
+              onHandUpPress={isHost ? () => Alert.alert(`${name} — Raise Hand`, "", [
                 { text: "Dismiss", onPress: () => dismissHand(p.user_id) },
                 { text: "Allow", onPress: () => allowHand(p.user_id) },
               ]) : undefined}
@@ -690,7 +687,7 @@ export default function FamilyWorshipScreen() {
       <View style={{ paddingTop: insets.top + 10 }}>
         <TogetherHeader
           onBack={leave}
-          title="Family Worship"
+          title="Family Media"
           modeIcon={currentModeMeta.icon}
           modeLabel={currentModeMeta.label}
           participantCount={activeParticipants.length}

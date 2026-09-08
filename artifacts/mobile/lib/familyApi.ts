@@ -70,7 +70,7 @@ export function updateFamilyPrayerRequestStatus(familyId: string, id: string, st
   return authedFetch(`/family/${familyId}/prayer-requests/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) });
 }
 
-export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "silent_prayer" | "thanksgiving" | "teaching";
+export type WorshipMode = "worship" | "scripture" | "prayer" | "sharing" | "silent_prayer" | "teaching";
 // mediaProvider is the new provider boundary (lib/mediaProviders) — when
 // set, mediaId holds that provider's external id and mediaType/mediaUrl
 // are unused. When null, mediaType/mediaUrl carry the legacy raw-file

@@ -95,7 +95,7 @@ export default function ChatPanel({
                 </TouchableOpacity>
               )}
               {currentMedia && (
-                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "media", ...currentMedia })} accessibilityRole="button" accessibilityLabel="Attach this moment in Shared Media">
+                <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "media", ...currentMedia })} accessibilityRole="button" accessibilityLabel="Attach this moment in Media">
                   <Text style={styles.attachChipText}>🎬 Moment</Text>
                 </TouchableOpacity>
               )}

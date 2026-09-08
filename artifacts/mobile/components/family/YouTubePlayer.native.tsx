@@ -122,12 +122,32 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     <WebView
       ref={webviewRef}
       style={styles.wrap}
-      source={{ html }}
+      // Real-device forensic fix — reproduced on the actual APK: YouTube's
+      // IFrame API failed every single load with "Video player
+      // configuration error / Error 153". Root cause: source={{ html }}
+      // with no baseUrl gives the WebView an opaque/null origin, and the
+      // IFrame API's postMessage handshake between this page and the
+      // youtube.com iframe it creates validates origins — an opaque
+      // origin breaks that handshake. baseUrl gives the page a real
+      // origin the handshake can validate against.
+      source={{ html, baseUrl: "https://www.youtube.com" }}
       onMessage={handleMessage}
       javaScriptEnabled
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
       originWhitelist={["*"]}
+      domStorageEnabled
+      thirdPartyCookiesEnabled
+      // Real-device forensic fix #2 — after the baseUrl fix above resolved
+      // Error 153, playback still failed with YouTube's own "video
+      // unavailable / Error 152" on two unrelated, definitely-embeddable
+      // videos, reproduced identically on two separate devices. Android
+      // WebView's default UA string carries a "; wv)" marker identifying
+      // it as an embedded WebView rather than the Chrome browser itself;
+      // YouTube's playback backend is known to reject/degrade requests
+      // carrying that marker. Overriding to a stock mobile Chrome UA
+      // (no "wv" marker) is the documented workaround.
+      userAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"
     />
   );
 }

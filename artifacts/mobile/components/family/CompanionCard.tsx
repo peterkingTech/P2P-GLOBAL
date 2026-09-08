@@ -21,7 +21,7 @@ interface Props {
 // copying another product's speaking indicator.
 export default function CompanionCard({ name, isGuide, speaking, muted, praying, handUp, canModerate, onLongPress, onHandUpPress }: Props) {
   const initial = name.charAt(0).toUpperCase();
-  const statusParts = [isGuide ? "Guide" : null, praying ? "Praying" : null, muted ? "Microphone muted" : null, handUp ? "Hand raised" : null].filter(Boolean);
+  const statusParts = [isGuide ? "Guide (Host)" : null, praying ? "Praying" : null, muted ? "Microphone muted" : null, handUp ? "Hand raised" : null].filter(Boolean);
 
   return (
     <TouchableOpacity
@@ -34,7 +34,7 @@ export default function CompanionCard({ name, isGuide, speaking, muted, praying,
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initial}</Text>
       </View>
-      <Text style={styles.name} numberOfLines={1}>{name}{isGuide ? " · Guide" : ""}</Text>
+      <Text style={styles.name} numberOfLines={1}>{name}{isGuide ? " · Guide (Host)" : ""}</Text>
       <View style={styles.badges}>
         {praying && <Text style={styles.badgeEmoji}>🙏</Text>}
         {muted && <Ionicons name="mic-off" size={11} color={colors.textTertiary} />}

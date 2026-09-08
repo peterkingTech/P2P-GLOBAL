@@ -15,7 +15,7 @@ export default function ExpressionBar({ emojis, onSend }: Props) {
       {emojis.map((emoji) => (
         <TouchableOpacity
           key={emoji} style={styles.btn} onPress={() => onSend(emoji)}
-          accessibilityRole="button" accessibilityLabel={`Send ${emoji} expression`}
+          accessibilityRole="button" accessibilityLabel={`Send ${emoji} reaction`}
         >
           <Text style={styles.emoji}>{emoji}</Text>
         </TouchableOpacity>

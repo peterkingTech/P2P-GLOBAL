@@ -42,8 +42,8 @@ export default function AudioBalance({
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>AUDIO BALANCE</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Audio Balance">
+            <Text style={styles.title}>AUDIO</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Audio">
               <Ionicons name="close" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -55,10 +55,10 @@ export default function AudioBalance({
             />
 
             <AudioSlider label="Output" value={prefs.outputVolume} onChange={onSetOutput} accentColor={colors.light} />
-            <AudioSlider label="Shared Media" value={prefs.mediaVolume} onChange={onSetMedia} accentColor={colors.growth} />
-            <AudioSlider label="Voice Space" value={prefs.roomVolume} onChange={onSetRoom} accentColor={colors.connection} disabled={!voiceConnected} />
+            <AudioSlider label="Media" value={prefs.mediaVolume} onChange={onSetMedia} accentColor={colors.growth} />
+            <AudioSlider label="Voice" value={prefs.roomVolume} onChange={onSetRoom} accentColor={colors.connection} disabled={!voiceConnected} />
             {!voiceConnected && (
-              <Text style={styles.hint}>Join Voice Space above for these settings to affect anything.</Text>
+              <Text style={styles.hint}>Join Voice above for these settings to affect anything.</Text>
             )}
 
             {companions.length > 0 && (

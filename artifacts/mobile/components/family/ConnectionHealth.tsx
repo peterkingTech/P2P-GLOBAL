@@ -9,7 +9,7 @@ interface Props {
 }
 
 const STATE: Record<VoicePhase, { label: string; color: string }> = {
-  idle: { label: "Voice Space not joined", color: colors.textFaint },
+  idle: { label: "Voice not joined", color: colors.textFaint },
   connecting: { label: "Connecting…", color: colors.light },
   connected: { label: "Connection Health: Good", color: colors.growth },
   failed: { label: "Connection lost", color: colors.rest },

@@ -42,7 +42,7 @@ export default function SharedMedia({
         <View style={styles.controlRow}>
           <TouchableOpacity
             style={styles.playBtn} onPress={onTogglePlay}
-            accessibilityRole="button" accessibilityLabel={session.isPlaying ? "Pause Shared Media" : "Play Shared Media"}
+            accessibilityRole="button" accessibilityLabel={session.isPlaying ? "Pause Media" : "Play Media"}
           >
             <Ionicons name={session.isPlaying ? "pause" : "play"} size={20} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -53,9 +53,9 @@ export default function SharedMedia({
             value={urlInput}
             onChangeText={onChangeUrlInput}
             autoCapitalize="none"
-            accessibilityLabel="YouTube link for Shared Media"
+            accessibilityLabel="YouTube link for Media"
           />
-          <TouchableOpacity style={styles.setBtn} onPress={onSetMedia} accessibilityRole="button" accessibilityLabel="Set Shared Media">
+          <TouchableOpacity style={styles.setBtn} onPress={onSetMedia} accessibilityRole="button" accessibilityLabel="Set Media">
             <Text style={styles.setBtnText}>Set</Text>
           </TouchableOpacity>
         </View>

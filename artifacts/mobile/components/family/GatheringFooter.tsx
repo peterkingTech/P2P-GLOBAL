@@ -47,7 +47,7 @@ export default function GatheringFooter({
       <TouchableOpacity style={styles.iconBtn} onPress={onOpenNotes} accessibilityRole="button" accessibilityLabel="Open Notes">
         <Ionicons name="document-text-outline" size={16} color={colors.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenAudioBalance} accessibilityRole="button" accessibilityLabel="Open Audio Balance">
+      <TouchableOpacity style={styles.iconBtn} onPress={onOpenAudioBalance} accessibilityRole="button" accessibilityLabel="Open Audio">
         <Ionicons name="options-outline" size={16} color={colors.textPrimary} />
       </TouchableOpacity>
       {isHost && (

@@ -67,8 +67,8 @@ export default function MediaShelf({
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>MEDIA SHELF</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Media Shelf">
+            <Text style={styles.title}>QUEUE</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Queue">
               <Ionicons name="close" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -120,7 +120,7 @@ export default function MediaShelf({
 
           <ScrollView contentContainerStyle={styles.list}>
             {queue.length === 0 ? (
-              <Text style={styles.emptyText}>The Media Shelf is empty.</Text>
+              <Text style={styles.emptyText}>The Queue is empty.</Text>
             ) : (
               queue.map((item, i) => (
                 <View key={item.id} style={styles.itemRow}>
@@ -152,7 +152,7 @@ export default function MediaShelf({
                   {(canControl || item.addedBy === myUserId) && (
                     <TouchableOpacity
                       onPress={() => onRemove(item.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      accessibilityRole="button" accessibilityLabel={`Remove ${item.title ?? "this item"} from the Media Shelf`}
+                      accessibilityRole="button" accessibilityLabel={`Remove ${item.title ?? "this item"} from the Queue`}
                     >
                       <Ionicons name="trash-outline" size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
@@ -178,9 +178,9 @@ export default function MediaShelf({
                 value={input}
                 onChangeText={setInput}
                 autoCapitalize="none"
-                accessibilityLabel="YouTube link to add to the Media Shelf"
+                accessibilityLabel="YouTube link to add to the Queue"
               />
-              <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={adding || !input.trim()} accessibilityRole="button" accessibilityLabel="Add to Media Shelf">
+              <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={adding || !input.trim()} accessibilityRole="button" accessibilityLabel="Add to Queue">
                 {adding ? <ActivityIndicator color={colors.textPrimary} size="small" /> : <Ionicons name="add" size={18} color={colors.textPrimary} />}
               </TouchableOpacity>
             </View>

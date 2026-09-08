@@ -153,7 +153,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
     return (
       <View style={styles.placeholder}>
         <Text style={styles.placeholderIcon}>🎵</Text>
-        <Text style={styles.placeholderText}>No Shared Media selected yet</Text>
+        <Text style={styles.placeholderText}>No Media selected yet</Text>
       </View>
     );
   }
@@ -188,7 +188,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
     <View style={styles.audioBox}>
       <ActivityIndicator color={colors.accentGreen} size="small" style={{ opacity: session.isPlaying ? 0 : 1 }} />
       <Text style={styles.placeholderIcon}>{session.isPlaying ? "🎵" : "⏸️"}</Text>
-      <Text style={styles.placeholderText}>{session.isPlaying ? "Shared Media playing" : "Paused"}</Text>
+      <Text style={styles.placeholderText}>{session.isPlaying ? "Media playing" : "Paused"}</Text>
     </View>
   );
 }
