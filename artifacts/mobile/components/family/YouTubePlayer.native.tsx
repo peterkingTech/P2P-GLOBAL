@@ -5,73 +5,32 @@ import { computePositionFromClock } from "@/lib/familyApi";
 import type { YouTubePlayerProps } from "./youTubePlayerTypes";
 import { describeYouTubeError, DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_MS, NOTICEABLE_DRIFT_THRESHOLD_MS } from "./youTubePlayerTypes";
 
-// A self-contained page loaded into the WebView — this is the standard,
-// documented way to embed a controllable YouTube player natively (there is
-// no first-party RN SDK): load the IFrame API script, construct a
-// YT.Player against a div, and bridge its events back to React Native via
-// window.ReactNativeWebView.postMessage. Commands flow the other direction
-// via injectJavaScript. The page also self-reports its current playback
-// time every 3s — injectJavaScript can't return a value back to RN on
-// every platform, so periodic drift-checking needs the page to push its
-// position rather than RN pulling it.
-function buildHtml(externalId: string, autoplay: boolean, startSeconds: number, initialVolume: number) {
-  return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body style="margin:0;background:#000;">
-<div id="player"></div>
-<script>
-  // YOUTUBE DEBUG — forensic instrumentation for Error 152. Surfaces
-  // in-page JS errors and the IFrame script's own load failure, neither
-  // of which the YT.Player onError callback below would ever see (that
-  // only fires for player-level errors after the API has already loaded).
-  window.onerror = function (msg, src, line, col, err) {
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: "jserror", msg: String(msg), src: String(src), line: line }));
-  };
-  var player;
-  var tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  tag.onerror = function () { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "scripterror", src: tag.src })); };
-  document.head.appendChild(tag);
-  window.onYouTubeIframeAPIReady = function () {
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: "apiready" }));
-    player = new YT.Player('player', {
-      videoId: "${externalId}",
-      playerVars: { playsinline: 1, modestbranding: 1, rel: 0, autoplay: ${autoplay ? 1 : 0}, start: ${Math.max(0, Math.round(startSeconds))} },
-      events: {
-        onReady: function () { player.setVolume(${Math.round(Math.min(1, Math.max(0, initialVolume)) * 100)}); window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ready" })); },
-        onError: function (e) {
-          var extra = {};
-          try { extra.state = player.getPlayerState(); } catch (ignored) {}
-          try { extra.videoUrl = player.getVideoUrl ? player.getVideoUrl() : null; } catch (ignored) {}
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: "error", code: e.data, extra: extra }));
-        },
-        onStateChange: function (e) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: "state", state: e.data }));
-          if (e.data === 0) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ended" }));
-        }
-      }
-    });
-    setInterval(function () {
-      if (player && player.getCurrentTime) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: "time", ms: Math.round(player.getCurrentTime() * 1000) }));
-      }
-    }, 3000);
-  };
-  // YOUTUBE DEBUG — if onYouTubeIframeAPIReady never fires at all, that by
-  // itself is evidence the iframe_api script never actually executed
-  // (network-level failure), distinct from the player loading and then
-  // erroring.
-  setTimeout(function () {
-    if (!player) window.ReactNativeWebView.postMessage(JSON.stringify({ type: "apitimeout" }));
-  }, 8000);
-  window.p2pCommand = function (name, arg) {
-    if (!player) return;
-    if (name === "play") player.playVideo();
-    else if (name === "pause") player.pauseVideo();
-    else if (name === "seek") player.seekTo(arg, true);
-    else if (name === "volume") player.setVolume(arg);
-  };
-</script>
-</body></html>`;
+// Real-device forensic fix — Error 152 ("video unavailable") persisted
+// after the earlier baseUrl fix (which resolved a *different* error, 153)
+// and after a custom User-Agent (which didn't help), reproduced on two
+// separate devices with two unrelated, definitely-embeddable videos. Root
+// cause, confirmed against multiple independent reports of this exact
+// "152-4" signature in native WebView embeds: source={{ html, baseUrl }}
+// uses Android's loadDataWithBaseURL, which gives the page a synthetic
+// document origin for JS purposes (fixing the postMessage handshake
+// behind Error 153) but does NOT make the WebView's native HTTP layer
+// send a real Referer header on the page's own sub-resource requests —
+// YouTube's playback backend requires that header and serves "video
+// unavailable" without it. The page itself (IFrame API bootstrap +
+// event → postMessage bridge, identical to what used to be inlined here)
+// now lives server-side at GET /youtube-embed and is loaded via a real
+// https:// network navigation instead, which makes the WebView send
+// standard Referer headers the way any normal page load would.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "";
+
+function buildEmbedUrl(externalId: string, autoplay: boolean, startSeconds: number, initialVolume: number) {
+  const params = new URLSearchParams({
+    v: externalId,
+    autoplay: autoplay ? "1" : "0",
+    start: String(Math.max(0, Math.round(startSeconds))),
+    volume: String(Math.min(1, Math.max(0, initialVolume))),
+  });
+  return `${API_BASE_URL}/youtube-embed?${params.toString()}`;
 }
 
 export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, baseServerTimeIso, playbackRate, volume, resyncNonce, onDriftStatus, onEnded, onError }: YouTubePlayerProps) {
@@ -86,10 +45,10 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     return computePositionFromClock(c.basePositionMs, c.baseServerTimeIso, c.playbackRate, c.isPlaying);
   }
 
-  // Join-in-progress: the initial HTML embeds the expected position at
+  // Join-in-progress: the initial URL embeds the expected position at
   // mount time directly (autoplay + start=), so the first paint already
   // starts near the shared position rather than at 0.
-  const html = useMemo(() => buildHtml(externalId, clockRef.current.isPlaying, expectedNowMs() / 1000, volume), [externalId]);
+  const embedUrl = useMemo(() => buildEmbedUrl(externalId, clockRef.current.isPlaying, expectedNowMs() / 1000, volume), [externalId]);
 
   function handleMessage(event: { nativeEvent: { data: string } }) {
     try {
@@ -137,7 +96,8 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
   }, [resyncNonce]);
 
   // Ongoing drift correction, using the page's own self-reported position
-  // (see buildHtml's "time" postMessage) rather than blindly reseeking.
+  // (see the server-side embed page's "time" postMessage) rather than
+  // blindly reseeking.
   // Also reports "noticeably behind" status for the Return to Live banner.
   useEffect(() => {
     const interval = setInterval(() => {
@@ -157,15 +117,10 @@ export default function YouTubePlayer({ externalId, isPlaying, basePositionMs, b
     <WebView
       ref={webviewRef}
       style={styles.wrap}
-      // Real-device forensic fix — reproduced on the actual APK: YouTube's
-      // IFrame API failed every single load with "Video player
-      // configuration error / Error 153". Root cause: source={{ html }}
-      // with no baseUrl gives the WebView an opaque/null origin, and the
-      // IFrame API's postMessage handshake between this page and the
-      // youtube.com iframe it creates validates origins — an opaque
-      // origin breaks that handshake. baseUrl gives the page a real
-      // origin the handshake can validate against.
-      source={{ html, baseUrl: "https://www.youtube.com" }}
+      // See buildEmbedUrl above — a real https:// navigation to our own
+      // server-rendered embed page, not loadDataWithBaseURL, is the fix
+      // for Error 152 (missing Referer header on sub-resource requests).
+      source={{ uri: embedUrl }}
       onMessage={handleMessage}
       javaScriptEnabled
       allowsInlineMediaPlayback

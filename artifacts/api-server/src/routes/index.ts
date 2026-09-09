@@ -24,6 +24,7 @@ import officialMessagesRouter from "./officialMessages";
 import pushRouter from "./push";
 import familyRouter from "./family";
 import familyWorshipRouter from "./familyWorship";
+import youtubeEmbedRouter from "./youtubeEmbed";
 
 const router: IRouter = Router();
 
@@ -52,5 +53,6 @@ router.use(officialMessagesRouter); // Admin → User official "P2P Global" mess
 router.use(pushRouter); // Push notification device-token registration (paths differ, handled internally)
 router.use("/family", familyRouter);
 router.use("/family", familyWorshipRouter); // worship sessions live under /family/worship/* (paths differ, handled internally)
+router.use(youtubeEmbedRouter); // GET /youtube-embed — real HTTPS-origin page for the mobile YouTube WebView (see file for why)
 
 export default router;
