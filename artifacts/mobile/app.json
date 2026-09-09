@@ -37,7 +37,12 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -79,11 +84,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "p2p-global-discipleship-network-production-builds",
     "extra": {
       "eas": {
-        "projectId": "85d871bf-45ba-401c-88e9-077929ab7bd4"
+        "projectId": "5f2f927e-77fc-4e44-b85a-ac2fcd725ad1"
       }
-    },
-    "owner": "amen-tech.projects"
+    }
   }
 }
