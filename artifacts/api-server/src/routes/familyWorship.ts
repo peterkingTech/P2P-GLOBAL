@@ -233,6 +233,7 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     if (!request || request.family_id !== session.family_id) return err(res, "That prayer request wasn't found", 404);
     if (request.visibility !== "family") return err(res, "Only a shared prayer request can be focused", 400);
   }
+
   const update: Record<string, unknown> = {};
   if (body.status) update.status = body.status;
   if (body.currentMode) {
