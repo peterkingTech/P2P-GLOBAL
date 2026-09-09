@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
 import {
   createAgoraRtcEngine,
   ChannelProfileType,
@@ -46,52 +47,78 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
 
   useEffect(() => {
     if (!token || !channelName || uid === null) return;
+    let cancelled = false;
+    let engine: IRtcEngine | null = null;
 
-    const resolvedAppId = appId || FALLBACK_APP_ID;
-    console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo, usingServerAppId: !!appId });
-    const engine = createAgoraRtcEngine();
-    engineRef.current = engine;
-    engine.initialize({ appId: resolvedAppId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
-    engine.registerEventHandler(eventHandler);
+    (async () => {
+      // Android requires an explicit runtime grant for these dangerous
+      // permissions even though they're already declared in the manifest —
+      // without it, Agora's native capture silently produces empty mic/
+      // camera frames instead of real input: no crash, no error, no
+      // JS-visible signal of any kind, so a call can "connect" while being
+      // completely silent both ways. iOS prompts automatically on first
+      // capture via the Info.plist usage-description strings already
+      // present in app.json, so no equivalent call is needed there.
+      if (Platform.OS === "android") {
+        const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+        if (enableVideo) permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+        const results = await PermissionsAndroid.requestMultiple(permissions);
+        const denied = permissions.filter((p) => results[p] !== PermissionsAndroid.RESULTS.GRANTED);
+        if (denied.length > 0) {
+          console.warn("CALL DEBUG engine: permission denied, joining without real audio/video", { channelName, denied });
+        }
+      }
+      if (cancelled) return;
 
-    if (enableVideo) engine.enableVideo();
-    else engine.disableVideo();
-    engine.enableAudio();
-    // Default audio route for a normal call (section 11): speakerphone on,
-    // microphone on. Previously this was never set at all here — only ever
-    // toggled from the user's own mute/speaker buttons — so a fresh call
-    // started in whatever route Android happened to default to (usually
-    // the earpiece), silently disagreeing with the UI's speakerOn=true
-    // initial state.
-    engine.setEnableSpeakerphone(true);
-    engine.muteLocalAudioStream(false);
-    console.log("CALL DEBUG engine: configured, calling joinChannel", { channelName, uid });
+      const resolvedAppId = appId || FALLBACK_APP_ID;
+      console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo, usingServerAppId: !!appId });
+      engine = createAgoraRtcEngine();
+      engineRef.current = engine;
+      engine.initialize({ appId: resolvedAppId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
+      engine.registerEventHandler(eventHandler);
 
-    // joinChannel returns synchronously: 0 means the native call was
-    // accepted (actual join/failure still arrives async via eventHandler),
-    // but a negative code means the SDK rejected the call outright and
-    // will NEVER fire onJoinChannelSuccess/onError/onConnectionStateChanged
-    // for it at all — that path was previously invisible at this layer.
-    const joinResult = engine.joinChannel(token, channelName, uid, {
-      channelProfile: ChannelProfileType.ChannelProfileCommunication,
-      clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      publishMicrophoneTrack: true,
-      publishCameraTrack: enableVideo,
-      autoSubscribeAudio: true,
-      autoSubscribeVideo: enableVideo,
-    });
-    if (joinResult !== 0) {
-      console.warn("CALL DEBUG engine: joinChannel rejected synchronously", { channelName, uid, joinResult });
-    } else {
-      console.log("CALL DEBUG engine: joinChannel accepted, awaiting async result", { channelName, uid });
-    }
+      if (enableVideo) engine.enableVideo();
+      else engine.disableVideo();
+      engine.enableAudio();
+      // Default audio route for a normal call (section 11): speakerphone on,
+      // microphone on. Previously this was never set at all here — only ever
+      // toggled from the user's own mute/speaker buttons — so a fresh call
+      // started in whatever route Android happened to default to (usually
+      // the earpiece), silently disagreeing with the UI's speakerOn=true
+      // initial state.
+      engine.setEnableSpeakerphone(true);
+      engine.muteLocalAudioStream(false);
+      console.log("CALL DEBUG engine: configured, calling joinChannel", { channelName, uid });
+
+      // joinChannel returns synchronously: 0 means the native call was
+      // accepted (actual join/failure still arrives async via eventHandler),
+      // but a negative code means the SDK rejected the call outright and
+      // will NEVER fire onJoinChannelSuccess/onError/onConnectionStateChanged
+      // for it at all — that path was previously invisible at this layer.
+      const joinResult = engine.joinChannel(token, channelName, uid, {
+        channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+        publishMicrophoneTrack: true,
+        publishCameraTrack: enableVideo,
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: enableVideo,
+      });
+      if (joinResult !== 0) {
+        console.warn("CALL DEBUG engine: joinChannel rejected synchronously", { channelName, uid, joinResult });
+      } else {
+        console.log("CALL DEBUG engine: joinChannel accepted, awaiting async result", { channelName, uid });
+      }
+    })();
 
     return () => {
-      console.log("CALL DEBUG engine: leaving channel and releasing", { channelName, uid });
-      engine.leaveChannel();
-      engine.unregisterEventHandler(eventHandler);
-      engine.release();
-      if (engineRef.current === engine) engineRef.current = null;
+      cancelled = true;
+      if (engine) {
+        console.log("CALL DEBUG engine: leaving channel and releasing", { channelName, uid });
+        engine.leaveChannel();
+        engine.unregisterEventHandler(eventHandler);
+        engine.release();
+        if (engineRef.current === engine) engineRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelName, token, uid, enableVideo, appId]);
