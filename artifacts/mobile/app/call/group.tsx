@@ -219,10 +219,6 @@ export default function GroupCallScreen() {
     },
   });
 
-  useEffect(() => {
-    engineRef.current?.enableAudioVolumeIndication(500, 3, true);
-  }, [engineRef, token]);
-
   function toggleMute() {
     const next = !muted;
     setMuted(next);

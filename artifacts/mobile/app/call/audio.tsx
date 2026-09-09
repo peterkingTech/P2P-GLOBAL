@@ -386,10 +386,6 @@ export default function AudioCallScreen() {
     },
   });
 
-  useEffect(() => {
-    engineRef.current?.enableAudioVolumeIndication(500, 3, true);
-  }, [engineRef, token]);
-
   // Resolve real names for group calls only (>1 remote party) — the
   // existing 1:1 path keeps using otherUserId/otherUserName from route
   // params directly and never calls this.

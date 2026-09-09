@@ -108,6 +108,15 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       } else {
         console.log("CALL DEBUG engine: joinChannel accepted, awaiting async result", { channelName, uid });
       }
+
+      // CALL DEBUG fix — this used to live in each call screen's own effect
+      // keyed on `engineRef`, which looked safe but wasn't: engine creation
+      // now happens after an awaited permission request, so a screen's own
+      // synchronous effect always ran before engineRef.current was set,
+      // silently no-oping via optional chaining. Calling it here, after the
+      // engine that owns it actually exists, is the only ordering that's
+      // guaranteed correct.
+      engine.enableAudioVolumeIndication(500, 3, true);
     })();
 
     return () => {
