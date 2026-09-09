@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Switch } from "react-native";
 import type { FamilyPrayerRequest, WorshipScripture, WorshipSession } from "@/lib/familyApi";
-import { computePrayerTimerRemainingSeconds, formatScriptureReference } from "@/lib/familyApi";
-
-const TIMER_PRESETS_SECONDS = [60, 120, 300];
+import { formatScriptureReference } from "@/lib/familyApi";
 
 interface Props {
   session: WorshipSession;
@@ -17,38 +15,21 @@ interface Props {
   onMarkPrayed: (id: string) => void;
   onMarkAnswered: (id: string) => void;
   onSetFocus: (requestId: string | null) => void;
-  onStartTimer: (durationSeconds: number) => void;
-  onStopTimer: () => void;
 }
 
-function formatCountdown(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-// P2P's own Prayer Space — a focus + a shared timer sit above the request
-// list, not a chat-shaped feed. "People growing together" over "people
-// chatting online": the room can gather around ONE request at a time.
+// P2P's own Prayer panel — a focus sits above the request list, not a
+// chat-shaped feed. "People growing together" over "people chatting
+// online": the room can gather around ONE request at a time.
 export default function PrayerSpacePanel({
   session, prayers, isGuide, myUserId, praying, prayingCount, onTogglePraying,
-  onAdd, onMarkPrayed, onMarkAnswered, onSetFocus, onStartTimer, onStopTimer,
+  onAdd, onMarkPrayed, onMarkAnswered, onSetFocus,
 }: Props) {
   const [draft, setDraft] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [attachCurrentPassage, setAttachCurrentPassage] = useState(false);
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    if (!session.prayerTimerStartedAt) return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [session.prayerTimerStartedAt]);
 
   const focused = prayers.find((p) => p.id === session.currentFocusPrayerRequestId);
   const others = prayers.filter((p) => p.status !== "answered" && p.id !== session.currentFocusPrayerRequestId);
-  const remainingSeconds = computePrayerTimerRemainingSeconds(session);
-  const timerRunning = remainingSeconds !== null && remainingSeconds > 0;
 
   function submit() {
     if (!draft.trim()) return;
@@ -80,24 +61,6 @@ export default function PrayerSpacePanel({
 
   return (
     <View>
-      {isGuide && (
-        <View style={styles.timerRow}>
-          {timerRunning ? (
-            <>
-              <Text style={styles.timerValue}>⏱ {formatCountdown(remainingSeconds)}</Text>
-              <TouchableOpacity style={styles.timerBtn} onPress={onStopTimer}><Text style={styles.timerBtnText}>Stop</Text></TouchableOpacity>
-            </>
-          ) : (
-            TIMER_PRESETS_SECONDS.map((s) => (
-              <TouchableOpacity key={s} style={styles.timerBtn} onPress={() => onStartTimer(s)}>
-                <Text style={styles.timerBtnText}>{s < 60 ? `${s}s` : `${s / 60}m`}</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-      )}
-      {!isGuide && timerRunning && <Text style={styles.timerValue}>⏱ {formatCountdown(remainingSeconds)} of focused prayer</Text>}
-
       {focused && renderRequest(focused, true)}
 
       <TouchableOpacity style={styles.prayingBtn} onPress={onTogglePraying}>
@@ -135,11 +98,6 @@ export default function PrayerSpacePanel({
 }
 
 const styles = StyleSheet.create({
-  timerRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
-  timerValue: { color: "#B8860B", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 8 },
-  timerBtn: { backgroundColor: "rgba(184,134,11,0.2)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  timerBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
   requestCard: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
   requestCardFocused: {
     backgroundColor: "rgba(184,134,11,0.12)", borderRadius: 10, borderBottomWidth: 0,

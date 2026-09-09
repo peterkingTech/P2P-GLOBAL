@@ -41,7 +41,7 @@ export default function GatheringFooter({
       >
         <Text style={{ fontSize: 16 }}>✋</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenChat} accessibilityRole="button" accessibilityLabel="Open Together Chat">
+      <TouchableOpacity style={styles.iconBtn} onPress={onOpenChat} accessibilityRole="button" accessibilityLabel="Open Chat">
         <Ionicons name="chatbubble-outline" size={16} color={colors.textPrimary} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.iconBtn} onPress={onOpenNotes} accessibilityRole="button" accessibilityLabel="Open Notes">

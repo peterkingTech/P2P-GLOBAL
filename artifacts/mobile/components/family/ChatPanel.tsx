@@ -53,8 +53,8 @@ export default function ChatPanel({
       <KeyboardAvoidingView style={[styles.overlay, dockRight && styles.overlayDockRight]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.sheet, dockRight && styles.sheetDockRight]}>
           <View style={styles.header}>
-            <Text style={styles.title}>TOGETHER CHAT</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Together Chat">
+            <Text style={styles.title}>CHAT</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Chat">
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>
           </View>

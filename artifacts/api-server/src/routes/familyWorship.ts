@@ -26,8 +26,6 @@ function mapSession(row: Record<string, unknown>) {
     trustedUserIds: row.trusted_user_ids ?? [],
     autoAdvance: row.auto_advance ?? false,
     currentFocusPrayerRequestId: row.current_focus_prayer_request_id ?? null,
-    prayerTimerDurationSeconds: row.prayer_timer_duration_seconds ?? null,
-    prayerTimerStartedAt: row.prayer_timer_started_at ?? null,
   };
 }
 
@@ -199,13 +197,11 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (bodyHasScriptureChange && session.host_id !== userId) {
     return err(res, "Only the current Guide can select Scripture", 403);
   }
-  // Prayer Space: focusing a request and starting/stopping the shared
-  // timer are Guide-only room-flow decisions, same category as mode and
-  // Scripture changes — not gated by Media Permissions.
+  // Prayer: focusing a request is a Guide-only room-flow decision, same
+  // category as mode and Scripture changes — not gated by Media Permissions.
   const bodyHasPrayerFocusChange = req.body?.focusPrayerRequestId !== undefined;
-  const bodyHasPrayerTimerChange = req.body?.prayerTimerDurationSeconds !== undefined;
-  if ((bodyHasPrayerFocusChange || bodyHasPrayerTimerChange) && session.host_id !== userId) {
-    return err(res, "Only the current Guide can control Prayer Space", 403);
+  if (bodyHasPrayerFocusChange && session.host_id !== userId) {
+    return err(res, "Only the current Guide can control Prayer", 403);
   }
   const bodyHasMediaChange =
     req.body?.mediaProvider !== undefined || req.body?.mediaType !== undefined || req.body?.mediaId !== undefined ||
@@ -221,7 +217,6 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     isPlaying?: boolean; positionMs?: number; playbackRate?: number;
     currentScripture?: { translation?: string; translationName?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
     focusPrayerRequestId?: string | null;
-    prayerTimerDurationSeconds?: number | null;
   };
 
   if (body.currentScripture !== undefined && body.currentScripture !== null) {
@@ -238,12 +233,6 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     if (!request || request.family_id !== session.family_id) return err(res, "That prayer request wasn't found", 404);
     if (request.visibility !== "family") return err(res, "Only a shared prayer request can be focused", 400);
   }
-  if (bodyHasPrayerTimerChange && body.prayerTimerDurationSeconds !== null) {
-    if (!Number.isFinite(body.prayerTimerDurationSeconds) || (body.prayerTimerDurationSeconds as number) <= 0) {
-      return err(res, "prayerTimerDurationSeconds must be a positive number of seconds");
-    }
-  }
-
   const update: Record<string, unknown> = {};
   if (body.status) update.status = body.status;
   if (body.currentMode) {
@@ -262,13 +251,6 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (body.currentScripture !== undefined) update.current_scripture = body.currentScripture;
   if (body.playbackRate !== undefined) update.playback_rate = body.playbackRate;
   if (bodyHasPrayerFocusChange) update.current_focus_prayer_request_id = body.focusPrayerRequestId;
-  // Setting a duration (re)starts the timer, anchored to now — same
-  // "recompute from a fixed point" idea as the media playback clock.
-  // Sending null explicitly stops/clears it.
-  if (bodyHasPrayerTimerChange) {
-    update.prayer_timer_duration_seconds = body.prayerTimerDurationSeconds;
-    update.prayer_timer_started_at = body.prayerTimerDurationSeconds === null ? null : new Date().toISOString();
-  }
 
   // Any play/pause/seek/media-change re-anchors the server clock: position
   // and "now" move together, so every client recomputes from the same

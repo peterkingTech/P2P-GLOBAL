@@ -63,7 +63,7 @@ export default function FamilyPrayerScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "Family Prayer" }} />
+        <Stack.Screen options={{ title: "Prayer" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -71,7 +71,7 @@ export default function FamilyPrayerScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "Family Prayer" }} />
+      <Stack.Screen options={{ title: "Prayer" }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}

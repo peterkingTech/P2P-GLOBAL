@@ -70,7 +70,7 @@ export default function FamilyMembersScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "Family Members" }} />
+        <Stack.Screen options={{ title: "Members" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -78,7 +78,7 @@ export default function FamilyMembersScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "Family Members" }} />
+      <Stack.Screen options={{ title: "Members" }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}

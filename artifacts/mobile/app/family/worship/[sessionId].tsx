@@ -34,13 +34,17 @@ function showAlert(title: string, message: string) {
   else Alert.alert(title, message);
 }
 
+// Labels are the only thing standardized here — the WorshipMode key
+// values ("sharing", "silent_prayer", "teaching", ...) are the internal
+// identifiers used by the API/DB and are unchanged; only what's shown to
+// the user is renamed to the canonical product vocabulary.
 const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "worship", label: "Media", icon: "📺" },
   { key: "scripture", label: "Scripture", icon: "📖" },
   { key: "prayer", label: "Prayer", icon: "🙏" },
-  { key: "sharing", label: "Sharing", icon: "🎤" },
-  { key: "silent_prayer", label: "Silent", icon: "🕊️" },
-  { key: "teaching", label: "Teaching", icon: "📚" },
+  { key: "sharing", label: "Share", icon: "🎤" },
+  { key: "silent_prayer", label: "Mute", icon: "🕊️" },
+  { key: "teaching", label: "Lesson", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
 const MODE_BY_KEY = new Map(MODES.map((m) => [m.key, m]));
@@ -143,7 +147,7 @@ export default function FamilyWorshipScreen() {
       getWorshipQueue(params.sessionId).then(setQueue).catch(() => {});
       getWorshipNotes(params.sessionId).then(setNotes).catch(() => {});
     } catch (e: any) {
-      showAlert("Couldn't load Family Media", e.message ?? "Please try again.");
+      showAlert("Couldn't load the Gathering", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -189,7 +193,7 @@ export default function FamilyWorshipScreen() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "p2p_family_worship_sessions", filter: `id=eq.${params.sessionId}` }, (payload) => {
         const row = payload.new as Record<string, unknown>;
         if (row.status === "ended") {
-          showAlert("Family Media ended", "This session has ended.");
+          showAlert("Gathering ended", "This session has ended.");
           leave();
           return;
         }
@@ -260,7 +264,7 @@ export default function FamilyWorshipScreen() {
       // its definition for why this exists alongside postgres_changes.
       .on("broadcast", { event: "state" }, ({ payload }: { payload: WorshipSession }) => {
         if (payload.status === "ended") {
-          showAlert("Family Media ended", "This session has ended.");
+          showAlert("Gathering ended", "This session has ended.");
           leave();
           return;
         }
@@ -492,9 +496,9 @@ export default function FamilyWorshipScreen() {
     catch (e: any) { showAlert("Couldn't update this prayer", e.message ?? "Please try again."); }
   }
 
-  // Prayer Focus and the Prayer Timer both ride the session row (Guide-only,
-  // same authorization + broadcast pattern as Scripture and mode changes) —
-  // no separate realtime channel needed.
+  // Prayer Focus rides the session row (Guide-only, same authorization +
+  // broadcast pattern as Scripture and mode changes) — no separate
+  // realtime channel needed.
   async function setPrayerFocus(requestId: string | null) {
     if (!session || !isHost) return;
     try {
@@ -502,22 +506,6 @@ export default function FamilyWorshipScreen() {
       setSession(updated);
       broadcastState(updated);
     } catch (e: any) { showAlert("Couldn't focus this request", e.message ?? "Please try again."); }
-  }
-  async function startPrayerTimer(durationSeconds: number) {
-    if (!session || !isHost) return;
-    try {
-      const updated = await updateWorshipState(session.id, { prayerTimerDurationSeconds: durationSeconds });
-      setSession(updated);
-      broadcastState(updated);
-    } catch (e: any) { showAlert("Couldn't start the timer", e.message ?? "Please try again."); }
-  }
-  async function stopPrayerTimer() {
-    if (!session || !isHost) return;
-    try {
-      const updated = await updateWorshipState(session.id, { prayerTimerDurationSeconds: null });
-      setSession(updated);
-      broadcastState(updated);
-    } catch (e: any) { showAlert("Couldn't stop the timer", e.message ?? "Please try again."); }
   }
 
   // "I'm praying" — persists to the participant row (reconnect-safe) and
@@ -559,7 +547,7 @@ export default function FamilyWorshipScreen() {
 
   async function handleEnd() {
     if (!session) return;
-    Alert.alert("End Family Media?", "This will end the session for everyone.", [
+    Alert.alert("End Gathering?", "This will end the session for everyone.", [
       { text: "Cancel", style: "cancel" },
       { text: "End", style: "destructive", onPress: async () => {
         await endWorshipSession(session.id);
@@ -611,7 +599,7 @@ export default function FamilyWorshipScreen() {
 
       {(session.currentMode === "prayer" || session.currentMode === "silent_prayer") && (
         <View style={styles.panel}>
-          <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "SILENT PRAYER" : "PRAYER SPACE"}</Text>
+          <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "MUTE" : "PRAYER"}</Text>
           {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Microphones are muted.</Text>}
           <PrayerSpacePanel
             session={session}
@@ -625,8 +613,6 @@ export default function FamilyWorshipScreen() {
             onMarkPrayed={markPrayed}
             onMarkAnswered={markAnswered}
             onSetFocus={setPrayerFocus}
-            onStartTimer={startPrayerTimer}
-            onStopTimer={stopPrayerTimer}
           />
         </View>
       )}
@@ -634,7 +620,7 @@ export default function FamilyWorshipScreen() {
       {session.currentMode === "teaching" && (
         <View style={styles.panel}>
           <View style={styles.panelLabelRow}>
-            <Text style={styles.panelLabel}>TEACHING</Text>
+            <Text style={styles.panelLabel}>LESSON</Text>
             <TouchableOpacity onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Notes${notes.length > 0 ? `, ${notes.length} notes` : ""}`}>
               <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
             </TouchableOpacity>
@@ -647,7 +633,7 @@ export default function FamilyWorshipScreen() {
 
       {session.currentMode === "sharing" && (
         <View style={styles.panel}>
-          <Text style={styles.panelLabel}>SHARING</Text>
+          <Text style={styles.panelLabel}>SHARE</Text>
           <Text style={styles.silentHint}>Take turns sharing with the family.</Text>
         </View>
       )}
@@ -656,7 +642,7 @@ export default function FamilyWorshipScreen() {
 
   const companionsArea = (
     <View>
-      <Text style={styles.companionsLabel}>COMPANIONS</Text>
+      <Text style={styles.companionsLabel}>PARTICIPANTS</Text>
       <View style={styles.companionsGrid}>
         {activeParticipants.map((p) => {
           const m = memberById.get(p.user_id);
@@ -693,7 +679,7 @@ export default function FamilyWorshipScreen() {
       <View style={{ paddingTop: insets.top + 10 }}>
         <TogetherHeader
           onBack={leave}
-          title="Family Media"
+          title="Study Workspace"
           modeIcon={currentModeMeta.icon}
           modeLabel={currentModeMeta.label}
           participantCount={activeParticipants.length}

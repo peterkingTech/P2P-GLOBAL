@@ -6,8 +6,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  getFamilyDetail, startFamilyWorship, getFamilyPrayerRequests, removeFamilyMember,
-  type FamilyDetailResponse, type FamilyPrayerRequest,
+  getFamilyDetail, startFamilyWorship, removeFamilyMember,
+  type FamilyDetailResponse,
 } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
@@ -18,7 +18,14 @@ function showAlert(title: string, message: string) {
 // One specific family's home screen — reached from MY FAMILIES
 // (app/family/index.tsx). Everything here is scoped to this familyId only;
 // a user who belongs to several families sees each one's own independent
-// roster, prayer list, and Family Media sessions when they open it.
+// roster, prayer list, and Gathering sessions when they open it.
+//
+// Members and Prayer are reachable via the small icon buttons in the
+// header (not full-width cards) — they used to be duplicated as their own
+// landing-page cards here, which read as redundant next to the same
+// information already surfaced elsewhere (member count in the header,
+// Prayer itself inside the Study Workspace). The routes/screens
+// (app/family/members.tsx, app/family/prayer.tsx) are unchanged.
 export default function FamilyDetailScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
@@ -29,16 +36,12 @@ export default function FamilyDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<FamilyDetailResponse | null>(null);
-  const [openPrayerCount, setOpenPrayerCount] = useState(0);
-  const [startingWorship, setStartingWorship] = useState(false);
+  const [startingGathering, setStartingGathering] = useState(false);
 
   const load = useCallback(async () => {
     if (!familyId) return;
     try {
-      const res = await getFamilyDetail(familyId);
-      setData(res);
-      const prayers = await getFamilyPrayerRequests(familyId);
-      setOpenPrayerCount(prayers.filter((p: FamilyPrayerRequest) => p.status === "open").length);
+      setData(await getFamilyDetail(familyId));
     } catch (e: any) {
       showAlert("Couldn't load this family", e.message ?? "Please try again.");
     } finally {
@@ -49,16 +52,16 @@ export default function FamilyDetailScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleStartWorship() {
+  async function handleStartGathering() {
     if (!data?.family) return;
-    setStartingWorship(true);
+    setStartingGathering(true);
     try {
       const session = await startFamilyWorship(data.family.id);
       router.push({ pathname: "/family/worship/[sessionId]", params: { sessionId: session.id } } as any);
     } catch (e: any) {
       showAlert("Couldn't start", e.message ?? "Please try again.");
     } finally {
-      setStartingWorship(false);
+      setStartingGathering(false);
     }
   }
 
@@ -110,43 +113,37 @@ export default function FamilyDetailScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
       >
         <View style={styles.headerCard}>
-          <Text style={styles.familyName}>{data.family.name}</Text>
-          <Text style={styles.familySub}>{data.members.length} member{data.members.length === 1 ? "" : "s"}</Text>
-          <TouchableOpacity style={styles.worshipBtn} onPress={handleStartWorship} disabled={startingWorship}>
-            {startingWorship ? <ActivityIndicator color="#fff" size="small" /> : (
+          <View style={styles.headerTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.familyName}>{data.family.name}</Text>
+              <Text style={styles.familySub}>{data.members.length} member{data.members.length === 1 ? "" : "s"}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => router.push({ pathname: "/family/members", params: { familyId } } as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Members"
+            >
+              <Ionicons name="people" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => router.push({ pathname: "/family/prayer", params: { familyId } } as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Prayer"
+            >
+              <Text style={{ fontSize: 16 }}>🙏</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.gatheringBtn} onPress={handleStartGathering} disabled={startingGathering}>
+            {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : (
               <>
-                <Text style={styles.worshipBtnIcon}>📺</Text>
-                <Text style={styles.worshipBtnText}>Start Family Media</Text>
+                <Text style={styles.gatheringBtnIcon}>📅</Text>
+                <Text style={styles.gatheringBtnText}>Start Gathering</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={styles.navRow}
-          onPress={() => router.push({ pathname: "/family/members", params: { familyId } } as any)}
-          accessibilityRole="button"
-        >
-          <View style={styles.navRowIcon}><Ionicons name="people" size={20} color={c.primaryGreen} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navRowTitle}>Family Members</Text>
-            <Text style={styles.navRowSub}>{data.members.length} member{data.members.length === 1 ? "" : "s"}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={c.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navRow}
-          onPress={() => router.push({ pathname: "/family/prayer", params: { familyId } } as any)}
-          accessibilityRole="button"
-        >
-          <View style={styles.navRowIcon}><Text style={{ fontSize: 18 }}>🙏</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navRowTitle}>Family Prayer</Text>
-            <Text style={styles.navRowSub}>{openPrayerCount > 0 ? `${openPrayerCount} open request${openPrayerCount === 1 ? "" : "s"}` : "No open requests"}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={c.textMuted} />
-        </TouchableOpacity>
 
         {!isShepherd && (
           <TouchableOpacity style={styles.leaveRow} onPress={handleLeaveFamily} accessibilityRole="button">
@@ -167,22 +164,19 @@ function makeStyles(c: AppColors) {
     headerCard: {
       backgroundColor: c.primaryGreen, borderRadius: 18, padding: 20, gap: 4,
     },
+    headerTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+    headerIconBtn: {
+      width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.16)",
+      alignItems: "center", justifyContent: "center",
+    },
     familyName: { fontSize: 20, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     familySub: { fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "Inter_400Regular" },
-    worshipBtn: {
+    gatheringBtn: {
       flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
       backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 12, paddingVertical: 13, marginTop: 14,
     },
-    worshipBtnIcon: { fontSize: 16 },
-    worshipBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
-    navRow: {
-      flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.card, borderRadius: 16,
-      borderWidth: 1, borderColor: c.borderBeige, padding: 16,
-    },
-    navRowIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.lightCream, alignItems: "center", justifyContent: "center" },
-    navRowTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    navRowSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+    gatheringBtnIcon: { fontSize: 16 },
+    gatheringBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     leaveRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10 },
     leaveText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium" },

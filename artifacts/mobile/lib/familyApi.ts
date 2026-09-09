@@ -107,17 +107,6 @@ export interface WorshipSession {
   mediaPermission: MediaPermission; trustedUserIds: string[]; autoAdvance: boolean;
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
   currentFocusPrayerRequestId: string | null;
-  prayerTimerDurationSeconds: number | null;
-  prayerTimerStartedAt: string | null;
-}
-
-// Remaining seconds on the Guide's shared Prayer Timer, same
-// anchor-clock derivation as computeWorshipPositionMs — never persisted
-// per-tick, just recomputed on every render/tick from a fixed point.
-export function computePrayerTimerRemainingSeconds(session: WorshipSession): number | null {
-  if (session.prayerTimerDurationSeconds == null || !session.prayerTimerStartedAt) return null;
-  const elapsedSeconds = (Date.now() - new Date(session.prayerTimerStartedAt).getTime()) / 1000;
-  return Math.max(0, Math.round(session.prayerTimerDurationSeconds - elapsedSeconds));
 }
 
 export function formatScriptureReference(s: WorshipScripture): string {
@@ -153,7 +142,7 @@ export function updateWorshipState(sessionId: string, patch: {
   status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
   mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
   isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: WorshipScripture | null;
-  focusPrayerRequestId?: string | null; prayerTimerDurationSeconds?: number | null;
+  focusPrayerRequestId?: string | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });
 }

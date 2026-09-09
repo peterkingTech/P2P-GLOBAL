@@ -137,7 +137,7 @@ export default function MyFamiliesScreen() {
           <View style={styles.emptyCard}>
             <Ionicons name="people-circle-outline" size={40} color={c.primaryGreen} />
             <Text style={styles.emptyTitle}>No families yet</Text>
-            <Text style={styles.emptyText}>Create a family to gather for Family Media, share prayer requests, and grow together.</Text>
+            <Text style={styles.emptyText}>Create a family to gather, study, and pray together.</Text>
           </View>
         )}
 

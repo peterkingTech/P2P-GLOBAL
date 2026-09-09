@@ -70,7 +70,7 @@ export function useVoiceSpace(channelName: string, myUserId: string | undefined,
       setTokenAppId(appId);
     } catch (e: any) {
       setPhase("failed");
-      setErrorMessage(e?.message ?? "Couldn't connect to Voice Space.");
+      setErrorMessage(e?.message ?? "Couldn't connect to Voice.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelName, myUid, myUserId, getToken]);
@@ -110,7 +110,7 @@ export function useVoiceSpace(channelName: string, myUserId: string | undefined,
     const timer = setTimeout(() => {
       if (attemptRef.current !== attempt) return; // a retry/leave already superseded this attempt
       setPhase((p) => (p === "connecting" ? "failed" : p));
-      setErrorMessage("Unable to connect to Voice Space.");
+      setErrorMessage("Unable to connect to Voice.");
     }, JOIN_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [phase]);
@@ -142,7 +142,7 @@ export function useVoiceSpace(channelName: string, myUserId: string | undefined,
       onConnectionStateChanged: (_c, state) => {
         if (state === AGORA_CONNECTION_STATE_FAILED) {
           setPhase((p) => (p === "idle" ? p : "failed"));
-          setErrorMessage("The Voice Space connection failed.");
+          setErrorMessage("The Voice connection failed.");
         }
       },
       onError: (err) => console.log("VOICE SPACE error", err),
