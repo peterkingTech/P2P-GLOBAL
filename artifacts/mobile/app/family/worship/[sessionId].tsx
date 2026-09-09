@@ -40,11 +40,11 @@ function showAlert(title: string, message: string) {
 // the user is renamed to the canonical product vocabulary.
 const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "worship", label: "Media", icon: "📺" },
-  { key: "scripture", label: "Scripture", icon: "📖" },
+  { key: "scripture", label: "Bible", icon: "📖" },
   { key: "prayer", label: "Prayer", icon: "🙏" },
   { key: "sharing", label: "Share", icon: "🎤" },
-  { key: "silent_prayer", label: "Mute", icon: "🕊️" },
-  { key: "teaching", label: "Lesson", icon: "📚" },
+  { key: "silent_prayer", label: "Mute", icon: "🤫" },
+  { key: "teaching", label: "Study Workspace", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
 const MODE_BY_KEY = new Map(MODES.map((m) => [m.key, m]));
@@ -592,7 +592,7 @@ export default function FamilyWorshipScreen() {
 
       {session.currentMode === "scripture" && (
         <View style={styles.panel}>
-          <Text style={styles.panelLabel}>SCRIPTURE</Text>
+          <Text style={styles.panelLabel}>BIBLE</Text>
           <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
         </View>
       )}
@@ -620,7 +620,7 @@ export default function FamilyWorshipScreen() {
       {session.currentMode === "teaching" && (
         <View style={styles.panel}>
           <View style={styles.panelLabelRow}>
-            <Text style={styles.panelLabel}>LESSON</Text>
+            <Text style={styles.panelLabel}>STUDY WORKSPACE</Text>
             <TouchableOpacity onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Notes${notes.length > 0 ? `, ${notes.length} notes` : ""}`}>
               <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
             </TouchableOpacity>

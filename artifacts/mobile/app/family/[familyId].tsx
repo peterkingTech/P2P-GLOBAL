@@ -137,10 +137,7 @@ export default function FamilyDetailScreen() {
           </View>
           <TouchableOpacity style={styles.gatheringBtn} onPress={handleStartGathering} disabled={startingGathering}>
             {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : (
-              <>
-                <Text style={styles.gatheringBtnIcon}>📅</Text>
-                <Text style={styles.gatheringBtnText}>Start Gathering</Text>
-              </>
+              <Text style={styles.gatheringBtnText}>Start Gathering</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -175,7 +172,6 @@ function makeStyles(c: AppColors) {
       flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
       backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 12, paddingVertical: 13, marginTop: 14,
     },
-    gatheringBtnIcon: { fontSize: 16 },
     gatheringBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     leaveRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10 },
