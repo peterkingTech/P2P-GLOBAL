@@ -369,7 +369,16 @@ function PushNotificationHost() {
       handledNotificationIds.current.add(id);
       const data = response.notification.request.content.data as Record<string, unknown> | undefined;
       const notificationType = (data?.notificationType as string | undefined) ?? null;
-      router.push(pathForNotification(notificationType, data) as any);
+      const path = pathForNotification(notificationType, data);
+      // Incoming-call taps use replace, not push: IncomingCallHost below
+      // already navigates to this exact same screen the instant realtime
+      // detects the call (foreground/background-but-alive case) — a push
+      // tap arriving after that already happened would otherwise stack a
+      // second copy of the ringing screen instead of landing on the one
+      // already there. Cold start has nothing to replace, so this is a
+      // normal first navigation in that case.
+      if (notificationType === "incoming_call") router.replace(path as any);
+      else router.push(path as any);
     }
 
     Notifications.getLastNotificationResponseAsync().then((response) => {

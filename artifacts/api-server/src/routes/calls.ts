@@ -797,6 +797,34 @@ router.post("/calls/start", async (req, res) => {
     return err(res, incomingErr?.message ?? "Failed to create incoming call", 500);
   }
 
+  // Realtime (DataContext's p2p_incoming_calls subscription) only reaches a
+  // recipient whose JS is alive right now — foreground, or background just
+  // long enough for Android not to have suspended it yet. This notification
+  // row is what makes the SAME ring reach them via push when it isn't: the
+  // existing pushDispatch poller (routes/push.ts's dispatch cron, already
+  // used by ~19 other event types) picks it up and delivers it through every
+  // active device token this recipient has registered. The `data` payload
+  // deliberately mirrors IncomingCallHost's (app/_layout.tsx) own
+  // `/call/incoming` route params exactly, field for field — the same deep
+  // link reconstructs the same ringing screen whether it was reached via a
+  // live realtime event or a cold-started notification tap. No Agora
+  // token/certificate/secret goes in this payload; joining still goes
+  // through the existing, unmodified /calls/token flow once the recipient
+  // is actually on the incoming-call screen and taps Answer.
+  const { data: callerNameProfile } = await supabaseWrite
+    .from("p2p_profiles").select("full_name").eq("id", callerId).maybeSingle();
+  const callerName = (callerNameProfile?.full_name as string | undefined) ?? "Someone";
+  await supabaseWrite.from("p2p_notifications").insert({
+    user_id: recipientId,
+    title: `Incoming ${callType === "video" ? "video" : "voice"} call`,
+    message: `${callerName} is calling you`,
+    notification_type: "incoming_call",
+    data: {
+      callId: incomingCall.id, channelName, callType, callerId, callerName,
+      conversationId: conversationId ?? null, callLogId: callLog.id, invitationId: null,
+    },
+  });
+
   return ok(res, { callLogId: callLog.id as string, incomingCallId: incomingCall.id as string });
 });
 

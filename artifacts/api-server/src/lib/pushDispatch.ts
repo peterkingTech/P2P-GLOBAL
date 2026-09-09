@@ -66,13 +66,23 @@ async function deactivateTokens(tokens: string[]): Promise<void> {
 // platform -- this is the "Expo-compatible delivery" the spec asks to
 // prefer, and it's the reason a single dispatcher can serve both platforms
 // without provider-specific branching here.
+//
+// Incoming calls route to the "calls" Android channel (registered client-
+// side in lib/push.ts's registerForPushNotificationsAsync, MAX importance)
+// instead of the "default" channel every other notification type uses --
+// an incoming call needs to interrupt (heads-up, sound, vibration) the way
+// an ordinary background message notification deliberately doesn't.
+// `priority: "high"` is the equivalent instruction to FCM itself, so the
+// message wakes a dozing device instead of waiting for the next batch.
 function buildExpoMessage(n: PendingNotification, to: string) {
+  const isIncomingCall = n.notification_type === "incoming_call";
   return {
     to,
     title: n.title ?? "P2P Global",
     body: n.message ?? "",
     data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}) },
     sound: "default" as const,
+    ...(isIncomingCall ? { channelId: "calls", priority: "high" as const } : {}),
   };
 }
 

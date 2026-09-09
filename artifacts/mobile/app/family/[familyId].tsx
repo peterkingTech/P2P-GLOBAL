@@ -134,6 +134,14 @@ export default function FamilyDetailScreen() {
             >
               <Text style={{ fontSize: 16 }}>🙏</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => router.push({ pathname: "/family/calls", params: { familyId } } as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Calls"
+            >
+              <Ionicons name="call" size={16} color="#fff" />
+            </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.gatheringBtn} onPress={handleStartGathering} disabled={startingGathering}>
             {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : (

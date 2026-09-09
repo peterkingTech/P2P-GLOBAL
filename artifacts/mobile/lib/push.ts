@@ -37,6 +37,22 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       name: "Default",
       importance: Notifications.AndroidImportance.DEFAULT,
     });
+    // A separate, MAX-importance channel for incoming calls — the existing
+    // "default" channel intentionally stays at DEFAULT importance for
+    // everything else (messages, invitations, etc.), matching how every
+    // other notification type in this app has always behaved. Only
+    // incoming-call pushes (routes/calls.ts's /calls/start,
+    // pushDispatch.ts sets channelId: "calls" for notification_type
+    // "incoming_call") use this one, so ringing gets a heads-up
+    // display/sound/vibration without changing anything else's behavior.
+    await Notifications.setNotificationChannelAsync("calls", {
+      name: "Incoming calls",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
+      vibrationPattern: [0, 400, 200, 400],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: false,
+    });
   }
 
   const current = await Notifications.getPermissionsAsync();
@@ -104,6 +120,23 @@ export function pathForNotification(notificationType: string | null, data: Recor
   }
   if (notificationType === "contact_message_replied" && contactMessageId) {
     return `/messages/contact-thread/${contactMessageId}`;
+  }
+  // Incoming call — /calls/start (calls.ts) writes this notification's data
+  // payload as the exact same field set IncomingCallHost (app/_layout.tsx)
+  // passes to /call/incoming when it detects the call over realtime, so a
+  // background/killed-app push tap reconstructs the identical ringing
+  // screen a foreground user would already be looking at. call/incoming.tsx
+  // itself decides whether the call is still live (a stale/answered/
+  // declined/expired call is handled there, same as the realtime path) —
+  // this function only routes, it never assumes the call is still ringing.
+  if (notificationType === "incoming_call" && data?.callId) {
+    const p = new URLSearchParams({
+      callId: String(data.callId ?? ""), channelName: String(data.channelName ?? ""),
+      callType: String(data.callType ?? "audio"), callerId: String(data.callerId ?? ""),
+      callerName: String(data.callerName ?? ""), conversationId: String(data.conversationId ?? ""),
+      callLogId: String(data.callLogId ?? ""), invitationId: String(data.invitationId ?? ""),
+    });
+    return `/call/incoming?${p.toString()}`;
   }
   return "/notifications";
 }
