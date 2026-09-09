@@ -1,0 +1,33 @@
+-- 126: A user may belong to multiple families at the same time.
+--
+-- Migration 115 enforced "one active family per user" via a partial unique
+-- index on p2p_family_members(user_id) where status = 'active', mirrored by
+-- a matching application-layer block in routes/family.ts (create/invite/
+-- accept-invitation all rejected a second active membership with a 409).
+-- Product decision: this was wrong. A person can be a Member of one family,
+-- a Shepherd of another, and a Guide of a third, simultaneously — the same
+-- relationship shape Peer Circles (migration 044) already allowed.
+--
+-- This migration removes ONLY the one-active-family-per-user backstop.
+-- Every other constraint stays exactly as it was:
+--   - unique(family_id, user_id) on p2p_family_members (migration 115) is
+--     UNCHANGED — a user still cannot have two membership rows in the SAME
+--     family. This is the correct, still-needed uniqueness rule.
+--   - unique(family_id, invited_user_id) on p2p_family_invitations is
+--     UNCHANGED — still at most one pending/resolved invitation per
+--     (family, invitee) pair.
+--   - Every RLS policy on p2p_families / p2p_family_members /
+--     p2p_family_invitations / p2p_family_worship_* / p2p_family_prayer_*
+--     already scopes membership checks by the SPECIFIC family_id of the row
+--     being accessed (e.g. "exists (... where m.family_id = <this row's
+--     family_id> and m.user_id = auth.uid())") rather than by "the user's
+--     one family" — so multi-family membership requires zero RLS changes.
+--     Family A membership was never able to leak access into Family B
+--     through these policies, and still can't.
+--
+-- The matching application-layer blocks (the three 409 "You already belong
+-- to a family" checks in routes/family.ts, and the getMyFamily()-based
+-- single-family reads in the mobile app) are fixed in the same change as
+-- this migration — see routes/family.ts and lib/familyApi.ts.
+
+drop index if exists idx_p2p_family_members_one_active_per_user;

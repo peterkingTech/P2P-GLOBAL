@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import {
-  getMyFamily, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState, updateWorshipPresence,
+  getFamilyDetail, getWorshipSession, joinWorshipSession, leaveWorshipSession, updateWorshipState, updateWorshipPresence,
   transferWorshipHost, endWorshipSession, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus,
   getWorshipMessages, sendWorshipMessage, removeWorshipParticipant, canControlMedia,
   getWorshipQueue, addToWorshipQueue, removeFromWorshipQueue, reorderWorshipQueue, playNextInWorshipQueue,
@@ -122,15 +122,21 @@ export default function FamilyWorshipScreen() {
   const load = useCallback(async () => {
     if (!params.sessionId) return;
     try {
-      const [s, family] = await Promise.all([getWorshipSession(params.sessionId), getMyFamily()]);
+      // Session first — its own familyId is the source of truth for which
+      // family's roster/prayer list to load next. A user can be in worship
+      // sessions belonging to different families, so this can never assume
+      // "my one family"; it must ask for the SPECIFIC family this session
+      // belongs to.
+      const s = await getWorshipSession(params.sessionId);
       setSession(s);
       setParticipants(s.participants ?? []);
+
+      const family = await getFamilyDetail(s.familyId);
       setMembers(family.members);
       setShepherdId(family.family?.shepherdId ?? null);
-      if (family.family) {
-        const p = await getFamilyPrayerRequests(family.family.id);
-        setPrayers(p);
-      }
+      const p = await getFamilyPrayerRequests(s.familyId);
+      setPrayers(p);
+
       // Chat history — a late joiner or reconnecting client catches up here;
       // new messages after that arrive live over the signal broadcast below.
       getWorshipMessages(params.sessionId).then(setMessages).catch(() => {});

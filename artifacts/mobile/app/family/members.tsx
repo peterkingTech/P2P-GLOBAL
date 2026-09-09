@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
-import { getMyFamily, inviteToFamily, removeFamilyMember, type MyFamilyResponse } from "@/lib/familyApi";
+import { getFamilyDetail, inviteToFamily, removeFamilyMember, type FamilyDetailResponse } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -16,30 +16,34 @@ const ROLE_LABEL: Record<string, string> = {
   shepherd: "Family Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
 };
 
+// Scoped to one familyId (passed via route params from app/family/[familyId].tsx)
+// — a member of several families sees each family's own independent roster here.
 export default function FamilyMembersScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
+  const { familyId } = useLocalSearchParams<{ familyId: string }>();
   const { profile } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState<MyFamilyResponse | null>(null);
+  const [data, setData] = useState<FamilyDetailResponse | null>(null);
   const [inviteUsername, setInviteUsername] = useState("");
   const [inviting, setInviting] = useState(false);
 
   const load = useCallback(async () => {
-    try { setData(await getMyFamily()); }
-    catch (e: any) { showAlert("Couldn't load your family", e.message ?? "Please try again."); }
+    if (!familyId) return;
+    try { setData(await getFamilyDetail(familyId)); }
+    catch (e: any) { showAlert("Couldn't load this family", e.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [familyId]);
 
   useEffect(() => { load(); }, [load]);
 
   async function handleInvite() {
-    if (!data?.family || !inviteUsername.trim()) return;
+    if (!familyId || !inviteUsername.trim()) return;
     setInviting(true);
     try {
-      await inviteToFamily(data.family.id, inviteUsername.trim());
+      await inviteToFamily(familyId, inviteUsername.trim());
       setInviteUsername("");
       showAlert("Invitation sent", `@${inviteUsername.trim()} has been invited.`);
       await load();
@@ -51,8 +55,7 @@ export default function FamilyMembersScreen() {
   }
 
   function handleRemoveMember(userId: string, name: string) {
-    if (!data?.family) return;
-    const familyId = data.family.id;
+    if (!familyId) return;
     Alert.alert(`Remove ${name}?`, "They can be invited again later.", [
       { text: "Cancel", style: "cancel" },
       {

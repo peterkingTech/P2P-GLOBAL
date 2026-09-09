@@ -1,39 +1,40 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { getMyFamily, getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus, type FamilyPrayerRequest } from "@/lib/familyApi";
+import { getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus, type FamilyPrayerRequest } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
 }
 
+// Scoped to one familyId (passed via route params from app/family/[familyId].tsx)
+// — a member of several families sees each family's own independent prayer list here.
 export default function FamilyPrayerScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
+  const { familyId } = useLocalSearchParams<{ familyId: string }>();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [familyId, setFamilyId] = useState<string | null>(null);
   const [prayerRequests, setPrayerRequests] = useState<FamilyPrayerRequest[]>([]);
   const [newPrayer, setNewPrayer] = useState("");
   const [newPrayerPrivate, setNewPrayerPrivate] = useState(false);
 
   const load = useCallback(async () => {
+    if (!familyId) return;
     try {
-      const res = await getMyFamily();
-      setFamilyId(res.family?.id ?? null);
-      if (res.family) setPrayerRequests(await getFamilyPrayerRequests(res.family.id));
+      setPrayerRequests(await getFamilyPrayerRequests(familyId));
     } catch (e: any) {
       showAlert("Couldn't load prayer requests", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [familyId]);
 
   useEffect(() => { load(); }, [load]);
 

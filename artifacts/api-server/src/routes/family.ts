@@ -22,8 +22,20 @@ function mapMember(row: Record<string, unknown>, profile?: { full_name: string; 
   };
 }
 
-async function getActiveMembership(userId: string) {
-  const { data } = await db.from("p2p_family_members").select("*").eq("user_id", userId).eq("status", "active").maybeSingle();
+// A user may belong to many families at once (migration 126) — this
+// returns ALL of the caller's active memberships, never just one.
+async function getActiveMemberships(userId: string) {
+  const { data } = await db.from("p2p_family_members").select("*").eq("user_id", userId).eq("status", "active");
+  return (data ?? []) as Record<string, unknown>[];
+}
+
+// The family-scoped membership check every family-specific route should
+// use: "is this user an active member of THIS SPECIFIC family" — never
+// "what is the user's one family," which stopped being a meaningful
+// question once multi-family membership shipped.
+async function getMembership(userId: string, familyId: string) {
+  const { data } = await db
+    .from("p2p_family_members").select("*").eq("user_id", userId).eq("family_id", familyId).eq("status", "active").maybeSingle();
   return data as Record<string, unknown> | null;
 }
 
@@ -35,21 +47,64 @@ async function isShepherdOrCoShepherd(familyId: string, userId: string): Promise
   return member?.role === "co_shepherd";
 }
 
-// GET /family/mine — the caller's family (roster + pending invitations they
-// can act on), or null with any invitations awaiting their own response.
+// GET /family/mine — every family the caller actively belongs to (a
+// summary per family, not each family's full roster — see GET /:familyId
+// for that), plus any invitations awaiting the caller's own response.
+// "My Family" now represents the user's family relationships, plural.
 router.get("/mine", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
 
-  const membership = await getActiveMembership(userId);
+  const memberships = await getActiveMemberships(userId);
   const { data: myInvitations } = await db
     .from("p2p_family_invitations").select("*").eq("invited_user_id", userId).eq("status", "pending");
 
-  if (!membership) {
-    return ok(res, { family: null, members: [], myRole: null, pendingInvitations: myInvitations ?? [] });
+  if (memberships.length === 0) {
+    return ok(res, { families: [], pendingInvitations: myInvitations ?? [] });
   }
 
-  const familyId = membership.family_id as string;
+  const familyIds = memberships.map((m) => m.family_id as string);
+  const { data: families } = await db.from("p2p_families").select("*").in("id", familyIds);
+  const familyById = new Map((families ?? []).map((f) => [f.id as string, f]));
+
+  // One cheap count query per family for the summary card — this list is
+  // never large enough (a person's own families) to warrant batching this
+  // into a single grouped query.
+  const summaries = await Promise.all(
+    memberships.map(async (m) => {
+      const familyId = m.family_id as string;
+      const family = familyById.get(familyId);
+      if (!family) return null;
+      const { count } = await db
+        .from("p2p_family_members").select("id", { count: "exact", head: true }).eq("family_id", familyId).eq("status", "active");
+      return {
+        family: mapFamily(family as Record<string, unknown>),
+        myRole: m.role,
+        memberCount: count ?? 0,
+      };
+    })
+  );
+
+  return ok(res, {
+    families: summaries.filter((s): s is NonNullable<typeof s> => s !== null),
+    pendingInvitations: myInvitations ?? [],
+  });
+});
+
+// GET /family/:familyId — one specific family's full detail: roster,
+// caller's role in THIS family, and (if the caller can manage it) the
+// roster invitations awaiting response. This is the family-scoped read
+// every per-family screen (Members, Prayer, Family Media) should use
+// instead of assuming "my one family" — a caller who belongs to several
+// families asks for each one explicitly, by id.
+router.get("/:familyId", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId } = req.params;
+
+  const membership = await getMembership(userId, familyId);
+  if (!membership) return err(res, "You're not a member of this family", 403);
+
   const { data: family } = await db.from("p2p_families").select("*").eq("id", familyId).maybeSingle();
   if (!family) return err(res, "Family not found", 404);
 
@@ -71,7 +126,7 @@ router.get("/mine", async (req, res) => {
     members: (members ?? []).map((m) => mapMember(m as Record<string, unknown>, profileById.get(m.user_id as string))),
     myRole: membership.role,
     canManage,
-    pendingInvitations: canManage ? pendingRosterInvitations : (myInvitations ?? []),
+    pendingInvitations: pendingRosterInvitations ?? [],
   });
 });
 
@@ -83,9 +138,8 @@ router.post("/", async (req, res) => {
   const { name } = req.body as { name?: string };
   if (!name?.trim()) return err(res, "name is required");
 
-  const existing = await getActiveMembership(userId);
-  if (existing) return err(res, "You already belong to a family", 409);
-
+  // A user may belong to (and lead) multiple families — no longer blocked
+  // by any existing membership elsewhere (migration 126).
   const { data: family, error } = await db.from("p2p_families").insert({ name: name.trim(), shepherd_id: userId }).select().single();
   if (error || !family) return err(res, error?.message ?? "Failed to create family", 500);
 
@@ -113,8 +167,13 @@ router.post("/:familyId/invite", async (req, res) => {
     .from("p2p_profiles").select("id,full_name").ilike("username", username.trim().replace(/^@/, "")).maybeSingle();
   if (!targetProfile) return err(res, `No account found for @${username}`, 404);
 
-  const existingMembership = await getActiveMembership(targetProfile.id as string);
-  if (existingMembership) return err(res, `${targetProfile.full_name} already belongs to a family`, 409);
+  // Only block a duplicate invite into THIS SAME family — belonging to any
+  // other family is no longer a reason to reject (migration 126). The
+  // upsert below on (family_id, invited_user_id) would silently resend a
+  // pending invite anyway, but an already-active membership in this exact
+  // family deserves a clear message rather than a resent invite.
+  const existingMembership = await getMembership(targetProfile.id as string, familyId);
+  if (existingMembership) return err(res, `${targetProfile.full_name} is already a member of this family`, 409);
 
   const { data: family } = await db.from("p2p_families").select("name").eq("id", familyId).maybeSingle();
   const { data: invitation, error } = await db
@@ -151,17 +210,16 @@ router.post("/invitations/:invitationId/respond", async (req, res) => {
   if (invitation.status !== "pending") return err(res, "This invitation has already been responded to", 409);
 
   if (action === "accept") {
-    const existing = await getActiveMembership(userId);
-    if (existing) return err(res, "You already belong to a family — leave it before accepting a new invitation", 409);
-
+    // Accepting adds this family alongside any others the user already
+    // belongs to — no longer blocked by, and never replaces, an existing
+    // membership elsewhere (migration 126). unique(family_id, user_id) is
+    // still the hard backstop against a double-accept race into this SAME
+    // family (e.g. two concurrent taps) — surfaced as a normal conflict.
     const { error: memberError } = await db.from("p2p_family_members").upsert(
       { family_id: invitation.family_id, user_id: userId, role: invitation.role, status: "active", joined_at: new Date().toISOString() },
       { onConflict: "family_id,user_id" }
     );
-    // The partial unique index (one active family per user) is the hard
-    // backstop against a race between the check above and this write —
-    // surface it as a normal conflict, not a 500.
-    if (memberError) return err(res, "You already belong to a family", 409);
+    if (memberError) return err(res, "Couldn't join this family", 409);
   }
 
   await db.from("p2p_family_invitations")
@@ -222,8 +280,7 @@ router.get("/:familyId/prayer-requests", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { familyId } = req.params;
-  const membership = await getActiveMembership(userId);
-  if (membership?.family_id !== familyId) return err(res, "You're not a member of this family", 403);
+  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
 
   const { data, error } = await db
     .from("p2p_family_prayer_requests").select("*").eq("family_id", familyId)
@@ -250,8 +307,7 @@ router.post("/:familyId/prayer-requests", async (req, res) => {
     return err(res, "scriptureReference requires book, chapter, and translation");
   }
 
-  const membership = await getActiveMembership(userId);
-  if (membership?.family_id !== familyId) return err(res, "You're not a member of this family", 403);
+  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
 
   const { data, error } = await db.from("p2p_family_prayer_requests").insert({
     family_id: familyId, user_id: userId, content: content.trim(), visibility: visibility === "private" ? "private" : "family",
@@ -276,8 +332,7 @@ router.put("/:familyId/prayer-requests/:id/status", async (req, res) => {
   if (!request) return err(res, "Prayer request not found", 404);
   if (status === "answered" && request.user_id !== userId) return err(res, "Only the person who shared this request can mark it answered", 403);
   if (status === "prayed") {
-    const membership = await getActiveMembership(userId);
-    if (membership?.family_id !== familyId) return err(res, "You're not a member of this family", 403);
+    if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
   }
 
   const { error } = await db.from("p2p_family_prayer_requests").update({ status, updated_at: new Date().toISOString() }).eq("id", id);

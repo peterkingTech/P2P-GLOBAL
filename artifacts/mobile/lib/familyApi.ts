@@ -29,13 +29,26 @@ export interface FamilyMember {
 }
 export interface Family { id: string; name: string; shepherdId: string; createdAt: string }
 export interface FamilyInvitation { id: string; family_id: string; invited_by: string; invited_user_id: string; role: FamilyRole; status: string; created_at: string }
-export interface MyFamilyResponse {
-  family: Family | null; members: FamilyMember[]; myRole: FamilyRole | null;
-  canManage?: boolean; pendingInvitations: FamilyInvitation[];
+
+// A user may belong to several families at once — "My Family" represents
+// all of the user's family relationships, not one single identity.
+export interface FamilySummary { family: Family; myRole: FamilyRole; memberCount: number }
+export interface MyFamiliesResponse {
+  families: FamilySummary[]; pendingInvitations: FamilyInvitation[];
+}
+export interface FamilyDetailResponse {
+  family: Family; members: FamilyMember[]; myRole: FamilyRole;
+  canManage: boolean; pendingInvitations: FamilyInvitation[];
 }
 
-export function getMyFamily(): Promise<MyFamilyResponse> {
+export function getMyFamilies(): Promise<MyFamiliesResponse> {
   return authedFetch("/family/mine");
+}
+// One specific family's full detail (roster, caller's role in THIS
+// family) — every per-family screen fetches by familyId rather than
+// assuming there is only one.
+export function getFamilyDetail(familyId: string): Promise<FamilyDetailResponse> {
+  return authedFetch(`/family/${familyId}`);
 }
 export function createFamily(name: string): Promise<Family> {
   return authedFetch("/family", { method: "POST", body: JSON.stringify({ name }) });
