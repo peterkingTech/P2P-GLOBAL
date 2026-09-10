@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225407496332",
+    "project_id": "p2p-global-discipleship-net",
+    "storage_bucket": "p2p-global-discipleship-net.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225407496332:android:1227c2839940dbd5618ba9",
+        "android_client_info": {
+          "package_name": "com.amentech.p2pglobalbiblestudy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgm86tUdaYYY1ErMqDmmrUDAIdQekVS40"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

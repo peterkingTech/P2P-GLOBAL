@@ -25,6 +25,7 @@
     "android": {
       "package": "com.amentech.p2pglobalbiblestudy",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon-adaptive.png",
         "backgroundColor": "#06110D"
