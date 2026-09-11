@@ -163,6 +163,19 @@ router.post("/calls/token", async (req, res) => {
       const { data: participant } = await supabaseWrite
         .from("p2p_family_worship_participants").select("id").eq("session_id", sessionId).eq("user_id", userId).is("left_at", null).maybeSingle();
       if (!participant) return err(res, "Not authorized to join this worship session", 403);
+    } else if (channelName.startsWith("church_call_")) {
+      // Church Calls Stage 1 — same additive pattern as family_worship_
+      // above: a closed-membership channel, checked against
+      // p2p_church_call_participants (the caller must already have an
+      // active participant row, written only by the authorized
+      // POST /churches/calls/:callId/join route in churchCalls.ts — this
+      // never re-derives church/cohort scope authorization itself, it just
+      // confirms that authorization already happened).
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const callId = channelName.slice("church_call_".length);
+      const { data: participant } = await supabaseWrite
+        .from("p2p_church_call_participants").select("id").eq("call_id", callId).eq("user_id", userId).is("left_at", null).maybeSingle();
+      if (!participant) return err(res, "Not authorized to join this call", 403);
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;

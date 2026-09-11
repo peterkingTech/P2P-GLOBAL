@@ -8,6 +8,7 @@ import { generateWeeklyReportDrafts, notifyAdminsToSubmitReports, flagOverdueRep
 import { publishScheduledAnnouncements } from "./lib/churchAnnouncements";
 import { flagOverdueContactMessages } from "./lib/contactOverdue";
 import { dispatchPendingPushes } from "./lib/pushDispatch";
+import { sendDueChurchCallReminders } from "./lib/churchCallReminders";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -157,5 +158,16 @@ cron.schedule("*/1 * * * *", async () => {
     if (result.notifications) logger.info(result, "Push dispatch tick");
   } catch (err) {
     logger.error({ err }, "Push dispatch failed");
+  }
+});
+
+// Church Call reminders — Stage 3. Same once-a-minute cadence and same
+// idempotent-update dedup shape as publishScheduledAnnouncements() above.
+cron.schedule("*/1 * * * *", async () => {
+  try {
+    const result = await sendDueChurchCallReminders();
+    if (result.reminded) logger.info(result, "Church Call reminders sent");
+  } catch (err) {
+    logger.error({ err }, "Church Call reminder sweep failed");
   }
 });
