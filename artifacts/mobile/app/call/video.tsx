@@ -13,11 +13,18 @@ import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
-import { ParticipantGrid } from "@/components/call/ParticipantGrid";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
+import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
+import { P2PParticipantOrbit } from "@/components/call/P2PParticipantOrbit";
+import { P2PControlButton } from "@/components/call/P2PControlButton";
+import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
+import type { P2PCallColors } from "@/components/call/p2pCallTheme";
+import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
+import { useTheme } from "@/contexts/ThemeContext";
+import { withAlpha } from "@/lib/colorUtils";
 
 // Alert.alert on native is fire-and-forget — it returns immediately rather
 // than waiting for the user to dismiss it. Callers that need cleanup/
@@ -65,6 +72,9 @@ export default function VideoCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const { colors, resolvedMode } = useTheme();
+  const p2pColors = getP2PCallColors(colors, resolvedMode);
+  const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{
     channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
@@ -115,6 +125,8 @@ export default function VideoCallScreen() {
   const [blurOn, setBlurOn] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
   const [videoAutoDisabled, setVideoAutoDisabled] = useState(false);
+  // P2P Call Redesign — presentation layer only, see useActiveSpeaker.ts.
+  const activeSpeaker = useActiveSpeaker();
   // CALL DEBUG fix — same explicit state machine as audio.tsx, including
   // the "failed" addition (see that file's comment for the full rationale).
   const [callState, setCallState] = useState<
@@ -293,8 +305,19 @@ export default function VideoCallScreen() {
       // Study Together C1: ends only when the LAST remote participant
       // leaves — for an existing 1:1 call that's the same single moment
       // as before, preserving current behavior unchanged.
+      // P2P Call Redesign — video calls did not previously subscribe to
+      // this callback at all. It is an EXISTING Agora SDK event (already
+      // used identically in audio.tsx); wiring it here only adds a
+      // listener for real speaking data to drive the orbit's active-
+      // speaker highlight — it does not change how Agora computes or
+      // reports volume, and nothing about join/leave/token/permission
+      // behavior is touched.
+      onAudioVolumeIndication: (_connection, speakers) => {
+        activeSpeaker.reportVolume(speakers ?? []);
+      },
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
+        activeSpeaker.clearIfActive(uid);
         setRemoteUids((prev) => {
           const next = prev.filter((u) => u !== uid);
           if (next.length === 0) handleEndCall();
@@ -456,6 +479,25 @@ export default function VideoCallScreen() {
     </View>
   );
 
+  // P2P Call Redesign — presentation only. Self is now a real orbit
+  // participant (previously only a small PIP tile, hidden entirely in
+  // group calls) rather than a special case — see audio.tsx's identical
+  // comment. Remote tiles' videoOn always true, matching the existing
+  // group.tsx precedent exactly (this codebase has never tracked a
+  // per-remote camera-on/off signal — confirmed forensically — so this
+  // is not a new limitation introduced by the redesign); poorConnection
+  // forces the graceful avatar fallback instead of a broken video frame.
+  const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({
+    uid, isSelf: false,
+    name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
+    videoOn: !poorConnection, muted: false,
+  }));
+  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: cameraOn, muted };
+  const allTiles = [selfTile, ...otherTiles];
+  const centerUid = activeSpeaker.activeUid ?? (remoteUids.length > 0 ? remoteUids[0] : 0);
+  const centerTile = allTiles.find((t) => t.uid === centerUid) ?? selfTile;
+  const orbitTiles = allTiles.filter((t) => t.uid !== centerTile.uid);
+
   if (mode === "study") {
     return (
       <View style={{ flex: 1 }}>
@@ -484,44 +526,46 @@ export default function VideoCallScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      {remoteUids.length > 1 ? (
-        // Study Together C1 group-calling foundation — minimal reusable
-        // grid, no group Study Together content here. The 1:1 fullscreen
-        // + PIP layout below is completely untouched for exactly one
-        // remote party.
-        <ParticipantGrid
-          tiles={[
-            { uid: 0, name: "You", isSelf: true, videoOn: cameraOn },
-            ...remoteUids.map((uid) => ({
-              uid, isSelf: false, videoOn: true,
-              name: groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone",
-            })),
-          ]}
-        />
-      ) : remoteUid !== null && !poorConnection ? (
-        <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, styles.remoteFallback]}>
-          <Ionicons name="person" size={64} color="rgba(255,255,255,0.3)" />
-          {callState !== "connected" && callState !== "ended" && (
-            <View style={styles.statusRow}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.statusText}>
-                {callState === "waiting_for_peer" && isInitiator ? "Calling…" : "Connecting…"}
-              </Text>
-            </View>
-          )}
+      {/* Minimal header (section 11) — no participant-count badge; Direct
+          Calls has no Participants button today (confirmed absent from
+          this file, audio.tsx, and group.tsx), so none is invented here. */}
+      <View style={[styles.header, { top: insets.top + 10 }]}>
+        <TouchableOpacity onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="Back">
+          <Ionicons name="chevron-back" size={22} color={p2pColors.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ alignItems: "center" }}>
+          <Text style={styles.brand}>P2P Global</Text>
+          <Text style={styles.brandSub}>Discipleship Network</Text>
         </View>
-      )}
+        <View style={{ width: 22 }} />
+      </View>
+      <View style={[styles.callTypePillWrap, { top: insets.top + 56 }]}>
+        <View style={styles.callTypePill}>
+          <Ionicons name="videocam" size={12} color={p2pColors.accent} />
+          <Text style={styles.callTypePillText}>Video Call</Text>
+        </View>
+      </View>
 
-      {remoteUids.length <= 1 && cameraOn && (
-        <TouchableOpacity style={[styles.pip, { top: insets.top + 16 }]} onPress={toggleBlur} activeOpacity={0.85}>
-          <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} zOrderMediaOverlay />
-          {blurOn && (
-            <View style={styles.pipBlurBadge}>
-              <Ionicons name="sparkles" size={10} color="#fff" />
-            </View>
-          )}
+      <View style={styles.orbitArea}>
+        <P2PParticipantOrbit
+          centerTile={centerTile}
+          orbitTiles={orbitTiles}
+          speakingUids={activeSpeaker.speakingUids}
+          colors={p2pColors}
+        />
+        {callState !== "connected" && callState !== "ended" && (
+          <View style={styles.statusRow}>
+            <ActivityIndicator color={p2pColors.textPrimary} size="small" />
+            <Text style={styles.statusText}>
+              {callState === "waiting_for_peer" && isInitiator ? "Calling…" : "Connecting…"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {centerTile.isSelf && cameraOn && (
+        <TouchableOpacity style={[styles.blurToggle, { top: insets.top + 100 }]} onPress={toggleBlur} activeOpacity={0.85} accessibilityLabel="Toggle background blur">
+          <Ionicons name="sparkles" size={14} color={blurOn ? p2pColors.accent : p2pColors.textPrimary} />
         </TouchableOpacity>
       )}
 
@@ -533,10 +577,7 @@ export default function VideoCallScreen() {
       )}
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{otherName}</Text>
-          {callState === "connected" && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
-        </View>
+        {callState === "connected" && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
 
         {callState === "connected" && study.pendingGroupStudy?.active && (
           <View style={styles.autoStudyCard}>
@@ -569,33 +610,33 @@ export default function VideoCallScreen() {
         )}
 
         <View style={styles.controlsRow}>
-          <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
-            <Ionicons name={muted ? "mic-off" : "mic"} size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
-            <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.controlBtn} onPress={flipCamera} disabled={!cameraOn}>
-            <Ionicons name="camera-reverse" size={20} color={cameraOn ? "#fff" : "rgba(255,255,255,0.35)"} />
-          </TouchableOpacity>
+          <P2PControlButton onPress={toggleMute} active={muted} accessibilityLabel="Mute microphone" colors={p2pColors}>
+            <Ionicons name={muted ? "mic-off" : "mic"} size={20} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
+          </P2PControlButton>
+          <P2PControlButton onPress={toggleCamera} active={!cameraOn} accessibilityLabel="Turn camera on or off" colors={p2pColors}>
+            <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
+          </P2PControlButton>
+          <P2PControlButton onPress={flipCamera} disabled={!cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
+            <Ionicons name="camera-reverse" size={20} color={cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
+          </P2PControlButton>
           {callState === "connected" && (
-            <TouchableOpacity style={styles.controlBtn} onPress={handleOpenStudy}>
-              <Ionicons name="school" size={20} color="#fff" />
-            </TouchableOpacity>
+            <P2PControlButton onPress={handleOpenStudy} accessibilityLabel="Study Together" colors={p2pColors}>
+              <Ionicons name="school" size={20} color={p2pColors.textPrimary} />
+            </P2PControlButton>
           )}
           {sessionQuestions.length > 0 && (
-            <TouchableOpacity style={styles.controlBtn} onPress={() => setLessonSidebarVisible(true)}>
-              <Ionicons name="list" size={20} color="#fff" />
-            </TouchableOpacity>
+            <P2PControlButton onPress={() => setLessonSidebarVisible(true)} accessibilityLabel="Lesson questions" colors={p2pColors}>
+              <Ionicons name="list" size={20} color={p2pColors.textPrimary} />
+            </P2PControlButton>
           )}
           {canAddPeople && (
-            <TouchableOpacity style={styles.controlBtn} onPress={() => setAddPeopleOpen(true)}>
-              <Ionicons name="person-add" size={20} color="#fff" />
-            </TouchableOpacity>
+            <P2PControlButton onPress={() => setAddPeopleOpen(true)} accessibilityLabel="Add someone to this call" colors={p2pColors}>
+              <Ionicons name="person-add" size={20} color={p2pColors.textPrimary} />
+            </P2PControlButton>
           )}
-          <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={() => handleEndCall()}>
+          <P2PControlButton onPress={() => handleEndCall()} danger accessibilityLabel="End call" colors={p2pColors}>
             <Ionicons name="call" size={20} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
-          </TouchableOpacity>
+          </P2PControlButton>
         </View>
       </View>
 
@@ -631,73 +672,75 @@ export default function VideoCallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E" },
-  remoteFallback: { alignItems: "center", justifyContent: "center", backgroundColor: "#111A15", gap: 12 },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  statusText: { color: "rgba(255,255,255,0.7)", fontSize: 14, fontFamily: "Inter_400Regular" },
-  pip: {
-    position: "absolute", right: 16, width: 110, height: 150, borderRadius: 14, overflow: "hidden",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", backgroundColor: "#000",
-  },
-  pipBlurBadge: {
-    position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 10, padding: 4,
-  },
-  banner: {
-    position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(180,83,9,0.9)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-  },
-  bannerText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
-  bottomBar: {
-    position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 20, paddingHorizontal: 20,
-    backgroundColor: "rgba(0,0,0,0.35)", gap: 14,
-  },
-  nameRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  name: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  timer: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontFamily: "Inter_500Medium" },
-  controlsRow: { flexDirection: "row", justifyContent: "space-between" },
-  controlBtn: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center", justifyContent: "center",
-  },
-  endBtn: { backgroundColor: "#DC2626" },
-  studyParticipantStrip: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
-  },
-  studyMiniTile: {
-    width: 36, height: 36, borderRadius: 8, overflow: "hidden",
-    backgroundColor: "#1A241E", alignItems: "center", justifyContent: "center",
-  },
-  studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
-  studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
-  autoStudyCard: {
-    backgroundColor: "rgba(20,31,25,0.92)", borderWidth: 1, borderColor: "#1D9E75",
-    borderRadius: 14, padding: 12, gap: 10, marginBottom: 14,
-  },
-  autoStudyText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
-  autoStudyRow: { flexDirection: "row", gap: 8 },
-  autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  autoStudyDismissText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: "#1D9E75" },
-  autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
+function makeStyles(p2p: P2PCallColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p2p.bg },
+    header: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, zIndex: 2 },
+    brand: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_700Bold" },
+    brandSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+    callTypePillWrap: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 2 },
+    callTypePill: {
+      flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: p2p.pillBg,
+      borderWidth: 1, borderColor: p2p.accentBorder, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    },
+    callTypePillText: { color: p2p.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+    orbitArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+    statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+    statusText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
+    blurToggle: {
+      position: "absolute", right: 16, width: 34, height: 34, borderRadius: 17,
+      backgroundColor: withAlpha(p2p.bg, 0.6), alignItems: "center", justifyContent: "center",
+      borderWidth: 1, borderColor: p2p.surfaceBorder, zIndex: 2,
+    },
+    banner: {
+      position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 8,
+      backgroundColor: "rgba(180,83,9,0.9)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, zIndex: 2,
+    },
+    bannerText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
+    bottomBar: {
+      position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 20, paddingHorizontal: 20,
+      backgroundColor: withAlpha(p2p.bg, 0.55), gap: 14, alignItems: "center",
+    },
+    timer: { color: p2p.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
+    controlsRow: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+    endBtn: { backgroundColor: P2P_END_CALL_RED },
+    studyParticipantStrip: {
+      flexDirection: "row", alignItems: "center", gap: 8,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
+    },
+    studyMiniTile: {
+      width: 36, height: 36, borderRadius: 8, overflow: "hidden",
+      backgroundColor: "#1A241E", alignItems: "center", justifyContent: "center",
+    },
+    studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+    studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+    autoStudyCard: {
+      backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accent,
+      borderRadius: 14, padding: 12, gap: 10, marginBottom: 14, width: "100%",
+    },
+    autoStudyText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
+    autoStudyRow: { flexDirection: "row", gap: 8 },
+    autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: p2p.surfaceBorder },
+    autoStudyDismissText: { color: p2p.textMuted, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: p2p.accent },
+    autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  modalBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  modalTitle: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  modalSearchRow: { flexDirection: "row", gap: 8 },
-  modalInput: {
-    flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular",
-  },
-  modalSearchBtn: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
-  modalError: { color: "#F87171", fontSize: 13, fontFamily: "Inter_400Regular" },
-  modalResult: { gap: 6, paddingVertical: 8 },
-  modalResultText: { color: "#fff", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
-  modalResultRef: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  sidebarQuestionRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  sidebarQuestionNumber: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_700Bold", width: 18 },
-  sidebarQuestionText: { flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
-});
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+    modalBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14 },
+    modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    modalTitle: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    modalSearchRow: { flexDirection: "row", gap: 8 },
+    modalInput: {
+      flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+      color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular",
+    },
+    modalSearchBtn: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
+    modalError: { color: "#F87171", fontSize: 13, fontFamily: "Inter_400Regular" },
+    modalResult: { gap: 6, paddingVertical: 8 },
+    modalResultText: { color: "#fff", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
+    modalResultRef: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    sidebarQuestionRow: { flexDirection: "row", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+    sidebarQuestionNumber: { color: "#1D9E75", fontSize: 13, fontFamily: "Inter_700Bold", width: 18 },
+    sidebarQuestionText: { flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  });
+}

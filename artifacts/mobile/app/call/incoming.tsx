@@ -7,6 +7,9 @@ import { supabase } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { acceptCallInvitation, declineCallInvitation } from "@/lib/callInvitations";
 import { useRingtone } from "@/hooks/useRingtone";
+import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
+import type { P2PCallColors } from "@/components/call/p2pCallTheme";
+import { useTheme } from "@/contexts/ThemeContext";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -25,6 +28,9 @@ const CALL_TYPE_LABEL: Record<CallType, string> = {
 export default function IncomingCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, resolvedMode } = useTheme();
+  const p2pColors = getP2PCallColors(colors, resolvedMode);
+  const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{
     callId: string; channelName: string; callType: CallType; callerId: string; callerName?: string;
     conversationId?: string; callLogId?: string; invitationId?: string;
@@ -251,7 +257,7 @@ export default function IncomingCallScreen() {
         </Text>
 
         <View style={styles.typeChip}>
-          <Ionicons name={callType === "video" ? "videocam" : "call"} size={14} color="#fff" />
+          <Ionicons name={callType === "video" ? "videocam" : "call"} size={14} color={p2pColors.accent} />
           <Text style={styles.typeChipText}>{CALL_TYPE_LABEL[callType]}</Text>
         </View>
       </View>
@@ -272,28 +278,35 @@ export default function IncomingCallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E", justifyContent: "space-between", alignItems: "center" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
-  avatarRing: {
-    position: "absolute", width: 160, height: 160, borderRadius: 80,
-    borderWidth: 2, borderColor: "rgba(29,158,117,0.5)",
-  },
-  avatarCircle: {
-    width: 130, height: 130, borderRadius: 65, backgroundColor: "rgba(29,158,117,0.18)",
-    alignItems: "center", justifyContent: "center", marginBottom: 24,
-  },
-  avatarEmoji: { fontSize: 56 },
-  callerName: { fontSize: 26, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
-  callingText: { fontSize: 15, color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", marginTop: 4 },
-  typeChip: {
-    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 20,
-    backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-  },
-  typeChipText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" },
-  buttonRow: { flexDirection: "row", gap: 40, paddingBottom: 20 },
-  circleBtn: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", gap: 4 },
-  declineBtn: { backgroundColor: "#DC2626" },
-  answerBtn: { backgroundColor: "#1D9E75" },
-  circleBtnLabel: { position: "absolute", bottom: -22, color: "rgba(255,255,255,0.8)", fontSize: 11, fontFamily: "Inter_500Medium" },
-});
+function makeStyles(p2p: P2PCallColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p2p.bg, justifyContent: "space-between", alignItems: "center" },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
+    avatarRing: {
+      position: "absolute", width: 160, height: 160, borderRadius: 80,
+      borderWidth: 2, borderColor: p2p.accentBorder,
+    },
+    avatarCircle: {
+      width: 130, height: 130, borderRadius: 65, backgroundColor: p2p.pillBg,
+      alignItems: "center", justifyContent: "center", marginBottom: 24,
+      borderWidth: 1.5, borderColor: p2p.accent,
+    },
+    avatarEmoji: { fontSize: 56 },
+    callerName: { fontSize: 26, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
+    callingText: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
+    typeChip: {
+      flexDirection: "row", alignItems: "center", gap: 6, marginTop: 20,
+      backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accentBorder,
+      borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+    },
+    typeChipText: { color: p2p.accent, fontSize: 13, fontFamily: "Inter_500Medium" },
+    buttonRow: { flexDirection: "row", gap: 40, paddingBottom: 20 },
+    circleBtn: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", gap: 4 },
+    // Decline is the same "hang up" red-icon safety convention as the
+    // in-call End Call button (see P2PControlButton's `danger` branch) —
+    // always P2P_END_CALL_RED, never themed.
+    declineBtn: { backgroundColor: P2P_END_CALL_RED },
+    answerBtn: { backgroundColor: p2p.accent },
+    circleBtnLabel: { position: "absolute", bottom: -22, color: "rgba(255,255,255,0.8)", fontSize: 11, fontFamily: "Inter_500Medium" },
+  });
+}

@@ -16,6 +16,13 @@ import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
+import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
+import { P2PParticipantOrbit } from "@/components/call/P2PParticipantOrbit";
+import { P2PControlButton } from "@/components/call/P2PControlButton";
+import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
+import type { P2PCallColors } from "@/components/call/p2pCallTheme";
+import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Alert.alert on native is fire-and-forget — it returns immediately rather
 // than waiting for the user to dismiss it. Callers that need cleanup/
@@ -81,6 +88,9 @@ export default function AudioCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const { colors, resolvedMode } = useTheme();
+  const p2pColors = getP2PCallColors(colors, resolvedMode);
+  const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{
     channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
@@ -116,6 +126,10 @@ export default function AudioCallScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
+  // P2P Call Redesign — presentation layer only, see useActiveSpeaker.ts.
+  // Consumes the existing onAudioVolumeIndication callback below; does not
+  // change how Agora computes or reports volume.
+  const activeSpeaker = useActiveSpeaker();
   // CALL DEBUG fix — explicit state machine (was "connecting" | "ringing" |
   // "connected" | "ended", where "ringing" ambiguously meant "Calling…" for
   // BOTH the caller and, after answering, the recipient too). Now:
@@ -353,6 +367,7 @@ export default function AudioCallScreen() {
       // detected on that uid's mic. Logged, not surfaced in the UI (no
       // existing speaking indicator on this screen, unlike group.tsx).
       onAudioVolumeIndication: (connection, speakers) => {
+        activeSpeaker.reportVolume(speakers ?? []);
         const nonzero = (speakers ?? []).filter((s) => (s.volume ?? 0) > 5);
         if (nonzero.length > 0) {
           console.log("CALL DEBUG audio: onAudioVolumeIndication", {
@@ -363,6 +378,7 @@ export default function AudioCallScreen() {
       },
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
+        activeSpeaker.clearIfActive(uid);
         setRemoteUids((prev) => {
           const next = prev.filter((u) => u !== uid);
           if (next.length === 0) handleEndCall();
@@ -506,6 +522,25 @@ export default function AudioCallScreen() {
     </View>
   );
 
+  // P2P Call Redesign — presentation only. "You" is always included as a
+  // real orbit participant (not hidden the way the old 1:1 layout hid
+  // self entirely) — see section 34's own 2-person example ("large central
+  // active participant + small local participant orbit/secondary circle").
+  // The center defaults to the other party until real speaking data
+  // (activeSpeaker, from the unmodified onAudioVolumeIndication callback)
+  // promotes whoever is actually talking — never a fixed role, since
+  // Direct Calls has no role concept at all.
+  const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({
+    uid, isSelf: false,
+    name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
+    videoOn: false, muted: false,
+  }));
+  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted };
+  const allTiles = [selfTile, ...otherTiles];
+  const centerUid = activeSpeaker.activeUid ?? (remoteUids.length > 0 ? remoteUids[0] : 0);
+  const centerTile = allTiles.find((t) => t.uid === centerUid) ?? selfTile;
+  const orbitTiles = allTiles.filter((t) => t.uid !== centerTile.uid);
+
   if (mode === "study") {
     return (
       <View style={{ flex: 1 }}>
@@ -531,37 +566,43 @@ export default function AudioCallScreen() {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 30, paddingBottom: insets.bottom + 30 }]}>
+    <View style={[styles.screen, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 30 }]}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-      <Text style={styles.brand}>P2P Global</Text>
+
+      {/* Minimal header (section 11) — no participant-count badge here:
+          Direct Calls has no Participants button today (confirmed — none
+          exists in this file, group.tsx, or video.tsx), so there is
+          nothing to deduplicate against; one is not invented here per
+          section 23's "do not invent new call functionality." */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="Back">
+          <Ionicons name="chevron-back" size={22} color={p2pColors.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ alignItems: "center" }}>
+          <Text style={styles.brand}>P2P Global</Text>
+          <Text style={styles.brandSub}>Discipleship Network</Text>
+        </View>
+        <View style={{ width: 22 }} />
+      </View>
+      <View style={styles.callTypePillWrap}>
+        <View style={styles.callTypePill}>
+          <Ionicons name="pulse" size={12} color={p2pColors.accent} />
+          <Text style={styles.callTypePillText}>Audio Call</Text>
+        </View>
+      </View>
 
       <View style={styles.center}>
-        {remoteUids.length <= 1 ? (
-          <>
-            <View style={styles.avatarCircle}>
-              <Ionicons name="person" size={56} color="rgba(255,255,255,0.6)" />
-            </View>
-            <Text style={styles.name}>{otherName}</Text>
-          </>
-        ) : (
-          // Study Together C1 group-calling foundation — minimal reusable
-          // layout for >1 remote party. No group Study Together UI here;
-          // this is only the call-layer participant list.
-          <View style={styles.groupParticipantList}>
-            {groupParticipants.map((p) => (
-              <View key={p.uid} style={styles.groupParticipantRow}>
-                <View style={styles.groupParticipantAvatar}><Ionicons name="person" size={18} color="rgba(255,255,255,0.6)" /></View>
-                <Text style={styles.groupParticipantName} numberOfLines={1}>{p.name}</Text>
-              </View>
-            ))}
-            <Text style={styles.name}>{groupParticipants.length + 1} on this call</Text>
-          </View>
-        )}
-        {callType !== "audio" && <Text style={styles.subLabel}>{CALL_TYPE_LABEL[callType]}</Text>}
+        <P2PParticipantOrbit
+          centerTile={centerTile}
+          orbitTiles={orbitTiles}
+          speakingUids={activeSpeaker.speakingUids}
+          showWaveform
+          colors={p2pColors}
+        />
 
         {callState !== "connected" && callState !== "ended" ? (
           <View style={styles.statusRow}>
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={p2pColors.textPrimary} size="small" />
             {/* "Calling…" is only ever accurate for the person who placed
                 the call while genuinely still waiting on the other side —
                 the recipient, even at this same waiting_for_peer state
@@ -619,24 +660,20 @@ export default function AudioCallScreen() {
       </View>
 
       <View style={styles.controlsRow}>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
-          <Ionicons name={muted ? "mic-off" : "mic"} size={22} color="#fff" />
-          <Text style={styles.controlLabel}>{muted ? "Unmute" : "Mute"}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleSpeaker}>
-          <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={22} color="#fff" />
-          <Text style={styles.controlLabel}>Speaker</Text>
-        </TouchableOpacity>
+        <P2PControlButton onPress={toggleMute} active={muted} label={muted ? "Unmute" : "Mute"} accessibilityLabel="Mute microphone" colors={p2pColors}>
+          <Ionicons name={muted ? "mic-off" : "mic"} size={22} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton onPress={toggleSpeaker} active={speakerOn} label="Speaker" accessibilityLabel="Speaker output" colors={p2pColors}>
+          <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={22} color={speakerOn ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
         {canAddPeople && (
-          <TouchableOpacity style={styles.controlBtn} onPress={() => setAddPeopleOpen(true)}>
-            <Ionicons name="person-add" size={20} color="#fff" />
-            <Text style={styles.controlLabel}>Add</Text>
-          </TouchableOpacity>
+          <P2PControlButton onPress={() => setAddPeopleOpen(true)} label="Add" accessibilityLabel="Add someone to this call" colors={p2pColors}>
+            <Ionicons name="person-add" size={20} color={p2pColors.textPrimary} />
+          </P2PControlButton>
         )}
-        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={() => handleEndCall()}>
+        <P2PControlButton onPress={() => handleEndCall()} danger label="End" accessibilityLabel="End call" colors={p2pColors}>
           <Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
-          <Text style={styles.controlLabel}>End</Text>
-        </TouchableOpacity>
+        </P2PControlButton>
       </View>
 
       {params.callLogId && (
@@ -652,53 +689,49 @@ export default function AudioCallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E", alignItems: "center", justifyContent: "space-between" },
-  brand: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_500Medium", letterSpacing: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6 },
-  avatarCircle: {
-    width: 120, height: 120, borderRadius: 60, backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center", justifyContent: "center", marginBottom: 18,
-  },
-  name: { fontSize: 24, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
-  groupParticipantList: { alignItems: "center", gap: 8, marginBottom: 10 },
-  groupParticipantRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  groupParticipantAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  groupParticipantName: { color: "#fff", fontSize: 15, fontFamily: "Inter_500Medium" },
-  subLabel: { fontSize: 13, color: "rgba(255,255,255,0.55)", fontFamily: "Inter_400Regular", marginTop: 2 },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18 },
-  statusText: { color: "rgba(255,255,255,0.7)", fontSize: 14, fontFamily: "Inter_400Regular" },
-  timerText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#DC2626" },
-  controlsRow: { flexDirection: "row", gap: 28 },
-  controlBtn: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: "rgba(255,255,255,0.1)",
-    alignItems: "center", justifyContent: "center", gap: 2,
-  },
-  endBtn: { backgroundColor: "#DC2626" },
-  controlLabel: { position: "absolute", bottom: -20, color: "rgba(255,255,255,0.7)", fontSize: 10, fontFamily: "Inter_500Medium" },
-  studyBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8, marginTop: 26,
-    backgroundColor: "rgba(29,158,117,0.15)", borderWidth: 1, borderColor: "#1D9E75",
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
-  },
-  studyBtnEmoji: { fontSize: 16 },
-  studyBtnText: { color: "#1D9E75", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  studyParticipantStrip: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
-  },
-  studyMiniAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
-  studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
-  studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
-  autoStudyCard: {
-    marginTop: 26, backgroundColor: "#141F19", borderWidth: 1, borderColor: "#1D9E75",
-    borderRadius: 14, padding: 14, gap: 10, width: "88%",
-  },
-  autoStudyText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
-  autoStudyRow: { flexDirection: "row", gap: 8 },
-  autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
-  autoStudyDismissText: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: "#1D9E75" },
-  autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-});
+function makeStyles(p2p: P2PCallColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: p2p.bg, alignItems: "center", justifyContent: "space-between" },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 20 },
+    brand: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_700Bold" },
+    brandSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+    callTypePillWrap: { marginTop: 10 },
+    callTypePill: {
+      flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: p2p.pillBg,
+      borderWidth: 1, borderColor: p2p.accentBorder, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    },
+    callTypePillText: { color: p2p.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6, width: "100%" },
+    subLabel: { fontSize: 13, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+    statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18 },
+    statusText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
+    timerText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
+    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p2p.accent },
+    controlsRow: { flexDirection: "row", gap: 24 },
+    studyBtn: {
+      flexDirection: "row", alignItems: "center", gap: 8, marginTop: 22,
+      backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accent,
+      borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
+    },
+    studyBtnEmoji: { fontSize: 16 },
+    studyBtnText: { color: p2p.accent, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    studyParticipantStrip: {
+      flexDirection: "row", alignItems: "center", gap: 8,
+      paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
+    },
+    studyMiniAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
+    studyMiniName: { flex: 1, color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+    studyMiniBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" },
+    endBtn: { backgroundColor: P2P_END_CALL_RED },
+    autoStudyCard: {
+      marginTop: 22, backgroundColor: p2p.surface, borderWidth: 1, borderColor: p2p.accentBorder,
+      borderRadius: 14, padding: 14, gap: 10, width: "88%",
+    },
+    autoStudyText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center" },
+    autoStudyRow: { flexDirection: "row", gap: 8 },
+    autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: p2p.surfaceBorder },
+    autoStudyDismissText: { color: p2p.textMuted, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+    autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: p2p.accent },
+    autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  });
+}
