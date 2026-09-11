@@ -32,7 +32,15 @@ export default function FamilyCallsScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
   const router = useRouter();
-  const { familyId } = useLocalSearchParams<{ familyId: string }>();
+  // Uses "fid" (not "familyId") as the query-param key here: passing a
+  // param literally named "familyId" to this route collides with the
+  // sibling dynamic segment app/family/[familyId].tsx — Expo Router
+  // resolves the ambiguity by substituting the literal path segment
+  // ("calls") as the value instead of the intended id, so every request
+  // this screen made hit GET /family/calls (a 403, since no family is
+  // literally named "calls") rather than the real family. Renaming the
+  // param sidesteps the collision entirely.
+  const { fid: familyId } = useLocalSearchParams<{ fid: string }>();
   const { profile } = useAuth();
 
   const [loading, setLoading] = useState(true);

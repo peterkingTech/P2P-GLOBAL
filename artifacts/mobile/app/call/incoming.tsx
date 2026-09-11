@@ -78,6 +78,18 @@ export default function IncomingCallScreen() {
   // rings/waits indefinitely, per the "no infinite transitional state"
   // requirement.
   const SETTLE_TIMEOUT_MS = 10000;
+  // CALL DEBUG forensic fix — proven live via a cold-start decline: the app
+  // was launched directly into this screen by a notification tap, so there
+  // is no prior screen on the stack and router.canGoBack() is false. Every
+  // exit path here used to be a bare `if (router.canGoBack()) router.back()`
+  // with no else, so declining/missing/remote-cancelling from a cold start
+  // left the user stuck on the ringing screen forever even though the call
+  // was already correctly settled in the database. Mirrors the same
+  // fallback audio.tsx's navigateBack() already uses.
+  function dismissScreen() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/messages" as any);
+  }
   async function settle(status: "accepted" | "declined" | "missed") {
     if (settledRef.current) return;
     settledRef.current = true;
@@ -96,7 +108,7 @@ export default function IncomingCallScreen() {
       console.log("CALL DEBUG incoming: ring timeout, marking missed", { callId: params.callId });
       void ringtone.stop();
       settle("missed");
-      if (router.canGoBack()) router.back();
+      dismissScreen();
     }, RING_TIMEOUT_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,7 +134,7 @@ export default function IncomingCallScreen() {
             console.log("CALL DEBUG incoming: remote settled the call first", { callId: params.callId, status });
             settledRef.current = true;
             void ringtone.stop();
-            if (router.canGoBack()) router.back();
+            dismissScreen();
           }
         }
       )
@@ -147,7 +159,7 @@ export default function IncomingCallScreen() {
     if (isInvitation && params.invitationId) {
       declineCallInvitation(params.invitationId).catch(() => { /* the row is already settled locally either way */ });
     }
-    if (router.canGoBack()) router.back();
+    dismissScreen();
   }
 
   async function handleAnswer() {

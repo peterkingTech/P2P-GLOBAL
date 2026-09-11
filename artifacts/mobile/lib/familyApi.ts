@@ -39,6 +39,9 @@ export interface MyFamiliesResponse {
 export interface FamilyDetailResponse {
   family: Family; members: FamilyMember[]; myRole: FamilyRole;
   canManage: boolean; pendingInvitations: FamilyInvitation[];
+  // Non-null when a Gathering is already in progress for this family — lets
+  // the UI offer "Join Family Gathering" instead of "Start Gathering".
+  activeSessionId: string | null;
 }
 
 export function getMyFamilies(): Promise<MyFamiliesResponse> {
@@ -107,6 +110,7 @@ export interface WorshipSession {
   mediaPermission: MediaPermission; trustedUserIds: string[]; autoAdvance: boolean;
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
   currentFocusPrayerRequestId: string | null;
+  lessonId: string | null;
 }
 
 export function formatScriptureReference(s: WorshipScripture): string {
@@ -142,7 +146,7 @@ export function updateWorshipState(sessionId: string, patch: {
   status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
   mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
   isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: WorshipScripture | null;
-  focusPrayerRequestId?: string | null;
+  focusPrayerRequestId?: string | null; lessonId?: string | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });
 }
@@ -189,6 +193,74 @@ export interface WorshipHistoryEntry {
   id: string; family_id: string; session_id: string; duration_seconds: number;
   modes_visited: string[]; participant_count: number; scripture_reference: string | null; created_at: string;
   media_provider: string | null; media_id: string | null; prayer_request_count: number; notes_count: number;
+  guide_id: string | null; started_at: string | null; ended_at: string | null; guide_summary: string | null;
+  lesson_id: string | null; continuity_notes: string | null; lesson_title: string | null;
+}
+
+// Family Gathering Session Summary — a derived read of the same completed-
+// session facts p2p_family_worship_history/session_events already hold;
+// never a second copy of message/note/prayer-request content (see
+// familyWorship.ts's GET /worship/history/:historyId comment).
+export interface WorshipSessionSummary {
+  id: string; familyId: string; sessionId: string;
+  durationSeconds: number; startedAt: string | null; endedAt: string | null; modesVisited: string[];
+  guide: { id: string; name: string; photoUrl: string | null } | null;
+  guideSummary: string | null;
+  continuityNotes: string | null;
+  study: { lessonId: string; lessonTitle: string; moduleTitle: string; curriculumTitle: string | null } | null;
+  participants: { userId: string; name: string; photoUrl: string | null }[];
+  participation: { participantCount: number; contributorCount: number };
+  scripture: { references: string[] };
+  media: { items: { provider: string; id: string }[] };
+  prayer: {
+    requestCount: number; contributorCount: number; scriptureLinkedCount: number; answeredCount: number;
+    answeredPrayers: { id: string; content: string }[];
+  };
+  share: { messageCount: number; contributorCount: number };
+  notes: { authorCount: number };
+  timeline: { type: string; data: Record<string, unknown> | null; at: string }[];
+}
+export function getWorshipSessionSummary(historyId: string): Promise<WorshipSessionSummary> {
+  return authedFetch(`/family/worship/history/${historyId}`);
+}
+export function updateGuideSummary(historyId: string, summary: string): Promise<{ ok: true }> {
+  return authedFetch(`/family/worship/history/${historyId}/guide-summary`, { method: "PUT", body: JSON.stringify({ summary }) });
+}
+export function updateContinuityNotes(historyId: string, notes: string): Promise<{ ok: true }> {
+  return authedFetch(`/family/worship/history/${historyId}/continuity-notes`, { method: "PUT", body: JSON.stringify({ notes }) });
+}
+
+// ── Stage 2: Discipleship Continuity ────────────────────────────────────
+// Both derived purely from existing p2p_family_worship_history/session_events
+// plus the existing curriculum tables (p2p_curriculums/modules/lessons) —
+// see familyWorship.ts's GET /worship/continue-study and /worship/journey.
+export interface ContinueStudyResponse {
+  previousGathering: {
+    historyId: string; createdAt: string; durationSeconds: number; participantCount: number;
+    scriptureReferences: string[]; guideSummary: string | null; continuityNotes: string | null;
+    lessonTitle: string | null; moduleTitle: string | null; curriculumTitle: string | null;
+  } | null;
+  continueStudy: {
+    curriculumTitle: string | null; previousLessonId: string; previousLessonTitle: string;
+    nextLessonId: string; nextLessonTitle: string; nextModuleTitle: string | null;
+  } | null;
+  discipleshipJourney: {
+    curriculumTitle: string | null;
+    lessons: { id: string; title: string; status: "done" | "current" | "upcoming" }[];
+  } | null;
+}
+export function getContinueStudy(familyId: string): Promise<ContinueStudyResponse> {
+  return authedFetch(`/family/worship/continue-study?familyId=${familyId}`);
+}
+export interface FamilyJourneyResponse {
+  gatheringCount: number;
+  lessonsCoveredCount: number;
+  scripture: { count: number; references: string[] };
+  media: { count: number; items: { provider: string; id: string }[] };
+  prayer: { count: number; answeredCount: number; recentAnswered: { id: string; content: string }[] };
+}
+export function getFamilyJourney(familyId: string): Promise<FamilyJourneyResponse> {
+  return authedFetch(`/family/worship/journey?familyId=${familyId}`);
 }
 
 // ── Shared / Private / Scripture-linked Notes ───────────────────────────────────

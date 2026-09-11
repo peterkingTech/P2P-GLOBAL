@@ -21,7 +21,7 @@ interface Props {
 export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, participantCount, showEnd, onEnd }: Props) {
   return (
     <View style={styles.row}>
-      <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Leave this screen">
+      <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Leave Family Gathering">
         <Ionicons name="chevron-down" size={24} color={colors.textPrimary} />
       </TouchableOpacity>
       <View style={styles.center}>

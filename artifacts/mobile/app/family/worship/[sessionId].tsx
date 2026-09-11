@@ -27,6 +27,7 @@ import MediaShelf from "@/components/family/MediaShelf";
 import ScripturePanel from "@/components/family/ScripturePanel";
 import PrayerSpacePanel from "@/components/family/PrayerSpacePanel";
 import NotesPanel from "@/components/family/NotesPanel";
+import LessonPicker from "@/components/family/LessonPicker";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 
 function showAlert(title: string, message: string) {
@@ -43,7 +44,7 @@ const MODES: { key: WorshipMode; label: string; icon: string }[] = [
   { key: "scripture", label: "Bible", icon: "📖" },
   { key: "prayer", label: "Prayer", icon: "🙏" },
   { key: "sharing", label: "Share", icon: "🎤" },
-  { key: "silent_prayer", label: "Mute", icon: "🤫" },
+  { key: "silent_prayer", label: "Mute", icon: "🔕" },
   { key: "teaching", label: "Study Workspace", icon: "📚" },
 ];
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
@@ -92,6 +93,8 @@ export default function FamilyWorshipScreen() {
   const [pendingChatContext, setPendingChatContext] = useState<MessageContext | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [notes, setNotes] = useState<WorshipNote[]>([]);
+  const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
+  const [attachedLesson, setAttachedLesson] = useState<{ id: string; title: string } | null>(null);
   const [mediaShelfOpen, setMediaShelfOpen] = useState(false);
   const [queue, setQueue] = useState<WorshipQueueItem[]>([]);
   const [isBehind, setIsBehind] = useState(false);
@@ -478,6 +481,33 @@ export default function FamilyWorshipScreen() {
     } catch (e: any) { showAlert("Couldn't share that passage", e.message ?? "Please try again."); }
   }
 
+  // Attaches an existing curriculum lesson to this Gathering — never writes
+  // p2p_lesson_progress or implies completion, purely a "this Gathering is
+  // about this lesson" link the Session Summary and next-Gathering
+  // continuity screens read back later (see migrations/129).
+  async function selectLesson(lessonId: string, lessonTitle: string) {
+    if (!session || !isHost) return;
+    try {
+      const updated = await updateWorshipState(session.id, { lessonId });
+      setSession(updated);
+      setAttachedLesson({ id: lessonId, title: lessonTitle });
+      setLessonPickerOpen(false);
+    } catch (e: any) { showAlert("Couldn't attach that lesson", e.message ?? "Please try again."); }
+  }
+
+  // Resolves a display title for a lesson attached by someone else (or
+  // still set from before this client last reloaded) — a single cheap
+  // lookup, only when the id we're showing is stale, never repeated per-tick.
+  useEffect(() => {
+    if (!session?.lessonId) { setAttachedLesson(null); return; }
+    if (attachedLesson?.id === session.lessonId) return;
+    let cancelled = false;
+    supabase.from("p2p_lessons").select("id,title").eq("id", session.lessonId).maybeSingle().then(({ data }) => {
+      if (!cancelled && data) setAttachedLesson({ id: data.id as string, title: data.title as string });
+    });
+    return () => { cancelled = true; };
+  }, [session?.lessonId, attachedLesson?.id]);
+
   async function addPrayer(content: string, visibility: "private" | "family", scriptureReference: WorshipScripture | null) {
     if (!session) return;
     try {
@@ -626,6 +656,14 @@ export default function FamilyWorshipScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
+          <View style={styles.lessonRow}>
+            <Text style={styles.lessonRowLabel}>Lesson: {attachedLesson?.title ?? "None selected"}</Text>
+            {isHost && (
+              <TouchableOpacity onPress={() => setLessonPickerOpen(true)} accessibilityRole="button" accessibilityLabel="Choose Lesson">
+                <Text style={styles.shelfLink}>Choose Lesson</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
           {(session.mediaId || canControl) && <SharedMedia {...sharedMediaProps} />}
         </View>
@@ -803,6 +841,12 @@ export default function FamilyWorshipScreen() {
         onAdd={addNote}
         onDelete={deleteNote}
       />
+
+      <LessonPicker
+        visible={lessonPickerOpen}
+        onClose={() => setLessonPickerOpen(false)}
+        onSelect={selectLesson}
+      />
     </View>
   );
 }
@@ -817,6 +861,8 @@ const styles = StyleSheet.create({
   panelLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   shelfLink: { color: colors.connection, ...type.caption, fontFamily: "Inter_600SemiBold" },
   silentHint: { color: colors.textSecondary, ...type.body, marginTop: spacing.xs },
+  lessonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm },
+  lessonRowLabel: { color: colors.textSecondary, ...type.caption, flex: 1, marginRight: spacing.sm },
 
   companionsLabel: { color: colors.textTertiary, ...type.label, marginBottom: spacing.sm },
   companionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

@@ -103,7 +103,7 @@ router.get("/:familyId", async (req, res) => {
   const { familyId } = req.params;
 
   const membership = await getMembership(userId, familyId);
-  if (!membership) return err(res, "You're not a member of this family", 403);
+  if (!membership) return err(res, "You're not a member of this Family Gathering", 403);
 
   const { data: family } = await db.from("p2p_families").select("*").eq("id", familyId).maybeSingle();
   if (!family) return err(res, "Family not found", 404);
@@ -121,12 +121,19 @@ router.get("/:familyId", async (req, res) => {
     ? await db.from("p2p_family_invitations").select("*").eq("family_id", familyId).eq("status", "pending")
     : { data: [] as Record<string, unknown>[] };
 
+  // At most one non-ended session per family (idx_p2p_family_worship_sessions_one_live_per_family),
+  // so this is a cheap, indexed lookup — lets the client say "Join Family Gathering" instead of
+  // "Start Gathering" when one is already in progress, without a second screen-load round trip.
+  const { data: activeSession } = await db
+    .from("p2p_family_worship_sessions").select("id").eq("family_id", familyId).neq("status", "ended").maybeSingle();
+
   return ok(res, {
     family: mapFamily(family as Record<string, unknown>),
     members: (members ?? []).map((m) => mapMember(m as Record<string, unknown>, profileById.get(m.user_id as string))),
     myRole: membership.role,
     canManage,
     pendingInvitations: pendingRosterInvitations ?? [],
+    activeSessionId: activeSession?.id ?? null,
   });
 });
 
@@ -280,7 +287,7 @@ router.get("/:familyId/prayer-requests", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { familyId } = req.params;
-  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
+  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this Family Gathering", 403);
 
   const { data, error } = await db
     .from("p2p_family_prayer_requests").select("*").eq("family_id", familyId)
@@ -307,7 +314,7 @@ router.post("/:familyId/prayer-requests", async (req, res) => {
     return err(res, "scriptureReference requires book, chapter, and translation");
   }
 
-  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
+  if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this Family Gathering", 403);
 
   const { data, error } = await db.from("p2p_family_prayer_requests").insert({
     family_id: familyId, user_id: userId, content: content.trim(), visibility: visibility === "private" ? "private" : "family",
@@ -332,7 +339,7 @@ router.put("/:familyId/prayer-requests/:id/status", async (req, res) => {
   if (!request) return err(res, "Prayer request not found", 404);
   if (status === "answered" && request.user_id !== userId) return err(res, "Only the person who shared this request can mark it answered", 403);
   if (status === "prayed") {
-    if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this family", 403);
+    if (!(await getMembership(userId, familyId))) return err(res, "You're not a member of this Family Gathering", 403);
   }
 
   const { error } = await db.from("p2p_family_prayer_requests").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
