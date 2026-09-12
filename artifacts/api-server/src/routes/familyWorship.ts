@@ -97,7 +97,16 @@ async function isActiveFamilyMember(familyId: string, userId: string): Promise<b
 // p2p_lesson_progress, matching routes/familyStudyPlans.ts's own plan
 // detail endpoint exactly.
 async function computePlanContinuity(familyId: string, planId: string) {
-  const { data: plan } = await db.from("p2p_family_study_plans").select("id,title").eq("id", planId).maybeSingle();
+  // SP-1 fix: active_study_plan_id is only ever set to a published plan
+  // (enforced at PUT /family/:familyId/study-source), but archiving a plan
+  // does not clear that pointer — so this lookup must re-check status here,
+  // the one place that reads the plan's content, rather than trusting the
+  // pointer was still valid. An archived (or otherwise non-published) active
+  // plan must not drive continuity; falling back to the same "nothing to
+  // continue" shape as "plan not found" is the correct, minimal behavior —
+  // study_source is left untouched, so the family stays in Custom Study Plan
+  // mode until a Shepherd/Co-Shepherd picks a new published active plan.
+  const { data: plan } = await db.from("p2p_family_study_plans").select("id,title").eq("id", planId).eq("status", "published").maybeSingle();
   if (!plan) return { continueStudy: null, discipleshipJourney: null };
 
   const { data: items } = await db.from("p2p_family_study_plan_items").select("lesson_id,order_index").eq("plan_id", planId).order("order_index", { ascending: true });
