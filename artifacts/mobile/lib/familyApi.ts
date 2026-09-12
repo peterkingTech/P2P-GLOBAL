@@ -27,7 +27,10 @@ export interface FamilyMember {
   id: string; familyId: string; userId: string; role: FamilyRole; status: string;
   joinedAt: string; name: string; avatarUrl: string | null; username: string | null;
 }
-export interface Family { id: string; name: string; shepherdId: string; createdAt: string }
+export interface Family {
+  id: string; name: string; shepherdId: string; createdAt: string;
+  studySource: "p2p_curriculum" | "custom_study_plan"; activeStudyPlanId: string | null;
+}
 export interface FamilyInvitation { id: string; family_id: string; invited_by: string; invited_user_id: string; role: FamilyRole; status: string; created_at: string }
 
 // A user may belong to several families at once — "My Family" represents
@@ -241,7 +244,7 @@ export interface ContinueStudyResponse {
     lessonTitle: string | null; moduleTitle: string | null; curriculumTitle: string | null;
   } | null;
   continueStudy: {
-    curriculumTitle: string | null; previousLessonId: string; previousLessonTitle: string;
+    curriculumTitle: string | null; previousLessonId: string | null; previousLessonTitle: string | null;
     nextLessonId: string; nextLessonTitle: string; nextModuleTitle: string | null;
   } | null;
   discipleshipJourney: {

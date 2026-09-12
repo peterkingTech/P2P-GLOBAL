@@ -20,11 +20,15 @@ import connectionsRouter from "./connections";
 import feedbackRouter from "./feedback";
 import churchesRouter from "./churches";
 import churchCallsRouter from "./churchCalls";
+import churchStudiesRouter from "./churchStudies";
+import churchStudyPlansRouter from "./churchStudyPlans";
 import contactRouter from "./contact";
 import officialMessagesRouter from "./officialMessages";
 import pushRouter from "./push";
 import familyRouter from "./family";
 import familyWorshipRouter from "./familyWorship";
+import familyStudiesRouter from "./familyStudies";
+import familyStudyPlansRouter from "./familyStudyPlans";
 import youtubeEmbedRouter from "./youtubeEmbed";
 
 const router: IRouter = Router();
@@ -50,11 +54,15 @@ router.use("/connections", connectionsRouter);
 router.use("/feedback", feedbackRouter);
 router.use(churchesRouter); // church + members + grove + cohorts + announcements (paths differ, handled internally)
 router.use(churchCallsRouter); // Church Calls — live under /churches/:churchId/calls and /churches/calls/:callId (paths differ, handled internally)
+router.use(churchStudiesRouter); // Custom Studies (Church) — live under /churches/:churchId/studies and /churches/studies/:studyId (paths differ, handled internally)
+router.use(churchStudyPlansRouter); // Custom Study Plans (Church) — ordered arrangements of EXISTING p2p_lessons, live under /churches/:churchId/study-plans and /churches/study-plans/:planId (paths differ, handled internally)
 router.use(contactRouter); // Contact P2P Global — peer messages + admin inbox (paths differ, handled internally)
 router.use(officialMessagesRouter); // Admin → User official "P2P Global" messages (paths differ, handled internally)
 router.use(pushRouter); // Push notification device-token registration (paths differ, handled internally)
 router.use("/family", familyRouter);
 router.use("/family", familyWorshipRouter); // worship sessions live under /family/worship/* (paths differ, handled internally)
+router.use("/family", familyStudiesRouter); // Custom Studies (Family) — live under /family/:familyId/studies and /family/studies/:studyId (paths differ, handled internally)
+router.use("/family", familyStudyPlansRouter); // Custom Study Plans (Family) — ordered arrangements of EXISTING p2p_lessons, live under /family/:familyId/study-plans, /family/study-plans/:planId, and /family/:familyId/study-source (paths differ, handled internally)
 router.use(youtubeEmbedRouter); // GET /youtube-embed — real HTTPS-origin page for the mobile YouTube WebView (see file for why)
 
 export default router;

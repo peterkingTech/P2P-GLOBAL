@@ -11,7 +11,15 @@ function err(res: import("express").Response, message: string, status = 400) {
 const MANAGED_ROLES = ["co_shepherd", "adult", "teen", "child"] as const;
 
 function mapFamily(row: Record<string, unknown>) {
-  return { id: row.id, name: row.name, shepherdId: row.shepherd_id, createdAt: row.created_at };
+  return {
+    id: row.id, name: row.name, shepherdId: row.shepherd_id, createdAt: row.created_at,
+    // Custom Study Plans — study_source/active_study_plan_id (migration 137)
+    // default to 'p2p_curriculum'/null for every existing family; only
+    // PUT /family/:familyId/study-source (routes/familyStudyPlans.ts) ever
+    // changes them.
+    studySource: row.study_source ?? "p2p_curriculum",
+    activeStudyPlanId: row.active_study_plan_id ?? null,
+  };
 }
 
 function mapMember(row: Record<string, unknown>, profile?: { full_name: string; photo_url: string | null; username: string | null }) {

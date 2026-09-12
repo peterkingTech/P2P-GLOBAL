@@ -83,6 +83,63 @@ async function isActiveFamilyMember(familyId: string, userId: string): Promise<b
   return !!data;
 }
 
+// Custom Study Plans (Stage 6) — when a family has switched its study
+// source to a Custom Study Plan, "continue-study"/"Discipleship Journey"
+// walk that plan's own ordered lesson list instead of raw curriculum
+// order_index. Returned shape is DELIBERATELY IDENTICAL to the
+// curriculum-sequence branch below (continueStudy.curriculumTitle is
+// reused to carry the plan's title, discipleshipJourney.lessons keeps the
+// same {id,title,status} shape) so the existing family screen
+// (app/family/[familyId].tsx) needs zero changes to render either source —
+// this is the "extend minimally" version of continuity integration, not a
+// second continuity system. "done" is still the family-memory signal
+// (p2p_family_worship_history.lesson_id coverage), never an individual's
+// p2p_lesson_progress, matching routes/familyStudyPlans.ts's own plan
+// detail endpoint exactly.
+async function computePlanContinuity(familyId: string, planId: string) {
+  const { data: plan } = await db.from("p2p_family_study_plans").select("id,title").eq("id", planId).maybeSingle();
+  if (!plan) return { continueStudy: null, discipleshipJourney: null };
+
+  const { data: items } = await db.from("p2p_family_study_plan_items").select("lesson_id,order_index").eq("plan_id", planId).order("order_index", { ascending: true });
+  const lessonIds = (items ?? []).map((i) => i.lesson_id as string);
+  if (lessonIds.length === 0) return { continueStudy: null, discipleshipJourney: null };
+
+  const { data: lessons } = await db.from("p2p_lessons").select("id,title").in("id", lessonIds);
+  const lessonTitleById = new Map((lessons ?? []).map((l) => [l.id as string, l.title as string]));
+
+  const { data: coveredRows } = await db.from("p2p_family_worship_history").select("lesson_id").eq("family_id", familyId).in("lesson_id", lessonIds);
+  const coveredIds = new Set((coveredRows ?? []).map((r) => r.lesson_id as string));
+
+  const orderedIds = (items ?? []).map((i) => i.lesson_id as string);
+  let currentIndex = orderedIds.findIndex((id) => !coveredIds.has(id));
+  if (currentIndex === -1) currentIndex = orderedIds.length; // whole plan already covered
+
+  const discipleshipJourney = {
+    curriculumTitle: plan.title as string,
+    lessons: orderedIds.map((id, i) => ({
+      id, title: lessonTitleById.get(id) ?? "(lesson unavailable)",
+      status: (coveredIds.has(id) ? "done" : i === currentIndex ? "current" : "upcoming") as "done" | "current" | "upcoming",
+    })),
+  };
+
+  if (currentIndex >= orderedIds.length) {
+    // Every lesson in the plan has been covered — nothing left to
+    // "continue" to, but the Journey list above still shows the full
+    // completed sequence.
+    return { continueStudy: null, discipleshipJourney };
+  }
+
+  const nextId = orderedIds[currentIndex];
+  const prevId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
+  const continueStudy = {
+    curriculumTitle: plan.title as string,
+    previousLessonId: prevId, previousLessonTitle: prevId ? lessonTitleById.get(prevId) ?? null : null,
+    nextLessonId: nextId, nextLessonTitle: lessonTitleById.get(nextId) ?? "(lesson unavailable)",
+    nextModuleTitle: null,
+  };
+  return { continueStudy, discipleshipJourney };
+}
+
 // Session Summary's timeline/Scripture-list/media-list source — one row per
 // real, already-authorized state transition (never per-tick; every call
 // site below is a write the handler had to check Guide/host authorization
@@ -796,20 +853,47 @@ router.get("/worship/continue-study", async (req, res) => {
 
   const { data: lastHistory } = await db.from("p2p_family_worship_history").select("*")
     .eq("family_id", familyId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+  // Custom Study Plans (Stage 6) — a plan's "current lesson" is well-defined
+  // even before this family's very first Gathering (it's simply the plan's
+  // first lesson), so this branch runs independently of lastHistory/never
+  // early-returns on "no Gathering yet" the way the curriculum branch below
+  // does. previousGathering (the "Last Gathering" card) is unrelated to
+  // study source and still reflects the real last Gathering either way.
+  const { data: family } = await db.from("p2p_families").select("study_source,active_study_plan_id").eq("id", familyId).maybeSingle();
+  const usingPlan = family?.study_source === "custom_study_plan" && !!family.active_study_plan_id;
+
+  let previousGathering: {
+    historyId: unknown; createdAt: unknown; durationSeconds: unknown; participantCount: unknown;
+    scriptureReferences: string[]; guideSummary: unknown; continuityNotes: unknown;
+    lessonTitle: string | null; moduleTitle: string | null; curriculumTitle: string | null;
+  } | null = null;
+
+  if (lastHistory) {
+    const { data: scriptureEvents } = await db.from("p2p_family_worship_session_events")
+      .select("event_data").eq("session_id", lastHistory.session_id as string).eq("event_type", "scripture_changed");
+    const scriptureReferences = Array.from(new Set(
+      (scriptureEvents ?? []).map((e) => (e.event_data as Record<string, unknown> | null)?.reference as string | undefined).filter(Boolean)
+    )) as string[];
+
+    previousGathering = {
+      historyId: lastHistory.id, createdAt: lastHistory.created_at, durationSeconds: lastHistory.duration_seconds,
+      participantCount: lastHistory.participant_count, scriptureReferences,
+      guideSummary: lastHistory.guide_summary ?? null, continuityNotes: lastHistory.continuity_notes ?? null,
+      lessonTitle: null, moduleTitle: null, curriculumTitle: null,
+    };
+  }
+
+  if (usingPlan) {
+    const { continueStudy, discipleshipJourney } = await computePlanContinuity(familyId, family!.active_study_plan_id as string);
+    if (previousGathering && lastHistory!.lesson_id) {
+      const { data: lessonRow } = await db.from("p2p_lessons").select("title").eq("id", lastHistory!.lesson_id as string).maybeSingle();
+      previousGathering.lessonTitle = lessonRow?.title ?? null;
+    }
+    return ok(res, { previousGathering, continueStudy, discipleshipJourney });
+  }
+
   if (!lastHistory) return ok(res, { previousGathering: null, continueStudy: null, discipleshipJourney: null });
-
-  const { data: scriptureEvents } = await db.from("p2p_family_worship_session_events")
-    .select("event_data").eq("session_id", lastHistory.session_id as string).eq("event_type", "scripture_changed");
-  const scriptureReferences = Array.from(new Set(
-    (scriptureEvents ?? []).map((e) => (e.event_data as Record<string, unknown> | null)?.reference as string | undefined).filter(Boolean)
-  ));
-
-  const previousGathering = {
-    historyId: lastHistory.id, createdAt: lastHistory.created_at, durationSeconds: lastHistory.duration_seconds,
-    participantCount: lastHistory.participant_count, scriptureReferences,
-    guideSummary: lastHistory.guide_summary ?? null, continuityNotes: lastHistory.continuity_notes ?? null,
-    lessonTitle: null as string | null, moduleTitle: null as string | null, curriculumTitle: null as string | null,
-  };
 
   let continueStudy: Record<string, unknown> | null = null;
   let discipleshipJourney: Record<string, unknown> | null = null;

@@ -157,6 +157,14 @@ export default function FamilyDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
+              onPress={() => router.push({ pathname: "/family/studies", params: { familyId } } as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Study"
+            >
+              <Ionicons name="book-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
               onPress={() => router.push({ pathname: "/family/history", params: { familyId } } as any)}
               accessibilityRole="button"
               accessibilityLabel="Gathering History"

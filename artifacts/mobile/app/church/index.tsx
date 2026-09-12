@@ -141,6 +141,7 @@ export default function ChurchHomeScreen() {
 
           <View style={{ gap: 10, marginTop: 16 }}>
             <NavRow icon="call-outline" label="Calls" onPress={() => router.push("/church/calls" as any)} />
+            <NavRow icon="book-outline" label="Study" onPress={() => router.push("/church/studies" as any)} />
             <NavRow icon="leaf-outline" label="Grove Dashboard" onPress={() => router.push("/church/grove" as any)} />
             <NavRow icon="people-outline" label="Members" onPress={() => router.push("/church/members" as any)} />
             {isChurchCreator && (
@@ -156,6 +157,11 @@ export default function ChurchHomeScreen() {
           <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/calls" as any)}>
             <Text style={styles.attentionTitle}>📞 Church Calls</Text>
             <Text style={styles.attentionLink}>View Live &amp; Recent Calls →</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/studies" as any)}>
+            <Text style={styles.attentionTitle}>📖 Study</Text>
+            <Text style={styles.attentionLink}>P2P Curriculum & Church Studies →</Text>
           </TouchableOpacity>
 
           <Text style={styles.sectionTitle}>My Cohorts</Text>
