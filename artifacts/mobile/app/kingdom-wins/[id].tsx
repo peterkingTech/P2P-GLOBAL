@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import {
   getKingdomWin, reactToKingdomWin, unreactToKingdomWin,
-  KINGDOM_CATEGORY_LABELS, type KingdomWin, type KingdomReactionType,
+  KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomWin, type KingdomReactionType,
 } from "@/lib/kingdomWinsApi";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import KingdomWinVideoPlayer from "@/components/KingdomWinVideoPlayer";
@@ -99,7 +99,7 @@ export default function KingdomWinDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerType}>{entry.entryType === "testimony" ? "Testimony" : "Kingdom Win"}</Text>
+        <Text style={styles.headerType}>{entry.entryType === "testimony" ? "Testimony" : entry.entryType === "p2p_impact" ? "P2P Impact" : "Kingdom Win"}</Text>
         {!isOwn ? (
           <TouchableOpacity onPress={handleReport} accessibilityLabel="Report" accessibilityRole="button" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="flag-outline" size={18} color={c.textMuted} />
@@ -119,6 +119,25 @@ export default function KingdomWinDetailScreen() {
         {entry.mediaType === "photo" && entry.mediaPath && <View style={{ marginTop: 14 }}><SignedPhotoView bucket="kingdom-wins-media" path={entry.mediaPath} /></View>}
 
         <Text style={styles.body}>{entry.body}</Text>
+        {entry.impactThemes.length > 0 && (
+          <View style={styles.themesRow}>
+            {entry.impactThemes.map((t) => (
+              <View key={t} style={styles.themeChip}><Text style={styles.themeChipText}>{IMPACT_THEME_LABELS[t]}</Text></View>
+            ))}
+          </View>
+        )}
+
+        {isOwn && entry.status !== "published" && (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusBoxText}>
+              {entry.status === "draft" && "This is a draft — only you can see it."}
+              {entry.status === "submitted" && "Submitted for review — a team member will look at this before it's shared."}
+              {entry.status === "rejected" && `This wasn't published.${entry.moderationNote ? ` ${entry.moderationNote}` : ""}`}
+              {entry.status === "archived" && "This story is archived and no longer publicly visible."}
+            </Text>
+          </View>
+        )}
+
         {!!entry.lessonLearned && (
           <View style={styles.lessonBox}>
             <Text style={styles.lessonLabel}>What I learned</Text>
@@ -191,5 +210,10 @@ function makeStyles(c: AppColors) {
     reactionTextActive: { color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     connectionNote: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16 },
     connectionNoteText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic" },
+    themesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
+    themeChip: { backgroundColor: "rgba(94,114,228,0.1)", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+    themeChipText: { fontSize: 11, color: "#5e72e4", fontFamily: "Inter_600SemiBold" },
+    statusBox: { backgroundColor: "rgba(224,164,65,0.12)", borderRadius: 10, padding: 12, marginTop: 14 },
+    statusBoxText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", lineHeight: 17 },
   });
 }

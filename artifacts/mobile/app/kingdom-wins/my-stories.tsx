@@ -7,6 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getMyKingdomWins, updateKingdomWin, deleteKingdomWin, KINGDOM_CATEGORY_LABELS, type KingdomWin } from "@/lib/kingdomWinsApi";
 
+const ENTRY_TYPE_LABELS: Record<KingdomWin["entryType"], string> = { kingdom_win: "Kingdom Win", testimony: "Testimony", p2p_impact: "P2P Impact" };
+
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -26,8 +28,31 @@ export default function MyKingdomWinsScreen() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function handlePublish(id: string) {
-    try { await updateKingdomWin(id, { status: "published" }); load(); }
+  async function handlePublish(entry: KingdomWin) {
+    if (entry.entryType === "p2p_impact") {
+      // P2P Impact never self-publishes — it goes through review, and
+      // needs its own explicit consent confirmation first (§33), so it
+      // gets its own confirm step rather than reusing the plain publish flow.
+      if (Platform.OS === "web") {
+        if (!window.confirm("I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community.")) return;
+        try { await updateKingdomWin(entry.id, { status: "submitted", consentConfirmed: true }); load(); }
+        catch (e: any) { showAlert("Couldn't submit", e.message ?? "Please try again."); }
+        return;
+      }
+      Alert.alert(
+        "Confirm & submit for review",
+        "I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Confirm & Submit", onPress: async () => {
+            try { await updateKingdomWin(entry.id, { status: "submitted", consentConfirmed: true }); load(); }
+            catch (e: any) { showAlert("Couldn't submit", e.message ?? "Please try again."); }
+          } },
+        ]
+      );
+      return;
+    }
+    try { await updateKingdomWin(entry.id, { status: "published" }); load(); }
     catch (e: any) { showAlert("Couldn't publish", e.message ?? "Please try again."); }
   }
   function handleDelete(id: string) {
@@ -37,9 +62,10 @@ export default function MyKingdomWinsScreen() {
     ]);
   }
 
-  const drafts = entries.filter((e) => e.status === "draft" || e.status === "submitted");
+  const drafts = entries.filter((e) => e.status === "draft");
+  const pending = entries.filter((e) => e.status === "submitted");
   const published = entries.filter((e) => e.status === "published");
-  const other = entries.filter((e) => e.status === "rejected" || e.status === "removed");
+  const other = entries.filter((e) => e.status === "rejected" || e.status === "removed" || e.status === "archived");
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
@@ -65,8 +91,8 @@ export default function MyKingdomWinsScreen() {
                 <Text style={styles.cardMeta}>{KINGDOM_CATEGORY_LABELS[e.category]} · {e.status}</Text>
               </TouchableOpacity>
               <View style={styles.cardActions}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handlePublish(e.id)}>
-                  <Text style={styles.actionBtnText}>Publish</Text>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handlePublish(e)}>
+                  <Text style={styles.actionBtnText}>{e.entryType === "p2p_impact" ? "Submit for Review" : "Publish"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDelete(e.id)}>
                   <Text style={styles.actionBtnDangerText}>Delete</Text>
@@ -74,6 +100,18 @@ export default function MyKingdomWinsScreen() {
               </View>
             </View>
           ))}
+
+          {pending.length > 0 && (
+            <>
+              <Text style={styles.sectionHeading}>Pending Review</Text>
+              {pending.map((e) => (
+                <View key={e.id} style={styles.card}>
+                  <Text style={styles.cardTitle}>{e.title}</Text>
+                  <Text style={styles.cardMeta}>{ENTRY_TYPE_LABELS[e.entryType]} · Awaiting moderator review</Text>
+                </View>
+              ))}
+            </>
+          )}
 
           <Text style={styles.sectionHeading}>Published</Text>
           {published.length === 0 ? <Text style={styles.emptyText}>Nothing published yet.</Text> : published.map((e) => (
@@ -85,7 +123,7 @@ export default function MyKingdomWinsScreen() {
 
           {other.length > 0 && (
             <>
-              <Text style={styles.sectionHeading}>Removed / Rejected</Text>
+              <Text style={styles.sectionHeading}>Archived / Removed / Rejected</Text>
               {other.map((e) => (
                 <View key={e.id} style={styles.card}>
                   <Text style={styles.cardTitle}>{e.title}</Text>

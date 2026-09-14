@@ -55,9 +55,11 @@ export default function KingdomWinsScreen() {
       <Text style={styles.subtitle}>Look what God has done.</Text>
 
       <View style={styles.tabRow}>
-        {(["all", "kingdom_win", "testimony"] as const).map((f) => (
+        {(["all", "kingdom_win", "p2p_impact", "testimony"] as const).map((f) => (
           <TouchableOpacity key={f} style={[styles.tab, filter === f && styles.tabActive]} onPress={() => setFilter(f)}>
-            <Text style={[styles.tabText, filter === f && styles.tabTextActive]}>{f === "all" ? "All" : f === "kingdom_win" ? "Kingdom Wins" : "Testimonies"}</Text>
+            <Text style={[styles.tabText, filter === f && styles.tabTextActive]}>
+              {f === "all" ? "All" : f === "kingdom_win" ? "God's Faithfulness" : f === "p2p_impact" ? "P2P Impact" : "Testimonies"}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -86,8 +88,8 @@ export default function KingdomWinsScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.card} onPress={() => router.push(`/kingdom-wins/${item.id}` as any)} activeOpacity={0.85}>
               <View style={styles.cardHeader}>
-                <View style={[styles.entryBadge, item.entryType === "testimony" && styles.entryBadgeTestimony]}>
-                  <Text style={styles.entryBadgeText}>{item.entryType === "testimony" ? "Testimony" : "Kingdom Win"}</Text>
+                <View style={[styles.entryBadge, item.entryType === "testimony" && styles.entryBadgeTestimony, item.entryType === "p2p_impact" && styles.entryBadgeImpact]}>
+                  <Text style={styles.entryBadgeText}>{item.entryType === "testimony" ? "Testimony" : item.entryType === "p2p_impact" ? "P2P Impact" : "Kingdom Win"}</Text>
                 </View>
                 <Text style={styles.categoryText}>{KINGDOM_CATEGORY_LABELS[item.category]}</Text>
                 <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
@@ -132,6 +134,7 @@ function makeStyles(c: AppColors) {
     cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
     entryBadge: { backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
     entryBadgeTestimony: { backgroundColor: "rgba(224,164,65,0.15)" },
+    entryBadgeImpact: { backgroundColor: "rgba(94,114,228,0.15)" },
     entryBadgeText: { fontSize: 10, color: c.accentGreen, fontFamily: "Inter_700Bold" },
     categoryText: { flex: 1, fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium" },
     timeText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
