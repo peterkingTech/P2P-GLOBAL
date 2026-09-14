@@ -32,10 +32,14 @@ export default function PrayWithMeScreen() {
   // Mission" entry point) pre-fills the focus and links the created
   // request back to that mission (p2p_prayer_coord_requests.mission_id).
   const { missionId, missionTitle } = useLocalSearchParams<{ missionId?: string; missionTitle?: string }>();
+  // Pray the Word Stage 7 — a Scripture flow's "Pray With Me" button
+  // routes here with ?scriptureRef=&topicTitle= rather than a second
+  // peer-invitation system; this only pre-fills existing fields.
+  const { scriptureRef, topicTitle } = useLocalSearchParams<{ scriptureRef?: string; topicTitle?: string }>();
 
-  const [title, setTitle] = useState(missionTitle ? `Pray for ${missionTitle}` : "");
+  const [title, setTitle] = useState(missionTitle ? `Pray for ${missionTitle}` : topicTitle ? `Pray for ${topicTitle}` : "");
   const [prayerPoint, setPrayerPoint] = useState("");
-  const [scripture, setScripture] = useState("");
+  const [scripture, setScripture] = useState(scriptureRef ?? "");
   const [mode, setMode] = useState<PrayerMode>("both");
   const [visibility, setVisibility] = useState<PrayerRequestVisibility>("open");
   const [isAnonymous, setIsAnonymous] = useState(false);

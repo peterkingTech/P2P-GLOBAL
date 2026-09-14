@@ -6,6 +6,10 @@ import progressRouter from "./progress";
 import prayerRouter from "./prayer";
 import prayerCoordinationRouter from "./prayerCoordination";
 import prayerTestimoniesRouter from "./prayerTestimonies";
+import prayerTopicsRouter from "./prayerTopics";
+import prayerPathsRouter from "./prayerPaths";
+import prayerJournalRouter from "./prayerJournal";
+import prayerLibraryRouter from "./prayerLibrary";
 import sessionsRouter from "./sessions";
 import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
@@ -42,6 +46,10 @@ router.use("/progress", progressRouter);
 router.use("/prayers", prayerRouter); // legacy, unauthenticated nation-prayer wall (Prayer 2.0 Stage 0 forensic finding — left untouched, not extended)
 router.use("/prayer", prayerCoordinationRouter); // Prayer 2.0 — peer-to-peer prayer coordination (requests/availability/invitations/gatherings/participants, paths differ, handled internally)
 router.use("/prayer", prayerTestimoniesRouter); // Prayer 2.0 Stage 6 — testimonies live under /prayer/testimonies/* (paths differ, handled internally)
+router.use("/prayer", prayerTopicsRouter); // "Pray the Word" Stage 1 — topics/scripture references live under /prayer/topics/* and /prayer/admin/* (paths differ, handled internally)
+router.use("/prayer", prayerPathsRouter); // "Pray the Word" Stage 3 — Prayer Paths live under /prayer/paths/* and /prayer/admin/* (paths differ, handled internally)
+router.use("/prayer", prayerJournalRouter); // "Pray the Word" Stage 4 — Journal 2.0 additive API, live under /prayer/journal/* (paths differ, handled internally)
+router.use("/prayer", prayerLibraryRouter); // "Pray the Word" Stage 5 — Personal Prayer Library (saved items, recent, answered), live under /prayer/saved-*, /prayer/library/*, /prayer/recent, /prayer/activity
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);

@@ -33,6 +33,7 @@ import {
   getAvailableNow, getMyAvailability, getMyGatherings, getMyInvitations, createInvitation,
   type AvailableNowMatch, type PrayerGathering, type PrayerInvitation,
 } from "@/lib/prayerCoordinationApi";
+import { savePrayer, getSavedPrayers } from "@/lib/prayerLibraryApi";
 import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 
 function showAlert(title: string, message: string) {
@@ -281,6 +282,7 @@ export default function PrayerTab() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activePrayer, setActivePrayer] = useState<LibraryPrayer | null>(null);
   const [confession, setConfession] = useState<ConfessionSummary | null>(null);
+  const [savedPrayerIds, setSavedPrayerIds] = useState<Set<string>>(new Set());
 
   // ── Prayer 2.0 dashboard state ──
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -316,7 +318,23 @@ export default function PrayerTab() {
     setJournalPreview((journal ?? []) as JournalEntryPreview[]);
     setLibrary((lib ?? []) as LibraryPrayer[]);
     setConfession((conf as ConfessionSummary) ?? null);
+    try {
+      const saved = await getSavedPrayers();
+      setSavedPrayerIds(new Set(saved.map((s) => s.prayer?.id).filter((id): id is string => !!id)));
+    } catch {
+      // "Pray the Word" Stage 5 saved-prayers lookup is best-effort here —
+      // never blocks the rest of this screen's existing data from loading.
+    }
   }, [profile?.id]);
+
+  async function handleSaveLibraryPrayer(prayerLibraryId: string) {
+    try {
+      await savePrayer(prayerLibraryId);
+      setSavedPrayerIds((prev) => new Set(prev).add(prayerLibraryId));
+    } catch (e: any) {
+      showAlert("Couldn't save this prayer", e.message ?? "Please try again.");
+    }
+  }
 
   useEffect(() => { loadExtras(); }, [loadExtras]);
 
@@ -472,6 +490,35 @@ export default function PrayerTab() {
             <Text style={styles.headerTitle}>{t("prayer.title")}</Text>
             <Text style={styles.headerSub}>{t("prayer.subtitle")}</Text>
           </View>
+        </View>
+
+        {/* ── "Pray the Word" — Scripture-centered prayer discovery ── */}
+        <View style={styles.sectionBlock}>
+          <TouchableOpacity style={styles.ptwHero} onPress={() => router.push("/prayer/pray-the-word" as any)} activeOpacity={0.9}>
+            <Ionicons name="sparkles-outline" size={22} color={colors.upperRoomAmber} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ptwHeroTitle}>Pray the Word</Text>
+              <Text style={styles.ptwHeroSub}>Turn Scripture into prayer.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.upperRoomAmber} />
+          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+            <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/discover" as any)}>
+              <Ionicons name="compass-outline" size={20} color={colors.upperRoomAmber} />
+              <Text style={styles.dashActionTitle}>What Are You Carrying?</Text>
+              <Text style={styles.dashActionSub}>Find Scripture for today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/paths" as any)}>
+              <Ionicons name="trail-sign-outline" size={20} color={colors.upperRoomAmber} />
+              <Text style={styles.dashActionTitle}>Prayer Paths</Text>
+              <Text style={styles.dashActionSub}>Guided Scripture journeys</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[styles.dashActionCard, { marginTop: 10 }]} onPress={() => router.push("/prayer/library" as any)}>
+            <Ionicons name="library-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>My Prayer Library</Text>
+            <Text style={styles.dashActionSub}>Saved Scriptures, paths, and answered prayers</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Prayer 2.0: Pray Now ── */}
@@ -805,8 +852,8 @@ export default function PrayerTab() {
                 <TouchableOpacity style={styles.prayThisBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>
                   <Text style={styles.prayThisBtnText}>Pray This</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveMineBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>
-                  <Text style={styles.saveMineBtnText}>Save to My Prayers</Text>
+                <TouchableOpacity style={styles.saveMineBtn} onPress={() => activePrayer && handleSaveLibraryPrayer(activePrayer.id)} disabled={!!activePrayer && savedPrayerIds.has(activePrayer.id)}>
+                  <Text style={styles.saveMineBtnText}>{activePrayer && savedPrayerIds.has(activePrayer.id) ? "Saved" : "Save to My Prayers"}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -903,6 +950,12 @@ function makeStyles(c: AppColors) {
   },
   dashActionTitle: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
   dashActionSub: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
+  ptwHero: {
+    flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(224,164,65,0.10)",
+    borderWidth: 1, borderColor: "rgba(224,164,65,0.35)", borderRadius: 16, padding: 16,
+  },
+  ptwHeroTitle: { fontSize: 16, color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
+  ptwHeroSub: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
   inviteRow: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.upperRoomCard, borderWidth: 1,
     borderColor: c.upperRoomBorder, borderRadius: 12, padding: 12, marginTop: 8,

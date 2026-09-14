@@ -136,6 +136,41 @@ export async function lookupVerseForAdmin(
   }
 }
 
+export interface PassageResult {
+  translationCode: string;
+  translationName: string;
+  book: string;
+  chapter: number;
+  verses: { verse: number; text: string }[];
+}
+
+// "Pray the Word" (Prayer Stage 2) — a Scripture reference can span a verse
+// RANGE (start/end), which GET /bible/verse (single-verse only) can't
+// resolve. Reuses the existing POST /bible/passage endpoint added for P2P
+// Together Phase 6 rather than adding a second Bible provider.
+export async function fetchPassage(
+  book: string,
+  chapter: number,
+  startVerse: number,
+  endVerse: number,
+  translationCode: string
+): Promise<PassageResult | null> {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return null;
+  try {
+    const res = await fetch(`${apiUrl}/bible/passage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ book, chapter, startVerse, endVerse, translationCode }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as PassageResult;
+  } catch {
+    return null;
+  }
+}
+
 export interface BibleTranslationOption {
   translation_code: string;
   provider: string;
