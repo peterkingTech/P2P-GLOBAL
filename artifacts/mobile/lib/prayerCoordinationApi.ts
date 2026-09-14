@@ -36,12 +36,15 @@ export interface PrayerCoordRequest {
   progressNote: string | null; progressNoteType: ProgressNoteType | null;
   progressUpdatedAt: string | null; answerNote: string | null;
   missionId: string | null;
+  // Missions Stage 4 — explicit, nullable pointer into the NEW mission
+  // domain (never a duplicate of the story/field row).
+  missionStoryId: string | null; missionFieldId: string | null;
 }
 
 export function createPrayerRequest(input: {
   title: string; prayerPoint: string; category?: string | null; scriptureReference?: unknown;
   isAnonymous?: boolean; visibility?: PrayerRequestVisibility; prayerMode?: PrayerMode; expiresAt?: string | null;
-  missionId?: string | null;
+  missionId?: string | null; missionStoryId?: string | null; missionFieldId?: string | null;
 }): Promise<PrayerCoordRequest> {
   return authedFetch("/prayer/requests", { method: "POST", body: JSON.stringify(input) });
 }

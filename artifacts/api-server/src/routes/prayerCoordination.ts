@@ -36,6 +36,10 @@ function mapRequest(row: Record<string, unknown>) {
     progressNote: row.progress_note ?? null, progressNoteType: row.progress_note_type ?? null,
     progressUpdatedAt: row.progress_updated_at ?? null, answerNote: row.answer_note ?? null,
     missionId: row.mission_id ?? null,
+    // Missions Stage 4 — explicit, nullable reference into the NEW mission
+    // domain (migration 147), distinct from the legacy mission_id above.
+    // Never a duplicate of the story/field row, just a pointer.
+    missionStoryId: row.mission_story_id ?? null, missionFieldId: row.mission_field_id ?? null,
   };
 }
 function mapCommitment(row: Record<string, unknown>) {
@@ -118,9 +122,10 @@ async function gatheringTimezones(row: Record<string, unknown>) {
 router.post("/requests", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
-  const { title, prayerPoint, category, scriptureReference, isAnonymous, visibility, prayerMode, expiresAt, missionId } = req.body as {
+  const { title, prayerPoint, category, scriptureReference, isAnonymous, visibility, prayerMode, expiresAt, missionId, missionStoryId, missionFieldId } = req.body as {
     title?: string; prayerPoint?: string; category?: string | null; scriptureReference?: unknown;
     isAnonymous?: boolean; visibility?: string; prayerMode?: string; expiresAt?: string | null; missionId?: string | null;
+    missionStoryId?: string | null; missionFieldId?: string | null;
   };
   if (!title?.trim()) return err(res, "title is required");
   if (!prayerPoint?.trim()) return err(res, "prayerPoint is required");
@@ -130,12 +135,21 @@ router.post("/requests", async (req, res) => {
     const { data: mission } = await db.from("p2p_missions").select("id").eq("id", missionId).maybeSingle();
     if (!mission) return err(res, "That mission could not be found", 404);
   }
+  if (missionStoryId) {
+    const { data: story } = await db.from("p2p_mission_stories").select("id").eq("id", missionStoryId).eq("status", "published").maybeSingle();
+    if (!story) return err(res, "That mission story could not be found", 404);
+  }
+  if (missionFieldId) {
+    const { data: field } = await db.from("p2p_mission_fields").select("id").eq("id", missionFieldId).eq("status", "published").maybeSingle();
+    if (!field) return err(res, "That mission field could not be found", 404);
+  }
 
   const { data, error } = await db.from("p2p_prayer_coord_requests").insert({
     user_id: userId, title: title.trim(), prayer_point: prayerPoint.trim(),
     category: category?.trim() || null, scripture_reference: scriptureReference ?? null,
     is_anonymous: !!isAnonymous, visibility: visibility ?? "open", prayer_mode: prayerMode ?? "both",
     expires_at: expiresAt ?? null, mission_id: missionId ?? null,
+    mission_story_id: missionStoryId ?? null, mission_field_id: missionFieldId ?? null,
   }).select().single();
   if (error || !data) return err(res, error?.message ?? "Failed to create the prayer request", 500);
   return ok(res, mapRequest(data as Record<string, unknown>));

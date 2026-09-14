@@ -36,6 +36,10 @@ export default function PrayWithMeScreen() {
   // routes here with ?scriptureRef=&topicTitle= rather than a second
   // peer-invitation system; this only pre-fills existing fields.
   const { scriptureRef, topicTitle } = useLocalSearchParams<{ scriptureRef?: string; topicTitle?: string }>();
+  // Missions Stage 4 — the same explicit-reference pattern as missionId
+  // above, for the NEW mission domain (migration 147). Passed from a
+  // Mission Story/Field's "Pray With Me" button.
+  const { missionStoryId, missionFieldId } = useLocalSearchParams<{ missionStoryId?: string; missionFieldId?: string }>();
 
   const [title, setTitle] = useState(missionTitle ? `Pray for ${missionTitle}` : topicTitle ? `Pray for ${topicTitle}` : "");
   const [prayerPoint, setPrayerPoint] = useState("");
@@ -53,6 +57,7 @@ export default function PrayWithMeScreen() {
         title: title.trim(), prayerPoint: prayerPoint.trim(),
         scriptureReference: scripture.trim() ? { reference: scripture.trim() } : null,
         prayerMode: mode, visibility, isAnonymous, missionId: missionId ?? null,
+        missionStoryId: missionStoryId ?? null, missionFieldId: missionFieldId ?? null,
       });
       router.back();
     } catch (e: any) {
