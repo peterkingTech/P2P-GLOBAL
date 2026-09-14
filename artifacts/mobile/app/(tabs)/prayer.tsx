@@ -29,6 +29,16 @@ import {
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import {
+  getAvailableNow, getMyAvailability, getMyGatherings, getMyInvitations, createInvitation,
+  type AvailableNowMatch, type PrayerGathering, type PrayerInvitation,
+} from "@/lib/prayerCoordinationApi";
+import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
 
 interface LibraryPrayer {
   id: string;
@@ -272,6 +282,16 @@ export default function PrayerTab() {
   const [activePrayer, setActivePrayer] = useState<LibraryPrayer | null>(null);
   const [confession, setConfession] = useState<ConfessionSummary | null>(null);
 
+  // ── Prayer 2.0 dashboard state ──
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [prayNowMatches, setPrayNowMatches] = useState<AvailableNowMatch[]>([]);
+  const [availabilityCount, setAvailabilityCount] = useState(0);
+  const [pendingInvitations, setPendingInvitations] = useState<PrayerInvitation[]>([]);
+  const [upcomingGatherings, setUpcomingGatherings] = useState<PrayerGathering[]>([]);
+  const [requestingMatch, setRequestingMatch] = useState<AvailableNowMatch | null>(null);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [sendingRequest, setSendingRequest] = useState(false);
+
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { isTablet } = useLayout();
@@ -299,6 +319,53 @@ export default function PrayerTab() {
   }, [profile?.id]);
 
   useEffect(() => { loadExtras(); }, [loadExtras]);
+
+  const loadDashboard = useCallback(async () => {
+    if (!profile?.id) return;
+    setDashboardLoading(true);
+    try {
+      const [matches, availability, invitations, gatherings] = await Promise.all([
+        getAvailableNow(), getMyAvailability(), getMyInvitations(), getMyGatherings(),
+      ]);
+      setPrayNowMatches(matches);
+      setAvailabilityCount(availability.filter((a) => a.isActive).length);
+      setPendingInvitations(invitations.filter((i) => i.status === "pending" && i.recipientId === profile.id));
+      setUpcomingGatherings(
+        gatherings
+          .filter((g) => g.status === "scheduled" && new Date(g.scheduledEndAt) > new Date())
+          .sort((a, b) => new Date(a.scheduledStartAt).getTime() - new Date(b.scheduledStartAt).getTime())
+      );
+    } catch {
+      // Silent — the dashboard degrades to empty states rather than
+      // blocking the rest of the Prayer tab (journal/library/wall) from loading.
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+
+  async function handleSendPrayerRequest() {
+    if (!requestingMatch) return;
+    setSendingRequest(true);
+    try {
+      await createInvitation({
+        recipientId: requestingMatch.userId,
+        proposedStartAt: new Date().toISOString(),
+        proposedEndAt: requestingMatch.availableUntil,
+        message: requestMessage.trim() || undefined,
+      });
+      setRequestingMatch(null);
+      setRequestMessage("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert("Invitation sent", `${requestingMatch.displayName} will be notified.`);
+      await loadDashboard();
+    } catch (e: any) {
+      showAlert("Couldn't send this invitation", e.message ?? "Please try again.");
+    } finally {
+      setSendingRequest(false);
+    }
+  }
 
   const visiblePosts = posts.filter((p) =>
     section === "private" ? p.visibility === "peer_group" : p.visibility === "global"
@@ -405,6 +472,107 @@ export default function PrayerTab() {
             <Text style={styles.headerTitle}>{t("prayer.title")}</Text>
             <Text style={styles.headerSub}>{t("prayer.subtitle")}</Text>
           </View>
+        </View>
+
+        {/* ── Prayer 2.0: Pray Now ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>🙏 Pray Now</Text>
+          {dashboardLoading ? (
+            <View style={styles.centerFillSmall}><ActivityIndicator color={colors.upperRoomAmber} size="small" /></View>
+          ) : prayNowMatches.length === 0 ? (
+            <View style={styles.dashEmptyCard}>
+              <Text style={styles.dashEmptyText}>No one is available right now.</Text>
+              <TouchableOpacity style={styles.dashEmptyBtn} onPress={() => router.push("/prayer/availability" as any)}>
+                <Text style={styles.dashEmptyBtnText}>Set My Availability</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.mutedText}>{prayNowMatches.length} peer{prayNowMatches.length === 1 ? "" : "s"} available now</Text>
+              {prayNowMatches.map((m) => (
+                <View key={m.availabilityId} style={styles.matchCard}>
+                  <View style={styles.matchAvatar}><Text style={styles.matchAvatarText}>{m.displayName.charAt(0)}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.matchName}>{m.displayName}</Text>
+                    <Text style={styles.matchUntil}>🟢 Available until {formatTimeInZone(m.availableUntil, m.timezone)}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.requestBtn} onPress={() => { setRequestingMatch(m); setRequestMessage(""); }}>
+                    <Text style={styles.requestBtnText}>Request Prayer</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
+
+        {/* ── Prayer 2.0: Pray With Me + My Availability ── */}
+        <View style={[styles.sectionBlock, { flexDirection: "row", gap: 10, marginTop: 20 }]}>
+          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/pray-with-me" as any)}>
+            <Ionicons name="megaphone-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>Pray With Me</Text>
+            <Text style={styles.dashActionSub}>Ask peers to join you</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/availability" as any)}>
+            <Ionicons name="time-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>My Availability</Text>
+            <Text style={styles.dashActionSub}>{availabilityCount > 0 ? `${availabilityCount} active slot${availabilityCount === 1 ? "" : "s"}` : "Not set yet"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.sectionBlock, { flexDirection: "row", gap: 10, marginTop: 10 }]}>
+          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/requests" as any)}>
+            <Ionicons name="people-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>Prayer Requests</Text>
+            <Text style={styles.dashActionSub}>See who needs prayer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/my-prayer" as any)}>
+            <Ionicons name="heart-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>My Prayer</Text>
+            <Text style={styles.dashActionSub}>Commitments & history</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Prayer 2.0 Stage 6: Testimonies (answered prayer + growth) ── */}
+        <View style={[styles.sectionBlock, { marginTop: 10 }]}>
+          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/testimony/feed" as any)}>
+            <Ionicons name="sparkles-outline" size={20} color={colors.upperRoomAmber} />
+            <Text style={styles.dashActionTitle}>Testimonies</Text>
+            <Text style={styles.dashActionSub}>Answered prayers & growth stories</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Prayer 2.0: Invitations awaiting response ── */}
+        {pendingInvitations.length > 0 && (
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeading}>Prayer Invitations</Text>
+            {pendingInvitations.map((inv) => (
+              <TouchableOpacity key={inv.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/invitation/[id]", params: { id: inv.id } } as any)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inviteText}>{inv.requesterName ?? "Someone"} would like to pray with you</Text>
+                  <Text style={styles.inviteMeta}>{relativeDayLabel(inv.proposedStartAt)} · {formatTimeInZone(inv.proposedStartAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.upperRoomMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* ── Prayer 2.0: Upcoming Prayer ── */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeading}>📅 Upcoming Prayer</Text>
+          {upcomingGatherings.length === 0 ? (
+            <Text style={styles.mutedText}>Nothing scheduled yet.</Text>
+          ) : (
+            upcomingGatherings.map((g) => (
+              <TouchableOpacity key={g.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/gathering/[id]", params: { id: g.id } } as any)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inviteText}>{g.prayerFocus || "Prayer together"}</Text>
+                  <Text style={styles.inviteMeta}>{relativeDayLabel(g.scheduledStartAt)} · {formatTimeInZone(g.scheduledStartAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.upperRoomMuted} />
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* ── Section 1: The Sinner's Prayer ── */}
@@ -645,6 +813,38 @@ export default function PrayerTab() {
           </View>
         </View>
       </Modal>
+
+      {/* Request Prayer modal (Prayer 2.0 — Pray Now) */}
+      <Modal visible={!!requestingMatch} transparent animationType="slide" onRequestClose={() => setRequestingMatch(null)}>
+        <View style={styles.prayerModalOverlay}>
+          <View style={[styles.prayerModalBox, { maxHeight: undefined }]}>
+            <View style={styles.prayerModalHeader}>
+              <Text style={styles.prayerModalTitle}>Request Prayer</Text>
+              <TouchableOpacity onPress={() => setRequestingMatch(null)}>
+                <Ionicons name="close" size={22} color={colors.upperRoomCream} />
+              </TouchableOpacity>
+            </View>
+            {requestingMatch && (
+              <>
+                <Text style={styles.mutedText}>
+                  Invite {requestingMatch.displayName} to pray with you now, until {formatTimeInZone(requestingMatch.availableUntil, requestingMatch.timezone)} their time.
+                </Text>
+                <TextInput
+                  style={[styles.formInput, { marginTop: 12 }]}
+                  value={requestMessage}
+                  onChangeText={setRequestMessage}
+                  placeholder="What would you like prayer for? (optional)"
+                  placeholderTextColor={colors.upperRoomMuted}
+                  multiline
+                />
+                <TouchableOpacity style={styles.submitBtn} onPress={handleSendPrayerRequest} disabled={sendingRequest}>
+                  {sendingRequest ? <ActivityIndicator color="#100B06" size="small" /> : <Text style={styles.submitBtnText}>Send Invitation</Text>}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -678,6 +878,37 @@ function makeStyles(c: AppColors) {
   sectionHeading: { fontSize: 13, fontWeight: "700", color: c.upperRoomMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 },
   viewAllText: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
   mutedText: { fontSize: 13, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
+
+  centerFillSmall: { alignItems: "center", paddingVertical: 16 },
+  dashEmptyCard: {
+    alignItems: "center", gap: 12, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder,
+    borderRadius: 14, padding: 20,
+  },
+  dashEmptyText: { fontSize: 13, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
+  dashEmptyBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
+  dashEmptyBtnText: { color: "#100B06", fontSize: 12, fontFamily: "Inter_700Bold" },
+  matchCard: {
+    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.upperRoomCard, borderWidth: 1,
+    borderColor: c.upperRoomBorder, borderRadius: 14, padding: 12, marginTop: 8,
+  },
+  matchAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(224,164,65,0.15)", alignItems: "center", justifyContent: "center" },
+  matchAvatarText: { fontSize: 14, color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
+  matchName: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  matchUntil: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+  requestBtn: { backgroundColor: "rgba(224,164,65,0.15)", borderWidth: 1, borderColor: "rgba(224,164,65,0.4)", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  requestBtnText: { fontSize: 11, color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
+  dashActionCard: {
+    flex: 1, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder,
+    borderRadius: 14, padding: 14, gap: 6, alignItems: "flex-start",
+  },
+  dashActionTitle: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
+  dashActionSub: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
+  inviteRow: {
+    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.upperRoomCard, borderWidth: 1,
+    borderColor: c.upperRoomBorder, borderRadius: 12, padding: 12, marginTop: 8,
+  },
+  inviteText: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
+  inviteMeta: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
   journalPreviewRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 12, marginBottom: 8 },
   journalPreviewText: { flex: 1, fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_400Regular" },

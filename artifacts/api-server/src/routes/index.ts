@@ -4,6 +4,8 @@ import profilesRouter from "./profiles";
 import curriculumRouter from "./curriculum";
 import progressRouter from "./progress";
 import prayerRouter from "./prayer";
+import prayerCoordinationRouter from "./prayerCoordination";
+import prayerTestimoniesRouter from "./prayerTestimonies";
 import sessionsRouter from "./sessions";
 import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
@@ -37,7 +39,9 @@ router.use(healthRouter);
 router.use("/profiles", profilesRouter);
 router.use(curriculumRouter); // curriculum + modules + lessons (paths differ, handled internally)
 router.use("/progress", progressRouter);
-router.use("/prayers", prayerRouter);
+router.use("/prayers", prayerRouter); // legacy, unauthenticated nation-prayer wall (Prayer 2.0 Stage 0 forensic finding — left untouched, not extended)
+router.use("/prayer", prayerCoordinationRouter); // Prayer 2.0 — peer-to-peer prayer coordination (requests/availability/invitations/gatherings/participants, paths differ, handled internally)
+router.use("/prayer", prayerTestimoniesRouter); // Prayer 2.0 Stage 6 — testimonies live under /prayer/testimonies/* (paths differ, handled internally)
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);

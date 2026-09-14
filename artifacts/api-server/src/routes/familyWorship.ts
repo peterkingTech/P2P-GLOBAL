@@ -910,9 +910,13 @@ router.get("/worship/continue-study", async (req, res) => {
   if (lastHistory.lesson_id) {
     const { data: lessonCtx } = await resolveLessonContext(lastHistory.lesson_id as string);
     if (lessonCtx) {
-      previousGathering.lessonTitle = lessonCtx.lessonTitle as string;
-      previousGathering.moduleTitle = lessonCtx.moduleTitle as string;
-      previousGathering.curriculumTitle = lessonCtx.curriculumTitle as string | null;
+      // Non-null: this branch only runs once !lastHistory has already
+      // returned above, and previousGathering is always set whenever
+      // lastHistory is truthy (see the `if (lastHistory) {...}` block
+      // above) — TS just can't correlate the two guards on its own.
+      previousGathering!.lessonTitle = lessonCtx.lessonTitle as string;
+      previousGathering!.moduleTitle = lessonCtx.moduleTitle as string;
+      previousGathering!.curriculumTitle = lessonCtx.curriculumTitle as string | null;
 
       // Next lesson: first try the next published lesson within the same
       // module; if this was the module's last lesson, try the first

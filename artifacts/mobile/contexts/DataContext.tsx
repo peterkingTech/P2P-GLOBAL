@@ -581,7 +581,7 @@ export interface OfficialMailThread {
 }
 
 export type ModerationFlagStatus = "open" | "dismissed" | "warned" | "removed" | "escalated";
-export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile";
+export type ModerationContentType = "prayer_post" | "prayer_comment" | "message" | "profile" | "prayer_testimony";
 
 export interface ModerationPosterIdentity {
   id: string;

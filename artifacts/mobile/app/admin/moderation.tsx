@@ -14,6 +14,18 @@ const STATUS_FILTERS: Array<{ value: ModerationFlagStatus; label: string }> = [
   { value: "dismissed", label: "Dismissed" },
 ];
 
+// Was a hardcoded prayer_post/"Comment" binary that mislabeled every other
+// content_type (message/profile since 019, now prayer_testimony too) as
+// "Comment" in the admin queue — a real, pre-existing display bug, fixed
+// here as a direct, minimal, additive correction rather than worked around.
+const CONTENT_TYPE_LABELS: Record<string, string> = {
+  prayer_post: "Prayer post",
+  prayer_comment: "Comment",
+  message: "Direct message",
+  profile: "Profile",
+  prayer_testimony: "Testimony",
+};
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -115,7 +127,7 @@ export default function ModerationQueueScreen() {
                 <View style={styles.contentTypeBadge}>
                   <Ionicons name="flag" size={11} color="#fff" />
                   <Text style={styles.contentTypeBadgeText}>
-                    {item.contentType === "prayer_post" ? "Prayer post" : "Comment"}
+                    {CONTENT_TYPE_LABELS[item.contentType] ?? item.contentType}
                   </Text>
                 </View>
                 <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>

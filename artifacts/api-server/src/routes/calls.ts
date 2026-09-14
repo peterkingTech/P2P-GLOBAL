@@ -176,6 +176,20 @@ router.post("/calls/token", async (req, res) => {
       const { data: participant } = await supabaseWrite
         .from("p2p_church_call_participants").select("id").eq("call_id", callId).eq("user_id", userId).is("left_at", null).maybeSingle();
       if (!participant) return err(res, "Not authorized to join this call", 403);
+    } else if (channelName.startsWith("prayer_gathering_")) {
+      // Prayer 2.0 Stage 3 — same additive pattern as church_call_/
+      // family_worship_ above. Unlike those, there is no separate prior
+      // "join" endpoint that creates the participant row here — Stage 1's
+      // invitation-accept flow already seeds BOTH participant rows (host +
+      // recipient) the instant the gathering is created, so simply having
+      // ANY row (regardless of status) is the correct, already-established
+      // authorization check: only the two people who were actually invited
+      // and accepted can ever have a row here at all.
+      if (!userId) return err(res, "userId required for this call type", 400);
+      const gatheringId = channelName.slice("prayer_gathering_".length);
+      const { data: participant } = await supabaseWrite
+        .from("p2p_prayer_coord_participants").select("id").eq("gathering_id", gatheringId).eq("user_id", userId).maybeSingle();
+      if (!participant) return err(res, "Not authorized to join this prayer gathering", 403);
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;
