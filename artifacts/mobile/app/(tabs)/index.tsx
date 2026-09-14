@@ -314,12 +314,6 @@ function makeStyles(c: AppColors) {
     },
     greeting: { fontSize: 20, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     greetingSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-    prayingBtn: {
-      width: 40, height: 40, borderRadius: 20,
-      backgroundColor: "rgba(224,164,65,0.12)",
-      borderWidth: 1, borderColor: "rgba(224,164,65,0.25)",
-      alignItems: "center", justifyContent: "center",
-    },
 
     treeCard: {
       borderRadius: 18,
@@ -671,15 +665,6 @@ export default function HomeTab() {
           <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.greetingSub}>{t("home.continueGrowth")}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.prayingBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/(tabs)/prayer");
-          }}
-        >
-          <Ionicons name="radio" size={18} color={colors.upperRoomAmber} />
-        </TouchableOpacity>
       </View>
 
       {/* Living Tree — growth photo card (falls back to the SVG tree if the
