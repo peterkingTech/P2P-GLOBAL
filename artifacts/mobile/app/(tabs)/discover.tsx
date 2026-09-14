@@ -10,7 +10,6 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
-import { VerificationBadge } from "@/components/VerificationBadge";
 import { InviteCard } from "@/components/InviteCard";
 
 interface DiscoverCircleSummary {
@@ -31,15 +30,18 @@ interface LiveRoomSummary {
   speakingMode: "open" | "structured";
 }
 
-interface SearchResult {
-  userId: string;
-  username: string;
-  fullName: string | null;
-  photoUrl: string | null;
-  country: string | null;
-  modulesCompleted: number | null;
-  isVerified: boolean;
-}
+// P2P Global Search — one result shape shared across every searchable
+// domain (routes/search.ts). Deliberately minimal: only what's needed to
+// show and navigate to a result, never private fields.
+interface GlobalSearchResult { type: string; id: string; title: string; subtitle?: string | null; category?: string | null; route: string }
+interface GlobalSearchGroup { type: string; label: string; results: GlobalSearchResult[] }
+
+const SEARCH_RESULT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  person: "person-outline", curriculum: "school-outline", plan: "school-outline",
+  prayer_topic: "hand-left-outline", prayer_path: "hand-left-outline",
+  mission_field: "flag-outline", mission_story: "flag-outline",
+  kingdom_story: "book-outline", kingdom_win: "sparkles-outline",
+};
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -135,42 +137,38 @@ export default function DiscoverTab() {
   const { t } = useTranslation();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchGroups, setSearchGroups] = useState<GlobalSearchGroup[]>([]);
   const [searching, setSearching] = useState(false);
-  const [connectingId, setConnectingId] = useState<string | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // P2P Global Search — the SAME search field, extended from people-only
+  // (/profiles/search) into a single bounded multi-domain call
+  // (routes/search.ts). Debounce (300ms) and minimum query length (2)
+  // unchanged from the original people-search implementation.
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     const q = searchQuery.trim();
-    if (q.length < 2) { setSearchResults([]); setSearching(false); return; }
+    if (q.length < 2) { setSearchGroups([]); setSearching(false); return; }
     setSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const url = `${getApiUrl()}/profiles/search?q=${encodeURIComponent(q)}${profile?.id ? `&viewerId=${profile.id}` : ""}`;
-        const res = await fetch(url);
-        setSearchResults(await res.json());
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const res = await fetch(`${getApiUrl()}/search?q=${encodeURIComponent(q)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const body = await res.json();
+        setSearchGroups(res.ok ? body.groups ?? [] : []);
       } catch {
-        setSearchResults([]);
+        setSearchGroups([]);
       } finally {
         setSearching(false);
       }
     }, 300);
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [searchQuery, profile?.id]);
+  }, [searchQuery]);
 
-  async function quickConnect(target: SearchResult) {
-    if (!profile?.id || connectingId) return;
-    setConnectingId(target.userId);
-    try {
-      await fetch(`${getApiUrl()}/connections/request`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fromUserId: profile.id, toUserId: target.userId, requestType: "connect" }),
-      });
-    } finally {
-      setConnectingId(null);
-    }
-  }
+  const totalSearchResults = searchGroups.reduce((sum, g) => sum + g.results.length, 0);
 
   const loadLiveRooms = useCallback(async () => {
     try {
@@ -231,6 +229,7 @@ export default function DiscoverTab() {
     { key: "wall", icon: "hand-left-outline" as const, title: t("discover.prayerWall"), count: wallCount, sub: t("discover.prayerWallSub"), route: "/(tabs)/prayer" as const },
     { key: "countries", icon: "earth-outline" as const, title: t("discover.countriesReached"), count: forestStats.countriesReached.length, sub: t("discover.countriesReachedSub"), route: "/living-tree" as const },
     { key: "missions", icon: "flag-outline" as const, title: t("discover.missions"), count: missions.length, sub: t("discover.missionsSub"), route: "/(tabs)/missions" as const },
+    { key: "kingdom-stories", icon: "book-outline" as const, title: t("discover.kingdomStories"), count: null, sub: t("discover.kingdomStoriesSub"), route: "/kingdom-stories" as const },
   ];
 
   return (
@@ -245,7 +244,7 @@ export default function DiscoverTab() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search @username"
+            placeholder="Search P2P"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
@@ -261,40 +260,33 @@ export default function DiscoverTab() {
       {searchQuery.trim().length >= 2 ? (
         searching ? (
           <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
-        ) : searchResults.length === 0 ? (
+        ) : totalSearchResults === 0 ? (
           <View style={styles.searchEmpty}>
-            <Text style={styles.searchEmptyTitle}>No one found for "{searchQuery.trim()}"</Text>
-            <Text style={styles.searchEmptySub}>Check the spelling or try:{"\n"}· Searching without the @{"\n"}· A shorter search term</Text>
-            <TouchableOpacity style={styles.searchEmptyBtn} onPress={() => { setSearchQuery(""); }}>
-              <Text style={styles.searchEmptyBtnText}>Invite someone to P2P Global</Text>
-            </TouchableOpacity>
+            <Text style={styles.searchEmptyTitle}>No results for "{searchQuery.trim()}"</Text>
+            <Text style={styles.searchEmptySub}>Try another search, or check the spelling.</Text>
           </View>
         ) : (
-          <FlatList
-            data={searchResults}
-            keyExtractor={(r) => r.userId}
-            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.searchResultRow} activeOpacity={0.8} onPress={() => router.push(`/profile/${item.username}` as any)}>
-                <View style={styles.searchAvatar}>
-                  <Text style={styles.searchAvatarText}>{(item.fullName ?? item.username).charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={styles.searchResultUsername}>@{item.username}</Text>
-                    <VerificationBadge isVerified={item.isVerified} username={item.username} size="small" />
-                  </View>
-                  <Text style={styles.searchResultMeta}>
-                    {item.fullName ?? "Someone"}{item.country ? ` · ${item.country}` : ""}
-                    {item.modulesCompleted != null ? ` · Module ${item.modulesCompleted}` : ""}
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.connectBtn} onPress={() => quickConnect(item)} disabled={connectingId === item.userId}>
-                  {connectingId === item.userId ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.connectBtnText}>Connect</Text>}
-                </TouchableOpacity>
-              </TouchableOpacity>
-            )}
-          />
+          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
+            {searchGroups.map((group) => (
+              <View key={group.type} style={{ marginBottom: 18 }}>
+                <Text style={styles.sectionHeading}>{group.label}</Text>
+                {group.results.map((r) => (
+                  <TouchableOpacity key={`${r.type}-${r.id}`} style={styles.searchResultRow} activeOpacity={0.8} onPress={() => router.push(r.route as any)}>
+                    <View style={styles.searchAvatar}>
+                      <Ionicons name={SEARCH_RESULT_ICONS[r.type] ?? "search-outline"} size={18} color={colors.accentGreen} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.searchResultUsername} numberOfLines={1}>{r.title}</Text>
+                      {(!!r.subtitle || !!r.category) && (
+                        <Text style={styles.searchResultMeta} numberOfLines={1}>{[r.category, r.subtitle].filter(Boolean).join(" · ")}</Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
         )
       ) : loading ? (
         <View style={styles.loading}>
@@ -336,7 +328,7 @@ export default function DiscoverTab() {
           )}
 
           {cards.map((c) => (
-            <TouchableOpacity key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route)}>
+            <TouchableOpacity key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route as any)}>
               <View style={styles.iconWrap}>
                 <Ionicons name={c.icon} size={22} color={colors.accentGreen} />
               </View>
