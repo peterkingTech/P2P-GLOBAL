@@ -31,8 +31,15 @@ export interface ScriptureReference {
   translationCode: string | null; referenceDisplay: string;
   role?: "core" | "supporting"; displayOrder?: number; editorialNote?: string | null;
 }
+// Enhancement Stage 2 — sequential lock/progression, one row per
+// (user, topic), mirroring Prayer Paths' own progress shape exactly.
+export interface TopicProgress {
+  id: string; userId: string; topicId: string; status: "in_progress" | "completed";
+  currentScriptureOrder: number; startedAt: string; completedAt: string | null; updatedAt: string;
+}
 export interface PrayerTopicDetail extends PrayerTopic {
   scriptures: ScriptureReference[];
+  myProgress: TopicProgress | null;
 }
 
 export function getTopics(): Promise<PrayerTopic[]> {
@@ -40,6 +47,13 @@ export function getTopics(): Promise<PrayerTopic[]> {
 }
 export function getTopic(slug: string): Promise<PrayerTopicDetail> {
   return authedFetch(`/prayer/topics/${slug}`);
+}
+// Marks the scripture at `completedScriptureOrder` (1-based position in
+// the topic's own scripture list) as completed. The server rejects any
+// value other than exactly current+1 — this call cannot be used to skip
+// ahead, regardless of what value the client sends.
+export function updateTopicProgress(topicId: string, completedScriptureOrder: number): Promise<TopicProgress> {
+  return authedFetch(`/prayer/topics/${topicId}/progress`, { method: "PUT", body: JSON.stringify({ completedScriptureOrder }) });
 }
 export function getScriptureReference(id: string): Promise<ScriptureReference> {
   return authedFetch(`/prayer/scriptures/${id}`);

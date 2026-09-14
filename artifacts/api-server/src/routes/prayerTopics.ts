@@ -33,6 +33,13 @@ function mapScripture(row: Record<string, unknown>, link?: Record<string, unknow
     ...(link ? { role: link.role, displayOrder: link.display_order, editorialNote: link.editorial_note } : {}),
   };
 }
+function mapTopicProgress(row: Record<string, unknown>) {
+  return {
+    id: row.id, userId: row.user_id, topicId: row.topic_id, status: row.status,
+    currentScriptureOrder: row.current_scripture_order, startedAt: row.started_at,
+    completedAt: row.completed_at, updatedAt: row.updated_at,
+  };
+}
 
 // ── Public/user reads ───────────────────────────────────────────────────────
 
@@ -80,7 +87,55 @@ router.get("/topics/:slug", async (req, res) => {
     .filter((l: any) => l.scripture)
     .map((l: any) => mapScripture(l.scripture, l));
 
-  return ok(res, { ...mapTopic(topic as Record<string, unknown>), scriptures });
+  // Enhancement Stage 2 — sequential lock/progression. current_scripture_order
+  // is a position in THIS flat list (1-based); scriptures beyond
+  // current+1 stay locked client-side. Appending new scriptures later only
+  // ever extends this list, never renumbers earlier entries, so existing
+  // progress is never invalidated.
+  const { data: progress } = await db.from("p2p_prayer_topic_progress").select("*")
+    .eq("user_id", userId).eq("topic_id", topic.id as string).maybeSingle();
+
+  return ok(res, {
+    ...mapTopic(topic as Record<string, unknown>), scriptures,
+    myProgress: progress ? mapTopicProgress(progress as Record<string, unknown>) : null,
+  });
+});
+
+// PUT /prayer/topics/:id/progress — mark the scripture at
+// `completedScriptureOrder` (1-based position in the topic's own flat
+// scripture list) as completed. Enforced STRICTLY sequential server-side
+// (must be exactly current+1) — a client cannot skip ahead by calling
+// this directly with an arbitrary order, regardless of what the UI shows.
+router.put("/topics/:id/progress", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { data: topic } = await db.from("p2p_prayer_topics").select("id,status").eq("id", req.params.id).maybeSingle();
+  if (!topic || topic.status !== "published") return err(res, "Topic not found", 404);
+
+  const { completedScriptureOrder } = req.body as { completedScriptureOrder?: number };
+  if (!completedScriptureOrder || completedScriptureOrder < 1) return err(res, "a valid completedScriptureOrder is required");
+
+  const { count: totalScriptures } = await db.from("p2p_topic_scriptures").select("id", { count: "exact", head: true }).eq("topic_id", topic.id as string);
+
+  const { data: existing } = await db.from("p2p_prayer_topic_progress").select("current_scripture_order,completed_at")
+    .eq("user_id", userId).eq("topic_id", topic.id as string).maybeSingle();
+  const currentOrder = existing?.current_scripture_order ?? 0;
+
+  if (completedScriptureOrder !== currentOrder + 1) {
+    return err(res, `Scripture ${completedScriptureOrder} is not the next one to complete (you are at ${currentOrder})`, 409);
+  }
+
+  const isComplete = totalScriptures != null && completedScriptureOrder >= totalScriptures;
+  const updates: Record<string, unknown> = {
+    user_id: userId, topic_id: topic.id, current_scripture_order: completedScriptureOrder,
+    status: isComplete ? "completed" : "in_progress", updated_at: new Date().toISOString(),
+  };
+  if (isComplete && !existing?.completed_at) updates.completed_at = new Date().toISOString();
+
+  const { data, error } = await db.from("p2p_prayer_topic_progress")
+    .upsert(updates, { onConflict: "user_id,topic_id" }).select().single();
+  if (error || !data) return err(res, error?.message ?? "Failed to save progress", 500);
+  return ok(res, mapTopicProgress(data as Record<string, unknown>));
 });
 
 // ── Admin/editorial mutation ─────────────────────────────────────────────────

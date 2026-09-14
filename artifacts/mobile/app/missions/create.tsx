@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Image, Platform, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoRecorder from "@/components/VideoRecorder";
-import { createMissionStory, uploadMissionStoryVideo, type MissionStoryType } from "@/lib/missionsApi";
+import { createMissionStory, uploadMissionStoryVideo, uploadMissionStoryPhoto, type MissionStoryType } from "@/lib/missionsApi";
 import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
 
 function showAlert(title: string, message: string) {
@@ -51,19 +52,33 @@ export default function CreateMissionStoryScreen() {
   const [scripture, setScripture] = useState("");
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [photoAsset, setPhotoAsset] = useState<{ uri: string; mimeType?: string; fileName?: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const isAuthorized = !!profile?.role && ADMIN_ROLES.has(profile.role);
+
+  async function handlePickPhoto() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { showAlert("Photo access needed", "Please allow photo library access to add a picture."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setPhotoAsset({ uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName });
+  }
 
   async function handleSubmit(status: "draft" | "published") {
     if (!profile?.id || !title.trim() || !body.trim()) return;
     setSubmitting(true);
     try {
-      let mediaFields: { id?: string; mediaType?: "video"; mediaPath?: string; mediaDurationSeconds?: number } = {};
+      let mediaFields: { id?: string; mediaType?: "video" | "photo"; mediaPath?: string; mediaDurationSeconds?: number } = {};
       if (videoUri) {
         const uploaded = await uploadMissionStoryVideo(videoUri, profile.id);
         if (!uploaded) { showAlert("Couldn't upload your video", "Please check your connection and try again."); setSubmitting(false); return; }
         mediaFields = { id: uploaded.storyId, mediaType: "video", mediaPath: uploaded.mediaPath, mediaDurationSeconds: videoDuration };
+      } else if (photoAsset) {
+        const uploaded = await uploadMissionStoryPhoto(photoAsset, profile.id);
+        if (!uploaded) { showAlert("Couldn't upload your photo", "Please check your connection and try again."); setSubmitting(false); return; }
+        mediaFields = { id: uploaded.storyId, mediaType: "photo", mediaPath: uploaded.mediaPath };
       }
       let scriptureReferenceId: string | null = null;
       if (scripture.trim()) {
@@ -129,8 +144,15 @@ export default function CreateMissionStoryScreen() {
         <Text style={styles.fieldLabel}>Scripture reference (optional, e.g. Philippians 4:6-7)</Text>
         <TextInput style={styles.input} value={scripture} onChangeText={setScripture} placeholder="Book chapter:verse" placeholderTextColor={c.textMuted} />
 
-        <Text style={styles.fieldLabel}>Video (optional)</Text>
-        {videoUri ? (
+        <Text style={styles.fieldLabel}>Media (optional — a photo or a video, not both)</Text>
+        {photoAsset ? (
+          <View style={styles.photoPreviewBox}>
+            <Image source={{ uri: photoAsset.uri }} style={styles.photoPreview} resizeMode="cover" />
+            <TouchableOpacity style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
+              <Ionicons name="close-circle" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : videoUri ? (
           <View style={styles.videoChosenBox}>
             <Ionicons name="videocam" size={16} color={c.accentGreen} />
             <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
@@ -139,7 +161,13 @@ export default function CreateMissionStoryScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
+          <>
+            <TouchableOpacity style={styles.addPhotoBtn} onPress={handlePickPhoto} disabled={submitting}>
+              <Ionicons name="image-outline" size={18} color={c.accentGreen} />
+              <Text style={styles.addPhotoBtnText}>Add Photo</Text>
+            </TouchableOpacity>
+            <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
+          </>
         )}
 
         <View style={styles.btnRow}>
@@ -169,6 +197,14 @@ function makeStyles(c: AppColors) {
     modeLabel: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     videoChosenBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 12 },
     videoChosenText: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
+    addPhotoBtn: {
+      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
+      borderWidth: 1, borderColor: c.accentGreen, borderStyle: "dashed", borderRadius: 12, paddingVertical: 14, marginBottom: 10,
+    },
+    addPhotoBtnText: { fontSize: 14, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+    photoPreviewBox: { borderRadius: 12, overflow: "hidden", position: "relative" },
+    photoPreview: { width: "100%", height: 200, borderRadius: 12, backgroundColor: c.borderBeige },
+    removeMediaBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 12 },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 24 },
     draftBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
     draftBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },

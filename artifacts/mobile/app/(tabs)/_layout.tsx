@@ -90,7 +90,10 @@ function ClassicTabLayout() {
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
     { name: "learn", label: getLearnTabLabel(t("tabs.learn"), i18n.language), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
-    { name: "prayer", label: t("tabs.prayer"), icon: "radio-outline" as const, iconActive: "radio" as const },
+    // Wi-Fi/connectivity icon, not the prior hotspot-style "radio" icon —
+    // "God is the Hotspot and we are connecting to Him." Label/route/nav
+    // all unchanged; only the icon glyphs changed.
+    { name: "prayer", label: t("tabs.prayer"), icon: "wifi-outline" as const, iconActive: "wifi" as const },
     { name: "missions", label: t("tabs.missions"), icon: "earth-outline" as const, iconActive: "earth" as const },
     { name: "discover", label: t("tabs.discover"), icon: "compass-outline" as const, iconActive: "compass" as const },
   ];

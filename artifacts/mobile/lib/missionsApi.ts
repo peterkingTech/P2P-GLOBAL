@@ -45,7 +45,7 @@ export interface MissionField {
 export interface MissionStory {
   id: string; authorId: string; authorName?: string; storyType: MissionStoryType; title: string;
   summary: string | null; body: string; missionFieldId: string | null; missionField?: MissionField;
-  missionFocus: MissionFocusTag[]; scriptureReferenceId: string | null; mediaType: "video" | null;
+  missionFocus: MissionFocusTag[]; scriptureReferenceId: string | null; mediaType: "video" | "photo" | null;
   mediaPath: string | null; mediaDurationSeconds: number | null; status: MissionStatus;
   createdAt: string; updatedAt: string; publishedAt: string | null;
 }
@@ -100,7 +100,7 @@ export function getMyMissionStories(): Promise<MissionStory[]> {
 export function createMissionStory(input: {
   id?: string; storyType: MissionStoryType; title: string; summary?: string | null; body: string;
   missionFieldId?: string | null; missionFocus?: MissionFocusTag[]; scriptureReferenceId?: string | null;
-  mediaType?: "video" | null; mediaPath?: string | null; mediaDurationSeconds?: number | null; status?: MissionStatus;
+  mediaType?: "video" | "photo" | null; mediaPath?: string | null; mediaDurationSeconds?: number | null; status?: MissionStatus;
 }): Promise<MissionStory> {
   return authedFetch("/missions/stories", { method: "POST", body: JSON.stringify(input) });
 }
@@ -142,4 +142,27 @@ export async function uploadMissionStoryVideo(localUri: string, userId: string):
 export function getMissionMediaSignedUrl(mediaPath: string): Promise<string | null> {
   return supabase.storage.from("mission-media").createSignedUrl(mediaPath, 3600)
     .then(({ data, error }) => (error || !data?.signedUrl ? null : data.signedUrl));
+}
+
+// Enhancement Stage 5 — photo upload, same client-generated-id shape as
+// the video helper above, reusing the existing resolveMediaUpload()
+// extension/content-type resolver (lib/mediaUpload.ts) rather than
+// re-deriving it.
+export async function uploadMissionStoryPhoto(
+  asset: { uri: string; mimeType?: string; fileName?: string | null },
+  userId: string
+): Promise<{ storyId: string; mediaPath: string } | null> {
+  try {
+    const { resolveMediaUpload } = await import("@/lib/mediaUpload");
+    const { ext, contentType } = resolveMediaUpload(asset);
+    const storyId = generateUUID();
+    const mediaPath = `${userId}/${storyId}/photo.${ext}`;
+    const response = await fetch(asset.uri);
+    const arrayBuffer = await response.arrayBuffer();
+    const { error } = await supabase.storage.from("mission-media").upload(mediaPath, arrayBuffer, { contentType, upsert: false });
+    if (error) return null;
+    return { storyId, mediaPath };
+  } catch {
+    return null;
+  }
 }

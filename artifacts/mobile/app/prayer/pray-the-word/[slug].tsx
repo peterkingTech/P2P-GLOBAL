@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { getTopic, type PrayerTopicDetail, type ScriptureReference } from "@/lib/prayerTopicsApi";
+import { getTopic, updateTopicProgress, type PrayerTopicDetail, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
@@ -51,6 +51,13 @@ export default function PrayTheWordFlowScreen() {
       try {
         const t = await getTopic(slug);
         setTopic(t);
+        // Enhancement Stage 2 — resume exactly where the peer left off,
+        // never further. currentScriptureOrder is a COUNT of completed
+        // scriptures (0 = none yet), which is also the correct 0-based
+        // index of the next one to view. Clamped so a fully-completed
+        // topic still opens (at its last scripture) instead of crashing.
+        const resumeIndex = Math.min(t.myProgress?.currentScriptureOrder ?? 0, Math.max(0, t.scriptures.length - 1));
+        setScriptureIndex(resumeIndex);
       } catch (e: any) {
         showAlert("Couldn't open this topic", e.message ?? "Please try again.");
       } finally {
@@ -117,8 +124,15 @@ export default function PrayTheWordFlowScreen() {
     }
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (!topic) return;
+    // Enhancement Stage 2 — record completion of THIS scripture (1-based
+    // position) before advancing. The server enforces this must be
+    // exactly the next sequential step; since this screen only ever calls
+    // it in order, that should always succeed — if it doesn't (e.g. a
+    // stale session), navigation still proceeds rather than trapping the
+    // peer, but progress simply won't have advanced server-side.
+    await updateTopicProgress(topic.id, scriptureIndex + 1).catch(() => {});
     const nextIndex = scriptureIndex + 1;
     setReflection(""); setPrayerText(""); setResponse(""); setSavedThisRound(false);
     if (nextIndex < topic.scriptures.length) {
@@ -246,7 +260,10 @@ export default function PrayTheWordFlowScreen() {
               <Ionicons name="people-outline" size={16} color={c.accentGreen} />
               <Text style={styles.secondaryBtnText}>Pray With Me</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/curriculum" as any)}>
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => router.push({ pathname: "/prayer/study/[scriptureId]", params: { scriptureId: currentScripture.id, topicTitle: topic.title } } as any)}
+            >
               <Ionicons name="school-outline" size={16} color={c.accentGreen} />
               <Text style={styles.secondaryBtnText}>Study This Scripture</Text>
             </TouchableOpacity>

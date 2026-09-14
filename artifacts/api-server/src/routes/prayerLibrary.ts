@@ -147,7 +147,7 @@ router.get("/library/answered", async (req, res) => {
 
 // ── Recent (reads the activity timeline — zero-score, purely informational) ──
 
-const LOGGABLE_EVENTS = ["prayer_topic_viewed", "prayer_scripture_viewed", "prayer_path_started"];
+const LOGGABLE_EVENTS = ["prayer_topic_viewed", "prayer_scripture_viewed", "prayer_path_started", "scripture_devotional_completed"];
 
 // POST /prayer/activity — a narrow, whitelisted logger for the "Recent"
 // timeline only. Never accepts an arbitrary event_type (would let a client

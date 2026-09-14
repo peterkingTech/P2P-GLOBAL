@@ -59,7 +59,7 @@ export function getAnsweredPrayers(): Promise<AnsweredJournalEntry[]> {
   return authedFetch("/prayer/library/answered");
 }
 
-export type LoggableEvent = "prayer_topic_viewed" | "prayer_scripture_viewed" | "prayer_path_started";
+export type LoggableEvent = "prayer_topic_viewed" | "prayer_scripture_viewed" | "prayer_path_started" | "scripture_devotional_completed";
 export function logPrayerActivity(eventType: LoggableEvent, metadata: Record<string, unknown>): Promise<{ logged: true }> {
   return authedFetch("/prayer/activity", { method: "POST", body: JSON.stringify({ eventType, metadata }) });
 }

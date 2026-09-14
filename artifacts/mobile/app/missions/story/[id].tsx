@@ -11,6 +11,7 @@ import {
 } from "@/lib/missionsApi";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import MissionVideoPlayer from "@/components/MissionVideoPlayer";
+import SignedPhotoView from "@/components/SignedPhotoView";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -101,6 +102,9 @@ export default function MissionStoryScreen() {
 
         {story.mediaType === "video" && story.mediaPath && (
           <View style={{ marginTop: 14 }}><MissionVideoPlayer mediaPath={story.mediaPath} durationSeconds={story.mediaDurationSeconds} /></View>
+        )}
+        {story.mediaType === "photo" && story.mediaPath && (
+          <View style={{ marginTop: 14 }}><SignedPhotoView bucket="mission-media" path={story.mediaPath} /></View>
         )}
 
         <Text style={styles.body}>{story.body}</Text>

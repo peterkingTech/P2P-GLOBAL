@@ -24,6 +24,8 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   message: "Direct message",
   profile: "Profile",
   prayer_testimony: "Testimony",
+  mission_story: "Mission Story",
+  kingdom_win: "Kingdom Win",
 };
 
 function timeAgo(iso: string): string {

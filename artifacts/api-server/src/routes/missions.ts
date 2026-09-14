@@ -199,13 +199,14 @@ router.post("/stories", requireAdmin, async (req, res) => {
     mediaType, mediaPath, mediaDurationSeconds, status,
   } = req.body as {
     id?: string; storyType?: string; title?: string; summary?: string | null; body?: string; missionFieldId?: string | null;
-    missionFocus?: string[]; scriptureReferenceId?: string | null; mediaType?: "video" | null; mediaPath?: string | null;
+    missionFocus?: string[]; scriptureReferenceId?: string | null; mediaType?: "video" | "photo" | null; mediaPath?: string | null;
     mediaDurationSeconds?: number | null; status?: string;
   };
   if (id !== undefined && !UUID_RE.test(id)) return err(res, "id must be a valid UUID");
   if (!storyType || !STORY_TYPES.includes(storyType)) return err(res, `storyType must be one of: ${STORY_TYPES.join(", ")}`);
   if (!title?.trim()) return err(res, "title is required");
   if (!body?.trim()) return err(res, "body is required");
+  if (mediaType !== undefined && mediaType !== null && !["video", "photo"].includes(mediaType)) return err(res, "mediaType must be video or photo");
   if (missionFocus !== undefined && !validFocus(missionFocus)) return err(res, `missionFocus must be a subset of: ${MISSION_FOCUS_TAGS.join(", ")}`);
   if (status !== undefined && !["draft", "pending", "published", "archived", "removed"].includes(status)) {
     return err(res, "invalid status");

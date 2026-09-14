@@ -12,6 +12,7 @@ import {
   getMissionStories, getMissionFields, MISSION_FOCUS_LABELS,
   type MissionStory, type MissionField, type MissionFocusTag,
 } from "@/lib/missionsApi";
+import { getKingdomWinsFeed, type KingdomWin } from "@/lib/kingdomWinsApi";
 
 // Missions — rebuilt Discover-first landing (Stage 2). The old screen's
 // two data sources are handled deliberately:
@@ -103,6 +104,15 @@ function makeStyles(c: AppColors) {
     fieldCountry: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     focusChip: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 },
     focusChipText: { fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
+    kingdomWinsHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 22 },
+    viewAllLink: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+    kingdomWinsEmptyCard: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 20, backgroundColor: "rgba(29,158,117,0.08)", borderWidth: 1, borderColor: c.accentGreen, borderRadius: 14, padding: 16 },
+    kingdomWinsEmptyText: { flex: 1, fontSize: 13, color: c.accentGreen, fontFamily: "Inter_500Medium", lineHeight: 18 },
+    kingdomWinCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, padding: 14, marginBottom: 10, gap: 4 },
+    kingdomWinTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
+    kingdomWinBody: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    shareKingdomWinBtn: { flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 10 },
+    shareKingdomWinBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
   });
 }
 
@@ -120,6 +130,8 @@ export default function MissionsTab() {
   const [stories, setStories] = useState<MissionStory[]>([]);
   const [fields, setFields] = useState<MissionField[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kingdomWins, setKingdomWins] = useState<KingdomWin[]>([]);
+  const [kingdomWinsLoading, setKingdomWinsLoading] = useState(true);
 
   const loadWall = useCallback(async () => {
     setWallLoading(true);
@@ -138,8 +150,18 @@ export default function MissionsTab() {
     }
   }, []);
 
+  const loadKingdomWins = useCallback(async () => {
+    try {
+      const result = await getKingdomWinsFeed({ limit: 3 });
+      setKingdomWins(result.entries);
+    } finally {
+      setKingdomWinsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { loadWall(); }, [loadWall]);
   useFocusEffect(useCallback(() => { loadMissions(); }, [loadMissions]));
+  useFocusEffect(useCallback(() => { loadKingdomWins(); }, [loadKingdomWins]));
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const featured = stories[0];
@@ -202,7 +224,7 @@ export default function MissionsTab() {
                   <TouchableOpacity key={s.id} style={styles.storyCard} onPress={() => router.push(`/missions/story/${s.id}` as any)}>
                     <View style={styles.storyMetaRow}>
                       {!!s.missionField && <Text style={styles.storyFieldText}>{s.missionField.title}</Text>}
-                      {!!s.mediaType && <Ionicons name="videocam-outline" size={12} color={colors.textMuted} />}
+                      {!!s.mediaType && <Ionicons name={s.mediaType === "video" ? "videocam-outline" : "image-outline"} size={12} color={colors.textMuted} />}
                       {!!s.scriptureReferenceId && <Ionicons name="book-outline" size={12} color={colors.textMuted} />}
                     </View>
                     <Text style={styles.storyTitle}>{s.title}</Text>
@@ -241,7 +263,36 @@ export default function MissionsTab() {
           </>
         )}
 
-        <Text style={styles.sectionTitle}>{t("missions.kingdomWins")}</Text>
+        <View style={styles.kingdomWinsHeaderRow}>
+          <Text style={styles.sectionTitle}>Kingdom Wins</Text>
+          <TouchableOpacity onPress={() => router.push("/kingdom-wins" as any)}>
+            <Text style={styles.viewAllLink}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.sectionSub}>Look what God has done.</Text>
+        {kingdomWinsLoading ? (
+          <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
+        ) : kingdomWins.length === 0 ? (
+          <TouchableOpacity style={styles.kingdomWinsEmptyCard} onPress={() => router.push("/kingdom-wins/create" as any)}>
+            <Ionicons name="sparkles-outline" size={22} color={colors.accentGreen} />
+            <Text style={styles.kingdomWinsEmptyText}>Your story could encourage someone. Share a Kingdom Win.</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.list}>
+            {kingdomWins.map((k) => (
+              <TouchableOpacity key={k.id} style={styles.kingdomWinCard} onPress={() => router.push(`/kingdom-wins/${k.id}` as any)}>
+                <Text style={styles.kingdomWinTitle}>{k.title}</Text>
+                <Text style={styles.kingdomWinBody} numberOfLines={2}>{k.body}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.shareKingdomWinBtn} onPress={() => router.push("/kingdom-wins/create" as any)}>
+              <Ionicons name="add-circle-outline" size={16} color={colors.accentGreen} />
+              <Text style={styles.shareKingdomWinBtnText}>Share a Kingdom Win</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Prayer Wall Testimonies</Text>
         <Text style={styles.sectionSub}>From the Community Prayer Wall</Text>
         {wallLoading ? (
           <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
