@@ -319,6 +319,7 @@ function SuperAdminDashboard() {
           )}
           {tab === "management" && (
             <ScrollView contentContainerStyle={styles.content}>
+              <QueueLinkCard label="Kingdom Stories" sub="Create and publish curated editorial stories" path="/admin/kingdom-stories" icon="book" />
               {deptStats && (
                 <>
                   <Text style={styles.sectionTitle}>All Department Inboxes</Text>
@@ -392,7 +393,7 @@ export default function AdminHome() {
     case "admin_supervisor": return <SupervisorDashboard />;
     case "admin_zone": return <ZoneOrNationalAdminDashboard role="admin_zone" />;
     case "admin_national": return <ZoneOrNationalAdminDashboard role="admin_national" />;
-    case "admin_content": return <RoleQueueDashboard role="admin_content" queueLabel="Content Manager" queueSub="Curricula, modules, and lessons" queuePath="/admin/content" queueIcon="library" extraLinks={[{ label: "Kingdom Wins Review", sub: "P2P Impact submissions awaiting approval", path: "/admin/kingdom-wins-review", icon: "sparkles" }]} />;
+    case "admin_content": return <RoleQueueDashboard role="admin_content" queueLabel="Content Manager" queueSub="Curricula, modules, and lessons" queuePath="/admin/content" queueIcon="library" extraLinks={[{ label: "Kingdom Wins Review", sub: "P2P Impact submissions awaiting approval", path: "/admin/kingdom-wins-review", icon: "sparkles" }, { label: "Kingdom Stories", sub: "Create and publish curated editorial stories", path: "/admin/kingdom-stories", icon: "book" }]} />;
     case "admin_translation": return <RoleQueueDashboard role="admin_translation" queueLabel="Translations" queueSub="Coverage and pending translation work" queuePath="/admin/translations" queueIcon="language" />;
     case "admin_moderation": return <RoleQueueDashboard role="admin_moderation" queueLabel="Flags Queue" queueSub="Flagged content and users" queuePath="/admin/moderation" queueIcon="flag" extraLinks={[{ label: "Kingdom Wins Review", sub: "P2P Impact submissions awaiting approval", path: "/admin/kingdom-wins-review", icon: "sparkles" }]} />;
     case "admin_verification": return <RoleQueueDashboard role="admin_verification" queueLabel="Verification Queue" queueSub="Pending identity verifications" queuePath="/admin/verification" queueIcon="shield-checkmark" />;

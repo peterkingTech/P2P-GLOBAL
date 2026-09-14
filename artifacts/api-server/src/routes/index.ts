@@ -12,6 +12,7 @@ import prayerJournalRouter from "./prayerJournal";
 import prayerLibraryRouter from "./prayerLibrary";
 import missionsRouter from "./missions";
 import kingdomWinsRouter from "./kingdomWins";
+import kingdomStoriesRouter from "./kingdomStories";
 import sessionsRouter from "./sessions";
 import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
@@ -54,6 +55,7 @@ router.use("/prayer", prayerJournalRouter); // "Pray the Word" Stage 4 — Journ
 router.use("/prayer", prayerLibraryRouter); // "Pray the Word" Stage 5 — Personal Prayer Library (saved items, recent, answered), live under /prayer/saved-*, /prayer/library/*, /prayer/recent, /prayer/activity
 router.use("/missions", missionsRouter); // Missions — new independent content domain (fields/stories/prayer points), separate from legacy p2p_missions and the Prayer Wall
 router.use("/kingdom-wins", kingdomWinsRouter); // Kingdom Wins / Testimonies — peer-authored "look what God has done" domain, independent from the Prayer Wall and Missions
+router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P-curated EDITORIAL content (Christian history/revival/missions/etc.), admin_content/super_admin write-gated, distinct from peer-authored Kingdom Wins
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);

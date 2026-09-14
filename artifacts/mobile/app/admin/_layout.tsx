@@ -36,6 +36,7 @@ const ADMIN_ROLES = new Set([
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/admin", icon: "grid" as const, roles: Array.from(ADMIN_ROLES) },
   { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
+  { label: "Kingdom Stories", path: "/admin/kingdom-stories", icon: "book" as const, roles: ["super_admin", "admin_content"] },
   { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
   { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin", "admin_help"] },
   { label: "P2P Official Mail", path: "/admin/email-inbox", icon: "mail" as const, roles: ["admin_help", "admin_marketing", "super_admin"] },
