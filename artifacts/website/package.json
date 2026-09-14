@@ -1,0 +1,28 @@
+{
+  "name": "@workspace/website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "gsap": "^3.12.7"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "~5.9.3",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "15.1.6",
+    "@eslint/eslintrc": "^3.2.0"
+  }
+}
