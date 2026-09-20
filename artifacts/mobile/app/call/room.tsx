@@ -9,6 +9,7 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
+import ShareRoomPanel from "@/components/ShareRoomPanel";
 
 interface RoomParticipant { userId: string; name: string; country: string | null; joinedAt: string }
 interface RoomDetail {
@@ -60,6 +61,7 @@ export default function BreakRoomScreen() {
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set());
   const [speakingUids, setSpeakingUids] = useState<Set<number>>(new Set());
   const [flagOpen, setFlagOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [flagging, setFlagging] = useState(false);
   const [ending, setEnding] = useState(false);
   const leftRef = useRef(false);
@@ -326,10 +328,20 @@ export default function BreakRoomScreen() {
             {room.speakingMode === "structured" ? "Structured" : "Open"} · {room.currentParticipants} here
           </Text>
         </View>
+        {isHost && (
+          <TouchableOpacity style={styles.flagBtn} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
+            <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.flagBtn} onPress={() => setFlagOpen(true)}>
           <Ionicons name="flag-outline" size={18} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </View>
+      <ShareRoomPanel
+        visible={shareOpen} onClose={() => setShareOpen(false)}
+        roomType="break_room" roomId={room.id} roomTitle={room.name}
+        statusLine={room.isLive === false ? "This room has ended" : "Live now"}
+      />
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <Text style={styles.sectionLabel}>SPEAKING NOW</Text>

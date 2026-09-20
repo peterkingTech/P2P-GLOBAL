@@ -213,7 +213,7 @@
       var desc = params.get("desc") || "";
       var deepLink = params.get("link") || "";
 
-      var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : "";
+      var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : type === "room" ? "🔗 Room Invitation" : "";
       var preview = document.getElementById("preview");
       if (title) {
         preview.innerHTML =

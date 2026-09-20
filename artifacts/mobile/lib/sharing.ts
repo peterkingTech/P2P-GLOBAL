@@ -31,7 +31,7 @@ export const EFFECTIVE_INVITE_BASE = "https://peer-to-peer-globalbiblestudynetwo
 // the file to deploy.
 const SHARE_LANDING_BASE_URL = "https://peterkingtech.github.io/P2P-GLOBAL";
 
-function buildWebShareUrl(params: { type: "lesson" | "plan" | "category" | "profile"; title: string; desc: string; deepLink: string }): string {
+function buildWebShareUrl(params: { type: "lesson" | "plan" | "category" | "profile" | "room"; title: string; desc: string; deepLink: string }): string {
   const q = new URLSearchParams({
     type: params.type,
     title: params.title,
@@ -102,6 +102,26 @@ export async function shareChurchInvite(church: { name: string; inviteLink: stri
   await Share.share({
     title: `Join ${church.name} on P2P Global`,
     message: `⛪ ${church.name}${location ? ` (${location})` : ""} is using P2P Global Kingdom School for discipleship.\n\nJoin our church community and go through the Bible with a peer guide:\n${church.inviteLink}\n\n"Accept one another, just as Christ accepted you." — Romans 15:7`,
+  });
+}
+
+// P2P Rooms — shareable room invitation link (Stage D). The deep link
+// points at app/rooms/join/[token].tsx, NOT app/join/[token] (that path
+// is already owned by the existing invite-by-username flow). Never
+// include Agora credentials, channel names, or any room-internal id here
+// — only the opaque invitation token, exactly what routes/roomInvitations.ts
+// already treats as the only safe thing to hand out.
+const ROOM_TYPE_LABEL: Record<"break_room" | "church_call" | "family_worship", string> = {
+  break_room: "Break Room", church_call: "Church Call", family_worship: "Family Worship",
+};
+export async function shareRoomInvitation(room: { title: string; roomType: "break_room" | "church_call" | "family_worship"; statusLine: string; token: string }) {
+  const deepLink = `${APP_SCHEME}://rooms/join/${room.token}`;
+  const typeLabel = ROOM_TYPE_LABEL[room.roomType];
+  const webUrl = buildWebShareUrl({ type: "room", title: room.title, desc: typeLabel, deepLink });
+
+  await Share.share({
+    title: room.title,
+    message: `You're invited to join a P2P gathering.\n\n${room.title} (${typeLabel})\n${room.statusLine}\n\nOpen P2P to view the invitation and join if authorized:\n${webUrl}`,
   });
 }
 

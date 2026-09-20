@@ -8,6 +8,7 @@ import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { ParticipantGrid, type GridTile } from "@/components/call/ParticipantGrid";
+import ShareRoomPanel from "@/components/ShareRoomPanel";
 import {
   getChurchCall, leaveChurchCall, endChurchCall, CHURCH_CALL_PURPOSE_LABELS,
   getChurchCallMessages, sendChurchCallMessage, setParticipantMicDisabled, setParticipantVideoDisabled, removeParticipant,
@@ -71,6 +72,7 @@ export default function ChurchCallScreen() {
   const [participantsOpen, setParticipantsOpen] = useState(false);
 
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [scriptureBook, setScriptureBook] = useState("");
   const [scriptureChapter, setScriptureChapter] = useState("");
   const [scriptureStartVerse, setScriptureStartVerse] = useState("");
@@ -401,6 +403,11 @@ export default function ChurchCallScreen() {
             <Ionicons name="book" size={16} color="#fff" />
           </TouchableOpacity>
         )}
+        {isHost && (
+          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
+            <Ionicons name="share-outline" size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
         <View style={styles.liveDot} />
       </View>
 
@@ -463,6 +470,12 @@ export default function ChurchCallScreen() {
           <Ionicons name="call" size={18} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
         </TouchableOpacity>
       </View>
+
+      <ShareRoomPanel
+        visible={shareOpen} onClose={() => setShareOpen(false)}
+        roomType="church_call" roomId={detail.call.id} roomTitle={detail.call.title}
+        statusLine={detail.call.status === "live" ? "Live now" : "This call has ended"}
+      />
 
       {isHost && (
         <View style={styles.hostBar}>

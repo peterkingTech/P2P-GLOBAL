@@ -12,13 +12,15 @@ interface Props {
   participantCount: number;
   showEnd: boolean;
   onEnd: () => void;
+  showShare?: boolean;
+  onShare?: () => void;
 }
 
 // The Gathering's own header — a title, the live GatheringBadge, and a
 // participant count on the left; End (Guide/Shepherd only) on the right.
 // No app-icon rail, no channel/server switcher — this is the top of one
 // room, not navigation chrome.
-export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, participantCount, showEnd, onEnd }: Props) {
+export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, participantCount, showEnd, onEnd, showShare, onShare }: Props) {
   return (
     <View style={styles.row}>
       <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Leave Family Gathering">
@@ -31,6 +33,11 @@ export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, par
           <Text style={styles.count}>{participantCount} together</Text>
         </View>
       </View>
+      {showShare && (
+        <TouchableOpacity onPress={onShare} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Share Room">
+          <Ionicons name="share-outline" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+      )}
       {showEnd && (
         <TouchableOpacity onPress={onEnd} style={styles.endBtn} accessibilityRole="button" accessibilityLabel="End this Gathering for everyone">
           <Text style={styles.endBtnText}>End</Text>

@@ -26,6 +26,7 @@ import ChatPanel from "@/components/family/ChatPanel";
 import MediaShelf from "@/components/family/MediaShelf";
 import ScripturePanel from "@/components/family/ScripturePanel";
 import PrayerSpacePanel from "@/components/family/PrayerSpacePanel";
+import ShareRoomPanel from "@/components/ShareRoomPanel";
 import NotesPanel from "@/components/family/NotesPanel";
 import LessonPicker from "@/components/family/LessonPicker";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
@@ -84,6 +85,7 @@ export default function FamilyWorshipScreen() {
   const [prayers, setPrayers] = useState<FamilyPrayerRequest[]>([]);
   const [mediaUrlInput, setMediaUrlInput] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [audioBalanceOpen, setAudioBalanceOpen] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<string>>(new Set());
@@ -723,6 +725,8 @@ export default function FamilyWorshipScreen() {
           participantCount={activeParticipants.length}
           showEnd={isHost || isShepherd}
           onEnd={handleEnd}
+          showShare={isHost}
+          onShare={() => setShareOpen(true)}
         />
       </View>
 
@@ -743,6 +747,12 @@ export default function FamilyWorshipScreen() {
       </View>
 
       {isHost && <GuideControls modes={MODES} currentMode={session.currentMode} onChange={changeMode} />}
+
+      <ShareRoomPanel
+        visible={shareOpen} onClose={() => setShareOpen(false)}
+        roomType="family_worship" roomId={session.id} roomTitle="Family Worship"
+        statusLine={session.status === "ended" ? "This gathering has ended" : "Gathering in progress"}
+      />
 
       <GatheringFooter
         reactionEmojis={REACTIONS}
