@@ -33,11 +33,18 @@ const LOGO = require("@/assets/images/logo.png");
 // out of sync with it again. The AsyncStorage handoff to AuthContext
 // (selectLanguage below) and RTL's post-login-only activation are both
 // unchanged — only the list of offered languages changed.
-const LANGUAGES = SUPPORTED_LANGUAGES.map((code) => ({
-  code,
-  label: LANGUAGE_DISPLAY[code].native,
-  flag: LANGUAGE_DISPLAY[code].flag,
-}));
+//
+// Sorted A-Z by English name (matching settings/language.tsx's picker),
+// not the displayed native name — sorting by native script would scatter
+// non-Latin entries unpredictably. Only the ORDER changes; the picker
+// still displays the native name and flag as before.
+const LANGUAGES = SUPPORTED_LANGUAGES
+  .map((code) => ({
+    code,
+    label: LANGUAGE_DISPLAY[code].native,
+    flag: LANGUAGE_DISPLAY[code].flag,
+  }))
+  .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
 
 export default function OnboardingScreen() {
   const router = useRouter();

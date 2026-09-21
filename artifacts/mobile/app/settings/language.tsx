@@ -15,7 +15,14 @@ import { SUPPORTED_LANGUAGES, BIBLE_STUDY_LANGUAGES, LANGUAGE_DISPLAY } from "@/
 // and still be unreachable from Settings with no error. Generating it
 // from the same source i18next itself uses makes that specific drift
 // structurally impossible going forward.
-const LANGUAGES = SUPPORTED_LANGUAGES.map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }));
+//
+// Sorted A-Z by English name (LANGUAGE_DISPLAY[code].label), not the
+// displayed native name — sorting by native script would scatter
+// non-Latin entries unpredictably rather than producing a real A-Z order.
+// Only the ORDER changes; the picker still displays the native name.
+const LANGUAGES = SUPPORTED_LANGUAGES
+  .map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }))
+  .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
 
 // Stage 3 — Content (Bible Study) Language is a genuinely different list
 // from App Language: it must never offer a language with no confirmed
@@ -26,7 +33,9 @@ const LANGUAGES = SUPPORTED_LANGUAGES.map((code) => ({ code, label: LANGUAGE_DIS
 // it could offer zh/zh-TW for Bible study (no real Scripture behind it)
 // while never offering some content languages that don't need UI
 // translation to be a valid Bible Study Language choice.
-const BIBLE_LANGUAGES = BIBLE_STUDY_LANGUAGES.map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }));
+const BIBLE_LANGUAGES = BIBLE_STUDY_LANGUAGES
+  .map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }))
+  .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
 
 const DATE_FORMATS: { value: "DD.MM.YYYY" | "MM/DD/YYYY"; label: string; example: string }[] = [
   { value: "DD.MM.YYYY", label: "DD.MM.YYYY", example: "e.g. 25.12.1998" },

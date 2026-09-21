@@ -35,6 +35,7 @@ import yo from "@/locales/yo.json";
 import ig from "@/locales/ig.json";
 import tl from "@/locales/tl.json";
 import zu from "@/locales/zu.json";
+import tw from "@/locales/tw.json";
 
 // Multilingual Expansion Stage 2 — reconciliation. Display metadata (native
 // name, RTL) lives here alongside the resource map itself so the two can
@@ -58,11 +59,18 @@ import zu from "@/locales/zu.json";
 // never part of either of this project's two source specs — left
 // un-imported, not deleted, pending an explicit decision on whether to
 // formally adopt them.
+//
+// tw (Twi/Akan, migration 159): registered as a genuine 40th language at
+// explicit request, beyond the earlier 39-language target. Its resource
+// (locales/tw.json) is deliberately an empty {} — real registration, zero
+// fabricated translation content. Every UI string falls back to English
+// via fallbackLng below until actual Twi translation work happens; do not
+// treat its presence here as claiming any translation exists.
 export const SUPPORTED_LANGUAGES = [
   "en", "de", "es", "fr", "pt", "it", "nl", "pl", "ro", "el",
   "ru", "uk", "tr", "ar", "he", "fa", "hi", "bn", "ur", "ta",
   "te", "zh", "zh-TW", "ja", "ko", "th", "vi", "id", "ms", "sw",
-  "ha", "yo", "ig", "tl", "zu",
+  "ha", "yo", "ig", "tl", "zu", "tw",
 ] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
@@ -106,6 +114,7 @@ export const LANGUAGE_DISPLAY: Record<SupportedLanguage, { label: string; native
   ig: { label: "Igbo", native: "Igbo", rtl: false, flag: "🇳🇬" },
   tl: { label: "Filipino", native: "Filipino", rtl: false, flag: "🇵🇭" },
   zu: { label: "Zulu", native: "isiZulu", rtl: false, flag: "🇿🇦" },
+  tw: { label: "Twi (Akan)", native: "Twi", rtl: false, flag: "🇬🇭" },
 };
 
 // Multilingual Expansion Stage 3 — Bible Study Language is a SEPARATE
@@ -164,6 +173,7 @@ i18n.use(initReactI18next).init({
     ig: { translation: ig },
     tl: { translation: tl },
     zu: { translation: zu },
+    tw: { translation: tw },
   },
   lng: "en",
   fallbackLng: "en",

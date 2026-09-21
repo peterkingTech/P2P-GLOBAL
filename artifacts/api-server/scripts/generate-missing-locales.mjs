@@ -1,14 +1,17 @@
-// Multilingual Expansion — 39-language target reconciliation.
-// Generates the 4 locale files that have a p2p_languages row but NO
-// locale file at all: am (Amharic), cs (Czech), mr (Marathi),
-// pcm (Nigerian Pidgin). Unlike complete-partial-locales.mjs (which fills
-// gaps in an EXISTING file), these start from nothing — every key is
-// translated fresh from en.json.
+// Multilingual Expansion — target reconciliation.
+// Generates locale files with no real content yet: am (Amharic), cs
+// (Czech), mr (Marathi), pcm (Nigerian Pidgin) — these have no file at
+// all — and tw (Twi/Akan, migration 159), whose locales/tw.json exists
+// but is a deliberately empty {} (real registration, zero fabricated
+// content, per the Twi task's explicit rule against fabricating
+// translations). Unlike complete-partial-locales.mjs (which fills gaps
+// in an already-partly-translated file), these all start from nothing —
+// every key is translated fresh from en.json.
 //
 // am was previously targeted by both translate-locales.mjs and
 // translate-remaining.mjs (the older OpenAI-based scripts) but no am.json
 // ever landed in this repository — no log or trace of that run exists
-// here to explain why. cs/mr/pcm were never targeted by any script at
+// here to explain why. cs/mr/pcm/tw were never targeted by any script at
 // all, in any environment, ever (confirmed by searching both older
 // scripts' target arrays).
 //
@@ -41,6 +44,7 @@ const TARGETS = [
   { code: "cs", name: "Czech" },
   { code: "mr", name: "Marathi" },
   { code: "pcm", name: "Nigerian Pidgin" },
+  { code: "tw", name: "Twi (Akan)" },
 ];
 
 const MODEL = "claude-haiku-4-5-20251001";
