@@ -19,22 +19,25 @@ import i18next from "i18next";
 import colors from "@/constants/colors";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { isSmallPhone, fs } from "@/lib/responsive";
+import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 
 const { width } = Dimensions.get("window");
 
 const LOGO = require("@/assets/images/logo.png");
 
-const LANGUAGES = [
-  { code: "en", label: "English", flag: "🇺🇸" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "pt", label: "Português", flag: "🇧🇷" },
-  { code: "zh", label: "中文", flag: "🇨🇳" },
-  { code: "ar", label: "العربية", flag: "🇸🇦" },
-  { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
-  { code: "sw", label: "Kiswahili", flag: "🇰🇪" },
-];
+// Onboarding Language Registry Alignment — this previously had its own
+// hardcoded 9-language list (independent of, and never touched by, the
+// multilingual expansion work that brought Settings' picker up to 35).
+// Generated from the same SUPPORTED_LANGUAGES/LANGUAGE_DISPLAY source
+// settings/language.tsx already uses, so onboarding can never drift back
+// out of sync with it again. The AsyncStorage handoff to AuthContext
+// (selectLanguage below) and RTL's post-login-only activation are both
+// unchanged — only the list of offered languages changed.
+const LANGUAGES = SUPPORTED_LANGUAGES.map((code) => ({
+  code,
+  label: LANGUAGE_DISPLAY[code].native,
+  flag: LANGUAGE_DISPLAY[code].flag,
+}));
 
 export default function OnboardingScreen() {
   const router = useRouter();
