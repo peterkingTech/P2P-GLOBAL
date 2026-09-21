@@ -119,14 +119,21 @@ export default function LanguageSettingsScreen() {
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
-            {(langPickerOpen === "app" ? LANGUAGES : BIBLE_LANGUAGES).map((l) => (
-              <TouchableOpacity key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
-                <Text style={styles.optionLabel}>{l.label}</Text>
-                {(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code && (
-                  <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
-                )}
-              </TouchableOpacity>
-            ))}
+            {/* 39-language expansion: the App Language list grew from 7 to 34
+                entries — the sheet's maxHeight (75%) was previously never
+                reached with so few rows, so this was never wrapped in a
+                scroll container. Without it, anything past the visible
+                area would be unreachable with no indication more exists. */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(langPickerOpen === "app" ? LANGUAGES : BIBLE_LANGUAGES).map((l) => (
+                <TouchableOpacity key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
+                  <Text style={styles.optionLabel}>{l.label}</Text>
+                  {(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code && (
+                    <Ionicons name="checkmark" size={18} color={colors.accentGreen} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
