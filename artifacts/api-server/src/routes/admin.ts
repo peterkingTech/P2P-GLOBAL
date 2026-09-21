@@ -414,12 +414,18 @@ router.put("/lesson/:id/translations/:lang", requireContentAdmin, async (req, re
       }, { onConflict: "section_id,language_code" });
     }
 
+    // Stage 7 (Scripture integrity): this writes admin-typed text, NOT a
+    // verified Bible translation — see migration 156's `source` column
+    // and table comment. This table has no student-facing read path
+    // today (confirmed repo-wide); if one is ever added it MUST filter
+    // source = 'api_bible', never the 'admin_manual' default written here.
     for (const s of scriptures) {
       if (!s.id) continue;
       await supabase.from("p2p_scripture_translations").upsert({
         scripture_id: s.id,
         language_code: lang,
         verse: s.verse ?? "",
+        source: "admin_manual",
       }, { onConflict: "scripture_id,language_code" });
     }
 

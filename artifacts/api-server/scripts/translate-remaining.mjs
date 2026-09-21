@@ -28,7 +28,7 @@ const REMAINING = [
   { code: "ig", name: "Igbo" },
   { code: "zu", name: "Zulu" },
   { code: "af", name: "Afrikaans" },
-  { code: "zh-Hant", name: "Chinese Traditional" },
+  { code: "zh-TW", name: "Chinese Traditional" },
   { code: "pa", name: "Punjabi" },
   { code: "ta", name: "Tamil" },
   { code: "te", name: "Telugu" },

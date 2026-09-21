@@ -6,12 +6,52 @@ import es from "@/locales/es.json";
 import fr from "@/locales/fr.json";
 import pt from "@/locales/pt.json";
 import zh from "@/locales/zh.json";
+import zhTW from "@/locales/zh-TW.json";
 import ar from "@/locales/ar.json";
 import hi from "@/locales/hi.json";
 import sw from "@/locales/sw.json";
 
-export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "pt", "zh", "ar", "hi", "sw"] as const;
+// Multilingual Expansion Stage 2 — reconciliation. Display metadata (native
+// name, RTL) lives here alongside the resource map itself so the two can
+// never drift again the way the old separate `app/settings/language.tsx`
+// LANGUAGES array did (that array silently omitted hi/sw, which already
+// had real resources here, and offered es/fr/pt/zh with no way for the
+// Settings screen to know they're only ~10% translated). Full completion
+// percentages are Stage 4's job (a repeatable audit tool, not a hardcoded
+// number here) — this file only records what actually has a resource.
+export const SUPPORTED_LANGUAGES = ["en", "de", "es", "fr", "pt", "zh", "zh-TW", "ar", "hi", "sw"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
+export const LANGUAGE_DISPLAY: Record<SupportedLanguage, { label: string; native: string; rtl: boolean }> = {
+  en: { label: "English", native: "English", rtl: false },
+  de: { label: "German", native: "Deutsch", rtl: false },
+  es: { label: "Spanish", native: "Español", rtl: false },
+  fr: { label: "French", native: "Français", rtl: false },
+  pt: { label: "Portuguese", native: "Português", rtl: false },
+  zh: { label: "Chinese (Simplified)", native: "中文(简体)", rtl: false },
+  "zh-TW": { label: "Chinese (Traditional)", native: "中文(繁體)", rtl: false },
+  ar: { label: "Arabic", native: "العربية", rtl: true },
+  hi: { label: "Hindi", native: "हिन्दी", rtl: false },
+  sw: { label: "Swahili", native: "Kiswahili", rtl: false },
+};
+
+// Multilingual Expansion Stage 3 — Bible Study Language is a SEPARATE
+// availability list from App Language (SUPPORTED_LANGUAGES above). It is
+// NOT UI-translation-driven — a user's ability to study Scripture in a
+// language has nothing to do with whether the app's own menus are
+// translated. It also isn't curriculum-draft-driven: p2p_content_translations
+// has unreviewed AI drafts for 15 languages, but that's not the same as a
+// verified Bible source. This list is generated from the one table that
+// actually records a licensed, confirmed Bible translation:
+// p2p_bible_translations.is_licensed_confirmed (verified live 2026-09-21 —
+// exactly these 8 languages have a confirmed row with a real api_bible_id;
+// notably zh/zh-TW do NOT, despite having a full UI translation). Keeping
+// this list scoped to confirmed sources means the picker can never offer a
+// language with no real Scripture behind it — simpler and safer than
+// building an "unavailable translation" banner across every content
+// screen right now.
+export const BIBLE_STUDY_LANGUAGES = ["en", "de", "es", "fr", "pt", "ar", "hi", "sw"] as const;
+export type BibleStudyLanguage = (typeof BIBLE_STUDY_LANGUAGES)[number];
 
 i18n.use(initReactI18next).init({
   compatibilityJSON: "v4",
@@ -22,6 +62,7 @@ i18n.use(initReactI18next).init({
     fr: { translation: fr },
     pt: { translation: pt },
     zh: { translation: zh },
+    "zh-TW": { translation: zhTW },
     ar: { translation: ar },
     hi: { translation: hi },
     sw: { translation: sw },

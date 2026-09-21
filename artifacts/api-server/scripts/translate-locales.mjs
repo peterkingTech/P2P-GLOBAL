@@ -52,7 +52,7 @@ const PHASE1_LANGUAGES = [
   { code: "zu", name: "Zulu" },
   { code: "af", name: "Afrikaans" },
   // Chinese Traditional
-  { code: "zh-Hant", name: "Chinese Traditional" },
+  { code: "zh-TW", name: "Chinese Traditional" },
 ];
 
 async function translateTo(langCode, langName, enObj) {

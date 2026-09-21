@@ -1,21 +1,32 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { SUPPORTED_LANGUAGES, BIBLE_STUDY_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "de", label: "Deutsch" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "pt", label: "Português" },
-  { code: "zh", label: "中文" },
-  { code: "ar", label: "العربية" },
-];
+// Multilingual Expansion Stage 2 — generated directly from lib/i18n.ts's
+// SUPPORTED_LANGUAGES/LANGUAGE_DISPLAY instead of a separately hardcoded
+// list. Previously this array silently omitted hi/sw (which already had
+// real i18next resources) — a language could be fully wired into the app
+// and still be unreachable from Settings with no error. Generating it
+// from the same source i18next itself uses makes that specific drift
+// structurally impossible going forward.
+const LANGUAGES = SUPPORTED_LANGUAGES.map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }));
+
+// Stage 3 — Content (Bible Study) Language is a genuinely different list
+// from App Language: it must never offer a language with no confirmed
+// Bible source, regardless of whether that language's UI menus happen to
+// be translated (zh/zh-TW are the concrete example — full UI translation,
+// zero confirmed Bible translation). Previously this screen reused
+// `LANGUAGES` for both pickers, which both over- and under-served users:
+// it could offer zh/zh-TW for Bible study (no real Scripture behind it)
+// while never offering some content languages that don't need UI
+// translation to be a valid Bible Study Language choice.
+const BIBLE_LANGUAGES = BIBLE_STUDY_LANGUAGES.map((code) => ({ code, label: LANGUAGE_DISPLAY[code].native }));
 
 const DATE_FORMATS: { value: "DD.MM.YYYY" | "MM/DD/YYYY"; label: string; example: string }[] = [
   { value: "DD.MM.YYYY", label: "DD.MM.YYYY", example: "e.g. 25.12.1998" },
@@ -30,9 +41,21 @@ export default function LanguageSettingsScreen() {
 
   const [langPickerOpen, setLangPickerOpen] = useState<"app" | "content" | null>(null);
 
+  // Pre-integration audit finding: this used to close the picker before
+  // the write even started and discarded updateProfile()'s result — once
+  // migration 155's server-side Bible Study Language validation is live,
+  // a rejected write (e.g. no confirmed Bible source for the selected
+  // content language) would close the sheet as if it succeeded with zero
+  // feedback. Mirrors the exact existing convention already used by
+  // account.tsx/change-username.tsx (`const err = await updateProfile(...);
+  // if (err) Alert.alert(...)`) rather than inventing a new pattern.
   async function setLanguage(kind: "app" | "content", code: string) {
+    const err = await updateProfile(kind === "app" ? { appLanguage: code } : { contentLanguage: code });
+    if (err) {
+      Alert.alert("Couldn't save", err);
+      return;
+    }
     setLangPickerOpen(null);
-    await updateProfile(kind === "app" ? { appLanguage: code } : { contentLanguage: code });
   }
 
   async function setDateFormat(value: "DD.MM.YYYY" | "MM/DD/YYYY") {
@@ -60,7 +83,7 @@ export default function LanguageSettingsScreen() {
               <Text style={styles.rowSub}>Changes the language curriculum is delivered in</Text>
             </View>
             <View style={styles.linkRowRight}>
-              <Text style={styles.linkRowValue}>{LANGUAGES.find((l) => l.code === profile?.contentLanguage)?.label ?? "English"}</Text>
+              <Text style={styles.linkRowValue}>{BIBLE_LANGUAGES.find((l) => l.code === profile?.contentLanguage)?.label ?? "English"}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </View>
           </TouchableOpacity>
@@ -96,7 +119,7 @@ export default function LanguageSettingsScreen() {
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
-            {LANGUAGES.map((l) => (
+            {(langPickerOpen === "app" ? LANGUAGES : BIBLE_LANGUAGES).map((l) => (
               <TouchableOpacity key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
                 <Text style={styles.optionLabel}>{l.label}</Text>
                 {(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code && (
