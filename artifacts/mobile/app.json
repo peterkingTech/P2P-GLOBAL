@@ -15,15 +15,16 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.amentech.p2pglobalbiblestudy",
+      "bundleIdentifier": "com.amentech.p2pglobaldiscipleshipnetwork",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera for video calls with peer guides and circles.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone for audio and video calls."
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone for audio and video calls.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.amentech.p2pglobalbiblestudy",
+      "package": "com.amentech.p2pglobaldiscipleshipnetwork",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
@@ -63,7 +64,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to auto-fill your city and country."
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to auto-fill your city and country.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false
         }
       ],
       [
