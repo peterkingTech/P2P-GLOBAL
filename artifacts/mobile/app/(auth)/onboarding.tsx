@@ -159,10 +159,10 @@ export default function OnboardingScreen() {
           </View>
         )}
         <Text style={[styles.title, isSmallPhone && { fontSize: fs(22) }, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</Text>
+        <Text style={styles.subtitle}>{SLIDES[current].subtitle}</Text>
         {SLIDES[current].id === "1" && (
           <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
         )}
-        <Text style={styles.subtitle}>{SLIDES[current].subtitle}</Text>
       </View>
 
       {/* Dots */}
@@ -323,9 +323,9 @@ const styles = StyleSheet.create({
     lineHeight: 30, marginBottom: 8,
   },
   poweredBy: {
-    fontSize: 11, fontWeight: "600", color: colors.accentGreen,
-    textAlign: "center", letterSpacing: 1.5,
-    fontFamily: "Inter_600SemiBold", marginBottom: 20,
+    fontSize: 9, fontWeight: "600", color: colors.accentGreen,
+    textAlign: "center", letterSpacing: 0.8,
+    fontFamily: "Inter_600SemiBold", marginTop: 14,
     textTransform: "uppercase",
   },
   subtitle: {

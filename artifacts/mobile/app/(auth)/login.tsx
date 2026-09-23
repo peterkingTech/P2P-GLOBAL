@@ -75,7 +75,7 @@ export default function LoginScreen() {
       {/* Logo */}
       <View style={styles.logoArea}>
         <Image source={LOGO} style={[styles.logoImg, isSmallPhone && styles.logoImgSmall]} resizeMode="contain" />
-        <Text style={[styles.appName, isSmallPhone && { fontSize: fs(19) }]}>P2P Bible Study</Text>
+        <Text style={[styles.appName, isSmallPhone && { fontSize: fs(17) }]}>P2P GLOBAL DISCIPLESHIP NETWORK</Text>
         <Text style={styles.tagline}>Welcome back</Text>
       </View>
 
@@ -178,10 +178,12 @@ const styles = StyleSheet.create({
   },
   logoImgSmall: { width: 96, height: 64 },
   appName: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "700",
     color: colors.cream,
     fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
   tagline: {
     fontSize: 14,
