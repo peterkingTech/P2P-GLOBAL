@@ -78,9 +78,9 @@
     "visibilityTitle": "قابلیت مشاهده پروفایل"
   },
   "onboarding": {
-    "slide1Title": "شبکه جهانی مطالعه کتاب مقدس\nهمراه به همراه",
-    "slide1Sub": "با ایمانداران سراسر جهان ارتباط برقرار کنید. در کنار یکدیگر، فراتر از هر مرز و در میان همه ملت‌ها رشد کنید.",
-    "poweredBy": "با پشتیبانی AMEN TECH",
+    "slide1Title": "به P2P Global خوش آمدید",
+    "slide1Sub": "یک شبکه جهانی شاگردسازی همتا به همتا.",
+    "poweredBy": "با پشتیبانی AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "رشد درخت خود را تماشا کنید",
     "slide2Sub": "هر جلسه مطالعه، هر دعا و هر دوستی، میوه‌ای به درخت زنده شما می‌افزاید — تصویری از سفر روحانی شما.",
     "slide3Title": "همراه مطالعاتی خود را پیدا کنید",
@@ -91,7 +91,9 @@
     "getStarted": "شروع کنید",
     "discoverMore": "بیشتر کشف کنید",
     "alreadyHaveAccount": "از قبل حساب کاربری دارم",
-    "selectLanguage": "انتخاب زبان"
+    "selectLanguage": "انتخاب زبان",
+    "createAccount": "ایجاد حساب",
+    "kingdomSchoolIntro": "این معرفی شما به مدرسه ملکوت است — آغاز سفر شاگردی شما."
   },
   "auth": {
     "appName": "مطالعه کتاب مقدس P2P",
@@ -165,7 +167,13 @@
     "myProfile": "پروفایل من",
     "myProfileSub": "پروفایل شاگردی خود را ببینید",
     "admin": "مدیر",
-    "adminSub": "مدیر برنامه درسی و پاسخ‌های ثبت‌نام"
+    "adminSub": "مدیر برنامه درسی و پاسخ‌های ثبت‌نام",
+    "kingdomImpact": "تأثیر ملکوت",
+    "kingdomImpactSub": "آمار شخصی شاگردی شما",
+    "peerConnect": "ارتباط همتا",
+    "peerConnectSub": "یک همراه مطالعاتی یا راهنمای همتا پیدا کنید",
+    "myDiscipleship": "شاگردی من",
+    "myDiscipleshipSub": "همراه دیگران قدم بردارید و تأثیر خود را ببینید"
   },
   "learn": {
     "title": "یادگیری",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} درس از {{total}} درس تأیید شده",
     "submitted": "ارسال‌شده",
     "noPlans": "هنوز برنامه‌ای در دسترس نیست. به‌زودی دوباره بررسی کنید!",
-    "unlockPlan": "برای باز کردن قفل، برنامه قبلی را تکمیل کنید"
+    "unlockPlan": "برای باز کردن قفل، برنامه قبلی را تکمیل کنید",
+    "foundationHeader": "بنیاد مدرسه ملکوت",
+    "foundationSubtitle": "سفر شاگردی شما — {{modules}} ماژول، {{lessons}} درس",
+    "foundationPctComplete": "{{pct}}% تکمیل شده",
+    "continueBtn": "ادامه",
+    "currentModule": "ماژول فعلی",
+    "allModules": "همه ماژول‌ها",
+    "upcoming": "پیش رو",
+    "completeLabel": "تکمیل شده",
+    "electivesHeader": "دروس انتخابی مدرسه ملکوت",
+    "electivesSubtitle": "مطالعات متمرکز برای هر فصل از زندگی",
+    "findElectives": "یافتن دروس انتخابی"
   },
   "prayer": {
     "title": "دعا و شهادت‌ها",
@@ -239,7 +258,9 @@
     "countriesReached": "کشورهای تحت تأثیر",
     "countriesReachedSub": "ملت‌هایی که از طریق شبکه شما تحت تأثیر قرار گرفته‌اند",
     "missions": "مأموریت‌ها",
-    "missionsSub": "قوم‌های دست‌نیافته‌ای که باید برایشان دعا کرد"
+    "missionsSub": "قوم‌های دست‌نیافته‌ای که باید برایشان دعا کرد",
+    "kingdomStories": "داستان‌های ملکوت",
+    "kingdomStoriesSub": "تاریخ مسیحیت، احیای روحانی، و کاری که خدا امروز انجام می‌دهد"
   },
   "missions": {
     "title": "مأموریت‌ها",

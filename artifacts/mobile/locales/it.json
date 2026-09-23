@@ -78,9 +78,9 @@
     "visibilityTitle": "Visibilità del profilo"
   },
   "onboarding": {
-    "slide1Title": "RETE GLOBALE DI STUDIO BIBLICO\nDA PARI A PARI",
-    "slide1Sub": "Connettiti con credenti di tutto il mondo. Crescete insieme, oltre ogni confine e ogni nazione.",
-    "poweredBy": "Offerto da AMEN TECH",
+    "slide1Title": "Benvenuto in P2P Global",
+    "slide1Sub": "Una rete globale di discepolato peer-to-peer.",
+    "poweredBy": "Offerto da AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Guarda crescere il tuo albero",
     "slide2Sub": "Ogni sessione di studio, ogni preghiera, ogni amicizia aggiunge frutto al tuo Albero Vivente — un'immagine del tuo cammino spirituale.",
     "slide3Title": "Trova il tuo compagno di studio",
@@ -91,7 +91,9 @@
     "getStarted": "Inizia",
     "discoverMore": "Scopri di più",
     "alreadyHaveAccount": "Ho già un account",
-    "selectLanguage": "Seleziona lingua"
+    "selectLanguage": "Seleziona lingua",
+    "createAccount": "Crea account",
+    "kingdomSchoolIntro": "Questa è la tua introduzione alla Kingdom School — l'inizio del tuo cammino di discepolato."
   },
   "auth": {
     "appName": "Studio biblico P2P",
@@ -165,7 +167,13 @@
     "myProfile": "Il mio profilo",
     "myProfileSub": "Visualizza il tuo profilo di discepolato",
     "admin": "Amministrazione",
-    "adminSub": "Gestore del curriculum e risposte alle registrazioni"
+    "adminSub": "Gestore del curriculum e risposte alle registrazioni",
+    "kingdomImpact": "Impatto del Regno",
+    "kingdomImpactSub": "Le tue statistiche personali di discepolato",
+    "peerConnect": "Connessione tra Pari",
+    "peerConnectSub": "Trova un compagno di studio o una guida tra pari",
+    "myDiscipleship": "Il Mio Discepolato",
+    "myDiscipleshipSub": "Cammina insieme agli altri e vedi il tuo impatto"
   },
   "learn": {
     "title": "Impara",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} di {{total}} approvate",
     "submitted": "consegnato",
     "noPlans": "Nessun piano disponibile. Torna a controllare presto!",
-    "unlockPlan": "Completa il piano precedente per sbloccare"
+    "unlockPlan": "Completa il piano precedente per sbloccare",
+    "foundationHeader": "Fondamenta della Kingdom School",
+    "foundationSubtitle": "Il tuo cammino di discepolato — {{modules}} moduli, {{lessons}} lezioni",
+    "foundationPctComplete": "{{pct}}% Completato",
+    "continueBtn": "Continua",
+    "currentModule": "Modulo Attuale",
+    "allModules": "Tutti i Moduli",
+    "upcoming": "Prossimamente",
+    "completeLabel": "Completato",
+    "electivesHeader": "Materie Facoltative della Kingdom School",
+    "electivesSubtitle": "Studi mirati per ogni stagione della vita",
+    "findElectives": "Trova Materie Facoltative"
   },
   "prayer": {
     "title": "Preghiera e testimonianze",
@@ -239,7 +258,9 @@
     "countriesReached": "Paesi raggiunti",
     "countriesReachedSub": "Nazioni toccate attraverso la tua rete",
     "missions": "Missioni",
-    "missionsSub": "Popoli non raggiunti per cui pregare"
+    "missionsSub": "Popoli non raggiunti per cui pregare",
+    "kingdomStories": "Storie del Regno",
+    "kingdomStoriesSub": "Storia cristiana, risveglio, e ciò che Dio sta facendo oggi"
   },
   "missions": {
     "title": "Missioni",

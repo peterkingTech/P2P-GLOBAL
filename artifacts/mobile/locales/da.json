@@ -78,9 +78,9 @@
     "visibilityTitle": "Profilens synlighed"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Forbind dig med troende over hele verden. Voks sammen på tværs af alle grænser og nationer.",
-    "poweredBy": "Drevet af AMEN TECH",
+    "slide1Title": "Velkommen til P2P Global",
+    "slide1Sub": "Et globalt peer-to-peer discipelskabsnetværk.",
+    "poweredBy": "Drevet af AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Se dit træ vokse",
     "slide2Sub": "Hver studiesession, hver bøn og hvert venskab giver frugt på dit levende træ — et billede på din åndelige rejse.",
     "slide3Title": "Find din studiepartner",
@@ -91,7 +91,9 @@
     "getStarted": "Kom i gang",
     "discoverMore": "Opdag mere",
     "alreadyHaveAccount": "Jeg har allerede en konto",
-    "selectLanguage": "Vælg sprog"
+    "selectLanguage": "Vælg sprog",
+    "createAccount": "Opret konto",
+    "kingdomSchoolIntro": "Dette er din introduktion til Kingdom School — begyndelsen på din discipelrejse."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Min profil",
     "myProfileSub": "Se din discipelprofil",
     "admin": "Administration",
-    "adminSub": "Læseplansadministrator og registreringssvar"
+    "adminSub": "Læseplansadministrator og registreringssvar",
+    "kingdomImpact": "Rigets Indflydelse",
+    "kingdomImpactSub": "Dine personlige discipelskabsstatistikker",
+    "peerConnect": "Ligeværdig Forbindelse",
+    "peerConnectSub": "Find en studiepartner eller ligeværdig vejleder",
+    "myDiscipleship": "Mit Discipelskab",
+    "myDiscipleshipSub": "Vandr sammen med andre, og se din indflydelse"
   },
   "learn": {
     "title": "Lær",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} af {{total}} godkendt",
     "submitted": "afleveret",
     "noPlans": "Ingen planer tilgængelige endnu. Kom snart tilbage!",
-    "unlockPlan": "Gennemfør den forrige plan for at låse op"
+    "unlockPlan": "Gennemfør den forrige plan for at låse op",
+    "foundationHeader": "Kingdom School Fundament",
+    "foundationSubtitle": "Din discipelrejse — {{modules}} moduler, {{lessons}} lektioner",
+    "foundationPctComplete": "{{pct}}% Fuldført",
+    "continueBtn": "Fortsæt",
+    "currentModule": "Nuværende Modul",
+    "allModules": "Alle Moduler",
+    "upcoming": "Kommende",
+    "completeLabel": "Fuldført",
+    "electivesHeader": "Kingdom School Valgfag",
+    "electivesSubtitle": "Fokuserede studier til enhver livsfase",
+    "findElectives": "Find Valgfag"
   },
   "prayer": {
     "title": "Bøn og vidnesbyrd",
@@ -239,7 +258,9 @@
     "countriesReached": "Nåede lande",
     "countriesReachedSub": "Nationer, der er berørt gennem dit netværk",
     "missions": "Missioner",
-    "missionsSub": "Unåede folkeslag, du kan bede for"
+    "missionsSub": "Unåede folkeslag, du kan bede for",
+    "kingdomStories": "Rigets Historier",
+    "kingdomStoriesSub": "Kristen historie, vækkelse, og hvad Gud gør i dag"
   },
   "missions": {
     "title": "Missioner",

@@ -78,9 +78,9 @@
     "visibilityTitle": "프로필 공개 설정"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "전 세계의 믿는 이들과 연결되세요. 모든 경계와 모든 나라를 넘어 함께 성장하세요.",
-    "poweredBy": "AMEN TECH 제공",
+    "slide1Title": "P2P Global에 오신 것을 환영합니다",
+    "slide1Sub": "전 세계 피어투피어 제자훈련 네트워크입니다.",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY 제공",
     "slide2Title": "나무가 자라는 모습을 지켜보세요",
     "slide2Sub": "모든 공부 시간, 모든 기도, 모든 우정이 여러분의 리빙 트리에 열매를 더합니다 — 영적 여정을 보여 주는 모습입니다.",
     "slide3Title": "공부 파트너를 찾으세요",
@@ -91,7 +91,9 @@
     "getStarted": "시작하기",
     "discoverMore": "더 알아보기",
     "alreadyHaveAccount": "이미 계정이 있습니다",
-    "selectLanguage": "언어 선택"
+    "selectLanguage": "언어 선택",
+    "createAccount": "계정 만들기",
+    "kingdomSchoolIntro": "이것은 킹덤 스쿨에 대한 소개입니다 — 당신의 제자훈련 여정의 시작입니다."
   },
   "auth": {
     "appName": "P2P 성경 공부",
@@ -165,7 +167,13 @@
     "myProfile": "내 프로필",
     "myProfileSub": "제자도 프로필을 확인하세요",
     "admin": "관리자",
-    "adminSub": "커리큘럼 관리자 및 등록 응답"
+    "adminSub": "커리큘럼 관리자 및 등록 응답",
+    "kingdomImpact": "왕국의 영향력",
+    "kingdomImpactSub": "당신의 개인 제자훈련 통계",
+    "peerConnect": "동료 연결",
+    "peerConnectSub": "학습 파트너나 동료 가이드를 찾으세요",
+    "myDiscipleship": "나의 제자훈련",
+    "myDiscipleshipSub": "다른 사람들과 함께 걸으며 당신의 영향력을 확인하세요"
   },
   "learn": {
     "title": "학습",
@@ -182,7 +190,18 @@
     "lessonsApproved": "총 {{total}}개 중 {{approved}}개 승인됨",
     "submitted": "제출됨",
     "noPlans": "아직 이용 가능한 계획이 없습니다. 곧 다시 확인해 주세요!",
-    "unlockPlan": "잠금을 해제하려면 이전 계획을 완료하세요"
+    "unlockPlan": "잠금을 해제하려면 이전 계획을 완료하세요",
+    "foundationHeader": "킹덤 스쿨 기초 과정",
+    "foundationSubtitle": "당신의 제자훈련 여정 — {{modules}}개 모듈, {{lessons}}개 레슨",
+    "foundationPctComplete": "{{pct}}% 완료",
+    "continueBtn": "계속",
+    "currentModule": "현재 모듈",
+    "allModules": "모든 모듈",
+    "upcoming": "예정",
+    "completeLabel": "완료",
+    "electivesHeader": "킹덤 스쿨 선택 과목",
+    "electivesSubtitle": "인생의 모든 계절을 위한 집중 학습",
+    "findElectives": "선택 과목 찾기"
   },
   "prayer": {
     "title": "기도와 간증",
@@ -239,7 +258,9 @@
     "countriesReached": "연결된 국가",
     "countriesReachedSub": "네트워크를 통해 복음이 닿은 나라들",
     "missions": "선교",
-    "missionsSub": "기도할 미전도 종족"
+    "missionsSub": "기도할 미전도 종족",
+    "kingdomStories": "왕국의 이야기",
+    "kingdomStoriesSub": "기독교 역사, 부흥, 그리고 오늘날 하나님이 하시는 일"
   },
   "missions": {
     "title": "선교",

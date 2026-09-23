@@ -78,9 +78,9 @@
     "visibilityTitle": "個人檔案可見度"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "與全球信徒連結。在每個疆界、每個國家，一同成長。",
-    "poweredBy": "由 AMEN TECH 提供技術支援",
+    "slide1Title": "歡迎來到P2P Global",
+    "slide1Sub": "一個全球點對點門徒訓練網絡。",
+    "poweredBy": "由 AMEN KINGDOM TECH MINISTRY 提供技術支援",
     "slide2Title": "看著你的樹成長",
     "slide2Sub": "每次查經、每次禱告、每段友誼，都為你的生命樹增添果子——描繪你的屬靈旅程。",
     "slide3Title": "尋找你的查經夥伴",
@@ -91,7 +91,9 @@
     "getStarted": "開始使用",
     "discoverMore": "探索更多",
     "alreadyHaveAccount": "我已經有帳戶",
-    "selectLanguage": "選擇語言"
+    "selectLanguage": "選擇語言",
+    "createAccount": "建立帳戶",
+    "kingdomSchoolIntro": "這是你對國度學校的介紹——你門徒訓練旅程的開始。"
   },
   "auth": {
     "appName": "P2P 聖經查考",
@@ -165,7 +167,13 @@
     "myProfile": "我的個人檔案",
     "myProfileSub": "查看你的門徒訓練個人檔案",
     "admin": "管理員",
-    "adminSub": "課程管理員與註冊回覆"
+    "adminSub": "課程管理員與註冊回覆",
+    "kingdomImpact": "國度影響力",
+    "kingdomImpactSub": "你的個人門徒訓練數據",
+    "peerConnect": "夥伴連結",
+    "peerConnectSub": "尋找查經夥伴或同儕引導者",
+    "myDiscipleship": "我的門徒訓練",
+    "myDiscipleshipSub": "與他人同行，看見你的影響力"
   },
   "learn": {
     "title": "學習",
@@ -182,7 +190,18 @@
     "lessonsApproved": "已核准 {{approved}}／共 {{total}} 堂課",
     "submitted": "已提交",
     "noPlans": "目前尚無可用計畫。請稍後再回來查看！",
-    "unlockPlan": "完成上一個計畫以解鎖"
+    "unlockPlan": "完成上一個計畫以解鎖",
+    "foundationHeader": "國度學校基礎課程",
+    "foundationSubtitle": "你的門徒訓練旅程——{{modules}} 個單元，{{lessons}} 堂課",
+    "foundationPctComplete": "已完成 {{pct}}%",
+    "continueBtn": "繼續",
+    "currentModule": "目前單元",
+    "allModules": "所有單元",
+    "upcoming": "即將推出",
+    "completeLabel": "已完成",
+    "electivesHeader": "國度學校選修課程",
+    "electivesSubtitle": "針對人生每個階段的專注學習",
+    "findElectives": "尋找選修課程"
   },
   "prayer": {
     "title": "禱告與見證",
@@ -239,7 +258,9 @@
     "countriesReached": "觸及的國家",
     "countriesReachedSub": "透過你的網絡接觸到的國家",
     "missions": "宣教",
-    "missionsSub": "需要代禱的未得之民"
+    "missionsSub": "需要代禱的未得之民",
+    "kingdomStories": "國度故事",
+    "kingdomStoriesSub": "基督教歷史、復興，以及上帝今日正在做的事"
   },
   "missions": {
     "title": "宣教",

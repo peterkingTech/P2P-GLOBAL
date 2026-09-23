@@ -78,9 +78,9 @@
     "visibilityTitle": "প্রোফাইলের দৃশ্যমানতা"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "বিশ্বজুড়ে বিশ্বাসীদের সঙ্গে সংযুক্ত হোন। প্রতিটি সীমান্ত ও প্রতিটি জাতির ঊর্ধ্বে একসঙ্গে বেড়ে উঠুন।",
-    "poweredBy": "AMEN TECH দ্বারা পরিচালিত",
+    "slide1Title": "P2P গ্লোবালে স্বাগতম",
+    "slide1Sub": "একটি বিশ্বব্যাপী পিয়ার-টু-পিয়ার শিষ্যত্ব নেটওয়ার্ক।",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY দ্বারা পরিচালিত",
     "slide2Title": "আপনার গাছের বৃদ্ধি দেখুন",
     "slide2Sub": "প্রতিটি অধ্যয়ন সেশন, প্রতিটি প্রার্থনা ও প্রতিটি বন্ধুত্ব আপনার জীবন্ত গাছে ফল যোগ করে — এটি আপনার আত্মিক যাত্রার একটি প্রতিচ্ছবি।",
     "slide3Title": "আপনার অধ্যয়নসঙ্গী খুঁজে নিন",
@@ -91,7 +91,9 @@
     "getStarted": "শুরু করুন",
     "discoverMore": "আরও আবিষ্কার করুন",
     "alreadyHaveAccount": "আমার ইতিমধ্যে একটি অ্যাকাউন্ট আছে",
-    "selectLanguage": "ভাষা নির্বাচন করুন"
+    "selectLanguage": "ভাষা নির্বাচন করুন",
+    "createAccount": "অ্যাকাউন্ট তৈরি করুন",
+    "kingdomSchoolIntro": "এটি কিংডম স্কুলের সাথে আপনার পরিচয় — আপনার শিষ্যত্ব যাত্রার সূচনা।"
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "আমার প্রোফাইল",
     "myProfileSub": "আপনার শিষ্যত্বের প্রোফাইল দেখুন",
     "admin": "অ্যাডমিন",
-    "adminSub": "পাঠ্যক্রম ব্যবস্থাপক ও নিবন্ধনের উত্তরসমূহ"
+    "adminSub": "পাঠ্যক্রম ব্যবস্থাপক ও নিবন্ধনের উত্তরসমূহ",
+    "kingdomImpact": "রাজ্যের প্রভাব",
+    "kingdomImpactSub": "আপনার ব্যক্তিগত শিষ্যত্ব পরিসংখ্যান",
+    "peerConnect": "সহপাঠী সংযোগ",
+    "peerConnectSub": "একজন অধ্যয়নসঙ্গী বা সহপাঠী গাইড খুঁজুন",
+    "myDiscipleship": "আমার শিষ্যত্ব",
+    "myDiscipleshipSub": "অন্যদের সাথে চলুন এবং আপনার প্রভাব দেখুন"
   },
   "learn": {
     "title": "শিখুন",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{total}}টির মধ্যে {{approved}}টি অনুমোদিত",
     "submitted": "জমা দেওয়া হয়েছে",
     "noPlans": "এখনও কোনো পরিকল্পনা উপলব্ধ নেই। শীঘ্রই আবার দেখুন!",
-    "unlockPlan": "আনলক করতে আগের পরিকল্পনাটি সম্পন্ন করুন"
+    "unlockPlan": "আনলক করতে আগের পরিকল্পনাটি সম্পন্ন করুন",
+    "foundationHeader": "কিংডম স্কুল ফাউন্ডেশন",
+    "foundationSubtitle": "আপনার শিষ্যত্ব যাত্রা — {{modules}}টি মডিউল, {{lessons}}টি পাঠ",
+    "foundationPctComplete": "{{pct}}% সম্পন্ন",
+    "continueBtn": "চালিয়ে যান",
+    "currentModule": "বর্তমান মডিউল",
+    "allModules": "সব মডিউল",
+    "upcoming": "আসন্ন",
+    "completeLabel": "সম্পন্ন",
+    "electivesHeader": "কিংডম স্কুল ঐচ্ছিক বিষয়",
+    "electivesSubtitle": "জীবনের প্রতিটি পর্যায়ের জন্য বিশেষ অধ্যয়ন",
+    "findElectives": "ঐচ্ছিক বিষয় খুঁজুন"
   },
   "prayer": {
     "title": "প্রার্থনা ও সাক্ষ্য",
@@ -239,7 +258,9 @@
     "countriesReached": "যেসব দেশে পৌঁছেছে",
     "countriesReachedSub": "আপনার নেটওয়ার্কের মাধ্যমে স্পর্শ করা জাতিসমূহ",
     "missions": "মিশন",
-    "missionsSub": "যেসব জনগোষ্ঠীর জন্য প্রার্থনা করতে হবে"
+    "missionsSub": "যেসব জনগোষ্ঠীর জন্য প্রার্থনা করতে হবে",
+    "kingdomStories": "রাজ্যের গল্প",
+    "kingdomStoriesSub": "খ্রিস্টান ইতিহাস, পুনর্জাগরণ, এবং ঈশ্বর আজ যা করছেন"
   },
   "missions": {
     "title": "মিশন",

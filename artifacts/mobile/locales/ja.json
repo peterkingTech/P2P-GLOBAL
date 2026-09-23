@@ -78,9 +78,9 @@
     "visibilityTitle": "プロフィールの公開設定"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "世界中の信徒とつながりましょう。あらゆる国境、あらゆる国を越えて、ともに成長しましょう。",
-    "poweredBy": "AMEN TECH 提供",
+    "slide1Title": "P2P Globalへようこそ",
+    "slide1Sub": "グローバルなピアツーピア弟子訓練ネットワーク。",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY 提供",
     "slide2Title": "あなたの木の成長を見守る",
     "slide2Sub": "一つひとつの学び、一つひとつの祈り、一つひとつの友情が、あなたの生ける木に実を加えます。それはあなたの霊的な歩みを表すものです。",
     "slide3Title": "学びのパートナーを見つける",
@@ -91,7 +91,9 @@
     "getStarted": "始める",
     "discoverMore": "さらに見る",
     "alreadyHaveAccount": "すでにアカウントを持っています",
-    "selectLanguage": "言語を選択"
+    "selectLanguage": "言語を選択",
+    "createAccount": "アカウントを作成",
+    "kingdomSchoolIntro": "これはキングダムスクールへの導入です — あなたの弟子訓練の旅の始まりです。"
   },
   "auth": {
     "appName": "P2P聖書学習",
@@ -165,7 +167,13 @@
     "myProfile": "マイプロフィール",
     "myProfileSub": "弟子としてのプロフィールを見る",
     "admin": "管理者",
-    "adminSub": "カリキュラム管理と登録回答"
+    "adminSub": "カリキュラム管理と登録回答",
+    "kingdomImpact": "キングダム・インパクト",
+    "kingdomImpactSub": "あなたの個人的な弟子訓練の統計",
+    "peerConnect": "ピア・コネクト",
+    "peerConnectSub": "学びのパートナーやピアガイドを見つける",
+    "myDiscipleship": "私の弟子訓練",
+    "myDiscipleshipSub": "他の人と共に歩み、あなたの影響を見る"
   },
   "learn": {
     "title": "学ぶ",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{total}}レッスン中{{approved}}レッスン承認済み",
     "submitted": "提出済み",
     "noPlans": "利用できるプランはまだありません。しばらくしてからもう一度確認してください！",
-    "unlockPlan": "前のプランを完了すると解除されます"
+    "unlockPlan": "前のプランを完了すると解除されます",
+    "foundationHeader": "キングダムスクール・ファウンデーション",
+    "foundationSubtitle": "あなたの弟子訓練の旅 — {{modules}}モジュール、{{lessons}}レッスン",
+    "foundationPctComplete": "{{pct}}% 完了",
+    "continueBtn": "続ける",
+    "currentModule": "現在のモジュール",
+    "allModules": "すべてのモジュール",
+    "upcoming": "予定",
+    "completeLabel": "完了",
+    "electivesHeader": "キングダムスクール選択科目",
+    "electivesSubtitle": "人生のあらゆる季節のための集中的な学び",
+    "findElectives": "選択科目を探す"
   },
   "prayer": {
     "title": "祈りと証し",
@@ -239,7 +258,9 @@
     "countriesReached": "つながった国々",
     "countriesReachedSub": "あなたのネットワークを通して触れられた国々",
     "missions": "宣教",
-    "missionsSub": "祈るべき未伝道の人々"
+    "missionsSub": "祈るべき未伝道の人々",
+    "kingdomStories": "キングダム・ストーリー",
+    "kingdomStoriesSub": "キリスト教の歴史、リバイバル、そして神が今日行っていること"
   },
   "missions": {
     "title": "宣教",

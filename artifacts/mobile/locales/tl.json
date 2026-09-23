@@ -78,9 +78,9 @@
     "visibilityTitle": "Pagkakakita sa Profile"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Makipag-ugnayan sa mga mananampalataya sa buong mundo. Sama-samang lumago, sa kabila ng bawat hangganan at bansa.",
-    "poweredBy": "Pinapatakbo ng AMEN TECH",
+    "slide1Title": "Maligayang Pagdating sa P2P Global",
+    "slide1Sub": "Isang pandaigdigang network ng pagdisipulo, peer-to-peer.",
+    "poweredBy": "Pinapatakbo ng AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Panoorin ang Paglago ng Iyong Puno",
     "slide2Sub": "Bawat sesyon ng pag-aaral, bawat panalangin, bawat pagkakaibigan ay nagdaragdag ng bunga sa iyong Buhay na Puno — larawan ng iyong espirituwal na paglalakbay.",
     "slide3Title": "Hanapin ang Iyong Kasama sa Pag-aaral",
@@ -91,7 +91,9 @@
     "getStarted": "Magsimula",
     "discoverMore": "Tuklasin Pa",
     "alreadyHaveAccount": "May account na ako",
-    "selectLanguage": "Pumili ng Wika"
+    "selectLanguage": "Pumili ng Wika",
+    "createAccount": "Gumawa ng Account",
+    "kingdomSchoolIntro": "Ito ang iyong panimula sa Kingdom School — ang simula ng iyong paglalakbay sa pagpapamuridan."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Aking Profile",
     "myProfileSub": "Tingnan ang iyong profile bilang alagad",
     "admin": "Admin",
-    "adminSub": "Tagapamahala ng kurikulum at mga tugon sa pagpaparehistro"
+    "adminSub": "Tagapamahala ng kurikulum at mga tugon sa pagpaparehistro",
+    "kingdomImpact": "Epekto ng Kaharian",
+    "kingdomImpactSub": "Ang iyong personal na sukatan sa pagpapamuridan",
+    "peerConnect": "Koneksyon sa Kasama",
+    "peerConnectSub": "Maghanap ng kasama sa pag-aaral o gabay na kasamahan",
+    "myDiscipleship": "Ang Aking Pagpapamuridan",
+    "myDiscipleshipSub": "Lumakad kasama ang iba at makita ang iyong epekto"
   },
   "learn": {
     "title": "Matuto",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} sa {{total}} ang naaprubahan",
     "submitted": "naisumite",
     "noPlans": "Wala pang available na mga plano. Bumalik muli sa lalong madaling panahon!",
-    "unlockPlan": "Kumpletuhin ang nakaraang plano upang ma-unlock"
+    "unlockPlan": "Kumpletuhin ang nakaraang plano upang ma-unlock",
+    "foundationHeader": "Pundasyon ng Kingdom School",
+    "foundationSubtitle": "Ang iyong paglalakbay sa pagpapamuridan — {{modules}} na modyul, {{lessons}} na aralin",
+    "foundationPctComplete": "{{pct}}% Nakumpleto",
+    "continueBtn": "Magpatuloy",
+    "currentModule": "Kasalukuyang Modyul",
+    "allModules": "Lahat ng Modyul",
+    "upcoming": "Paparating",
+    "completeLabel": "Nakumpleto",
+    "electivesHeader": "Mga Elektibong Asignatura ng Kingdom School",
+    "electivesSubtitle": "Nakatuong pag-aaral para sa bawat yugto ng buhay",
+    "findElectives": "Maghanap ng Elektibo"
   },
   "prayer": {
     "title": "Panalangin at mga Patotoo",
@@ -239,7 +258,9 @@
     "countriesReached": "Mga Bansang Naabot",
     "countriesReachedSub": "Mga bansang naabot sa pamamagitan ng iyong network",
     "missions": "Mga Misyon",
-    "missionsSub": "Mga taong hindi pa naaabot ng ebanghelyo na dapat ipanalangin"
+    "missionsSub": "Mga taong hindi pa naaabot ng ebanghelyo na dapat ipanalangin",
+    "kingdomStories": "Mga Kwento ng Kaharian",
+    "kingdomStoriesSub": "Kasaysayang Kristiyano, muling pagsigla, at ang ginagawa ng Diyos ngayon"
   },
   "missions": {
     "title": "Mga Misyon",

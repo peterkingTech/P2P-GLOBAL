@@ -78,9 +78,9 @@
     "visibilityTitle": "ਪ੍ਰੋਫ਼ਾਈਲ ਦੀ ਦਿੱਖ"
   },
   "onboarding": {
-    "slide1Title": "ਪੀਅਰ-ਟੂ-ਪੀਅਰ ਗਲੋਬਲ\nਬਾਈਬਲ ਅਧਿਐਨ ਨੈੱਟਵਰਕ",
-    "slide1Sub": "ਦੁਨੀਆ ਭਰ ਦੇ ਵਿਸ਼ਵਾਸੀਆਂ ਨਾਲ ਜੁੜੋ। ਹਰ ਸਰਹੱਦ ਅਤੇ ਹਰ ਕੌਮ ਤੋਂ ਪਰੇ, ਇਕੱਠੇ ਵਧੋ।",
-    "poweredBy": "AMEN TECH ਦੁਆਰਾ ਸੰਚਾਲਿਤ",
+    "slide1Title": "P2P ਗਲੋਬਲ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ",
+    "slide1Sub": "ਇੱਕ ਗਲੋਬਲ ਪੀਅਰ-ਟੂ-ਪੀਅਰ ਚੇਲਾਪਣ ਨੈੱਟਵਰਕ।",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY ਦੁਆਰਾ ਸੰਚਾਲਿਤ",
     "slide2Title": "ਆਪਣੇ ਰੁੱਖ ਨੂੰ ਵਧਦਾ ਵੇਖੋ",
     "slide2Sub": "ਹਰ ਅਧਿਐਨ ਸੈਸ਼ਨ, ਹਰ ਪ੍ਰਾਰਥਨਾ ਅਤੇ ਹਰ ਦੋਸਤੀ ਤੁਹਾਡੇ ਜੀਉਂਦੇ ਰੁੱਖ ਵਿੱਚ ਫਲ ਜੋੜਦੀ ਹੈ — ਤੁਹਾਡੀ ਆਤਮਿਕ ਯਾਤਰਾ ਦੀ ਤਸਵੀਰ।",
     "slide3Title": "ਆਪਣਾ ਅਧਿਐਨ ਸਾਥੀ ਲੱਭੋ",
@@ -91,7 +91,9 @@
     "getStarted": "ਸ਼ੁਰੂ ਕਰੋ",
     "discoverMore": "ਹੋਰ ਖੋਜੋ",
     "alreadyHaveAccount": "ਮੇਰੇ ਕੋਲ ਪਹਿਲਾਂ ਹੀ ਖਾਤਾ ਹੈ",
-    "selectLanguage": "ਭਾਸ਼ਾ ਚੁਣੋ"
+    "selectLanguage": "ਭਾਸ਼ਾ ਚੁਣੋ",
+    "createAccount": "ਖਾਤਾ ਬਣਾਓ",
+    "kingdomSchoolIntro": "ਇਹ ਕਿੰਗਡਮ ਸਕੂਲ ਨਾਲ ਤੁਹਾਡੀ ਜਾਣ-ਪਛਾਣ ਹੈ — ਤੁਹਾਡੀ ਚੇਲਾਪਣ ਯਾਤਰਾ ਦੀ ਸ਼ੁਰੂਆਤ।"
   },
   "auth": {
     "appName": "P2P ਬਾਈਬਲ ਅਧਿਐਨ",
@@ -165,7 +167,13 @@
     "myProfile": "ਮੇਰੀ ਪ੍ਰੋਫ਼ਾਈਲ",
     "myProfileSub": "ਆਪਣੀ ਚੇਲਾਪਣ ਦੀ ਪ੍ਰੋਫ਼ਾਈਲ ਵੇਖੋ",
     "admin": "ਐਡਮਿਨ",
-    "adminSub": "ਪਾਠਕ੍ਰਮ ਪ੍ਰਬੰਧਕ ਅਤੇ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਜਵਾਬ"
+    "adminSub": "ਪਾਠਕ੍ਰਮ ਪ੍ਰਬੰਧਕ ਅਤੇ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਜਵਾਬ",
+    "kingdomImpact": "ਰਾਜ ਦਾ ਪ੍ਰਭਾਵ",
+    "kingdomImpactSub": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਚੇਲਾਪਣ ਦੇ ਅੰਕੜੇ",
+    "peerConnect": "ਸਾਥੀ ਸੰਪਰਕ",
+    "peerConnectSub": "ਇੱਕ ਅਧਿਐਨ ਸਾਥੀ ਜਾਂ ਸਾਥੀ ਗਾਈਡ ਲੱਭੋ",
+    "myDiscipleship": "ਮੇਰੀ ਚੇਲਾਪਣ",
+    "myDiscipleshipSub": "ਦੂਜਿਆਂ ਨਾਲ ਚੱਲੋ ਅਤੇ ਆਪਣਾ ਪ੍ਰਭਾਵ ਵੇਖੋ"
   },
   "learn": {
     "title": "ਸਿੱਖੋ",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{total}} ਵਿੱਚੋਂ {{approved}} ਮਨਜ਼ੂਰ ਕੀਤੇ ਗਏ",
     "submitted": "ਜਮ੍ਹਾਂ ਕਰਵਾਇਆ",
     "noPlans": "ਅਜੇ ਕੋਈ ਯੋਜਨਾ ਉਪਲਬਧ ਨਹੀਂ। ਜਲਦੀ ਦੁਬਾਰਾ ਵੇਖੋ!",
-    "unlockPlan": "ਅਨਲੌਕ ਕਰਨ ਲਈ ਪਿਛਲੀ ਯੋਜਨਾ ਪੂਰੀ ਕਰੋ"
+    "unlockPlan": "ਅਨਲੌਕ ਕਰਨ ਲਈ ਪਿਛਲੀ ਯੋਜਨਾ ਪੂਰੀ ਕਰੋ",
+    "foundationHeader": "ਕਿੰਗਡਮ ਸਕੂਲ ਬੁਨਿਆਦ",
+    "foundationSubtitle": "ਤੁਹਾਡੀ ਚੇਲਾਪਣ ਯਾਤਰਾ — {{modules}} ਮੋਡੀਊਲ, {{lessons}} ਪਾਠ",
+    "foundationPctComplete": "{{pct}}% ਪੂਰਾ",
+    "continueBtn": "ਜਾਰੀ ਰੱਖੋ",
+    "currentModule": "ਮੌਜੂਦਾ ਮੋਡੀਊਲ",
+    "allModules": "ਸਾਰੇ ਮੋਡੀਊਲ",
+    "upcoming": "ਆਉਣ ਵਾਲਾ",
+    "completeLabel": "ਪੂਰਾ",
+    "electivesHeader": "ਕਿੰਗਡਮ ਸਕੂਲ ਚੋਣਵੇਂ ਵਿਸ਼ੇ",
+    "electivesSubtitle": "ਜ਼ਿੰਦਗੀ ਦੇ ਹਰ ਮੌਸਮ ਲਈ ਕੇਂਦਰਿਤ ਅਧਿਐਨ",
+    "findElectives": "ਚੋਣਵੇਂ ਵਿਸ਼ੇ ਲੱਭੋ"
   },
   "prayer": {
     "title": "ਪ੍ਰਾਰਥਨਾ ਅਤੇ ਗਵਾਹੀਆਂ",
@@ -239,7 +258,9 @@
     "countriesReached": "ਪਹੁੰਚੇ ਦੇਸ਼",
     "countriesReachedSub": "ਤੁਹਾਡੇ ਨੈੱਟਵਰਕ ਰਾਹੀਂ ਛੁਹੀਆਂ ਕੌਮਾਂ",
     "missions": "ਮਿਸ਼ਨ",
-    "missionsSub": "ਉਹ ਲੋਕ-ਸਮੂਹ ਜਿਨ੍ਹਾਂ ਲਈ ਪ੍ਰਾਰਥਨਾ ਕਰਨੀ ਹੈ"
+    "missionsSub": "ਉਹ ਲੋਕ-ਸਮੂਹ ਜਿਨ੍ਹਾਂ ਲਈ ਪ੍ਰਾਰਥਨਾ ਕਰਨੀ ਹੈ",
+    "kingdomStories": "ਰਾਜ ਦੀਆਂ ਕਹਾਣੀਆਂ",
+    "kingdomStoriesSub": "ਈਸਾਈ ਇਤਿਹਾਸ, ਪੁਨਰ ਸੁਰਜੀਤੀ, ਅਤੇ ਅੱਜ ਪਰਮੇਸ਼ੁਰ ਕੀ ਕਰ ਰਿਹਾ ਹੈ"
   },
   "missions": {
     "title": "ਮਿਸ਼ਨ",

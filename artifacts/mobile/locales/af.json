@@ -78,9 +78,9 @@
     "visibilityTitle": "Profielsigbaarheid"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Verbind met gelowiges wêreldwyd. Groei saam, oor elke grens en in elke nasie.",
-    "poweredBy": "Aangedryf deur AMEN TECH",
+    "slide1Title": "Welkom by P2P Global",
+    "slide1Sub": "'n Globale Peer-tot-Peer Dissipelskapnetwerk.",
+    "poweredBy": "Aangedryf deur AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Kyk Hoe Jou Boom Groei",
     "slide2Sub": "Elke studiesessie, elke gebed en elke vriendskap voeg vrugte by jou Lewende Boom — ’n beeld van jou geestelike reis.",
     "slide3Title": "Vind Jou Studievennoot",
@@ -91,7 +91,9 @@
     "getStarted": "Begin",
     "discoverMore": "Ontdek Meer",
     "alreadyHaveAccount": "Ek het reeds ’n rekening",
-    "selectLanguage": "Kies Taal"
+    "selectLanguage": "Kies Taal",
+    "createAccount": "Skep Rekening",
+    "kingdomSchoolIntro": "Dit is jou inleiding tot Koninkryksskool — die begin van jou dissipelskapreis."
   },
   "auth": {
     "appName": "P2P Bybelstudie",
@@ -165,7 +167,13 @@
     "myProfile": "My Profiel",
     "myProfileSub": "Bekyk jou dissipelskapprofiel",
     "admin": "Administrateur",
-    "adminSub": "Kurrikulum- en registrasieresponsbestuurder"
+    "adminSub": "Kurrikulum- en registrasieresponsbestuurder",
+    "kingdomImpact": "Koninkryksimpak",
+    "kingdomImpactSub": "Jou persoonlike dissipelskap-statistieke",
+    "peerConnect": "Portuurverbinding",
+    "peerConnectSub": "Vind 'n studievennoot of portuurgids",
+    "myDiscipleship": "My Dissipelskap",
+    "myDiscipleshipSub": "Loop saam met ander en sien jou impak"
   },
   "learn": {
     "title": "Leer",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} van {{total}} goedgekeur",
     "submitted": "ingedien",
     "noPlans": "Nog geen planne beskikbaar nie. Kom kyk binnekort weer!",
-    "unlockPlan": "Voltooi die vorige plan om dit te ontsluit"
+    "unlockPlan": "Voltooi die vorige plan om dit te ontsluit",
+    "foundationHeader": "Koninkryksskool-fondament",
+    "foundationSubtitle": "Jou dissipelskapreis — {{modules}} modules, {{lessons}} lesse",
+    "foundationPctComplete": "{{pct}}% Voltooi",
+    "continueBtn": "Gaan voort",
+    "currentModule": "Huidige Module",
+    "allModules": "Alle Modules",
+    "upcoming": "Aankomend",
+    "completeLabel": "Voltooi",
+    "electivesHeader": "Koninkryksskool-keusevakke",
+    "electivesSubtitle": "Gefokusde studies vir elke lewensseisoen",
+    "findElectives": "Vind Keusevakke"
   },
   "prayer": {
     "title": "Gebed en Getuienisse",
@@ -239,7 +258,9 @@
     "countriesReached": "Lande Bereik",
     "countriesReachedSub": "Nasies wat deur jou netwerk aangeraak is",
     "missions": "Sendinge",
-    "missionsSub": "Onbereikte volke om voor te bid"
+    "missionsSub": "Onbereikte volke om voor te bid",
+    "kingdomStories": "Koninkryksverhale",
+    "kingdomStoriesSub": "Christelike geskiedenis, herlewing, en wat God vandag doen"
   },
   "missions": {
     "title": "Sendinge",

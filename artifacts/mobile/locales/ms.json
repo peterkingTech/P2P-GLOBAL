@@ -78,9 +78,9 @@
     "visibilityTitle": "Keterlihatan Profil"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Berhubung dengan orang percaya di seluruh dunia. Bertumbuh bersama, merentasi setiap sempadan dan setiap bangsa.",
-    "poweredBy": "Dikuasakan oleh AMEN TECH",
+    "slide1Title": "Selamat Datang ke P2P Global",
+    "slide1Sub": "Rangkaian pemuridan peer-to-peer global.",
+    "poweredBy": "Dikuasakan oleh AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Saksikan Pokok Anda Bertumbuh",
     "slide2Sub": "Setiap sesi pembelajaran, setiap doa dan setiap persahabatan menambahkan buah pada Pokok Kehidupan anda — gambaran perjalanan rohani anda.",
     "slide3Title": "Cari Rakan Pembelajaran Anda",
@@ -91,7 +91,9 @@
     "getStarted": "Mulakan",
     "discoverMore": "Terokai Lebih Lanjut",
     "alreadyHaveAccount": "Saya sudah mempunyai akaun",
-    "selectLanguage": "Pilih Bahasa"
+    "selectLanguage": "Pilih Bahasa",
+    "createAccount": "Cipta Akaun",
+    "kingdomSchoolIntro": "Ini adalah pengenalan anda kepada Kingdom School — permulaan perjalanan pemuridan anda."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Profil Saya",
     "myProfileSub": "Lihat profil pemuridan anda",
     "admin": "Pentadbir",
-    "adminSub": "Pengurus kurikulum & respons pendaftaran"
+    "adminSub": "Pengurus kurikulum & respons pendaftaran",
+    "kingdomImpact": "Impak Kerajaan",
+    "kingdomImpactSub": "Statistik pemuridan peribadi anda",
+    "peerConnect": "Hubungan Rakan Sebaya",
+    "peerConnectSub": "Cari rakan pembelajaran atau pembimbing rakan sebaya",
+    "myDiscipleship": "Pemuridan Saya",
+    "myDiscipleshipSub": "Berjalan bersama orang lain dan lihat impak anda"
   },
   "learn": {
     "title": "Belajar",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} daripada {{total}} diluluskan",
     "submitted": "dihantar",
     "noPlans": "Belum ada pelan yang tersedia. Sila semak semula tidak lama lagi!",
-    "unlockPlan": "Selesaikan pelan sebelumnya untuk membuka kunci"
+    "unlockPlan": "Selesaikan pelan sebelumnya untuk membuka kunci",
+    "foundationHeader": "Asas Kingdom School",
+    "foundationSubtitle": "Perjalanan pemuridan anda — {{modules}} modul, {{lessons}} pelajaran",
+    "foundationPctComplete": "{{pct}}% Selesai",
+    "continueBtn": "Teruskan",
+    "currentModule": "Modul Semasa",
+    "allModules": "Semua Modul",
+    "upcoming": "Akan Datang",
+    "completeLabel": "Selesai",
+    "electivesHeader": "Subjek Elektif Kingdom School",
+    "electivesSubtitle": "Kajian tertumpu untuk setiap musim kehidupan",
+    "findElectives": "Cari Subjek Elektif"
   },
   "prayer": {
     "title": "Doa & Kesaksian",
@@ -239,7 +258,9 @@
     "countriesReached": "Negara yang Dicapai",
     "countriesReachedSub": "Bangsa-bangsa yang disentuh melalui rangkaian anda",
     "missions": "Misi",
-    "missionsSub": "Bangsa-bangsa yang belum terjangkau untuk didoakan"
+    "missionsSub": "Bangsa-bangsa yang belum terjangkau untuk didoakan",
+    "kingdomStories": "Kisah Kerajaan",
+    "kingdomStoriesSub": "Sejarah Kristian, kebangkitan rohani, dan apa yang Tuhan lakukan hari ini"
   },
   "missions": {
     "title": "Misi",

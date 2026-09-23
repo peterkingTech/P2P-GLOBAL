@@ -78,9 +78,9 @@
     "visibilityTitle": "Profil Görünürlüğü"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Dünyanın dört bir yanındaki imanlılarla bağlantı kurun. Her sınırın ve her ulusun ötesinde birlikte büyüyün.",
-    "poweredBy": "AMEN TECH tarafından desteklenmektedir",
+    "slide1Title": "P2P Global'e Hoş Geldiniz",
+    "slide1Sub": "Küresel bir eşler arası öğrencilik ağı.",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY tarafından desteklenmektedir",
     "slide2Title": "Ağacınızın Büyümesini İzleyin",
     "slide2Sub": "Her çalışma oturumu, her dua ve her dostluk, ruhsal yolculuğunuzun bir resmi olan Yaşayan Ağacınıza meyve katar.",
     "slide3Title": "Çalışma Arkadaşınızı Bulun",
@@ -91,7 +91,9 @@
     "getStarted": "Başlayın",
     "discoverMore": "Daha Fazlasını Keşfet",
     "alreadyHaveAccount": "Zaten bir hesabım var",
-    "selectLanguage": "Dil Seçin"
+    "selectLanguage": "Dil Seçin",
+    "createAccount": "Hesap Oluştur",
+    "kingdomSchoolIntro": "Bu, Kingdom School'a girişiniz — öğrencilik yolculuğunuzun başlangıcı."
   },
   "auth": {
     "appName": "P2P Kutsal Kitap Çalışması",
@@ -165,7 +167,13 @@
     "myProfile": "Profilim",
     "myProfileSub": "Öğrencilik profilinizi görüntüleyin",
     "admin": "Yönetici",
-    "adminSub": "Müfredat yöneticisi ve kayıt yanıtları"
+    "adminSub": "Müfredat yöneticisi ve kayıt yanıtları",
+    "kingdomImpact": "Krallık Etkisi",
+    "kingdomImpactSub": "Kişisel öğrencilik istatistikleriniz",
+    "peerConnect": "Akran Bağlantısı",
+    "peerConnectSub": "Bir çalışma arkadaşı veya akran rehberi bulun",
+    "myDiscipleship": "Öğrenciliğim",
+    "myDiscipleshipSub": "Başkalarıyla birlikte yürüyün ve etkinizi görün"
   },
   "learn": {
     "title": "Öğren",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{total}} dersten {{approved}} tanesi onaylandı",
     "submitted": "gönderildi",
     "noPlans": "Henüz kullanılabilir plan yok. Yakında tekrar kontrol edin!",
-    "unlockPlan": "Kilidi açmak için önceki planı tamamlayın"
+    "unlockPlan": "Kilidi açmak için önceki planı tamamlayın",
+    "foundationHeader": "Kingdom School Temeli",
+    "foundationSubtitle": "Öğrencilik yolculuğunuz — {{modules}} modül, {{lessons}} ders",
+    "foundationPctComplete": "%{{pct}} Tamamlandı",
+    "continueBtn": "Devam Et",
+    "currentModule": "Mevcut Modül",
+    "allModules": "Tüm Modüller",
+    "upcoming": "Yaklaşan",
+    "completeLabel": "Tamamlandı",
+    "electivesHeader": "Kingdom School Seçmeli Dersleri",
+    "electivesSubtitle": "Hayatın her mevsimi için odaklanmış çalışmalar",
+    "findElectives": "Seçmeli Ders Bul"
   },
   "prayer": {
     "title": "Dua ve Tanıklıklar",
@@ -239,7 +258,9 @@
     "countriesReached": "Ulaşılan Ülkeler",
     "countriesReachedSub": "Ağınız aracılığıyla dokunulan uluslar",
     "missions": "Misyonlar",
-    "missionsSub": "Ulaşılmamış halklar için dua edin"
+    "missionsSub": "Ulaşılmamış halklar için dua edin",
+    "kingdomStories": "Krallık Hikayeleri",
+    "kingdomStoriesSub": "Hristiyan tarihi, uyanış ve Tanrı'nın bugün yaptıkları"
   },
   "missions": {
     "title": "Misyonlar",

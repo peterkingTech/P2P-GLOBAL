@@ -78,9 +78,9 @@
     "visibilityTitle": "Ọhụhụ Profaịlụ"
   },
   "onboarding": {
-    "slide1Title": "NETWỌK ỌMỤMỤ BIBLE ỤWA\nSITE N’ONYE OTU RỤỌRỤ ỌZỌ",
-    "slide1Sub": "Jikọọ ndị kwere ekwe n’ụwa niile. Too ọnụ, gafee ókèala na mba niile.",
-    "poweredBy": "AMEN TECH kwadoro",
+    "slide1Title": "Nnọọ na P2P Global",
+    "slide1Sub": "Otu netwọkụ nkuzi na-agbasa n'ụwa niile, onye na onye.",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY kwadoro",
     "slide2Title": "Hụ Osisi Gị Ka Ọ Na-eto",
     "slide2Sub": "Oge ọmụmụ ọ bụla, ekpere ọ bụla na ọbụbụenyi ọ bụla na-agbakwunye mkpụrụ n’Osisi Ndụ gị — ihe osise nke njem ime mmụọ gị.",
     "slide3Title": "Chọta Onye Ị Ga-amụ Ihe Ọnụ",
@@ -91,7 +91,9 @@
     "getStarted": "Malite",
     "discoverMore": "Chọpụta karịa",
     "alreadyHaveAccount": "Enwere m akaụntụ ugbua",
-    "selectLanguage": "Họrọ Asụsụ"
+    "selectLanguage": "Họrọ Asụsụ",
+    "createAccount": "Mepụta Akaụntụ",
+    "kingdomSchoolIntro": "Nke a bụ mmalite gị na Ụlọ Akwụkwọ Alaeze — mmalite nke njem ndị na-eso ụzọ gị."
   },
   "auth": {
     "appName": "P2P Ọmụmụ Bible",
@@ -165,7 +167,13 @@
     "myProfile": "Profaịlụ M",
     "myProfileSub": "Hụ profaịlụ iso ụzọ gị",
     "admin": "Onye nchịkwa",
-    "adminSub": "Onye njikwa usoro ọmụmụ na azịza ndebanye aha"
+    "adminSub": "Onye njikwa usoro ọmụmụ na azịza ndebanye aha",
+    "kingdomImpact": "Mmetụta Alaeze",
+    "kingdomImpactSub": "Ọnụọgụ ndị na-eso ụzọ nke gị",
+    "peerConnect": "Njikọ Ndị Otu",
+    "peerConnectSub": "Chọta onye ị ga-amụ ihe ọnụ maọbụ onye ndu otu",
+    "myDiscipleship": "Ndị Na-eso Ụzọ M",
+    "myDiscipleshipSub": "Soro ndị ọzọ jee ije ma hụ mmetụta gị"
   },
   "learn": {
     "title": "Mụta",
@@ -182,7 +190,18 @@
     "lessonsApproved": "Nkuzi {{approved}} n’ime {{total}} akwadoro",
     "submitted": "e nyefere",
     "noPlans": "Atụmatụ adịghị ugbu a. Bịa lelee ọzọ n’oge na-adịghị anya!",
-    "unlockPlan": "Mechaa atụmatụ gara aga iji kpọghee"
+    "unlockPlan": "Mechaa atụmatụ gara aga iji kpọghee",
+    "foundationHeader": "Ntọala Ụlọ Akwụkwọ Alaeze",
+    "foundationSubtitle": "Njem ndị na-eso ụzọ gị — modul {{modules}}, nkuzi {{lessons}}",
+    "foundationPctComplete": "{{pct}}% Emechara",
+    "continueBtn": "Gaa n'ihu",
+    "currentModule": "Modul Ugbu a",
+    "allModules": "Modul Niile",
+    "upcoming": "Na-abịa",
+    "completeLabel": "Emechara",
+    "electivesHeader": "Nkuzi Nhọrọ nke Ụlọ Akwụkwọ Alaeze",
+    "electivesSubtitle": "Ọmụmụ elekwasịrị anya maka oge ọ bụla nke ndụ",
+    "findElectives": "Chọta Nkuzi Nhọrọ"
   },
   "prayer": {
     "title": "Ekpere na Akaebe",
@@ -239,7 +258,9 @@
     "countriesReached": "Mba E Rutere",
     "countriesReachedSub": "Mba ndị netwọk gị metụrụ",
     "missions": "Ozi-ọma",
-    "missionsSub": "Ndị a na-erubeghị ozi ọma ị ga-ekpe ekpere maka ha"
+    "missionsSub": "Ndị a na-erubeghị ozi ọma ị ga-ekpe ekpere maka ha",
+    "kingdomStories": "Akụkọ Alaeze",
+    "kingdomStoriesSub": "Akụkọ ihe mere eme ndị Kraịst, mmụgharị, na ihe Chineke na-eme taa"
   },
   "missions": {
     "title": "Ozi-ọma",

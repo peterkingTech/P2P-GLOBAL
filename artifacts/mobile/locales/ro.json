@@ -78,9 +78,9 @@
     "visibilityTitle": "Vizibilitatea profilului"
   },
   "onboarding": {
-    "slide1Title": "REȚEAUA GLOBALĂ DE STUDIU BIBLIC\nDE LA CREDINCIOS LA CREDINCIOS",
-    "slide1Sub": "Conectează-te cu credincioși din întreaga lume. Creșteți împreună, dincolo de orice graniță și în fiecare națiune.",
-    "poweredBy": "Oferit de AMEN TECH",
+    "slide1Title": "Bine ai venit la P2P Global",
+    "slide1Sub": "O rețea globală de ucenicie de la egal la egal.",
+    "poweredBy": "Oferit de AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Privește-ți copacul cum crește",
     "slide2Sub": "Fiecare sesiune de studiu, fiecare rugăciune și fiecare prietenie adaugă rod Copacului tău Viu — o imagine a călătoriei tale spirituale.",
     "slide3Title": "Găsește-ți partenerul de studiu",
@@ -91,7 +91,9 @@
     "getStarted": "Începe",
     "discoverMore": "Descoperă mai mult",
     "alreadyHaveAccount": "Am deja un cont",
-    "selectLanguage": "Selectează limba"
+    "selectLanguage": "Selectează limba",
+    "createAccount": "Creează cont",
+    "kingdomSchoolIntro": "Aceasta este introducerea ta în Kingdom School — începutul călătoriei tale de ucenicie."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Profilul meu",
     "myProfileSub": "Vezi profilul tău de ucenicie",
     "admin": "Administrator",
-    "adminSub": "Manager de curriculum și răspunsuri la înregistrări"
+    "adminSub": "Manager de curriculum și răspunsuri la înregistrări",
+    "kingdomImpact": "Impactul Împărăției",
+    "kingdomImpactSub": "Statisticile tale personale de ucenicie",
+    "peerConnect": "Conexiune între Parteneri",
+    "peerConnectSub": "Găsește un partener de studiu sau un ghid partener",
+    "myDiscipleship": "Ucenicia Mea",
+    "myDiscipleshipSub": "Mergi împreună cu alții și vezi impactul tău"
   },
   "learn": {
     "title": "Învață",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} din {{total}} aprobate",
     "submitted": "trimise",
     "noPlans": "Nu există încă planuri disponibile. Revino în curând!",
-    "unlockPlan": "Finalizează planul anterior pentru a-l debloca"
+    "unlockPlan": "Finalizează planul anterior pentru a-l debloca",
+    "foundationHeader": "Fundația Kingdom School",
+    "foundationSubtitle": "Călătoria ta de ucenicie — {{modules}} module, {{lessons}} lecții",
+    "foundationPctComplete": "{{pct}}% Finalizat",
+    "continueBtn": "Continuă",
+    "currentModule": "Modulul Curent",
+    "allModules": "Toate Modulele",
+    "upcoming": "Viitoare",
+    "completeLabel": "Finalizat",
+    "electivesHeader": "Materii Opționale Kingdom School",
+    "electivesSubtitle": "Studii concentrate pentru fiecare sezon al vieții",
+    "findElectives": "Găsește Materii Opționale"
   },
   "prayer": {
     "title": "Rugăciune și mărturii",
@@ -239,7 +258,9 @@
     "countriesReached": "Țări atinse",
     "countriesReachedSub": "Națiuni atinse prin rețeaua ta",
     "missions": "Misiuni",
-    "missionsSub": "Popoare neatinse pentru care să te rogi"
+    "missionsSub": "Popoare neatinse pentru care să te rogi",
+    "kingdomStories": "Povești ale Împărăției",
+    "kingdomStoriesSub": "Istorie creștină, trezire spirituală și ce face Dumnezeu astăzi"
   },
   "missions": {
     "title": "Misiuni",

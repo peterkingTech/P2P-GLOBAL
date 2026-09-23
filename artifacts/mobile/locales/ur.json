@@ -78,9 +78,9 @@
     "visibilityTitle": "پروفائل کی مرئیت"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "دنیا بھر کے ایمانداروں سے جڑیں۔ ہر سرحد اور ہر قوم سے بالاتر ہو کر مل کر بڑھیں۔",
-    "poweredBy": "Powered by AMEN TECH",
+    "slide1Title": "P2P گلوبل میں خوش آمدید",
+    "slide1Sub": "ایک عالمی پیئر ٹو پیئر شاگردی نیٹ ورک۔",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY کی جانب سے",
     "slide2Title": "اپنے درخت کو بڑھتے دیکھیں",
     "slide2Sub": "ہر مطالعے کا سیشن، ہر دعا اور ہر دوستی آپ کے زندہ درخت میں پھل شامل کرتی ہے — جو آپ کے روحانی سفر کی تصویر ہے۔",
     "slide3Title": "اپنا مطالعاتی ساتھی تلاش کریں",
@@ -91,7 +91,9 @@
     "getStarted": "شروع کریں",
     "discoverMore": "مزید دریافت کریں",
     "alreadyHaveAccount": "میرا اکاؤنٹ پہلے سے موجود ہے",
-    "selectLanguage": "زبان منتخب کریں"
+    "selectLanguage": "زبان منتخب کریں",
+    "createAccount": "اکاؤنٹ بنائیں",
+    "kingdomSchoolIntro": "یہ کنگڈم اسکول سے آپ کا تعارف ہے — آپ کے شاگردی کے سفر کا آغاز۔"
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "میرا پروفائل",
     "myProfileSub": "اپنا شاگردی پروفائل دیکھیں",
     "admin": "ایڈمن",
-    "adminSub": "نصاب کا منتظم اور رجسٹریشن کے جوابات"
+    "adminSub": "نصاب کا منتظم اور رجسٹریشن کے جوابات",
+    "kingdomImpact": "بادشاہت کا اثر",
+    "kingdomImpactSub": "آپ کے ذاتی شاگردی کے اعداد و شمار",
+    "peerConnect": "ساتھی رابطہ",
+    "peerConnectSub": "ایک مطالعاتی ساتھی یا ساتھی رہنما تلاش کریں",
+    "myDiscipleship": "میری شاگردی",
+    "myDiscipleshipSub": "دوسروں کے ساتھ چلیں اور اپنا اثر دیکھیں"
   },
   "learn": {
     "title": "سیکھیں",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{total}} میں سے {{approved}} منظور شدہ",
     "submitted": "جمع کرایا گیا",
     "noPlans": "ابھی کوئی منصوبہ دستیاب نہیں۔ جلد دوبارہ دیکھیں!",
-    "unlockPlan": "کھولنے کے لیے پچھلا منصوبہ مکمل کریں"
+    "unlockPlan": "کھولنے کے لیے پچھلا منصوبہ مکمل کریں",
+    "foundationHeader": "کنگڈم اسکول بنیاد",
+    "foundationSubtitle": "آپ کا شاگردی کا سفر — {{modules}} ماڈیولز، {{lessons}} اسباق",
+    "foundationPctComplete": "{{pct}}% مکمل",
+    "continueBtn": "جاری رکھیں",
+    "currentModule": "موجودہ ماڈیول",
+    "allModules": "تمام ماڈیولز",
+    "upcoming": "آئندہ",
+    "completeLabel": "مکمل",
+    "electivesHeader": "کنگڈم اسکول اختیاری مضامین",
+    "electivesSubtitle": "زندگی کے ہر موسم کے لیے مرکوز مطالعہ",
+    "findElectives": "اختیاری مضامین تلاش کریں"
   },
   "prayer": {
     "title": "دعا اور گواہیاں",
@@ -239,7 +258,9 @@
     "countriesReached": "جن ممالک تک رسائی ہوئی",
     "countriesReachedSub": "آپ کے نیٹ ورک کے ذریعے متاثر ہونے والی قومیں",
     "missions": "مشنز",
-    "missionsSub": "وہ قومیں جن کے لیے دعا کرنی ہے"
+    "missionsSub": "وہ قومیں جن کے لیے دعا کرنی ہے",
+    "kingdomStories": "بادشاہت کی کہانیاں",
+    "kingdomStoriesSub": "عیسائی تاریخ، بیداری، اور خدا آج کیا کر رہا ہے"
   },
   "missions": {
     "title": "مشنز",

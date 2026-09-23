@@ -78,9 +78,9 @@
     "visibilityTitle": "Híhan Àkọ́ọ́lẹ̀"
   },
   "onboarding": {
-    "slide1Title": "P2P KÁÀKIRI AYÉ\nẸ̀KỌ́ BÍBÉLÌ ÀWỌN Ẹ̀GBẸ́",
-    "slide1Sub": "Sopọ̀ pẹ̀lú àwọn onígbàgbọ́ káàkiri ayé. Ẹ máa dàgbà pọ̀, kọjá gbogbo ààlà àti gbogbo orílẹ̀-èdè.",
-    "poweredBy": "AMEN TECH ló ń pèsè rẹ̀",
+    "slide1Title": "Kaabo si P2P Global",
+    "slide1Sub": "Nẹ́tíwọ́ọ̀kì kíkọ́ni-ọmọ-ẹ̀yìn kárí ayé, láàrin ẹgbẹ́ẹgbẹ́.",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY ló ń pèsè rẹ̀",
     "slide2Title": "Wo Bí Igi Rẹ Ṣe Ń Dàgbà",
     "slide2Sub": "Gbogbo ìpàdé ẹ̀kọ́, gbogbo àdúrà àti gbogbo ọ̀rẹ́ ń fi èso kún Igi Alààyè rẹ — àwòrán ìrìnàjò ẹ̀mí rẹ.",
     "slide3Title": "Wa Alábàákẹ́gbẹ́ Ẹ̀kọ́ Rẹ",
@@ -91,7 +91,9 @@
     "getStarted": "Bẹ̀rẹ̀",
     "discoverMore": "Ṣàwárí Síi",
     "alreadyHaveAccount": "Mo ti ní àkọ́ọ́lẹ̀ tẹ́lẹ̀",
-    "selectLanguage": "Yan Èdè"
+    "selectLanguage": "Yan Èdè",
+    "createAccount": "Ṣẹ̀dá Àkọ́ọ́lẹ̀",
+    "kingdomSchoolIntro": "Èyí ni ìfáyọ̀rí rẹ sí Ilé-Ìwé Ìjọba — ìbẹ̀rẹ̀ ìrìn-àjò kíkọ́ni-ọmọ-ẹ̀yìn rẹ."
   },
   "auth": {
     "appName": "P2P Ẹ̀kọ́ Bíbélì",
@@ -165,7 +167,13 @@
     "myProfile": "Àkọ́ọ́lẹ̀ Mi",
     "myProfileSub": "Wo àkọ́ọ́lẹ̀ ọmọ-ẹ̀yìn rẹ",
     "admin": "Alákóso",
-    "adminSub": "Olùṣàkóso ètò ẹ̀kọ́ àti àwọn ìdáhùn ìforúkọsílẹ̀"
+    "adminSub": "Olùṣàkóso ètò ẹ̀kọ́ àti àwọn ìdáhùn ìforúkọsílẹ̀",
+    "kingdomImpact": "Ipa Ìjọba",
+    "kingdomImpactSub": "Àwọn ìsúnmọ́ kíkọ́ni-ọmọ-ẹ̀yìn tìrẹ",
+    "peerConnect": "Ìsopọ̀ Ẹgbẹ́ẹgbẹ́",
+    "peerConnectSub": "Wa alábàákẹ́gbẹ́ ẹ̀kọ́ tàbí atọ́nà ẹgbẹ́ẹgbẹ́",
+    "myDiscipleship": "Kíkọ́ni-ọmọ-ẹ̀yìn Mi",
+    "myDiscipleshipSub": "Rìn pẹ̀lú àwọn ẹlòmíràn kí o sì rí ipa rẹ"
   },
   "learn": {
     "title": "Kọ́ ẹ̀kọ́",
@@ -182,7 +190,18 @@
     "lessonsApproved": "A ti fọwọ́sí {{approved}} nínú {{total}}",
     "submitted": "tí a fi ránṣẹ́",
     "noPlans": "Kò sí ètò kankan tí ó wà síbẹ̀. Padà wá láìpẹ́!",
-    "unlockPlan": "Parí ètò tó ṣáájú láti ṣí i"
+    "unlockPlan": "Parí ètò tó ṣáájú láti ṣí i",
+    "foundationHeader": "Ìpìlẹ̀ Ilé-Ìwé Ìjọba",
+    "foundationSubtitle": "Ìrìn-àjò kíkọ́ni-ọmọ-ẹ̀yìn rẹ — àpá {{modules}}, ẹ̀kọ́ {{lessons}}",
+    "foundationPctComplete": "{{pct}}% Ti parí",
+    "continueBtn": "Tẹ̀síwájú",
+    "currentModule": "Àpá Lọ́wọ́lọ́wọ́",
+    "allModules": "Gbogbo Àpá",
+    "upcoming": "Ń bọ̀",
+    "completeLabel": "Ti parí",
+    "electivesHeader": "Àwọn Ẹ̀kọ́ Yíyàn ti Ilé-Ìwé Ìjọba",
+    "electivesSubtitle": "Àwọn ìkẹ́kọ̀ọ́ pàtàkì fún àsìkò gbogbo ìgbésí ayé",
+    "findElectives": "Wa Àwọn Ẹ̀kọ́ Yíyàn"
   },
   "prayer": {
     "title": "Àdúrà àti Àwọn Ẹ̀rí",
@@ -239,7 +258,9 @@
     "countriesReached": "Àwọn Orílẹ̀-èdè Tí A Dé",
     "countriesReachedSub": "Àwọn orílẹ̀-èdè tí nẹ́tíwọ́ọ̀kì rẹ ti kàn",
     "missions": "Àwọn Iṣẹ́ Ìránṣẹ́",
-    "missionsSub": "Àwọn ènìyàn tí a kò tíì dé ọ̀dọ̀ Kristi láti gbàdúrà fún"
+    "missionsSub": "Àwọn ènìyàn tí a kò tíì dé ọ̀dọ̀ Kristi láti gbàdúrà fún",
+    "kingdomStories": "Àwọn Ìtàn Ìjọba",
+    "kingdomStoriesSub": "Ìtàn Kristẹni, ìjí sílẹ̀ ẹ̀mí, àti ohun tí Ọlọ́run ń ṣe lónìí"
   },
   "missions": {
     "title": "Àwọn Iṣẹ́ Ìránṣẹ́",

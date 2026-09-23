@@ -78,9 +78,9 @@
     "visibilityTitle": "Hiển thị hồ sơ"
   },
   "onboarding": {
-    "slide1Title": "MẠNG LƯỚI HỌC KINH THÁNH\nTOÀN CẦU THEO MÔ HÌNH BẠN-ĐỒNG-HÀNH",
-    "slide1Sub": "Kết nối với tín hữu trên khắp thế giới. Cùng nhau lớn lên, vượt qua mọi biên giới, mọi quốc gia.",
-    "poweredBy": "Được vận hành bởi AMEN TECH",
+    "slide1Title": "Chào mừng đến với P2P Global",
+    "slide1Sub": "Một mạng lưới môn đồ hóa peer-to-peer toàn cầu.",
+    "poweredBy": "Được vận hành bởi AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Ngắm Cây Của Bạn Lớn Lên",
     "slide2Sub": "Mỗi buổi học, mỗi lời cầu nguyện, mỗi tình bạn đều thêm trái cho Cây Sự Sống của bạn — hình ảnh về hành trình thuộc linh của bạn.",
     "slide3Title": "Tìm Bạn Học Kinh Thánh",
@@ -91,7 +91,9 @@
     "getStarted": "Bắt đầu",
     "discoverMore": "Khám phá thêm",
     "alreadyHaveAccount": "Tôi đã có tài khoản",
-    "selectLanguage": "Chọn ngôn ngữ"
+    "selectLanguage": "Chọn ngôn ngữ",
+    "createAccount": "Tạo tài khoản",
+    "kingdomSchoolIntro": "Đây là phần giới thiệu của bạn về Kingdom School — khởi đầu hành trình môn đồ hóa của bạn."
   },
   "auth": {
     "appName": "P2P Học Kinh Thánh",
@@ -165,7 +167,13 @@
     "myProfile": "Hồ sơ của tôi",
     "myProfileSub": "Xem hồ sơ môn đồ hóa của bạn",
     "admin": "Quản trị",
-    "adminSub": "Quản lý giáo trình và phản hồi đăng ký"
+    "adminSub": "Quản lý giáo trình và phản hồi đăng ký",
+    "kingdomImpact": "Ảnh Hưởng Vương Quốc",
+    "kingdomImpactSub": "Số liệu môn đồ hóa cá nhân của bạn",
+    "peerConnect": "Kết Nối Bạn Đồng Hành",
+    "peerConnectSub": "Tìm một bạn học hoặc người hướng dẫn đồng hành",
+    "myDiscipleship": "Hành Trình Môn Đồ Của Tôi",
+    "myDiscipleshipSub": "Bước đi cùng người khác và xem ảnh hưởng của bạn"
   },
   "learn": {
     "title": "Học",
@@ -182,7 +190,18 @@
     "lessonsApproved": "Đã duyệt {{approved}}/{{total}} bài học",
     "submitted": "đã nộp",
     "noPlans": "Chưa có kế hoạch nào. Hãy quay lại sớm nhé!",
-    "unlockPlan": "Hoàn thành kế hoạch trước để mở khóa"
+    "unlockPlan": "Hoàn thành kế hoạch trước để mở khóa",
+    "foundationHeader": "Nền Tảng Kingdom School",
+    "foundationSubtitle": "Hành trình môn đồ hóa của bạn — {{modules}} mô-đun, {{lessons}} bài học",
+    "foundationPctComplete": "Hoàn thành {{pct}}%",
+    "continueBtn": "Tiếp tục",
+    "currentModule": "Mô-đun Hiện Tại",
+    "allModules": "Tất Cả Mô-đun",
+    "upcoming": "Sắp Tới",
+    "completeLabel": "Hoàn thành",
+    "electivesHeader": "Môn Tự Chọn Kingdom School",
+    "electivesSubtitle": "Các nghiên cứu tập trung cho mọi giai đoạn cuộc sống",
+    "findElectives": "Tìm Môn Tự Chọn"
   },
   "prayer": {
     "title": "Cầu nguyện & Lời chứng",
@@ -239,7 +258,9 @@
     "countriesReached": "Các quốc gia đã tiếp cận",
     "countriesReachedSub": "Những quốc gia được chạm đến qua mạng lưới của bạn",
     "missions": "Sứ mạng",
-    "missionsSub": "Những dân tộc chưa được tiếp cận cần cầu nguyện"
+    "missionsSub": "Những dân tộc chưa được tiếp cận cần cầu nguyện",
+    "kingdomStories": "Câu Chuyện Vương Quốc",
+    "kingdomStoriesSub": "Lịch sử Cơ Đốc giáo, phục hưng, và những gì Chúa đang làm hôm nay"
   },
   "missions": {
     "title": "Sứ mạng",

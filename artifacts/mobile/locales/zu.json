@@ -5,27 +5,7 @@
     "prayer": "Umthandazo",
     "messages": "Imiyalezo",
     "discover": "Thola",
-    "missions": "Imisebenzi",
-    "profile": "Iphrofayela yami",
-    "settings": "Izilungiselelo",
-    "onboarding": "Ukuqalisa",
-    "auth": "Ukungena",
-    "intake": "Mayelana nawe",
-    "lesson": "Isifundo",
-    "module": "Imojuli",
-    "livingTree": "Isihlahla Esiphilayo",
-    "progress": "Inqubekelaphambili",
-    "evaluations": "Ukubuyekezwa",
-    "fruit": "Iqoqo Lezithelo",
-    "hallOfFaith": "Ihholo Lokholo",
-    "notes": "Amanothi",
-    "highlights": "Amaphuzu agqamile",
-    "stages": "Izigaba",
-    "curriculum": "Ikharikhulamu",
-    "session": "Iseshini",
-    "connect": "Xhuma",
-    "plan": "Uhlelo",
-    "admin": "Umqondisi"
+    "missions": "Imisebenzi"
   },
   "profile": {
     "title": "Iphrofayela yami",
@@ -98,9 +78,9 @@
     "visibilityTitle": "Ukubonakala Kwephrofayela"
   },
   "onboarding": {
-    "slide1Title": "INETHIWEKHI YOKUFUNDA\nIBHAYIBHELI YE-P2P EMHLABENI",
-    "slide1Sub": "Xhumana namakholwa emhlabeni wonke. Khulani ndawonye, niweqe yonke imingcele nazo zonke izizwe.",
-    "poweredBy": "Ixhaswe yi-AMEN TECH",
+    "slide1Title": "Wamukelekile ku-P2P Global",
+    "slide1Sub": "Inethiwekhi yomhlaba wonke yokufundisa abafundi, umuntu nomuntu.",
+    "poweredBy": "Ixhaswe yi-AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Buka Isihlahla Sakho Sikhula",
     "slide2Sub": "Isikhathi ngasinye sokufunda, umthandazo ngamunye, nobungane ngabunye kwengeza izithelo Esihlahleni sakho Esiphilayo — umfanekiso wohambo lwakho lukamoya.",
     "slide3Title": "Thola Umlingani Wakho Wokufunda",
@@ -111,7 +91,9 @@
     "getStarted": "Qalisa",
     "discoverMore": "Thola okwengeziwe",
     "alreadyHaveAccount": "Senginayo i-akhawunti",
-    "selectLanguage": "Khetha Ulimi"
+    "selectLanguage": "Khetha Ulimi",
+    "createAccount": "Dala I-akhawunti",
+    "kingdomSchoolIntro": "Lokhu ukwaziswa kwakho eKingdom School — ukuqala kohambo lwakho lokufundisa abafundi."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -185,7 +167,13 @@
     "myProfile": "Iphrofayela yami",
     "myProfileSub": "Buka iphrofayela yakho yokuba umfundi",
     "admin": "Umqondisi",
-    "adminSub": "Umphathi wekharikhulamu nezimpendulo zokubhaliswa"
+    "adminSub": "Umphathi wekharikhulamu nezimpendulo zokubhaliswa",
+    "kingdomImpact": "Umthelela WoMbuso",
+    "kingdomImpactSub": "Izibalo zakho zomuntu siqu zokufundisa abafundi",
+    "peerConnect": "Ukuxhumana Nabalingani",
+    "peerConnectSub": "Thola umlingani wokufunda noma umhlahlandlela olingana nawe",
+    "myDiscipleship": "Ukufundisa Kwami Abafundi",
+    "myDiscipleshipSub": "Hamba nabanye futhi ubone umthelela wakho"
   },
   "learn": {
     "title": "Funda",
@@ -202,7 +190,18 @@
     "lessonsApproved": "{{approved}} kwezi-{{total}} zivunyiwe",
     "submitted": "kuthunyelwe",
     "noPlans": "Azikho izinhlelo ezitholakalayo okwamanje. Buya maduze!",
-    "unlockPlan": "Qedela uhlelo lwangaphambilini ukuze uvule"
+    "unlockPlan": "Qedela uhlelo lwangaphambilini ukuze uvule",
+    "foundationHeader": "Isisekelo SeKingdom School",
+    "foundationSubtitle": "Uhambo lwakho lokufundisa abafundi — amamojuli angu-{{modules}}, izifundo ezingu-{{lessons}}",
+    "foundationPctComplete": "{{pct}}% Kuqediwe",
+    "continueBtn": "Qhubeka",
+    "currentModule": "Imojuli Yamanje",
+    "allModules": "Wonke Amamojuli",
+    "upcoming": "Okuzayo",
+    "completeLabel": "Kuqediwe",
+    "electivesHeader": "Izifundo Zokukhetha ZeKingdom School",
+    "electivesSubtitle": "Izifundo ezigxile kuzo zonke izikhathi zempilo",
+    "findElectives": "Thola Izifundo Zokukhetha"
   },
   "prayer": {
     "title": "Umthandazo Nobufakazi",
@@ -259,7 +258,9 @@
     "countriesReached": "Amazwe Asefinyelelwe",
     "countriesReachedSub": "Izizwe ezithintwe ngenethiwekhi yakho",
     "missions": "Imisebenzi",
-    "missionsSub": "Abantu abangakafinyelelwa ongabakhulekela"
+    "missionsSub": "Abantu abangakafinyelelwa ongabakhulekela",
+    "kingdomStories": "Izindaba ZoMbuso",
+    "kingdomStoriesSub": "Umlando wobuKristu, ukuvuselelwa, nalokho uNkulunkulu akwenzayo namuhla"
   },
   "missions": {
     "title": "Imisebenzi",

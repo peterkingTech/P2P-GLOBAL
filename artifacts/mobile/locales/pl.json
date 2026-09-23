@@ -78,9 +78,9 @@
     "visibilityTitle": "Widoczność profilu"
   },
   "onboarding": {
-    "slide1Title": "GLOBALNA SIEĆ STUDIUM BIBLII\nPEER-TO-PEER",
-    "slide1Sub": "Połącz się z wierzącymi na całym świecie. Wzrastajcie razem, ponad każdą granicą i w każdym narodzie.",
-    "poweredBy": "Wspierane przez AMEN TECH",
+    "slide1Title": "Witamy w P2P Global",
+    "slide1Sub": "Globalna sieć uczniostwa typu peer-to-peer.",
+    "poweredBy": "Wspierane przez AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Obserwuj, jak rośnie twoje drzewo",
     "slide2Sub": "Każda sesja studium, każda modlitwa i każda przyjaźń dodają owocu twojemu Żyjącemu Drzewu — obrazowi twojej duchowej drogi.",
     "slide3Title": "Znajdź partnera do studium",
@@ -91,7 +91,9 @@
     "getStarted": "Rozpocznij",
     "discoverMore": "Dowiedz się więcej",
     "alreadyHaveAccount": "Mam już konto",
-    "selectLanguage": "Wybierz język"
+    "selectLanguage": "Wybierz język",
+    "createAccount": "Utwórz konto",
+    "kingdomSchoolIntro": "To jest twoje wprowadzenie do Kingdom School — początek twojej drogi uczniostwa."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Mój profil",
     "myProfileSub": "Wyświetl swój profil uczniostwa",
     "admin": "Administrator",
-    "adminSub": "Menedżer programu i odpowiedzi rejestracyjne"
+    "adminSub": "Menedżer programu i odpowiedzi rejestracyjne",
+    "kingdomImpact": "Wpływ Królestwa",
+    "kingdomImpactSub": "Twoje osobiste statystyki uczniostwa",
+    "peerConnect": "Połączenie Rówieśnicze",
+    "peerConnectSub": "Znajdź partnera do studium lub rówieśniczego przewodnika",
+    "myDiscipleship": "Moje Uczniostwo",
+    "myDiscipleshipSub": "Krocz razem z innymi i zobacz swój wpływ"
   },
   "learn": {
     "title": "Nauka",
@@ -182,7 +190,18 @@
     "lessonsApproved": "Zatwierdzono {{approved}} z {{total}}",
     "submitted": "przesłano",
     "noPlans": "Nie ma jeszcze dostępnych planów. Wkrótce sprawdź ponownie!",
-    "unlockPlan": "Ukończ poprzedni plan, aby odblokować ten"
+    "unlockPlan": "Ukończ poprzedni plan, aby odblokować ten",
+    "foundationHeader": "Fundament Kingdom School",
+    "foundationSubtitle": "Twoja droga uczniostwa — {{modules}} moduły, {{lessons}} lekcje",
+    "foundationPctComplete": "{{pct}}% Ukończono",
+    "continueBtn": "Dalej",
+    "currentModule": "Bieżący Moduł",
+    "allModules": "Wszystkie Moduły",
+    "upcoming": "Nadchodzące",
+    "completeLabel": "Ukończono",
+    "electivesHeader": "Przedmioty Fakultatywne Kingdom School",
+    "electivesSubtitle": "Ukierunkowane studia na każdy sezon życia",
+    "findElectives": "Znajdź Przedmioty Fakultatywne"
   },
   "prayer": {
     "title": "Modlitwa i świadectwa",
@@ -239,7 +258,9 @@
     "countriesReached": "Dotarte kraje",
     "countriesReachedSub": "Narody, do których dotarłeś przez swoją sieć",
     "missions": "Misje",
-    "missionsSub": "Nieosiągnięte ludy, za które warto się modlić"
+    "missionsSub": "Nieosiągnięte ludy, za które warto się modlić",
+    "kingdomStories": "Historie Królestwa",
+    "kingdomStoriesSub": "Historia chrześcijaństwa, przebudzenie i to, co Bóg czyni dzisiaj"
   },
   "missions": {
     "title": "Misje",

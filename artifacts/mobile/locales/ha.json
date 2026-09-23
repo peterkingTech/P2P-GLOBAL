@@ -78,9 +78,9 @@
     "visibilityTitle": "Bayyanar Bayanan Baya"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Haɗu da masu bi a faɗin duniya. Ku girma tare, a ketare kowane iyaka da kowace ƙasa.",
-    "poweredBy": "AMEN TECH ne ke ƙarfafa shi",
+    "slide1Title": "Barka da zuwa P2P Global",
+    "slide1Sub": "Wata hanyar sadarwa ta almajirci ta duniya, mutum-da-mutum.",
+    "poweredBy": "AMEN KINGDOM TECH MINISTRY ne ke ƙarfafa shi",
     "slide2Title": "Kalli Bishiyarka Tana Girma",
     "slide2Sub": "Kowane zaman nazari, kowace addu'a da kowace abota suna ƙara 'ya'ya ga Bishiyar Rayuwarka — hoto ne na tafiyarka ta ruhaniya.",
     "slide3Title": "Nemo Abokin Nazarinka",
@@ -91,7 +91,9 @@
     "getStarted": "Fara",
     "discoverMore": "Gano Ƙari",
     "alreadyHaveAccount": "Na riga ina da asusu",
-    "selectLanguage": "Zaɓi Harshe"
+    "selectLanguage": "Zaɓi Harshe",
+    "createAccount": "Ƙirƙiri Asusu",
+    "kingdomSchoolIntro": "Wannan gabatarwarka ce ga Makarantar Mulki — farkon tafiyar almajircinka."
   },
   "auth": {
     "appName": "Nazarin Littafi Mai Tsarki na P2P",
@@ -165,7 +167,13 @@
     "myProfile": "Bayanan Bayana",
     "myProfileSub": "Dubi bayanan almajirancinka",
     "admin": "Mai Gudanarwa",
-    "adminSub": "Mai sarrafa tsarin koyarwa da amsoshin rajista"
+    "adminSub": "Mai sarrafa tsarin koyarwa da amsoshin rajista",
+    "kingdomImpact": "Tasirin Mulki",
+    "kingdomImpactSub": "Bayanan almajircinka na kai",
+    "peerConnect": "Haɗin Aboki",
+    "peerConnectSub": "Nemo abokin nazari ko jagoran aboki",
+    "myDiscipleship": "Almajircina",
+    "myDiscipleshipSub": "Yi tafiya tare da wasu ka ga tasirinka"
   },
   "learn": {
     "title": "Koyo",
@@ -182,7 +190,18 @@
     "lessonsApproved": "An amince da {{approved}} cikin {{total}}",
     "submitted": "an miƙa",
     "noPlans": "Babu tsare-tsare a yanzu. Duba nan ba da daɗewa ba!",
-    "unlockPlan": "Kammala tsarin da ya gabata domin buɗe wannan"
+    "unlockPlan": "Kammala tsarin da ya gabata domin buɗe wannan",
+    "foundationHeader": "Harsashin Makarantar Mulki",
+    "foundationSubtitle": "Tafiyar almajircinka — babi {{modules}}, darussa {{lessons}}",
+    "foundationPctComplete": "{{pct}}% An Kammala",
+    "continueBtn": "Ci gaba",
+    "currentModule": "Babin Yanzu",
+    "allModules": "Duk Babobi",
+    "upcoming": "Mai zuwa",
+    "completeLabel": "An Kammala",
+    "electivesHeader": "Zaɓaɓɓun Karatu na Makarantar Mulki",
+    "electivesSubtitle": "Karatun da aka mayar da hankali gare shi don kowane lokaci na rayuwa",
+    "findElectives": "Nemo Zaɓaɓɓun Karatu"
   },
   "prayer": {
     "title": "Addu'a da Shaidu",
@@ -239,7 +258,9 @@
     "countriesReached": "Ƙasashen da Aka Kai",
     "countriesReachedSub": "Al'umman da aka taɓa ta hanyar cibiyar sadarwarka",
     "missions": "Ayyuka",
-    "missionsSub": "Mutanen da ba su kai ga Bishara ba da za a yi wa addu'a"
+    "missionsSub": "Mutanen da ba su kai ga Bishara ba da za a yi wa addu'a",
+    "kingdomStories": "Labaran Mulki",
+    "kingdomStoriesSub": "Tarihin Kirista, farfaɗowa, da abin da Allah yake yi yau"
   },
   "missions": {
     "title": "Ayyuka",

@@ -78,9 +78,9 @@
     "visibilityTitle": "Zichtbaarheid van profiel"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Verbind je met gelovigen wereldwijd. Groei samen, over elke grens en in elke natie.",
-    "poweredBy": "Mogelijk gemaakt door AMEN TECH",
+    "slide1Title": "Welkom bij P2P Global",
+    "slide1Sub": "Een wereldwijd peer-to-peer discipelschapsnetwerk.",
+    "poweredBy": "Mogelijk gemaakt door AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Zie je boom groeien",
     "slide2Sub": "Elke studiesessie, elk gebed en elke vriendschap voegt vrucht toe aan je Levende Boom — een beeld van je geestelijke reis.",
     "slide3Title": "Vind je studiepartner",
@@ -91,7 +91,9 @@
     "getStarted": "Aan de slag",
     "discoverMore": "Meer ontdekken",
     "alreadyHaveAccount": "Ik heb al een account",
-    "selectLanguage": "Selecteer taal"
+    "selectLanguage": "Selecteer taal",
+    "createAccount": "Account aanmaken",
+    "kingdomSchoolIntro": "Dit is jouw introductie tot Kingdom School — het begin van jouw discipelschapsreis."
   },
   "auth": {
     "appName": "P2P Bijbelstudie",
@@ -165,7 +167,13 @@
     "myProfile": "Mijn profiel",
     "myProfileSub": "Bekijk je discipelschapsprofiel",
     "admin": "Beheer",
-    "adminSub": "Beheer van lesprogramma en registratieantwoorden"
+    "adminSub": "Beheer van lesprogramma en registratieantwoorden",
+    "kingdomImpact": "Koninkrijksimpact",
+    "kingdomImpactSub": "Jouw persoonlijke discipelschapsstatistieken",
+    "peerConnect": "Peerverbinding",
+    "peerConnectSub": "Vind een studiepartner of peer-gids",
+    "myDiscipleship": "Mijn Discipelschap",
+    "myDiscipleshipSub": "Loop samen met anderen en zie jouw impact"
   },
   "learn": {
     "title": "Leren",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} van {{total}} goedgekeurd",
     "submitted": "ingediend",
     "noPlans": "Er zijn nog geen plannen beschikbaar. Kom binnenkort terug!",
-    "unlockPlan": "Voltooi het vorige plan om dit te ontgrendelen"
+    "unlockPlan": "Voltooi het vorige plan om dit te ontgrendelen",
+    "foundationHeader": "Kingdom School Fundament",
+    "foundationSubtitle": "Jouw discipelschapsreis — {{modules}} modules, {{lessons}} lessen",
+    "foundationPctComplete": "{{pct}}% Voltooid",
+    "continueBtn": "Doorgaan",
+    "currentModule": "Huidige Module",
+    "allModules": "Alle Modules",
+    "upcoming": "Aankomend",
+    "completeLabel": "Voltooid",
+    "electivesHeader": "Kingdom School Keuzevakken",
+    "electivesSubtitle": "Gerichte studies voor elk seizoen van het leven",
+    "findElectives": "Vind Keuzevakken"
   },
   "prayer": {
     "title": "Gebed en getuigenissen",
@@ -239,7 +258,9 @@
     "countriesReached": "Bereikte landen",
     "countriesReachedSub": "Naties die via jouw netwerk zijn bereikt",
     "missions": "Missies",
-    "missionsSub": "Onbereikte volken om voor te bidden"
+    "missionsSub": "Onbereikte volken om voor te bidden",
+    "kingdomStories": "Koninkrijksverhalen",
+    "kingdomStoriesSub": "Christelijke geschiedenis, opwekking, en wat God vandaag doet"
   },
   "missions": {
     "title": "Missies",

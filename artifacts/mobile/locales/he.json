@@ -78,9 +78,9 @@
     "visibilityTitle": "נראות הפרופיל"
   },
   "onboarding": {
-    "slide1Title": "רשת עולמית ללימוד התנ״ך\nמעמית לעמית",
-    "slide1Sub": "התחבר/י למאמינים ברחבי העולם. צמחו יחד, מעבר לכל גבול ובכל אומה.",
-    "poweredBy": "מופעל על ידי AMEN TECH",
+    "slide1Title": "ברוך הבא ל-P2P Global",
+    "slide1Sub": "רשת תלמידות עולמית מעמית לעמית.",
+    "poweredBy": "מופעל על ידי AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "צפה/י בעץ שלך צומח",
     "slide2Sub": "כל מפגש לימוד, כל תפילה וכל חברות מוסיפים פרי לעץ החי שלך — תמונה של המסע הרוחני שלך.",
     "slide3Title": "מצא/י את שותף/ת הלימוד שלך",
@@ -91,7 +91,9 @@
     "getStarted": "בוא/י נתחיל",
     "discoverMore": "גלה/י עוד",
     "alreadyHaveAccount": "כבר יש לי חשבון",
-    "selectLanguage": "בחר/י שפה"
+    "selectLanguage": "בחר/י שפה",
+    "createAccount": "יצירת חשבון",
+    "kingdomSchoolIntro": "זוהי ההיכרות שלך עם בית הספר של המלכות — תחילתה של מסע התלמידות שלך."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "הפרופיל שלי",
     "myProfileSub": "צפה/י בפרופיל התלמידות שלך",
     "admin": "מנהל",
-    "adminSub": "מנהל תוכנית הלימודים ותשובות הרשמה"
+    "adminSub": "מנהל תוכנית הלימודים ותשובות הרשמה",
+    "kingdomImpact": "השפעת המלכות",
+    "kingdomImpactSub": "נתוני התלמידות האישיים שלך",
+    "peerConnect": "חיבור עמיתים",
+    "peerConnectSub": "מצא/י שותף/ת לימוד או מדריך/ת עמית/ה",
+    "myDiscipleship": "התלמידות שלי",
+    "myDiscipleshipSub": "צעד/י יחד עם אחרים וראה/י את ההשפעה שלך"
   },
   "learn": {
     "title": "לימוד",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} מתוך {{total}} אושרו",
     "submitted": "הוגשו",
     "noPlans": "עדיין אין תוכניות זמינות. בדוק/י שוב בקרוב!",
-    "unlockPlan": "השלם/י את התוכנית הקודמת כדי לפתוח"
+    "unlockPlan": "השלם/י את התוכנית הקודמת כדי לפתוח",
+    "foundationHeader": "יסודות בית הספר של המלכות",
+    "foundationSubtitle": "מסע התלמידות שלך — {{modules}} יחידות, {{lessons}} שיעורים",
+    "foundationPctComplete": "{{pct}}% הושלם",
+    "continueBtn": "המשך",
+    "currentModule": "היחידה הנוכחית",
+    "allModules": "כל היחידות",
+    "upcoming": "בקרוב",
+    "completeLabel": "הושלם",
+    "electivesHeader": "מקצועות בחירה של בית הספר של המלכות",
+    "electivesSubtitle": "לימודים ממוקדים לכל עונה בחיים",
+    "findElectives": "מצא/י מקצועות בחירה"
   },
   "prayer": {
     "title": "תפילה ועדויות",
@@ -239,7 +258,9 @@
     "countriesReached": "מדינות שהגענו אליהן",
     "countriesReachedSub": "אומות שהושפעו באמצעות הרשת שלך",
     "missions": "שליחויות",
-    "missionsSub": "עמים שטרם שמעו שעליהם להתפלל"
+    "missionsSub": "עמים שטרם שמעו שעליהם להתפלל",
+    "kingdomStories": "סיפורי המלכות",
+    "kingdomStoriesSub": "היסטוריה נוצרית, התעוררות רוחנית, ומה שאלוהים עושה היום"
   },
   "missions": {
     "title": "שליחויות",

@@ -78,9 +78,9 @@
     "visibilityTitle": "Profilens synlighet"
   },
   "onboarding": {
-    "slide1Title": "PEER-TO-PEER GLOBAL\nBIBLE STUDY NETWORK",
-    "slide1Sub": "Kom i kontakt med troende över hela världen. Väx tillsammans, över alla gränser och i alla nationer.",
-    "poweredBy": "Drivs av AMEN TECH",
+    "slide1Title": "Välkommen till P2P Global",
+    "slide1Sub": "Ett globalt peer-to-peer-lärjungaskapsnätverk.",
+    "poweredBy": "Drivs av AMEN KINGDOM TECH MINISTRY",
     "slide2Title": "Se ditt träd växa",
     "slide2Sub": "Varje studiesession, varje bön och varje vänskap ger frukt åt ditt livets träd — en bild av din andliga resa.",
     "slide3Title": "Hitta din studiepartner",
@@ -91,7 +91,9 @@
     "getStarted": "Kom igång",
     "discoverMore": "Upptäck mer",
     "alreadyHaveAccount": "Jag har redan ett konto",
-    "selectLanguage": "Välj språk"
+    "selectLanguage": "Välj språk",
+    "createAccount": "Skapa konto",
+    "kingdomSchoolIntro": "Detta är din introduktion till Kingdom School — början på din lärjungaresa."
   },
   "auth": {
     "appName": "P2P Bible Study",
@@ -165,7 +167,13 @@
     "myProfile": "Min profil",
     "myProfileSub": "Visa din lärjungaprofil",
     "admin": "Administratör",
-    "adminSub": "Kursplaneringsverktyg och registreringssvar"
+    "adminSub": "Kursplaneringsverktyg och registreringssvar",
+    "kingdomImpact": "Rikets Påverkan",
+    "kingdomImpactSub": "Din personliga lärjungaskapsstatistik",
+    "peerConnect": "Kamratkontakt",
+    "peerConnectSub": "Hitta en studiepartner eller kamratguide",
+    "myDiscipleship": "Mitt Lärjungaskap",
+    "myDiscipleshipSub": "Vandra tillsammans med andra och se din påverkan"
   },
   "learn": {
     "title": "Lär dig",
@@ -182,7 +190,18 @@
     "lessonsApproved": "{{approved}} av {{total}} godkända",
     "submitted": "inskickade",
     "noPlans": "Inga planer tillgängliga ännu. Kom tillbaka snart!",
-    "unlockPlan": "Slutför den föregående planen för att låsa upp"
+    "unlockPlan": "Slutför den föregående planen för att låsa upp",
+    "foundationHeader": "Kingdom School Grund",
+    "foundationSubtitle": "Din lärjungaresa — {{modules}} moduler, {{lessons}} lektioner",
+    "foundationPctComplete": "{{pct}}% Klart",
+    "continueBtn": "Fortsätt",
+    "currentModule": "Aktuell Modul",
+    "allModules": "Alla Moduler",
+    "upcoming": "Kommande",
+    "completeLabel": "Klart",
+    "electivesHeader": "Kingdom School Valfria Ämnen",
+    "electivesSubtitle": "Fokuserade studier för varje livssäsong",
+    "findElectives": "Hitta Valfria Ämnen"
   },
   "prayer": {
     "title": "Bön och vittnesbörd",
@@ -239,7 +258,9 @@
     "countriesReached": "Nådda länder",
     "countriesReachedSub": "Nationer som berörts genom ditt nätverk",
     "missions": "Mission",
-    "missionsSub": "Onådda folk att be för"
+    "missionsSub": "Onådda folk att be för",
+    "kingdomStories": "Rikets Berättelser",
+    "kingdomStoriesSub": "Kristen historia, väckelse, och vad Gud gör idag"
   },
   "missions": {
     "title": "Mission",
