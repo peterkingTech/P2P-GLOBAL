@@ -40,9 +40,16 @@ interface UseAgoraEngineOptions {
   /** The appId the token was actually minted for (see useAgora.ts's
    * getToken) — always preferred over the local env fallback. */
   appId?: string;
+  /** Forensic calling audit — Android camera-permission denial previously
+   * only logged a console.warn and otherwise vanished: the engine still
+   * joined and published "video" that was actually empty frames, while the
+   * screen's own cameraOn UI state stayed true (no JS-visible signal ever
+   * reached it). This lets the caller reflect a real denial into its own
+   * video-tile state instead of showing a permanently blank self-preview. */
+  onCameraUnavailable?: () => void;
 }
 
-export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId }: UseAgoraEngineOptions) {
+export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable }: UseAgoraEngineOptions) {
   const engineRef = useRef<IRtcEngine | null>(null);
 
   useEffect(() => {
@@ -66,6 +73,9 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         const denied = permissions.filter((p) => results[p] !== PermissionsAndroid.RESULTS.GRANTED);
         if (denied.length > 0) {
           console.warn("CALL DEBUG engine: permission denied, joining without real audio/video", { channelName, denied });
+          if (enableVideo && denied.includes(PermissionsAndroid.PERMISSIONS.CAMERA)) {
+            onCameraUnavailable?.();
+          }
         }
       }
       if (cancelled) return;
@@ -130,7 +140,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelName, token, uid, enableVideo, appId]);
+  }, [channelName, token, uid, enableVideo, appId, onCameraUnavailable]);
 
   return engineRef;
 }

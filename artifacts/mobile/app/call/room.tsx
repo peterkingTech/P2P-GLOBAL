@@ -10,6 +10,10 @@ import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import ShareRoomPanel from "@/components/ShareRoomPanel";
+import { useTheme } from "@/contexts/ThemeContext";
+import { getP2PCallColors } from "@/components/call/p2pCallTheme";
+import type { P2PCallColors } from "@/components/call/p2pCallTheme";
+import { P2PControlButton } from "@/components/call/P2PControlButton";
 
 interface RoomParticipant { userId: string; name: string; country: string | null; joinedAt: string }
 interface RoomDetail {
@@ -25,7 +29,7 @@ function showAlert(title: string, message: string) {
   else Alert.alert(title, message);
 }
 
-function SpeakingWave() {
+function SpeakingWave({ colors }: { colors: P2PCallColors }) {
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -37,13 +41,23 @@ function SpeakingWave() {
     loop.start();
     return () => loop.stop();
   }, [scale]);
-  return <Animated.View style={[styles.waveRing, { transform: [{ scale }] }]} />;
+  return (
+    <Animated.View
+      style={[
+        { position: "absolute", width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: colors.accent },
+        { transform: [{ scale }] },
+      ]}
+    />
+  );
 }
 
 export default function BreakRoomScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const { colors, resolvedMode } = useTheme();
+  const p2pColors = getP2PCallColors(colors, resolvedMode);
+  const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{ roomId: string }>();
 
   const [room, setRoom] = useState<RoomDetail | null>(null);
@@ -304,7 +318,7 @@ export default function BreakRoomScreen() {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.errorText}>This room isn't live anymore.</Text>}
+        {loading ? <ActivityIndicator color={p2pColors.textPrimary} /> : <Text style={styles.errorText}>This room isn't live anymore.</Text>}
       </View>
     );
   }
@@ -345,15 +359,16 @@ export default function BreakRoomScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <Text style={styles.sectionLabel}>SPEAKING NOW</Text>
+        <View style={styles.sectionCard}>
         <View style={styles.speakerRow}>
           {speakers.length === 0 ? (
             <Text style={styles.emptyText}>{room.speakingMode === "structured" ? "No one has the floor yet." : "It's quiet in here."}</Text>
           ) : speakers.map((p) => (
             <View key={p.userId} style={styles.speakerTile}>
               <View style={styles.speakerAvatarWrap}>
-                <SpeakingWave />
+                <SpeakingWave colors={p2pColors} />
                 <View style={styles.avatarCircleLarge}>
-                  <Ionicons name="person" size={30} color="rgba(255,255,255,0.7)" />
+                  <Ionicons name="person" size={30} color={p2pColors.textMuted} />
                 </View>
               </View>
               <Text style={styles.speakerName} numberOfLines={1}>
@@ -362,8 +377,10 @@ export default function BreakRoomScreen() {
             </View>
           ))}
         </View>
+        </View>
 
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>LISTENERS ({listeners.length})</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 20 }]}>LISTENERS ({listeners.length})</Text>
+        <View style={styles.sectionCard}>
         <View style={styles.listenerGrid}>
           {listeners.map((p) => (
             <TouchableOpacity
@@ -373,7 +390,7 @@ export default function BreakRoomScreen() {
               activeOpacity={isHost ? 0.7 : 1}
             >
               <View style={styles.avatarCircleSmall}>
-                <Ionicons name="person" size={18} color="rgba(255,255,255,0.6)" />
+                <Ionicons name="person" size={18} color={p2pColors.textMuted} />
               </View>
               <Text style={styles.listenerName} numberOfLines={1}>{getFlagEmoji(p.country)} {p.name}</Text>
               {raisedHands.has(p.userId) && <Text style={styles.handEmoji}>✋</Text>}
@@ -385,22 +402,25 @@ export default function BreakRoomScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        </View>
       </ScrollView>
 
       <View style={[styles.controlsRow, { paddingBottom: insets.bottom + 14 }]}>
-        <TouchableOpacity
-          style={[styles.controlBtn, !canSpeak && styles.controlBtnDisabled]}
+        <P2PControlButton
           onPress={toggleMute}
           disabled={!canSpeak}
+          active={canSpeak && muted}
+          accessibilityLabel="Mute microphone"
+          colors={p2pColors}
         >
-          <Ionicons name={!canSpeak ? "mic-off" : muted ? "mic-off" : "mic"} size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.controlBtn, handRaised && styles.controlBtnActive]} onPress={toggleRaiseHand}>
+          <Ionicons name={!canSpeak ? "mic-off" : muted ? "mic-off" : "mic"} size={18} color={canSpeak && muted ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton onPress={toggleRaiseHand} active={handRaised} accessibilityLabel="Raise hand" colors={p2pColors}>
           <Text style={{ fontSize: 16 }}>✋</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={isHost ? endRoomForAll : leaveRoom} disabled={ending}>
+        </P2PControlButton>
+        <P2PControlButton onPress={isHost ? endRoomForAll : leaveRoom} disabled={ending} danger accessibilityLabel={isHost ? "End room for everyone" : "Leave room"} colors={p2pColors}>
           {ending ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="exit-outline" size={18} color="#fff" />}
-        </TouchableOpacity>
+        </P2PControlButton>
       </View>
       {room.speakingMode === "structured" && !canSpeak && (
         <Text style={styles.structuredHint}>Raise your hand to ask for the floor</Text>
@@ -426,43 +446,47 @@ export default function BreakRoomScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E" },
-  errorText: { color: "rgba(255,255,255,0.7)", fontSize: 14, fontFamily: "Inter_400Regular" },
+function makeStyles(p2p: P2PCallColors) {
+  return StyleSheet.create({
+  screen: { flex: 1, backgroundColor: p2p.bg },
+  errorText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
   topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
-  topBarTitle: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  topBarSub: { color: "rgba(255,255,255,0.55)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  topBarTitle: { color: p2p.textPrimary, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  topBarSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   flagBtn: { padding: 4 },
 
-  sectionLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  emptyText: { color: "rgba(255,255,255,0.4)", fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 10 },
-  speakerRow: { flexDirection: "row", flexWrap: "wrap", gap: 18, marginTop: 14 },
+  sectionLabel: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  emptyText: { color: p2p.textMuted, fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 10 },
+  // Rectangular card container around each participant section — the
+  // circular avatars inside remain ordinary profile imagery (explicitly
+  // allowed), not a circular/orbit *arrangement* of participants.
+  sectionCard: {
+    backgroundColor: p2p.surface, borderWidth: 1, borderColor: p2p.surfaceBorder,
+    borderRadius: 14, padding: 14, marginTop: 10,
+  },
+  speakerRow: { flexDirection: "row", flexWrap: "wrap", gap: 18 },
   speakerTile: { alignItems: "center", width: 84 },
   speakerAvatarWrap: { alignItems: "center", justifyContent: "center", width: 72, height: 72 },
-  waveRing: { position: "absolute", width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: "#1D9E75" },
-  avatarCircleLarge: { width: 60, height: 60, borderRadius: 30, backgroundColor: "#1A241E", alignItems: "center", justifyContent: "center" },
-  speakerName: { color: "#fff", fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 8, textAlign: "center" },
+  avatarCircleLarge: { width: 60, height: 60, borderRadius: 30, backgroundColor: p2p.pillBg, alignItems: "center", justifyContent: "center" },
+  speakerName: { color: p2p.textPrimary, fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 8, textAlign: "center" },
 
-  listenerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 14 },
+  listenerGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   listenerTile: { alignItems: "center", width: 64 },
-  avatarCircleSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#1A241E", alignItems: "center", justifyContent: "center" },
-  listenerName: { color: "rgba(255,255,255,0.8)", fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 6, textAlign: "center" },
+  avatarCircleSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: p2p.pillBg, alignItems: "center", justifyContent: "center" },
+  listenerName: { color: p2p.textPrimary, fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 6, textAlign: "center" },
   handEmoji: { fontSize: 12, marginTop: 2 },
-  grantBtn: { marginTop: 4, backgroundColor: "#1D9E75", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  grantBtn: { marginTop: 4, backgroundColor: p2p.accent, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
   grantBtnText: { color: "#fff", fontSize: 9, fontFamily: "Inter_700Bold" },
 
   controlsRow: { flexDirection: "row", justifyContent: "center", gap: 24, paddingTop: 8 },
-  controlBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
-  controlBtnDisabled: { opacity: 0.4 },
-  controlBtnActive: { backgroundColor: "#B8860B" },
-  endBtn: { backgroundColor: "#DC2626" },
-  structuredHint: { textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 11, fontFamily: "Inter_400Regular", paddingBottom: 8 },
+  structuredHint: { textAlign: "center", color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", paddingBottom: 8 },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
-  sheetTitle: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 8 },
-  reasonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  reasonText: { color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular" },
+  sheetBox: { backgroundColor: p2p.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
+  sheetTitle: { color: p2p.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 8 },
+  reasonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: p2p.surfaceBorder },
+  reasonText: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_400Regular" },
   cancelBtn: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
-  cancelBtnText: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-});
+  cancelBtnText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  });
+}

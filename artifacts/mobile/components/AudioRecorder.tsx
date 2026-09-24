@@ -1,121 +1,173 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  PanResponder,
+  Animated,
   ActivityIndicator,
 } from "react-native";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 
-type RecorderState = "idle" | "requesting" | "ready" | "recording" | "reviewing" | "uploading";
+type Phase = "idle" | "recording" | "locked" | "uploading";
+
+// WhatsApp/Instagram-style thresholds: drag up to lock (release the finger,
+// keep recording), drag left to cancel. Tuned to be reachable with a short
+// thumb movement without triggering accidentally on a plain tap-and-hold.
+const LOCK_DISTANCE = 70;
+const CANCEL_DISTANCE = 90;
+// A release under this duration is treated as an accidental tap, not an
+// intentional message — matches "no accidental message submission".
+const MIN_SEND_SECONDS = 1;
 
 interface Props {
   onSubmit: (localUri: string, durationSeconds: number) => Promise<void>;
+  onActiveChange?: (active: boolean) => void;
   disabled?: boolean;
 }
 
-export default function AudioRecorder({ onSubmit, disabled }: Props) {
-  const [state, setState] = useState<RecorderState>("idle");
+export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Props) {
+  const [phase, setPhase] = useState<Phase>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [playbackMillis, setPlaybackMillis] = useState(0);
-  const [durationMillis, setDurationMillis] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [recordedDuration, setRecordedDuration] = useState(0);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dragX = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  // Latched flags, not state — must be readable synchronously inside the
+  // same PanResponder move callback that sets them, before the next render.
+  const lockedRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const startingRef = useRef(false);
+  const elapsedRef = useRef(0);
+
+  useEffect(() => {
+    elapsedRef.current = elapsedSeconds;
+  }, [elapsedSeconds]);
+
+  useEffect(() => {
+    onActiveChange?.(phase === "recording" || phase === "locked");
+  }, [phase, onActiveChange]);
 
   useEffect(() => {
     return () => {
-      timerRef.current && clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-      soundRef.current?.unloadAsync().catch(() => {});
     };
   }, []);
 
-  async function startRecording() {
-    setState("requesting");
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== "granted") {
-      setState("idle");
-      return;
+  function clearTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-    const { recording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
-    );
-    recordingRef.current = recording;
-    setElapsedSeconds(0);
-    setState("recording");
-    timerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
   }
 
-  async function stopRecording() {
-    timerRef.current && clearInterval(timerRef.current);
+  async function beginRecording() {
+    if (startingRef.current || recordingRef.current) return;
+    startingRef.current = true;
+    setErrorText(null);
+    setPermissionDenied(false);
+    lockedRef.current = false;
+    cancelledRef.current = false;
+    dragX.setValue(0);
+    dragY.setValue(0);
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== "granted") {
+        setPermissionDenied(true);
+        startingRef.current = false;
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      setElapsedSeconds(0);
+      setPhase("recording");
+      timerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    } catch {
+      setErrorText("Couldn't start recording. Please try again.");
+    } finally {
+      startingRef.current = false;
+    }
+  }
+
+  async function discardRecording() {
+    clearTimer();
     const recording = recordingRef.current;
-    if (!recording) return;
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    const status = await recording.getStatusAsync();
-    const dur = Math.round(((status as any).durationMillis ?? elapsedSeconds * 1000) / 1000);
     recordingRef.current = null;
-    setRecordedUri(uri ?? null);
-    setRecordedDuration(dur);
-    setPlaybackMillis(0);
-    setDurationMillis(dur * 1000);
-    setIsPlaying(false);
-    soundRef.current?.unloadAsync().catch(() => {});
-    soundRef.current = null;
-    setState("reviewing");
+    if (recording) {
+      await recording.stopAndUnloadAsync().catch(() => {});
+    }
+    setPhase("idle");
+    setElapsedSeconds(0);
   }
 
-  async function togglePlayback() {
-    if (!recordedUri) return;
-    if (isPlaying) {
-      await soundRef.current?.pauseAsync();
-      setIsPlaying(false);
+  async function finishAndSend() {
+    clearTimer();
+    const recording = recordingRef.current;
+    recordingRef.current = null;
+    if (!recording) {
+      setPhase("idle");
       return;
     }
-    if (!soundRef.current) {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordedUri },
-        { shouldPlay: true },
-        (status) => {
-          if (!status.isLoaded) return;
-          setPlaybackMillis(status.positionMillis ?? 0);
-          if (status.durationMillis) setDurationMillis(status.durationMillis);
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPlaybackMillis(0);
-          }
-        }
-      );
-      soundRef.current = sound;
-    } else {
-      await soundRef.current.replayAsync();
+    if (elapsedRef.current < MIN_SEND_SECONDS) {
+      await recording.stopAndUnloadAsync().catch(() => {});
+      setPhase("idle");
+      setElapsedSeconds(0);
+      return;
     }
-    setIsPlaying(true);
+    setPhase("uploading");
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      const status = await recording.getStatusAsync();
+      const dur = Math.round(((status as any).durationMillis ?? elapsedRef.current * 1000) / 1000);
+      if (uri) await onSubmit(uri, dur);
+    } catch (e: any) {
+      setErrorText(e?.message ?? "Voice message not sent. Please try again.");
+    } finally {
+      setPhase("idle");
+      setElapsedSeconds(0);
+    }
   }
 
-  async function handleReRecord() {
-    await soundRef.current?.unloadAsync().catch(() => {});
-    soundRef.current = null;
-    setRecordedUri(null);
-    setIsPlaying(false);
-    setState("ready");
-    await startRecording();
-  }
-
-  async function handleSubmit() {
-    if (!recordedUri) return;
-    setState("uploading");
-    await onSubmit(recordedUri, recordedDuration);
-  }
+  // Recreated each render (cheap — a plain object of closures) rather than
+  // memoized once, so these handlers always see the current phase/refs
+  // instead of stale ones from whichever render first created it.
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => phase === "idle" && !disabled,
+    onMoveShouldSetPanResponder: () => phase === "recording",
+    onPanResponderGrant: () => {
+      void beginRecording();
+    },
+    onPanResponderMove: (_evt, gesture) => {
+      if (phase !== "recording" || lockedRef.current || cancelledRef.current) return;
+      const dx = Math.min(0, gesture.dx);
+      const dy = Math.min(0, gesture.dy);
+      dragX.setValue(dx);
+      dragY.setValue(dy);
+      if (-dy > LOCK_DISTANCE) {
+        lockedRef.current = true;
+        setPhase("locked");
+      } else if (-dx > CANCEL_DISTANCE) {
+        cancelledRef.current = true;
+        void discardRecording();
+      }
+    },
+    onPanResponderRelease: () => {
+      if (cancelledRef.current || lockedRef.current) return;
+      if (phase === "recording") void finishAndSend();
+    },
+    onPanResponderTerminate: () => {
+      if (!cancelledRef.current && !lockedRef.current && phase === "recording") void discardRecording();
+    },
+  });
 
   function formatTime(seconds: number) {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -123,150 +175,95 @@ export default function AudioRecorder({ onSubmit, disabled }: Props) {
     return `${m}:${s}`;
   }
 
-  const progressPct = durationMillis > 0 ? playbackMillis / durationMillis : 0;
-
-  if (state === "idle" || state === "requesting") {
+  if (phase === "recording" || phase === "locked") {
     return (
-      <TouchableOpacity
-        style={[styles.startBtn, (disabled || state === "requesting") && styles.btnDisabled]}
-        onPress={startRecording}
-        disabled={disabled || state === "requesting"}
-        activeOpacity={0.8}
-      >
-        {state === "requesting" ? (
-          <ActivityIndicator color={colors.accentGreen} size="small" />
+      <View style={styles.activeBar}>
+        <View style={styles.activeLeft}>
+          <View style={styles.recDot} />
+          <Text style={styles.activeTimer}>{formatTime(elapsedSeconds)}</Text>
+          {phase === "recording" && (
+            <Animated.Text style={[styles.slideHint, { transform: [{ translateX: dragX }] }]}>
+              ◁ Slide to cancel
+            </Animated.Text>
+          )}
+        </View>
+        {phase === "recording" ? (
+          <Animated.View style={[styles.lockHint, { transform: [{ translateY: dragY }] }]}>
+            <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
+            <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+          </Animated.View>
         ) : (
-          <>
-            <Ionicons name="mic" size={18} color={colors.accentGreen} />
-            <Text style={styles.startBtnText}>Record Audio</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    );
-  }
-
-  if (state === "recording") {
-    return (
-      <View style={styles.recordingBox}>
-        <View style={styles.recordingPulse}>
-          <View style={styles.recordingDot} />
-          <Text style={styles.recordingTimer}>{formatTime(elapsedSeconds)}</Text>
-        </View>
-        <TouchableOpacity style={styles.stopBtn} onPress={stopRecording} activeOpacity={0.8}>
-          <Ionicons name="stop" size={20} color={colors.cream} />
-          <Text style={styles.stopBtnText}>Stop</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (state === "reviewing") {
-    return (
-      <View style={styles.reviewBox}>
-        <View style={styles.reviewHeader}>
-          <Ionicons name="mic" size={14} color={colors.accentGreen} />
-          <Text style={styles.reviewDuration}>{formatTime(recordedDuration)} recorded</Text>
-        </View>
-
-        <View style={styles.progressRow}>
-          <TouchableOpacity onPress={togglePlayback} style={styles.playBtn} activeOpacity={0.8}>
-            <Ionicons
-              name={isPlaying ? "pause" : "play"}
-              size={20}
-              color={colors.cream}
-            />
-          </TouchableOpacity>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
+          <View style={styles.lockedActions}>
+            <TouchableOpacity onPress={discardRecording} style={styles.lockedCancelBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="trash-outline" size={18} color="#C0392B" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={finishAndSend} style={styles.lockedSendBtn}>
+              <Ionicons name="send" size={16} color={colors.cream} />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.progressTime}>{formatTime(Math.round(playbackMillis / 1000))}</Text>
-        </View>
-
-        <View style={styles.reviewActions}>
-          <TouchableOpacity style={styles.reRecordBtn} onPress={handleReRecord} activeOpacity={0.8}>
-            <Ionicons name="refresh" size={14} color={colors.textMid} />
-            <Text style={styles.reRecordText}>Re-record</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.useBtn} onPress={handleSubmit} activeOpacity={0.8}>
-            <Ionicons name="checkmark" size={14} color={colors.cream} />
-            <Text style={styles.useText}>Use Recording</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
     );
   }
 
-  if (state === "uploading") {
+  if (phase === "uploading") {
     return (
       <View style={styles.uploadingBox}>
-        <ActivityIndicator color={colors.accentGreen} />
-        <Text style={styles.uploadingText}>Uploading audio…</Text>
+        <ActivityIndicator color={colors.accentGreen} size="small" />
+        <Text style={styles.uploadingText}>Uploading…</Text>
       </View>
     );
   }
 
-  return null;
+  return (
+    <View style={styles.idleWrap}>
+      <TouchableOpacity
+        style={[styles.micBtn, disabled && styles.btnDisabled]}
+        disabled={disabled}
+        activeOpacity={0.85}
+        {...panResponder.panHandlers}
+      >
+        <Ionicons name="mic" size={18} color="#fff" />
+      </TouchableOpacity>
+      {permissionDenied && <Text style={styles.errorText}>Microphone permission denied.</Text>}
+      {errorText && <Text style={styles.errorText}>{errorText}</Text>}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  startBtn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 12,
-    borderStyle: "dashed", paddingVertical: 14, paddingHorizontal: 16,
-  },
-  btnDisabled: { opacity: 0.5 },
-  startBtnText: { fontSize: 14, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
-
-  recordingBox: {
-    borderRadius: 12, borderWidth: 1, borderColor: "#C0392B33",
-    backgroundColor: "#C0392B08", padding: 14, gap: 12,
-  },
-  recordingPulse: { flexDirection: "row", alignItems: "center", gap: 10, justifyContent: "center" },
-  recordingDot: {
-    width: 10, height: 10, borderRadius: 5, backgroundColor: "#C0392B",
-  },
-  recordingTimer: { fontSize: 22, fontWeight: "700", color: "#C0392B", fontFamily: "Inter_700Bold" },
-  stopBtn: {
-    flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: "#C0392B", borderRadius: 10, paddingVertical: 10,
-  },
-  stopBtnText: { color: colors.cream, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-
-  reviewBox: {
-    borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige,
-    backgroundColor: colors.cardBeige, padding: 14, gap: 10,
-  },
-  reviewHeader: { flexDirection: "row", gap: 6, alignItems: "center" },
-  reviewDuration: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
-
-  progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  playBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: colors.accentGreen,
+  idleWrap: { alignItems: "flex-end" },
+  micBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: colors.primaryGreen,
     alignItems: "center", justifyContent: "center",
   },
-  progressTrack: {
-    flex: 1, height: 4, backgroundColor: colors.borderBeige, borderRadius: 2, overflow: "hidden",
-  },
-  progressFill: { height: "100%", backgroundColor: colors.accentGreen, borderRadius: 2 },
-  progressTime: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", minWidth: 36 },
+  btnDisabled: { opacity: 0.5 },
+  errorText: { fontSize: 11, color: "#C0392B", fontFamily: "Inter_400Regular", marginTop: 4, maxWidth: 140, textAlign: "right" },
 
-  reviewActions: { flexDirection: "row", gap: 8, marginTop: 2 },
-  reRecordBtn: {
-    flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingVertical: 9,
-    backgroundColor: colors.card,
+  activeBar: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderRadius: 12, borderWidth: 1, borderColor: "#C0392B33",
+    backgroundColor: "#C0392B08", paddingHorizontal: 14, paddingVertical: 10, minHeight: 40,
   },
-  reRecordText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  useBtn: {
-    flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 9,
+  activeLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#C0392B" },
+  activeTimer: { fontSize: 15, fontWeight: "700", color: "#C0392B", fontFamily: "Inter_700Bold" },
+  slideHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  lockHint: { alignItems: "center" },
+  lockedActions: { flexDirection: "row", gap: 10, alignItems: "center" },
+  lockedCancelBtn: {
+    width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "#C0392B33",
   },
-  useText: { fontSize: 13, color: colors.cream, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  lockedSendBtn: {
+    width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.primaryGreen,
+  },
 
   uploadingBox: {
-    flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center",
-    padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige,
+    flex: 1, flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center",
+    padding: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige, minHeight: 40,
   },
   uploadingText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular" },
 });

@@ -6,6 +6,7 @@ export interface CallParticipant {
   userId: string;
   uid: number;
   name: string;
+  photoUrl?: string | null;
 }
 
 // Resolves the real identities behind a p2p_ call's joined Agora uids,
@@ -25,16 +26,17 @@ export async function resolveCallParticipants(channelName: string, remoteUids: n
     const uidToUserId = new Map(ids.map((id) => [uidFromUserId(id), id]));
     const resolvedIds = remoteUids.map((u) => uidToUserId.get(u)).filter((id): id is string => !!id);
 
-    let profileById = new Map<string, { full_name: string }>();
+    let profileById = new Map<string, { full_name: string; photo_url: string | null }>();
     if (resolvedIds.length) {
-      const { data: profiles } = await supabase.from("p2p_profiles").select("id, full_name").in("id", resolvedIds);
-      profileById = new Map(((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p]));
+      const { data: profiles } = await supabase.from("p2p_profiles").select("id, full_name, photo_url").in("id", resolvedIds);
+      profileById = new Map(((profiles ?? []) as { id: string; full_name: string; photo_url: string | null }[]).map((p) => [p.id, p]));
     }
 
     return remoteUids.map((uid) => {
       const userId = uidToUserId.get(uid);
       const name = userId ? (profileById.get(userId)?.full_name ?? "Someone") : "Someone";
-      return { userId: userId ?? "", uid, name };
+      const photoUrl = userId ? (profileById.get(userId)?.photo_url ?? null) : null;
+      return { userId: userId ?? "", uid, name, photoUrl };
     });
   } catch {
     return remoteUids.map((uid) => ({ userId: "", uid, name: "Someone" }));

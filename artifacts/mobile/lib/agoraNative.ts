@@ -4,4 +4,4 @@
 // resolving actual imports, so this is never loaded at runtime;
 // re-exporting from the web stub keeps it side-effect-free (no
 // react-native-agora import) if that assumption is ever wrong.
-export { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType } from "./agoraNative.web";
+export { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType, RemoteVideoState } from "./agoraNative.web";

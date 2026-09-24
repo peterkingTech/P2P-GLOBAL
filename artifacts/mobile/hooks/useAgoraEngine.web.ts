@@ -15,6 +15,7 @@ interface UseAgoraEngineOptions {
   enableVideo: boolean;
   eventHandler: IRtcEngineEventHandler;
   appId?: string;
+  onCameraUnavailable?: () => void;
 }
 
 export function useAgoraEngine(_options: UseAgoraEngineOptions) {

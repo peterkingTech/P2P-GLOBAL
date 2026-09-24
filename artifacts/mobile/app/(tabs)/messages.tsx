@@ -11,6 +11,7 @@ import { useData, ConversationSummary } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { OfficialBadge } from "@/components/OfficialBadge";
+import { Avatar } from "@/components/Avatar";
 import "@/lib/i18n";
 
 type TabKey = "all" | "unread" | "favourites" | "peer_groups" | "circles";
@@ -255,13 +256,13 @@ export default function MessagesTab() {
                 onPress={() => router.push(`/messages/${item.id}` as any)}
                 onLongPress={() => handleLongPressRow(item)}
               >
-                <View style={styles.avatarCircle}>
-                  <Ionicons
-                    name={item.type === "group" ? "people" : "person"}
-                    size={20}
-                    color={colors.primaryGreen}
-                  />
-                </View>
+                {item.type === "group" ? (
+                  <View style={styles.avatarCircle}>
+                    <Ionicons name="people" size={20} color={colors.primaryGreen} />
+                  </View>
+                ) : (
+                  <Avatar photoUrl={item.otherUserPhotoUrl} name={item.name} size={46} />
+                )}
                 <View style={{ flex: 1 }}>
                   <View style={styles.rowTop}>
                     {unread && <View style={styles.unreadDot} />}

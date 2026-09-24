@@ -22,3 +22,10 @@ export const QualityType = { QualityBad: 4 } as const;
 export const BackgroundSourceType = { BackgroundBlur: 3 } as const;
 export const BackgroundBlurDegree = { BlurDegreeHigh: 3 } as const;
 export const SegModelType = { SegModelAi: 1 } as const;
+export const RemoteVideoState = {
+  RemoteVideoStateStopped: 0,
+  RemoteVideoStateStarting: 1,
+  RemoteVideoStateDecoding: 2,
+  RemoteVideoStateFrozen: 3,
+  RemoteVideoStateFailed: 4,
+} as const;

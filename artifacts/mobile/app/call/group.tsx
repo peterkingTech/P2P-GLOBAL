@@ -10,6 +10,10 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
+import { useTheme } from "@/contexts/ThemeContext";
+import { getP2PCallColors } from "@/components/call/p2pCallTheme";
+import type { P2PCallColors } from "@/components/call/p2pCallTheme";
+import { P2PControlButton } from "@/components/call/P2PControlButton";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; country?: string | null }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -31,6 +35,9 @@ export default function GroupCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const { colors, resolvedMode } = useTheme();
+  const p2pColors = getP2PCallColors(colors, resolvedMode);
+  const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{ circleId: string; channelName: string }>();
 
   const [circle, setCircle] = useState<CircleDetail | null>(null);
@@ -294,7 +301,7 @@ export default function GroupCallScreen() {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={p2pColors.textPrimary} />
       </View>
     );
   }
@@ -314,7 +321,7 @@ export default function GroupCallScreen() {
           <Text style={styles.topBarTitle} numberOfLines={1}>{circle.name}</Text>
           <Text style={styles.topBarSub}>{lessonTitle || "Group call"} · {tiles.length} participant{tiles.length === 1 ? "" : "s"}</Text>
         </View>
-        <View style={styles.liveDot} />
+        <View style={styles.liveDot} accessibilityLabel="Live" />
       </View>
 
       <ScrollView contentContainerStyle={styles.grid}>
@@ -370,24 +377,26 @@ export default function GroupCallScreen() {
       )}
 
       <View style={[styles.controlsRow, { paddingBottom: insets.bottom + 14 }]}>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
-          <Ionicons name={muted ? "mic-off" : "mic"} size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
-          <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.controlBtn, handRaised && styles.controlBtnActive]} onPress={toggleRaiseHand}>
+        <P2PControlButton onPress={toggleMute} active={muted} accessibilityLabel="Mute microphone" colors={p2pColors}>
+          <Ionicons name={muted ? "mic-off" : "mic"} size={18} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton onPress={toggleCamera} active={!cameraOn} accessibilityLabel="Turn camera on or off" colors={p2pColors}>
+          <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={18} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton onPress={toggleRaiseHand} active={handRaised} accessibilityLabel="Raise hand" colors={p2pColors}>
           <Text style={{ fontSize: 16 }}>✋</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.controlBtn} onPress={() => setLessonSheetOpen(true)}>
-          <Ionicons name="book" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.controlBtn, styles.endBtn]}
+        </P2PControlButton>
+        <P2PControlButton onPress={() => setLessonSheetOpen(true)} accessibilityLabel="Lesson questions" colors={p2pColors}>
+          <Ionicons name="book" size={18} color={p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton
           onPress={() => (isHost ? setCompletionOpen(true) : handleLeave())}
+          danger
+          accessibilityLabel={isHost ? "Complete session" : "Leave call"}
+          colors={p2pColors}
         >
           <Ionicons name="call" size={18} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
-        </TouchableOpacity>
+        </P2PControlButton>
       </View>
 
       {isHost && (
@@ -464,20 +473,21 @@ export default function GroupCallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0B120E" },
+function makeStyles(p2p: P2PCallColors) {
+  return StyleSheet.create({
+  screen: { flex: 1, backgroundColor: p2p.bg },
   topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
-  topBarTitle: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  topBarSub: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#DC2626" },
+  topBarTitle: { color: p2p.textPrimary, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  topBarSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p2p.endRed },
 
   grid: { flexDirection: "row", flexWrap: "wrap", padding: 8, gap: 8 },
   tile: {
-    width: "48%", aspectRatio: 0.9, borderRadius: 14, backgroundColor: "#141F19", overflow: "hidden",
+    width: "48%", aspectRatio: 0.9, borderRadius: 14, backgroundColor: p2p.surface, overflow: "hidden",
     borderWidth: 2, borderColor: "transparent",
   },
-  tileSpeaking: { borderColor: "#1D9E75" },
-  tileAvatarWrap: { alignItems: "center", justifyContent: "center", backgroundColor: "#1A241E" },
+  tileSpeaking: { borderColor: p2p.accent },
+  tileAvatarWrap: { alignItems: "center", justifyContent: "center", backgroundColor: p2p.pillBg },
   tileFooter: {
     position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: "rgba(0,0,0,0.45)", paddingHorizontal: 8, paddingVertical: 6,
@@ -487,38 +497,36 @@ const styles = StyleSheet.create({
   tileHandEmoji: { fontSize: 12 },
   ackHandBtn: { position: "absolute", top: 6, right: 6, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10, padding: 4 },
 
-  questionBar: { marginHorizontal: 12, marginBottom: 8, backgroundColor: "#141F19", borderRadius: 12, padding: 12, gap: 4 },
-  questionLabel: { color: "#1D9E75", fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  questionText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic" },
+  questionBar: { marginHorizontal: 12, marginBottom: 8, backgroundColor: p2p.surface, borderRadius: 12, padding: 12, gap: 4 },
+  questionLabel: { color: p2p.accent, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  questionText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic" },
   nextQBtn: { alignSelf: "flex-end", marginTop: 4 },
-  nextQBtnText: { color: "#1D9E75", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  nextQBtnText: { color: p2p.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   controlsRow: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 16, paddingTop: 8 },
-  controlBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
-  controlBtnActive: { backgroundColor: "#B8860B" },
-  endBtn: { backgroundColor: "#DC2626" },
 
   hostBar: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 10, justifyContent: "center" },
-  hostBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  hostBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
+  hostBtn: { borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  hostBtnText: { color: p2p.textPrimary, fontSize: 12, fontFamily: "Inter_500Medium" },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
+  sheetBox: { backgroundColor: p2p.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sheetTitle: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  sheetEmpty: { color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "Inter_400Regular" },
-  questionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  questionRowActive: { backgroundColor: "rgba(29,158,117,0.1)" },
-  questionRowText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
-  markDiscussedBtn: { backgroundColor: "#1D9E75", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 6 },
+  sheetTitle: { color: p2p.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  sheetEmpty: { color: p2p.textMuted, fontSize: 13, fontFamily: "Inter_400Regular" },
+  questionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: p2p.surfaceBorder },
+  questionRowActive: { backgroundColor: p2p.pillBg },
+  questionRowText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  markDiscussedBtn: { backgroundColor: p2p.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 6 },
   markDiscussedText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
   notesInput: {
-    backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, padding: 12, color: "#fff",
+    backgroundColor: p2p.pillBg, borderRadius: 10, padding: 12, color: p2p.textPrimary,
     fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 70,
   },
-  cancelBtn: { flex: 1, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  cancelBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  saveBtn: { flex: 1, backgroundColor: "#1D9E75", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  cancelBtn: { flex: 1, borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  cancelBtnText: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  saveBtn: { flex: 1, backgroundColor: p2p.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-});
+  });
+}

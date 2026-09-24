@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,17 +11,23 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  Keyboard,
+  Modal,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Swipeable } from "react-native-gesture-handler";
+import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import type { OfficialAccountType } from "@/contexts/AuthContext";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { OfficialBadge } from "@/components/OfficialBadge";
+import * as Clipboard from "expo-clipboard";
 import AudioRecorder from "@/components/AudioRecorder";
 import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
+import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
@@ -33,6 +39,8 @@ interface Message {
   body: string | null;
   created_at: string;
   senderName?: string;
+  senderPhotoUrl?: string | null;
+  senderUsername?: string | null;
   message_type?: string;
   is_pinned?: boolean;
   pinned_label?: string | null;
@@ -41,6 +49,8 @@ interface Message {
   media_url?: string | null;
   media_duration_seconds?: number | null;
   call_log_id?: string | null;
+  replyToMessageId?: string | null;
+  deletedAt?: string | null;
 }
 
 // Call History / Call Information — the fields a call_summary message's
@@ -125,6 +135,146 @@ function MentionText({ body, style, linkStyle }: { body: string; style: any; lin
   return <Text style={style}>{nodes}</Text>;
 }
 
+function replySnippet(target: Message | undefined): { label: string; text: string } {
+  if (!target) return { label: "Message", text: "Original message unavailable" };
+  if (target.deletedAt) return { label: target.senderName ?? "Message", text: "This message was deleted" };
+  if (target.message_type === "voice") return { label: target.senderName ?? "Message", text: "🎤 Voice message" };
+  return { label: target.senderName ?? "Message", text: target.body ?? "" };
+}
+
+// Strips every emoji-related code point (pictographs, ZWJ joiners,
+// variation selectors, skin-tone modifiers, regional-indicator flag pairs,
+// keycap combiners) plus plain whitespace; if nothing but that is left, the
+// message is emoji-only. Handles single emoji, multiple emoji, skin tones,
+// compound/ZWJ sequences (family emoji), and flags correctly, and does NOT
+// flag ordinary text that merely contains an emoji.
+const EMOJI_STRIP_REGEX = /([0-9#*](?=️?⃣)|\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}|‍|️|⃣|\s)/gu;
+function isEmojiOnlyMessage(body: string): boolean {
+  if (!body || !body.trim()) return false;
+  if (body.replace(EMOJI_STRIP_REGEX, "").length > 0) return false;
+  const pictographCount = (body.match(/\p{Extended_Pictographic}/gu) ?? []).length;
+  const keycapCount = (body.match(/[0-9#*]️?⃣/gu) ?? []).length;
+  const flagCount = (body.match(/\p{Regional_Indicator}{2}/gu) ?? []).length;
+  const emojiCount = pictographCount + keycapCount + flagCount;
+  return emojiCount > 0 && emojiCount <= 8;
+}
+
+const SUGGESTED_REACTIONS = ["❤️", "🙏", "👍", "😂", "🔥", "😮", "🎉"];
+
+// Extracted so the swipe-to-reply gesture can own a per-row Swipeable ref
+// via a real hook — FlatList's renderItem is a plain callback, not a
+// component instance, so hooks can't live there directly.
+function MessageBubbleRow({
+  item, mine, otherUserOfficialType, replyPreviewTarget, reactions, currentUserId,
+  onLongPress, onOpenProfile, onSwipeReply, onScrollToReply, onToggleReaction,
+}: {
+  item: Message;
+  mine: boolean;
+  otherUserOfficialType: OfficialAccountType | null;
+  replyPreviewTarget: Message | undefined;
+  reactions: { emoji: string; userId: string }[];
+  currentUserId: string | undefined;
+  onLongPress: () => void;
+  onOpenProfile: () => void;
+  onSwipeReply: () => void;
+  onScrollToReply: () => void;
+  onToggleReaction: (emoji: string) => void;
+}) {
+  const swipeRef = useRef<Swipeable>(null);
+  const preview = item.replyToMessageId ? replySnippet(replyPreviewTarget) : null;
+  const emojiOnly = !item.deletedAt && item.message_type !== "voice" && isEmojiOnlyMessage(item.body ?? "");
+
+  const reactionCounts = new Map<string, number>();
+  let myReaction: string | null = null;
+  for (const r of reactions) {
+    reactionCounts.set(r.emoji, (reactionCounts.get(r.emoji) ?? 0) + 1);
+    if (r.userId === currentUserId) myReaction = r.emoji;
+  }
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderLeftActions={() => (
+        <View style={styles.swipeReplyIconWrap}>
+          <Ionicons name="arrow-undo" size={18} color={colors.accentGreen} />
+        </View>
+      )}
+      overshootLeft={false}
+      leftThreshold={40}
+      friction={2}
+      onSwipeableWillOpen={() => {
+        swipeRef.current?.close();
+        onSwipeReply();
+      }}
+    >
+      <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
+        {!mine && (
+          <TouchableOpacity onPress={onOpenProfile} disabled={!item.senderUsername} style={styles.bubbleAvatar}>
+            <Avatar photoUrl={item.senderPhotoUrl} name={item.senderName} size={28} />
+          </TouchableOpacity>
+        )}
+        <View style={styles.bubbleStack}>
+          {item.is_official_response && (
+            <View style={styles.officialResponseRow}>
+              {otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
+              <Text style={styles.officialResponseLabel} numberOfLines={1}>
+                {item.crisis_context ?? "Official Response"}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onLongPress={onLongPress}
+            style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, emojiOnly && styles.bubbleEmojiOnly]}
+          >
+            {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
+            {preview && (
+              <TouchableOpacity onPress={onScrollToReply} style={[styles.replyQuote, mine && styles.replyQuoteMine]}>
+                <Text style={[styles.replyQuoteName, mine && styles.bubbleTextMine]} numberOfLines={1}>{preview.label}</Text>
+                <Text style={[styles.replyQuoteText, mine && styles.bubbleTextMine]} numberOfLines={1}>{preview.text}</Text>
+              </TouchableOpacity>
+            )}
+            {item.deletedAt ? (
+              <Text style={[styles.deletedText, mine && styles.bubbleTextMine]}>🚫 This message was deleted</Text>
+            ) : item.message_type === "voice" && item.media_url ? (
+              <VoiceMessageBubble
+                mediaUrl={item.media_url}
+                durationSeconds={item.media_duration_seconds ?? null}
+                mine={mine}
+              />
+            ) : emojiOnly ? (
+              // Large, chrome-free presentation for emoji-only content
+              // (WhatsApp/Instagram convention) — the stored message body
+              // is untouched, this only changes how it's rendered.
+              <Text style={styles.emojiOnlyText} accessibilityLabel={item.body ?? undefined}>{item.body}</Text>
+            ) : (
+              <MentionText
+                body={item.body ?? ""}
+                style={[styles.bubbleText, mine && styles.bubbleTextMine]}
+                linkStyle={styles.mentionLink}
+              />
+            )}
+            {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
+          </TouchableOpacity>
+          {reactionCounts.size > 0 && (
+            <View style={[styles.reactionRow, mine && styles.reactionRowMine]}>
+              {Array.from(reactionCounts.entries()).map(([emoji, count]) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={[styles.reactionPill, myReaction === emoji && styles.reactionPillMine]}
+                  onPress={() => onToggleReaction(emoji)}
+                >
+                  <Text style={styles.reactionPillText}>{emoji} {count > 1 ? count : ""}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    </Swipeable>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -133,10 +283,23 @@ export default function ChatScreen() {
   const { reportContent, pinMessage, unpinMessage, setActiveConversationId } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [hiddenForMeIds, setHiddenForMeIds] = useState<Set<string>>(new Set());
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  // Set only when the emoji picker was opened from the reaction picker's
+  // "+" (custom emoji) button, so the shared picker's onEmojiSelected knows
+  // whether to insert into the composer or react to a message.
+  const pendingReactionTargetRef = useRef<string | null>(null);
+  const [reactionsByMessage, setReactionsByMessage] = useState<Record<string, { emoji: string; userId: string }[]>>({});
+  const messagesById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+  const visibleMessages = useMemo(() => messages.filter((m) => !hiddenForMeIds.has(m.id)), [messages, hiddenForMeIds]);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const [title, setTitle] = useState("Conversation");
   const [isDirect, setIsDirect] = useState(false);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [otherUserPhotoUrl, setOtherUserPhotoUrl] = useState<string | null>(null);
+  const [otherUserUsername, setOtherUserUsername] = useState<string | null>(null);
   const [otherUserVerified, setOtherUserVerified] = useState(false);
   const [otherUserOfficialType, setOtherUserOfficialType] = useState<OfficialAccountType | null>(null);
   const [crisisType, setCrisisType] = useState<CrisisThreadType | null>(null);
@@ -144,7 +307,7 @@ export default function ChatScreen() {
   const [helpRequestId, setHelpRequestId] = useState<string | null>(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
-  const [showRecorder, setShowRecorder] = useState(false);
+  const [recordingActive, setRecordingActive] = useState(false);
   const [text, setText] = useState("");
   const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
   const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -190,13 +353,15 @@ export default function ChatScreen() {
       setIsDirect(true);
       const { data: members } = await supabase
         .from("p2p_conversation_members")
-        .select("user_id, p2p_profiles(full_name, is_verified, official_account_type)")
+        .select("user_id, p2p_profiles(full_name, is_verified, official_account_type, photo_url, username)")
         .eq("conversation_id", id)
         .neq("user_id", user.id)
         .maybeSingle();
       setOtherUserId((members as any)?.user_id ?? null);
       setTitle((members as any)?.p2p_profiles?.full_name ?? "Direct message");
       setOtherUserVerified((members as any)?.p2p_profiles?.is_verified ?? false);
+      setOtherUserPhotoUrl((members as any)?.p2p_profiles?.photo_url ?? null);
+      setOtherUserUsername((members as any)?.p2p_profiles?.username ?? null);
       setOtherUserOfficialType((members as any)?.p2p_profiles?.official_account_type ?? null);
     } else {
       setIsDirect(false);
@@ -215,7 +380,7 @@ export default function ChatScreen() {
         // checked for .error). Disambiguating by FK constraint name is the
         // same pattern already used elsewhere in this codebase, e.g.
         // DataContext's getModerationQueue.
-        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, call_log_id, p2p_profiles!p2p_messages_sender_id_fkey(full_name)")
+        .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, call_log_id, reply_to_message_id, deleted_at, p2p_profiles!p2p_messages_sender_id_fkey(full_name, photo_url, username)")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -233,6 +398,8 @@ export default function ChatScreen() {
       message_type: m.message_type,
       created_at: m.created_at,
       senderName: m.p2p_profiles?.full_name,
+      senderPhotoUrl: m.p2p_profiles?.photo_url ?? null,
+      senderUsername: m.p2p_profiles?.username ?? null,
       is_pinned: m.is_pinned,
       pinned_label: m.pinned_label,
       is_official_response: m.is_official_response,
@@ -240,6 +407,8 @@ export default function ChatScreen() {
       media_url: m.media_url,
       media_duration_seconds: m.media_duration_seconds,
       call_log_id: m.call_log_id,
+      replyToMessageId: m.reply_to_message_id ?? null,
+      deletedAt: m.deleted_at ?? null,
     });
     if (msgsErr) console.error("Failed to load messages", msgsErr);
     if (pinnedErr) console.error("Failed to load pinned messages", pinnedErr);
@@ -247,7 +416,36 @@ export default function ChatScreen() {
     setMessages(mappedMsgs);
     setPinnedMessages((pinned ?? []).map(mapMsg));
     setLoading(false);
+
+    // Delete-for-me is a per-viewer hide, not a security boundary (the
+    // sender/other members still see the message) — filtered client-side
+    // against messagesById rather than baked into the messages_select RLS
+    // policy, since nothing here is unauthorized to read, just hidden by
+    // this viewer's own choice.
+    const { data: hidden } = await supabase
+      .from("p2p_message_deletions")
+      .select("message_id")
+      .eq("user_id", user.id)
+      .in("message_id", mappedMsgs.map((m) => m.id));
+    setHiddenForMeIds(new Set((hidden ?? []).map((h: any) => h.message_id as string)));
     void fetchCallLogs(mappedMsgs.filter((m) => m.message_type === "call_summary" && m.call_log_id).map((m) => m.call_log_id as string));
+
+    const { data: reactions, error: reactionsErr } = await supabase
+      .from("p2p_message_reactions")
+      .select("message_id, user_id, emoji")
+      .in("message_id", mappedMsgs.map((m) => m.id));
+    if (reactionsErr) {
+      // Missing-table is expected until migration 163 has been applied —
+      // fail soft (no reactions shown) rather than breaking the whole thread.
+      console.warn("Failed to load reactions (migration 163 applied?)", reactionsErr.message);
+    } else {
+      const grouped: Record<string, { emoji: string; userId: string }[]> = {};
+      for (const r of reactions ?? []) {
+        const key = (r as any).message_id as string;
+        (grouped[key] ??= []).push({ emoji: (r as any).emoji, userId: (r as any).user_id });
+      }
+      setReactionsByMessage(grouped);
+    }
 
     await supabase
       .from("p2p_conversation_members")
@@ -287,6 +485,36 @@ export default function ChatScreen() {
     };
   }, [id, supabase, fetchCallLogs]);
 
+  // p2p_message_reactions has no conversation_id column, so there's no
+  // server-side filter to scope this subscription to just this thread (RLS
+  // still restricts it to conversations this user is actually a member of —
+  // see migration 163 — this filter is about not touching state for other
+  // open conversations' reactions, not authorization). messageIdsRef avoids
+  // a stale closure over `messages` inside the long-lived .on() callback.
+  const messageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    messageIdsRef.current = new Set(messages.map((m) => m.id));
+  }, [messages]);
+
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`p2p_message_reactions_${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "p2p_message_reactions" }, (payload) => {
+        const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as any;
+        if (!row?.message_id || !messageIdsRef.current.has(row.message_id)) return;
+        setReactionsByMessage((prev) => {
+          const existing = (prev[row.message_id] ?? []).filter((r) => r.userId !== row.user_id);
+          const next = payload.eventType === "DELETE" ? existing : [...existing, { emoji: row.emoji, userId: row.user_id }];
+          return { ...prev, [row.message_id]: next };
+        });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, supabase]);
+
   async function initiateCall(callType: "audio" | "video") {
     if (!user || !otherUserId || !id || callingType) return;
     setCallingType(callType);
@@ -319,6 +547,7 @@ export default function ChatScreen() {
           channelName,
           otherUserId,
           otherUserName: title,
+          otherUserAvatarUrl: otherUserPhotoUrl ?? "",
           callType,
           isInitiator: "true",
           callId: startData.incomingCallId,
@@ -333,6 +562,76 @@ export default function ChatScreen() {
     }
   }
 
+  // Reuses the app-wide /profile/[username] route (same one MentionText and
+  // the profile screen's own navigation already use) rather than inventing
+  // a second profile view for chat.
+  function openProfile(username?: string | null) {
+    if (!username) return;
+    router.push(`/profile/${username}` as any);
+  }
+
+  // Indexes against visibleMessages (what the FlatList actually renders),
+  // not the raw messages array — a hidden-for-me message would otherwise
+  // throw the index off by however many hidden rows precede it.
+  function scrollToMessage(messageId: string) {
+    const idx = visibleMessages.findIndex((m) => m.id === messageId);
+    if (idx >= 0) listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+  }
+
+  // p2p_delete_message_for_everyone (migration 161) clears body/media_url
+  // and stamps deleted_at server-side — SECURITY DEFINER, verifies the
+  // caller is the sender, so there's no client-only authorization here to
+  // bypass. Optimistic local update mirrors what the RPC actually did
+  // rather than re-fetching the whole thread.
+  async function handleDeleteForEveryone(messageId: string) {
+    const { error } = await supabase.rpc("p2p_delete_message_for_everyone", { p_message_id: messageId });
+    if (error) {
+      Alert.alert("Couldn't delete message", error.message);
+      return;
+    }
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, body: null, media_url: null, media_duration_seconds: null, deletedAt: new Date().toISOString() } : m)));
+  }
+
+  // p2p_delete_message_for_me (migration 161) only ever writes a row keyed
+  // to auth.uid() — never touches the shared message row, so the sender and
+  // every other member still see it exactly as before.
+  async function handleDeleteForMe(messageId: string) {
+    const { error } = await supabase.rpc("p2p_delete_message_for_me", { p_message_id: messageId });
+    if (error) {
+      Alert.alert("Couldn't hide message", error.message);
+      return;
+    }
+    setHiddenForMeIds((prev) => new Set(prev).add(messageId));
+  }
+
+  // One reaction per user per message (migration 163's PRIMARY KEY enforces
+  // this server-side too) — tapping the emoji you already reacted with
+  // removes it, tapping a different one replaces it, matching WhatsApp/
+  // Instagram. Optimistic local update; the realtime subscription above
+  // reconciles it (including for the other party) without a full reload.
+  async function handleToggleReaction(messageId: string, emoji: string) {
+    if (!user) return;
+    const mine = (reactionsByMessage[messageId] ?? []).find((r) => r.userId === user.id);
+    setReactionPickerFor(null);
+    if (mine && mine.emoji === emoji) {
+      setReactionsByMessage((prev) => ({ ...prev, [messageId]: (prev[messageId] ?? []).filter((r) => r.userId !== user.id) }));
+      const { error } = await supabase.from("p2p_message_reactions").delete().eq("message_id", messageId).eq("user_id", user.id);
+      if (error) load();
+    } else {
+      setReactionsByMessage((prev) => ({
+        ...prev,
+        [messageId]: [...(prev[messageId] ?? []).filter((r) => r.userId !== user.id), { emoji, userId: user.id }],
+      }));
+      const { error } = await supabase
+        .from("p2p_message_reactions")
+        .upsert({ message_id: messageId, user_id: user.id, emoji }, { onConflict: "message_id,user_id" });
+      if (error) {
+        Alert.alert("Couldn't react", error.message);
+        load();
+      }
+    }
+  }
+
   function handleLongPressMessage(item: Message) {
     if (item.message_type === "call_summary" || !item.sender_id) return;
     const senderId = item.sender_id;
@@ -340,6 +639,36 @@ export default function ChatScreen() {
     const canPin = isDirect || true; // either DM party, or a group/circle leader — enforced server-side by p2p_can_pin_message
 
     const options: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[] = [];
+
+    if (item.deletedAt) {
+      // A tombstoned message has no body/media left to act on — only let
+      // the viewer hide their own copy of it.
+      options.push({
+        text: "Delete for Me",
+        style: "destructive",
+        onPress: () => handleDeleteForMe(item.id),
+      });
+      options.push({ text: "Cancel", style: "cancel" });
+      Alert.alert("Message options", undefined, options);
+      return;
+    }
+
+    options.push({
+      text: "😀 React",
+      onPress: () => setReactionPickerFor(item.id),
+    });
+
+    options.push({
+      text: "↩️ Reply",
+      onPress: () => setReplyTarget(item),
+    });
+
+    if (item.message_type !== "voice" && item.body) {
+      options.push({
+        text: "📋 Copy Text",
+        onPress: () => { Clipboard.setStringAsync(item.body ?? ""); },
+      });
+    }
 
     if (item.is_pinned) {
       options.push({
@@ -379,6 +708,24 @@ export default function ChatScreen() {
         },
       });
     }
+
+    if (mine) {
+      options.push({
+        text: "🗑 Delete for Everyone",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert("Delete for everyone?", "This will remove the message for everyone in this conversation.", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => handleDeleteForEveryone(item.id) },
+          ]);
+        },
+      });
+    }
+    options.push({
+      text: "🗑 Delete for Me",
+      style: "destructive",
+      onPress: () => handleDeleteForMe(item.id),
+    });
 
     options.push({ text: "Cancel", style: "cancel" });
     Alert.alert(item.senderName || "Message options", undefined, options);
@@ -439,18 +786,21 @@ export default function ChatScreen() {
   async function handleSend() {
     const body = text.trim();
     if (!body || !id || !user) return;
+    const replyingTo = replyTarget?.id ?? null;
     setStartersVisible(false);
     setSending(true);
     setText("");
     setMentionResults([]);
+    setReplyTarget(null);
     const { data, error } = await supabase
       .from("p2p_messages")
-      .insert({ conversation_id: id, sender_id: user.id, body })
+      .insert({ conversation_id: id, sender_id: user.id, body, reply_to_message_id: replyingTo })
       .select("id, flagged_self_harm")
       .single();
     setSending(false);
     if (error) {
       setText(body);
+      if (replyingTo) setReplyTarget(messages.find((m) => m.id === replyingTo) ?? null);
       Alert.alert("Message not sent", error.message);
       return;
     }
@@ -466,6 +816,7 @@ export default function ChatScreen() {
   // rather than requiring a signed-URL round trip per bubble.
   async function handleSendVoice(localUri: string, durationSeconds: number) {
     if (!id || !user) return;
+    const replyingTo = replyTarget?.id ?? null;
     try {
       // On web, localUri is a blob: URL with no dot-extension at all, so a
       // plain split(".").pop() returns the ENTIRE URL (including "/" and ":"
@@ -482,7 +833,6 @@ export default function ChatScreen() {
         .upload(path, arrayBuffer, { contentType: "audio/m4a", upsert: false });
       if (uploadError) {
         Alert.alert("Voice message not sent", uploadError.message);
-        setShowRecorder(false);
         return;
       }
       const { data: { publicUrl } } = supabase.storage.from("voice-messages").getPublicUrl(path);
@@ -492,20 +842,20 @@ export default function ChatScreen() {
         .insert({
           conversation_id: id, sender_id: user.id, message_type: "voice",
           media_url: publicUrl, media_duration_seconds: durationSeconds,
+          reply_to_message_id: replyingTo,
         })
         .select("id, flagged_self_harm")
         .single();
-      setShowRecorder(false);
       if (error) {
         Alert.alert("Voice message not sent", error.message);
         return;
       }
+      setReplyTarget(null);
       if (data?.flagged_self_harm) {
         Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
       }
     } catch (e: any) {
       Alert.alert("Voice message not sent", e?.message ?? "Please try again.");
-      setShowRecorder(false);
     }
   }
 
@@ -521,11 +871,16 @@ export default function ChatScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+            disabled={!isDirect || !otherUserUsername}
+            onPress={() => openProfile(otherUserUsername)}
+          >
+            {isDirect && <Avatar photoUrl={otherUserPhotoUrl} name={title} size={32} />}
             <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
             {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
             {isDirect && otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
-          </View>
+          </TouchableOpacity>
           {isDirect && otherUserId && !otherUserOfficialType && (
             <View style={styles.headerCallBtns}>
               <TouchableOpacity onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
@@ -538,7 +893,12 @@ export default function ChatScreen() {
           )}
         </View>
 
-        {crisisType && <CrisisThreadBanner crisisType={crisisType} submittedAt={crisisSubmittedAt} />}
+        {/* Help request responses now flow through the P2P email system
+            instead of a permanent in-chat banner (crisis_type is a
+            conversation-level flag, not a stored message, so this is a
+            presentation-only exclusion — the underlying data/email workflow
+            is untouched). Other crisis banner types are unaffected. */}
+        {crisisType && crisisType !== "help_request" && <CrisisThreadBanner crisisType={crisisType} submittedAt={crisisSubmittedAt} />}
 
         {showFeedbackPrompt && (
           <TouchableOpacity
@@ -568,10 +928,7 @@ export default function ChatScreen() {
               <TouchableOpacity
                 key={pm.id}
                 style={styles.pinnedItem}
-                onPress={() => {
-                  const idx = messages.findIndex((m) => m.id === pm.id);
-                  if (idx >= 0) listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
-                }}
+                onPress={() => scrollToMessage(pm.id)}
               >
                 <Text style={styles.pinnedItemMeta}>{pm.senderName ?? "Someone"} · {new Date(pm.created_at).toLocaleDateString()}</Text>
                 <Text style={styles.pinnedItemBody} numberOfLines={2}>{pm.body}</Text>
@@ -588,7 +945,7 @@ export default function ChatScreen() {
         ) : (
           <FlatList
             ref={listRef}
-            data={messages}
+            data={visibleMessages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, gap: 8 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
@@ -633,39 +990,19 @@ export default function ChatScreen() {
               }
               const mine = item.sender_id === user?.id;
               return (
-                <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
-                  <View style={styles.bubbleStack}>
-                    {item.is_official_response && (
-                      <View style={styles.officialResponseRow}>
-                        {otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
-                        <Text style={styles.officialResponseLabel} numberOfLines={1}>
-                          {item.crisis_context ?? "Official Response"}
-                        </Text>
-                      </View>
-                    )}
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onLongPress={() => handleLongPressMessage(item)}
-                      style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-                    >
-                      {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
-                      {item.message_type === "voice" && item.media_url ? (
-                        <VoiceMessageBubble
-                          mediaUrl={item.media_url}
-                          durationSeconds={item.media_duration_seconds ?? null}
-                          mine={mine}
-                        />
-                      ) : (
-                        <MentionText
-                          body={item.body ?? ""}
-                          style={[styles.bubbleText, mine && styles.bubbleTextMine]}
-                          linkStyle={styles.mentionLink}
-                        />
-                      )}
-                      {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <MessageBubbleRow
+                  item={item}
+                  mine={mine}
+                  otherUserOfficialType={otherUserOfficialType}
+                  replyPreviewTarget={item.replyToMessageId ? messagesById.get(item.replyToMessageId) : undefined}
+                  reactions={reactionsByMessage[item.id] ?? []}
+                  currentUserId={user?.id}
+                  onLongPress={() => handleLongPressMessage(item)}
+                  onOpenProfile={() => openProfile(item.senderUsername)}
+                  onSwipeReply={() => { if (!item.deletedAt) setReplyTarget(item); }}
+                  onScrollToReply={() => { if (item.replyToMessageId) scrollToMessage(item.replyToMessageId); }}
+                  onToggleReaction={(emoji) => handleToggleReaction(item.id, emoji)}
+                />
               );
             }}
           />
@@ -701,17 +1038,35 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {showRecorder ? (
-          <View style={[styles.recorderRow, { paddingBottom: insets.bottom + 10 }]}>
+        {replyTarget && (
+          <View style={styles.replyPreviewBar}>
+            <View style={styles.replyPreviewBarAccent} />
             <View style={{ flex: 1 }}>
-              <AudioRecorder onSubmit={handleSendVoice} />
+              <Text style={styles.replyPreviewBarName} numberOfLines={1}>
+                Replying to {replyTarget.sender_id === user?.id ? "yourself" : (replyTarget.senderName ?? "message")}
+              </Text>
+              <Text style={styles.replyPreviewBarText} numberOfLines={1}>
+                {replyTarget.message_type === "voice" ? "🎤 Voice message" : (replyTarget.body ?? "")}
+              </Text>
             </View>
-            <TouchableOpacity style={styles.cancelRecorderBtn} onPress={() => setShowRecorder(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={20} color={colors.textMuted} />
+            <TouchableOpacity onPress={() => setReplyTarget(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
-        ) : (
-          <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
+        )}
+
+        <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
+          {!recordingActive && (
+            <TouchableOpacity
+              style={styles.emojiBtn}
+              onPress={() => { Keyboard.dismiss(); pendingReactionTargetRef.current = null; setEmojiPickerOpen(true); }}
+              accessibilityLabel="Open emoji picker"
+              accessibilityRole="button"
+            >
+              <Ionicons name="happy-outline" size={24} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+          {!recordingActive && (
             <TextInput
               style={styles.input}
               value={text}
@@ -720,17 +1075,77 @@ export default function ChatScreen() {
               placeholderTextColor={colors.textMuted}
               multiline
             />
-            {text.trim() ? (
-              <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending}>
-                <Ionicons name="send" size={18} color="#fff" />
+          )}
+          {!recordingActive && text.trim() ? (
+            <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending}>
+              <Ionicons name="send" size={18} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            // Single stable instance — must stay mounted at this same JSX
+            // position across the whole recording lifecycle (recordingActive
+            // flips true mid-flight while text stays empty, so this branch
+            // never swaps away underneath it). Two separate mount points for
+            // this component would unmount/remount it mid-recording and
+            // orphan the in-progress Audio.Recording object.
+            <AudioRecorder onSubmit={handleSendVoice} onActiveChange={setRecordingActive} />
+          )}
+        </View>
+
+        <EmojiPicker
+          open={emojiPickerOpen}
+          onClose={() => setEmojiPickerOpen(false)}
+          onEmojiSelected={(e: EmojiType) => {
+            if (pendingReactionTargetRef.current) {
+              handleToggleReaction(pendingReactionTargetRef.current, e.emoji);
+              pendingReactionTargetRef.current = null;
+            } else {
+              setText((prev) => prev + e.emoji);
+            }
+          }}
+          enableSearchBar
+          enableRecentlyUsed
+          categoryPosition="top"
+          theme={{
+            backdrop: "rgba(0,0,0,0.4)",
+            knob: colors.borderBeige,
+            container: colors.card,
+            header: colors.textDark,
+            skinTonesContainer: colors.cardBeige,
+            category: {
+              icon: colors.textMuted, iconActive: colors.accentGreen,
+              container: "transparent", containerActive: "rgba(29,158,117,0.12)",
+            },
+            search: { background: colors.cardBeige, text: colors.textDark, placeholder: colors.textMuted, icon: colors.textMuted },
+          }}
+        />
+
+        <Modal visible={!!reactionPickerFor} transparent animationType="fade" onRequestClose={() => setReactionPickerFor(null)}>
+          <TouchableOpacity style={styles.reactionModalBackdrop} activeOpacity={1} onPress={() => setReactionPickerFor(null)}>
+            <View style={styles.reactionModalCard}>
+              {SUGGESTED_REACTIONS.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.reactionModalEmojiBtn}
+                  onPress={() => { if (reactionPickerFor) handleToggleReaction(reactionPickerFor, emoji); }}
+                  accessibilityLabel={`React with ${emoji}`}
+                >
+                  <Text style={styles.reactionModalEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.reactionModalEmojiBtn}
+                onPress={() => {
+                  pendingReactionTargetRef.current = reactionPickerFor;
+                  setReactionPickerFor(null);
+                  setEmojiPickerOpen(true);
+                }}
+                accessibilityLabel="Choose a different emoji reaction"
+              >
+                <Ionicons name="add-circle-outline" size={26} color={colors.textMuted} />
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.sendBtn} onPress={() => setShowRecorder(true)}>
-                <Ionicons name="mic" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -758,8 +1173,9 @@ const styles = StyleSheet.create({
   callCardStatus: { flex: 1, fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   callCardStatusMine: { color: "rgba(255,255,255,0.85)" },
   callCardTime: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  bubbleRow: { flexDirection: "row" },
+  bubbleRow: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
   bubbleRowMine: { justifyContent: "flex-end" },
+  bubbleAvatar: { marginBottom: 2 },
   bubbleStack: { maxWidth: "78%" },
   bubble: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   bubbleTheirs: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
@@ -790,6 +1206,23 @@ const styles = StyleSheet.create({
   },
   bubbleTextMine: { color: "#fff" },
   mentionLink: { color: "#3B82F6", fontFamily: "Inter_600SemiBold" },
+  deletedText: { fontSize: 13, fontStyle: "italic", color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  swipeReplyIconWrap: { width: 56, alignItems: "center", justifyContent: "center" },
+  replyQuote: {
+    borderLeftWidth: 3, borderLeftColor: colors.accentGreen, backgroundColor: "rgba(29,158,117,0.08)",
+    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 4,
+  },
+  replyQuoteMine: { backgroundColor: "rgba(255,255,255,0.15)", borderLeftColor: "#fff" },
+  replyQuoteName: { fontSize: 11, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  replyQuoteText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  replyPreviewBar: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginHorizontal: 16, marginTop: 8, padding: 8,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10,
+  },
+  replyPreviewBarAccent: { width: 3, alignSelf: "stretch", backgroundColor: colors.accentGreen, borderRadius: 2 },
+  replyPreviewBarName: { fontSize: 12, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  replyPreviewBarText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   mentionDropdown: {
     marginHorizontal: 16, marginBottom: 4,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
@@ -818,12 +1251,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 10,
     borderTopWidth: 1, borderTopColor: colors.borderBeige,
   },
-  recorderRow: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 16, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: colors.borderBeige,
-  },
-  cancelRecorderBtn: { padding: 6 },
   input: {
     flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
     borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10,
@@ -833,4 +1260,26 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.accentGreen, alignItems: "center", justifyContent: "center",
   },
+  emojiBtn: { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
+  bubbleEmojiOnly: { backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 0, paddingVertical: 2 },
+  emojiOnlyText: { fontSize: 42, lineHeight: 50 },
+  reactionRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 3 },
+  reactionRowMine: { justifyContent: "flex-end" },
+  reactionPill: {
+    flexDirection: "row", alignItems: "center", backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
+    paddingHorizontal: 7, paddingVertical: 2, minHeight: 24,
+  },
+  reactionPillMine: { borderColor: colors.accentGreen, backgroundColor: "rgba(29,158,117,0.1)" },
+  reactionPillText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.textDark },
+  reactionModalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" },
+  reactionModalCard: {
+    flexDirection: "row", flexWrap: "wrap", gap: 6, maxWidth: 280,
+    backgroundColor: colors.card, borderRadius: 20, padding: 14,
+    borderWidth: 1, borderColor: colors.borderBeige,
+  },
+  reactionModalEmojiBtn: {
+    width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center",
+  },
+  reactionModalEmoji: { fontSize: 26 },
 });

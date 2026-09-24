@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { CircleCard } from "@/components/CircleCard";
 
 interface DiscoverCircle {
   id: string;
@@ -109,26 +110,16 @@ export default function DiscoverCirclesScreen() {
           </View>
         ) : (
           filtered.map((c) => (
-            <View key={c.id} style={styles.circleCard}>
-              <View style={styles.circleTopRow}>
-                <Text style={styles.circleName} numberOfLines={1}>{c.name}</Text>
-                <View style={[styles.statusPill, c.status === "forming" && styles.statusPillForming]}>
-                  <Text style={styles.statusPillText}>{c.status === "forming" ? "Forming" : "Active"}</Text>
-                </View>
-              </View>
-              {c.description ? <Text style={styles.circleDesc} numberOfLines={2}>{c.description}</Text> : null}
-              <Text style={styles.circleMeta}>
-                Led by {c.leaderName} · {c.memberCount}/{c.maxMembers} members
-                {c.timezone ? ` · ${c.timezone}` : ""} · {c.languageCode.toUpperCase()}
-              </Text>
-              <TouchableOpacity
-                style={styles.joinBtn}
-                onPress={() => requestToJoin(c.id)}
-                disabled={requestingId === c.id}
-              >
-                {requestingId === c.id ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.joinBtnText}>Request to Join</Text>}
-              </TouchableOpacity>
-            </View>
+            <CircleCard
+              key={c.id}
+              name={c.name}
+              leaderName={`${c.leaderName}${c.timezone ? ` · ${c.timezone}` : ""} · ${c.languageCode.toUpperCase()}`}
+              memberCount={c.memberCount}
+              maxMembers={c.maxMembers}
+              description={c.description}
+              status={c.status === "forming" ? "forming" : "active"}
+              action={{ label: "Request to Join", onPress: () => requestToJoin(c.id), loading: requestingId === c.id }}
+            />
           ))
         )}
       </ScrollView>

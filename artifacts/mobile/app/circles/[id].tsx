@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { Avatar } from "@/components/Avatar";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null; isVerified: boolean }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -329,32 +330,32 @@ export default function CircleDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
-        {circle.members.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            style={styles.memberRow}
-            activeOpacity={isLeader && m.userId !== profile?.id ? 0.6 : 1}
-            onLongPress={() => memberActionSheet(m)}
-            onPress={() => m.username && router.push(`/profile/${m.username}` as any)}
-          >
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={styles.memberUsername} numberOfLines={1}>{m.username ? `@${m.username}` : m.name}</Text>
-                <VerificationBadge isVerified={m.isVerified} username={m.username} size="small" />
+        <View style={styles.membersCard}>
+          {circle.members.map((m, i) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberRow, i === circle.members.length - 1 && styles.memberRowLast]}
+              activeOpacity={isLeader && m.userId !== profile?.id ? 0.6 : 1}
+              onLongPress={() => memberActionSheet(m)}
+              onPress={() => m.username && router.push(`/profile/${m.username}` as any)}
+            >
+              <Avatar photoUrl={m.avatarUrl} name={m.name} size={34} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={styles.memberUsername} numberOfLines={1}>{m.username ? `@${m.username}` : m.name}</Text>
+                  <VerificationBadge isVerified={m.isVerified} username={m.username} size="small" />
+                </View>
+                {m.username && <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>}
               </View>
-              {m.username && <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>}
-            </View>
-            {m.role === "leader" && (
-              <View style={styles.leaderPill}><Text style={styles.leaderPillText}>Leader</Text></View>
-            )}
-            {m.role === "co_leader" && (
-              <View style={styles.coLeaderPill}><Text style={styles.leaderPillText}>Co-Leader</Text></View>
-            )}
-          </TouchableOpacity>
-        ))}
+              {m.role === "leader" && (
+                <View style={styles.leaderPill}><Text style={styles.leaderPillText}>Leader</Text></View>
+              )}
+              {m.role === "co_leader" && (
+                <View style={styles.coLeaderPill}><Text style={styles.leaderPillText}>Co-Leader</Text></View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {isLeader && (
           <TouchableOpacity style={styles.addMemberBtn} onPress={() => { setAddMemberOpen(true); setAddUsername(""); setAddPreview(null); setAddError(null); }}>
@@ -537,9 +538,14 @@ function makeStyles(c: AppColors) {
     requestMessage: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     approveBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
     declineBtn: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
-    membersHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20 },
+    membersHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 10 },
     transferLink: { fontSize: 11, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
-    memberRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+    // Rectangular card wrapping the whole roster, matching sessionCard/
+    // evalCard's treatment elsewhere on this screen — rows inside stay a
+    // plain list (divided by a hairline), not individually-boxed cards.
+    membersCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, paddingHorizontal: 12 },
+    memberRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
+    memberRowLast: { borderBottomWidth: 0 },
     memberAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(29,158,117,0.15)", alignItems: "center", justifyContent: "center" },
     memberAvatarText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     memberUsername: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },

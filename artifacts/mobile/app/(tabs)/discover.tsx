@@ -11,6 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { InviteCard } from "@/components/InviteCard";
+import { CircleCard } from "@/components/CircleCard";
 
 interface DiscoverCircleSummary {
   id: string;
@@ -98,7 +99,10 @@ function makeStyles(c: AppColors) {
       flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: "rgba(220,38,38,0.25)", padding: 14, marginBottom: 10,
     },
-    liveRoomName: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
+    liveRoomTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    liveRoomName: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", flexShrink: 1 },
+    liveRoomCategoryPill: { backgroundColor: c.borderBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, flexShrink: 0 },
+    liveRoomCategoryText: { fontSize: 10, fontWeight: "600", color: c.textMuted, fontFamily: "Inter_600SemiBold" },
     liveRoomMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
     joinRoomBtn: { backgroundColor: "#DC2626", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
     joinRoomBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
@@ -309,7 +313,14 @@ export default function DiscoverTab() {
               {(showAllRooms ? liveRooms : liveRooms.slice(0, 3)).map((r) => (
                 <View key={r.id} style={styles.liveRoomCard}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.liveRoomName} numberOfLines={1}>{r.name}</Text>
+                    <View style={styles.liveRoomTitleRow}>
+                      <Text style={styles.liveRoomName} numberOfLines={1}>{r.name}</Text>
+                      {!!r.category && (
+                        <View style={styles.liveRoomCategoryPill}>
+                          <Text style={styles.liveRoomCategoryText} numberOfLines={1}>{r.category}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.liveRoomMeta}>
                       Hosted by {r.hostName} · {r.currentParticipants} listening{r.speakingMode === "structured" ? " · Structured" : ""}
                     </Text>
@@ -357,10 +368,14 @@ export default function DiscoverTab() {
             </TouchableOpacity>
           </View>
           {circles.map((c) => (
-            <TouchableOpacity key={c.id} style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push(`/circles/${c.id}` as any)}>
-              <Text style={styles.circleCardName}>{c.name}</Text>
-              <Text style={styles.circleCardMeta}>Led by {c.leaderName} · {c.memberCount}/{c.maxMembers} members</Text>
-            </TouchableOpacity>
+            <CircleCard
+              key={c.id}
+              name={c.name}
+              leaderName={c.leaderName}
+              memberCount={c.memberCount}
+              maxMembers={c.maxMembers}
+              onPress={() => router.push(`/circles/${c.id}` as any)}
+            />
           ))}
 
           <Text style={styles.sectionHeading}>⛪ Churches on P2P Global</Text>

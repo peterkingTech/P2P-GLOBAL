@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, Animated, Easing, Platform, Alert, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -51,6 +51,19 @@ export default function IncomingCallScreen() {
   const settledRef = useRef(false);
   const [joining, setJoining] = useState(false);
   const ringtone = useRingtone();
+  // The incoming-call invitation payload (push notification / p2p_incoming_calls
+  // row) has never carried a caller photo — only callerId/callerName — so this
+  // is a small additive read-only lookup, not a change to push/invitation
+  // architecture. Absence of a photo silently keeps the existing emoji fallback.
+  const [callerPhotoUrl, setCallerPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!params.callerId) return;
+    let cancelled = false;
+    supabase.from("p2p_profiles").select("photo_url").eq("id", params.callerId).maybeSingle().then(({ data }) => {
+      if (!cancelled) setCallerPhotoUrl((data as any)?.photo_url ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [params.callerId]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -188,6 +201,7 @@ export default function IncomingCallScreen() {
             channelName: result.channelName,
             otherUserId: params.callerId,
             otherUserName: callerName,
+            otherUserAvatarUrl: callerPhotoUrl ?? "",
             callType: result.callType,
             isInitiator: "false",
             callId: params.callId,
@@ -232,6 +246,7 @@ export default function IncomingCallScreen() {
         channelName: params.channelName,
         otherUserId: params.callerId,
         otherUserName: callerName,
+        otherUserAvatarUrl: callerPhotoUrl ?? "",
         callType,
         isInitiator: "false",
         callId: params.callId,
@@ -248,7 +263,11 @@ export default function IncomingCallScreen() {
       <View style={styles.center}>
         <Animated.View style={[styles.avatarRing, { transform: [{ scale: pulse }] }]} />
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarEmoji}>🌳</Text>
+          {callerPhotoUrl ? (
+            <Image source={{ uri: callerPhotoUrl }} style={styles.avatarPhoto} />
+          ) : (
+            <Text style={styles.avatarEmoji}>🌳</Text>
+          )}
         </View>
 
         <Text style={styles.callerName}>{callerName}</Text>
@@ -292,6 +311,7 @@ function makeStyles(p2p: P2PCallColors) {
       borderWidth: 1.5, borderColor: p2p.accent,
     },
     avatarEmoji: { fontSize: 56 },
+    avatarPhoto: { width: "100%", height: "100%", borderRadius: 65 },
     callerName: { fontSize: 26, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
     callingText: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
     typeChip: {

@@ -436,7 +436,17 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <SafeAreaProvider>
-        <ErrorBoundary>
+        <ErrorBoundary
+          onError={(error, stackTrace) => {
+            // The boundary previously caught render exceptions silently —
+            // "Something went wrong" gave no clue which screen or provider
+            // threw, or why. This logs the real error/component stack so it
+            // shows up in Metro/device logs (and __DEV__'s own error-details
+            // modal already surfaces it in the UI); no PII or tokens are
+            // logged, just the error message and React's component stack.
+            console.error("[ErrorBoundary] Uncaught render error:", error, "\nComponent stack:", stackTrace);
+          }}
+        >
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#06110D" }}>
               <KeyboardProvider>

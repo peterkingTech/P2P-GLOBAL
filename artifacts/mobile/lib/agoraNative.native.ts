@@ -6,4 +6,4 @@
 // non-route module (resolved through ordinary Metro platform-extension
 // resolution, which DOES work correctly) is what actually keeps it out of
 // the web bundle.
-export { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType } from "react-native-agora";
+export { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType, RemoteVideoState } from "react-native-agora";

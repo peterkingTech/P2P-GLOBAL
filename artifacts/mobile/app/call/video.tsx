@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Scr
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType } from "@/lib/agoraNative";
+import { RtcSurfaceView, QualityType, BackgroundSourceType, BackgroundBlurDegree, SegModelType, RemoteVideoState } from "@/lib/agoraNative";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { useAgora } from "@/hooks/useAgora";
@@ -18,7 +18,7 @@ import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
-import { P2PParticipantOrbit } from "@/components/call/P2PParticipantOrbit";
+import { P2PRectStage } from "@/components/call/P2PRectStage";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
@@ -76,7 +76,7 @@ export default function VideoCallScreen() {
   const p2pColors = getP2PCallColors(colors, resolvedMode);
   const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{
-    channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
+    channelName: string; otherUserId: string; otherUserName?: string; otherUserAvatarUrl?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
     sessionId?: string; lessonId?: string;
     autoStudyLessonId?: string; autoStudyModuleId?: string; autoStudyLessonTitle?: string;
@@ -119,6 +119,13 @@ export default function VideoCallScreen() {
   const remoteUid = remoteUids.length === 1 ? remoteUids[0] : null;
   const connected = remoteUids.length > 0;
   const [groupParticipants, setGroupParticipants] = useState<CallParticipant[]>([]);
+  // Forensic calling audit — this codebase never tracked a real per-remote
+  // camera-on/off signal before (confirmed: otherTiles.videoOn was hardcoded
+  // true/!poorConnection everywhere). Driven now by Agora's own
+  // onRemoteVideoStateChanged; defaults to false (avatar fallback) per uid
+  // until that uid's first Decoding event actually arrives, rather than
+  // assuming video is showing before there's any evidence it is.
+  const [remoteVideoOn, setRemoteVideoOn] = useState<Record<number, boolean>>({});
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
@@ -267,6 +274,10 @@ export default function VideoCallScreen() {
     uid: myUid,
     enableVideo: true,
     appId: tokenAppId,
+    onCameraUnavailable: () => {
+      console.warn("CALL DEBUG video: camera permission unavailable, reflecting into cameraOn state");
+      setCameraOn(false);
+    },
     eventHandler: {
       // CALL DEBUG fix — see audio.tsx's identical handlers/comments: this
       // device joining the channel is NOT "connected," and previously had
@@ -315,12 +326,27 @@ export default function VideoCallScreen() {
       onAudioVolumeIndication: (_connection, speakers) => {
         activeSpeaker.reportVolume(speakers ?? []);
       },
+      // Forensic calling audit — see remoteVideoOn's declaration above. Only
+      // Decoding counts as "actually showing video"; Stopped/Starting/
+      // Frozen/Failed all fall back to the avatar rather than risk a blank
+      // or stale frame, matching this codebase's existing "never an empty/
+      // black rectangle" fallback convention (P2PParticipantNode).
+      onRemoteVideoStateChanged: (connection, uid, state) => {
+        console.log("CALL DEBUG video: onRemoteVideoStateChanged", { channelName: connection.channelId, remoteUid: uid, state });
+        setRemoteVideoOn((prev) => ({ ...prev, [uid]: state === RemoteVideoState.RemoteVideoStateDecoding }));
+      },
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         activeSpeaker.clearIfActive(uid);
         setRemoteUids((prev) => {
           const next = prev.filter((u) => u !== uid);
           if (next.length === 0) handleEndCall();
+          return next;
+        });
+        setRemoteVideoOn((prev) => {
+          if (!(uid in prev)) return prev;
+          const next = { ...prev };
+          delete next[uid];
           return next;
         });
         // Study Together C4.7/C4.3 — report ANY departed study participant,
@@ -482,21 +508,18 @@ export default function VideoCallScreen() {
   // P2P Call Redesign — presentation only. Self is now a real orbit
   // participant (previously only a small PIP tile, hidden entirely in
   // group calls) rather than a special case — see audio.tsx's identical
-  // comment. Remote tiles' videoOn always true, matching the existing
-  // group.tsx precedent exactly (this codebase has never tracked a
-  // per-remote camera-on/off signal — confirmed forensically — so this
-  // is not a new limitation introduced by the redesign); poorConnection
-  // forces the graceful avatar fallback instead of a broken video frame.
+  // comment. Remote tiles' videoOn now comes from a real per-uid signal
+  // (remoteVideoOn, driven by onRemoteVideoStateChanged above) instead of
+  // being hardcoded true; poorConnection still forces the graceful avatar
+  // fallback on top of that when this device's own network is bad.
   const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({
     uid, isSelf: false,
     name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
-    videoOn: !poorConnection, muted: false,
+    videoOn: !poorConnection && !!remoteVideoOn[uid], muted: false,
+    photoUrl: remoteUids.length === 1 ? (params.otherUserAvatarUrl || null) : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
   }));
-  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: cameraOn, muted };
+  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: cameraOn, muted, photoUrl: profile?.avatarUrl ?? null };
   const allTiles = [selfTile, ...otherTiles];
-  const centerUid = activeSpeaker.activeUid ?? (remoteUids.length > 0 ? remoteUids[0] : 0);
-  const centerTile = allTiles.find((t) => t.uid === centerUid) ?? selfTile;
-  const orbitTiles = allTiles.filter((t) => t.uid !== centerTile.uid);
 
   if (mode === "study") {
     return (
@@ -547,9 +570,8 @@ export default function VideoCallScreen() {
       </View>
 
       <View style={styles.orbitArea}>
-        <P2PParticipantOrbit
-          centerTile={centerTile}
-          orbitTiles={orbitTiles}
+        <P2PRectStage
+          tiles={allTiles}
           speakingUids={activeSpeaker.speakingUids}
           colors={p2pColors}
         />
@@ -563,7 +585,7 @@ export default function VideoCallScreen() {
         )}
       </View>
 
-      {centerTile.isSelf && cameraOn && (
+      {cameraOn && (
         <TouchableOpacity style={[styles.blurToggle, { top: insets.top + 100 }]} onPress={toggleBlur} activeOpacity={0.85} accessibilityLabel="Toggle background blur">
           <Ionicons name="sparkles" size={14} color={blurOn ? p2pColors.accent : p2pColors.textPrimary} />
         </TouchableOpacity>

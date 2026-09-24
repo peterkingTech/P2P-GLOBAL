@@ -17,7 +17,7 @@ import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
-import { P2PParticipantOrbit } from "@/components/call/P2PParticipantOrbit";
+import { P2PRectStage } from "@/components/call/P2PRectStage";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
@@ -92,7 +92,7 @@ export default function AudioCallScreen() {
   const p2pColors = getP2PCallColors(colors, resolvedMode);
   const styles = makeStyles(p2pColors);
   const params = useLocalSearchParams<{
-    channelName: string; otherUserId: string; otherUserName?: string; callType?: CallType;
+    channelName: string; otherUserId: string; otherUserName?: string; otherUserAvatarUrl?: string; callType?: CallType;
     isInitiator?: string; callId?: string; conversationId?: string; callLogId?: string;
     autoStudyLessonId?: string; autoStudyModuleId?: string; autoStudyLessonTitle?: string;
   }>();
@@ -534,12 +534,10 @@ export default function AudioCallScreen() {
     uid, isSelf: false,
     name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
     videoOn: false, muted: false,
+    photoUrl: remoteUids.length === 1 ? (params.otherUserAvatarUrl || null) : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
   }));
-  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted };
+  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted, photoUrl: profile?.avatarUrl ?? null };
   const allTiles = [selfTile, ...otherTiles];
-  const centerUid = activeSpeaker.activeUid ?? (remoteUids.length > 0 ? remoteUids[0] : 0);
-  const centerTile = allTiles.find((t) => t.uid === centerUid) ?? selfTile;
-  const orbitTiles = allTiles.filter((t) => t.uid !== centerTile.uid);
 
   if (mode === "study") {
     return (
@@ -592,11 +590,11 @@ export default function AudioCallScreen() {
       </View>
 
       <View style={styles.center}>
-        <P2PParticipantOrbit
-          centerTile={centerTile}
-          orbitTiles={orbitTiles}
+        <P2PRectStage
+          tiles={allTiles}
           speakingUids={activeSpeaker.speakingUids}
           showWaveform
+          renderVideo={false}
           colors={p2pColors}
         />
 

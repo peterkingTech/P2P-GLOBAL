@@ -327,6 +327,7 @@ export interface ConversationSummary {
   otherUserVerified: boolean;
   otherUserIsOfficial: boolean;
   otherUserOfficialType: OfficialAccountType | null;
+  otherUserPhotoUrl: string | null;
   memberCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
@@ -4693,7 +4694,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ),
         selectInChunks<any>(
           "p2p_conversation_members",
-          "conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type)",
+          "conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type, photo_url)",
           "conversation_id", convIds,
           (q) => q.neq("user_id", profile.id)
         ),
@@ -4741,6 +4742,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           otherUserVerified: otherProfile?.is_verified ?? false,
           otherUserIsOfficial: otherProfile?.is_official_account ?? false,
           otherUserOfficialType: otherProfile?.official_account_type ?? null,
+          otherUserPhotoUrl: otherProfile?.photo_url ?? null,
           memberCount: memberCountByConv.get(c.id) ?? 0,
           lastMessage: lastMsg?.message_type === "voice" ? "🎤 Voice message" : lastMsg?.body ?? null,
           lastMessageAt: lastMsg?.created_at ?? null,

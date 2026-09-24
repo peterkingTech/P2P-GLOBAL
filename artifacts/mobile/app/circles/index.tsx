@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { CircleCard } from "@/components/CircleCard";
 
 interface MyCircle {
   id: string;
@@ -91,19 +92,15 @@ export default function MyCirclesScreen() {
           circles.map((c) => {
             const nextSession = c.sessions.find((s) => s.sessionStatus === "scheduled" && s.scheduledAt);
             return (
-              <TouchableOpacity key={c.id} style={styles.circleCard} activeOpacity={0.88} onPress={() => router.push(`/circles/${c.id}` as any)}>
-                <View style={styles.circleIconWrap}>
-                  <Ionicons name="people-circle" size={26} color={colors.accentGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.circleName} numberOfLines={1}>{c.name}</Text>
-                  <Text style={styles.circleMeta}>{c.memberCount} member{c.memberCount === 1 ? "" : "s"} · Led by {c.leaderName}</Text>
-                  {nextSession?.scheduledAt ? (
-                    <Text style={styles.circleNextSession}>Next session: {new Date(nextSession.scheduledAt).toLocaleDateString()}</Text>
-                  ) : null}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
+              <CircleCard
+                key={c.id}
+                name={c.name}
+                leaderName={c.leaderName}
+                memberCount={c.memberCount}
+                nextSessionAt={nextSession?.scheduledAt ?? null}
+                onPress={() => router.push(`/circles/${c.id}` as any)}
+                action="chevron"
+              />
             );
           })
         )}

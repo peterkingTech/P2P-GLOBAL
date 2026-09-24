@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RtcSurfaceView } from "@/lib/agoraNative";
 import { P2PSpeakingRing } from "./P2PSpeakingRing";
@@ -14,6 +14,8 @@ export interface P2POrbitTile {
   muted: boolean;
   raisedHand?: boolean;
   reaction?: string | null;
+  /** Profile photo shown in the avatar fallback when video is off. Renders initials when absent. */
+  photoUrl?: string | null;
 }
 
 // A single orbiting participant — video when available, a graceful avatar
@@ -33,6 +35,8 @@ export function P2PParticipantNode({ tile, size, speaking, colors }: { tile: P2P
       >
         {tile.videoOn ? (
           <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: tile.uid }} zOrderMediaOverlay={tile.isSelf} />
+        ) : tile.photoUrl ? (
+          <Image source={{ uri: tile.photoUrl }} style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[styles.avatarFallback, { backgroundColor: colors.pillBg }]}>
             <Text style={[styles.avatarInitial, { fontSize: size * 0.36, color: colors.textPrimary }]}>{initial}</Text>
