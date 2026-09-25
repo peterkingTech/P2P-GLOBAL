@@ -800,6 +800,39 @@ router.post("/calls/start", async (req, res) => {
     return err(res, "You can't call this account directly.", 403);
   }
 
+  // Forensic P2P Connection audit — this endpoint previously had NO
+  // relationship check at all beyond the admin-separation rule above: any
+  // authenticated user could call any other non-admin user directly,
+  // regardless of any relationship (a gap messaging's own
+  // p2p_start_direct_conversation RPC has never had). Reuses that exact
+  // same authorization boundary (p2p_can_contact_directly, migration 166 —
+  // family, church-adjacent peer-group membership, discipleship links,
+  // accepted P2P connections, or an admin responding to a help request)
+  // rather than inventing a second, potentially-diverging one. An existing,
+  // already-shared conversation bypasses this — matches
+  // p2p_start_direct_conversation's own "already have a DM? reuse it"
+  // precedent, so a call within an already-established, legitimate
+  // conversation is never retroactively broken by a relationship that may
+  // have since changed (e.g. left a shared group).
+  let callAuthorized = false;
+  if (conversationId) {
+    const { data: members } = await supabaseWrite
+      .from("p2p_conversation_members")
+      .select("user_id")
+      .eq("conversation_id", conversationId)
+      .in("user_id", [callerId, recipientId]);
+    callAuthorized = (members ?? []).length === 2;
+  }
+  if (!callAuthorized) {
+    const { data: canContact } = await supabaseWrite.rpc("p2p_can_contact_directly", {
+      p_user_a: callerId, p_user_b: recipientId,
+    });
+    callAuthorized = !!canContact;
+  }
+  if (!callAuthorized) {
+    return err(res, "Connect with this person first to start a call.", 403);
+  }
+
   const { data: callLog, error: logErr } = await supabaseWrite
     .from("p2p_call_logs")
     .insert({

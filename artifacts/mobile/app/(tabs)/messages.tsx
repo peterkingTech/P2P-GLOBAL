@@ -152,12 +152,18 @@ export default function MessagesTab() {
       text: item.isFavourite ? "Remove from Favourites" : "Add to Favourites",
       onPress: () => (item.isFavourite ? removeFromFavourites(item.id) : addToFavourites(item.id)).then(loadConversations),
     });
-    if (!item.isPinnedBySystem) {
-      options.push({
-        text: item.isPinnedByUser ? "Unpin" : "Pin",
-        onPress: () => (item.isPinnedByUser ? unpinConversation(item.id) : pinConversation(item.id)).then(loadConversations),
-      });
-    }
+    // isPinnedBySystem (p2p_conversations.is_pinned_by_system, admin-only,
+    // e.g. a linked help-request thread — see admin.ts's
+    // /help-requests/:id/link-conversation) and isPinnedByUser
+    // (p2p_conversation_settings, this action) are independent: the system
+    // pin keeps a conversation sorted above user-pinned ones regardless,
+    // but that's an ordering decision, not a reason to hide the user's own
+    // pin/unpin toggle — official-response conversations use the exact
+    // same p2p_conversation_settings mechanism as every other chat.
+    options.push({
+      text: item.isPinnedByUser ? "Unpin" : "Pin",
+      onPress: () => (item.isPinnedByUser ? unpinConversation(item.id) : pinConversation(item.id)).then(loadConversations),
+    });
     options.push({ text: "Cancel", style: "cancel" });
     Alert.alert(item.name ?? "Conversation", undefined, options);
   }

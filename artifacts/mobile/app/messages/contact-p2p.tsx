@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView,
   ActivityIndicator, Modal, Image, Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -86,7 +86,12 @@ export default function ContactP2P() {
     setSent(true);
   }
 
-  if (sent) return <SentConfirmation department={selectedDept} referenceNumber={referenceNumber} />;
+  if (sent) return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SentConfirmation department={selectedDept} referenceNumber={referenceNumber} />
+    </>
+  );
 
   const subjectValid = subject.trim().length >= 5;
   const bodyValid = body.trim().length >= 20;
@@ -98,6 +103,11 @@ export default function ContactP2P() {
       contentContainerStyle={{ paddingTop: insets.top + (Platform.OS === "web" ? 20 : 12), paddingBottom: insets.bottom + 40 }}
       keyboardShouldPersistTaps="handled"
     >
+      {/* This screen renders its own header row below (back button +
+          "Contact P2P Global") — without this, Expo Router's default
+          native header also renders above it, showing the raw route
+          segment "messages/contact-p2p" as visible UI text. */}
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />

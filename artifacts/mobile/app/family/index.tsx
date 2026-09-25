@@ -4,9 +4,10 @@ import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getMyFamilies, createFamily, respondToFamilyInvitation,
-  type MyFamiliesResponse,
+  type MyFamiliesResponse, FamilyApiError,
 } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
@@ -27,6 +28,16 @@ export default function MyFamiliesScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
   const router = useRouter();
+  // Root cause of "Couldn't load your families — Unauthorized": this screen
+  // previously fired its fetch unconditionally on mount, with no dependency
+  // on AuthContext at all. On a fresh app/build launch, this effect could
+  // run before Supabase's session restoration had finished, so authedFetch
+  // (lib/familyApi.ts) built its request with no session yet and no
+  // Authorization header attached, which the server correctly rejects with
+  // 401 — every other data loader in this app (DataContext) already gates
+  // on the auth context being ready before fetching; this screen was the
+  // one place that didn't.
+  const { isLoading: authLoading, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,19 +45,29 @@ export default function MyFamiliesScreen() {
   const [creating, setCreating] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
+      setLoadError(null);
       setData(await getMyFamilies());
     } catch (e: any) {
-      showAlert("Couldn't load your families", e.message ?? "Please try again.");
+      const message = e instanceof FamilyApiError && e.status === 401
+        ? "Please sign in again to view your families."
+        : e.message ?? "Please try again.";
+      setLoadError(message);
+      showAlert("Couldn't load your families", message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (authLoading) return; // wait for session restoration before fetching
+    if (!user) { setLoading(false); return; } // genuinely signed out — not this screen's job to redirect
+    load();
+  }, [authLoading, user, load]);
 
   async function handleCreateFamily() {
     if (!newFamilyName.trim()) return;
@@ -134,11 +155,25 @@ export default function MyFamiliesScreen() {
         )}
 
         {families.length === 0 && pendingInvitations.length === 0 && (
-          <View style={styles.emptyCard}>
-            <Ionicons name="people-circle-outline" size={40} color={c.primaryGreen} />
-            <Text style={styles.emptyTitle}>No families yet</Text>
-            <Text style={styles.emptyText}>Create a family to gather, study, and pray together.</Text>
-          </View>
+          loadError ? (
+            // Distinct from the genuine-zero-families empty state below —
+            // a failed load must never be presented as "you have no
+            // families" (the exact confusable-states bug this screen had).
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={40} color={c.textMuted} />
+              <Text style={styles.emptyTitle}>Couldn't load your families</Text>
+              <Text style={styles.emptyText}>{loadError}</Text>
+              <TouchableOpacity onPress={load} style={{ marginTop: 10 }}>
+                <Text style={{ color: c.accentGreen, fontWeight: "600" }}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <Ionicons name="people-circle-outline" size={40} color={c.primaryGreen} />
+              <Text style={styles.emptyTitle}>No families yet</Text>
+              <Text style={styles.emptyText}>Create a family to gather, study, and pray together.</Text>
+            </View>
+          )
         )}
 
         {showCreateForm ? (

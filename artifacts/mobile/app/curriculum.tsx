@@ -137,7 +137,12 @@ export default function CurriculumScreen() {
                       label above, and the entire card surface (not just the
                       arrow) is the touch target. */}
                   <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
-                    <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+                    {/* Fixed dark color, not colors.textDark — see learn.tsx's
+                        identical fix. arrowBadge's own background is a fixed
+                        light rgba(255,255,255,0.85) regardless of theme, but
+                        textDark flips to near-white in dark mode, putting a
+                        white arrow on a white badge. */}
+                    <Ionicons name="chevron-forward" size={18} color="#4A3A1E" />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -184,8 +189,12 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   // The photo's own dedicated region — large and square-ish, taking up the
   // maximum width the card can spare on the right without shrinking
-  // cardContent below.
-  photoWrap: { width: 148, alignSelf: "stretch" },
+  // cardContent below. Fixed height (matches currCard's minHeight), not
+  // alignSelf: "stretch" against a row whose own cross axis is otherwise
+  // undetermined — see learn.tsx's identical fix for the full explanation
+  // (a percentage-height Image child with nothing concrete to resolve
+  // against grows the whole row to the image's natural aspect ratio).
+  photoWrap: { width: 148, height: 168 },
   photoBlock: { width: "100%", height: "100%" },
   photoBlockFallback: { alignItems: "center", justifyContent: "center" },
   currCardLocked: { opacity: 0.65 },

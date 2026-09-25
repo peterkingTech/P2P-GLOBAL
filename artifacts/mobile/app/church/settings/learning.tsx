@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, FlatList } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, LearningGoal, LearningGoalLevel, LearningGoalTimeframe, LearningGoalTargetType } from "@/contexts/DataContext";
@@ -86,6 +86,7 @@ export default function ChurchLearningGoalsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.headerTitle}>Learning Goals</Text>

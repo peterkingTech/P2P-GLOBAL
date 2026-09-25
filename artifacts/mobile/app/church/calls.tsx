@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Alert, Platform, Switch } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
@@ -135,14 +135,18 @@ export default function ChurchCallsScreen() {
 
   if (!userChurch) {
     return (
-      <View style={[styles.container, styles.centerFill]}>
-        <Text style={styles.emptyText}>Join or register a church to use Church Calls.</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.container, styles.centerFill]}>
+          <Text style={styles.emptyText}>Join or register a church to use Church Calls.</Text>
+        </View>
+      </>
     );
   }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Calls</Text>

@@ -5,43 +5,38 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, DiscoverablePeer } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getApiUrl } from "@/lib/apiUrl";
 import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
 
+// P2P Connection audit — Discovery used to show a Report/Flag icon and an
+// always-available Message icon for every listed peer, regardless of any
+// relationship. Per the "Discover -> Connect -> Accept -> Communicate"
+// requirement: Report is removed from Discovery entirely (it still exists
+// on the profile screen's menu and inside an actual conversation's
+// long-press menu — a meaningful-interaction context, not a first-contact
+// list), and Message is only offered once the backend's own
+// p2p_can_contact_directly boundary (migration 166) actually permits
+// direct contact — everyone else sees a P2P Connection action instead.
 export default function Discover() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { supabase } = useAuth();
+  const { profile, supabase } = useAuth();
   const { highlight } = useLocalSearchParams<{ highlight?: string }>();
-  const { getDiscoverablePeers, reportContent } = useData();
+  const { getDiscoverablePeers, getDiscoveryRelationshipStatus } = useData();
   const [peers, setPeers] = useState<DiscoverablePeer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [messaging, setMessaging] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [responding, setResponding] = useState<string | null>(null);
   const [skillFilter, setSkillFilter] = useState<string[]>([]);
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
 
-  function handleReport(peer: DiscoverablePeer) {
-    Alert.alert(
-      `Report ${peer.fullName}?`,
-      "Let a moderator know what's wrong with this profile. This won't notify them.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Report",
-          style: "destructive",
-          onPress: async () => {
-            const err = await reportContent("profile", peer.id, "Reported from discovery");
-            Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
-          },
-        },
-      ]
-    );
-  }
-
   async function handleMessage(peer: DiscoverablePeer) {
+    if (!peer.canContact) return;
     setMessaging(peer.id);
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: peer.id });
@@ -55,10 +50,7 @@ export default function Discover() {
         } else if (error?.message?.includes("adult and minor accounts")) {
           Alert.alert("Can't message this person", "This conversation isn't available.");
         } else {
-          Alert.alert(
-            "Can't message yet",
-            "You can message peers once you share a study group together, or once they've reached out for help."
-          );
+          Alert.alert("Can't message yet", "Connect with this person first to start a conversation.");
         }
         return;
       }
@@ -68,11 +60,64 @@ export default function Discover() {
     }
   }
 
+  async function handleConnect(peer: DiscoverablePeer) {
+    if (!profile?.id || peer.connectionStatus !== "none") return;
+    setConnecting(peer.id);
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/request`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromUserId: profile.id, toUserId: peer.id, requestType: "connect" }),
+      });
+      if (res.ok) {
+        const row = await res.json();
+        setPeers((prev) => prev.map((p) => (p.id === peer.id ? { ...p, connectionStatus: "pending_sent", connectionRequestId: row.id } : p)));
+      } else {
+        const body = await res.json();
+        Alert.alert("Couldn't send request", body.error ?? "Please try again.");
+      }
+    } catch {
+      Alert.alert("Couldn't send request", "Please check your connection and try again.");
+    } finally {
+      setConnecting(null);
+    }
+  }
+
+  async function handleRespond(peer: DiscoverablePeer, response: "accepted" | "declined") {
+    if (!profile?.id || !peer.connectionRequestId) return;
+    setResponding(peer.id);
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/${peer.connectionRequestId}/respond`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responderId: profile.id, response }),
+      });
+      if (res.ok) {
+        setPeers((prev) => prev.map((p) => (p.id === peer.id
+          ? { ...p, connectionStatus: response === "accepted" ? "connected" : "none", canContact: response === "accepted" ? true : p.canContact }
+          : p)));
+      } else {
+        const body = await res.json();
+        Alert.alert("Couldn't respond", body.error ?? "This request may have already been handled.");
+      }
+    } catch {
+      Alert.alert("Couldn't respond", "Please check your connection and try again.");
+    } finally {
+      setResponding(null);
+    }
+  }
+
   const load = useCallback(async (q?: string, skills?: string[]) => {
     setLoading(true);
-    setPeers(await getDiscoverablePeers(q, skills));
+    const results = await getDiscoverablePeers(q, skills);
+    setPeers(results);
     setLoading(false);
-  }, [getDiscoverablePeers]);
+    // Relationship status loads in a second pass rather than blocking the
+    // initial list render — the list itself (names/photos) doesn't depend
+    // on it, only the action shown per row does.
+    if (results.length > 0) {
+      const statusById = await getDiscoveryRelationshipStatus(results.map((p) => p.id));
+      setPeers((prev) => prev.map((p) => (statusById[p.id] ? { ...p, ...statusById[p.id] } : p)));
+    }
+  }, [getDiscoverablePeers, getDiscoveryRelationshipStatus]);
 
   useEffect(() => { load(search, skillFilter); }, [skillFilter, load]);
 
@@ -130,7 +175,12 @@ export default function Discover() {
               </View>
             }
             renderItem={({ item }) => (
-              <View style={[styles.row, item.id === highlight && styles.rowHighlight]}>
+              <TouchableOpacity
+                style={[styles.row, item.id === highlight && styles.rowHighlight]}
+                onPress={() => { if (item.username) router.push(`/profile/${item.username}` as any); }}
+                disabled={!item.username}
+                activeOpacity={0.8}
+              >
                 <Avatar photoUrl={item.photoUrl} name={item.fullName} size={44} style={styles.avatar} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{item.fullName}</Text>
@@ -141,17 +191,51 @@ export default function Discover() {
                     </Text>
                   )}
                 </View>
-                <TouchableOpacity style={styles.reportBtn} onPress={() => handleReport(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.msgBtn} onPress={() => handleMessage(item)} disabled={messaging === item.id}>
-                  {messaging === item.id ? (
-                    <ActivityIndicator size="small" color={colors.accentGreen} />
-                  ) : (
-                    <Ionicons name="chatbubble-outline" size={18} color={colors.accentGreen} />
-                  )}
-                </TouchableOpacity>
-              </View>
+                {item.connectionStatus === "pending_received" ? (
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      onPress={(e) => { e.stopPropagation(); handleRespond(item, "accepted"); }}
+                      disabled={responding === item.id}
+                    >
+                      {responding === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.declineBtn}
+                      onPress={(e) => { e.stopPropagation(); handleRespond(item, "declined"); }}
+                      disabled={responding === item.id}
+                    >
+                      <Ionicons name="close" size={16} color={colors.accentGreen} />
+                    </TouchableOpacity>
+                  </View>
+                ) : item.canContact ? (
+                  <TouchableOpacity
+                    style={styles.msgBtn}
+                    onPress={(e) => { e.stopPropagation(); handleMessage(item); }}
+                    disabled={messaging === item.id}
+                  >
+                    {messaging === item.id ? (
+                      <ActivityIndicator size="small" color={colors.accentGreen} />
+                    ) : (
+                      <Ionicons name="chatbubble-outline" size={18} color={colors.accentGreen} />
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.connectBtn, item.connectionStatus === "pending_sent" && styles.connectBtnPending]}
+                    onPress={(e) => { e.stopPropagation(); handleConnect(item); }}
+                    disabled={connecting === item.id || item.connectionStatus === "pending_sent" || item.canContact === undefined}
+                  >
+                    {connecting === item.id || item.canContact === undefined ? (
+                      <ActivityIndicator size="small" color={item.connectionStatus === "pending_sent" ? colors.accentGreen : "#fff"} />
+                    ) : item.connectionStatus === "pending_sent" ? (
+                      <Text style={styles.connectBtnPendingText}>Pending</Text>
+                    ) : (
+                      <><Ionicons name="add" size={14} color="#fff" /><Text style={styles.connectBtnText}>Connect</Text></>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
             )}
           />
         )}
@@ -202,7 +286,15 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryGreen, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
   msgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(29,158,117,0.08)" },
-  reportBtn: { padding: 4 },
+  acceptBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryGreen },
+  declineBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderBeige },
+  connectBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 16, backgroundColor: colors.primaryGreen,
+  },
+  connectBtnPending: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.borderBeige },
+  connectBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  connectBtnPendingText: { color: colors.textMuted, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   name: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
   empty: { alignItems: "center", gap: 12, marginTop: 60 },

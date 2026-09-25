@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Alert, Platform } from "react-native";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
@@ -153,16 +153,17 @@ export default function ChurchStudyPlanScreen() {
   }
 
   if (loading && !detail) {
-    return <View style={[styles.container, styles.centerFill]}><ActivityIndicator color={colors.accentGreen} /></View>;
+    return <><Stack.Screen options={{ headerShown: false }} /><View style={[styles.container, styles.centerFill]}><ActivityIndicator color={colors.accentGreen} /></View></>;
   }
   if (!detail) {
-    return <View style={[styles.container, styles.centerFill]}><Text style={styles.emptyText}>This Custom Study Plan is not available.</Text></View>;
+    return <><Stack.Screen options={{ headerShown: false }} /><View style={[styles.container, styles.centerFill]}><Text style={styles.emptyText}>This Custom Study Plan is not available.</Text></View></>;
   }
 
   const { plan, items, progress } = detail;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />

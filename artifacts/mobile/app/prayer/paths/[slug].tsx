@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -129,17 +129,21 @@ export default function PrayerPathFlowScreen() {
     }
   }
 
-  if (loading) return <View style={[styles.screen, styles.centerFill]}><ActivityIndicator color={c.accentGreen} /></View>;
+  if (loading) return <><Stack.Screen options={{ headerShown: false }} /><View style={[styles.screen, styles.centerFill]}><ActivityIndicator color={c.accentGreen} /></View></>;
   if (!path) {
     return (
-      <View style={[styles.screen, styles.centerFill]}>
-        <Text style={styles.emptyText}>This prayer path isn't available right now.</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.screen, styles.centerFill]}>
+          <Text style={styles.emptyText}>This prayer path isn't available right now.</Text>
+        </View>
+      </>
     );
   }
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />

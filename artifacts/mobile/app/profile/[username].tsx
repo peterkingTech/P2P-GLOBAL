@@ -15,12 +15,26 @@ import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import { PeerGuideRequestModal } from "@/components/PeerGuideRequestModal";
 import { grainLabel } from "@/lib/grain";
 
+type ConnectionStatus = "none" | "pending_sent" | "pending_received" | "connected";
+
 interface PublicProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
   country: string | null; countryCode: string | null; bio: string | null;
   isPeerGuideEligible: boolean; joinedAt: string; showProgressPublicly: boolean;
   growthLevel: number | null; modulesCompleted: number | null; fruitCount: number | null;
   activeMenteesCount: number | null; isVerified: boolean;
+  connectionStatus?: ConnectionStatus;
+  connectionRequestId?: string | null;
+  // Whether the backend's own authorization boundary (p2p_can_contact_directly,
+  // migration 166 — the same check p2p_start_direct_conversation and
+  // /calls/start enforce server-side) currently permits direct contact.
+  // NOT the same as connectionStatus === "connected" — family, shared
+  // peer-group, and active discipleship-link relationships also grant this
+  // without any P2P connection request at all. The UI must reflect this
+  // full boundary, not just the P2P-connection-specific state, or it would
+  // incorrectly hide Message for relationships that legitimately already
+  // allow it.
+  canContact?: boolean;
 }
 
 function showAlert(title: string, message: string) {
@@ -41,6 +55,7 @@ export default function PublicProfileScreen() {
   const [notFound, setNotFound] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [responding, setResponding] = useState(false);
   const [messaging, setMessaging] = useState(false);
   const [isBlockedByMe, setIsBlockedByMe] = useState(false);
   const [grainCount, setGrainCount] = useState(0);
@@ -71,6 +86,49 @@ export default function PublicProfileScreen() {
       .then(({ data: block }) => setIsBlockedByMe(!!block));
   }, [viewer?.id, data?.userId]);
 
+  // Lightweight re-fetch (no full-screen loading flash) so the connection
+  // button reflects authoritative state after a realtime event, rather than
+  // trusting the event payload itself as the source of truth.
+  const refreshConnectionStatus = useCallback(async () => {
+    if (!username) return;
+    try {
+      const url = `${getApiUrl()}/profiles/username/${encodeURIComponent(username)}${viewer?.id ? `?viewerId=${viewer.id}` : ""}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const fresh = await res.json();
+      setData((prev) => (prev ? { ...prev, connectionStatus: fresh.connectionStatus, connectionRequestId: fresh.connectionRequestId } : prev));
+    } catch {
+      // Best-effort — the next focus/load() cycle will reconcile state anyway.
+    }
+  }, [username, viewer?.id]);
+
+  // p2p_connection_requests itself isn't in the realtime publication, but
+  // every connect-request/accept/decline already inserts into
+  // p2p_notifications (which is) — reusing that existing channel instead of
+  // adding a new published table. See DataContext's identical pattern for
+  // the unread-count badge.
+  useEffect(() => {
+    if (!viewer?.id || !data?.userId) return;
+    const targetId = data.userId;
+    const channel = supabase
+      .channel(`p2p_notifications_connection_${viewer.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${viewer.id}` },
+        (payload) => {
+          const n = payload.new as any;
+          const type = n?.notification_type as string | undefined;
+          if (!type || !["connection_request", "connection_accepted", "connection_declined"].includes(type)) return;
+          const involvedId = n?.data?.fromUserId ?? n?.data?.responderId;
+          if (involvedId === targetId) void refreshConnectionStatus();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [viewer?.id, data?.userId, refreshConnectionStatus]);
+
   useEffect(() => {
     if (!data?.userId) { setGrainCount(0); return; }
     fetch(`${getApiUrl()}/profiles/${data.userId}/grain`)
@@ -82,17 +140,50 @@ export default function PublicProfileScreen() {
   const isOwnProfile = viewer?.id === data?.userId;
 
   async function handleConnect() {
-    if (!viewer?.id || !data) return;
+    if (!viewer?.id || !data || data.connectionStatus !== "none") return;
     setConnecting(true);
     try {
       const res = await fetch(`${getApiUrl()}/connections/request`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromUserId: viewer.id, toUserId: data.userId, requestType: "connect" }),
       });
-      if (res.ok) showAlert("Request sent", `@${data.username} will see your connection request.`);
-      else { const body = await res.json(); showAlert("Couldn't send request", body.error ?? "Please try again."); }
+      if (res.ok) {
+        const row = await res.json();
+        // Optimistic — reconciled against authoritative state on the next
+        // load()/realtime refresh, per B4/B5's "database is the source of
+        // truth" requirement; this just avoids a flash back to "Connect"
+        // before that reconciliation happens.
+        setData((prev) => (prev ? { ...prev, connectionStatus: "pending_sent", connectionRequestId: row.id } : prev));
+      } else {
+        const body = await res.json();
+        showAlert("Couldn't send request", body.error ?? "Please try again.");
+      }
+    } catch {
+      showAlert("Couldn't send request", "Please check your connection and try again.");
     } finally {
       setConnecting(false);
+    }
+  }
+
+  async function handleRespond(response: "accepted" | "declined") {
+    if (!viewer?.id || !data?.connectionRequestId || responding) return;
+    setResponding(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/${data.connectionRequestId}/respond`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responderId: viewer.id, response }),
+      });
+      if (res.ok) {
+        setData((prev) => (prev ? { ...prev, connectionStatus: response === "accepted" ? "connected" : "none", connectionRequestId: response === "accepted" ? prev.connectionRequestId : null } : prev));
+      } else {
+        const body = await res.json();
+        showAlert("Couldn't respond", body.error ?? "This request may have already been handled.");
+        void refreshConnectionStatus();
+      }
+    } catch {
+      showAlert("Couldn't respond", "Please check your connection and try again.");
+    } finally {
+      setResponding(false);
     }
   }
 
@@ -261,16 +352,48 @@ export default function PublicProfileScreen() {
 
         {!isOwnProfile && (
           <View style={styles.actionsGrid}>
-            <TouchableOpacity style={styles.actionBtnPrimary} onPress={handleConnect} disabled={connecting}>
-              {connecting ? <ActivityIndicator color="#fff" size="small" /> : (
-                <><Ionicons name="person-add" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Connect</Text></>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtnSecondary} onPress={handleMessage} disabled={messaging}>
-              {messaging ? <ActivityIndicator color={colors.accentGreen} size="small" /> : (
-                <><Ionicons name="chatbubble-outline" size={15} color={colors.accentGreen} /><Text style={styles.actionBtnSecondaryText}>Message</Text></>
-              )}
-            </TouchableOpacity>
+            {data.connectionStatus === "pending_received" ? (
+              <>
+                <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => handleRespond("accepted")} disabled={responding}>
+                  {responding ? <ActivityIndicator color="#fff" size="small" /> : (
+                    <><Ionicons name="checkmark" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Accept</Text></>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => handleRespond("declined")} disabled={responding}>
+                  <Ionicons name="close" size={15} color={colors.accentGreen} />
+                  <Text style={styles.actionBtnSecondaryText}>Decline</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={data.connectionStatus === "connected" ? styles.actionBtnSecondary : styles.actionBtnPrimary}
+                onPress={handleConnect}
+                disabled={connecting || data.connectionStatus !== "none"}
+              >
+                {connecting ? <ActivityIndicator color="#fff" size="small" /> : data.connectionStatus === "connected" ? (
+                  <Text style={styles.actionBtnSecondaryText}>Connected ✓</Text>
+                ) : data.connectionStatus === "pending_sent" ? (
+                  <><Ionicons name="time-outline" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Pending</Text></>
+                ) : (
+                  <><Ionicons name="person-add" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Connect</Text></>
+                )}
+              </TouchableOpacity>
+            )}
+            {/* Discover -> Connect -> Accept -> Communicate: Message is only
+                offered once the backend's own authorization boundary
+                (canContact) actually permits direct contact — not merely
+                gated on P2P connection status, since family/group/
+                discipleship relationships also grant this without one.
+                Hiding this button is a UX convenience only; /calls/start
+                and p2p_start_direct_conversation enforce the real boundary
+                server-side regardless of what the client shows. */}
+            {data.canContact && (
+              <TouchableOpacity style={styles.actionBtnSecondary} onPress={handleMessage} disabled={messaging}>
+                {messaging ? <ActivityIndicator color={colors.accentGreen} size="small" /> : (
+                  <><Ionicons name="chatbubble-outline" size={15} color={colors.accentGreen} /><Text style={styles.actionBtnSecondaryText}>Message</Text></>
+                )}
+              </TouchableOpacity>
+            )}
             {data.isPeerGuideEligible && (
               <TouchableOpacity style={[styles.actionBtnSecondary, { flexBasis: "100%" }]} onPress={() => setPeerGuideModalOpen(true)}>
                 <Ionicons name="compass-outline" size={15} color={colors.accentGreen} />

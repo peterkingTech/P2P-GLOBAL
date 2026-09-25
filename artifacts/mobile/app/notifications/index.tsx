@@ -5,8 +5,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { useAuth } from "@/contexts/AuthContext";
 import { useData, AppNotification } from "@/contexts/DataContext";
 import { getCurrentGroupStudy } from "@/lib/groupStudy";
+import { getApiUrl } from "@/lib/apiUrl";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 
 function showAlert(title: string, message: string) {
@@ -22,6 +24,9 @@ const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   study_invitation_declined: "close-circle-outline",
   study_participant_removed: "exit-outline",
   study_ended: "flag-outline",
+  connection_request: "person-add-outline",
+  connection_accepted: "checkmark-circle-outline",
+  connection_declined: "close-circle-outline",
 };
 
 // Every Study Together notification type shares this prefix — one rule
@@ -49,12 +54,42 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { profile: viewer } = useAuth();
   const { getMyNotifications, markNotificationRead, markAllNotificationsRead } = useData();
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [navigatingId, setNavigatingId] = useState<string | null>(null);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  // Requests already responded to from this screen, keyed by requestId —
+  // the notification row itself doesn't change, so this is how the Accept/
+  // Decline buttons disappear immediately without waiting for a reload.
+  const [respondedRequestIds, setRespondedRequestIds] = useState<Set<string>>(new Set());
   const hasUnread = notifications.some((n) => !n.isRead);
+
+  async function handleConnectionRespond(n: AppNotification, response: "accepted" | "declined") {
+    const requestId = n.data?.requestId as string | undefined;
+    if (!requestId || !viewer?.id || respondingId) return;
+    setRespondingId(n.id);
+    try {
+      const res = await fetch(`${getApiUrl()}/connections/${requestId}/respond`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responderId: viewer.id, response }),
+      });
+      if (res.ok) {
+        setRespondedRequestIds((prev) => new Set(prev).add(requestId));
+        if (!n.isRead) { markNotificationRead(n.id); setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))); }
+      } else {
+        const body = await res.json();
+        showAlert("Couldn't respond", body.error ?? "This request may have already been handled.");
+        setRespondedRequestIds((prev) => new Set(prev).add(requestId));
+      }
+    } catch {
+      showAlert("Couldn't respond", "Please check your connection and try again.");
+    } finally {
+      setRespondingId(null);
+    }
+  }
 
   async function handleMarkAllRead() {
     setNotifications((prev) => prev.map((x) => ({ ...x, isRead: true })));
@@ -121,23 +156,48 @@ export default function NotificationsScreen() {
         ) : (
           notifications.map((n) => {
             const category = categoryFor(n.notificationType);
+            const requestId = n.data?.requestId as string | undefined;
+            const showConnectionActions =
+              n.notificationType === "connection_request" &&
+              n.data?.requestType === "connect" &&
+              !!requestId &&
+              !respondedRequestIds.has(requestId);
             return (
-              <TouchableOpacity
-                key={n.id}
-                style={[styles.row, !n.isRead && styles.rowUnread]}
-                onPress={() => handlePress(n)}
-                disabled={navigatingId === n.id}
-                activeOpacity={0.8}
-              >
-                <Ionicons name={TYPE_ICON[n.notificationType ?? ""] ?? "notifications-outline"} size={20} color={n.isRead ? colors.textMuted : colors.accentGreen} />
-                <View style={{ flex: 1 }}>
-                  {category && <Text style={styles.categoryLabel}>{category.emoji} {category.label}</Text>}
-                  <Text style={[styles.rowTitle, !n.isRead && styles.rowTitleUnread]}>{n.title}</Text>
-                  {n.message && <Text style={styles.rowMessage} numberOfLines={2}>{n.message}</Text>}
-                  <Text style={styles.rowDate}>{new Date(n.createdAt).toLocaleString()}</Text>
-                </View>
-                {navigatingId === n.id ? <ActivityIndicator size="small" color={colors.accentGreen} /> : !n.isRead && <View style={styles.unreadDot} />}
-              </TouchableOpacity>
+              <View key={n.id} style={[styles.row, styles.rowColumn, !n.isRead && styles.rowUnread]}>
+                <TouchableOpacity
+                  style={styles.rowMain}
+                  onPress={() => handlePress(n)}
+                  disabled={navigatingId === n.id}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={TYPE_ICON[n.notificationType ?? ""] ?? "notifications-outline"} size={20} color={n.isRead ? colors.textMuted : colors.accentGreen} />
+                  <View style={{ flex: 1 }}>
+                    {category && <Text style={styles.categoryLabel}>{category.emoji} {category.label}</Text>}
+                    <Text style={[styles.rowTitle, !n.isRead && styles.rowTitleUnread]}>{n.title}</Text>
+                    {n.message && <Text style={styles.rowMessage} numberOfLines={2}>{n.message}</Text>}
+                    <Text style={styles.rowDate}>{new Date(n.createdAt).toLocaleString()}</Text>
+                  </View>
+                  {navigatingId === n.id ? <ActivityIndicator size="small" color={colors.accentGreen} /> : !n.isRead && <View style={styles.unreadDot} />}
+                </TouchableOpacity>
+                {showConnectionActions && (
+                  <View style={styles.connectionActionsRow}>
+                    <TouchableOpacity
+                      style={styles.connectionAcceptBtn}
+                      onPress={() => handleConnectionRespond(n, "accepted")}
+                      disabled={respondingId === n.id}
+                    >
+                      {respondingId === n.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.connectionAcceptText}>Accept</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.connectionDeclineBtn}
+                      onPress={() => handleConnectionRespond(n, "declined")}
+                      disabled={respondingId === n.id}
+                    >
+                      <Text style={styles.connectionDeclineText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             );
           })
         )}
@@ -155,14 +215,26 @@ function makeStyles(c: AppColors) {
     markAllText: { color: c.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
     categoryLabel: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginBottom: 2 },
     row: {
-      flexDirection: "row", alignItems: "center", gap: 12,
       backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 14,
     },
+    rowColumn: { gap: 10 },
+    rowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
     rowUnread: { borderColor: c.accentGreen },
     rowTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     rowTitleUnread: { fontWeight: "700", fontFamily: "Inter_700Bold" },
     rowMessage: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     rowDate: { fontSize: 10, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen },
+    connectionActionsRow: { flexDirection: "row", gap: 8 },
+    connectionAcceptBtn: {
+      flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 9,
+      borderRadius: 10, backgroundColor: c.accentGreen,
+    },
+    connectionAcceptText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    connectionDeclineBtn: {
+      flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 9,
+      borderRadius: 10, borderWidth: 1.5, borderColor: c.accentGreen,
+    },
+    connectionDeclineText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

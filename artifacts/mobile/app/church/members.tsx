@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMember, ChurchRole } from "@/contexts/DataContext";
@@ -72,6 +72,7 @@ export default function ChurchMembersScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Members ({members.length})</Text>

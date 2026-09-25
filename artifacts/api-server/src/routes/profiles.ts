@@ -131,6 +131,33 @@ async function mapPublicProfile(row: PublicProfileRow) {
 const PUBLIC_PROFILE_COLUMNS = "id,username,full_name,photo_url,country,country_code,growth_level,bio,is_peer_guide_eligible,created_at,profile_visibility,show_real_name_publicly,show_progress_publicly,is_verified,verification_badge_visible";
 
 // GET /profiles/username/:username — public profile by username.
+// Resolves the P2P Connection status between viewerId and targetId from the
+// existing p2p_connection_requests table (request_type='connect') — reused
+// as-is, not a new relationship system. A row can exist in either
+// direction, and (rare race: both users request each other before seeing
+// the other's request) there could be two independent pending rows; an
+// accepted row always wins if present, otherwise whichever pending row
+// involves viewerId as sender vs. recipient determines the state.
+async function resolveConnectionStatus(viewerId: string, targetId: string) {
+  const { data: reqs } = await supabaseRead
+    .from("p2p_connection_requests")
+    .select("id, from_user_id, to_user_id, status")
+    .eq("request_type", "connect")
+    .or(`and(from_user_id.eq.${viewerId},to_user_id.eq.${targetId}),and(from_user_id.eq.${targetId},to_user_id.eq.${viewerId})`);
+
+  const rows = reqs ?? [];
+  const accepted = rows.find((r) => r.status === "accepted");
+  if (accepted) return { connectionStatus: "connected" as const, connectionRequestId: accepted.id as string };
+
+  const received = rows.find((r) => r.status === "pending" && r.to_user_id === viewerId);
+  if (received) return { connectionStatus: "pending_received" as const, connectionRequestId: received.id as string };
+
+  const sent = rows.find((r) => r.status === "pending" && r.from_user_id === viewerId);
+  if (sent) return { connectionStatus: "pending_sent" as const, connectionRequestId: sent.id as string };
+
+  return { connectionStatus: "none" as const, connectionRequestId: null as string | null };
+}
+
 router.get("/username/:username", async (req, res) => {
   const { username } = req.params;
   const { viewerId } = req.query as { viewerId?: string };
@@ -148,7 +175,23 @@ router.get("/username/:username", async (req, res) => {
     return res.status(404).json({ error: "Profile not found" });
   }
 
-  return res.json({ userId: data.id, ...(await mapPublicProfile(data as PublicProfileRow)) });
+  const connection = viewerId && viewerId !== data.id
+    ? await resolveConnectionStatus(viewerId, data.id)
+    : { connectionStatus: "none" as const, connectionRequestId: null as string | null };
+
+  // Discover -> Connect -> Accept -> Communicate: whether Message/Call
+  // should be offered at all is NOT simply "connectionStatus === connected"
+  // — p2p_can_contact_directly (migration 166, the same boundary
+  // p2p_start_direct_conversation and /calls/start already enforce) also
+  // covers family membership, shared peer-group membership, and active
+  // discipleship links, none of which require a P2P connection request.
+  // Hiding Message/Call for those relationships would have been a real
+  // regression, not a security fix.
+  const canContact = viewerId && viewerId !== data.id
+    ? !!(await supabaseRead.rpc("p2p_can_contact_directly", { p_user_a: viewerId, p_user_b: data.id })).data
+    : false;
+
+  return res.json({ userId: data.id, ...connection, canContact, ...(await mapPublicProfile(data as PublicProfileRow)) });
 });
 
 // GET /profiles/search?q=&viewerId= — prefix-then-contains username/name

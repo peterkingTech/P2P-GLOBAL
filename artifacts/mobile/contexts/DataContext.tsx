@@ -617,14 +617,23 @@ export interface TeamProfile {
   isCrisisResponder: boolean;
 }
 
+export type DiscoveryConnectionStatus = "none" | "pending_sent" | "pending_received" | "connected";
 export interface DiscoverablePeer {
   id: string;
+  username: string | null;
   fullName: string;
   country: string | null;
   role: string;
   gifts: string[];
   skills: string[];
   photoUrl: string | null;
+  // Populated by a separate batched call (getDiscoveryRelationshipStatus) —
+  // undefined until that resolves, not a security boundary in itself
+  // (p2p_can_contact_directly is re-checked server-side on every actual
+  // message/call/connection-request attempt regardless of what this says).
+  canContact?: boolean;
+  connectionStatus?: DiscoveryConnectionStatus;
+  connectionRequestId?: string | null;
 }
 
 export interface UsernameSearchResult {
@@ -1212,6 +1221,7 @@ interface DataContextValue {
   getCrisisResponderIds: () => Promise<string[]>;
   setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
   getDiscoverablePeers: (search?: string, skillKeys?: string[]) => Promise<DiscoverablePeer[]>;
+  getDiscoveryRelationshipStatus: (peerIds: string[]) => Promise<Record<string, { canContact: boolean; connectionStatus: DiscoveryConnectionStatus; connectionRequestId: string | null }>>;
   getSmartMatch: () => Promise<DiscoverablePeer | null>;
   getGroups: () => Promise<PeerGroup[]>;
   joinGroup: (groupId: string) => Promise<string | null>;
@@ -3870,7 +3880,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // filter — this just keeps the query's own intent explicit.
       let query = supabase
         .from("p2p_profiles")
-        .select("id, full_name, country, role, gifts, skills, photo_url")
+        .select("id, username, full_name, country, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .eq("is_official_account", false)
         .order("full_name", { ascending: true })
@@ -3879,17 +3889,56 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (skillKeys && skillKeys.length > 0) query = query.overlaps("skills", skillKeys);
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map((p: any) => ({
-        id: p.id, fullName: p.full_name || "Unnamed",
-        country: p.country, role: p.role, gifts: p.gifts || [],
-        skills: p.skills || [],
-        photoUrl: p.photo_url || null,
-      }));
+
+      // Forensic P2P Connection audit — this query never excluded blocked
+      // users before (either direction), unlike the profile screen's own
+      // isBlockedEitherWay check. Matches that same either-direction rule.
+      const { data: blocks } = await supabase
+        .from("p2p_user_blocks")
+        .select("blocker_id, blocked_id")
+        .or(`blocker_id.eq.${profile.id},blocked_id.eq.${profile.id}`);
+      const blockedIds = new Set(
+        (blocks ?? []).map((b: any) => (b.blocker_id === profile.id ? b.blocked_id : b.blocker_id) as string)
+      );
+
+      return (data || [])
+        .filter((p: any) => !blockedIds.has(p.id))
+        .map((p: any) => ({
+          id: p.id, username: p.username || null, fullName: p.full_name || "Unnamed",
+          country: p.country, role: p.role, gifts: p.gifts || [],
+          skills: p.skills || [],
+          photoUrl: p.photo_url || null,
+        }));
     } catch (e) {
       console.error("getDiscoverablePeers failed", e);
       return [];
     }
   }, [profile]);
+
+  // Batched P2P Connection status for a page of Discovery results — one
+  // RPC call for the whole list (p2p_discovery_relationship_status,
+  // migration 167) instead of one per peer.
+  const getDiscoveryRelationshipStatus = useCallback(async (
+    peerIds: string[]
+  ): Promise<Record<string, { canContact: boolean; connectionStatus: DiscoveryConnectionStatus; connectionRequestId: string | null }>> => {
+    if (peerIds.length === 0) return {};
+    try {
+      const { data, error } = await supabase.rpc("p2p_discovery_relationship_status", { p_target_ids: peerIds });
+      if (error) throw error;
+      const out: Record<string, { canContact: boolean; connectionStatus: DiscoveryConnectionStatus; connectionRequestId: string | null }> = {};
+      for (const row of (data ?? []) as any[]) {
+        out[row.target_id] = {
+          canContact: !!row.can_contact,
+          connectionStatus: (row.connection_status ?? "none") as DiscoveryConnectionStatus,
+          connectionRequestId: row.connection_request_id ?? null,
+        };
+      }
+      return out;
+    } catch (e) {
+      console.error("getDiscoveryRelationshipStatus failed", e);
+      return {};
+    }
+  }, []);
 
   const getSmartMatch = useCallback(async (): Promise<DiscoverablePeer | null> => {
     if (!profile) return null;
@@ -3898,7 +3947,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const mySkills: string[] = profile.skills || [];
       const { data, error } = await supabase
         .from("p2p_profiles")
-        .select("id, full_name, country, role, gifts, skills, photo_url")
+        .select("id, username, full_name, country, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .limit(200);
       if (error) throw error;
@@ -3915,7 +3964,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         if (score > bestScore) { bestScore = score; best = c; }
       }
       return {
-        id: best.id, fullName: best.full_name || "Unnamed",
+        id: best.id, username: best.username || null, fullName: best.full_name || "Unnamed",
         country: best.country, role: best.role, gifts: best.gifts || [],
         skills: best.skills || [],
         photoUrl: best.photo_url || null,
@@ -5741,7 +5790,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       verificationStatus, loadVerificationStatus, submitVerification, withdrawVerification, toggleBadgeVisibility,
       grainCount, inviteLink, peopleInvited, getMyInviteLink, refreshGrainCount,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
-      getDiscoverablePeers, getSmartMatch, getGroups, joinGroup, leaveGroup,
+      getDiscoverablePeers, getDiscoveryRelationshipStatus, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, updateNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       getHighlightsForLesson, addSectionHighlight,

@@ -175,58 +175,74 @@ export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Pr
     return `${m}:${s}`;
   }
 
-  if (phase === "recording" || phase === "locked") {
-    return (
-      <View style={styles.activeBar}>
-        <View style={styles.activeLeft}>
-          <View style={styles.recDot} />
-          <Text style={styles.activeTimer}>{formatTime(elapsedSeconds)}</Text>
-          {phase === "recording" && (
-            <Animated.Text style={[styles.slideHint, { transform: [{ translateX: dragX }] }]}>
-              ◁ Slide to cancel
-            </Animated.Text>
+  // Forensic voice-recording audit — root cause of "slide-up gesture not
+  // responding": this used to be three separate `return` statements with
+  // structurally different JSX per phase, and panHandlers only lived on the
+  // idle-phase TouchableOpacity. The instant beginRecording() set
+  // phase="recording", React tore down that element and mounted a
+  // different tree (the active bar) with no gesture handlers at all —
+  // severing the native touch responder chain while the finger was still
+  // down, so every subsequent slide-up move event had nothing to report
+  // to. Fixed by keeping ONE persistent root element carrying
+  // panHandlers across idle -> recording (the only window where the
+  // finger can still be down while phase changes); only its inner content
+  // switches. By the time phase reaches "locked"/"uploading" the finger
+  // has already been released, so those states are safe to render as
+  // plain content with their own separate tap targets.
+  return (
+    <View
+      style={phase === "idle" ? styles.idleWrap : styles.activeWrap}
+      {...panResponder.panHandlers}
+    >
+      {phase === "idle" && (
+        <>
+          <TouchableOpacity
+            style={[styles.micBtn, disabled && styles.btnDisabled]}
+            disabled={disabled}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="mic" size={18} color="#fff" />
+          </TouchableOpacity>
+          {permissionDenied && <Text style={styles.errorText}>Microphone permission denied.</Text>}
+          {errorText && <Text style={styles.errorText}>{errorText}</Text>}
+        </>
+      )}
+
+      {(phase === "recording" || phase === "locked") && (
+        <View style={styles.activeBar}>
+          <View style={styles.activeLeft}>
+            <View style={styles.recDot} />
+            <Text style={styles.activeTimer}>{formatTime(elapsedSeconds)}</Text>
+            {phase === "recording" && (
+              <Animated.Text style={[styles.slideHint, { transform: [{ translateX: dragX }] }]}>
+                ◁ Slide to cancel
+              </Animated.Text>
+            )}
+          </View>
+          {phase === "recording" ? (
+            <Animated.View style={[styles.lockHint, { transform: [{ translateY: dragY }] }]}>
+              <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
+              <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+            </Animated.View>
+          ) : (
+            <View style={styles.lockedActions}>
+              <TouchableOpacity onPress={discardRecording} style={styles.lockedCancelBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="trash-outline" size={18} color="#C0392B" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={finishAndSend} style={styles.lockedSendBtn}>
+                <Ionicons name="send" size={16} color={colors.cream} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
-        {phase === "recording" ? (
-          <Animated.View style={[styles.lockHint, { transform: [{ translateY: dragY }] }]}>
-            <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
-            <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-          </Animated.View>
-        ) : (
-          <View style={styles.lockedActions}>
-            <TouchableOpacity onPress={discardRecording} style={styles.lockedCancelBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="trash-outline" size={18} color="#C0392B" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={finishAndSend} style={styles.lockedSendBtn}>
-              <Ionicons name="send" size={16} color={colors.cream} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  }
+      )}
 
-  if (phase === "uploading") {
-    return (
-      <View style={styles.uploadingBox}>
-        <ActivityIndicator color={colors.accentGreen} size="small" />
-        <Text style={styles.uploadingText}>Uploading…</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.idleWrap}>
-      <TouchableOpacity
-        style={[styles.micBtn, disabled && styles.btnDisabled]}
-        disabled={disabled}
-        activeOpacity={0.85}
-        {...panResponder.panHandlers}
-      >
-        <Ionicons name="mic" size={18} color="#fff" />
-      </TouchableOpacity>
-      {permissionDenied && <Text style={styles.errorText}>Microphone permission denied.</Text>}
-      {errorText && <Text style={styles.errorText}>{errorText}</Text>}
+      {phase === "uploading" && (
+        <View style={styles.uploadingBox}>
+          <ActivityIndicator color={colors.accentGreen} size="small" />
+          <Text style={styles.uploadingText}>Uploading…</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -240,6 +256,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   errorText: { fontSize: 11, color: "#C0392B", fontFamily: "Inter_400Regular", marginTop: 4, maxWidth: 140, textAlign: "right" },
+  activeWrap: { flex: 1 },
 
   activeBar: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between",

@@ -11,7 +11,11 @@
 const { spawn } = require("child_process");
 
 const port = process.env.PORT || "8081";
-const env = { ...process.env, CI: "1" };
+// CI must stay unset for local dev — Metro/Watchman disable the file
+// watcher under CI=1, so a bundler started this way bundles correctly
+// once at startup but silently never re-bundles on later edits (no hot
+// reload, no fast refresh, regardless of browser cache state).
+const env = { ...process.env };
 
 if (process.env.REPLIT_DEV_DOMAIN) {
   env.EXPO_PACKAGER_PROXY_URL = `https://${process.env.REPLIT_EXPO_DEV_DOMAIN || process.env.REPLIT_DEV_DOMAIN}`;

@@ -17,8 +17,21 @@ async function authedFetch(path: string, init?: RequestInit) {
     },
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
+  if (!res.ok) {
+    // Distinguishes "no/invalid session" (401) from every other failure so
+    // callers can show "please sign in again" instead of the raw technical
+    // string the server sends ("Unauthorized") — see FamilyApiError below.
+    throw new FamilyApiError((body as { error?: string }).error ?? "Request failed", res.status);
+  }
   return body;
+}
+
+export class FamilyApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 export type FamilyRole = "shepherd" | "co_shepherd" | "adult" | "teen" | "child";

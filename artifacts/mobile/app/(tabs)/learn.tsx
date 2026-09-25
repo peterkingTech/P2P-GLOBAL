@@ -30,7 +30,6 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
-import StyleAccent from "@/components/StyleAccent";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
 
 const LOGO = require("@/assets/images/logo.png");
@@ -78,10 +77,6 @@ function KingdomSchoolSplash({ status, foundationPct, onEnter, colors }: {
 
   return (
     <View style={styles.root}>
-      {/* App Style's decorative accent — Kingdom School is one of the few
-          explicitly-approved illustration zones (welcome/splash screens).
-          Renders nothing at Minimal, respects the user's chosen style. */}
-      <StyleAccent size={64} />
       <Animated.View style={{ opacity: logoOpacity }}>
         <Image source={LOGO} style={styles.logo} resizeMode="contain" />
       </Animated.View>
@@ -190,7 +185,13 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
       <View style={styles.photoWrap}>
         <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.photoBlock} fallbackStyle={styles.photoBlockFallback} />
         <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
-          <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+          {/* Deliberately NOT colors.textDark — the badge behind it is a
+              fixed light rgba(255,255,255,0.85) regardless of theme (so it
+              stays legible sitting on top of varied photos), but textDark
+              flips to a near-white color in dark mode, which put a white
+              arrow on a white badge. A fixed dark color matches the badge's
+              own fixed-light background instead of following the theme. */}
+          <Ionicons name="chevron-forward" size={18} color="#4A3A1E" />
         </View>
       </View>
     </TouchableOpacity>
@@ -213,8 +214,13 @@ function foundationCardStyles(c: AppColors) {
     metaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium" },
     // The photo's own dedicated region — large and square-ish, taking up
     // the maximum width the card can spare on the right without shrinking
-    // the text column below.
-    photoWrap: { width: 132, alignSelf: "stretch" },
+    // the text column below. A fixed height (not alignSelf: "stretch"
+    // against the row's own minHeight-only, otherwise-undetermined cross
+    // axis) — without it, the Image child's height: "100%" has nothing
+    // concrete to resolve against and the whole row grows to the image's
+    // natural aspect ratio instead, dragging the card to several times its
+    // intended height.
+    photoWrap: { width: 132, height: 150 },
     photoBlock: { width: "100%", height: "100%" },
     photoBlockFallback: { alignItems: "center", justifyContent: "center" },
     arrowBadge: {

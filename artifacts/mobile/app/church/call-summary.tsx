@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Alert, Platform } from "react-native";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,14 +79,18 @@ export default function CallSummaryScreen() {
 
   if (loading || !summary) {
     return (
-      <View style={[styles.container, styles.centerFill]}>
-        <ActivityIndicator color={colors.accentGreen} />
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.container, styles.centerFill]}>
+          <ActivityIndicator color={colors.accentGreen} />
+        </View>
+      </>
     );
   }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{summary.overview.title}</Text>

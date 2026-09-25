@@ -51,6 +51,18 @@ router.post("/request", async (req, res) => {
   }
   if (fromUserId === toUserId) return res.status(400).json({ error: "Cannot send a request to yourself" });
 
+  // Forensic P2P Connection audit — this endpoint never checked
+  // p2p_user_blocks at all: a blocked user could still send (or receive) a
+  // connection request to/from the person who blocked them. Same
+  // either-direction check as isBlockedEitherWay used elsewhere in this
+  // codebase (profiles.ts).
+  const { data: blockRow } = await supabaseWrite
+    .from("p2p_user_blocks")
+    .select("id")
+    .or(`and(blocker_id.eq.${fromUserId},blocked_id.eq.${toUserId}),and(blocker_id.eq.${toUserId},blocked_id.eq.${fromUserId})`)
+    .maybeSingle();
+  if (blockRow) return res.status(403).json({ error: "You can't connect with this person" });
+
   // Re-sending after a decline/cancel should revive the same row rather than
   // permanently fail on the unique(from,to,type) constraint.
   const { data: existing } = await supabaseWrite
@@ -83,11 +95,16 @@ router.post("/request", async (req, res) => {
 
   const { data: fromProfile } = await supabaseWrite.from("p2p_profiles").select("full_name,username").eq("id", fromUserId).maybeSingle();
   const fromName = (fromProfile?.username as string | undefined) ? `@${fromProfile!.username}` : (fromProfile?.full_name as string | undefined) ?? "Someone";
-  let title = `${fromName} wants to connect with you`;
-  let notifMessage = "Tap to view their profile.";
+  // "P2P Connection" wording is intentional and specific to requestType
+  // 'connect' — deliberately distinct from a circle_invite, which is a
+  // different existing feature (circle membership) reusing this same
+  // request/respond lifecycle, not a P2P Connection.
+  let title = "P2P Connection Request";
+  let notifMessage = `${fromName} wants to connect with you.`;
   if (requestType === "circle_invite") {
     const { data: circle } = await supabaseWrite.from("p2p_peer_circles").select("name").eq("id", circleId).maybeSingle();
     title = `${fromName} has invited you to join ${circle?.name ?? "a circle"}`;
+    notifMessage = "Tap to view their profile.";
   }
   await supabaseWrite.from("p2p_notifications").insert({
     user_id: toUserId, title, message: notifMessage,
@@ -149,10 +166,17 @@ router.post("/:id/respond", async (req, res) => {
 
   const { data: responderProfile } = await supabaseWrite.from("p2p_profiles").select("full_name,username").eq("id", responderId).maybeSingle();
   const responderName = (responderProfile?.username as string | undefined) ? `@${responderProfile!.username}` : (responderProfile?.full_name as string | undefined) ?? "Someone";
+  const isConnect = request.request_type === "connect";
   await supabaseWrite.from("p2p_notifications").insert({
     user_id: request.from_user_id,
-    title: response === "accepted" ? `${responderName} accepted your request` : `${responderName} declined your request`,
-    message: "",
+    title: response === "accepted"
+      ? (isConnect ? "P2P Connection Accepted" : `${responderName} accepted your request`)
+      : (isConnect ? "P2P Connection Update" : `${responderName} declined your request`),
+    message: response === "accepted"
+      ? (isConnect ? `${responderName} accepted your P2P connection request.` : "")
+      : (isConnect ? `${responderName} declined your P2P connection request.` : ""),
+    notification_type: response === "accepted" ? "connection_accepted" : "connection_declined",
+    data: { requestId: id, requestType: request.request_type, responderId },
   });
 
   return res.json({ ok: true, status: response });

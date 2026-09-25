@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
@@ -85,22 +85,29 @@ export default function CategoryDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
-        <ActivityIndicator color={colors.accentGreen} />
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
+          <ActivityIndicator color={colors.accentGreen} />
+        </View>
+      </>
     );
   }
 
   if (!category) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
-        <Text style={styles.errorText}>Category not found.</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
+          <Text style={styles.errorText}>Category not found.</Text>
+        </View>
+      </>
     );
   }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { backgroundColor: category.colorTheme }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
