@@ -73,6 +73,12 @@ const NO_ANSWER_TIMEOUT_MS = 40000;
 const JOIN_CHANNEL_TIMEOUT_MS = 15000;
 const PEER_WAIT_TIMEOUT_MS = 45000;
 
+// Video-call lifecycle audit — see video.tsx's identical constant/comment:
+// a remote participant's onUserOffline is commonly just a transient network
+// drop, not a real hangup. Give a genuine reconnect this long before
+// treating it as a real departure.
+const RECONNECT_GRACE_MS = 15000;
+
 // react-native-agora's ConnectionStateType.ConnectionStateFailed (=5). Not
 // imported as a value from "react-native-agora" here on purpose — that
 // package statically pulls in native-only RN internals
@@ -153,6 +159,12 @@ export default function AudioCallScreen() {
   // still waiting on the Android mic permission dialog inside useAgoraEngine.
   const [readyToJoin, setReadyToJoin] = useState(false);
   const endedRef = useRef(false);
+  // Video-call lifecycle audit — see video.tsx's identical declaration/
+  // comment: a transient remote network drop must not immediately end the
+  // call. uid stays in remoteUids during the grace period; this set only
+  // drives the "reconnecting" UI signal.
+  const [disconnectedUids, setDisconnectedUids] = useState<Set<number>>(new Set());
+  const reconnectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   const [mode, setMode] = useState<"call" | "study">("call");
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
@@ -270,6 +282,11 @@ export default function AudioCallScreen() {
     endedRef.current = true;
     setCallState("ended");
 
+    // Video-call lifecycle audit — a real end must not leave a pending
+    // reconnect-grace timer to fire afterward against an already-ended call.
+    reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+    reconnectTimersRef.current.clear();
+
     const durationSeconds = connectedAtRef.current ? Math.round((Date.now() - connectedAtRef.current) / 1000) : 0;
     const wasConnected = !!connectedAtRef.current;
 
@@ -316,7 +333,7 @@ export default function AudioCallScreen() {
     uid: myUid,
     enableVideo: false,
     appId: tokenAppId,
-    onPermissionsResolved: () => setReadyToJoin(true),
+    onPermissionsResolved: useCallback(() => setReadyToJoin(true), []),
     eventHandler: {
       // CALL DEBUG fix — this device successfully joined the Agora channel.
       // This is NOT "connected" (see section 5 of the audit): it only means
@@ -347,8 +364,23 @@ export default function AudioCallScreen() {
       onError: (err, msg) => {
         console.warn("CALL DEBUG audio: onError", { err, msg });
       },
+      // Video-call lifecycle audit — see video.tsx's identical comment:
+      // previously only logged, then the call ran on borrowed time until
+      // Agora dropped it. Fetch a fresh token from the existing
+      // token-minting endpoint and hand it to the SAME live engine via
+      // renewToken — never leave/rejoin, never touch the `token` state this
+      // hook is keyed on (that would retrigger a full rejoin).
       onTokenPrivilegeWillExpire: () => {
         console.warn("CALL DEBUG audio: token privilege about to expire", { channelName: params.channelName });
+        if (!myUid || !profile?.id) return;
+        getToken(params.channelName, myUid, profile.id)
+          .then(({ token: freshToken }) => {
+            const result = engineRef.current?.renewToken(freshToken);
+            console.log("CALL DEBUG audio: renewToken", { channelName: params.channelName, result });
+          })
+          .catch((e) => {
+            console.warn("CALL DEBUG audio: token renewal FAILED", { channelName: params.channelName, error: e instanceof Error ? e.message : String(e) });
+          });
       },
       // Another participant has actually joined and is available — THIS is
       // the real, only correct signal for "connected." Never set by
@@ -356,9 +388,23 @@ export default function AudioCallScreen() {
       // remote party is present.
       onUserJoined: (connection, uid) => {
         console.log("CALL DEBUG audio: onUserJoined", { channelName: connection.channelId, remoteUid: uid });
-        connectedAtRef.current = Date.now();
+        // Video-call lifecycle audit — only stamp the FIRST real connect; a
+        // reconnect after a transient onUserOffline fires this again for
+        // the same uid and must not reset call-duration bookkeeping.
+        if (!connectedAtRef.current) connectedAtRef.current = Date.now();
         setCallState("connected");
         setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+        const pendingTimer = reconnectTimersRef.current.get(uid);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          reconnectTimersRef.current.delete(uid);
+        }
+        setDisconnectedUids((prev) => {
+          if (!prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.delete(uid);
+          return next;
+        });
       },
       // Study Together C1: the call now only ends when the LAST remote
       // participant leaves, not simply "a" participant — for an existing
@@ -381,28 +427,54 @@ export default function AudioCallScreen() {
           });
         }
       },
+      // Video-call lifecycle audit — see video.tsx's identical comment:
+      // onUserOffline fires for both a genuine hangup and a transient
+      // network drop, indistinguishable at this event. Previously this
+      // immediately ended the call once remoteUids hit zero. Now: keep the
+      // uid in remoteUids (so `connected` stays true) and only mark it
+      // "reconnecting"; a real removal/possible handleEndCall only happens
+      // if RECONNECT_GRACE_MS elapses with no rejoin (onUserJoined above
+      // cancels this if they come back).
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         activeSpeaker.clearIfActive(uid);
-        setRemoteUids((prev) => {
-          const next = prev.filter((u) => u !== uid);
-          if (next.length === 0) handleEndCall();
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
           return next;
         });
-        // Study Together C4.7/C4.3 — report ANY departed study participant,
-        // not just the leader (a rank-and-file departure still needs to be
-        // cleared from the active roster; the server only recomputes a
-        // leader when the departure actually affects leadership). This
-        // handler is registered once at mount (see useAgoraEngine.native.ts),
-        // so it reads live values via refs, not the closed-over `study`/
-        // `groupParticipants` from the render that registered it.
-        const liveStudy = studyRef.current;
-        if (liveStudy.isActive && liveStudy.isGroup) {
-          const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
-          if (departed) {
-            void liveStudy.reportParticipantDeparture(departed.userId);
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        const timer = setTimeout(() => {
+          reconnectTimersRef.current.delete(uid);
+          setDisconnectedUids((prev) => {
+            if (!prev.has(uid)) return prev;
+            const next = new Set(prev);
+            next.delete(uid);
+            return next;
+          });
+          setRemoteUids((prev) => {
+            const next = prev.filter((u) => u !== uid);
+            if (next.length === 0) handleEndCall();
+            return next;
+          });
+          // Study Together C4.7/C4.3 — report ANY departed study
+          // participant, not just the leader (a rank-and-file departure
+          // still needs to be cleared from the active roster; the server
+          // only recomputes a leader when the departure actually affects
+          // leadership). This handler is registered once at mount (see
+          // useAgoraEngine.native.ts), so it reads live values via refs,
+          // not the closed-over `study`/`groupParticipants` from the render
+          // that registered it.
+          const liveStudy = studyRef.current;
+          if (liveStudy.isActive && liveStudy.isGroup) {
+            const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
+            if (departed) {
+              void liveStudy.reportParticipantDeparture(departed.userId);
+            }
           }
-        }
+        }, RECONNECT_GRACE_MS);
+        reconnectTimersRef.current.set(uid, timer);
       },
     },
   });
@@ -423,6 +495,16 @@ export default function AudioCallScreen() {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(interval);
   }, [connected]);
+
+  // Video-call lifecycle audit — safety net for reconnect-grace timers on
+  // unmount (handleEndCall already clears them on every normal exit path;
+  // this only guards against an unmount that bypasses it).
+  useEffect(() => {
+    return () => {
+      reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reconnectTimersRef.current.clear();
+    };
+  }, []);
 
   // Caller side only — watch the incoming_calls row this call came from for
   // a decline/missed transition so "calling..." doesn't hang forever.
@@ -594,6 +676,17 @@ export default function AudioCallScreen() {
         </View>
       </View>
 
+      {/* Video-call lifecycle audit — see video.tsx's identical banner: a
+          remote participant's transient network drop must not immediately
+          end the call; this only shows while their reconnect grace period
+          (RECONNECT_GRACE_MS) is running. */}
+      {disconnectedUids.size > 0 && (
+        <View style={styles.banner}>
+          <Ionicons name="cloud-offline" size={14} color="#fff" />
+          <Text style={styles.bannerText}>{otherName} disconnected — reconnecting…</Text>
+        </View>
+      )}
+
       <View style={styles.center}>
         <P2PRectStage
           tiles={allTiles}
@@ -704,6 +797,11 @@ function makeStyles(p2p: P2PCallColors) {
       borderWidth: 1, borderColor: p2p.accentBorder, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
     },
     callTypePillText: { color: p2p.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+    banner: {
+      flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, marginHorizontal: 20,
+      backgroundColor: "rgba(180,83,9,0.9)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    },
+    bannerText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 6, width: "100%" },
     subLabel: { fontSize: 13, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 18 },

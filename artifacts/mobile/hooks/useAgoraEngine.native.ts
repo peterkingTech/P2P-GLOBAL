@@ -17,6 +17,25 @@ import {
 // rather than a JS exception, so it must not be possible to construct at all.
 const FALLBACK_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID || "";
 
+// Video-call lifecycle audit — every Agora event name any call screen
+// (audio/video/group/room/church) currently registers through this hook's
+// `eventHandler` option. Forwarded individually (not via a Proxy) because
+// react-native-agora's registerEventHandler inspects the handler object's
+// own keys to decide which native events to subscribe to — an object with
+// no real own keys would silently register nothing. Adding a new event to
+// any call screen only requires adding its name here once.
+const FORWARDED_EVENTS = [
+  "onJoinChannelSuccess",
+  "onConnectionStateChanged",
+  "onError",
+  "onTokenPrivilegeWillExpire",
+  "onUserJoined",
+  "onUserOffline",
+  "onAudioVolumeIndication",
+  "onRemoteVideoStateChanged",
+  "onNetworkQuality",
+] as const;
+
 // Shared engine lifecycle for every call screen (audio/video/group/room) —
 // they differ only in enableVideo and their own event callbacks, so this
 // owns create -> configure -> join -> leave/release, and hands back a ref
@@ -63,10 +82,49 @@ interface UseAgoraEngineOptions {
 export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved }: UseAgoraEngineOptions) {
   const engineRef = useRef<IRtcEngine | null>(null);
 
+  // Video-call lifecycle audit — root cause of "engine keeps
+  // reinitializing": eventHandler/onCameraUnavailable/onPermissionsResolved
+  // are all inline closures created fresh by the call screen on EVERY
+  // render. Previously they were read directly by the effect below and
+  // three of them sat in its dependency array, so React saw "changed deps"
+  // on every re-render of the screen (not just on a real new call) and tore
+  // the engine down (leaveChannel/release) and recreated it
+  // (createAgoraRtcEngine/joinChannel) each time. Reading them through refs
+  // instead — updated unconditionally on every render, not inside an
+  // effect — means whatever runs later always sees this render's latest
+  // closure (no stale handlers), while the effect that owns the actual
+  // engine only depends on values that represent a genuinely different
+  // call: channelName/token/uid/enableVideo/appId.
+  const eventHandlerRef = useRef(eventHandler);
+  eventHandlerRef.current = eventHandler;
+  const onCameraUnavailableRef = useRef(onCameraUnavailable);
+  onCameraUnavailableRef.current = onCameraUnavailable;
+  const onPermissionsResolvedRef = useRef(onPermissionsResolved);
+  onPermissionsResolvedRef.current = onPermissionsResolved;
+
+  // One object, created once and never replaced for the life of this hook
+  // instance, registered with Agora exactly once per real join. Each
+  // forwarded method reads eventHandlerRef.current at CALL time (not at
+  // registration time), so it always reaches this render's latest handler
+  // logic without the object's own identity ever changing — that identity
+  // stability is what lets registerEventHandler/unregisterEventHandler
+  // happen exactly once per real engine lifetime instead of once per render.
+  const stableHandlerRef = useRef<IRtcEngineEventHandler | null>(null);
+  if (!stableHandlerRef.current) {
+    const handler: Record<string, (...args: unknown[]) => void> = {};
+    for (const name of FORWARDED_EVENTS) {
+      handler[name] = (...args: unknown[]) => {
+        (eventHandlerRef.current as unknown as Record<string, ((...a: unknown[]) => void) | undefined>)[name]?.(...args);
+      };
+    }
+    stableHandlerRef.current = handler as unknown as IRtcEngineEventHandler;
+  }
+
   useEffect(() => {
     if (!token || !channelName || uid === null) return;
     let cancelled = false;
     let engine: IRtcEngine | null = null;
+    const stableHandler = stableHandlerRef.current!;
 
     (async () => {
       // Android requires an explicit runtime grant for these dangerous
@@ -85,19 +143,19 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         if (denied.length > 0) {
           console.warn("CALL DEBUG engine: permission denied, joining without real audio/video", { channelName, denied });
           if (enableVideo && denied.includes(PermissionsAndroid.PERMISSIONS.CAMERA)) {
-            onCameraUnavailable?.();
+            onCameraUnavailableRef.current?.();
           }
         }
       }
       if (cancelled) return;
-      onPermissionsResolved?.();
+      onPermissionsResolvedRef.current?.();
 
       const resolvedAppId = appId || FALLBACK_APP_ID;
       console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo, usingServerAppId: !!appId });
       engine = createAgoraRtcEngine();
       engineRef.current = engine;
       engine.initialize({ appId: resolvedAppId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
-      engine.registerEventHandler(eventHandler);
+      engine.registerEventHandler(stableHandler);
 
       if (enableVideo) engine.enableVideo();
       else engine.disableVideo();
@@ -146,13 +204,21 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       if (engine) {
         console.log("CALL DEBUG engine: leaving channel and releasing", { channelName, uid });
         engine.leaveChannel();
-        engine.unregisterEventHandler(eventHandler);
+        engine.unregisterEventHandler(stableHandler);
         engine.release();
         if (engineRef.current === engine) engineRef.current = null;
       }
     };
+    // Video-call lifecycle audit — deliberately NOT including eventHandler/
+    // onCameraUnavailable/onPermissionsResolved (read through refs above
+    // instead, see their declarations). This effect — and the real
+    // create/join/leave/release cycle it owns — must only run for an
+    // actual new call: a genuinely different channel/token/uid/appId, or
+    // video being turned on/off for the call as a whole. It must never
+    // rerun just because the screen re-rendered and happened to build a new
+    // inline callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelName, token, uid, enableVideo, appId, onCameraUnavailable, onPermissionsResolved]);
+  }, [channelName, token, uid, enableVideo, appId]);
 
   return engineRef;
 }

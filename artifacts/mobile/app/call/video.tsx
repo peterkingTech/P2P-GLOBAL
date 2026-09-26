@@ -63,6 +63,13 @@ const NO_ANSWER_TIMEOUT_MS = 40000;
 const JOIN_CHANNEL_TIMEOUT_MS = 15000;
 const PEER_WAIT_TIMEOUT_MS = 45000;
 
+// Video-call lifecycle audit — a remote participant's onUserOffline is
+// commonly just a transient network drop, not a real hangup (Agora itself
+// distinguishes "left the channel" from "connection dropped" no further
+// than this one event). Give a genuine reconnect this long to happen before
+// treating it as a real departure — see onUserOffline/onUserJoined below.
+const RECONNECT_GRACE_MS = 15000;
+
 // See audio.tsx's identical constant for why this isn't imported as a value
 // from "react-native-agora" (that package breaks Metro's web bundle the
 // instant it's imported by any file reachable from a route).
@@ -130,8 +137,33 @@ export default function VideoCallScreen() {
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [blurOn, setBlurOn] = useState(false);
+  // WhatsApp-style call redesign — user-controlled Video<->Audio presentation
+  // switch. Deliberately separate from cameraOn: cameraOn already means
+  // "is my camera capturing," which this reuses to actually stop the local
+  // video track (same engine.enableLocalVideo() call as the manual camera
+  // toggle below), but mediaMode is the distinct, explicit "I chose an
+  // audio-only presentation" concept that also drives which controls show.
+  // It never touches the Agora channel/engine/token — see switchTo*Mode.
+  const [mediaMode, setMediaMode] = useState<"video" | "audio">("video");
+  // WhatsApp-style call redesign — which participant is the large tile.
+  // Pure UI state: P2PRectStage's tap handler below only flips this, never
+  // touches Agora. false (the default) preserves this screen's original,
+  // pre-existing initial layout (other participant large, self small pip).
+  const [mainIsSelf, setMainIsSelf] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
-  const [videoAutoDisabled, setVideoAutoDisabled] = useState(false);
+  // Video-call lifecycle audit — camera-unavailable is now tracked
+  // separately from cameraOn: cameraOn also flips false when the USER
+  // deliberately toggles their camera off (toggleCamera below), which must
+  // not show a "camera unavailable" banner. This is only set true by a real
+  // permission denial (onCameraUnavailable) and cleared by a successful
+  // manual retry.
+  const [cameraUnavailable, setCameraUnavailable] = useState(false);
+  // Video-call lifecycle audit — a remote participant's transient network
+  // drop (Agora's onUserOffline) must not immediately end the call. uid is
+  // kept in remoteUids/remoteVideoOn during the grace period below (see
+  // RECONNECT_GRACE_MS) — this set only drives the "reconnecting" UI signal.
+  const [disconnectedUids, setDisconnectedUids] = useState<Set<number>>(new Set());
+  const reconnectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   // P2P Call Redesign — presentation layer only, see useActiveSpeaker.ts.
   const activeSpeaker = useActiveSpeaker();
   // CALL DEBUG fix — same explicit state machine as audio.tsx, including
@@ -243,6 +275,12 @@ export default function VideoCallScreen() {
     endedRef.current = true;
     setCallState("ended");
 
+    // Video-call lifecycle audit — a real end (explicit or genuine failure)
+    // must not leave a pending reconnect-grace timer to fire afterward and
+    // touch state on an already-ended call.
+    reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+    reconnectTimersRef.current.clear();
+
     const durationSeconds = connectedAtRef.current ? Math.round((Date.now() - connectedAtRef.current) / 1000) : 0;
     const wasConnected = !!connectedAtRef.current;
 
@@ -282,11 +320,17 @@ export default function VideoCallScreen() {
     uid: myUid,
     enableVideo: true,
     appId: tokenAppId,
-    onCameraUnavailable: () => {
+    onCameraUnavailable: useCallback(() => {
+      // Video-call lifecycle audit — a camera problem is not the same thing
+      // as ending (or downgrading) the video call: audio keeps flowing, the
+      // user stays on this screen, and cameraUnavailable drives a distinct
+      // banner (cameraOn alone would be indistinguishable from the user
+      // having simply toggled their own camera off via toggleCamera below).
       console.warn("CALL DEBUG video: camera permission unavailable, reflecting into cameraOn state");
       setCameraOn(false);
-    },
-    onPermissionsResolved: () => setReadyToJoin(true),
+      setCameraUnavailable(true);
+    }, []),
+    onPermissionsResolved: useCallback(() => setReadyToJoin(true), []),
     eventHandler: {
       // CALL DEBUG fix — see audio.tsx's identical handlers/comments: this
       // device joining the channel is NOT "connected," and previously had
@@ -309,14 +353,49 @@ export default function VideoCallScreen() {
       onError: (err, msg) => {
         console.warn("CALL DEBUG video: onError", { err, msg });
       },
+      // Video-call lifecycle audit — previously only logged, then the call
+      // ran on borrowed time until Agora dropped it outright. On this
+      // warning (fired ~30s before real expiry), fetch a fresh token from
+      // the existing token-minting endpoint (same getToken this screen
+      // already used to join) and hand it to the SAME live engine via
+      // renewToken — never leaveChannel/rejoin, never touch the `token`
+      // state this hook was keyed on (that would retrigger the engine
+      // effect above and cause exactly the reinit this fix removes).
       onTokenPrivilegeWillExpire: () => {
         console.warn("CALL DEBUG video: token privilege about to expire", { channelName: params.channelName });
+        if (!myUid || !profile?.id) return;
+        getToken(params.channelName, myUid, profile.id)
+          .then(({ token: freshToken }) => {
+            const result = engineRef.current?.renewToken(freshToken);
+            console.log("CALL DEBUG video: renewToken", { channelName: params.channelName, result });
+          })
+          .catch((e) => {
+            console.warn("CALL DEBUG video: token renewal FAILED", { channelName: params.channelName, error: e instanceof Error ? e.message : String(e) });
+          });
       },
       onUserJoined: (connection, uid) => {
         console.log("CALL DEBUG video: onUserJoined", { channelName: connection.channelId, remoteUid: uid });
-        connectedAtRef.current = Date.now();
+        // Video-call lifecycle audit — only stamp the FIRST real connect.
+        // A reconnect after a transient onUserOffline (see below) fires
+        // onUserJoined again for the same uid; overwriting connectedAtRef
+        // here would silently reset the call's duration bookkeeping every
+        // time the network blips.
+        if (!connectedAtRef.current) connectedAtRef.current = Date.now();
         setCallState("connected");
         setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+        // A genuine reconnect: cancel that uid's pending grace-period
+        // removal and clear its "reconnecting" UI state.
+        const pendingTimer = reconnectTimersRef.current.get(uid);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          reconnectTimersRef.current.delete(uid);
+        }
+        setDisconnectedUids((prev) => {
+          if (!prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.delete(uid);
+          return next;
+        });
         if (params.sessionId && !markedInProgressRef.current) {
           markedInProgressRef.current = true;
           void fetch(`${getApiUrl()}/calls/sessions/${params.sessionId}/mark-in-progress`, { method: "POST" });
@@ -344,47 +423,76 @@ export default function VideoCallScreen() {
         console.log("CALL DEBUG video: onRemoteVideoStateChanged", { channelName: connection.channelId, remoteUid: uid, state });
         setRemoteVideoOn((prev) => ({ ...prev, [uid]: state === RemoteVideoState.RemoteVideoStateDecoding }));
       },
+      // Video-call lifecycle audit — onUserOffline fires for BOTH a genuine
+      // hangup and a transient network drop; Agora itself does not
+      // distinguish them any further than this one event. Previously this
+      // immediately removed the uid and, once remoteUids hit zero, ended
+      // the call outright — a brief connectivity blip on the remote side
+      // was indistinguishable from a real hangup. Now: keep the uid in
+      // remoteUids/remoteVideoOn (so `connected` and the tile stay put) and
+      // only mark it "reconnecting" for the UI; a real removal/possible
+      // handleEndCall only happens if RECONNECT_GRACE_MS elapses with no
+      // rejoin (onUserJoined above cancels this if they come back).
       onUserOffline: (connection, uid) => {
         console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
         activeSpeaker.clearIfActive(uid);
-        setRemoteUids((prev) => {
-          const next = prev.filter((u) => u !== uid);
-          if (next.length === 0) handleEndCall();
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
           return next;
         });
-        setRemoteVideoOn((prev) => {
-          if (!(uid in prev)) return prev;
-          const next = { ...prev };
-          delete next[uid];
-          return next;
-        });
-        // Study Together C4.7/C4.3 — report ANY departed study participant,
-        // not just the leader, via refs since this handler is registered
-        // once at mount (see useAgoraEngine.native.ts) and would otherwise
-        // read stale state.
-        const liveStudy = studyRef.current;
-        if (liveStudy.isActive && liveStudy.isGroup) {
-          const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
-          if (departed) {
-            void liveStudy.reportParticipantDeparture(departed.userId);
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        const timer = setTimeout(() => {
+          reconnectTimersRef.current.delete(uid);
+          setDisconnectedUids((prev) => {
+            if (!prev.has(uid)) return prev;
+            const next = new Set(prev);
+            next.delete(uid);
+            return next;
+          });
+          setRemoteUids((prev) => {
+            const next = prev.filter((u) => u !== uid);
+            if (next.length === 0) handleEndCall();
+            return next;
+          });
+          setRemoteVideoOn((prev) => {
+            if (!(uid in prev)) return prev;
+            const next = { ...prev };
+            delete next[uid];
+            return next;
+          });
+          // Study Together C4.7/C4.3 — report ANY departed study
+          // participant, not just the leader, via refs since this handler
+          // is registered once at mount (see useAgoraEngine.native.ts) and
+          // would otherwise read stale state.
+          const liveStudy = studyRef.current;
+          if (liveStudy.isActive && liveStudy.isGroup) {
+            const departed = groupParticipantsRef.current.find((p) => p.uid === uid);
+            if (departed) {
+              void liveStudy.reportParticipantDeparture(departed.userId);
+            }
           }
-        }
+        }, RECONNECT_GRACE_MS);
+        reconnectTimersRef.current.set(uid, timer);
       },
+      // Video-call lifecycle audit — this previously force-disabled the
+      // local camera (setCameraOn(false) + engine.enableLocalVideo(false))
+      // after 3 consecutive bad samples, which is exactly the "silently
+      // downgrades to audio-only" behavior a video call must never do.
+      // Agora's own encoder already adapts bitrate/resolution to network
+      // conditions on its own; this handler now only ever drives the
+      // "Connection unstable" warning banner, never touches video enablement.
       onNetworkQuality: (_connection, uid, txQuality, rxQuality) => {
         if (uid !== 0) return; // only the local user's own uplink/downlink
         const worst = Math.max(txQuality, rxQuality);
         if (worst >= QualityType.QualityBad) {
           poorQualityStreakRef.current += 1;
+          // A few consecutive bad samples (not just one blip) before warning.
+          if (poorQualityStreakRef.current >= 3 && !poorConnection) setPoorConnection(true);
         } else {
           poorQualityStreakRef.current = 0;
           if (poorConnection) setPoorConnection(false);
-        }
-        // A few consecutive bad samples (not just one blip) before reacting.
-        if (poorQualityStreakRef.current >= 3 && !videoAutoDisabled) {
-          setPoorConnection(true);
-          setVideoAutoDisabled(true);
-          setCameraOn(false);
-          engineRef.current?.enableLocalVideo(false);
         }
       },
     },
@@ -395,6 +503,16 @@ export default function VideoCallScreen() {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(interval);
   }, [connected]);
+
+  // Video-call lifecycle audit — safety net for reconnect-grace timers on
+  // unmount (handleEndCall already clears them on every normal exit path;
+  // this only guards against an unmount that bypasses it).
+  useEffect(() => {
+    return () => {
+      reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reconnectTimersRef.current.clear();
+    };
+  }, []);
 
   // Resolve real names for group calls only (>1 remote party) — the
   // existing 1:1 path keeps using otherUserId/otherUserName from route
@@ -486,6 +604,32 @@ export default function VideoCallScreen() {
       { modelType: SegModelType.SegModelAi },
     );
   }
+  // WhatsApp-style call redesign — Feature B (Video<->Audio, user-controlled
+  // only). Deliberately the SAME primitive as the manual camera toggle above
+  // (engine.enableLocalVideo) — this is an intentional, explicit media-mode
+  // choice, never the automatic network/camera fallback that was removed
+  // from onNetworkQuality/onCameraUnavailable. No leaveChannel/joinChannel,
+  // no engine recreation, no getToken, no touching remoteUids/remoteVideoOn/
+  // connectedAtRef — the call, channel, and uid are completely unaffected;
+  // only the local video track and this screen's own chrome change. The
+  // remote tile is untouched by either of these and keeps reflecting its
+  // own real state (remoteVideoOn) regardless of my mediaMode.
+  function switchToAudioMode() {
+    if (mediaMode === "audio") return;
+    setMediaMode("audio");
+    setCameraOn(false);
+    engineRef.current?.enableLocalVideo(false);
+  }
+  function switchToVideoMode() {
+    if (mediaMode === "video") return;
+    setMediaMode("video");
+    setCameraOn(true);
+    engineRef.current?.enableLocalVideo(true);
+  }
+  function toggleMediaMode() {
+    if (mediaMode === "video") switchToAudioMode();
+    else switchToVideoMode();
+  }
 
   const studyStripLabel = studyOtherParticipants.length <= 1
     ? otherName
@@ -521,12 +665,16 @@ export default function VideoCallScreen() {
   // group calls) rather than a special case — see audio.tsx's identical
   // comment. Remote tiles' videoOn now comes from a real per-uid signal
   // (remoteVideoOn, driven by onRemoteVideoStateChanged above) instead of
-  // being hardcoded true; poorConnection still forces the graceful avatar
-  // fallback on top of that when this device's own network is bad.
+  // being hardcoded true. Video-call lifecycle audit — no longer gated on
+  // this device's own poorConnection signal: remote video should keep
+  // showing whenever it's actually still being decoded, regardless of our
+  // own uplink/downlink quality; remoteVideoOn already reflects Agora's own
+  // real per-uid decode state (Stopped/Frozen/Failed already fall back to
+  // the avatar on their own, see onRemoteVideoStateChanged above).
   const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({
     uid, isSelf: false,
     name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
-    videoOn: !poorConnection && !!remoteVideoOn[uid], muted: false,
+    videoOn: !!remoteVideoOn[uid], muted: false,
     photoUrl: remoteUids.length === 1 ? (params.otherUserAvatarUrl || null) : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
   }));
   const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: cameraOn, muted, photoUrl: profile?.avatarUrl ?? null };
@@ -575,8 +723,8 @@ export default function VideoCallScreen() {
       </View>
       <View style={[styles.callTypePillWrap, { top: insets.top + 56 }]}>
         <View style={styles.callTypePill}>
-          <Ionicons name="videocam" size={12} color={p2pColors.accent} />
-          <Text style={styles.callTypePillText}>Video Call</Text>
+          <Ionicons name={mediaMode === "video" ? "videocam" : "pulse"} size={12} color={p2pColors.accent} />
+          <Text style={styles.callTypePillText}>{mediaMode === "video" ? "Video Call" : "Audio Call"}</Text>
         </View>
       </View>
 
@@ -585,6 +733,8 @@ export default function VideoCallScreen() {
           tiles={allTiles}
           speakingUids={activeSpeaker.speakingUids}
           colors={p2pColors}
+          mainIsSelf={mainIsSelf}
+          onSwapMain={() => setMainIsSelf((v) => !v)}
         />
         {callState !== "connected" && callState !== "ended" && (
           <View style={styles.statusRow}>
@@ -602,10 +752,29 @@ export default function VideoCallScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Video-call lifecycle audit — this used to read "Poor connection —
+          switched to audio only" alongside code that actually did switch
+          it. The call now stays on video through poor network; this is a
+          warning only. Stacked with the other two below when more than one
+          applies at once. */}
       {poorConnection && (
         <View style={[styles.banner, { top: insets.top + 10 }]}>
           <Ionicons name="warning" size={14} color="#fff" />
-          <Text style={styles.bannerText}>Poor connection — switched to audio only</Text>
+          <Text style={styles.bannerText}>Connection unstable — trying to maintain video</Text>
+        </View>
+      )}
+
+      {cameraUnavailable && (
+        <View style={[styles.banner, { top: insets.top + (poorConnection ? 54 : 10) }]}>
+          <Ionicons name="videocam-off" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Camera unavailable — you're still connected by audio. Use the camera button below to retry.</Text>
+        </View>
+      )}
+
+      {disconnectedUids.size > 0 && (
+        <View style={[styles.banner, { top: insets.top + (poorConnection ? 54 : 10) + (cameraUnavailable ? 44 : 0) }]}>
+          <Ionicons name="cloud-offline" size={14} color="#fff" />
+          <Text style={styles.bannerText}>{otherName} disconnected — reconnecting…</Text>
         </View>
       )}
 
@@ -646,11 +815,26 @@ export default function VideoCallScreen() {
           <P2PControlButton onPress={toggleMute} active={muted} accessibilityLabel="Mute microphone" colors={p2pColors}>
             <Ionicons name={muted ? "mic-off" : "mic"} size={20} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          <P2PControlButton onPress={toggleCamera} active={!cameraOn} accessibilityLabel="Turn camera on or off" colors={p2pColors}>
-            <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
-          </P2PControlButton>
-          <P2PControlButton onPress={flipCamera} disabled={!cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
-            <Ionicons name="camera-reverse" size={20} color={cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
+          {mediaMode === "video" && (
+            <P2PControlButton onPress={toggleCamera} active={!cameraOn} accessibilityLabel="Turn camera on or off" colors={p2pColors}>
+              <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
+            </P2PControlButton>
+          )}
+          {mediaMode === "video" && (
+            <P2PControlButton onPress={flipCamera} disabled={!cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
+              <Ionicons name="camera-reverse" size={20} color={cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
+            </P2PControlButton>
+          )}
+          {/* WhatsApp-style call redesign — Feature B's explicit, user-only
+              Video<->Audio control. Distinct from the camera on/off button
+              above: this changes the call's overall presentation, not just
+              whether the camera is capturing. */}
+          <P2PControlButton
+            onPress={toggleMediaMode}
+            accessibilityLabel={mediaMode === "video" ? "Switch to audio call" : "Switch to video call"}
+            colors={p2pColors}
+          >
+            <Ionicons name={mediaMode === "video" ? "call-outline" : "videocam-outline"} size={20} color={p2pColors.textPrimary} />
           </P2PControlButton>
           {callState === "connected" && (
             <P2PControlButton onPress={handleOpenStudy} accessibilityLabel="Study Together" colors={p2pColors}>

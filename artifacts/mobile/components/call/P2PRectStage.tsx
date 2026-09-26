@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RtcSurfaceView } from "@/lib/agoraNative";
 import type { P2PCallColors } from "./p2pCallTheme";
@@ -27,6 +27,8 @@ export function P2PRectStage({
   colors,
   showWaveform,
   renderVideo = true,
+  mainIsSelf = false,
+  onSwapMain,
 }: {
   tiles: P2POrbitTile[];
   speakingUids: ReadonlySet<number>;
@@ -34,17 +36,41 @@ export function P2PRectStage({
   showWaveform?: boolean;
   /** false for audio calls: tiles never render a video surface, always the avatar fallback. */
   renderVideo?: boolean;
+  /** WhatsApp-style video swap (1:1 only, see below) — which participant is
+   * the large tile. Defaults to false (other=main, self=small pip), byte-
+   * identical to this component's original, unconditional layout for every
+   * caller that doesn't pass it. */
+  mainIsSelf?: boolean;
+  /** Tapping either the main or small tile calls this — a pure UI swap, no
+   * Agora call of any kind. Omitted entirely (audio.tsx, the 2+ grid below)
+   * means the tiles simply aren't tappable, same as before this prop existed. */
+  onSwapMain?: () => void;
 }) {
   const self = tiles.find((t) => t.isSelf) ?? tiles[0];
   const others = tiles.filter((t) => !t.isSelf);
 
   if (others.length <= 1) {
     const other = others[0] ?? null;
-    const otherSpeaking = !!other && speakingUids.has(other.uid);
+    // WhatsApp-style swap is only meaningful once a real remote participant
+    // exists — before that (waiting-for-peer placeholder), layout stays
+    // exactly as it always has, regardless of mainIsSelf.
+    const mainTile = other && mainIsSelf ? self : other;
+    const smallTile = other && mainIsSelf ? other : self;
+    const mainSpeaking = !!mainTile && speakingUids.has(mainTile.uid);
+    const MainWrapper = onSwapMain ? TouchableOpacity : View;
+    const mainWrapperExtraProps = onSwapMain
+      ? { onPress: onSwapMain, activeOpacity: 0.9, accessibilityRole: "button" as const, accessibilityLabel: "Swap main video" }
+      : {};
+    const SmallWrapper = onSwapMain ? TouchableOpacity : View;
+    const smallWrapperExtraProps = onSwapMain
+      ? { onPress: onSwapMain, activeOpacity: 0.85, accessibilityRole: "button" as const, accessibilityLabel: "Swap small video" }
+      : {};
     return (
       <View style={styles.mainWrap}>
-        {other ? (
-          <Tile tile={other} colors={colors} speaking={otherSpeaking} renderVideo={renderVideo} variant="main" />
+        {mainTile ? (
+          <MainWrapper style={styles.mainWrap} {...mainWrapperExtraProps}>
+            <Tile tile={mainTile} colors={colors} speaking={mainSpeaking} renderVideo={renderVideo} variant="main" />
+          </MainWrapper>
         ) : (
           <View style={[styles.tile, styles.mainWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
             <Ionicons name="person" size={48} color={colors.textMuted} />
@@ -52,13 +78,13 @@ export function P2PRectStage({
         )}
         {showWaveform && (
           <View style={styles.waveformDock} pointerEvents="none">
-            <P2PAudioWaveform active={otherSpeaking} volume={0} colors={colors} />
+            <P2PAudioWaveform active={mainSpeaking} volume={0} colors={colors} />
           </View>
         )}
         {renderVideo && (
-          <View style={[styles.pipTile, { borderColor: colors.surfaceBorder }]}>
-            <Tile tile={self} colors={colors} speaking={speakingUids.has(self.uid)} renderVideo={renderVideo} variant="pip" />
-          </View>
+          <SmallWrapper style={[styles.pipTile, { borderColor: colors.surfaceBorder }]} {...smallWrapperExtraProps}>
+            <Tile tile={smallTile} colors={colors} speaking={speakingUids.has(smallTile.uid)} renderVideo={renderVideo} variant="pip" />
+          </SmallWrapper>
         )}
       </View>
     );
