@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,6 +78,7 @@ export default function DiscoverCirclesScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />

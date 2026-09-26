@@ -13,7 +13,7 @@ import {
   Platform,
   LayoutChangeEvent,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
@@ -35,6 +35,14 @@ type CompletedPlan = Plan & { completedAt: string | null };
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+// Plan Collections category card — explicit on both the card and its photo
+// column, never a percentage-height photo against an alignSelf: "stretch"
+// wrapper. That combination previously let the photo's height:"100%" go
+// unresolved on iOS/native (no concrete parent height at layout time),
+// which is what let the photo/fallback block expand vertically to near
+// full-screen height instead of staying inside this fixed-height row.
+const CATEGORY_CARD_HEIGHT = 120;
 
 function alertLocked(message: string) {
   if (Platform.OS === "web") window.alert(message);
@@ -106,7 +114,7 @@ function CategoryCard({ category, colors, onPress }: { category: PlanCategory; c
           fallbackStyle={styles.categoryCardPhotoFallback}
         />
         <View style={styles.categoryCardArrow} accessibilityElementsHidden importantForAccessibility="no">
-          <Ionicons name="chevron-forward" size={18} color={colors.textDark} />
+          <Ionicons name="chevron-forward" size={18} color="#fff" />
         </View>
       </View>
     </TouchableOpacity>
@@ -548,6 +556,7 @@ export default function PlansHubScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
@@ -903,23 +912,23 @@ function makeStyles(c: AppColors) {
     // as independent flex children, so the photo can never compress the
     // text.
     categoryCard: {
-      // Fixed, not minHeight — see curriculum/[id].tsx's identical comment:
-      // the photo column's height:"100%" needs a concrete parent height,
-      // otherwise it falls back to the image's own native pixel size and
-      // can blow the whole card up to near full-screen height.
-      flexDirection: "row", height: 120, borderRadius: 16, overflow: "hidden",
+      // Explicit height, not minHeight and not inherited via stretch — see
+      // CATEGORY_CARD_HEIGHT's comment above: the photo column below is
+      // also given this same explicit height rather than height: "100%",
+      // so it never depends on percentage-height resolution at all.
+      flexDirection: "row", height: CATEGORY_CARD_HEIGHT, borderRadius: 16, overflow: "hidden",
       borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
       shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
     },
     categoryCardContent: { flex: 1, padding: 16, justifyContent: "center" },
     categoryCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 20 },
     categoryCardCount: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 4 },
-    categoryCardPhotoWrap: { alignSelf: "stretch" },
-    categoryCardPhoto: { width: "100%", height: "100%" },
+    categoryCardPhotoWrap: { height: CATEGORY_CARD_HEIGHT },
+    categoryCardPhoto: { width: "100%", height: CATEGORY_CARD_HEIGHT },
     categoryCardPhotoFallback: { alignItems: "center", justifyContent: "center" },
     categoryCardArrow: {
       position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
-      backgroundColor: "rgba(255,255,255,0.85)", alignItems: "center", justifyContent: "center",
+      backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center",
     },
 
     filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },

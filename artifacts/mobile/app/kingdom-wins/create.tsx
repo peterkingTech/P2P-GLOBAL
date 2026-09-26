@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Image, Platform, Alert } from "react-native";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -134,6 +134,7 @@ export default function CreateKingdomWinScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />

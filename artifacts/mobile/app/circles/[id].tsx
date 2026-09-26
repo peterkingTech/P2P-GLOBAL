@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert } from "react-native";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -252,6 +252,7 @@ export default function CircleDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
+        <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator color={colors.accentGreen} />
       </View>
     );
@@ -260,6 +261,7 @@ export default function CircleDetailScreen() {
   if (!circle) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
+        <Stack.Screen options={{ headerShown: false }} />
         <Text style={styles.errorText}>Circle not found.</Text>
       </View>
     );
@@ -270,6 +272,7 @@ export default function CircleDetailScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />

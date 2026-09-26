@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -43,6 +43,7 @@ export default function KingdomWinsScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +61,7 @@ export default function MyCirclesScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
