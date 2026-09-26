@@ -65,6 +65,14 @@ function makeStyles(c: AppColors) {
       borderRadius: 12,
     },
     requestsBannerText: { fontSize: 13, fontWeight: "600", color: "#B8860B", fontFamily: "Inter_600SemiBold" },
+    loadErrorBanner: {
+      flexDirection: "row", alignItems: "center", gap: 8,
+      marginHorizontal: 20, marginBottom: 8, padding: 12,
+      backgroundColor: "rgba(184,134,11,0.1)", borderWidth: 1, borderColor: "rgba(184,134,11,0.3)",
+      borderRadius: 12,
+    },
+    loadErrorBannerText: { flex: 1, fontSize: 12, color: "#8A6410", fontFamily: "Inter_400Regular" },
+    loadErrorBannerRetry: { fontSize: 12, fontWeight: "700", color: "#B8860B", fontFamily: "Inter_700Bold" },
     contactP2PButton: {
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",
       marginHorizontal: 20, marginBottom: 4, padding: 14,
@@ -122,7 +130,7 @@ export default function MessagesTab() {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const {
-    conversations, conversationsLoading, loadConversations,
+    conversations, conversationsLoading, conversationsLoadError, loadConversations,
     pendingConnectionRequestCount, addToFavourites, removeFromFavourites,
     pinConversation, unpinConversation,
   } = useData();
@@ -235,6 +243,18 @@ export default function MessagesTab() {
         <TouchableOpacity style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>
           <Text style={styles.requestsBannerText}>Message Requests ({pendingConnectionRequestCount})</Text>
           <Ionicons name="chevron-forward" size={16} color="#B8860B" />
+        </TouchableOpacity>
+      )}
+
+      {/* Message-restoration repair — conversationsLoadError never means the
+          list below is empty; DataContext keeps whatever was last loaded
+          successfully, this just makes a real failure visible with a retry
+          instead of it looking like the conversations are just gone. */}
+      {conversationsLoadError && (
+        <TouchableOpacity style={styles.loadErrorBanner} onPress={() => loadConversations()} activeOpacity={0.8}>
+          <Ionicons name="warning-outline" size={16} color="#B8860B" />
+          <Text style={styles.loadErrorBannerText} numberOfLines={2}>{conversationsLoadError}</Text>
+          <Text style={styles.loadErrorBannerRetry}>Retry</Text>
         </TouchableOpacity>
       )}
 

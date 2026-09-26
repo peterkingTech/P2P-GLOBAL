@@ -53,6 +53,37 @@ interface Message {
   deletedAt?: string | null;
 }
 
+// Shared row -> Message normalization — used by BOTH the initial historical
+// SELECT (which embeds p2p_profiles, so senderName/senderPhotoUrl/
+// senderUsername are populated directly from the join) and the realtime
+// INSERT handler below (whose payload.new is the raw table row with no
+// joined data at all — see mapRealtimeMessage, which fills in the sender
+// fields it can from already-known component state before falling back to
+// this same shape). Keeping ONE function for the field mapping means a
+// historical message and a live one can never silently diverge in shape.
+function mapMessageRow(m: any): Message {
+  return {
+    id: m.id,
+    conversation_id: m.conversation_id,
+    sender_id: m.sender_id,
+    body: m.body,
+    message_type: m.message_type,
+    created_at: m.created_at,
+    senderName: m.p2p_profiles?.full_name,
+    senderPhotoUrl: m.p2p_profiles?.photo_url ?? null,
+    senderUsername: m.p2p_profiles?.username ?? null,
+    is_pinned: m.is_pinned,
+    pinned_label: m.pinned_label,
+    is_official_response: m.is_official_response,
+    crisis_context: m.crisis_context,
+    media_url: m.media_url,
+    media_duration_seconds: m.media_duration_seconds,
+    call_log_id: m.call_log_id,
+    replyToMessageId: m.reply_to_message_id ?? null,
+    deletedAt: m.deleted_at ?? null,
+  };
+}
+
 // Call History / Call Information — the fields a call_summary message's
 // card needs, joined from p2p_call_logs (already has everything: no new
 // columns on p2p_messages). RLS on p2p_call_logs ("Users see own call
@@ -279,7 +310,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { supabase, user } = useAuth();
+  const { supabase, user, profile } = useAuth();
   const { reportContent, pinMessage, unpinMessage, setActiveConversationId } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
@@ -313,6 +344,13 @@ export default function ChatScreen() {
   const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [startersVisible, setStartersVisible] = useState(true);
   const [loading, setLoading] = useState(true);
+  // Message-restoration repair — a failed messages SELECT must render as a
+  // distinct, explicit error state with Retry, never as an empty chat
+  // (previously indistinguishable from "no history"). Pinned-message load
+  // failures are tracked separately since they must never block or hide
+  // normal chat history.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pinnedLoadError, setPinnedLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
   const [callLogsById, setCallLogsById] = useState<Record<string, CallLogInfo>>({});
@@ -380,6 +418,13 @@ export default function ChatScreen() {
         // checked for .error). Disambiguating by FK constraint name is the
         // same pattern already used elsewhere in this codebase, e.g.
         // DataContext's getModerationQueue.
+        //
+        // Message-restoration forensic note: this hint (p2p_messages_
+        // sender_id_fkey) matches the constraint Postgres auto-generates
+        // for sender_id's unnamed REFERENCES clause in migration 012, and
+        // no tracked migration ever renames or recreates it — so per the
+        // repair's explicit instruction not to invent a constraint name
+        // without live evidence it's wrong, this hint is left unchanged.
         .select("id, conversation_id, sender_id, body, created_at, message_type, is_pinned, pinned_label, is_official_response, crisis_context, media_url, media_duration_seconds, call_log_id, reply_to_message_id, deleted_at, p2p_profiles!p2p_messages_sender_id_fkey(full_name, photo_url, username)")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true }),
@@ -390,31 +435,39 @@ export default function ChatScreen() {
         .eq("is_pinned", true)
         .order("pinned_at", { ascending: false }),
     ]);
-    const mapMsg = (m: any): Message => ({
-      id: m.id,
-      conversation_id: m.conversation_id,
-      sender_id: m.sender_id,
-      body: m.body,
-      message_type: m.message_type,
-      created_at: m.created_at,
-      senderName: m.p2p_profiles?.full_name,
-      senderPhotoUrl: m.p2p_profiles?.photo_url ?? null,
-      senderUsername: m.p2p_profiles?.username ?? null,
-      is_pinned: m.is_pinned,
-      pinned_label: m.pinned_label,
-      is_official_response: m.is_official_response,
-      crisis_context: m.crisis_context,
-      media_url: m.media_url,
-      media_duration_seconds: m.media_duration_seconds,
-      call_log_id: m.call_log_id,
-      replyToMessageId: m.reply_to_message_id ?? null,
-      deletedAt: m.deleted_at ?? null,
-    });
-    if (msgsErr) console.error("Failed to load messages", msgsErr);
-    if (pinnedErr) console.error("Failed to load pinned messages", pinnedErr);
-    const mappedMsgs = (msgs ?? []).map(mapMsg);
+
+    // Message-restoration repair — a failed messages SELECT must NEVER be
+    // treated as "this conversation has no history." Previously this fell
+    // straight through to setMessages(msgs ?? []), which is indistinguishable
+    // from a genuinely empty chat. Now: log full structured diagnostics, set
+    // an explicit error the UI renders as a distinct state with Retry, leave
+    // whatever messages are already in state untouched, and stop before
+    // touching delete-for-me/reactions/last-read (which all depend on a
+    // successful load) rather than running them against stale/empty data.
+    if (msgsErr) {
+      console.error("Failed to load messages", {
+        conversationId: id, code: msgsErr.code, message: msgsErr.message, details: msgsErr.details, hint: msgsErr.hint,
+      });
+      setLoadError(msgsErr.message || "Couldn't load messages.");
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+
+    // Pinned-message failures are tracked and surfaced separately — they
+    // must never block or clear normal chat history (item 3 of the repair).
+    if (pinnedErr) {
+      console.error("Failed to load pinned messages", {
+        conversationId: id, code: pinnedErr.code, message: pinnedErr.message, details: pinnedErr.details, hint: pinnedErr.hint,
+      });
+      setPinnedLoadError(pinnedErr.message || "Couldn't load pinned messages.");
+    } else {
+      setPinnedLoadError(null);
+      setPinnedMessages((pinned ?? []).map(mapMessageRow));
+    }
+
+    const mappedMsgs = (msgs ?? []).map(mapMessageRow);
     setMessages(mappedMsgs);
-    setPinnedMessages((pinned ?? []).map(mapMsg));
     setLoading(false);
 
     // Delete-for-me is a per-viewer hide, not a security boundary (the
@@ -474,16 +527,68 @@ export default function ChatScreen() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "p2p_messages", filter: `conversation_id=eq.${id}` },
         (payload) => {
-          const m = payload.new as any;
-          setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
-          if (m.message_type === "call_summary" && m.call_log_id) void fetchCallLogs([m.call_log_id]);
+          const raw = payload.new as any;
+          // Message-restoration repair — realtime payloads are the raw table
+          // row (Postgres changefeeds never include joined data), so this
+          // previously pushed an object with a different shape than a
+          // historical message (missing senderName/senderPhotoUrl/
+          // senderUsername/replyToMessageId, snake_case fields left as-is).
+          // Run it through the SAME mapMessageRow the initial SELECT uses for
+          // shape consistency, then fill in the sender fields it can from
+          // already-known component state (no extra fetch needed for the two
+          // participants a direct conversation ever has) rather than leaving
+          // them blank.
+          const mapped = mapMessageRow(raw);
+          if (raw.sender_id === user?.id) {
+            mapped.senderName = profile?.displayName ?? mapped.senderName;
+            mapped.senderPhotoUrl = profile?.avatarUrl ?? mapped.senderPhotoUrl;
+            mapped.senderUsername = profile?.username ?? mapped.senderUsername;
+          } else if (isDirect && raw.sender_id === otherUserId) {
+            mapped.senderName = title ?? mapped.senderName;
+            mapped.senderPhotoUrl = otherUserPhotoUrl ?? mapped.senderPhotoUrl;
+            mapped.senderUsername = otherUserUsername ?? mapped.senderUsername;
+          }
+          setMessages((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [...prev, mapped]));
+          if (mapped.message_type === "call_summary" && mapped.call_log_id) void fetchCallLogs([mapped.call_log_id]);
+        }
+      )
+      // Message-restoration repair — pin/unpin and delete-for-everyone
+      // (which sets deleted_at, migration 161) both go through an UPDATE on
+      // this same row, previously never reflected live in an open thread.
+      // senderName/senderPhotoUrl/senderUsername are kept from the existing
+      // in-state message rather than the raw payload (which has no joined
+      // profile data) — only the fields an UPDATE can legitimately change
+      // (pin state, deleted_at, body/media if ever edited) are refreshed.
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_messages", filter: `conversation_id=eq.${id}` },
+        (payload) => {
+          const mapped = mapMessageRow(payload.new as any);
+          setMessages((prev) => prev.map((p) => (
+            p.id === mapped.id
+              ? { ...p, ...mapped, senderName: p.senderName, senderPhotoUrl: p.senderPhotoUrl, senderUsername: p.senderUsername }
+              : p
+          )));
+        }
+      )
+      // Defensive only — this app tombstones messages via deleted_at
+      // (an UPDATE, handled above), never a real row DELETE, so this should
+      // not normally fire. Included so an open thread can't be left showing
+      // a stale row if one ever does happen, without introducing any new
+      // deletion path of its own.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "p2p_messages", filter: `conversation_id=eq.${id}` },
+        (payload) => {
+          const removedId = (payload.old as any)?.id;
+          if (removedId) setMessages((prev) => prev.filter((p) => p.id !== removedId));
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, supabase, fetchCallLogs]);
+  }, [id, supabase, fetchCallLogs, user?.id, profile, isDirect, otherUserId, title, otherUserPhotoUrl, otherUserUsername]);
 
   // p2p_message_reactions has no conversation_id column, so there's no
   // server-side filter to scope this subscription to just this thread (RLS
@@ -916,6 +1021,16 @@ export default function ChatScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Message-restoration repair — a pinned-load failure is distinct
+            from "no pinned messages" (which renders nothing at all here),
+            and must never block or clear normal chat history above. */}
+        {pinnedLoadError && pinnedMessages.length === 0 && (
+          <TouchableOpacity style={styles.pinnedErrorRow} onPress={() => load()} activeOpacity={0.7}>
+            <Ionicons name="warning-outline" size={14} color={colors.textMuted} />
+            <Text style={styles.pinnedErrorText}>Couldn't load pinned messages · Tap to retry</Text>
+          </TouchableOpacity>
+        )}
+
         {pinnedMessages.length > 0 && (
           <View style={styles.pinnedBar}>
             <TouchableOpacity style={styles.pinnedBarHeader} onPress={() => setPinnedExpanded((v) => !v)}>
@@ -941,6 +1056,17 @@ export default function ChatScreen() {
         {loading ? (
           <View style={styles.centerFill}>
             <ActivityIndicator color={colors.accentGreen} />
+          </View>
+        ) : loadError ? (
+          // Message-restoration repair — a failed SELECT is now a distinct,
+          // explicit state (never silently rendered as an empty chat).
+          <View style={styles.centerFill}>
+            <Ionicons name="warning-outline" size={32} color={colors.textMuted} />
+            <Text style={styles.loadErrorText}>Couldn't load this conversation.</Text>
+            <Text style={styles.loadErrorSub}>{loadError}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.85}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <FlatList
@@ -1008,7 +1134,7 @@ export default function ChatScreen() {
           />
         )}
 
-        {!loading && messages.length === 0 && startersVisible && (
+        {!loading && !loadError && messages.length === 0 && startersVisible && (
           <View style={styles.startersRow}>
             {STARTERS.map((chip) => (
               <TouchableOpacity
@@ -1163,6 +1289,10 @@ const styles = StyleSheet.create({
   headerCallBtns: { flexDirection: "row", gap: 4 },
   headerIconBtn: { padding: 6, width: 34, alignItems: "center" },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadErrorText: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", marginTop: 10 },
+  loadErrorSub: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4, textAlign: "center", paddingHorizontal: 40 },
+  retryBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.accentGreen },
+  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   callCard: {
     flexDirection: "row", alignItems: "center", gap: 10,
     borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, minWidth: 170,
@@ -1191,6 +1321,11 @@ const styles = StyleSheet.create({
   },
   feedbackPromptText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium", flex: 1, marginRight: 8 },
   pinIcon: { position: "absolute", top: 4, right: 4 },
+  pinnedErrorRow: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginHorizontal: 16, marginTop: 10, paddingVertical: 6,
+  },
+  pinnedErrorText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   pinnedBar: {
     marginHorizontal: 16, marginTop: 10, backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, overflow: "hidden",

@@ -1,0 +1,49 @@
+-- Message-restoration forensic fix — the authenticated role has been unable
+-- to SELECT p2p_messages.reply_to_message_id or .deleted_at since they were
+-- added (migrations 160 and 161 respectively), causing every read of a
+-- conversation's message history to fail outright with Postgres error 42501
+-- ("permission denied for table p2p_messages") the moment either column was
+-- included in the query — which app/messages/[id].tsx's SELECT always does.
+-- Confirmed live, not assumed: an authenticated production session (real
+-- access token, not anon) reproducibly got 42501 selecting these two columns
+-- against a conversation known to contain 23 real historical messages, and
+-- the identical query succeeded the instant they were dropped from the
+-- SELECT list. This is why chat history appeared to vanish (and a
+-- newly-sent message disappeared again on reopen) while the inbox — whose
+-- own query never selects either column — kept working throughout.
+--
+-- Root cause: neither 160 nor 161 (nor any other tracked migration) ever
+-- issued a GRANT for p2p_messages at all — searched the full migrations/
+-- directory for "GRANT.*p2p_messages", zero matches anywhere. The base
+-- columns that DO work (id, conversation_id, sender_id, body, created_at,
+-- etc.) are therefore readable via privileges this project's database
+-- carries outside tracked migration history entirely (almost certainly a
+-- Supabase-provisioned default), not anything this repository ever granted.
+-- That underlying privilege set is evidently scoped per-column rather than
+-- table-wide, which is exactly why a later ADD COLUMN (160, 161) needed its
+-- own explicit grant that neither migration included, and why this bug
+-- persisted invisibly until a query finally asked for one of those columns.
+--
+-- Scope, deliberately minimal: only the two columns actually confirmed
+-- broken, only SELECT, only `authenticated`. `deleted_by` (added by the
+-- same ALTER TABLE as deleted_at in migration 161) was NOT tested and is
+-- NOT granted here — no current application query selects it, so there is
+-- no confirmed breakage to fix; if a future query needs it, the identical
+-- 42501 failure mode should be expected and this same fix pattern applies.
+--
+-- `anon` was deliberately NOT granted here, and this is a decision, not an
+-- oversight: p2p_messages' SELECT RLS policy authorizes access via
+-- p2p_is_conversation_member(conversation_id, auth.uid()), and auth.uid()
+-- is always NULL for the anon role, so p2p_is_conversation_member can never
+-- return true for anon regardless of any column grant — anon has no
+-- legitimate reason to read message content in this app's security model at
+-- all (there is no public/unauthenticated messaging surface), and granting
+-- it here would only widen privilege surface with zero functional benefit.
+-- If a genuine anon-facing need for these columns is ever identified, that
+-- should be its own deliberate, separately-justified change.
+--
+-- This is additive only: it grants a read privilege on two existing
+-- columns, nothing else. No RLS/policy change, no schema change, no row
+-- affected, no function/trigger touched, no conversation-creation behavior
+-- touched.
+GRANT SELECT (reply_to_message_id, deleted_at) ON public.p2p_messages TO authenticated;

@@ -20,25 +20,41 @@ export default function MessagesScreen() {
   const { supabase, user, profile } = useAuth();
   const [rows, setRows] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Message-restoration repair — this screen previously checked no query
+  // errors at all; a failed query rendered identically to "no conversations."
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data: memberships } = await supabase
+    const { data: memberships, error: membershipsErr } = await supabase
       .from("p2p_conversation_members")
       .select("conversation_id")
       .eq("user_id", user.id);
+    if (membershipsErr) {
+      console.error("MessagesScreen: memberships query failed", membershipsErr.message);
+      setLoadError(membershipsErr.message);
+      setLoading(false);
+      return;
+    }
     const convIds = (memberships ?? []).map((m: any) => m.conversation_id);
     if (convIds.length === 0) {
       setRows([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
 
-    const { data: convs } = await supabase
+    const { data: convs, error: convsErr } = await supabase
       .from("p2p_conversations")
       .select("id, type, name")
       .in("id", convIds);
+    if (convsErr) {
+      console.error("MessagesScreen: conversations query failed", convsErr.message);
+      setLoadError(convsErr.message);
+      setLoading(false);
+      return;
+    }
 
     const results: ConversationRow[] = [];
     for (const c of convs ?? []) {
@@ -69,6 +85,7 @@ export default function MessagesScreen() {
     }
     results.sort((a, b) => (b.lastAt ?? "").localeCompare(a.lastAt ?? ""));
     setRows(results);
+    setLoadError(null);
     setLoading(false);
   }, [supabase, user]);
 
@@ -91,6 +108,17 @@ export default function MessagesScreen() {
       {loading ? (
         <View style={styles.centerFill}>
           <ActivityIndicator color={colors.accentGreen} />
+        </View>
+      ) : loadError ? (
+        // Message-restoration repair — visually distinct from "no
+        // conversations yet" below; a query failure must never look empty.
+        <View style={styles.centerFill}>
+          <Ionicons name="warning-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.emptyText}>Couldn't load conversations.</Text>
+          <Text style={styles.emptySub}>{loadError}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.85}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : rows.length === 0 ? (
         <View style={styles.centerFill}>
@@ -139,6 +167,8 @@ const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 40 },
   emptyText: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   emptySub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular" },
+  retryBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.accentGreen },
+  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 20, paddingVertical: 14,

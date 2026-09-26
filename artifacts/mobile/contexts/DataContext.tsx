@@ -1318,6 +1318,11 @@ interface DataContextValue {
   // ── Messaging overhaul ──────────────────────────────────────────────────────
   conversations: ConversationSummary[];
   conversationsLoading: boolean;
+  // Message-restoration repair — set when the most recent loadConversations()
+  // hit a real query failure (full or partial). `conversations` is never
+  // wiped to [] just because this is set — it always holds whatever was
+  // successfully loaded, which may be a stale-but-valid previous list.
+  conversationsLoadError: string | null;
   totalUnreadCount: number;
   mostRecentUnread: ConversationSummary | null;
   loadConversations: () => Promise<void>;
@@ -1490,12 +1495,19 @@ function chunkIds<T>(items: T[], size = IN_CHUNK_SIZE): T[][] {
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
 }
+// Message-restoration repair — added an optional onError, nothing else.
+// Every existing caller that doesn't pass it keeps today's exact behavior
+// (log and silently continue with whatever chunks succeeded); callers that
+// need to know a chunk failed (currently only loadConversations) can now
+// find out without this helper throwing and aborting the other, possibly-
+// successful chunks.
 async function selectInChunks<T = Record<string, unknown>>(
   table: string,
   columns: string,
   column: string,
   ids: string[],
-  extraFilter?: (query: any) => any
+  extraFilter?: (query: any) => any,
+  onError?: (error: { message: string; code?: string }) => void
 ): Promise<T[]> {
   if (!ids.length) return [];
   const results: T[] = [];
@@ -1505,6 +1517,7 @@ async function selectInChunks<T = Record<string, unknown>>(
     const { data, error } = await query;
     if (error) {
       console.error(`${table}.${column} chunked query failed:`, error.message);
+      onError?.({ message: error.message, code: (error as { code?: string }).code });
       continue;
     }
     results.push(...((data ?? []) as T[]));
@@ -1518,6 +1531,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, profile, isLoading: authLoading } = useAuth();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationsLoadError, setConversationsLoadError] = useState<string | null>(null);
   const [pendingConnectionRequestCount, setPendingConnectionRequestCount] = useState(0);
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [userChurch, setUserChurch] = useState<Church | null>(null);
@@ -4726,34 +4740,59 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // ── Messaging overhaul ──────────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
-    if (!profile) { setConversations([]); return; }
+    if (!profile) { setConversations([]); setConversationsLoadError(null); return; }
     setConversationsLoading(true);
     try {
-      const { data: memberships } = await supabase
+      const { data: memberships, error: membershipsErr } = await supabase
         .from("p2p_conversation_members")
         .select("conversation_id, last_read_at")
         .eq("user_id", profile.id);
+      // Message-restoration repair — this query previously ignored `error`
+      // entirely, so a failure here (RLS, schema, network) looked identical
+      // to "you have no conversations." Now: a real failure is reported and
+      // the existing `conversations` state is left untouched rather than
+      // being wiped to [] — the inbox keeps showing the last successfully
+      // loaded list instead of pretending it's now empty.
+      if (membershipsErr) {
+        console.error("loadConversations: memberships query failed", membershipsErr.message);
+        setConversationsLoadError(membershipsErr.message);
+        setConversationsLoading(false);
+        return;
+      }
       const convIds = (memberships ?? []).map((m: any) => m.conversation_id as string);
       const lastReadById = new Map((memberships ?? []).map((m: any) => [m.conversation_id, m.last_read_at as string]));
-      if (convIds.length === 0) { setConversations([]); setConversationsLoading(false); return; }
+      if (convIds.length === 0) { setConversations([]); setConversationsLoadError(null); setConversationsLoading(false); return; }
+
+      // Message-restoration repair — selectInChunks' onError lets a failed
+      // chunk be reported without aborting the other three (still-parallel)
+      // queries or the chunks that did succeed. A partial failure still
+      // renders whatever data DID load, with conversationsLoadError set so
+      // the UI can show "some conversations may be missing, retry" rather
+      // than either silently dropping rows or wiping the whole list.
+      let hadQueryError = false;
+      const reportChunkError = (err: { message: string; code?: string }) => {
+        hadQueryError = true;
+        console.error("loadConversations: chunked query failed", err.message);
+      };
 
       const [convs, allMembers, recentMessages, settingsRows] = await Promise.all([
         selectInChunks<any>(
-          "p2p_conversations", "id, type, conversation_type, name, group_id, circle_id, is_pinned_by_system", "id", convIds
+          "p2p_conversations", "id, type, conversation_type, name, group_id, circle_id, is_pinned_by_system", "id", convIds,
+          undefined, reportChunkError
         ),
         selectInChunks<any>(
           "p2p_conversation_members",
           "conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type, photo_url)",
           "conversation_id", convIds,
-          (q) => q.neq("user_id", profile.id)
+          (q) => q.neq("user_id", profile.id), reportChunkError
         ),
         selectInChunks<any>(
           "p2p_messages", "conversation_id, body, sender_id, created_at, message_type", "conversation_id", convIds,
-          (q) => q.order("created_at", { ascending: false }).limit(500)
+          (q) => q.order("created_at", { ascending: false }).limit(500), reportChunkError
         ),
         selectInChunks<any>(
           "p2p_conversation_settings", "conversation_id, is_pinned, is_favourite, is_muted", "conversation_id", convIds,
-          (q) => q.eq("user_id", profile.id)
+          (q) => q.eq("user_id", profile.id), reportChunkError
         ),
       ]);
 
@@ -4815,8 +4854,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? "");
       });
       setConversations(results);
+      setConversationsLoadError(
+        hadQueryError ? "Some conversations may not have loaded. Pull to refresh to retry." : null
+      );
     } catch (e) {
+      // Message-restoration repair — a genuine thrown exception (e.g. a
+      // network failure) must not wipe out a previously successful load;
+      // `conversations` is deliberately left as-is here.
       console.error("loadConversations failed", e);
+      setConversationsLoadError(e instanceof Error ? e.message : "Failed to load conversations.");
     } finally {
       setConversationsLoading(false);
     }
@@ -5809,7 +5855,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       circleSessionInvite, dismissCircleSessionInvite,
       familyWorshipInvite, dismissFamilyWorshipInvite,
       unreadNotificationCount, getMyNotifications, markNotificationRead, markAllNotificationsRead,
-      conversations, conversationsLoading, totalUnreadCount, mostRecentUnread, loadConversations,
+      conversations, conversationsLoading, conversationsLoadError, totalUnreadCount, mostRecentUnread, loadConversations,
       pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,
       submitAdminFeedback, pendingConnectionRequestCount,
       incomingMessageBanner, dismissMessageBanner, setActiveConversationId,
