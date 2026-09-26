@@ -148,6 +148,10 @@ export default function AudioCallScreen() {
   const [callState, setCallState] = useState<
     "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended"
   >("requesting_token");
+  // CALL DEBUG fix — see video.tsx's identical declaration/comment: gates
+  // JOIN_CHANNEL_TIMEOUT_MS below so it can't start counting down while
+  // still waiting on the Android mic permission dialog inside useAgoraEngine.
+  const [readyToJoin, setReadyToJoin] = useState(false);
   const endedRef = useRef(false);
 
   const [mode, setMode] = useState<"call" | "study">("call");
@@ -312,6 +316,7 @@ export default function AudioCallScreen() {
     uid: myUid,
     enableVideo: false,
     appId: tokenAppId,
+    onPermissionsResolved: () => setReadyToJoin(true),
     eventHandler: {
       // CALL DEBUG fix — this device successfully joined the Agora channel.
       // This is NOT "connected" (see section 5 of the audit): it only means
@@ -459,13 +464,13 @@ export default function AudioCallScreen() {
   // onError, no onConnectionStateChanged — a genuine possibility, not just
   // a hypothetical) left the UI on "Connecting…"/"Calling…" forever.
   useEffect(() => {
-    if (callState !== "joining_channel") return;
+    if (callState !== "joining_channel" || !readyToJoin) return;
     const timer = setTimeout(() => {
       failureMessageRef.current = "Couldn't connect this call. Please check your connection and try again.";
       setCallState((s) => (s === "joining_channel" ? "failed" : s));
     }, JOIN_CHANNEL_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [callState]);
+  }, [callState, readyToJoin]);
 
   // CALL DEBUG forensic fix — the recipient side of the exact gap the
   // forensic audit confirmed: NO_ANSWER_TIMEOUT_MS above only ever applied

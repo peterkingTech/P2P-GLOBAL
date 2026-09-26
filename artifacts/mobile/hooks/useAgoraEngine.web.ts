@@ -16,6 +16,7 @@ interface UseAgoraEngineOptions {
   eventHandler: IRtcEngineEventHandler;
   appId?: string;
   onCameraUnavailable?: () => void;
+  onPermissionsResolved?: () => void;
 }
 
 export function useAgoraEngine(_options: UseAgoraEngineOptions) {

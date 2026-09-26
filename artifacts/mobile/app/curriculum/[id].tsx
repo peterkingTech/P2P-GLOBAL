@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useData, Module } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCardPhotoWidth } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
 
 function showAlert(title: string, message: string) {
@@ -77,6 +78,7 @@ export default function CurriculumDetailScreen() {
   const insets = useSafeAreaInsets();
   const { loadCurriculumDetail } = useData();
   const { profile } = useAuth();
+  const photoWidth = useCardPhotoWidth(120);
 
   const [detail, setDetail] = useState<{ curriculum: CurriculumDetailInfo; modules: Module[] } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +171,7 @@ export default function CurriculumDetailScreen() {
                 {/* A dedicated block, not an overlapping background — the
                     text column above is never affected no matter how large
                     this photo is. */}
-                <View style={styles.moduleCardPhotoWrap}>
+                <View style={[styles.moduleCardPhotoWrap, { width: photoWidth }]}>
                   <ModuleCardImage uri={m.imageUrl} />
                   {m.isLocked ? (
                     <View style={styles.moduleLockOverlay} accessibilityElementsHidden importantForAccessibility="no">
@@ -217,7 +219,13 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginBottom: 12 },
   moduleCard: {
-    flexDirection: "row", minHeight: 120, backgroundColor: colors.card, borderRadius: 16,
+    // Fixed, not minHeight — the photo column's height:"100%" needs a
+    // concrete parent height to resolve against; against an auto-sized
+    // (minHeight-only) row, RN falls back to the image's own native pixel
+    // size, which is how a single call to <Image> could blow this whole
+    // card up to near full-screen height. Sized to comfortably fit the
+    // (numberOfLines-capped) title + description + footer row below.
+    flexDirection: "row", height: 120, backgroundColor: colors.card, borderRadius: 16,
     borderWidth: 1, borderColor: colors.borderBeige, marginBottom: 12, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
   },
@@ -229,7 +237,7 @@ const styles = StyleSheet.create({
   // The photo's own dedicated region on the right — same split-layout
   // convention as the category cards, so it can be as large as the design
   // wants without ever compressing moduleCardBody's text.
-  moduleCardPhotoWrap: { width: 120, alignSelf: "stretch" },
+  moduleCardPhotoWrap: { alignSelf: "stretch" },
   moduleCardPhoto: { width: "100%", height: "100%" },
   moduleCardImageFallback: { backgroundColor: "rgba(29,158,117,0.08)", alignItems: "center", justifyContent: "center" },
   moduleCardArrow: {

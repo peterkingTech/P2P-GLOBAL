@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, CurriculumCatalogItem } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCardPhotoWidth } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
 
 // Three-category curriculum — a small, fixed library of stand-alone
@@ -70,6 +71,7 @@ export default function CurriculumScreen() {
   const { profile } = useAuth();
   const [catalog, setCatalog] = useState<CurriculumCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const photoWidth = useCardPhotoWidth(148);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,7 +115,7 @@ export default function CurriculumScreen() {
                 accessibilityLabel={`${item.title}. ${item.description}. ${countsLabel}. ${item.isLocked ? "Locked — complete the current category first." : "Tap to open."}`}
               >
                 <View style={styles.cardContent}>
-                  <Text style={styles.currTitle}>{item.title}</Text>
+                  <Text style={styles.currTitle} numberOfLines={2}>{item.title}</Text>
                   <Text style={styles.currDesc} numberOfLines={3}>{item.description}</Text>
                   <View style={styles.metaRow}>
                     <Ionicons name={item.isLocked ? "lock-closed" : "book-outline"} size={13} color={colors.textMuted} />
@@ -124,7 +126,7 @@ export default function CurriculumScreen() {
                 {/* A dedicated block, not an overlapping background — the
                     text column above is never affected no matter how large
                     this photo is. */}
-                <View style={styles.photoWrap}>
+                <View style={[styles.photoWrap, { width: photoWidth }]}>
                   <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} />
                   {item.isLocked && (
                     <View style={styles.categoryLockOverlay} accessibilityElementsHidden importantForAccessibility="no">
@@ -174,7 +176,11 @@ const styles = StyleSheet.create({
   introText: { fontSize: 13, color: colors.textMid, lineHeight: 20, fontFamily: "Inter_400Regular" },
   list: { paddingHorizontal: 16 },
   currCard: {
-    flexDirection: "row", minHeight: 168, borderRadius: 20, overflow: "hidden",
+    // Fixed, not minHeight — see curriculum/[id].tsx's identical comment:
+    // the photo column's height:"100%" needs a concrete parent height,
+    // otherwise it falls back to the image's own native pixel size and
+    // can blow the whole card up to near full-screen height.
+    flexDirection: "row", height: 168, borderRadius: 20, overflow: "hidden",
     borderWidth: 1, borderColor: colors.borderBeige,
     marginBottom: 14, backgroundColor: colors.card,
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
@@ -189,12 +195,9 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   // The photo's own dedicated region — large and square-ish, taking up the
   // maximum width the card can spare on the right without shrinking
-  // cardContent below. Fixed height (matches currCard's minHeight), not
-  // alignSelf: "stretch" against a row whose own cross axis is otherwise
-  // undetermined — see learn.tsx's identical fix for the full explanation
-  // (a percentage-height Image child with nothing concrete to resolve
-  // against grows the whole row to the image's natural aspect ratio).
-  photoWrap: { width: 148, height: 168 },
+  // cardContent below. Width comes from useCardPhotoWidth (scales down on
+  // narrow phones); alignSelf: "stretch" fills currCard's fixed height.
+  photoWrap: { alignSelf: "stretch" },
   photoBlock: { width: "100%", height: "100%" },
   photoBlockFallback: { alignItems: "center", justifyContent: "center" },
   currCardLocked: { opacity: 0.65 },

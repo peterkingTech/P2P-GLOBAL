@@ -143,6 +143,14 @@ export default function VideoCallScreen() {
   const connectedAtRef = useRef<number | null>(null);
   const poorQualityStreakRef = useRef(0);
   const failureMessageRef = useRef<string>("Unable to connect. Please try again.");
+  // CALL DEBUG fix — the Android mic/camera permission prompt(s) inside
+  // useAgoraEngine can take an arbitrary, human-paced amount of time to
+  // resolve. JOIN_CHANNEL_TIMEOUT_MS below must only start counting once
+  // that's done and the engine has actually attempted to join — otherwise
+  // time spent looking at the OS permission dialog silently eats into the
+  // join timeout and a call can time out before it was ever given a real
+  // chance to connect.
+  const [readyToJoin, setReadyToJoin] = useState(false);
 
   const [mode, setMode] = useState<"call" | "study">("call");
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
@@ -278,6 +286,7 @@ export default function VideoCallScreen() {
       console.warn("CALL DEBUG video: camera permission unavailable, reflecting into cameraOn state");
       setCameraOn(false);
     },
+    onPermissionsResolved: () => setReadyToJoin(true),
     eventHandler: {
       // CALL DEBUG fix — see audio.tsx's identical handlers/comments: this
       // device joining the channel is NOT "connected," and previously had
@@ -428,14 +437,16 @@ export default function VideoCallScreen() {
   }, [isInitiator, connected, handleEndCall, otherName]);
 
   // CALL DEBUG forensic fix — see audio.tsx's identical effects/comments.
+  // Gated on readyToJoin (see its declaration above) so this can't start
+  // counting down while still waiting on the Android permission dialog(s).
   useEffect(() => {
-    if (callState !== "joining_channel") return;
+    if (callState !== "joining_channel" || !readyToJoin) return;
     const timer = setTimeout(() => {
       failureMessageRef.current = "Couldn't connect this call. Please check your connection and try again.";
       setCallState((s) => (s === "joining_channel" ? "failed" : s));
     }, JOIN_CHANNEL_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [callState]);
+  }, [callState, readyToJoin]);
 
   useEffect(() => {
     if (isInitiator || callState !== "waiting_for_peer") return;

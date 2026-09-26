@@ -47,9 +47,20 @@ interface UseAgoraEngineOptions {
    * reached it). This lets the caller reflect a real denial into its own
    * video-tile state instead of showing a permanently blank self-preview. */
   onCameraUnavailable?: () => void;
+  /** CALL DEBUG fix — fired the moment the Android runtime permission
+   * request (below) has resolved, whether granted or denied, right before
+   * the engine is created and joinChannel() is issued. Callers use this to
+   * start their own "is the join taking too long" timeout from the actual
+   * start of the join attempt instead of from token-acquired time — see
+   * audio.tsx/video.tsx's JOIN_CHANNEL_TIMEOUT_MS for the bug this fixes:
+   * without it, a human's time spent looking at the OS mic/camera
+   * permission dialog(s) silently ate into that timeout budget, so a call
+   * could time out and hang up while the recipient was still tapping
+   * "Allow" — never having had a real chance to connect. */
+  onPermissionsResolved?: () => void;
 }
 
-export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable }: UseAgoraEngineOptions) {
+export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved }: UseAgoraEngineOptions) {
   const engineRef = useRef<IRtcEngine | null>(null);
 
   useEffect(() => {
@@ -79,6 +90,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         }
       }
       if (cancelled) return;
+      onPermissionsResolved?.();
 
       const resolvedAppId = appId || FALLBACK_APP_ID;
       console.log("CALL DEBUG engine: initializing", { channelName, uid, enableVideo, usingServerAppId: !!appId });
@@ -140,7 +152,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelName, token, uid, enableVideo, appId, onCameraUnavailable]);
+  }, [channelName, token, uid, enableVideo, appId, onCameraUnavailable, onPermissionsResolved]);
 
   return engineRef;
 }

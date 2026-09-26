@@ -1,11 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL =
-  process.env.SUPABASE_DB_URL?.startsWith("https://")
-    ? process.env.SUPABASE_DB_URL
-    : (process.env.SUPABASE_URL ?? "https://omkqkasniakcnmfcwrvs.supabase.co");
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+import { supabaseServiceRole as db } from "./supabase";
 
 // Cron sweep (see index.ts) — Stage 3's "reminders" requirement, reusing
 // the exact same idempotent-update-as-dedup-guard pattern

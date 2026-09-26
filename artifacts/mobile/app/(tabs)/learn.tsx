@@ -14,7 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
@@ -161,6 +161,7 @@ function CategoryPhotoBlock({
 // single self-contained experience rather than an extra navigation hop.
 function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCatalogItem; colors: AppColors; onPress: () => void }) {
   const styles = foundationCardStyles(colors);
+  const photoWidth = useCardPhotoWidth(132);
   const icon = (item.icon as keyof typeof Ionicons.glyphMap) || foundationsIconForTitle(item.title);
   const countsLabel = `${item.moduleCount} ${item.moduleCount === 1 ? "module" : "modules"} · ${item.lessonCount} ${item.lessonCount === 1 ? "lesson" : "lessons"}`;
   return (
@@ -182,7 +183,7 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
 
       {/* A dedicated block, not an overlapping background — the text
           column above is never affected no matter how large this photo is. */}
-      <View style={styles.photoWrap}>
+      <View style={[styles.photoWrap, { width: photoWidth }]}>
         <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.photoBlock} fallbackStyle={styles.photoBlockFallback} />
         <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
           {/* Deliberately NOT colors.textDark — the badge behind it is a
@@ -201,7 +202,11 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
 function foundationCardStyles(c: AppColors) {
   return StyleSheet.create({
     card: {
-      flexDirection: "row", minHeight: 150, borderRadius: 18, overflow: "hidden",
+      // Fixed, not minHeight — see curriculum/[id].tsx's identical comment:
+      // the photo column's height:"100%" needs a concrete parent height,
+      // otherwise it falls back to the image's own native pixel size and
+      // can blow the whole card up to near full-screen height.
+      flexDirection: "row", height: 150, borderRadius: 18, overflow: "hidden",
       borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
       shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
     },
@@ -214,13 +219,9 @@ function foundationCardStyles(c: AppColors) {
     metaText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium" },
     // The photo's own dedicated region — large and square-ish, taking up
     // the maximum width the card can spare on the right without shrinking
-    // the text column below. A fixed height (not alignSelf: "stretch"
-    // against the row's own minHeight-only, otherwise-undetermined cross
-    // axis) — without it, the Image child's height: "100%" has nothing
-    // concrete to resolve against and the whole row grows to the image's
-    // natural aspect ratio instead, dragging the card to several times its
-    // intended height.
-    photoWrap: { width: 132, height: 150 },
+    // the text column below. Width comes from useCardPhotoWidth (scales
+    // down on narrow phones); alignSelf: "stretch" fills card's fixed height.
+    photoWrap: { alignSelf: "stretch" },
     photoBlock: { width: "100%", height: "100%" },
     photoBlockFallback: { alignItems: "center", justifyContent: "center" },
     arrowBadge: {

@@ -24,7 +24,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getPlanCategoryMeta } from "@/lib/planCategories";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -79,6 +79,7 @@ function CategoryPhotoBlock({
 
 function CategoryCard({ category, colors, onPress }: { category: PlanCategory; colors: AppColors; onPress: () => void }) {
   const styles = makeStyles(colors);
+  const photoWidth = useCardPhotoWidth(120);
   const meta = getPlanCategoryMeta(category.category);
   const color = meta?.color ?? category.colorTheme;
   const emoji = meta?.icon ?? "📖";
@@ -96,7 +97,7 @@ function CategoryCard({ category, colors, onPress }: { category: PlanCategory; c
         <Text style={styles.categoryCardTitle} numberOfLines={2}>{title}</Text>
         <Text style={styles.categoryCardCount}>{countLabel}</Text>
       </View>
-      <View style={styles.categoryCardPhotoWrap}>
+      <View style={[styles.categoryCardPhotoWrap, { width: photoWidth }]}>
         <CategoryPhotoBlock
           uri={category.coverImage}
           emoji={emoji}
@@ -902,14 +903,18 @@ function makeStyles(c: AppColors) {
     // as independent flex children, so the photo can never compress the
     // text.
     categoryCard: {
-      flexDirection: "row", minHeight: 120, borderRadius: 16, overflow: "hidden",
+      // Fixed, not minHeight — see curriculum/[id].tsx's identical comment:
+      // the photo column's height:"100%" needs a concrete parent height,
+      // otherwise it falls back to the image's own native pixel size and
+      // can blow the whole card up to near full-screen height.
+      flexDirection: "row", height: 120, borderRadius: 16, overflow: "hidden",
       borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
       shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
     },
     categoryCardContent: { flex: 1, padding: 16, justifyContent: "center" },
     categoryCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 20 },
     categoryCardCount: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 4 },
-    categoryCardPhotoWrap: { width: 120, alignSelf: "stretch" },
+    categoryCardPhotoWrap: { alignSelf: "stretch" },
     categoryCardPhoto: { width: "100%", height: "100%" },
     categoryCardPhotoFallback: { alignItems: "center", justifyContent: "center" },
     categoryCardArrow: {

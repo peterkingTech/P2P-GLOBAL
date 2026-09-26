@@ -18,7 +18,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { sharePlan } from "@/lib/sharing";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 const COVER_HEIGHT = 200;
 
@@ -72,6 +72,7 @@ export default function PlanDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isTablet } = useLayout();
+  const photoWidth = useCardPhotoWidth(96);
   const { profile } = useAuth();
   const { getPlanProgress, checkCategoryCompletion } = useData();
   const { colors } = useTheme();
@@ -301,7 +302,7 @@ export default function PlanDetailScreen() {
                       {m.lessons.length} lesson{m.lessons.length === 1 ? "" : "s"}
                     </Text>
                   </View>
-                  <View style={styles.moduleHeaderPhotoWrap}>
+                  <View style={[styles.moduleHeaderPhotoWrap, { width: photoWidth }]}>
                     <ModuleHeaderPhoto
                       uri={m.coverImageUrl}
                       color={m.colorTheme ?? plan.colorTheme}
@@ -417,11 +418,15 @@ function makeStyles(c: AppColors) {
     // background, so the photo can be as large as the design wants without
     // ever compressing the title/lesson-count text.
     moduleHeaderCard: {
-      flexDirection: "row", minHeight: 88, backgroundColor: c.card, borderRadius: 14,
+      // Fixed, not minHeight — see curriculum/[id].tsx's identical comment:
+      // the photo column's height:"100%" needs a concrete parent height,
+      // otherwise it falls back to the image's own native pixel size and
+      // can blow the whole row up to near full-screen height.
+      flexDirection: "row", height: 88, backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige, overflow: "hidden", marginBottom: 10,
     },
     moduleHeaderContent: { flex: 1, padding: 12, justifyContent: "center" },
-    moduleHeaderPhotoWrap: { width: 96, alignSelf: "stretch" },
+    moduleHeaderPhotoWrap: { alignSelf: "stretch" },
     moduleHeaderPhoto: { width: "100%", height: "100%" },
     moduleHeaderPhotoFallback: { alignItems: "center", justifyContent: "center" },
     moduleNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
