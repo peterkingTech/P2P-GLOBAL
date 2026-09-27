@@ -41,6 +41,7 @@ import familyWorshipRouter from "./familyWorship";
 import familyStudiesRouter from "./familyStudies";
 import familyStudyPlansRouter from "./familyStudyPlans";
 import youtubeEmbedRouter from "./youtubeEmbed";
+import diagnosticsRouter from "./diagnostics";
 
 const router: IRouter = Router();
 
@@ -86,5 +87,6 @@ router.use("/family", familyWorshipRouter); // worship sessions live under /fami
 router.use("/family", familyStudiesRouter); // Custom Studies (Family) — live under /family/:familyId/studies and /family/studies/:studyId (paths differ, handled internally)
 router.use("/family", familyStudyPlansRouter); // Custom Study Plans (Family) — ordered arrangements of EXISTING p2p_lessons, live under /family/:familyId/study-plans, /family/study-plans/:planId, and /family/:familyId/study-source (paths differ, handled internally)
 router.use(youtubeEmbedRouter); // GET /youtube-embed — real HTTPS-origin page for the mobile YouTube WebView (see file for why)
+router.use(diagnosticsRouter); // POST /client-errors — temporary TestFlight crash-investigation log sink, see file header
 
 export default router;
