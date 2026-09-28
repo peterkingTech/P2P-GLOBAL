@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
-import { Audio, Video, ResizeMode } from "expo-av";
+import { createAudioPlayer, type AudioPlayer, type AudioStatus } from "expo-audio";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useEventListener } from "expo";
 import colors from "@/constants/colors";
 import { computeWorshipPositionMs, type WorshipSession } from "@/lib/familyApi";
 import { rampVolume } from "@/lib/togetherAudio/mixer";
@@ -32,12 +34,27 @@ interface Props {
 const NOTICEABLE_DRIFT_THRESHOLD_MS = 4000;
 
 export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonce, onDriftStatus, onEnded }: Props) {
-  const videoRef = useRef<Video | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
+  const audioReadyRef = useRef(false);
   const lastMediaUrl = useRef<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [displayedVolume, setDisplayedVolume] = useState(mediaVolume);
   const rampCancelRef = useRef<(() => void) | null>(null);
+
+  // Must be called unconditionally (hook rules) even though this component
+  // has several early returns below (youtube branch, no-media placeholder,
+  // error state) before the raw-file video actually renders. Source is null
+  // whenever this isn't a raw-file video session (youtube/audio/no-media),
+  // in which case this player simply sits unused — useVideoPlayer accepts
+  // a null source. It automatically recreates when the source object
+  // changes (keyed internally on JSON.stringify(source)), so no manual
+  // "did the URL change" tracking is needed for video the way it still is
+  // for audio below (createAudioPlayer is imperative, not hook-managed).
+  const videoPlayer = useVideoPlayer(
+    session.mediaType === "video" && session.mediaProvider !== "youtube" && session.mediaUrl
+      ? { uri: session.mediaUrl }
+      : null
+  );
 
   useEffect(() => {
     rampCancelRef.current?.();
@@ -47,27 +64,42 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
   }, [mediaVolume]);
 
   useEffect(() => {
-    soundRef.current?.setVolumeAsync(displayedVolume).catch(() => {});
+    if (soundRef.current) soundRef.current.volume = displayedVolume;
+    if (videoPlayer) videoPlayer.volume = displayedVolume;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayedVolume]);
 
+  // expo-video's player.currentTime/.playing and expo-audio's
+  // player.currentTime/.playing are live, synchronously-readable properties
+  // (confirmed directly against both packages' installed type declarations)
+  // — unlike expo-av's getStatusAsync(), no async status fetch is needed to
+  // read current position/playback state before deciding whether to
+  // correct. Seeking: video's `currentTime =` assignment is documented as
+  // performing a real seek; audio's currentTime is a plain settable
+  // property too, but since expo-audio *also* ships a dedicated async
+  // seekTo(seconds) method specifically for seeking (with tolerance
+  // parameters), that explicit, purpose-built method is used for audio
+  // instead of relying on property-assignment semantics that aren't
+  // separately documented as a "real seek" the way video's are.
   async function reconcile() {
     const targetMs = computeWorshipPositionMs(session);
     try {
-      if (session.mediaType === "video" && videoRef.current) {
-        const status = await videoRef.current.getStatusAsync();
-        if (!status.isLoaded) return;
-        const drift = Math.abs((status.positionMillis ?? 0) - targetMs);
-        if (drift > DRIFT_THRESHOLD_MS) await videoRef.current.setPositionAsync(Math.max(0, targetMs));
-        if (session.isPlaying && !status.isPlaying) await videoRef.current.playAsync();
-        if (!session.isPlaying && status.isPlaying) await videoRef.current.pauseAsync();
+      if (session.mediaType === "video" && videoPlayer) {
+        if (videoPlayer.status !== "readyToPlay") return;
+        const currentMs = videoPlayer.currentTime * 1000;
+        const drift = Math.abs(currentMs - targetMs);
+        if (drift > DRIFT_THRESHOLD_MS) videoPlayer.currentTime = Math.max(0, targetMs) / 1000;
+        if (session.isPlaying && !videoPlayer.playing) videoPlayer.play();
+        if (!session.isPlaying && videoPlayer.playing) videoPlayer.pause();
         onDriftStatus?.(drift > NOTICEABLE_DRIFT_THRESHOLD_MS);
       } else if (session.mediaType === "audio" && soundRef.current) {
-        const status = await soundRef.current.getStatusAsync();
-        if (!status.isLoaded) return;
-        const drift = Math.abs((status.positionMillis ?? 0) - targetMs);
-        if (drift > DRIFT_THRESHOLD_MS) await soundRef.current.setPositionAsync(Math.max(0, targetMs));
-        if (session.isPlaying && !status.isPlaying) await soundRef.current.playAsync();
-        if (!session.isPlaying && status.isPlaying) await soundRef.current.pauseAsync();
+        const sound = soundRef.current;
+        if (!sound.isLoaded) return;
+        const currentMs = sound.currentTime * 1000;
+        const drift = Math.abs(currentMs - targetMs);
+        if (drift > DRIFT_THRESHOLD_MS) await sound.seekTo(Math.max(0, targetMs) / 1000);
+        if (session.isPlaying && !sound.playing) sound.play();
+        if (!session.isPlaying && sound.playing) sound.pause();
         onDriftStatus?.(drift > NOTICEABLE_DRIFT_THRESHOLD_MS);
       }
     } catch {
@@ -77,6 +109,20 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
       // doesn't produce an unhandled rejection.
     }
   }
+
+  // Mirrors the original onLoad={() => reconcile()} / onError callbacks —
+  // the video player has no such props (VideoView only takes `player`),
+  // so this listens to the player's own statusChange event instead.
+  useEventListener(videoPlayer, "statusChange", ({ status, error }) => {
+    if (status === "error") {
+      setErrorMessage(error?.message ?? "This video couldn't be loaded. Check the link and try again.");
+      return;
+    }
+    if (status === "readyToPlay") reconcile();
+  });
+
+  // Mirrors the original onPlaybackStatusUpdate's didJustFinish check.
+  useEventListener(videoPlayer, "playToEnd", () => { onEnded?.(); });
 
   useEffect(() => {
     if (session.mediaProvider === "youtube") return; // YouTubePlayer owns its own sync loop
@@ -93,34 +139,50 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resyncNonce]);
 
+  // createAudioPlayer is synchronous (unlike expo-av's async createAsync),
+  // so the "effect re-ran while creation was still in flight" race the
+  // original `cancelled` flag guarded against no longer has a window to
+  // occur in — the player is created and assigned within the same tick.
+  // Initial position/play-state (previously passed as createAsync options)
+  // and load-error detection (previously a thrown exception) both move to
+  // the status listener instead: expo-audio has no shouldPlay/positionMillis
+  // creation options, and surfaces load failures via `status.error` on the
+  // async status event rather than throwing synchronously from creation.
   useEffect(() => {
     if (session.mediaProvider === "youtube" || session.mediaType !== "audio" || !session.mediaUrl) return;
-    let cancelled = false;
     if (lastMediaUrl.current === session.mediaUrl && soundRef.current) return;
     lastMediaUrl.current = session.mediaUrl;
-    (async () => {
-      try {
-        await soundRef.current?.unloadAsync().catch(() => {});
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: session.mediaUrl! },
-          { shouldPlay: session.isPlaying, positionMillis: Math.max(0, computeWorshipPositionMs(session)), volume: displayedVolume },
-          (status) => { if (status.isLoaded && status.didJustFinish) onEnded?.(); }
-        );
-        if (!cancelled) { soundRef.current = sound; setErrorMessage(null); }
-        else await sound.unloadAsync();
-      } catch {
-        // The exact class of bug this fixes: an unplayable/invalid URL
-        // (e.g. a page URL instead of a direct audio file) previously
-        // reached here as an unhandled promise rejection. Now it's a
-        // caught, user-facing message instead of a browser crash.
-        if (!cancelled) setErrorMessage("This audio couldn't be loaded. Check the link and try again.");
-      }
-    })();
-    return () => { cancelled = true; };
+    soundRef.current?.remove();
+    audioReadyRef.current = false;
+    try {
+      const sound = createAudioPlayer({ uri: session.mediaUrl });
+      sound.volume = displayedVolume;
+      sound.addListener("playbackStatusUpdate", (status: AudioStatus) => {
+        if (status.error) {
+          // The exact class of bug this fixes: an unplayable/invalid URL
+          // (e.g. a page URL instead of a direct audio file) previously
+          // reached here as an unhandled promise rejection. Now it's a
+          // caught, user-facing message instead of a browser crash.
+          setErrorMessage("This audio couldn't be loaded. Check the link and try again.");
+          return;
+        }
+        if (!status.isLoaded) return;
+        if (!audioReadyRef.current) {
+          audioReadyRef.current = true;
+          sound.currentTime = Math.max(0, computeWorshipPositionMs(session)) / 1000;
+          if (session.isPlaying) sound.play();
+          setErrorMessage(null);
+        }
+        if (status.didJustFinish) onEnded?.();
+      });
+      soundRef.current = sound;
+    } catch {
+      setErrorMessage("This audio couldn't be loaded. Check the link and try again.");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.mediaProvider, session.mediaUrl, session.mediaType]);
 
-  useEffect(() => () => { soundRef.current?.unloadAsync().catch(() => {}); }, []);
+  useEffect(() => () => { soundRef.current?.remove(); }, []);
 
   useEffect(() => { setErrorMessage(null); }, [session.mediaUrl, session.mediaId, session.mediaProvider]);
 
@@ -168,19 +230,11 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
   }
 
   if (session.mediaType === "video") {
+    // Load/error/finish/shouldPlay/volume are all handled above via
+    // useVideoPlayer + useEventListener + the volume effect — VideoView
+    // itself only takes the player instance and display props.
     return (
-      <Video
-        ref={videoRef}
-        source={{ uri: session.mediaUrl! }}
-        style={styles.video}
-        resizeMode={ResizeMode.CONTAIN}
-        useNativeControls={false}
-        onLoad={() => reconcile()}
-        onError={() => setErrorMessage("This video couldn't be loaded. Check the link and try again.")}
-        onPlaybackStatusUpdate={(status) => { if (status.isLoaded && status.didJustFinish) onEnded?.(); }}
-        shouldPlay={session.isPlaying}
-        volume={displayedVolume}
-      />
+      <VideoView player={videoPlayer} style={styles.video} contentFit="contain" nativeControls={false} />
     );
   }
 

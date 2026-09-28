@@ -24,7 +24,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getPlanCategoryMeta } from "@/lib/planCategories";
-import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -35,14 +35,6 @@ type CompletedPlan = Plan & { completedAt: string | null };
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-
-// Plan Collections category card — explicit on both the card and its photo
-// column, never a percentage-height photo against an alignSelf: "stretch"
-// wrapper. That combination previously let the photo's height:"100%" go
-// unresolved on iOS/native (no concrete parent height at layout time),
-// which is what let the photo/fallback block expand vertically to near
-// full-screen height instead of staying inside this fixed-height row.
-const CATEGORY_CARD_HEIGHT = 120;
 
 function alertLocked(message: string) {
   if (Platform.OS === "web") window.alert(message);
@@ -55,39 +47,18 @@ function alertLocked(message: string) {
 // (the database is authoritative for those); label/icon/color/order come
 // from the shared PLAN_CATEGORIES constant (lib/planCategories.ts) so
 // they're defined in exactly one place across the app.
-// Same split-layout card design used for the Foundations/Curriculum
-// category cards: a fixed-width text column on the left and a large,
-// dedicated photo block on the right, as two independent flex children
-// rather than an image the text overlaps — so the photo can be as large as
-// the design wants without ever compressing the title/count. Falls back to
-// this category's emoji + color wash (its existing icon system, unchanged)
-// when there's no cover photo yet or it fails to load.
-function CategoryPhotoBlock({
-  uri, emoji, color, style, fallbackStyle,
-}: { uri: string | null; emoji: string; color: string; style: any; fallbackStyle: any }) {
-  const [failed, setFailed] = useState(false);
-  if (uri && !failed) {
-    return (
-      <Image
-        source={{ uri }}
-        style={style}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-    );
-  }
-  return (
-    <View style={[style, fallbackStyle, { backgroundColor: color }]}>
-      <Text style={{ fontSize: 30 }}>{emoji}</Text>
-    </View>
-  );
-}
-
+//
+// Restored two-column colored card (the original Plan Collections
+// presentation) — deliberately NOT the photo-split card pattern used by
+// Foundations/Curriculum: a solid category-color background, emoji, title,
+// and plan count only. No image/photo column, no aspect-ratio or percentage-
+// height container, nothing that depends on useCardPhotoWidth() — the card's
+// size is fully determined by its own fixed layout (width: "48%" of the
+// grid row below, minHeight for consistent row heights), so there is no
+// path back to the blank-card/narrow-media-strip failure mode that pattern
+// produced.
 function CategoryCard({ category, colors, onPress }: { category: PlanCategory; colors: AppColors; onPress: () => void }) {
   const styles = makeStyles(colors);
-  const photoWidth = useCardPhotoWidth(120);
   const meta = getPlanCategoryMeta(category.category);
   const color = meta?.color ?? category.colorTheme;
   const emoji = meta?.icon ?? "📖";
@@ -95,27 +66,16 @@ function CategoryCard({ category, colors, onPress }: { category: PlanCategory; c
   const countLabel = `${category.planCount} plan${category.planCount === 1 ? "" : "s"}`;
   return (
     <TouchableOpacity
-      style={styles.categoryCard}
-      activeOpacity={0.9}
+      style={[styles.categoryCard, { backgroundColor: color }]}
+      activeOpacity={0.85}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${countLabel}. Tap to open.`}
     >
-      <View style={styles.categoryCardContent}>
+      <Text style={styles.categoryCardEmoji}>{emoji}</Text>
+      <View style={styles.categoryCardTextCol}>
         <Text style={styles.categoryCardTitle} numberOfLines={2}>{title}</Text>
         <Text style={styles.categoryCardCount}>{countLabel}</Text>
-      </View>
-      <View style={[styles.categoryCardPhotoWrap, { width: photoWidth }]}>
-        <CategoryPhotoBlock
-          uri={category.coverImage}
-          emoji={emoji}
-          color={color}
-          style={styles.categoryCardPhoto}
-          fallbackStyle={styles.categoryCardPhotoFallback}
-        />
-        <View style={styles.categoryCardArrow} accessibilityElementsHidden importantForAccessibility="no">
-          <Ionicons name="chevron-forward" size={18} color="#fff" />
-        </View>
       </View>
     </TouchableOpacity>
   );
@@ -700,7 +660,7 @@ export default function PlansHubScreen() {
               ) : planCategories.length === 0 ? (
                 <EmptyState colors={colors} icon="albums-outline" text="Plan collections are not available yet." />
               ) : (
-                <View>
+                <View style={styles.categoryGrid}>
                   {orderedCategories.map((c) => (
                     <CategoryCard key={c.id} category={c} colors={colors} onPress={() => router.push(`/plans/category/${c.id}` as any)} />
                   ))}
@@ -907,29 +867,27 @@ function makeStyles(c: AppColors) {
     alphabetStripLetter: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     alphabetStripLetterMuted: { color: c.borderBeige },
 
-    // Same split-layout design as the Foundations/Curriculum category
-    // cards: a fixed-width text column and a large, dedicated photo block
-    // as independent flex children, so the photo can never compress the
-    // text.
+    // Restored two-column colored category grid — see CategoryCard's own
+    // comment above for why this replaces the old photo-split card. Width
+    // is a percentage of categoryGrid's own rendered width (never a
+    // hardcoded screen-width value), so it's correct on phones and tablets
+    // alike without any responsive-width helper.
+    categoryGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
     categoryCard: {
-      // Explicit height, not minHeight and not inherited via stretch — see
-      // CATEGORY_CARD_HEIGHT's comment above: the photo column below is
-      // also given this same explicit height rather than height: "100%",
-      // so it never depends on percentage-height resolution at all.
-      flexDirection: "row", height: CATEGORY_CARD_HEIGHT, borderRadius: 16, overflow: "hidden",
-      borderWidth: 1, borderColor: c.borderBeige, marginBottom: 12, backgroundColor: c.card,
-      shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+      width: "48%", minHeight: 92, borderRadius: 14, marginBottom: 14,
+      flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 10,
+      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 1,
     },
-    categoryCardContent: { flex: 1, padding: 16, justifyContent: "center" },
-    categoryCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 20 },
-    categoryCardCount: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 4 },
-    categoryCardPhotoWrap: { height: CATEGORY_CARD_HEIGHT },
-    categoryCardPhoto: { width: "100%", height: CATEGORY_CARD_HEIGHT },
-    categoryCardPhotoFallback: { alignItems: "center", justifyContent: "center" },
-    categoryCardArrow: {
-      position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14,
-      backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center",
-    },
+    categoryCardEmoji: { fontSize: 26 },
+    // Fixed white/near-white regardless of theme — a deliberate exception,
+    // same rationale as the app's other fixed-on-color text (e.g. call
+    // screens' end-button red): these cards use the category's own solid
+    // color as background, which the theme doesn't control, so theme text
+    // colors (tuned for the neutral card background) aren't guaranteed to
+    // contrast against it.
+    categoryCardTextCol: { flex: 1 },
+    categoryCardTitle: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", lineHeight: 18 },
+    categoryCardCount: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_500Medium", marginTop: 2 },
 
     filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
     filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },

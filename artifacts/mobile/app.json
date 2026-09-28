@@ -82,16 +82,19 @@
           "icon": "./assets/images/icon.png",
           "color": "#1D9E75"
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-video",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "owner": "p2p-global-discipleship-network-production-builds",
+    "owner": "amen-tech.projects",
     "extra": {
       "eas": {
-        "projectId": "5f2f927e-77fc-4e44-b85a-ac2fcd725ad1"
+        "projectId": "85d871bf-45ba-401c-88e9-077929ab7bd4"
       }
     }
   }

@@ -13,7 +13,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useEventListener } from "expo";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
@@ -112,7 +113,6 @@ export default function LivingTreeScreen() {
   const [showForestTransition, setShowForestTransition] = useState(false);
   const [heroVideoFailed, setHeroVideoFailed] = useState(false);
   const autoTriggeredRef = useRef(false);
-  const heroVideoRef = useRef<Video>(null);
   const heroSeekedRef = useRef(false);
 
   // ── My Tree redesign — real fruit data, environment, and the new
@@ -190,24 +190,46 @@ export default function LivingTreeScreen() {
   const hasHeroVideo = stageIndex <= LAST_VIDEO_STAGE_INDEX && !heroVideoFailed;
   const heroSegment = STAGE_VIDEO_SEGMENTS[Math.min(stageIndex, LAST_VIDEO_STAGE_INDEX)];
 
+  // expo-video's player (and its `source`) are created once — GROWTH_VIDEO_SOURCE
+  // never changes, only which in/out segment of it this screen plays, so the
+  // player is not recreated per stage. timeUpdateEventInterval must be set
+  // explicitly (default 0 = event never fires) to get frequent enough position
+  // updates to catch the segment-end boundary, matching onPlaybackStatusUpdate's
+  // continuous callbacks in the previous expo-av version.
+  const heroPlayer = useVideoPlayer(GROWTH_VIDEO_SOURCE, (player) => {
+    player.muted = true;
+    player.loop = false;
+    player.timeUpdateEventInterval = 0.1;
+  });
+
+  useEventListener(heroPlayer, "statusChange", ({ status, error }) => {
+    if (status === "error") { setHeroVideoFailed(true); return; }
+    if (status === "readyToPlay" && !heroSeekedRef.current) {
+      heroSeekedRef.current = true;
+      heroPlayer.currentTime = heroSegment.start;
+      heroPlayer.play();
+    }
+  });
+
+  useEventListener(heroPlayer, "timeUpdate", ({ currentTime }) => {
+    if (currentTime >= heroSegment.end - 0.08) {
+      heroPlayer.currentTime = heroSegment.start;
+      heroPlayer.play();
+    }
+  });
+
+  // Stage change (not a fresh load) — the player already exists and is
+  // likely already playing a different segment of the same source, so
+  // re-seek immediately instead of waiting for another "readyToPlay".
   useEffect(() => {
     heroSeekedRef.current = false;
-  }, [stageIndex]);
-
-  async function handleHeroLoad() {
-    if (heroSeekedRef.current) return;
-    heroSeekedRef.current = true;
-    await heroVideoRef.current?.setPositionAsync(heroSegment.start * 1000);
-    await heroVideoRef.current?.playAsync();
-  }
-
-  async function handleHeroStatus(status: AVPlaybackStatus) {
-    if (!status.isLoaded) return;
-    if (status.positionMillis >= heroSegment.end * 1000 - 80) {
-      await heroVideoRef.current?.setPositionAsync(heroSegment.start * 1000);
-      await heroVideoRef.current?.playAsync();
+    if (heroPlayer.status === "readyToPlay") {
+      heroPlayer.currentTime = heroSegment.start;
+      heroPlayer.play();
+      heroSeekedRef.current = true;
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageIndex]);
 
   const { modules } = useData();
   const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
@@ -252,18 +274,11 @@ export default function LivingTreeScreen() {
       {tab === "tree" && (
         <View style={[styles.videoHero, { width: screenWidth, height: heroHeight }]}>
           {hasHeroVideo ? (
-            <Video
-              ref={heroVideoRef}
-              source={GROWTH_VIDEO_SOURCE}
+            <VideoView
+              player={heroPlayer}
               style={{ width: screenWidth, height: heroHeight }}
-              videoStyle={{ width: screenWidth, height: heroHeight }}
-              resizeMode={ResizeMode.COVER}
-              isMuted
-              isLooping={false}
-              shouldPlay
-              onLoad={handleHeroLoad}
-              onPlaybackStatusUpdate={handleHeroStatus}
-              onError={() => setHeroVideoFailed(true)}
+              contentFit="cover"
+              nativeControls={false}
             />
           ) : treeData ? (
             <View style={[styles.videoHeroFallback, { width: screenWidth, height: heroHeight }]}>

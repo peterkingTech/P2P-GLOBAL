@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { Audio } from "expo-av";
+import { createAudioPlayer, type AudioPlayer, type AudioStatus } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 
@@ -18,40 +18,48 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMillis, setPositionMillis] = useState(0);
   const [totalMillis, setTotalMillis] = useState((durationSeconds ?? 0) * 1000);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
-    return () => { soundRef.current?.unloadAsync().catch(() => {}); };
+    return () => { soundRef.current?.remove(); };
   }, []);
 
+  // Lazy creation preserved deliberately — a chat can render many of these
+  // bubbles at once, and eagerly creating/buffering a player for every one
+  // (e.g. via the useAudioPlayer hook) would be a real performance
+  // regression versus the original "only load on first tap" behavior.
   async function toggle() {
     if (isPlaying) {
-      await soundRef.current?.pauseAsync();
+      soundRef.current?.pause();
       setIsPlaying(false);
       return;
     }
     if (!soundRef.current) {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: mediaUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (!status.isLoaded) return;
-          setPositionMillis(status.positionMillis ?? 0);
-          if (status.durationMillis) setTotalMillis(status.durationMillis);
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPositionMillis(0);
-          }
+      const sound = createAudioPlayer({ uri: mediaUrl });
+      sound.addListener("playbackStatusUpdate", (status: AudioStatus) => {
+        if (!status.isLoaded) return;
+        // expo-audio reports currentTime/duration in seconds; this
+        // component's state (and formatTime/progressPct below) are kept in
+        // milliseconds unchanged from the expo-av version — convert at this
+        // one boundary rather than touching the rest of the component.
+        setPositionMillis(status.currentTime * 1000);
+        if (status.duration) setTotalMillis(status.duration * 1000);
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+          setPositionMillis(0);
         }
-      );
+      });
       soundRef.current = sound;
+      sound.play();
     } else {
-      const status = (await soundRef.current.getStatusAsync()) as any;
-      if (status.didJustFinish || status.positionMillis >= status.durationMillis - 200) {
-        await soundRef.current.replayAsync();
-      } else {
-        await soundRef.current.playAsync();
+      // Same "replay from start if at/near the end" behavior as before,
+      // using the position/duration this component already tracks instead
+      // of re-fetching status (no async status-fetch equivalent needed).
+      if (positionMillis >= totalMillis - 200) {
+        soundRef.current.currentTime = 0;
+        setPositionMillis(0);
       }
+      soundRef.current.play();
     }
     setIsPlaying(true);
   }

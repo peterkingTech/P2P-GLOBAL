@@ -1,7 +1,7 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Badge, Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -45,29 +45,29 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>{t("tabs.home")}</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
+        <NativeTabs.Trigger.Label>{t("tabs.home")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="learn">
-        <Icon sf={{ default: "book", selected: "book.fill" }} />
-        <Label>{getLearnTabLabel(t("tabs.learn"), i18n.language)}</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "book", selected: "book.fill" }} />
+        <NativeTabs.Trigger.Label>{getLearnTabLabel(t("tabs.learn"), i18n.language)}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="messages">
-        <Icon sf={{ default: "message", selected: "message.fill" }} />
-        <Label>{t("tabs.messages")}</Label>
-        <Badge hidden={totalUnreadCount === 0}>{String(totalUnreadCount)}</Badge>
+        <NativeTabs.Trigger.Icon sf={{ default: "message", selected: "message.fill" }} />
+        <NativeTabs.Trigger.Label>{t("tabs.messages")}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Badge hidden={totalUnreadCount === 0}>{String(totalUnreadCount)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="prayer">
-        <Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
-        <Label>{t("tabs.prayer")}</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
+        <NativeTabs.Trigger.Label>{t("tabs.prayer")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="missions">
-        <Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
-        <Label>{t("tabs.missions")}</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
+        <NativeTabs.Trigger.Label>{t("tabs.missions")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="discover">
-        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>{t("tabs.discover")}</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "safari", selected: "safari.fill" }} />
+        <NativeTabs.Trigger.Label>{t("tabs.discover")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

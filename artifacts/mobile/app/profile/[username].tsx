@@ -353,17 +353,20 @@ export default function PublicProfileScreen() {
         {!isOwnProfile && (
           <View style={styles.actionsGrid}>
             {data.connectionStatus === "pending_received" ? (
-              <>
-                <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => handleRespond("accepted")} disabled={responding}>
-                  {responding ? <ActivityIndicator color="#fff" size="small" /> : (
-                    <><Ionicons name="checkmark" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Accept</Text></>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => handleRespond("declined")} disabled={responding}>
-                  <Ionicons name="close" size={15} color={colors.accentGreen} />
-                  <Text style={styles.actionBtnSecondaryText}>Decline</Text>
-                </TouchableOpacity>
-              </>
+              <View style={{ width: "100%", gap: 8 }}>
+                <Text style={styles.incomingRequestText}>P2P Connect Request — {data.fullName || `@${data.username}`} wants to connect with you</Text>
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => handleRespond("accepted")} disabled={responding}>
+                    {responding ? <ActivityIndicator color="#fff" size="small" /> : (
+                      <><Ionicons name="checkmark" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Accept</Text></>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => handleRespond("declined")} disabled={responding}>
+                    <Ionicons name="close" size={15} color={colors.accentGreen} />
+                    <Text style={styles.actionBtnSecondaryText}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ) : (
               <TouchableOpacity
                 style={data.connectionStatus === "connected" ? styles.actionBtnSecondary : styles.actionBtnPrimary}
@@ -371,11 +374,11 @@ export default function PublicProfileScreen() {
                 disabled={connecting || data.connectionStatus !== "none"}
               >
                 {connecting ? <ActivityIndicator color="#fff" size="small" /> : data.connectionStatus === "connected" ? (
-                  <Text style={styles.actionBtnSecondaryText}>Connected ✓</Text>
+                  <Text style={styles.actionBtnSecondaryText}>✓ P2P Connected</Text>
                 ) : data.connectionStatus === "pending_sent" ? (
-                  <><Ionicons name="time-outline" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Pending</Text></>
+                  <><Ionicons name="time-outline" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>P2P Connect Pending</Text></>
                 ) : (
-                  <><Ionicons name="person-add" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Connect</Text></>
+                  <><Ionicons name="person-add" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>P2P Connect</Text></>
                 )}
               </TouchableOpacity>
             )}
@@ -468,6 +471,7 @@ function makeStyles(c: AppColors) {
     actionBtnPrimaryText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     actionBtnSecondary: { flex: 1, flexBasis: "47%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
     actionBtnSecondaryText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    incomingRequestText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
     joinedText: { fontSize: 12, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", marginTop: 8 },
     menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
     menuSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 10 },

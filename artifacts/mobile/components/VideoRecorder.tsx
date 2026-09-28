@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
-import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 
@@ -33,6 +33,11 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
 
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Must be called unconditionally (hook rules) even though this component
+  // has several early `if (state === ...) return` branches above where the
+  // review preview renders — recreates automatically once recordedUri is set
+  // (useVideoPlayer keys its memoized player on the source).
+  const reviewPlayer = useVideoPlayer(recordedUri ? { uri: recordedUri } : null);
 
   useEffect(() => {
     return () => {
@@ -157,11 +162,11 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
           <Text style={styles.reviewDuration}>{formatTime(recordedDuration)} recorded</Text>
         </View>
         {recordedUri && (
-          <Video
-            source={{ uri: recordedUri }}
+          <VideoView
+            player={reviewPlayer}
             style={[styles.videoPreview, { height: PREVIEW_HEIGHT }]}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
+            nativeControls
+            contentFit="contain"
           />
         )}
         <View style={styles.reviewActions}>

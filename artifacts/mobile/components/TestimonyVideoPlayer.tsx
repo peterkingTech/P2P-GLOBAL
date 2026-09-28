@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { getTestimonySignedUrl } from "@/lib/prayerTestimonyApi";
 import colors from "@/constants/colors";
@@ -19,6 +19,9 @@ const VIDEO_HEIGHT = Math.round((SCREEN_WIDTH - 64) * (9 / 16));
 export default function TestimonyVideoPlayer({ mediaPath, durationSeconds }: Props) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Must be called unconditionally (hook rules) even though this component
+  // has early returns below for the loading/error states.
+  const player = useVideoPlayer(signedUrl ? { uri: signedUrl } : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +56,7 @@ export default function TestimonyVideoPlayer({ mediaPath, durationSeconds }: Pro
   }
   return (
     <View style={styles.videoBox}>
-      <Video source={{ uri: signedUrl }} style={[styles.video, { height: VIDEO_HEIGHT }]} useNativeControls resizeMode={ResizeMode.CONTAIN} />
+      <VideoView player={player} style={[styles.video, { height: VIDEO_HEIGHT }]} nativeControls contentFit="contain" />
       {durationSeconds != null && (
         <View style={styles.durationBadge}>
           <Ionicons name="videocam" size={11} color={colors.textMid} />

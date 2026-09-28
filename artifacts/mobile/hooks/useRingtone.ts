@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Platform, Vibration } from "react-native";
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 
 // A real incoming-call ringing experience (audio + vibration), not a visual
 // animation standing in for it. Singleton-per-hook-instance by design: a
@@ -9,7 +9,7 @@ import { Audio } from "expo-av";
 // ringtone can never start while one is already playing — only stop() (or
 // this same start() call again, which is a no-op while already ringing)
 // can end it.
-let activeSound: Audio.Sound | null = null;
+let activeSound: AudioPlayer | null = null;
 let isRinging = false;
 
 // Android's repeating-vibration API takes a pattern array (ms): the first
@@ -26,20 +26,25 @@ export function useRingtone() {
     if (isRinging) return; // already ringing — never stack a second instance
     isRinging = true;
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: false,
+      // expo-audio field names differ from expo-av's AudioMode: playsInSilentMode
+      // (was playsInSilentModeIOS), shouldPlayInBackground (was
+      // staysActiveInBackground). shouldDuckAndroid has no direct equivalent —
+      // interruptionMode: "doNotMix" is the closest match to the original intent
+      // (an incoming-call ringtone should take priority, not be ducked under
+      // other audio) rather than the default "mixWithOthers".
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: "doNotMix",
       });
-      const { sound } = await Audio.Sound.createAsync(
-        require("../assets/sounds/ringtone.wav"),
-        { isLooping: true, volume: 1.0, shouldPlay: true }
-      );
-      // start() can race a fast stop() (e.g. the caller cancelled while the
-      // asset was still loading) — if ringing was already turned off by the
-      // time this resolves, unload immediately instead of playing anyway.
-      if (!isRinging) { await sound.unloadAsync().catch(() => {}); return; }
+      // createAudioPlayer is synchronous (unlike expo-av's async createAsync),
+      // so the "stopped while still loading" race this used to guard against
+      // no longer has a window to occur in.
+      const sound = createAudioPlayer(require("../assets/sounds/ringtone.wav"));
+      sound.loop = true;
+      sound.volume = 1.0;
       activeSound = sound;
+      sound.play();
       Vibration.vibrate(VIBRATION_PATTERN, true);
     } catch (e) {
       console.warn("CALL DEBUG: ringtone failed to start", e);
@@ -55,9 +60,11 @@ export function useRingtone() {
     activeSound = null;
     if (sound) {
       try {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-      } catch { /* already stopped/unloaded — nothing left to clean up */ }
+        // expo-audio has no stopAsync/unloadAsync — pause() halts playback,
+        // remove() frees the underlying native player. Both are synchronous.
+        sound.pause();
+        sound.remove();
+      } catch { /* already stopped/removed — nothing left to clean up */ }
     }
   }, []);
 

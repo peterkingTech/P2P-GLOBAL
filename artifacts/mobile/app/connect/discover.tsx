@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, DiscoverablePeer } from "@/contexts/DataContext";
@@ -121,6 +121,17 @@ export default function Discover() {
 
   useEffect(() => { load(search, skillFilter); }, [skillFilter, load]);
 
+  // Discover has no other refresh trigger (no realtime subscription, no
+  // pull-to-refresh) — without this, connectionStatus goes stale whenever a
+  // request is sent/accepted from another screen (e.g. the profile screen,
+  // which already refreshes itself the same way) and the user navigates
+  // back here, since this screen stays mounted rather than remounting.
+  useFocusEffect(
+    useCallback(() => {
+      load(search, skillFilter);
+    }, [load, search, skillFilter])
+  );
+
   return (
     <>
       <Stack.Screen options={{ title: "Discovery Search" }} />
@@ -209,17 +220,25 @@ export default function Discover() {
                     </TouchableOpacity>
                   </View>
                 ) : item.canContact ? (
-                  <TouchableOpacity
-                    style={styles.msgBtn}
-                    onPress={(e) => { e.stopPropagation(); handleMessage(item); }}
-                    disabled={messaging === item.id}
-                  >
-                    {messaging === item.id ? (
-                      <ActivityIndicator size="small" color={colors.accentGreen} />
-                    ) : (
-                      <Ionicons name="chatbubble-outline" size={18} color={colors.accentGreen} />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    {item.connectionStatus === "connected" && (
+                      <View style={styles.connectedPill}>
+                        <Ionicons name="checkmark" size={12} color={colors.primaryGreen} />
+                        <Text style={styles.connectedPillText}>P2P Connected</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.msgBtn}
+                      onPress={(e) => { e.stopPropagation(); handleMessage(item); }}
+                      disabled={messaging === item.id}
+                    >
+                      {messaging === item.id ? (
+                        <ActivityIndicator size="small" color={colors.accentGreen} />
+                      ) : (
+                        <Ionicons name="chatbubble-outline" size={18} color={colors.accentGreen} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={[styles.connectBtn, item.connectionStatus === "pending_sent" && styles.connectBtnPending]}
@@ -229,9 +248,9 @@ export default function Discover() {
                     {connecting === item.id || item.canContact === undefined ? (
                       <ActivityIndicator size="small" color={item.connectionStatus === "pending_sent" ? colors.accentGreen : "#fff"} />
                     ) : item.connectionStatus === "pending_sent" ? (
-                      <Text style={styles.connectBtnPendingText}>Pending</Text>
+                      <Text style={styles.connectBtnPendingText}>P2P Connect Pending</Text>
                     ) : (
-                      <><Ionicons name="add" size={14} color="#fff" /><Text style={styles.connectBtnText}>Connect</Text></>
+                      <><Ionicons name="add" size={14} color="#fff" /><Text style={styles.connectBtnText}>P2P Connect</Text></>
                     )}
                   </TouchableOpacity>
                 )}
@@ -286,6 +305,8 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryGreen, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
   msgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(29,158,117,0.08)" },
+  connectedPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  connectedPillText: { fontSize: 11, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   acceptBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryGreen },
   declineBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderBeige },
   connectBtn: {

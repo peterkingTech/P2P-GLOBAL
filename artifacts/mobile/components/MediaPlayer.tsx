@@ -7,7 +7,8 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
-import { Audio, Video, ResizeMode } from "expo-av";
+import { createAudioPlayer, type AudioPlayer, type AudioStatus } from "expo-audio";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
@@ -28,7 +29,11 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
   const [positionMillis, setPositionMillis] = useState(0);
   const [totalMillis, setTotalMillis] = useState((durationSeconds ?? 0) * 1000);
 
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
+  // Must be called unconditionally (hook rules); harmless when signedUrl is
+  // null or submissionType is "audio" — this player is simply never
+  // rendered into a <VideoView> in that case.
+  const videoPlayer = useVideoPlayer(signedUrl ? { uri: signedUrl } : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,39 +48,41 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
       });
     return () => {
       cancelled = true;
-      soundRef.current?.unloadAsync().catch(() => {});
+      soundRef.current?.remove();
     };
   }, [storagePath]);
 
+  // Lazy creation preserved deliberately, same as VoiceMessageBubble.tsx —
+  // only load/buffer audio once the user actually taps play.
   async function toggleAudio() {
     if (!signedUrl) return;
     if (isPlaying) {
-      await soundRef.current?.pauseAsync();
+      soundRef.current?.pause();
       setIsPlaying(false);
       return;
     }
     if (!soundRef.current) {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: signedUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (!status.isLoaded) return;
-          setPositionMillis(status.positionMillis ?? 0);
-          if (status.durationMillis) setTotalMillis(status.durationMillis);
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPositionMillis(0);
-          }
+      const sound = createAudioPlayer({ uri: signedUrl });
+      sound.addListener("playbackStatusUpdate", (status: AudioStatus) => {
+        if (!status.isLoaded) return;
+        // expo-audio reports currentTime/duration in seconds; this
+        // component's state stays in milliseconds unchanged from the
+        // expo-av version — convert at this one boundary.
+        setPositionMillis(status.currentTime * 1000);
+        if (status.duration) setTotalMillis(status.duration * 1000);
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+          setPositionMillis(0);
         }
-      );
+      });
       soundRef.current = sound;
+      sound.play();
     } else {
-      const status = await soundRef.current.getStatusAsync() as any;
-      if (status.didJustFinish || status.positionMillis >= status.durationMillis - 200) {
-        await soundRef.current.replayAsync();
-      } else {
-        await soundRef.current.playAsync();
+      if (positionMillis >= totalMillis - 200) {
+        soundRef.current.currentTime = 0;
+        setPositionMillis(0);
       }
+      soundRef.current.play();
     }
     setIsPlaying(true);
   }
@@ -110,11 +117,11 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
   if (submissionType === "video") {
     return (
       <View style={styles.videoBox}>
-        <Video
-          source={{ uri: signedUrl }}
+        <VideoView
+          player={videoPlayer}
           style={[styles.video, { height: VIDEO_HEIGHT }]}
-          useNativeControls
-          resizeMode={ResizeMode.CONTAIN}
+          nativeControls
+          contentFit="contain"
         />
         {durationSeconds != null && (
           <View style={styles.durationBadge}>

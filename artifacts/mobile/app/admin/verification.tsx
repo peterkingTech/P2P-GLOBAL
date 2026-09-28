@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
@@ -28,6 +28,14 @@ interface Stats {
   totalVerified: number; pendingApplications: number; approvedThisWeek: number; declinedThisWeek: number;
   avgReviewHours: number; totalApplicationsAllTime: number; totalApprovalsAllTime: number;
   totalDeclinesAllTime: number; totalRevocationsAllTime: number; verificationRate: number;
+}
+
+// expo-video's useVideoPlayer must be called unconditionally at a component's
+// own top level — extracted here since the <Video> it replaces was previously
+// rendered inline inside a conditional ternary (video_selfie vs photo).
+function VerificationSubmissionVideo({ uri, style }: { uri: string; style: any }) {
+  const player = useVideoPlayer({ uri }, (p) => { p.loop = true; });
+  return <VideoView player={player} style={style} nativeControls contentFit="cover" />;
 }
 
 const DECLINE_REASONS: Array<{ value: string; label: string }> = [
@@ -337,7 +345,7 @@ export default function AdminVerificationScreen() {
                   {!detail.submissionUrl ? (
                     <View style={styles.mediaPlaceholder}><Ionicons name="alert-circle" size={28} color={colors.textMuted} /></View>
                   ) : detail.method === "video_selfie" ? (
-                    <Video source={{ uri: detail.submissionUrl }} style={styles.mediaImage} useNativeControls resizeMode={ResizeMode.COVER} isLooping />
+                    <VerificationSubmissionVideo uri={detail.submissionUrl} style={styles.mediaImage} />
                   ) : (
                     <Image source={{ uri: detail.submissionUrl }} style={styles.mediaImage} />
                   )}

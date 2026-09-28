@@ -100,7 +100,7 @@ router.post("/request", async (req, res) => {
   // different existing feature (circle membership) reusing this same
   // request/respond lifecycle, not a P2P Connection.
   let title = "P2P Connection Request";
-  let notifMessage = `${fromName} wants to connect with you.`;
+  let notifMessage = `${fromName} wants to connect with you on P2P.`;
   if (requestType === "circle_invite") {
     const { data: circle } = await supabaseWrite.from("p2p_peer_circles").select("name").eq("id", circleId).maybeSingle();
     title = `${fromName} has invited you to join ${circle?.name ?? "a circle"}`;
@@ -137,6 +137,120 @@ router.get("/pending/:userId", async (req, res) => {
       fromPhotoUrl: p?.photo_url ?? null, fromCountry: p?.country ?? null,
     });
   }));
+});
+
+// GET /connections/sent/:userId — this user's own outgoing pending requests.
+// Mirrors /pending/:userId exactly, swapping from/to — same table, same
+// shape, no new query pattern.
+router.get("/sent/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabaseWrite
+    .from("p2p_connection_requests")
+    .select("*")
+    .eq("from_user_id", userId).eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const toIds = Array.from(new Set((data ?? []).map((r) => r.to_user_id as string)));
+  const { data: profiles } = toIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name,username,photo_url,country").in("id", toIds)
+    : { data: [] as { id: string; full_name: string; username: string | null; photo_url: string | null; country: string | null }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  return res.json((data ?? []).map((r) => {
+    const p = profileById.get(r.to_user_id as string);
+    return mapRequest(r as Record<string, unknown>, {
+      toUserName: p?.full_name ?? "Someone", toUsername: p?.username ?? null,
+      toPhotoUrl: p?.photo_url ?? null, toCountry: p?.country ?? null,
+    });
+  }));
+});
+
+// GET /connections/accepted/:userId — accepted P2P connections (request_type
+// 'connect' only — this list is specifically "My P2P Connections", not
+// circle memberships), either direction.
+router.get("/accepted/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabaseWrite
+    .from("p2p_connection_requests")
+    .select("*")
+    .eq("request_type", "connect").eq("status", "accepted")
+    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+    .order("responded_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const otherIds = Array.from(new Set((data ?? []).map((r) =>
+    (r.from_user_id === userId ? r.to_user_id : r.from_user_id) as string
+  )));
+  const { data: profiles } = otherIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name,username,photo_url,country").in("id", otherIds)
+    : { data: [] as { id: string; full_name: string; username: string | null; photo_url: string | null; country: string | null }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  return res.json((data ?? []).map((r) => {
+    const otherId = (r.from_user_id === userId ? r.to_user_id : r.from_user_id) as string;
+    const p = profileById.get(otherId);
+    return mapRequest(r as Record<string, unknown>, {
+      otherUserId: otherId, otherUserName: p?.full_name ?? "Someone",
+      otherUsername: p?.username ?? null, otherPhotoUrl: p?.photo_url ?? null, otherCountry: p?.country ?? null,
+    });
+  }));
+});
+
+// GET /connections/history/:userId — declined/cancelled requests involving
+// this user, either direction, either as sender or recipient. Read-only,
+// same table — no new schema, no destructive change.
+router.get("/history/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabaseWrite
+    .from("p2p_connection_requests")
+    .select("*")
+    .eq("request_type", "connect").in("status", ["declined", "cancelled"])
+    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+    .order("responded_at", { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+
+  const otherIds = Array.from(new Set((data ?? []).map((r) =>
+    (r.from_user_id === userId ? r.to_user_id : r.from_user_id) as string
+  )));
+  const { data: profiles } = otherIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name,username,photo_url").in("id", otherIds)
+    : { data: [] as { id: string; full_name: string; username: string | null; photo_url: string | null }[] };
+  const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+
+  return res.json((data ?? []).map((r) => {
+    const otherId = (r.from_user_id === userId ? r.to_user_id : r.from_user_id) as string;
+    const p = profileById.get(otherId);
+    return mapRequest(r as Record<string, unknown>, {
+      otherUserId: otherId, otherUserName: p?.full_name ?? "Someone",
+      otherUsername: p?.username ?? null, otherPhotoUrl: p?.photo_url ?? null,
+      wasSentByMe: r.from_user_id === userId,
+    });
+  }));
+});
+
+// POST /connections/:id/cancel — { userId } — sender cancels their own
+// still-pending outgoing request. 'cancelled' was already an anticipated
+// status value in the original schema design (migration 064's own comment:
+// 'pending' | 'accepted' | 'declined' | 'cancelled') — no migration needed.
+router.post("/:id/cancel", async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body as { userId?: string };
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+
+  const { data: request } = await supabaseWrite.from("p2p_connection_requests").select("*").eq("id", id).maybeSingle();
+  if (!request) return res.status(404).json({ error: "Request not found" });
+  if (request.from_user_id !== userId) return res.status(403).json({ error: "Only the sender can cancel this request" });
+  if (request.status !== "pending") return res.status(409).json({ error: "This request is no longer pending" });
+
+  const { error } = await supabaseWrite
+    .from("p2p_connection_requests")
+    .update({ status: "cancelled", responded_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.json({ ok: true, status: "cancelled" });
 });
 
 // POST /connections/:id/respond — { responderId, response: 'accepted'|'declined' }

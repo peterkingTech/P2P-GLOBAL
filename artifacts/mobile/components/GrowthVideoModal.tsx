@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View, Dimensions } from "react-native";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useEventListener } from "expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
@@ -28,31 +29,33 @@ export function GrowthVideoModal({
   onClose,
 }: GrowthVideoModalProps) {
   const insets = useSafeAreaInsets();
-  const videoRef = useRef<Video>(null);
   const [reachedEnd, setReachedEnd] = useState(false);
   const hasSeekedRef = useRef(false);
-  // expo-av's `style` prop only sizes the outer wrapping View on web — the
-  // actual <video> element is sized by the separate `videoStyle` prop, which
-  // defaults to an absolute-fill that silently collapses to the browser's
-  // intrinsic 300x150 video size unless given explicit dimensions. Measure
-  // the wrap's real layout size and feed it through videoStyle to fix this.
-  const [videoAreaSize, setVideoAreaSize] = useState({ width: SW, height: SW });
 
-  async function handleLoad() {
-    if (hasSeekedRef.current) return;
-    hasSeekedRef.current = true;
-    await videoRef.current?.setPositionAsync(startSec * 1000);
-    await videoRef.current?.playAsync();
-  }
+  // timeUpdateEventInterval must be set explicitly (default 0 = the event
+  // never fires) to get frequent enough position updates to catch the
+  // end-boundary reliably, matching onPlaybackStatusUpdate's continuous
+  // callbacks in the previous expo-av version.
+  const player = useVideoPlayer(GROWTH_VIDEO_SOURCE, (p) => {
+    p.loop = false;
+    p.timeUpdateEventInterval = 0.1;
+  });
 
-  async function handleStatus(status: AVPlaybackStatus) {
-    if (!status.isLoaded) return;
-    if (!reachedEnd && status.positionMillis >= endSec * 1000 - 80) {
-      setReachedEnd(true);
-      await videoRef.current?.pauseAsync();
-      await videoRef.current?.setPositionAsync(endSec * 1000);
+  useEventListener(player, "statusChange", ({ status }) => {
+    if (status === "readyToPlay" && !hasSeekedRef.current) {
+      hasSeekedRef.current = true;
+      player.currentTime = startSec;
+      player.play();
     }
-  }
+  });
+
+  useEventListener(player, "timeUpdate", ({ currentTime }) => {
+    if (!reachedEnd && currentTime >= endSec - 0.08) {
+      setReachedEnd(true);
+      player.pause();
+      player.currentTime = endSec;
+    }
+  });
 
   return (
     <Modal visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -65,20 +68,8 @@ export function GrowthVideoModal({
           <Ionicons name="close" size={26} color="#fff" />
         </TouchableOpacity>
 
-        <View
-          style={styles.videoWrap}
-          onLayout={(e) => setVideoAreaSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-        >
-          <Video
-            ref={videoRef}
-            source={GROWTH_VIDEO_SOURCE}
-            style={styles.video}
-            videoStyle={videoAreaSize}
-            resizeMode={ResizeMode.COVER}
-            isLooping={false}
-            onLoad={handleLoad}
-            onPlaybackStatusUpdate={handleStatus}
-          />
+        <View style={styles.videoWrap}>
+          <VideoView player={player} style={styles.video} contentFit="cover" nativeControls={false} />
         </View>
 
         <View style={[styles.infoPanel, { paddingBottom: insets.bottom + 20 }]}>

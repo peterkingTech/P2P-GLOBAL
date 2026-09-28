@@ -69,6 +69,14 @@ const MATCH_PATHS = [
     color: colors.primaryGreen,
     route: "/connect/by-username" as const,
   },
+  {
+    id: "connections",
+    icon: "checkmark-done-circle" as const,
+    title: "P2P Connections",
+    subtitle: "Manage incoming, sent, and accepted P2P connections",
+    color: colors.primaryGreen,
+    route: "/connections" as const,
+  },
 ];
 
 export default function ConnectHub() {

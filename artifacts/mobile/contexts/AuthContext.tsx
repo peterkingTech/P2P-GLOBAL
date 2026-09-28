@@ -281,6 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (s?.user) fetchProfile(s.user.id).finally(() => setIsLoading(false));
       else setIsLoading(false);
+    }).catch(() => {
+      setIsLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
