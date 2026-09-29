@@ -50,7 +50,7 @@ const queryClient = new QueryClient();
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, profile } = useAuth();
+  const { isAuthenticated, isLoading, profile, isPasswordRecovery } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
@@ -89,6 +89,13 @@ function AuthGate() {
 
   useEffect(() => {
     if (isLoading) return;
+    // Forgot Password — a recovery session is a real, authenticated Supabase
+    // session (isAuthenticated is true), but the user must land on and stay
+    // on reset-password.tsx, not get swept into /(tabs) or the onboarding/
+    // journey gates below like a normal login would. isPasswordRecovery is
+    // only ever true from the SDK's own PASSWORD_RECOVERY event (see
+    // AuthContext), never a guess.
+    if (isPasswordRecovery) return;
     const inAuth = segments[0] === "(auth)";
     const screenName = segments[1] as string | undefined;
     const inSetupFlow = inAuth && !!screenName && AUTH_SETUP_SCREENS.has(screenName);

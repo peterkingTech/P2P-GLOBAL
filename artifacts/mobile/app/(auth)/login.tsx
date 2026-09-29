@@ -134,6 +134,10 @@ export default function LoginScreen() {
           </View>
         </View>
 
+        <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password" as any)} style={styles.forgotPasswordLink}>
+          <Text style={styles.linkText}>Forgot password?</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={handleLogin}
@@ -210,6 +214,7 @@ const styles = StyleSheet.create({
   atBadge: { backgroundColor: "rgba(29,158,117,0.18)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   atBadgeText: { color: colors.accentGreen, fontSize: 11, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   inputHint: { color: colors.textMuted, fontSize: 11, marginTop: 4, fontFamily: "Inter_400Regular" },
+  forgotPasswordLink: { alignSelf: "flex-end", marginTop: -4 },
   input: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,

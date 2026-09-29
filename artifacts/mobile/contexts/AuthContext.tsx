@@ -20,6 +20,19 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Forgot Password — PKCE is required for the recovery deep link to work
+    // on a bare React Native client: detectSessionInUrl is (and must stay)
+    // false since there's no window/URL for the SDK to read automatically,
+    // so reset-password.tsx manually calls exchangeCodeForSession() with the
+    // `code` from the deep link. That method (and the PASSWORD_RECOVERY
+    // event it emits — verified directly in the installed
+    // @supabase/auth-js@2.110.0 source) only exists on the PKCE flow; the
+    // default 'implicit' flow never calls it. This only changes how
+    // URL-based flows (resetPasswordForEmail, and any future magic-link/
+    // OAuth) construct their redirect — it does not affect
+    // signInWithPassword/signUp/setSession, which this app's existing
+    // email/username login already uses and which are untouched by this.
+    flowType: "pkce",
   },
 });
 
@@ -152,6 +165,14 @@ interface AuthContextValue {
   profile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  // Forgot Password — true from the moment the recovery deep link
+  // establishes a session (Supabase's own PASSWORD_RECOVERY auth event,
+  // never inferred from timing) until reset-password.tsx signs it out
+  // after a successful password change. AuthGate (app/_layout.tsx) must
+  // never redirect to the main app while this is true — a recovery
+  // session is a real, authenticated Supabase session, so isAuthenticated
+  // alone can't distinguish it from a normal login.
+  isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithUsername: (username: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string, location?: SignUpLocation) => Promise<string | null>;
@@ -249,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   // Retries on PGRST116 ("no rows found") rather than giving up on the first
   // empty result — this listener's own auth-state-triggered call can fire
@@ -285,7 +307,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      // Forgot Password — PASSWORD_RECOVERY is a real, distinct event this
+      // SDK emits only when a session was established via the recovery
+      // code-exchange flow (see reset-password.tsx), never for an ordinary
+      // sign-in. SIGNED_OUT clears it — reset-password.tsx signs out once
+      // the new password is saved, which is the normal way this ends.
+      if (event === "PASSWORD_RECOVERY") setIsPasswordRecovery(true);
+      else if (event === "SIGNED_OUT") setIsPasswordRecovery(false);
       setSession(s);
       if (s?.user) fetchProfile(s.user.id);
       else setProfile(null);
@@ -521,6 +550,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         isLoading,
         isAuthenticated: !!session,
+        isPasswordRecovery,
         signIn,
         signInWithUsername,
         signUp,
