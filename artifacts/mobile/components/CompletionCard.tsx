@@ -4,7 +4,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "expo-media-library";
+// expo-media-library has no web implementation (ExpoMediaLibraryNext is a
+// native-only module) — its top-level code throws immediately if loaded on
+// web, which previously crashed the ENTIRE app there (this file is pulled
+// into the root bundle via (tabs)/learn.tsx), not just this screen. Gating
+// the require behind a runtime Platform check means the module's code never
+// executes on web at all, since MediaLibrary is only ever called from
+// handleSave below, which is itself gated the same way.
+const MediaLibrary = Platform.OS !== "web" ? (require("expo-media-library") as typeof import("expo-media-library")) : null;
 
 interface CompletionCardProps {
   visible: boolean;
@@ -55,6 +62,10 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
   }
 
   async function handleSave() {
+    if (!MediaLibrary) {
+      Alert.alert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
+      return;
+    }
     setBusy("save");
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();

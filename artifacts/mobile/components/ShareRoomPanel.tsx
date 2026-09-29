@@ -5,7 +5,15 @@ import * as Haptics from "expo-haptics";
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "expo-media-library";
+// expo-media-library has no web implementation (ExpoMediaLibraryNext is a
+// native-only module) — its top-level code throws immediately if loaded on
+// web, which crashes the whole app there since this component is pulled
+// into the root bundle via app/call/room.tsx, church.tsx, and family/
+// worship/[sessionId].tsx. Gating the require behind a runtime Platform
+// check (same pattern as components/CompletionCard.tsx) means the module's
+// code never executes on web, since MediaLibrary is only ever called from
+// handleSaveQR below, itself gated the same way.
+const MediaLibrary = Platform.OS !== "web" ? (require("expo-media-library") as typeof import("expo-media-library")) : null;
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -139,6 +147,10 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
   // Same capture/save pattern as components/ChurchQRCode.tsx (ViewShot +
   // expo-media-library, permission-checked) — reused, not reinvented.
   async function handleSaveQR() {
+    if (!MediaLibrary) {
+      showAlert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
+      return;
+    }
     setSavingQR(true);
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();

@@ -82,7 +82,7 @@ export default function ForgotPasswordScreen() {
           </View>
           <Text style={styles.title}>Check your email</Text>
           <Text style={styles.subtitle}>
-            We sent a password reset link if an account exists for that email address.
+            We’ve sent a password reset link to your email address. If you don’t see it, please check your spam or junk folder.
           </Text>
           <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/(auth)/login")} activeOpacity={0.85}>
             <Text style={styles.primaryBtnText}>Back to Sign In</Text>

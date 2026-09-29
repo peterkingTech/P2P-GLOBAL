@@ -1,10 +1,17 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, Modal, Alert, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, Modal, Alert, StyleSheet, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "expo-media-library";
+// expo-media-library has no web implementation (ExpoMediaLibraryNext is a
+// native-only module) — its top-level code throws immediately if loaded on
+// web, crashing the whole app there since this component is reachable from
+// the route tree. Gating the require behind a runtime Platform check (same
+// pattern as components/CompletionCard.tsx) means the module's code never
+// executes on web, since MediaLibrary is only ever called from handleSave
+// below, itself gated the same way.
+const MediaLibrary = Platform.OS !== "web" ? (require("expo-media-library") as typeof import("expo-media-library")) : null;
 import { shareChurchInvite } from "@/lib/sharing";
 import colors from "@/constants/colors";
 
@@ -30,6 +37,10 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
   }
 
   async function handleSave() {
+    if (!MediaLibrary) {
+      Alert.alert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
+      return;
+    }
     setBusy("save");
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();
