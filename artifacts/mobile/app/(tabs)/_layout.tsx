@@ -20,6 +20,12 @@ function getLearnTabLabel(fullLabel: string, language: string): string {
   return fullLabel;
 }
 
+// No locale has a tabs.profile key yet; every locale already translates
+// home.myProfile, so that is the fallback rather than an English-only label.
+function profileTabLabel(t: (key: string, opts?: Record<string, unknown>) => string): string {
+  return t("tabs.profile", { defaultValue: t("home.myProfile") });
+}
+
 // Auto-shrinks to fit its slot instead of truncating — a fixed-size label
 // (e.g. the old "K-School" abbreviation, added specifically to dodge
 // truncation on small screens — see commit a36c5b4) always has some device
@@ -61,13 +67,13 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
         <NativeTabs.Trigger.Label>{t("tabs.prayer")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="missions">
-        <NativeTabs.Trigger.Icon sf={{ default: "globe.americas", selected: "globe.americas.fill" }} />
-        <NativeTabs.Trigger.Label>{t("tabs.missions")}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="discover">
         <NativeTabs.Trigger.Icon sf={{ default: "safari", selected: "safari.fill" }} />
         <NativeTabs.Trigger.Label>{t("tabs.discover")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Icon sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }} />
+        <NativeTabs.Trigger.Label>{profileTabLabel(t)}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -94,8 +100,8 @@ function ClassicTabLayout() {
     // "God is the Hotspot and we are connecting to Him." Label/route/nav
     // all unchanged; only the icon glyphs changed.
     { name: "prayer", label: t("tabs.prayer"), icon: "wifi-outline" as const, iconActive: "wifi" as const },
-    { name: "missions", label: t("tabs.missions"), icon: "earth-outline" as const, iconActive: "earth" as const },
     { name: "discover", label: t("tabs.discover"), icon: "compass-outline" as const, iconActive: "compass" as const },
+    { name: "profile", label: profileTabLabel(t), icon: "person-circle-outline" as const, iconActive: "person-circle" as const },
   ];
 
   return (

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type MutableRefObject } from "react";
 import type { IRtcEngine, IRtcEngineEventHandler } from "react-native-agora";
 
 // Web stub — react-native-agora is a native-only module (it statically
@@ -17,8 +17,17 @@ interface UseAgoraEngineOptions {
   appId?: string;
   onCameraUnavailable?: () => void;
   onPermissionsResolved?: () => void;
+  initialPublishVideo?: boolean;
 }
 
-export function useAgoraEngine(_options: UseAgoraEngineOptions) {
-  return useRef<IRtcEngine | null>(null);
+// Same shape as useAgoraEngine.native.ts's AgoraEngineRef, so tsc (which
+// resolves this stub) checks video.tsx against the real API.
+type AgoraEngineRef = MutableRefObject<IRtcEngine | null> & { publishVideoNow: () => void };
+
+const noop = () => {};
+
+export function useAgoraEngine(_options: UseAgoraEngineOptions): AgoraEngineRef {
+  const engineRef = useRef<IRtcEngine | null>(null) as AgoraEngineRef;
+  engineRef.publishVideoNow = noop;
+  return engineRef;
 }

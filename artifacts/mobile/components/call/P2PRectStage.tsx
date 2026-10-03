@@ -69,7 +69,12 @@ export function P2PRectStage({
       <View style={styles.mainWrap}>
         {mainTile ? (
           <MainWrapper style={styles.mainWrap} {...mainWrapperExtraProps}>
-            <Tile tile={mainTile} colors={colors} speaking={mainSpeaking} renderVideo={renderVideo} variant="main" />
+            {/* WhatsApp-style swap — key includes uid, not just variant, so
+                React treats a swap as a different component identity and
+                fully unmounts/remounts the native RtcSurfaceView, rather
+                than reusing the same native view and rebinding it from one
+                participant's canvas to another's. */}
+            <Tile key={`main-${mainTile.uid}`} tile={mainTile} colors={colors} speaking={mainSpeaking} renderVideo={renderVideo} variant="main" />
           </MainWrapper>
         ) : (
           <View style={[styles.tile, styles.mainWrap, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
@@ -83,7 +88,7 @@ export function P2PRectStage({
         )}
         {renderVideo && (
           <SmallWrapper style={[styles.pipTile, { borderColor: colors.surfaceBorder }]} {...smallWrapperExtraProps}>
-            <Tile tile={smallTile} colors={colors} speaking={speakingUids.has(smallTile.uid)} renderVideo={renderVideo} variant="pip" />
+            <Tile key={`pip-${smallTile.uid}`} tile={smallTile} colors={colors} speaking={speakingUids.has(smallTile.uid)} renderVideo={renderVideo} variant="pip" />
           </SmallWrapper>
         )}
       </View>
@@ -103,7 +108,12 @@ export function P2PRectStage({
   );
 }
 
-function Tile({
+// Stage 20 — onAudioVolumeIndication fires every 500ms and updates
+// speakingUids/activeSpeaker state on every call screen; without this,
+// every tile in the stage re-renders on that same 500ms cadence even when
+// its own speaking/video/mute state didn't change. React.memo makes each
+// Tile only re-render when its own props actually differ.
+const Tile = React.memo(function Tile({
   tile, colors, speaking, renderVideo, variant,
 }: {
   tile: P2POrbitTile; colors: P2PCallColors; speaking: boolean; renderVideo: boolean; variant: "main" | "pip" | "grid";
@@ -118,6 +128,7 @@ function Tile({
         styles.tile,
         variant === "main" && styles.mainWrap,
         variant === "grid" && styles.gridTile,
+        variant === "pip" && styles.pipFill,
         {
           backgroundColor: colors.surface,
           borderColor: speaking ? colors.accent : colors.surfaceBorder,
@@ -144,18 +155,24 @@ function Tile({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   mainWrap: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
   waveformDock: { position: "absolute", bottom: 16, alignSelf: "center" },
+  // No overflow:"hidden" here — Tile's own "tile" style already clips with the
+  // same radius, so a second clip on this wrapper would be redundant.
   pipTile: {
     position: "absolute", top: 16, right: 16, width: 92, height: 122,
-    borderRadius: 14, overflow: "hidden", borderWidth: 2,
+    borderRadius: 14, borderWidth: 2,
   },
   grid: { flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 8, alignContent: "flex-start" },
   gridCell: { aspectRatio: 0.82, padding: 4 },
   gridTile: { flex: 1 },
+  // Without this the pip Tile has no size rule of its own and, since all its
+  // children are absolutely positioned, collapses to its border height
+  // (measured 88x8 on device), leaving RtcSurfaceView no area to draw into.
+  pipFill: { flex: 1 },
   tile: { borderRadius: 14, overflow: "hidden" },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontFamily: "Inter_700Bold" },

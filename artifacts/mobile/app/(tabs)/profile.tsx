@@ -315,15 +315,13 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
+      {/* Profile is a tab now, so there is no back button here. */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("profile.title")}</Text>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Avatar & Name */}
@@ -514,6 +512,9 @@ export default function ProfileScreen() {
             { icon: "notifications-outline", label: t("profile.notifications"), route: "/settings/notifications" },
             { icon: "language-outline", label: t("profile.language"), route: "/settings/language" },
             { icon: "shield-outline", label: t("profile.privacy"), route: "/settings/privacy" },
+            // Always reachable here, even after the Home card hides itself.
+            { icon: "map-outline", label: "How to use P2P", route: "/get-started" },
+            { icon: "person-add-outline", label: "Invite a Peer", route: "/connect/invite" },
           ].map((item) => (
             <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
               <Ionicons name={item.icon as any} size={20} color={colors.textMid} />

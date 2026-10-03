@@ -35,7 +35,7 @@ export default function PrayerDiscoverScreen() {
   const styles = makeStyles(c);
 
   function handleSelect(target: (typeof SITUATIONS)[number]["target"]) {
-    if (target.type === "missions") router.push("/(tabs)/missions" as any);
+    if (target.type === "missions") router.push("/missions" as any);
     else router.push(`/prayer/pray-the-word/${target.slug}` as any);
   }
 

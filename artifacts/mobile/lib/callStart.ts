@@ -16,6 +16,11 @@ export interface StartPeerCallArgs {
   otherUserId: string;
   callType?: "audio" | "video";
   onAlert: (title: string, message: string) => void;
+  // CALL START TRACE (automatic-second-call investigation) — identifies
+  // which call site actually triggered this /calls/start request. Every
+  // existing call site keeps working with no source (falls back to
+  // "unspecified") — this is diagnostic-only, never gates behavior.
+  source?: string;
 }
 
 export interface StartPeerCallResult {
@@ -26,7 +31,10 @@ export interface StartPeerCallResult {
 }
 
 export async function startPeerCall(args: StartPeerCallArgs): Promise<StartPeerCallResult | null> {
-  const { supabase, currentUserId, otherUserId, callType = "audio", onAlert } = args;
+  const { supabase, currentUserId, otherUserId, callType = "audio", onAlert, source = "unspecified" } = args;
+  console.log("CALL START TRACE", {
+    source, currentUserId, otherUserId, callType, timestamp: new Date().toISOString(),
+  });
   try {
     const apiUrl = getApiUrl();
     const channelRes = await fetch(`${apiUrl}/calls/peer-channel`, {
@@ -58,11 +66,17 @@ export async function startPeerCall(args: StartPeerCallArgs): Promise<StartPeerC
     const startData = await startRes.json();
     if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
 
+    console.log("CALL START TRACE: succeeded", {
+      source, currentUserId, otherUserId, channelName,
+      callLogId: startData.callLogId, incomingCallId: startData.incomingCallId,
+      timestamp: new Date().toISOString(),
+    });
     return {
       channelName, conversationId: conversationId as string,
       callLogId: startData.callLogId, incomingCallId: startData.incomingCallId,
     };
   } catch (e: any) {
+    console.warn("CALL START TRACE: failed", { source, currentUserId, otherUserId, error: e?.message });
     onAlert("Couldn't start call", e?.message ?? "Please try again.");
     return null;
   }

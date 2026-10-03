@@ -1,0 +1,25 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="expo.modules.callforegroundservice">
+
+  <!--
+    Stage 26B — merged into the generated app's manifest at prebuild time,
+    the same way react-native-agora's own bundled manifest already merges
+    its own permissions (confirmed by direct inspection of that package
+    during the Stage 26B-A audit). FOREGROUND_SERVICE is the base
+    permission; the two typed permissions are required on Android 14+
+    (API 34) for a service that declares foregroundServiceType
+    "microphone|camera" — declaring the type without the matching
+    permission throws a SecurityException at startForeground() time on
+    those OS versions.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+  <application>
+    <service
+      android:name=".CallForegroundService"
+      android:exported="false"
+      android:foregroundServiceType="microphone|camera" />
+  </application>
+</manifest>

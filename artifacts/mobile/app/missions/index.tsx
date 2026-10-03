@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Platform, ActivityIndicator, TouchableOpacity, ScrollView } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
@@ -116,7 +116,8 @@ function makeStyles(c: AppColors) {
   });
 }
 
-export default function MissionsTab() {
+// Formerly the Missions tab; now opened from Discover (see (tabs)/discover.tsx).
+export default function MissionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getPrayerWallPosts } = useData();
@@ -169,9 +170,19 @@ export default function MissionsTab() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        <View style={[styles.header, { paddingTop: 20 }]}>
+      <TouchableOpacity
+        onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/discover" as any))}
+        style={{ paddingHorizontal: 16, paddingTop: 8, alignSelf: "flex-start" }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+      >
+        <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+      </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        <View style={[styles.header, { paddingTop: 8 }]}>
           <Text style={styles.title}>🌍 Missions</Text>
           <Text style={styles.subtitle}>See the mission. Hear the story. Pray for the workers.</Text>
           <View style={styles.goRow}>

@@ -92,7 +92,7 @@ export default function CreateMissionStoryScreen() {
         scriptureReferenceId, status,
       });
       showAlert(status === "published" ? "Story published" : "Draft saved", status === "published" ? "Your mission story is now live." : "You can publish it later.");
-      router.replace("/(tabs)/missions" as any);
+      router.replace("/missions" as any);
     } catch (e: any) {
       showAlert("Couldn't save this story", e.message ?? "Please try again.");
     } finally {

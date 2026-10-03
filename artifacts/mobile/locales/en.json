@@ -141,6 +141,18 @@
     "churchPlaceholder": "Tell us about your church background or current involvement…"
   },
   "home": {
+    "continueJourney": "Continue Your Kingdom School Journey",
+    "lessonOf": "Lesson {{current}} of {{total}}",
+    "beginJourney": "Begin your Kingdom School journey",
+    "beginJourneySub": "Discover where to begin your journey.",
+    "exploreKingdomSchool": "Explore Kingdom School",
+    "foundationCompleteSub": "Your foundation is established. Keep growing and helping others grow.",
+    "yourJourney": "Your Journey",
+    "myFamily": "My Family",
+    "myFamilySub": "Media, Scripture, prayer and gatherings together",
+    "recommendedForYou": "Recommended for You",
+    "recommendedBasedOnGoals": "Based on your goals",
+    "seeAll": "See All",
     "goodMorning": "Good morning",
     "goodAfternoon": "Good afternoon",
     "goodEvening": "Good evening",

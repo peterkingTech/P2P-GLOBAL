@@ -253,7 +253,7 @@ export default function PrayerPathFlowScreen() {
                 <Text style={styles.secondaryBtnText}>Read Related Scriptures</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/(tabs)/missions" as any)}>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/missions" as any)}>
               <Ionicons name="earth-outline" size={16} color={c.accentGreen} />
               <Text style={styles.secondaryBtnText}>Pray for Missions</Text>
             </TouchableOpacity>

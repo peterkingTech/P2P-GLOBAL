@@ -1,0 +1,11 @@
+{
+  "name": "call-foreground-service",
+  "version": "1.0.0",
+  "description": "Local Expo native module — Android foreground service that keeps an active P2P Agora call alive while the app is backgrounded. Android only; a no-op host on every other platform. See Stage 26B.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "expo-modules-core": "~57.0.19"
+  }
+}

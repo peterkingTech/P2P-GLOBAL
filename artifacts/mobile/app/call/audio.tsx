@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,8 +10,11 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { QualityType } from "@/lib/agoraNative";
 import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
+import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -57,7 +60,16 @@ const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
 // the realtime watch effect below) — if the recipient's app never opens
 // incoming.tsx (backgrounded, killed, or just never received the signal),
 // the caller would otherwise wait indefinitely.
-const NO_ANSWER_TIMEOUT_MS = 40000;
+//
+// Root-cause fix (real BlueStacks/Nox test) — see video.tsx's identical
+// constant/comment: 40000 counted from screen mount, not from the
+// recipient's ring/accept, so it had to cover incoming.tsx's own
+// RING_TIMEOUT_MS (30000) plus however long the recipient then took to
+// accept, get permissions, spin up their engine, fetch a token, and join —
+// which real-device testing showed can exceed 60s even on a healthy
+// connection. 70000 keeps this bounded while giving that realistic
+// worst-case join path room to complete.
+const NO_ANSWER_TIMEOUT_MS = 70000;
 
 // CALL DEBUG forensic fix — two gaps the prior audit missed:
 //   1. Nothing timed out "joining_channel" itself. If Agora's joinChannel()
@@ -90,6 +102,10 @@ const RECONNECT_GRACE_MS = 15000;
 // own type definitions.
 const AGORA_CONNECTION_STATE_FAILED = 5;
 
+// CALL NAV TRACE (automatic-second-call investigation) — see video.tsx's
+// identical counter/comment.
+let audioMountCounter = 0;
+
 export default function AudioCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -104,6 +120,16 @@ export default function AudioCallScreen() {
   }>();
   const isInitiator = params.isInitiator === "true";
   const callType = (params.callType as CallType) || "audio";
+  // CALL NAV TRACE (automatic-second-call investigation) — see video.tsx's
+  // identical mountIdRef/comment.
+  const mountIdRef = useRef<number | null>(null);
+  if (mountIdRef.current === null) {
+    mountIdRef.current = ++audioMountCounter;
+    console.log("CALL NAV TRACE: audio.tsx mounted", {
+      mountId: mountIdRef.current, callId: params.callId, channelName: params.channelName,
+      isInitiator, otherUserId: params.otherUserId, timestamp: new Date().toISOString(),
+    });
+  }
 
   const { getToken } = useAgora();
   const [token, setToken] = useState<string | null>(null);
@@ -132,6 +158,17 @@ export default function AudioCallScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
+  // Stage 6 — mirrors video.tsx's cameraUnavailable: a denied mic permission
+  // previously produced zero user-visible signal at all (worse than the
+  // camera case — audio is this screen's only media). Cleared by the user's
+  // own retry gesture (unmuting, see toggleMute below), same convention as
+  // the camera-toggle-as-retry fix.
+  const [micUnavailable, setMicUnavailable] = useState(false);
+  // Stage 11 — mirrors video.tsx/group.tsx's identical connection-quality
+  // banner: audio.tsx previously had no onNetworkQuality wiring at all, even
+  // though connection quality matters just as much for an audio-only call.
+  const [poorConnection, setPoorConnection] = useState(false);
+  const poorQualityStreakRef = useRef(0);
   // P2P Call Redesign — presentation layer only, see useActiveSpeaker.ts.
   // Consumes the existing onAudioVolumeIndication callback below; does not
   // change how Agora computes or reports volume.
@@ -152,8 +189,10 @@ export default function AudioCallScreen() {
   // stopped (hangup/decline/cancel). Both still funnel through the same
   // handleEndCall for cleanup/reporting/navigation (see below).
   const [callState, setCallState] = useState<
-    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended"
+    "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended" | "no_answer"
   >("requesting_token");
+  // Stage 22 — guards "Call again" against a double-tap starting two calls.
+  const [callingAgain, setCallingAgain] = useState(false);
   // CALL DEBUG fix — see video.tsx's identical declaration/comment: gates
   // JOIN_CHANNEL_TIMEOUT_MS below so it can't start counting down while
   // still waiting on the Android mic permission dialog inside useAgoraEngine.
@@ -165,6 +204,13 @@ export default function AudioCallScreen() {
   // drives the "reconnecting" UI signal.
   const [disconnectedUids, setDisconnectedUids] = useState<Set<number>>(new Set());
   const reconnectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // CALL TIMEOUT DEBUG — see video.tsx's identical declarations/comments:
+  // anchor for elapsedMs, plus a ref mirror of callState so the
+  // NO_ANSWER_TIMEOUT_MS effect's callback (which must not list callState in
+  // its deps) can still log the real value instead of a stale one.
+  const callMountAtRef = useRef(Date.now());
+  const callStateRef = useRef(callState);
+  callStateRef.current = callState;
 
   const [mode, setMode] = useState<"call" | "study">("call");
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
@@ -269,6 +315,14 @@ export default function AudioCallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.channelName, myUid, profile?.id]);
 
+  // Stage 22 — extracted out of handleEndCall's own closure (it was a local
+  // function there before) so the "No answer" result screen's Cancel button
+  // can reuse the exact same fallback logic without duplicating it.
+  function navigateBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/messages" as any);
+  }
+
   // CALL DEBUG forensic fix — handleEndCall now takes an optional reason so
   // a genuine connection failure can still report accurately to /calls/end
   // (connected is always derived from connectedAtRef, never guessed) while
@@ -277,10 +331,29 @@ export default function AudioCallScreen() {
   // (token-fetch failure, join-channel timeout, peer-wait timeout, Agora's
   // own ConnectionStateFailed) sets failureMessageRef and calls this with
   // reason="failed" rather than inventing its own cleanup path.
-  const handleEndCall = useCallback(async (reason: "user" | "failed" = "user") => {
+  // Stage 22 — "no_answer" is a fourth, distinct outcome: the call never
+  // connected, but nothing failed technically. It reuses every line of
+  // cleanup/reporting below exactly like every other reason, but instead of
+  // navigating away it tears the Agora engine down via setToken(null) —
+  // which re-triggers useAgoraEngine's own existing, unmodified dependency-
+  // driven cleanup (leaveChannel/unregisterEventHandler/release, the exact
+  // same path already used on unmount) — and keeps this screen mounted so
+  // the dedicated "No answer" result UI (rendered below) can take over in
+  // place of navigation.
+  const handleEndCall = useCallback(async (reason: "user" | "failed" | "no_answer" = "user") => {
+    console.log("CALL END TRACE", {
+      mountId: mountIdRef.current, source: reason, callId: params.callId, channelName: params.channelName,
+      alreadyEnded: endedRef.current, timestamp: new Date().toISOString(),
+    });
     if (endedRef.current) return;
     endedRef.current = true;
-    setCallState("ended");
+    // Stage 26B — stop as soon as the app's own intent to end is known,
+    // rather than waiting for the eventual unmount/engine teardown (which
+    // still stops it too, as a safety net — see useAgoraEngine.native.ts).
+    // Idempotent and safe even if background support was never started
+    // (e.g. this call never actually connected).
+    stopCallBackgroundSupport();
+    setCallState(reason === "no_answer" ? "no_answer" : "ended");
 
     // Video-call lifecycle audit — a real end must not leave a pending
     // reconnect-grace timer to fire afterward against an already-ended call.
@@ -311,10 +384,15 @@ export default function AudioCallScreen() {
       } catch { /* the call is ending either way; a lost summary message isn't worth blocking on */ }
     }
 
-    function navigateBack() {
-      if (router.canGoBack()) router.back();
-      else router.replace("/(tabs)/messages" as any);
+    // Stage 22 — no navigation here at all: the /calls/end report above
+    // already ran, so the engine only needs to actually leave. See this
+    // function's own comment above for why setToken(null) is the correct,
+    // already-existing mechanism for that.
+    if (reason === "no_answer") {
+      setToken(null);
+      return;
     }
+
     // A connection failure (never connected) is surfaced to the user with a
     // real reason before navigating away — a deliberate hangup needs no
     // such dialog. Alert.alert doesn't block, so navigation runs from its
@@ -327,6 +405,40 @@ export default function AudioCallScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.callLogId, params.callId, params.conversationId, callType]);
 
+  // Stage 22 — "Call again" reuses the exact same shared helper every other
+  // call-initiation site in this codebase uses (lib/callStart.ts's
+  // startPeerCall/buildCallRouteParams — see profile/[username].tsx,
+  // my-discipleship/disciple/[discipleId].tsx, etc.), not a second call
+  // mechanism. It goes through /calls/peer-channel, p2p_start_direct_
+  // conversation, and /calls/start exactly like any other outgoing call.
+  async function handleCallAgain() {
+    if (callingAgain || !profile?.id || !params.otherUserId) return;
+    console.log("CALL NAV TRACE: Call Again button pressed", { mountId: mountIdRef.current, callId: params.callId, channelName: params.channelName, timestamp: new Date().toISOString() });
+    setCallingAgain(true);
+    const result = await startPeerCall({
+      supabase, currentUserId: profile.id, otherUserId: params.otherUserId,
+      callType: "audio", onAlert: showAlert, source: "audio_call_again_button",
+    });
+    if (!result) { setCallingAgain(false); return; }
+    router.replace({
+      pathname: "/call/audio",
+      params: buildCallRouteParams({
+        channelName: result.channelName, otherUserId: params.otherUserId, otherUserName: otherName,
+        callType: "audio", callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+      }),
+    } as any);
+  }
+
+  // Stage 22 — reuses the existing conversation screen's own voice-message
+  // recorder (components/AudioRecorder.tsx, already mounted in
+  // app/messages/[id].tsx's input bar) rather than a second recorder. The
+  // engine was already torn down by handleEndCall's "no_answer" branch
+  // before this screen ever renders, so this is a plain navigation only.
+  function handleRecordVoice() {
+    if (params.conversationId) router.replace(`/messages/${params.conversationId}` as any);
+    else navigateBack();
+  }
+
   const engineRef = useAgoraEngine({
     channelName: params.channelName,
     token,
@@ -334,6 +446,7 @@ export default function AudioCallScreen() {
     enableVideo: false,
     appId: tokenAppId,
     onPermissionsResolved: useCallback(() => setReadyToJoin(true), []),
+    onMicUnavailable: useCallback(() => setMicUnavailable(true), []),
     eventHandler: {
       // CALL DEBUG fix — this device successfully joined the Agora channel.
       // This is NOT "connected" (see section 5 of the audit): it only means
@@ -391,7 +504,13 @@ export default function AudioCallScreen() {
         // Video-call lifecycle audit — only stamp the FIRST real connect; a
         // reconnect after a transient onUserOffline fires this again for
         // the same uid and must not reset call-duration bookkeeping.
-        if (!connectedAtRef.current) connectedAtRef.current = Date.now();
+        if (!connectedAtRef.current) {
+          connectedAtRef.current = Date.now();
+          // Stage 26B — start background support only on the real first
+          // connect, matching connectedAtRef's own existing guard exactly;
+          // never on ring/connecting. Audio-only screen, so isVideo=false.
+          startCallBackgroundSupport(false);
+        }
         setCallState("connected");
         setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
         const pendingTimer = reconnectTimersRef.current.get(uid);
@@ -476,6 +595,20 @@ export default function AudioCallScreen() {
         }, RECONNECT_GRACE_MS);
         reconnectTimersRef.current.set(uid, timer);
       },
+      // Stage 11 — mirrors video.tsx/group.tsx's identical handler exactly:
+      // only ever drives a "Connection unstable" warning, never touches
+      // audio enablement.
+      onNetworkQuality: (_connection, uid, txQuality, rxQuality) => {
+        if (uid !== 0) return; // only the local user's own uplink/downlink
+        const worst = Math.max(txQuality, rxQuality);
+        if (worst >= QualityType.QualityBad) {
+          poorQualityStreakRef.current += 1;
+          if (poorQualityStreakRef.current >= 3 && !poorConnection) setPoorConnection(true);
+        } else {
+          poorQualityStreakRef.current = 0;
+          if (poorConnection) setPoorConnection(false);
+        }
+      },
     },
   });
 
@@ -503,6 +636,8 @@ export default function AudioCallScreen() {
     return () => {
       reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
       reconnectTimersRef.current.clear();
+      // CALL NAV TRACE (automatic-second-call investigation).
+      console.log("CALL NAV TRACE: audio.tsx unmounted", { mountId: mountIdRef.current, timestamp: new Date().toISOString() });
     };
   }, []);
 
@@ -517,6 +652,10 @@ export default function AudioCallScreen() {
         { event: "UPDATE", schema: "public", table: "p2p_incoming_calls", filter: `id=eq.${params.callId}` },
         (payload) => {
           const status = (payload.new as Record<string, unknown>).status as string;
+          console.log("CALL REALTIME TRACE: audio.tsx call_watch update", {
+            mountId: mountIdRef.current, callId: params.callId, channelName: params.channelName,
+            status, timestamp: new Date().toISOString(),
+          });
           if (status === "declined" || status === "missed" || status === "cancelled") {
             handleEndCall();
           }
@@ -535,10 +674,16 @@ export default function AudioCallScreen() {
   useEffect(() => {
     if (!isInitiator || connected) return;
     const timer = setTimeout(() => {
-      showAlert("No answer", `${otherName} didn't pick up.`, handleEndCall);
+      console.log("CALL TIMEOUT DEBUG audio: firing", {
+        callId: params.callId, channelName: params.channelName, callState: callStateRef.current,
+        elapsedMs: Date.now() - callMountAtRef.current, timeoutSource: "NO_ANSWER_TIMEOUT_MS",
+      });
+      // Stage 22 — replaces the previous plain Alert with the dedicated
+      // "No answer" result screen; see handleEndCall's "no_answer" branch.
+      handleEndCall("no_answer");
     }, NO_ANSWER_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [isInitiator, connected, handleEndCall, otherName]);
+  }, [isInitiator, connected, handleEndCall]);
 
   // CALL DEBUG forensic fix — bounds the "joining_channel" step itself
   // (waiting on Agora's onJoinChannelSuccess) for BOTH caller and
@@ -547,7 +692,13 @@ export default function AudioCallScreen() {
   // a hypothetical) left the UI on "Connecting…"/"Calling…" forever.
   useEffect(() => {
     if (callState !== "joining_channel" || !readyToJoin) return;
+    const timeoutArmedAt = Date.now();
     const timer = setTimeout(() => {
+      console.log("CALL TIMEOUT DEBUG audio: firing", {
+        callId: params.callId, channelName: params.channelName, callState: "joining_channel",
+        elapsedMs: Date.now() - callMountAtRef.current, timeoutSource: "JOIN_CHANNEL_TIMEOUT_MS",
+        armedForMs: Date.now() - timeoutArmedAt,
+      });
       failureMessageRef.current = "Couldn't connect this call. Please check your connection and try again.";
       setCallState((s) => (s === "joining_channel" ? "failed" : s));
     }, JOIN_CHANNEL_TIMEOUT_MS);
@@ -562,6 +713,10 @@ export default function AudioCallScreen() {
   useEffect(() => {
     if (isInitiator || callState !== "waiting_for_peer") return;
     const timer = setTimeout(() => {
+      console.log("CALL TIMEOUT DEBUG audio: firing", {
+        callId: params.callId, channelName: params.channelName, callState: "waiting_for_peer",
+        elapsedMs: Date.now() - callMountAtRef.current, timeoutSource: "PEER_WAIT_TIMEOUT_MS",
+      });
       failureMessageRef.current = "Unable to reach the other person. Please try again.";
       setCallState((s) => (s === "waiting_for_peer" ? "failed" : s));
     }, PEER_WAIT_TIMEOUT_MS);
@@ -580,6 +735,11 @@ export default function AudioCallScreen() {
     const next = !muted;
     setMuted(next);
     engineRef.current?.muteLocalAudioStream(next);
+    // Stage 6 — unmuting IS the retry gesture; if the mic is genuinely still
+    // unavailable, nothing here claims otherwise beyond clearing the banner
+    // (a real ongoing permission denial has no other JS-visible signal to
+    // re-assert it, same limitation as the existing camera-retry fix).
+    if (!next) setMicUnavailable(false);
   }
   function toggleSpeaker() {
     const next = !speakerOn;
@@ -625,6 +785,55 @@ export default function AudioCallScreen() {
   }));
   const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted, photoUrl: profile?.avatarUrl ?? null };
   const allTiles = [selfTile, ...otherTiles];
+
+  // Stage 22 — dedicated "No answer" result, replacing the previous plain
+  // Alert. Only ever reached via handleEndCall("no_answer") above, which by
+  // this point has already torn the Agora engine down (setToken(null)) and
+  // reported /calls/end — this is presentation only, no media/engine calls
+  // of any kind below.
+  if (callState === "no_answer") {
+    return (
+      <View style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 30 }]}>
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <View style={styles.center}>
+          <View style={styles.noAnswerAvatarWrap}>
+            {params.otherUserAvatarUrl ? (
+              <Image source={{ uri: params.otherUserAvatarUrl }} style={styles.noAnswerAvatarPhoto} />
+            ) : (
+              <Ionicons name="person" size={48} color={p2pColors.textMuted} />
+            )}
+          </View>
+          <Text style={styles.noAnswerName}>{otherName}</Text>
+          <Text style={styles.noAnswerStatus}>No answer</Text>
+        </View>
+        <View style={styles.noAnswerActions}>
+          <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={navigateBack} accessibilityRole="button" accessibilityLabel="Cancel">
+            <Text style={styles.noAnswerSecondaryText}>Cancel</Text>
+          </TouchableOpacity>
+          {!!params.conversationId && (
+            <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={handleRecordVoice} accessibilityRole="button" accessibilityLabel="Record voice message">
+              <Ionicons name="mic-outline" size={16} color={p2pColors.textPrimary} />
+              <Text style={styles.noAnswerSecondaryText}>Record voice message</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.noAnswerPrimaryBtn, { backgroundColor: p2pColors.accent }]}
+            onPress={handleCallAgain}
+            disabled={callingAgain}
+            accessibilityRole="button"
+            accessibilityLabel="Call again"
+          >
+            {callingAgain ? <ActivityIndicator color="#fff" size="small" /> : (
+              <>
+                <Ionicons name="call" size={16} color="#fff" />
+                <Text style={styles.noAnswerPrimaryText}>Call again</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   if (mode === "study") {
     return (
@@ -680,10 +889,24 @@ export default function AudioCallScreen() {
           remote participant's transient network drop must not immediately
           end the call; this only shows while their reconnect grace period
           (RECONNECT_GRACE_MS) is running. */}
+      {poorConnection && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="warning" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Connection unstable</Text>
+        </View>
+      )}
+
       {disconnectedUids.size > 0 && (
-        <View style={styles.banner}>
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Ionicons name="cloud-offline" size={14} color="#fff" />
           <Text style={styles.bannerText}>{otherName} disconnected — reconnecting…</Text>
+        </View>
+      )}
+
+      {micUnavailable && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="mic-off" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Microphone unavailable — check your permission settings and unmute to retry.</Text>
         </View>
       )}
 
@@ -788,6 +1011,26 @@ export default function AudioCallScreen() {
 function makeStyles(p2p: P2PCallColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: p2p.bg, alignItems: "center", justifyContent: "space-between" },
+    // Stage 22 — "No answer" result screen.
+    noAnswerAvatarWrap: {
+      width: 128, height: 128, borderRadius: 64, backgroundColor: p2p.pillBg,
+      alignItems: "center", justifyContent: "center", overflow: "hidden",
+      borderWidth: 1.5, borderColor: p2p.accentBorder, marginBottom: 20,
+    },
+    noAnswerAvatarPhoto: { width: "100%", height: "100%" },
+    noAnswerName: { fontSize: 24, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
+    noAnswerStatus: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
+    noAnswerActions: { width: "100%", paddingHorizontal: 24, gap: 12 },
+    noAnswerSecondaryBtn: {
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+      borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 14, paddingVertical: 14,
+    },
+    noAnswerSecondaryText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
+    noAnswerPrimaryBtn: {
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+      borderRadius: 14, paddingVertical: 14,
+    },
+    noAnswerPrimaryText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 20 },
     brand: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_700Bold" },
     brandSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },

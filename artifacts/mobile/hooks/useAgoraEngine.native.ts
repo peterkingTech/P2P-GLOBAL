@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import {
   createAgoraRtcEngine,
@@ -7,6 +7,7 @@ import {
   type IRtcEngine,
   type IRtcEngineEventHandler,
 } from "react-native-agora";
+import { stopCallBackgroundSupport } from "../lib/callBackgroundSupport";
 
 // CALL DEBUG fix — this local env constant is now only a fallback. The
 // authoritative value is whatever appId the token-minting server actually
@@ -59,6 +60,13 @@ interface UseAgoraEngineOptions {
   /** The appId the token was actually minted for (see useAgora.ts's
    * getToken) — always preferred over the local env fallback. */
   appId?: string;
+  /** WhatsApp-style ringing lifecycle — whether to publish the camera track
+   * at join time. Defaults to `enableVideo` (existing behavior, unchanged
+   * for audio.tsx/group.tsx/room.tsx/church.tsx). The video caller screen
+   * passes `false` here while the callee hasn't accepted yet (local preview
+   * only, nothing sent), then calls `publishVideoNow()` (returned below)
+   * once acceptance is confirmed. Never affects audio publishing. */
+  initialPublishVideo?: boolean;
   /** Forensic calling audit — Android camera-permission denial previously
    * only logged a console.warn and otherwise vanished: the engine still
    * joined and published "video" that was actually empty frames, while the
@@ -77,10 +85,35 @@ interface UseAgoraEngineOptions {
    * could time out and hang up while the recipient was still tapping
    * "Allow" — never having had a real chance to connect. */
   onPermissionsResolved?: () => void;
+  /** Stage 6 (network recovery/reliability audit) — mirrors
+   * onCameraUnavailable exactly: a denied RECORD_AUDIO permission previously
+   * only produced a console.warn below, with zero JS-visible signal that
+   * this device's mic was not actually being captured — worse than the
+   * camera case, since every call type (including audio-only calls)
+   * depends on the mic. Lets the caller reflect a real denial into its own
+   * UI instead of a silently one-way-muted "connected" call. */
+  onMicUnavailable?: () => void;
 }
 
-export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved }: UseAgoraEngineOptions) {
-  const engineRef = useRef<IRtcEngine | null>(null);
+/** engineRef's existing RefObject<IRtcEngine | null> shape, unchanged for
+ * every existing caller (audio.tsx/group.tsx/room.tsx/church.tsx keep doing
+ * engineRef.current?.method() exactly as before) — publishVideoNow is an
+ * additional property on the same object, used only by video.tsx. */
+export type AgoraEngineRef = MutableRefObject<IRtcEngine | null> & {
+  /** WhatsApp-style ringing lifecycle — call once the callee has accepted,
+   * to start publishing the caller's camera track (a no-op if the engine
+   * isn't live, e.g. the call already ended). */
+  publishVideoNow: () => void;
+};
+
+export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved, onMicUnavailable, initialPublishVideo }: UseAgoraEngineOptions): AgoraEngineRef {
+  const engineRef = useRef<IRtcEngine | null>(null) as AgoraEngineRef;
+  // WhatsApp-style ringing lifecycle — reads engineRef.current at CALL time
+  // (not creation time), so it always reaches whichever engine instance is
+  // currently live without being an effect dependency.
+  engineRef.publishVideoNow = useRef(() => {
+    engineRef.current?.updateChannelMediaOptions({ publishCameraTrack: true });
+  }).current;
 
   // Video-call lifecycle audit — root cause of "engine keeps
   // reinitializing": eventHandler/onCameraUnavailable/onPermissionsResolved
@@ -101,6 +134,8 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
   onCameraUnavailableRef.current = onCameraUnavailable;
   const onPermissionsResolvedRef = useRef(onPermissionsResolved);
   onPermissionsResolvedRef.current = onPermissionsResolved;
+  const onMicUnavailableRef = useRef(onMicUnavailable);
+  onMicUnavailableRef.current = onMicUnavailable;
 
   // One object, created once and never replaced for the life of this hook
   // instance, registered with Agora exactly once per real join. Each
@@ -145,6 +180,9 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
           if (enableVideo && denied.includes(PermissionsAndroid.PERMISSIONS.CAMERA)) {
             onCameraUnavailableRef.current?.();
           }
+          if (denied.includes(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO)) {
+            onMicUnavailableRef.current?.();
+          }
         }
       }
       if (cancelled) return;
@@ -157,8 +195,29 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       engine.initialize({ appId: resolvedAppId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
       engine.registerEventHandler(stableHandler);
 
-      if (enableVideo) engine.enableVideo();
-      else engine.disableVideo();
+      // LOCAL VIDEO FIX (iOS local-preview investigation) — read-only audit
+      // traced the blank-local-preview symptom to this missing call. The
+      // installed react-native-agora source (RtcSurfaceView's own doc
+      // comment) documents the required sequence before joining a channel
+      // as "call startPreview first, then call enableVideo" — this app
+      // called enableVideo/joinChannel but never startPreview, which left
+      // the local camera capture session never explicitly bound to a
+      // renderer on iOS (Android's capture pipeline tolerated the omission,
+      // which is why this was never caught there). Gated on enableVideo so
+      // audio-only calls (audio.tsx) never start the camera.
+      if (enableVideo) engine.startPreview();
+
+      if (enableVideo) {
+        engine.enableVideo();
+        // Explicit, documented call for "start camera capture and create a
+        // local video stream" (enableVideo's own doc says this is already
+        // the default, but making it explicit removes any ambiguity rather
+        // than relying on an implicit default during the local-preview
+        // investigation).
+        engine.enableLocalVideo(true);
+      } else {
+        engine.disableVideo();
+      }
       engine.enableAudio();
       // Default audio route for a normal call (section 11): speakerphone on,
       // microphone on. Previously this was never set at all here — only ever
@@ -179,7 +238,13 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         channelProfile: ChannelProfileType.ChannelProfileCommunication,
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
         publishMicrophoneTrack: true,
-        publishCameraTrack: enableVideo,
+        // WhatsApp-style ringing lifecycle — defaults to enableVideo
+        // (unchanged for every other caller of this hook); the video call
+        // screen passes initialPublishVideo:false for the caller while
+        // ringing, so the camera track is never sent to the callee before
+        // they accept. Subscribing to the REMOTE side's video is unaffected
+        // either way (autoSubscribeVideo below).
+        publishCameraTrack: initialPublishVideo ?? enableVideo,
         autoSubscribeAudio: true,
         autoSubscribeVideo: enableVideo,
       });
@@ -207,11 +272,26 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         engine.unregisterEventHandler(stableHandler);
         engine.release();
         if (engineRef.current === engine) engineRef.current = null;
+        // Stage 26B — safety net, not the primary stop path (call screens
+        // already call stopCallBackgroundSupport() through their own
+        // handleEndCall/handleLeave). This cleanup runs unconditionally on
+        // EVERY real teardown of a real engine, including an exit path
+        // that bypasses those screen-level functions entirely (e.g. an OS
+        // back-gesture unmount) — the one path that reliably had no
+        // guaranteed stop call otherwise, which would have left an Android
+        // foreground-service notification stuck indefinitely. A no-op on
+        // iOS/macOS/Windows and a no-op if background support was never
+        // started for this call.
+        stopCallBackgroundSupport();
       }
     };
     // Video-call lifecycle audit — deliberately NOT including eventHandler/
     // onCameraUnavailable/onPermissionsResolved (read through refs above
-    // instead, see their declarations). This effect — and the real
+    // instead, see their declarations), nor initialPublishVideo (only read
+    // once, at the initial joinChannel call, for whether to start
+    // publishing camera immediately — a later acceptance uses
+    // publishVideoNow() instead of changing this and retriggering a full
+    // engine recreation). This effect — and the real
     // create/join/leave/release cycle it owns — must only run for an
     // actual new call: a genuinely different channel/token/uid/appId, or
     // video being turned on/off for the call as a whole. It must never

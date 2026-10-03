@@ -19,7 +19,7 @@ function showAlert(title: string, message: string) {
 const NEXT_STEPS: { key: string; icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
   { key: "study", icon: "book-outline", label: "Study Together", route: "/curriculum" },
   { key: "growth", icon: "leaf-outline", label: "Set a Growth Step", route: "/my-discipleship/journey" },
-  { key: "mission", icon: "earth-outline", label: "Pray for a Mission", route: "/(tabs)/missions" },
+  { key: "mission", icon: "earth-outline", label: "Pray for a Mission", route: "/missions" },
   { key: "testimony", icon: "sparkles-outline", label: "Share a Testimony", route: "/prayer/testimony/record" },
 ];
 
