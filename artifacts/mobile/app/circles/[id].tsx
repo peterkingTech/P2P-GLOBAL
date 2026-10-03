@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { Avatar } from "@/components/Avatar";
 
@@ -113,7 +114,13 @@ export default function CircleDetailScreen() {
     }
     setStartingSession(true);
     try {
-      const res = await fetch(`${getApiUrl()}/circles/${circleId}/start-session`, {
+      // Stage 25D-B — the server now derives caller identity exclusively
+      // from verifyCaller(req) (a real session Bearer token), not this
+      // startedBy field. authedFetch attaches that token the same way
+      // every other authenticated call in this app already does; startedBy
+      // is kept only because the request needs a JSON body at all, never
+      // trusted by the server for authentication.
+      const res = await authedFetch(`/circles/${circleId}/start-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ startedBy: profile.id }),

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView, Platform, Alert, AppState } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView, Platform, Alert, AppState, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +22,7 @@ import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
 import { P2PRectStage } from "@/components/call/P2PRectStage";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
+import { CallMoreSheet, type CallMoreAction } from "@/components/call/CallMoreSheet";
 import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
@@ -96,6 +97,10 @@ let videoMountCounter = 0;
 
 export default function VideoCallScreen() {
   const insets = useSafeAreaInsets();
+  // Six main controls must fit one row on narrow phones (e.g. 320–360pt):
+  // shrink from 58 but never below a 44pt tap target.
+  const { width: screenWidth } = useWindowDimensions();
+  const controlSize = Math.max(44, Math.min(58, Math.floor((screenWidth - 40 - 5 * 8) / 6)));
   const router = useRouter();
   const { profile } = useAuth();
   const { colors, resolvedMode } = useTheme();
@@ -177,6 +182,9 @@ export default function VideoCallScreen() {
   // camera-toggle-as-retry pattern.
   const [micUnavailable, setMicUnavailable] = useState(false);
   const [blurOn, setBlurOn] = useState(false);
+  const [filterOn, setFilterOn] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
   // WhatsApp-style call redesign — user-controlled Video<->Audio presentation
   // switch. Deliberately separate from cameraOn: cameraOn already means
   // "is my camera capturing," which this reuses to actually stop the local
@@ -793,6 +801,40 @@ export default function VideoCallScreen() {
   function flipCamera() {
     engineRef.current?.switchCamera();
   }
+  // Same primitive audio.tsx's speaker toggle uses. useAgoraEngine turns
+  // speakerphone on at join, so speakerOn starts true to match.
+  function toggleSpeaker() {
+    const next = !speakerOn;
+    setSpeakerOn(next);
+    engineRef.current?.setEnableSpeakerphone(next);
+  }
+  // Subtle skin smoothing via Agora's built-in beauty pipeline (full SDK,
+  // already linked on iOS and Android). Applied to the local camera capture
+  // before encoding, so the renderers are untouched. Smoothing plus a little
+  // sharpness to keep real skin texture; lightening and redness stay at 0 so
+  // skin tone is never altered. A negative return (-4 = device can't run it)
+  // is reported honestly instead of leaving a toggle that does nothing.
+  function toggleFilter() {
+    const next = !filterOn;
+    const engine = engineRef.current;
+    if (!engine) return;
+    const result = engine.setBeautyEffectOptions(next, {
+      smoothnessLevel: 0.4, sharpnessLevel: 0.3, lighteningLevel: 0, rednessLevel: 0,
+    });
+    if (typeof result === "number" && result < 0) {
+      setFilterOn(false);
+      if (next) {
+        showAlert(
+          "Filter not available",
+          result === -4
+            ? "This device can't run the smoothing filter during a call."
+            : "The smoothing filter couldn't be turned on. Please try again.",
+        );
+      }
+      return;
+    }
+    setFilterOn(next);
+  }
   // Requires the Agora Segmentation Extension to be linked natively — the
   // JS/TS call below is always safe to make, but silently no-ops (non-zero
   // return code, no crash) if that extension isn't present in the build.
@@ -1034,9 +1076,19 @@ export default function VideoCallScreen() {
         )}
       </View>
 
-      {cameraOn && (
-        <TouchableOpacity style={[styles.blurToggle, { top: insets.top + 100 }]} onPress={toggleBlur} activeOpacity={0.85} accessibilityLabel="Toggle background blur">
-          <Ionicons name="sparkles" size={14} color={blurOn ? p2pColors.accent : p2pColors.textPrimary} />
+      {/* Smoothing filter sits beside your own video because it is about how
+          you look; background blur moved into the More sheet. */}
+      {cameraOn && mediaMode === "video" && (
+        <TouchableOpacity
+          style={[styles.filterPill, filterOn && { borderColor: p2pColors.accent, backgroundColor: p2pColors.pillBg }]}
+          onPress={toggleFilter}
+          activeOpacity={0.85}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: filterOn }}
+          accessibilityLabel="Smoothing filter"
+        >
+          <Ionicons name="sparkles" size={13} color={filterOn ? p2pColors.accent : p2pColors.textPrimary} />
+          <Text style={[styles.filterPillText, { color: filterOn ? p2pColors.accent : p2pColors.textPrimary }]}>Smooth</Text>
         </TouchableOpacity>
       )}
 
@@ -1106,51 +1158,60 @@ export default function VideoCallScreen() {
           </View>
         )}
 
+        {/* Main row: the controls used constantly during a call. Less
+            frequent ones live in the More sheet below. End Call is always
+            last and always red. */}
         <View style={styles.controlsRow}>
-          <P2PControlButton onPress={toggleMute} active={muted} accessibilityLabel="Mute microphone" colors={p2pColors}>
+          <P2PControlButton size={controlSize} onPress={toggleMute} active={muted} accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} colors={p2pColors}>
             <Ionicons name={muted ? "mic-off" : "mic"} size={20} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          {mediaMode === "video" && (
-            <P2PControlButton onPress={toggleCamera} active={!cameraOn} accessibilityLabel="Turn camera on or off" colors={p2pColors}>
-              <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
-            </P2PControlButton>
-          )}
-          {mediaMode === "video" && (
-            <P2PControlButton onPress={flipCamera} disabled={!cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
-              <Ionicons name="camera-reverse" size={20} color={cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
-            </P2PControlButton>
-          )}
-          {/* WhatsApp-style call redesign — Feature B's explicit, user-only
-              Video<->Audio control. Distinct from the camera on/off button
-              above: this changes the call's overall presentation, not just
-              whether the camera is capturing. */}
           <P2PControlButton
-            onPress={toggleMediaMode}
-            accessibilityLabel={mediaMode === "video" ? "Switch to audio call" : "Switch to video call"}
+            size={controlSize}
+            onPress={mediaMode === "video" ? toggleCamera : switchToVideoMode}
+            active={mediaMode === "video" && !cameraOn}
+            accessibilityLabel={mediaMode === "video" ? (cameraOn ? "Turn camera off" : "Turn camera on") : "Switch back to video"}
             colors={p2pColors}
           >
-            <Ionicons name={mediaMode === "video" ? "call-outline" : "videocam-outline"} size={20} color={p2pColors.textPrimary} />
+            <Ionicons name={mediaMode === "video" && cameraOn ? "videocam" : "videocam-off"} size={20} color={mediaMode === "video" && !cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          {callState === "connected" && (
-            <P2PControlButton onPress={handleOpenStudy} accessibilityLabel="Study Together" colors={p2pColors}>
-              <Ionicons name="school" size={20} color={p2pColors.textPrimary} />
-            </P2PControlButton>
-          )}
-          {sessionQuestions.length > 0 && (
-            <P2PControlButton onPress={() => setLessonSidebarVisible(true)} accessibilityLabel="Lesson questions" colors={p2pColors}>
-              <Ionicons name="list" size={20} color={p2pColors.textPrimary} />
-            </P2PControlButton>
-          )}
-          {canAddPeople && (
-            <P2PControlButton onPress={() => setAddPeopleOpen(true)} accessibilityLabel="Add someone to this call" colors={p2pColors}>
-              <Ionicons name="person-add" size={20} color={p2pColors.textPrimary} />
-            </P2PControlButton>
-          )}
-          <P2PControlButton onPress={() => handleEndCall()} danger accessibilityLabel="End call" colors={p2pColors}>
+          <P2PControlButton size={controlSize} onPress={flipCamera} disabled={mediaMode !== "video" || !cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
+            <Ionicons name="camera-reverse" size={20} color={mediaMode === "video" && cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
+          </P2PControlButton>
+          <P2PControlButton size={controlSize} onPress={toggleSpeaker} active={speakerOn} accessibilityLabel={speakerOn ? "Turn speaker off" : "Turn speaker on"} colors={p2pColors}>
+            <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={20} color={speakerOn ? p2pColors.accent : p2pColors.textPrimary} />
+          </P2PControlButton>
+          <P2PControlButton size={controlSize} onPress={() => setMoreOpen(true)} accessibilityLabel="More call options" colors={p2pColors}>
+            <Ionicons name="ellipsis-horizontal" size={20} color={p2pColors.textPrimary} />
+          </P2PControlButton>
+          <P2PControlButton size={controlSize} onPress={() => handleEndCall()} danger accessibilityLabel="End call" colors={p2pColors}>
             <Ionicons name="call" size={20} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
           </P2PControlButton>
         </View>
       </View>
+
+      <CallMoreSheet
+        visible={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        colors={p2pColors}
+        actions={[
+          ...(mediaMode === "video" && cameraOn
+            ? [{ key: "blur", icon: "aperture-outline", label: "Background blur", detail: blurOn ? "On" : "Off", active: blurOn, onPress: toggleBlur } as CallMoreAction]
+            : []),
+          {
+            key: "media-mode", icon: mediaMode === "video" ? "call-outline" : "videocam-outline",
+            label: mediaMode === "video" ? "Switch to audio only" : "Switch back to video", onPress: toggleMediaMode,
+          },
+          ...(callState === "connected"
+            ? [{ key: "study", icon: "school-outline", label: "Study Together", onPress: handleOpenStudy } as CallMoreAction]
+            : []),
+          ...(sessionQuestions.length > 0
+            ? [{ key: "questions", icon: "list-outline", label: "Lesson questions", onPress: () => setLessonSidebarVisible(true) } as CallMoreAction]
+            : []),
+          ...(canAddPeople
+            ? [{ key: "add-people", icon: "person-add-outline", label: "Add someone to this call", onPress: () => setAddPeopleOpen(true) } as CallMoreAction]
+            : []),
+        ]}
+      />
 
       {params.callLogId && (
         <AddPeopleSheet visible={addPeopleOpen} onClose={() => setAddPeopleOpen(false)} callId={params.callLogId} />
@@ -1219,11 +1280,13 @@ function makeStyles(p2p: P2PCallColors) {
     orbitArea: { flex: 1, alignItems: "center", justifyContent: "center" },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
     statusText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
-    blurToggle: {
-      position: "absolute", right: 16, width: 34, height: 34, borderRadius: 17,
-      backgroundColor: withAlpha(p2p.bg, 0.6), alignItems: "center", justifyContent: "center",
-      borderWidth: 1, borderColor: p2p.surfaceBorder, zIndex: 2,
+    // Just below the PiP tile (P2PRectStage's pipTile: top 16 + height 122).
+    filterPill: {
+      position: "absolute", top: 148, right: 16, height: 32, paddingHorizontal: 12, borderRadius: 16,
+      flexDirection: "row", alignItems: "center", gap: 5,
+      backgroundColor: withAlpha(p2p.bg, 0.6), borderWidth: 1, borderColor: p2p.surfaceBorder, zIndex: 2,
     },
+    filterPillText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
     banner: {
       position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 8,
       backgroundColor: "rgba(180,83,9,0.9)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, zIndex: 2,
@@ -1234,7 +1297,8 @@ function makeStyles(p2p: P2PCallColors) {
       backgroundColor: withAlpha(p2p.bg, 0.55), gap: 14, alignItems: "center",
     },
     timer: { color: p2p.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
-    controlsRow: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+    // maxWidth keeps the six buttons grouped on tablets instead of spread edge to edge.
+    controlsRow: { flexDirection: "row", justifyContent: "space-between", width: "100%", maxWidth: 440, alignSelf: "center" },
     endBtn: { backgroundColor: P2P_END_CALL_RED },
     studyParticipantStrip: {
       flexDirection: "row", alignItems: "center", gap: 8,

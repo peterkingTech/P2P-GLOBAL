@@ -46,6 +46,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     points: [
       "Connect with peers from Discover or a peer's profile.",
       "Messages keeps your conversations, and you can start a voice or video call from any chat.",
+      "Missed a call? Tap it to call back.",
     ],
     route: "/connect", actionLabel: "Find peers",
   },

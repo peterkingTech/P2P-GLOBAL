@@ -12,6 +12,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import { Avatar } from "@/components/Avatar";
+import { useActivityStatus } from "@/lib/presence";
 import "@/lib/i18n";
 
 type TabKey = "all" | "unread" | "favourites" | "peer_groups" | "circles";
@@ -109,6 +110,10 @@ function makeStyles(c: AppColors) {
     rowTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
     rowTitleUnread: { fontWeight: "700" },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen, marginRight: 6 },
+    onlineDot: {
+      position: "absolute", right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7,
+      backgroundColor: c.accentGreen, borderWidth: 2, borderColor: c.lightCream,
+    },
     systemPin: { marginLeft: 4 },
     userPin: { marginRight: 4 },
     rowSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
@@ -137,6 +142,11 @@ export default function MessagesTab() {
 
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
+  // Online dot only here; the fuller "Active today" wording is in the chat
+  // header. The server only returns peers the user may see (migration 171).
+  const activity = useActivityStatus(
+    conversations.filter((c) => c.type !== "group" && !c.otherUserOfficialType).map((c) => c.otherUserId),
+  );
 
   useFocusEffect(React.useCallback(() => { loadConversations(); }, [loadConversations]));
 
@@ -287,7 +297,12 @@ export default function MessagesTab() {
                     <Ionicons name="people" size={20} color={colors.primaryGreen} />
                   </View>
                 ) : (
-                  <Avatar photoUrl={item.otherUserPhotoUrl} name={item.name} size={46} />
+                  <View>
+                    <Avatar photoUrl={item.otherUserPhotoUrl} name={item.name} size={46} />
+                    {!!item.otherUserId && activity[item.otherUserId] === "online" && (
+                      <View style={styles.onlineDot} accessibilityLabel="Active now" />
+                    )}
+                  </View>
                 )}
                 <View style={{ flex: 1 }}>
                   <View style={styles.rowTop}>

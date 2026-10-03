@@ -31,6 +31,7 @@ import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
+import { useActivityStatus, activityLabel } from "@/lib/presence";
 
 interface Message {
   id: string;
@@ -338,6 +339,8 @@ export default function ChatScreen() {
   const [helpRequestId, setHelpRequestId] = useState<string | null>(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
   const [callingType, setCallingType] = useState<"audio" | "video" | null>(null);
+  const otherActivity = useActivityStatus([otherUserOfficialType ? null : otherUserId]);
+  const otherActivityLabel = otherUserId ? activityLabel(otherActivity[otherUserId]) : null;
   const [recordingActive, setRecordingActive] = useState(false);
   const [text, setText] = useState("");
   const [mentionResults, setMentionResults] = useState<{ username: string; fullName: string | null }[]>([]);
@@ -622,6 +625,9 @@ export default function ChatScreen() {
 
   async function initiateCall(callType: "audio" | "video") {
     if (!user || !otherUserId || !id || callingType) return;
+    console.log("CALL START TRACE", {
+      source: "messages_call_button", currentUserId: user.id, otherUserId, callType, timestamp: new Date().toISOString(),
+    });
     setCallingType(callType);
     try {
       const apiUrl = getApiUrl();
@@ -646,6 +652,10 @@ export default function ChatScreen() {
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || "Failed to start call");
 
+      console.log("CALL START TRACE: succeeded", {
+        source: "messages_call_button", currentUserId: user.id, otherUserId, channelName,
+        callLogId: startData.callLogId, incomingCallId: startData.incomingCallId, timestamp: new Date().toISOString(),
+      });
       router.push({
         pathname: callType === "video" ? "/call/video" : "/call/audio",
         params: {
@@ -982,9 +992,19 @@ export default function ChatScreen() {
             onPress={() => openProfile(otherUserUsername)}
           >
             {isDirect && <Avatar photoUrl={otherUserPhotoUrl} name={title} size={32} />}
-            <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-            {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
-            {isDirect && otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
+            <View style={{ flexShrink: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+                {isDirect && <VerificationBadge isVerified={otherUserVerified} username={title} size="small" />}
+                {isDirect && otherUserOfficialType && <OfficialBadge accountType={otherUserOfficialType} size="small" />}
+              </View>
+              {isDirect && otherActivityLabel && (
+                <View style={styles.headerActivityRow}>
+                  {otherActivity[otherUserId as string] === "online" && <View style={styles.onlineDot} />}
+                  <Text style={styles.headerActivityText} numberOfLines={1}>{otherActivityLabel}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
           {isDirect && otherUserId && !otherUserOfficialType && (
             <View style={styles.headerCallBtns}>
@@ -1086,7 +1106,13 @@ export default function ChatScreen() {
                 const isVideo = callLog?.call_type === "video";
                 const isGroup = (callLog?.participants?.length ?? 0) > 2;
                 const iconName = isGroup ? "people" : isVideo ? "videocam" : "call";
-                const callTitle = isGroup ? "Group call" : isVideo ? "Video call" : "Voice call";
+                // An incoming call that was never answered is "missed" from
+                // this user's side — label it the way they'd expect.
+                const missedIncoming = !!callLog && !callMine && callLog.status !== "ended";
+                const callTitle = isGroup
+                  ? "Group call"
+                  : missedIncoming ? (isVideo ? "Missed video call" : "Missed voice call")
+                  : isVideo ? "Video call" : "Voice call";
                 let statusText = "Call";
                 if (callLog) {
                   if (callLog.status === "ended") {
@@ -1095,10 +1121,27 @@ export default function ChatScreen() {
                   else if (callLog.status === "cancelled") statusText = "Cancelled";
                   else statusText = "No answer";
                 }
+                // Missed-call callback: an unanswered 1:1 call (either
+                // direction) taps through to a fresh call of the same type,
+                // via the same initiateCall the header buttons use. Answered
+                // calls stay non-tappable so scrolling past history can't
+                // place a call by accident.
+                const canCallBack = !!callLog && !isGroup && callLog.status !== "ended"
+                  && isDirect && !!otherUserId && !otherUserOfficialType;
+                const CallCardWrapper = canCallBack ? TouchableOpacity : View;
+                const callCardWrapperProps = canCallBack
+                  ? {
+                      onPress: () => initiateCall(isVideo ? "video" : "audio"),
+                      disabled: !!callingType,
+                      activeOpacity: 0.8,
+                      accessibilityRole: "button" as const,
+                      accessibilityLabel: `Call back with ${isVideo ? "video" : "voice"}`,
+                    }
+                  : {};
                 return (
                   <View style={[styles.bubbleRow, callMine && styles.bubbleRowMine]}>
-                    <View style={[styles.callCard, callMine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                      <Ionicons name={iconName as any} size={18} color={callMine ? "#fff" : colors.accentGreen} />
+                    <CallCardWrapper style={[styles.callCard, callMine ? styles.bubbleMine : styles.bubbleTheirs]} {...callCardWrapperProps}>
+                      <Ionicons name={iconName as any} size={18} color={missedIncoming ? "#B91C1C" : callMine ? "#fff" : colors.accentGreen} />
                       <View style={styles.callCardBody}>
                         <Text style={[styles.callCardTitle, callMine && styles.bubbleTextMine]}>{callTitle}</Text>
                         <View style={styles.callCardStatusRow}>
@@ -1109,8 +1152,13 @@ export default function ChatScreen() {
                             {formatCallTimestamp(item.created_at)}
                           </Text>
                         </View>
+                        {canCallBack && (
+                          <Text style={[styles.callCardStatus, callMine && styles.callCardStatusMine, { marginTop: 2 }]}>
+                            Tap to call back
+                          </Text>
+                        )}
                       </View>
-                    </View>
+                    </CallCardWrapper>
                   </View>
                 );
               }
@@ -1286,6 +1334,9 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
+  headerActivityRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  headerActivityText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accentGreen },
   headerCallBtns: { flexDirection: "row", gap: 4 },
   headerIconBtn: { padding: 6, width: 34, alignItems: "center" },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },

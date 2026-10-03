@@ -13,21 +13,24 @@ import { P2P_END_CALL_RED } from "./p2pCallTheme";
 // do NOT theme the End Call button" instruction — every other state here
 // (normal/active/disabled) derives from the caller's resolved theme.
 export function P2PControlButton({
-  onPress, disabled, danger, active, children, label, accessibilityLabel, colors,
+  onPress, disabled, danger, active, children, label, accessibilityLabel, colors, size = 58,
 }: {
   onPress: () => void; disabled?: boolean; danger?: boolean; active?: boolean;
   children: React.ReactNode; label?: string; accessibilityLabel: string; colors: P2PCallColors;
+  /** Diameter. Defaults to 58 (unchanged for every existing caller). */
+  size?: number;
 }) {
   const bg = danger ? P2P_END_CALL_RED : active ? colors.pillBg : colors.surface;
   const border = danger ? P2P_END_CALL_RED : active ? colors.accent : colors.surfaceBorder;
 
   return (
     <TouchableOpacity
-      style={[styles.btn, { backgroundColor: bg, borderColor: border }, disabled && styles.disabled]}
+      style={[styles.btn, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg, borderColor: border }, disabled && styles.disabled]}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: !!disabled, selected: !!active }}
     >
       {children}
       {!!label && <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>}

@@ -102,6 +102,88 @@ async function sendExpoBatch(messages: ReturnType<typeof buildExpoMessage>[]): P
   return (json as { data?: unknown[] })?.data ?? [];
 }
 
+// Stage 26A — immediate dispatch for latency-sensitive notification types
+// (currently only incoming_call, called from calls.ts's /calls/start right
+// after the p2p_notifications row is inserted). The once-per-minute cron
+// below remains the ONLY dispatch path for every other notification type —
+// this is additive, not a redesign of the notification system.
+//
+// Reuses the exact same pushed_at column the cron poller already uses as
+// its sole "is this pending" signal — no new state, no second notion of
+// "sent". Race safety against the cron comes from claiming the row
+// atomically FIRST (`update ... where pushed_at is null`): whichever of
+// the two — this immediate call, or the next cron tick — updates the row
+// first "wins" the claim, and the other's WHERE clause matches zero rows
+// and does nothing further, so the same notification can never be sent
+// twice. If the actual Expo send then fails, the claim is rolled back
+// (pushed_at reset to null) so the row falls back to the existing
+// cron-based retry path exactly as if this function had never run — a
+// transient push-provider failure is never silently lost, and this
+// function never throws back into its caller (a failed push must never
+// fail the call that was already created).
+export async function dispatchNotificationNow(notificationId: string): Promise<void> {
+  const { data: claimed, error: claimErr } = await db
+    .from("p2p_notifications")
+    .update({ pushed_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .is("pushed_at", null)
+    .select("id, user_id, title, message, notification_type, data")
+    .maybeSingle();
+  if (claimErr) {
+    logger.error({ err: claimErr, notificationId }, "dispatchNotificationNow: failed to claim notification");
+    return; // pushed_at is untouched (still null) -- cron will pick it up normally
+  }
+  if (!claimed) return; // already claimed/sent by cron or a prior call -- no duplicate
+
+  const n = claimed as PendingNotification;
+  let sendFailed = false;
+  try {
+    if (n.user_id) {
+      const { data: tokenRows, error: tokenErr } = await db
+        .from("p2p_push_tokens")
+        .select("id, user_id, token")
+        .eq("user_id", n.user_id)
+        .eq("is_active", true);
+      if (tokenErr) {
+        logger.error({ err: tokenErr, notificationId }, "dispatchNotificationNow: failed to fetch push tokens");
+        sendFailed = true;
+      } else {
+        const tokens = (tokenRows ?? []) as PushToken[];
+        if (tokens.length > 0) {
+          const messages = tokens.map((t) => buildExpoMessage(n, t.token));
+          const tickets = await sendExpoBatch(messages);
+          if (tickets.length === 0) {
+            // sendExpoBatch already logged the Expo API failure.
+            sendFailed = true;
+          } else {
+            const staleTokens: string[] = [];
+            tickets.forEach((ticket, i) => {
+              const t = ticket as { status?: string; details?: { error?: string } };
+              if (t?.status === "error" && t.details?.error === "DeviceNotRegistered") {
+                staleTokens.push(tokens[i].token);
+              }
+            });
+            await deactivateTokens(staleTokens);
+          }
+        }
+        // Zero active tokens is not a failure -- matches the batch
+        // dispatcher's own "still marked pushed" behavior for a user with
+        // no registered devices at send time.
+      }
+    }
+  } catch (err) {
+    logger.error({ err, notificationId }, "dispatchNotificationNow: unexpected error while dispatching");
+    sendFailed = true;
+  }
+
+  if (sendFailed) {
+    const { error: rollbackErr } = await db.from("p2p_notifications").update({ pushed_at: null }).eq("id", notificationId);
+    if (rollbackErr) {
+      logger.error({ err: rollbackErr, notificationId }, "dispatchNotificationNow: failed to roll back claim after send failure");
+    }
+  }
+}
+
 export async function dispatchPendingPushes(): Promise<{ notifications: number; pushed: number; staleTokens: number }> {
   const pending = await fetchPending();
   if (!pending.length) return { notifications: 0, pushed: 0, staleTokens: 0 };

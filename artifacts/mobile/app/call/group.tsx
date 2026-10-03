@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, AppState } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { RtcSurfaceView } from "@/lib/agoraNative";
+import { RtcSurfaceView, QualityType } from "@/lib/agoraNative";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
+import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getP2PCallColors } from "@/components/call/p2pCallTheme";
@@ -23,13 +25,20 @@ interface CircleDetail {
 }
 interface Question { id: string; question: string }
 
-type SignalType = "mute_all" | "remove_user" | "next_question" | "mark_discussed" | "hand_raised" | "hand_acknowledged" | "pass_host" | "session_ending";
+type SignalType = "mute_all" | "remove_user" | "next_question" | "mark_discussed" | "hand_raised" | "hand_acknowledged" | "pass_host" | "session_ending" | "reaction";
 interface Signal { type: SignalType; from: string; data?: any }
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
 }
+
+// P2P Calling Stage 2 — network recovery/continuity, mirrors the existing
+// audio.tsx/video.tsx reconnect-grace pattern (previously only wired for
+// 1:1 calls). A remote participant's onUserOffline is commonly a transient
+// network drop, not a real departure; this gives a real reconnect this long
+// to happen before removing them from the call.
+const RECONNECT_GRACE_MS = 15000;
 
 export default function GroupCallScreen() {
   const insets = useSafeAreaInsets();
@@ -59,6 +68,32 @@ export default function GroupCallScreen() {
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<string>>(new Set());
   const [speakingUids, setSpeakingUids] = useState<Set<number>>(new Set());
+  // Stage 16 — presentation-only participant focus/pin: a user-controlled
+  // choice independent of (and never overridden by) active-speaker
+  // highlighting above. No Agora call of any kind; purely which tile shows
+  // the pin badge.
+  const [pinnedUid, setPinnedUid] = useState<number | null>(null);
+  // Stage 18 — lightweight, ephemeral reaction per uid: never persisted
+  // anywhere, rides the same broadcast signal channel raise-hand already
+  // uses, and self-clears on a timer (a stale reaction simply stops
+  // rendering — no cleanup needed on participant departure either).
+  const [reactions, setReactions] = useState<Record<number, { emoji: string; id: number }>>({});
+  const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // Stage 2 — mirrors audio.tsx/video.tsx: a uid stays in remoteUids/the
+  // tile grid during its grace period; this set only drives the
+  // "reconnecting" banner below.
+  const [disconnectedUids, setDisconnectedUids] = useState<Set<number>>(new Set());
+  const reconnectTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // Stage 5/6 — mirrors audio.tsx/video.tsx's cameraUnavailable/
+  // micUnavailable: group calls previously had zero wiring for either
+  // event at all (confirmed absent from this file before this change).
+  // Cleared by the user's own retry gesture (toggling camera/mute back on).
+  const [cameraUnavailable, setCameraUnavailable] = useState(false);
+  const [micUnavailable, setMicUnavailable] = useState(false);
+  // Stage 8 — mirrors video.tsx's poorConnection banner; group calls had no
+  // onNetworkQuality wiring at all before this change.
+  const [poorConnection, setPoorConnection] = useState(false);
+  const poorQualityStreakRef = useRef(0);
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [lessonTitle, setLessonTitle] = useState("");
@@ -70,6 +105,10 @@ export default function GroupCallScreen() {
   const [sessionNotes, setSessionNotes] = useState("");
   const [ending, setEnding] = useState(false);
   const startedAtRef = useRef(Date.now());
+  // Stage 26B — group.tsx has no single callState/connectedAtRef the way
+  // audio.tsx/video.tsx do; this ref is the equivalent "only once, on the
+  // real first connect" guard for background-call support.
+  const hasStartedBackgroundSupportRef = useRef(false);
 
   // uid <-> member lookups, built once the roster is known — Agora only
   // gives us back the numeric uid on join/leave, never the real user id.
@@ -104,6 +143,39 @@ export default function GroupCallScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Stage 2 — safety net for reconnect-grace timers on unmount (the timer
+  // callback below already clears itself on every normal grace-period
+  // expiry; this only guards an unmount that happens mid-grace-period).
+  useEffect(() => {
+    return () => {
+      reconnectTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reconnectTimersRef.current.clear();
+    };
+  }, []);
+
+  // Stage 18 — safety net for reaction auto-clear timers on unmount.
+  useEffect(() => {
+    return () => {
+      reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reactionTimersRef.current.clear();
+    };
+  }, []);
+
+  // Stage 7 — mirrors video.tsx's identical effect: iOS stops camera capture
+  // while backgrounded and does not always resume it automatically on its
+  // own once foregrounded. Only re-issues the same enableLocalVideo call
+  // toggleCamera already uses; no leave/rejoin, no engine recreation, no
+  // channel/token/UID change, and only when the user's own cameraOn state
+  // says the camera should currently be on.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && cameraOn) {
+        engineRef.current?.enableLocalVideo(true);
+      }
+    });
+    return () => subscription.remove();
+  }, [cameraOn]);
+
   useEffect(() => {
     if (!myUid || !profile?.id) return;
     let cancelled = false;
@@ -136,6 +208,10 @@ export default function GroupCallScreen() {
       // Best-effort — not gated on success, the user is leaving either way.
       void 0;
     }
+    // Stage 26B — covers the "leave" button and every signal-driven forced
+    // leave (remove_user, session_ending) that already funnels through
+    // this function. Idempotent/safe even if never started.
+    stopCallBackgroundSupport();
     if (router.canGoBack()) router.back();
     else router.replace(`/circles/${params.circleId}` as any);
   }, [params.circleId, router]);
@@ -196,6 +272,11 @@ export default function GroupCallScreen() {
           showAlert("Session ended", "The leader has ended this session.");
           handleLeave();
           break;
+        case "reaction":
+          if (payload.data?.uid !== undefined && payload.data?.emoji) {
+            applyReaction(payload.data.uid, payload.data.emoji);
+          }
+          break;
       }
     }).subscribe((status, err) => {
       if (status === "CHANNEL_ERROR") console.error("Peer Circle realtime channel authorization failed", err);
@@ -216,12 +297,80 @@ export default function GroupCallScreen() {
     uid: myUid,
     enableVideo: true,
     appId: tokenAppId,
+    onCameraUnavailable: useCallback(() => setCameraUnavailable(true), []),
+    onMicUnavailable: useCallback(() => setMicUnavailable(true), []),
     eventHandler: {
-      onUserJoined: (_c, uid) => setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid])),
-      onUserOffline: (_c, uid) => setRemoteUids((prev) => prev.filter((u) => u !== uid)),
+      onUserJoined: (_c, uid) => {
+        setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid]));
+        // Stage 26B — first real participant joining is this screen's
+        // equivalent of audio.tsx/video.tsx's "connected" transition.
+        // Group calls are video-capable by default (isVideo=true) — this
+        // does not track per-participant camera state, matching the same
+        // fixed-at-connect-time simplification documented for video.tsx.
+        if (!hasStartedBackgroundSupportRef.current) {
+          hasStartedBackgroundSupportRef.current = true;
+          startCallBackgroundSupport(true);
+        }
+        // Stage 2 — a genuine reconnect: cancel the pending grace-period
+        // removal and clear the "reconnecting" UI state for this uid.
+        const pendingTimer = reconnectTimersRef.current.get(uid);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          reconnectTimersRef.current.delete(uid);
+        }
+        setDisconnectedUids((prev) => {
+          if (!prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.delete(uid);
+          return next;
+        });
+      },
+      // Stage 2 — onUserOffline fires for both a genuine hangup and a
+      // transient network drop, indistinguishable at this event (same
+      // caveat as audio.tsx/video.tsx). Previously this immediately dropped
+      // the uid from remoteUids, ending that participant's tile and — if
+      // they were the last one — implicitly leaving the caller alone with
+      // no path back for a reconnecting peer. Now: stays in remoteUids (the
+      // tile keeps showing, the call continues) and is only marked
+      // "reconnecting" until RECONNECT_GRACE_MS elapses with no rejoin.
+      onUserOffline: (_c, uid) => {
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
+          return next;
+        });
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        const timer = setTimeout(() => {
+          reconnectTimersRef.current.delete(uid);
+          setDisconnectedUids((prev) => {
+            if (!prev.has(uid)) return prev;
+            const next = new Set(prev);
+            next.delete(uid);
+            return next;
+          });
+          setRemoteUids((prev) => prev.filter((u) => u !== uid));
+        }, RECONNECT_GRACE_MS);
+        reconnectTimersRef.current.set(uid, timer);
+      },
       onAudioVolumeIndication: (_c, speakers) => {
         const loud = new Set((speakers ?? []).filter((s) => (s.volume ?? 0) > 40).map((s) => s.uid ?? 0));
         setSpeakingUids(loud);
+      },
+      // Stage 8 — mirrors video.tsx's identical handler exactly: only ever
+      // drives a "Connection unstable" warning banner, never touches video
+      // enablement — Agora's own encoder already adapts bitrate/resolution
+      // to network conditions on its own.
+      onNetworkQuality: (_c, uid, txQuality, rxQuality) => {
+        if (uid !== 0) return; // only the local user's own uplink/downlink
+        const worst = Math.max(txQuality, rxQuality);
+        if (worst >= QualityType.QualityBad) {
+          poorQualityStreakRef.current += 1;
+          if (poorQualityStreakRef.current >= 3 && !poorConnection) setPoorConnection(true);
+        } else {
+          poorQualityStreakRef.current = 0;
+          if (poorConnection) setPoorConnection(false);
+        }
       },
     },
   });
@@ -230,29 +379,103 @@ export default function GroupCallScreen() {
     const next = !muted;
     setMuted(next);
     engineRef.current?.muteLocalAudioStream(next);
+    // Stage 6 — unmuting IS the retry gesture for a prior mic-permission
+    // denial, same convention as audio.tsx/video.tsx.
+    if (!next) setMicUnavailable(false);
   }
   function toggleCamera() {
     const next = !cameraOn;
     setCameraOn(next);
     engineRef.current?.enableLocalVideo(next);
+    // Stage 5 — turning the camera back on IS the retry gesture for a
+    // prior onCameraUnavailable, same convention as video.tsx.
+    if (next) setCameraUnavailable(false);
   }
   function toggleRaiseHand() {
     const next = !handRaised;
     setHandRaised(next);
     if (next) sendSignal("hand_raised", { userId: profile?.id });
   }
+  // Stage 18 — shared by both the sender (self:false means the sender never
+  // receives its own broadcast, so it must apply locally too, same pattern
+  // as toggleRaiseHand's local setHandRaised below) and the broadcast
+  // handler above. Auto-clears after 2.5s, guarded by `id` so a second,
+  // newer reaction for the same uid arriving during that window is never
+  // wiped out early by the first reaction's own timer.
+  const REACTION_DURATION_MS = 2500;
+  function applyReaction(uid: number, emoji: string) {
+    const id = Date.now();
+    setReactions((prev) => ({ ...prev, [uid]: { emoji, id } }));
+    const existing = reactionTimersRef.current.get(uid);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      reactionTimersRef.current.delete(uid);
+      setReactions((prev) => {
+        if (prev[uid]?.id !== id) return prev; // a newer reaction already replaced it
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+    }, REACTION_DURATION_MS);
+    reactionTimersRef.current.set(uid, timer);
+  }
+  function sendReaction(emoji: string) {
+    if (myUid === null) return;
+    applyReaction(myUid, emoji);
+    sendSignal("reaction", { uid: myUid, emoji });
+  }
   function acknowledgeHand(userId: string) {
     sendSignal("hand_acknowledged", { userId });
     setRaisedHandUserIds((prev) => { const n = new Set(prev); n.delete(userId); return n; });
   }
-  function muteAll() {
+  // Stage 23 — server-authorized before broadcasting. The server
+  // independently verifies the real caller (verifyCaller, never this
+  // screen's own isHost/profile.id) against the circle's database
+  // leader_id; the app only ever broadcasts "mute_all" after that check
+  // has actually succeeded. On rejection: no broadcast, no local state
+  // change, no effect on the call itself.
+  async function muteAll() {
+    if (!params.circleId) return;
+    try {
+      const res = await authedFetch(`/calls/circle/${params.circleId}/mute-all`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string }));
+        showAlert("Couldn't mute everyone", body.error ?? "You may not have permission to do this.");
+        return;
+      }
+    } catch {
+      showAlert("Couldn't mute everyone", "Please try again.");
+      return;
+    }
     sendSignal("mute_all");
     showAlert("Muted everyone", "All participants except you have been muted.");
   }
   function removeParticipant(member: CircleMember) {
     Alert.alert(`Remove ${member.name}?`, "They'll be disconnected from this session.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: () => sendSignal("remove_user", { userId: member.userId }) },
+      {
+        text: "Remove", style: "destructive", onPress: async () => {
+          // Stage 23 — same server-authorized-before-broadcast pattern as
+          // muteAll above.
+          if (!params.circleId) return;
+          try {
+            const res = await authedFetch(`/calls/circle/${params.circleId}/remove-participant`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ targetUserId: member.userId }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({} as { error?: string }));
+              showAlert("Couldn't remove participant", body.error ?? "You may not have permission to do this.");
+              return;
+            }
+          } catch {
+            showAlert("Couldn't remove participant", "Please try again.");
+            return;
+          }
+          sendSignal("remove_user", { userId: member.userId });
+        },
+      },
     ]);
   }
   function passHost(member: CircleMember) {
@@ -288,6 +511,12 @@ export default function GroupCallScreen() {
       }
       sendSignal("session_ending");
       setCompletionOpen(false);
+      // Stage 26B — this host-only path ends the call without going
+      // through handleLeave; the engine-level safety net in
+      // useAgoraEngine.native.ts would also catch this on unmount, but
+      // stopping explicitly here matches the same "as soon as intent is
+      // known" convention used in audio.tsx/video.tsx's handleEndCall.
+      stopCallBackgroundSupport();
       if (router.canGoBack()) router.back();
       else router.replace(`/circles/${params.circleId}` as any);
     } catch {
@@ -324,6 +553,40 @@ export default function GroupCallScreen() {
         <View style={styles.liveDot} accessibilityLabel="Live" />
       </View>
 
+      {/* Stage 2 — see audio.tsx/video.tsx's identical banner: a remote
+          participant's transient network drop must not immediately end
+          their presence in the call; this only shows during their
+          reconnect grace period. */}
+      {poorConnection && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="warning" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Connection unstable — trying to maintain video</Text>
+        </View>
+      )}
+
+      {cameraUnavailable && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="videocam-off" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Camera unavailable — you're still connected by audio. Use the camera button below to retry.</Text>
+        </View>
+      )}
+
+      {micUnavailable && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="mic-off" size={14} color="#fff" />
+          <Text style={styles.bannerText}>Microphone unavailable — check your permission settings and unmute to retry.</Text>
+        </View>
+      )}
+
+      {disconnectedUids.size > 0 && (
+        <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Ionicons name="cloud-offline" size={14} color="#fff" />
+          <Text style={styles.bannerText} numberOfLines={1}>
+            {Array.from(disconnectedUids).map((uid) => uidToMember.get(uid)?.name ?? "Someone").join(", ")} disconnected — reconnecting…
+          </Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.grid}>
         {tiles.map(({ uid, member, isSelf }) => {
           const speaking = speakingUids.has(uid);
@@ -333,8 +596,11 @@ export default function GroupCallScreen() {
             <TouchableOpacity
               key={uid}
               style={[styles.tile, speaking && styles.tileSpeaking]}
+              onPress={() => setPinnedUid((prev) => (prev === uid ? null : uid))}
               onLongPress={() => { if (isHost && member && !isSelf) removeParticipant(member); }}
               activeOpacity={isHost && !isSelf ? 0.7 : 1}
+              accessibilityRole="button"
+              accessibilityLabel={`${member?.name ?? "Someone"}${pinnedUid === uid ? ", pinned" : ""}${speaking ? ", speaking" : ""}`}
             >
               {isSelf && cameraOn ? (
                 <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} />
@@ -351,6 +617,7 @@ export default function GroupCallScreen() {
                 </Text>
                 <View style={styles.tileBadgeRow}>
                   {isTileHost && <Ionicons name="star" size={12} color="#B8860B" />}
+                  {pinnedUid === uid && <Ionicons name="pin" size={12} color="#fff" />}
                   {handUp && <Text style={styles.tileHandEmoji}>✋</Text>}
                 </View>
               </View>
@@ -358,6 +625,11 @@ export default function GroupCallScreen() {
                 <TouchableOpacity style={styles.ackHandBtn} onPress={() => acknowledgeHand(member.userId)}>
                   <Text style={{ fontSize: 12 }}>✋</Text>
                 </TouchableOpacity>
+              )}
+              {reactions[uid] && (
+                <View style={styles.reactionBubble} pointerEvents="none">
+                  <Text style={styles.reactionEmoji}>{reactions[uid].emoji}</Text>
+                </View>
               )}
             </TouchableOpacity>
           );
@@ -385,6 +657,9 @@ export default function GroupCallScreen() {
         </P2PControlButton>
         <P2PControlButton onPress={toggleRaiseHand} active={handRaised} accessibilityLabel="Raise hand" colors={p2pColors}>
           <Text style={{ fontSize: 16 }}>✋</Text>
+        </P2PControlButton>
+        <P2PControlButton onPress={() => sendReaction("🙌")} accessibilityLabel="Send Amen reaction" colors={p2pColors}>
+          <Text style={{ fontSize: 16 }}>🙌</Text>
         </P2PControlButton>
         <P2PControlButton onPress={() => setLessonSheetOpen(true)} accessibilityLabel="Lesson questions" colors={p2pColors}>
           <Ionicons name="book" size={18} color={p2pColors.textPrimary} />
@@ -481,6 +756,12 @@ function makeStyles(p2p: P2PCallColors) {
   topBarSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p2p.endRed },
 
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8,
+    backgroundColor: "rgba(180,83,9,0.9)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  bannerText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
+
   grid: { flexDirection: "row", flexWrap: "wrap", padding: 8, gap: 8 },
   tile: {
     width: "48%", aspectRatio: 0.9, borderRadius: 14, backgroundColor: p2p.surface, overflow: "hidden",
@@ -496,6 +777,11 @@ function makeStyles(p2p: P2PCallColors) {
   tileBadgeRow: { flexDirection: "row", gap: 4, alignItems: "center" },
   tileHandEmoji: { fontSize: 12 },
   ackHandBtn: { position: "absolute", top: 6, right: 6, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10, padding: 4 },
+  reactionBubble: {
+    position: "absolute", top: 6, left: 6, backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 14, width: 28, height: 28, alignItems: "center", justifyContent: "center",
+  },
+  reactionEmoji: { fontSize: 16 },
 
   questionBar: { marginHorizontal: 12, marginBottom: 8, backgroundColor: p2p.surface, borderRadius: 12, padding: 12, gap: 4 },
   questionLabel: { color: p2p.accent, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },

@@ -37,6 +37,7 @@ import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { getStageFromPoints } from "@/constants/stages";
 import i18n, { SUPPORTED_LANGUAGES } from "@/lib/i18n";
+import { usePresenceHeartbeat } from "@/lib/presence";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -225,6 +226,11 @@ function IncomingCallHost() {
   useEffect(() => {
     if (!incomingCall || shownForCallId.current === incomingCall.callId) return;
     shownForCallId.current = incomingCall.callId;
+    // CALL INCOMING TRACE (automatic-second-call investigation).
+    console.log("CALL INCOMING TRACE: IncomingCallHost navigating", {
+      callId: incomingCall.callId, channelName: incomingCall.channelName,
+      callerId: incomingCall.callerId, timestamp: new Date().toISOString(),
+    });
     const navigate = incomingCall.callType === "crisis" ? router.replace : router.push;
     // Crisis calls interrupt whatever the recipient is doing — including an
     // active call screen — by replacing the current route instead of
@@ -398,6 +404,12 @@ function PushNotificationHost() {
   return null;
 }
 
+function PresenceHost() {
+  const { isAuthenticated, profile } = useAuth();
+  usePresenceHeartbeat(isAuthenticated ? profile?.id : null);
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
@@ -410,6 +422,7 @@ function RootLayoutNav() {
         <CompletionMomentHost />
         <MessageBannerHost />
         <PushNotificationHost />
+        <PresenceHost />
       </DataProvider>
     </AuthProvider>
   );

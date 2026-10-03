@@ -18,6 +18,22 @@ const ANON_KEY =
 // reads/writes here, same as every other route file in this API.
 const supabaseRead = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
 
+// Stage 25D — same scoped real-identity exception calls.ts's verifyCaller
+// introduced for Study Together: start-session previously trusted a
+// body-supplied `startedBy` compared only to the circle's own leader_id,
+// which never confirmed the HTTP caller was actually that person. Duplicated
+// here (not imported from calls.ts) matching this codebase's existing
+// per-route-file convention of each file owning its own Supabase client.
+const authClient = createClient(SUPABASE_URL, ANON_KEY);
+async function verifyCaller(req: import("express").Request): Promise<string | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const { data, error } = await authClient.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user.id;
+}
+
 function mapCircle(row: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   return {
     id: row.id,
@@ -384,55 +400,62 @@ router.post("/:circleId/sessions", async (req, res) => {
 // a scheduled session row exists for the circle's current lesson (creating one
 // if needed so the group call always has something to mark complete), notifies
 // every active member, and hands back the Agora channel name to join.
+//
+// Stage 25D — the find-or-create of the scheduled p2p_peer_circle_sessions
+// row (previously done here, non-atomically, in application code) plus the
+// NEW creation/reuse of the call's p2p_call_logs row (Stage 25D's Circle
+// Call Log Creation requirement) both now happen inside p2p_start_circle_call
+// (migration 170), which row-locks the circle first — this is what makes
+// two concurrent "Start Session" taps for the same circle safe against
+// migration 169's new unique indexes (no catch-and-retry, the race is
+// structurally impossible, not handled after the fact). Response shape is
+// UNCHANGED — still exactly { channelName, sessionId } — group.tsx is not
+// migrated in this stage and does not need to know about the new call log.
+//
+// KNOWN COMPANION ISSUE (not fixed here, mobile UI is out of scope for this
+// stage): app/circles/[id].tsx currently calls this route with a plain
+// fetch() and no Authorization header. Since this route now requires a
+// real verified session (verifyCaller), that existing call site will start
+// receiving 401 Unauthorized the moment this deploys, until it's updated to
+// send a Bearer token (the same one-line change every other authedFetch
+// call site already makes) — see the Stage 25D report.
 router.post("/:circleId/start-session", async (req, res) => {
+  const callerId = await verifyCaller(req);
+  if (!callerId) return res.status(401).json({ error: "Unauthorized" });
   const { circleId } = req.params;
-  const { startedBy } = req.body as { startedBy?: string };
-  if (!startedBy) return res.status(400).json({ error: "startedBy is required" });
 
-  const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("*").eq("id", circleId).maybeSingle();
-  if (!circle) return res.status(404).json({ error: "Circle not found" });
-  if (circle.leader_id !== startedBy) return res.status(403).json({ error: "Only the circle leader can start a session" });
-  if (!circle.current_lesson_id) return res.status(400).json({ error: "This circle has no current lesson set" });
-
-  let { data: session } = await supabaseRead
-    .from("p2p_peer_circle_sessions")
-    .select("*")
-    .eq("circle_id", circleId)
-    .eq("lesson_id", circle.current_lesson_id)
-    .eq("session_status", "scheduled")
-    .maybeSingle();
-
-  if (!session) {
-    const { data: created, error: createErr } = await supabaseRead
-      .from("p2p_peer_circle_sessions")
-      .insert({ circle_id: circleId, lesson_id: circle.current_lesson_id, session_status: "scheduled", created_by: startedBy })
-      .select()
-      .single();
-    if (createErr) return res.status(500).json({ error: createErr.message });
-    session = created;
+  const { data: result, error } = await supabaseRead.rpc("p2p_start_circle_call", {
+    p_circle_id: circleId, p_caller_id: callerId,
+  });
+  if (error) {
+    const reason = error.message ?? "";
+    if (reason.includes("circle_not_found")) return res.status(404).json({ error: "Circle not found" });
+    if (reason.includes("not_leader")) return res.status(403).json({ error: "Only the circle leader can start a session" });
+    if (reason.includes("no_current_lesson")) return res.status(400).json({ error: "This circle has no current lesson set" });
+    return res.status(500).json({ error: "Unable to start this session." });
   }
+  const { channelName, sessionId, circleName } = result as { channelName: string; sessionId: string; circleName: string | null };
 
   const { data: members } = await supabaseRead
     .from("p2p_peer_circle_members")
     .select("user_id")
     .eq("circle_id", circleId)
     .eq("status", "active")
-    .neq("user_id", startedBy);
+    .neq("user_id", callerId);
 
-  const channelName = `circle_${circleId}`;
   if (members && members.length > 0) {
     await supabaseRead.from("p2p_notifications").insert(
       members.map((m) => ({
         user_id: m.user_id,
-        title: `${circle.name} is starting`,
+        title: `${circleName ?? "Your circle"} is starting`,
         message: "Tap to join the group call now.",
         notification_type: "circle_session_start",
-        data: { circleId, circleName: circle.name, channelName },
+        data: { circleId, circleName, channelName },
       }))
     );
   }
 
-  return res.json({ channelName, sessionId: (session as Record<string, unknown>).id });
+  return res.json({ channelName, sessionId });
 });
 
 // PUT /circles/:circleId/sessions/:sessionId/complete

@@ -1,12 +1,18 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform, Alert } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/contexts/AuthContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
 import type { CallType } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
+
+function showAlert(title: string, message: string) {
+  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
 
 interface CallHistoryEntry {
   id: string; callType: CallType | "group"; status: string; durationSeconds: number;
@@ -40,6 +46,33 @@ export default function CallHistoryScreen() {
   const { profile } = useAuth();
   const [entries, setEntries] = useState<CallHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [callingBackId, setCallingBackId] = useState<string | null>(null);
+
+  // Missed-call callback — same shared start sequence every other call
+  // site uses (lib/callStart.ts). /calls/start enforces the relationship and
+  // block checks server-side; any refusal surfaces through showAlert.
+  async function callBack(item: CallHistoryEntry) {
+    if (!profile?.id || !item.otherUserId || callingBackId) return;
+    const callType = item.callType === "video" ? "video" : "audio";
+    setCallingBackId(item.id);
+    try {
+      const result = await startPeerCall({
+        supabase, currentUserId: profile.id, otherUserId: item.otherUserId,
+        callType, onAlert: showAlert, source: "call_history_callback",
+      });
+      if (!result) return;
+      router.push({
+        pathname: callType === "video" ? "/call/video" : "/call/audio",
+        params: buildCallRouteParams({
+          channelName: result.channelName, otherUserId: item.otherUserId,
+          otherUserName: item.otherUserName ?? "Peer", callType,
+          callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+        }),
+      } as any);
+    } finally {
+      setCallingBackId(null);
+    }
+  }
 
   const load = useCallback(async () => {
     if (!profile?.id) return;
@@ -83,24 +116,39 @@ export default function CallHistoryScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }}
           renderItem={({ item }) => {
             const missed = item.status === "missed";
+            // Only plain 1:1 audio/video calls with a known peer can be
+            // called back; group/pastoral/crisis calls, or a stale record
+            // with no peer id, keep the previous open-the-chat behavior.
+            const canCallBack = missed && !!item.otherUserId && (item.callType === "audio" || item.callType === "video");
             return (
               <TouchableOpacity
                 style={styles.row}
-                activeOpacity={item.conversationId ? 0.7 : 1}
-                onPress={() => { if (item.conversationId) router.push(`/messages/${item.conversationId}` as any); }}
+                activeOpacity={canCallBack || item.conversationId ? 0.7 : 1}
+                disabled={callingBackId === item.id}
+                accessibilityLabel={canCallBack ? `Call back ${item.otherUserName ?? ""}` : undefined}
+                onPress={() => {
+                  if (canCallBack) { void callBack(item); return; }
+                  if (item.conversationId) router.push(`/messages/${item.conversationId}` as any);
+                }}
               >
                 <View style={[styles.iconWrap, missed && styles.iconWrapMissed]}>
                   <Ionicons name={TYPE_ICON[item.callType] ?? "call"} size={18} color={missed ? "#B91C1C" : colors.accentGreen} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowName} numberOfLines={1}>{item.otherUserName ?? "Someone"}</Text>
-                  <Text style={styles.rowMeta}>
-                    {TYPE_LABEL[item.callType] ?? "Call"} · {formatDate(item.createdAt)}
+                  <Text style={[styles.rowMeta, missed && styles.rowDurationMissed]}>
+                    {missed ? `Missed ${(TYPE_LABEL[item.callType] ?? "call").toLowerCase()}` : TYPE_LABEL[item.callType] ?? "Call"} · {formatDate(item.createdAt)}
                   </Text>
                 </View>
-                <Text style={[styles.rowDuration, missed && styles.rowDurationMissed]}>
-                  {missed ? "Missed" : formatDuration(item.durationSeconds)}
-                </Text>
+                {callingBackId === item.id ? (
+                  <ActivityIndicator size="small" color={colors.accentGreen} />
+                ) : canCallBack ? (
+                  <Ionicons name={item.callType === "video" ? "videocam-outline" : "call-outline"} size={20} color={colors.accentGreen} />
+                ) : (
+                  <Text style={[styles.rowDuration, missed && styles.rowDurationMissed]}>
+                    {missed ? "Missed" : formatDuration(item.durationSeconds)}
+                  </Text>
+                )}
               </TouchableOpacity>
             );
           }}

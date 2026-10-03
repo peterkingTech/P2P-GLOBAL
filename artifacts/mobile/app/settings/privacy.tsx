@@ -1,5 +1,6 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform, Switch } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Platform, Switch, Alert } from "react-native";
+import { getMyActivityVisibility, setMyActivityVisibility } from "@/lib/presence";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -16,6 +17,24 @@ export default function PrivacySettingsScreen() {
   const { profile, updateProfile } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  // Activity status lives in p2p_presence (migration 171), not on the
+  // profile, so it is loaded and saved separately from the toggles above.
+  const [showActivity, setShowActivity] = useState(true);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    void getMyActivityVisibility(profile.id).then(setShowActivity);
+  }, [profile?.id]);
+
+  async function handleActivityToggle(next: boolean) {
+    setShowActivity(next);
+    const ok = await setMyActivityVisibility(next);
+    if (!ok) {
+      setShowActivity(!next);
+      if (Platform.OS === "web") window.alert("Couldn't save this setting. Please try again.");
+      else Alert.alert("Couldn't save", "Please try again.");
+    }
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -36,6 +55,24 @@ export default function PrivacySettingsScreen() {
               />
             </View>
           ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>Activity Status</Text>
+        <View style={styles.card}>
+          <View style={[styles.row, styles.rowLast]}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.label}>Show when I'm active</Text>
+              <Text style={styles.desc}>
+                Your connections can see "Active now" or roughly when you were last active — never an exact time. If you turn this off, you also won't see theirs.
+              </Text>
+            </View>
+            <Switch
+              value={showActivity}
+              onValueChange={(v) => { void handleActivityToggle(v); }}
+              trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>Data and Analytics</Text>

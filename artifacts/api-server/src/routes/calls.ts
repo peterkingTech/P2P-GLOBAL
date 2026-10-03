@@ -3,7 +3,9 @@ import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
+import { dispatchNotificationNow } from "../lib/pushDispatch";
 import { isEligibleStudyPartner, getEligibleStudyPartners } from "../lib/studyPartnerAuth";
+import { uidFromUserId } from "../lib/agoraUid";
 
 const router = Router();
 
@@ -72,6 +74,41 @@ async function getActivePeerCallLog(channelName: string) {
   return data as { id: string; initiated_by: string; participants: string[] } | null;
 }
 
+// Root-cause fix (real BlueStacks/Nox 1:1 video test) — /calls/end can mark
+// this channel's call log "missed" the instant the CALLER's own client
+// gives up waiting (see NO_ANSWER_TIMEOUT_MS in app/call/{audio,video}.tsx),
+// even while the recipient legitimately answered and is still completing
+// their own permission/engine-init/join pipeline. Once that happens,
+// getActivePeerCallLog above stops finding an "initiated" row, and the
+// recipient's own in-flight /calls/token request — for a call they really
+// did accept — gets a 403 it has no way to recover from.
+//
+// This does NOT weaken "must be a real participant in a real, accepted
+// call": it only recognizes a call the SAME requesting user genuinely
+// accepted moments ago, via the one status transition only the real
+// recipient's own client can make (p2p_incoming_calls' "Recipients update
+// own incoming calls" RLS policy — see incoming.tsx's settle("accepted")).
+// Bounded to a short, recent window so this can never become a standing
+// bypass for an unrelated/stale call that happens to share this channel
+// name (channel names are deterministic per pair and reused across every
+// call two people ever have).
+const TOKEN_GRACE_PERIOD_MS = 90000;
+async function getRecentlyAcceptedPeerCall(channelName: string, userId: string) {
+  const graceWindowStart = new Date(Date.now() - TOKEN_GRACE_PERIOD_MS).toISOString();
+  const { data, error } = await supabaseWrite
+    .from("p2p_incoming_calls")
+    .select("id")
+    .eq("channel_name", channelName)
+    .eq("recipient_id", userId)
+    .eq("status", "accepted")
+    .gte("responded_at", graceWindowStart)
+    .order("responded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { id: string } | null;
+}
+
 function err(res: import("express").Response, message: string, status = 400) {
   return res.status(status).json({ error: message });
 }
@@ -124,7 +161,14 @@ router.post("/calls/token", async (req, res) => {
     if (channelName.startsWith("p2p_")) {
       if (!userId) return err(res, "userId required for this call type", 400);
       const activeLog = await getActivePeerCallLog(channelName);
-      if (!activeLog || !(activeLog.participants ?? []).includes(userId)) {
+      let peerAuthorized = !!activeLog && (activeLog.participants ?? []).includes(userId);
+      if (!peerAuthorized) {
+        // See getRecentlyAcceptedPeerCall's comment above — the grace-period
+        // fallback for the caller-gave-up-first race.
+        const recentlyAccepted = await getRecentlyAcceptedPeerCall(channelName, userId);
+        peerAuthorized = !!recentlyAccepted;
+      }
+      if (!peerAuthorized) {
         return err(res, "Not authorized to join this call", 403);
       }
     } else if (channelName.startsWith("circle_")) {
@@ -190,6 +234,30 @@ router.post("/calls/token", async (req, res) => {
       const { data: participant } = await supabaseWrite
         .from("p2p_prayer_coord_participants").select("id").eq("gathering_id", gatheringId).eq("user_id", userId).maybeSingle();
       if (!participant) return err(res, "Not authorized to join this prayer gathering", 403);
+    } else {
+      // Stage 19 (call security/privacy audit) — previously there was no
+      // final branch here at all: a channelName not matching ANY of the
+      // known prefixes above fell straight through to token minting with
+      // ZERO authorization check (userId wasn't even required). Every
+      // legitimate call flow in this codebase already uses one of the six
+      // prefixes above, so rejecting anything else cannot break an existing
+      // call type — it only closes a real, previously wide-open hole.
+      return err(res, "Unrecognized channel type", 400);
+    }
+
+    // Stage 19 (call security/privacy audit) — every branch above already
+    // requires userId and independently verifies real membership/
+    // authorization for that specific channel, but none of them previously
+    // checked that the numeric `uid` the caller supplied actually belongs
+    // to that authorized userId. A caller passing an authorized channel +
+    // userId but an ARBITRARY uid could still get a token minted for any
+    // uid value — including one colliding with another real participant's
+    // expected uid in that same channel. Every legitimate client already
+    // computes uid via this exact deterministic function before calling
+    // this endpoint, so this rejects only a genuine mismatch, never a
+    // real caller's normal request.
+    if (userId && uid !== uidFromUserId(userId)) {
+      return err(res, "uid does not match the authenticated user", 403);
     }
 
     const expirationTime = Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS;
@@ -499,9 +567,20 @@ router.get("/calls/:callId/study/current", async (req, res) => {
   const { callId } = req.params;
 
   const { data: callLog } = await supabaseWrite
-    .from("p2p_call_logs").select("participants, status, channel_name, call_type, conversation_id").eq("id", callId).maybeSingle();
+    .from("p2p_call_logs").select("participants, status, channel_name, call_type, conversation_id, circle_id").eq("id", callId).maybeSingle();
   if (!callLog) return err(res, "Call not found", 404);
-  if (!((callLog.participants as string[]) ?? []).includes(userId)) return err(res, "Not authorized for this call", 403);
+  // Stage 25D — Circle-aware authorization: a Circle call log's participants
+  // array is not maintained as a live membership mirror (see the Stage 25D
+  // report), so a Circle call is authorized by active Peer Circle
+  // membership instead. 1:1 calls are completely unchanged below.
+  if (callLog.circle_id) {
+    const { data: membership } = await supabaseWrite
+      .from("p2p_peer_circle_members").select("id")
+      .eq("circle_id", callLog.circle_id).eq("user_id", userId).eq("status", "active").maybeSingle();
+    if (!membership) return err(res, "Not authorized for this call", 403);
+  } else if (!((callLog.participants as string[]) ?? []).includes(userId)) {
+    return err(res, "Not authorized for this call", 403);
+  }
 
   // C7.6 — notification deep links need to tell "study ended, call still
   // going" apart from "the whole call is over," so a stale notification
@@ -510,7 +589,7 @@ router.get("/calls/:callId/study/current", async (req, res) => {
 
   const { data: session } = await supabaseWrite
     .from("p2p_study_sessions")
-    .select("id, lesson_id, module_id, title, leader_id, current_section_index")
+    .select("id, lesson_id, module_id, title, leader_id, current_section_index, current_question_index")
     .eq("call_log_id", callId).eq("status", "active").maybeSingle();
   if (!session) {
     return ok(res, {
@@ -539,6 +618,12 @@ router.get("/calls/:callId/study/current", async (req, res) => {
     title: session.title,
     leaderId: session.leader_id,
     currentSectionIndex: session.current_section_index,
+    // Stage 25D-B — the migration-169 field existed in the database but was
+    // never returned by this endpoint. Exposed as-is (no new authorization
+    // logic, no change to current_section_index) for both the 1:1 and
+    // Circle paths — every session row has this column now, so both return
+    // it identically (null for a 1:1 session that never sets it).
+    currentQuestionIndex: session.current_question_index,
     participants: (participantRows ?? []).map((p) => ({ userId: p.user_id, name: nameById.get(p.user_id as string) ?? "Someone" })),
     channelName: callLog.channel_name,
     callType: callLog.call_type,
@@ -746,6 +831,94 @@ router.post("/calls/circle-channel", async (req, res) => {
   return ok(res, { channelName: `circle_${circleId}` });
 });
 
+// ── Stage 23: server-authorized group-call host controls ────────────────────
+// group.tsx previously let ANY active Peer Circle member publish "mute_all"/
+// "remove_user" directly over the call's Realtime Broadcast channel — the
+// channel's own RLS only checks active membership, never sender authority,
+// so the client-side `isHost` check (UI-only) was the entire protection.
+// These two routes verify the REAL caller (verifyCaller — never a client-
+// supplied hostId/profile.id/isHost) against the circle's own database
+// leader_id before the app is allowed to broadcast either signal. Scoped to
+// exactly the two controls this stage covers; Pass Host is explicitly left
+// unchanged (see the group-authorization architecture review's Stage 24).
+//
+// Deliberate, approved-for-this-stage limitation: authorization checks the
+// circle's STATIC leader_id, not any dynamic in-call host from a prior Pass
+// Host handoff — so after a Pass Host transfer, the new in-call host's
+// Mute All/Remove taps will now be rejected (403) by these routes even
+// though the (unchanged) client-side isHost still shows them the buttons,
+// until Stage 24's dynamic-host design is approved and implemented.
+router.post("/calls/circle/:circleId/mute-all", async (req, res) => {
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+  const { circleId } = req.params;
+
+  const { data: circle } = await supabaseWrite.from("p2p_peer_circles").select("leader_id").eq("id", circleId).maybeSingle();
+  if (!circle) return err(res, "Circle not found", 404);
+  if (circle.leader_id !== callerId) return err(res, "Only the circle leader can mute everyone", 403);
+
+  return ok(res, { authorized: true });
+});
+
+router.post("/calls/circle/:circleId/remove-participant", async (req, res) => {
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+  const { circleId } = req.params;
+  const { targetUserId } = req.body as { targetUserId?: string };
+  if (!targetUserId) return err(res, "targetUserId required", 400);
+
+  const { data: circle } = await supabaseWrite.from("p2p_peer_circles").select("leader_id").eq("id", circleId).maybeSingle();
+  if (!circle) return err(res, "Circle not found", 404);
+  if (circle.leader_id !== callerId) return err(res, "Only the circle leader can remove a participant", 403);
+  if (targetUserId === callerId) return err(res, "You cannot remove yourself", 400);
+
+  const { data: targetMembership } = await supabaseWrite
+    .from("p2p_peer_circle_members").select("id").eq("circle_id", circleId).eq("user_id", targetUserId).eq("status", "active").maybeSingle();
+  if (!targetMembership) return err(res, "That person is not an active member of this circle", 404);
+
+  return ok(res, { authorized: true, targetUserId });
+});
+
+// POST /calls/circle/:circleId/end — Stage 25D: Peer Circle calls previously
+// had no server-side call-ended lifecycle at all. This is intentionally NOT
+// wired up to group.tsx yet (that's Stage 25E's job) — it exists so the
+// server-side foundation is in place before the client migration. Ending
+// the live call log is deliberately independent of and never triggers
+// completing the scheduled business session (PUT
+// /circles/:circleId/sessions/:sessionId/complete, unchanged) — see the
+// Stage 25D report for why those two lifecycles must stay separate.
+// Authorization is active Circle membership (any member may report their
+// own view that the call ended), matching how either party can
+// independently call the 1:1 /calls/end.
+router.post("/calls/circle/:circleId/end", async (req, res) => {
+  const callerId = await verifyCaller(req);
+  if (!callerId) return err(res, "Unauthorized", 401);
+  const { circleId } = req.params;
+  const { durationSeconds } = req.body as { durationSeconds?: number };
+
+  const { data: membership } = await supabaseWrite
+    .from("p2p_peer_circle_members").select("id")
+    .eq("circle_id", circleId).eq("user_id", callerId).eq("status", "active").maybeSingle();
+  if (!membership) return err(res, "Not authorized for this call", 403);
+
+  const { data: callLog } = await supabaseWrite
+    .from("p2p_call_logs").select("id, status, created_at").eq("circle_id", circleId).eq("status", "initiated").maybeSingle();
+  if (!callLog) return ok(res, { ended: true }); // idempotent — nothing active to end
+
+  // No client wiring exists yet to report a precise Agora-observed duration
+  // for Circle calls (unlike 1:1's connectedAtRef) — accept one if a future
+  // caller provides it, otherwise fall back to an honest server-side
+  // approximation from created_at rather than leaving it unset.
+  const fallbackDuration = Math.max(0, Math.round((Date.now() - new Date(callLog.created_at as string).getTime()) / 1000));
+  const { error } = await supabaseWrite
+    .from("p2p_call_logs")
+    .update({ status: "ended", ended_at: new Date().toISOString(), duration_seconds: durationSeconds ?? fallbackDuration })
+    .eq("id", callLog.id);
+  if (error) return err(res, "Unable to end this call.", 500);
+
+  return ok(res, { ended: true });
+});
+
 // POST /calls/room-channel — one stable channel per break room.
 router.post("/calls/room-channel", async (req, res) => {
   const { roomId } = req.body as { roomId?: string };
@@ -874,7 +1047,7 @@ router.post("/calls/start", async (req, res) => {
   const { data: callerNameProfile } = await supabaseWrite
     .from("p2p_profiles").select("full_name").eq("id", callerId).maybeSingle();
   const callerName = (callerNameProfile?.full_name as string | undefined) ?? "Someone";
-  await supabaseWrite.from("p2p_notifications").insert({
+  const { data: callNotification, error: notifyErr } = await supabaseWrite.from("p2p_notifications").insert({
     user_id: recipientId,
     title: `Incoming ${callType === "video" ? "video" : "voice"} call`,
     message: `${callerName} is calling you`,
@@ -883,7 +1056,21 @@ router.post("/calls/start", async (req, res) => {
       callId: incomingCall.id, channelName, callType, callerId, callerName,
       conversationId: conversationId ?? null, callLogId: callLog.id, invitationId: null,
     },
-  });
+  }).select("id").single();
+  // Stage 26A — the p2p_notifications row above is still the one and only
+  // source of truth (unchanged insert, unchanged payload shape); this only
+  // adds an immediate push attempt on top of it instead of waiting for the
+  // once-per-minute cron. dispatchNotificationNow never throws and never
+  // blocks this response on the Expo API round-trip — a slow or failing
+  // push provider must never turn an already-created call into a failed
+  // /calls/start request. If the insert itself failed, there is nothing to
+  // dispatch; the call was still created successfully and the recipient
+  // still gets the existing realtime path.
+  if (!notifyErr && callNotification) {
+    void dispatchNotificationNow(callNotification.id).catch((err) => {
+      console.error("[CALL ERROR] stage=immediate_push_dispatch", err instanceof Error ? err.message : String(err));
+    });
+  }
 
   return ok(res, { callLogId: callLog.id as string, incomingCallId: incomingCall.id as string });
 });
@@ -1153,10 +1340,34 @@ router.get("/calls/:callId/study-progress", async (req, res) => {
   const { callId } = req.params;
   if (!requesterId || !lessonId) return err(res, "requesterId and lessonId are required", 400);
 
-  const { data: callLog } = await supabaseWrite.from("p2p_call_logs").select("participants").eq("id", callId).maybeSingle();
+  const { data: callLog } = await supabaseWrite.from("p2p_call_logs").select("participants, circle_id").eq("id", callId).maybeSingle();
   if (!callLog) return err(res, "Call not found", 404);
-  const participants = (callLog.participants as string[]) ?? [];
-  if (!participants.includes(requesterId)) return err(res, "Not authorized to view this call's progress", 403);
+
+  // Stage 25D — Circle-aware authorization, same reasoning as
+  // GET /calls/:callId/study/current above. For a Circle call, the group
+  // whose progress is shown is the study session's own joined roster
+  // (p2p_study_session_participants), not the call log's minimal
+  // participants array — that array only ever contains the initiator for
+  // Circle calls (see the Stage 25D report), so using it here would hide
+  // every other participant's progress.
+  let participants: string[];
+  if (callLog.circle_id) {
+    const { data: membership } = await supabaseWrite
+      .from("p2p_peer_circle_members").select("id")
+      .eq("circle_id", callLog.circle_id).eq("user_id", requesterId).eq("status", "active").maybeSingle();
+    if (!membership) return err(res, "Not authorized to view this call's progress", 403);
+
+    const { data: session } = await supabaseWrite
+      .from("p2p_study_sessions").select("id").eq("call_log_id", callId).eq("status", "active").maybeSingle();
+    if (!session) return ok(res, { participants: {} });
+
+    const { data: rows } = await supabaseWrite
+      .from("p2p_study_session_participants").select("user_id").eq("study_session_id", session.id).is("left_at", null);
+    participants = (rows ?? []).map((r) => r.user_id as string);
+  } else {
+    participants = (callLog.participants as string[]) ?? [];
+    if (!participants.includes(requesterId)) return err(res, "Not authorized to view this call's progress", 403);
+  }
 
   const { data, error } = await supabaseWrite
     .from("p2p_lesson_progress")
