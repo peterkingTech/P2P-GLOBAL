@@ -7,6 +7,9 @@ import { dispatchNotificationNow } from "../lib/pushDispatch";
 import { isEligibleStudyPartner, getEligibleStudyPartners } from "../lib/studyPartnerAuth";
 import { uidFromUserId } from "../lib/agoraUid";
 import { notifyMissedCall } from "../lib/callSweep";
+import { declineToken, verifyDeclineToken } from "../lib/callActionToken";
+import { sendIncomingCallVoip } from "../lib/apnsVoip";
+import { sendCallStatePush } from "../lib/pushDispatch";
 
 const router = Router();
 
@@ -1048,15 +1051,19 @@ router.post("/calls/start", async (req, res) => {
   const { data: callerNameProfile } = await supabaseWrite
     .from("p2p_profiles").select("full_name").eq("id", callerId).maybeSingle();
   const callerName = (callerNameProfile?.full_name as string | undefined) ?? "Someone";
+  const callData = {
+    callId: incomingCall.id, channelName, callType, callerId, callerName,
+    conversationId: conversationId ?? null, callLogId: callLog.id, invitationId: null,
+    // Lets the native call UI decline without the app's JS running
+    // (lib/callActionToken.ts, POST /calls/native-decline).
+    declineToken: declineToken(incomingCall.id as string, recipientId),
+  };
   const { data: callNotification, error: notifyErr } = await supabaseWrite.from("p2p_notifications").insert({
     user_id: recipientId,
     title: `${callerName} is calling you`,
     message: callType === "video" ? "📹 Video call" : "🎤 Audio call",
     notification_type: "incoming_call",
-    data: {
-      callId: incomingCall.id, channelName, callType, callerId, callerName,
-      conversationId: conversationId ?? null, callLogId: callLog.id, invitationId: null,
-    },
+    data: callData,
   }).select("id").single();
   // Stage 26A — the p2p_notifications row above is still the one and only
   // source of truth (unchanged insert, unchanged payload shape); this only
@@ -1067,8 +1074,18 @@ router.post("/calls/start", async (req, res) => {
   // /calls/start request. If the insert itself failed, there is nothing to
   // dispatch; the call was still created successfully and the recipient
   // still gets the existing realtime path.
+  //
+  // iOS devices with a VoIP token ring through CallKit (even when the app is
+  // closed) and are skipped by the ordinary push. Crisis calls stay on their
+  // existing path: CallKit always offers Decline, which they can't. Both
+  // run in the background so APNs latency never delays this response.
   if (!notifyErr && callNotification) {
-    void dispatchNotificationNow(callNotification.id).catch((err) => {
+    void (async () => {
+      const callKitDevices = callType === "crisis"
+        ? new Set<string>()
+        : await sendIncomingCallVoip(recipientId, { p2pCall: callData }).catch(() => new Set<string>());
+      await dispatchNotificationNow(callNotification.id, { skipDeviceIds: callKitDevices });
+    })().catch((err) => {
       console.error("[CALL ERROR] stage=immediate_push_dispatch", err instanceof Error ? err.message : String(err));
     });
   }
@@ -1097,6 +1114,38 @@ const UNANSWERED_LABEL: Record<string, string> = {
 // still "ringing" inside this window was hung up by the caller (cancelled);
 // past it, nobody answered (missed).
 const RING_WINDOW_MS = 30000;
+
+// GET /calls/config — switches for the native phone-call integration
+// (mobile modules/call-system). Set NATIVE_CALLS_ANDROID / NATIVE_CALLS_IOS
+// to "false" to fall every device back to the plain push + in-app ringing
+// path without shipping a new build.
+router.get("/calls/config", (_req, res) => {
+  return ok(res, {
+    nativeCallSystem: {
+      android: process.env.NATIVE_CALLS_ANDROID !== "false",
+      ios: process.env.NATIVE_CALLS_IOS !== "false",
+    },
+  });
+});
+
+// POST /calls/native-decline — { callId, token }. Decline pressed on the
+// native incoming-call UI (Android notification / iOS CallKit) while the
+// app's JS — and so its signed-in session — may not be running. The token
+// (lib/callActionToken.ts) came in that recipient's own incoming-call push
+// and authorizes exactly this: moving this one still-ringing call to
+// "declined". The caller's screen then shows "Call declined" via realtime.
+router.post("/calls/native-decline", async (req, res) => {
+  const { callId, token } = req.body as { callId?: string; token?: string };
+  if (!callId || !token) return err(res, "callId and token required");
+  const { data: row } = await supabaseWrite
+    .from("p2p_incoming_calls").select("recipient_id, status").eq("id", callId).maybeSingle();
+  if (!row || !verifyDeclineToken(callId, row.recipient_id as string, token)) return err(res, "Not authorized", 403);
+  if (row.status !== "ringing") return ok(res, { declined: false, status: row.status });
+  await supabaseWrite.from("p2p_incoming_calls")
+    .update({ status: "declined", responded_at: new Date().toISOString() })
+    .eq("id", callId).eq("status", "ringing");
+  return ok(res, { declined: true });
+});
 
 // POST /calls/end — closes out the call_log row and, if this call belonged
 // to a DM conversation, posts a read-only call-information system message
@@ -1181,12 +1230,18 @@ router.post("/calls/end", async (req, res) => {
   // only touch a row still "ringing", so this can't clobber a real
   // accept/decline that landed in the same instant.
   if (incomingCallId && !connected) {
-    await supabaseWrite
+    const rowStatus = finalStatus === "missed" ? "missed" : "cancelled";
+    const { data: stopped } = await supabaseWrite
       .from("p2p_incoming_calls")
       // Same outcome as the log: past the ring window it was a no-answer.
-      .update({ status: finalStatus === "missed" ? "missed" : "cancelled", responded_at: new Date().toISOString() })
+      .update({ status: rowStatus, responded_at: new Date().toISOString() })
       .eq("id", incomingCallId)
-      .eq("status", "ringing");
+      .eq("status", "ringing")
+      .select("recipient_id");
+    // The recipient's phone may be ringing natively with the app closed —
+    // tell it the call is over so the ringing stops now.
+    const recipient = stopped?.[0]?.recipient_id as string | undefined;
+    if (recipient) void sendCallStatePush(recipient, incomingCallId, rowStatus).catch(() => { /* best effort */ });
   }
 
   // Study Together C2 — a call ending invalidates every outstanding

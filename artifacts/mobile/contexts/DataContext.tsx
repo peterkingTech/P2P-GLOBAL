@@ -12,6 +12,7 @@ import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { dismissCallNotifications } from "@/lib/callNotifications";
+import { endSystemCall } from "@/lib/callSystem";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -3125,7 +3126,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         { event: "UPDATE", schema: "public", table: "p2p_incoming_calls", filter: `recipient_id=eq.${userId}` },
         (payload) => {
           const row = payload.new as Record<string, unknown>;
-          if (row.status !== "ringing") void dismissCallNotifications(row.id as string);
+          if (row.status === "ringing") return;
+          void dismissCallNotifications(row.id as string);
+          // Stop native (Telecom/CallKit) ringing too. "accepted" is ignored
+          // natively when it was this device that answered.
+          const status = row.status as string;
+          endSystemCall(
+            row.id as string,
+            status === "accepted" ? "answered_elsewhere" : status === "declined" ? "declined_elsewhere" : "missed",
+          );
         }
       )
       .subscribe((status) => {

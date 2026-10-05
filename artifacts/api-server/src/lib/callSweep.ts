@@ -1,6 +1,6 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
-import { dispatchNotificationNow } from "./pushDispatch";
+import { dispatchNotificationNow, sendCallStatePush } from "./pushDispatch";
 
 // Server-side end of an unanswered 1:1 call.
 //
@@ -74,6 +74,8 @@ export async function sweepUnansweredCalls(): Promise<{ settled: number; notifie
       .eq("id", call.id).eq("status", "ringing").select("id");
     if (!moved?.length) continue;
     settled++;
+    // Stop a phone still ringing natively with the app closed.
+    void sendCallStatePush(call.recipient_id as string, call.id as string, "missed").catch(() => { /* best effort */ });
     if (!call.call_log_id) continue;
 
     // Guarded on "initiated": if the caller's /calls/end already settled the

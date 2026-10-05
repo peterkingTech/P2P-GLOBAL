@@ -1,0 +1,11 @@
+{
+  "name": "call-system",
+  "version": "1.0.0",
+  "description": "Local Expo native module — native phone-call integration for P2P calls: Android Telecom (Jetpack core-telecom) and iOS CallKit/PushKit. Rings incoming calls through the OS, including on the lock screen, and records calls in the system call history where the OS supports it.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "expo-modules-core": "~57.0.19"
+  }
+}

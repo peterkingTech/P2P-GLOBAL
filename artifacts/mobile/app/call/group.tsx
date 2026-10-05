@@ -325,23 +325,12 @@ export default function GroupCallScreen() {
           return next;
         });
       },
-      // Stage 2 — onUserOffline fires for both a genuine hangup and a
-      // transient network drop, indistinguishable at this event (same
-      // caveat as audio.tsx/video.tsx). Previously this immediately dropped
-      // the uid from remoteUids, ending that participant's tile and — if
-      // they were the last one — implicitly leaving the caller alone with
-      // no path back for a reconnecting peer. Now: stays in remoteUids (the
-      // tile keeps showing, the call continues) and is only marked
-      // "reconnecting" until RECONNECT_GRACE_MS elapses with no rejoin.
-      onUserOffline: (_c, uid) => {
-        setDisconnectedUids((prev) => {
-          if (prev.has(uid)) return prev;
-          const next = new Set(prev);
-          next.add(uid);
-          return next;
-        });
-        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
-        const timer = setTimeout(() => {
+      // Stage 2 — a participant who LEFT (Agora UserOfflineQuit, reason 0)
+      // is removed at once. One whose connection DROPPED stays in
+      // remoteUids (the tile keeps showing, the call continues), marked
+      // "reconnecting", until RECONNECT_GRACE_MS elapses with no rejoin.
+      onUserOffline: (_c, uid, reason) => {
+        const removeRemote = () => {
           reconnectTimersRef.current.delete(uid);
           setDisconnectedUids((prev) => {
             if (!prev.has(uid)) return prev;
@@ -350,8 +339,21 @@ export default function GroupCallScreen() {
             return next;
           });
           setRemoteUids((prev) => prev.filter((u) => u !== uid));
-        }, RECONNECT_GRACE_MS);
-        reconnectTimersRef.current.set(uid, timer);
+        };
+        if (reason === 0) {
+          const pending = reconnectTimersRef.current.get(uid);
+          if (pending) clearTimeout(pending);
+          removeRemote();
+          return;
+        }
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
+          return next;
+        });
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        reconnectTimersRef.current.set(uid, setTimeout(removeRemote, RECONNECT_GRACE_MS));
       },
       onAudioVolumeIndication: (_c, speakers) => {
         const loud = new Set((speakers ?? []).filter((s) => (s.volume ?? 0) > 40).map((s) => s.uid ?? 0));

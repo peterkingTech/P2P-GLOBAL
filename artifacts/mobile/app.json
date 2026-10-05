@@ -86,7 +86,8 @@
       ],
       "expo-audio",
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      "./modules/call-system/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,

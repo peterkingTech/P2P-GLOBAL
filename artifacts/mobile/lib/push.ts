@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform, AppState } from "react-native";
 import { authedFetch } from "@/lib/adminFetch";
 import { registerIncomingCallCategory } from "@/lib/callNotifications";
+import { callSystemInstalled } from "@/lib/callSystem";
 
 const LAST_TOKEN_KEY = "p2p_last_push_token";
 
@@ -85,13 +86,50 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     const res = await authedFetch("/push/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, platform: Platform.OS }),
+      body: JSON.stringify({
+        token, platform: Platform.OS, deviceId: await getInstallId(),
+        // Builds with the native call system get silent call-state pushes.
+        callSystem: callSystemInstalled(),
+      }),
     });
     if (res.ok) await AsyncStorage.setItem(LAST_TOKEN_KEY, token);
     return token;
   } catch (e) {
     console.error("Push registration failed", e);
     return null;
+  }
+}
+
+const INSTALL_ID_KEY = "p2p_install_id";
+
+/**
+ * A stable id for this app install. It ties this device's Expo push token to
+ * its iOS VoIP token, so the server skips the ordinary incoming-call push on
+ * a device that CallKit is already ringing.
+ */
+async function getInstallId(): Promise<string> {
+  const existing = await AsyncStorage.getItem(INSTALL_ID_KEY);
+  if (existing) return existing;
+  const id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+  await AsyncStorage.setItem(INSTALL_ID_KEY, id);
+  return id;
+}
+
+/** iOS PushKit VoIP token — lets an incoming call ring through CallKit with the app closed. */
+export async function registerVoipTokenAsync(token: string): Promise<void> {
+  if (Platform.OS !== "ios" || !token) return;
+  try {
+    // 409 until migration 172 is applied — the server can't store it yet.
+    await authedFetch("/push/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, platform: "ios_voip", deviceId: await getInstallId(), callSystem: true }),
+    });
+  } catch (e) {
+    console.warn("VoIP token registration failed", e);
   }
 }
 

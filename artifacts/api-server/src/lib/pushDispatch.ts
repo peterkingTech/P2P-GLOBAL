@@ -137,7 +137,12 @@ async function sendExpoBatch(messages: ReturnType<typeof buildExpoMessage>[]): P
 // transient push-provider failure is never silently lost, and this
 // function never throws back into its caller (a failed push must never
 // fail the call that was already created).
-export async function dispatchNotificationNow(notificationId: string): Promise<void> {
+export async function dispatchNotificationNow(
+  notificationId: string,
+  // Devices already ringing through CallKit (lib/apnsVoip.ts) — no second,
+  // ordinary push for the same call on those.
+  opts: { skipDeviceIds?: Set<string> } = {},
+): Promise<void> {
   const { data: claimed, error: claimErr } = await db
     .from("p2p_notifications")
     .update({ pushed_at: new Date().toISOString() })
@@ -157,14 +162,17 @@ export async function dispatchNotificationNow(notificationId: string): Promise<v
     if (n.user_id) {
       const { data: tokenRows, error: tokenErr } = await db
         .from("p2p_push_tokens")
-        .select("id, user_id, token")
+        .select("id, user_id, token, device_id")
         .eq("user_id", n.user_id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .neq("platform", "ios_voip");
       if (tokenErr) {
         logger.error({ err: tokenErr, notificationId }, "dispatchNotificationNow: failed to fetch push tokens");
         sendFailed = true;
       } else {
-        const tokens = (tokenRows ?? []) as PushToken[];
+        const skip = opts.skipDeviceIds;
+        const tokens = ((tokenRows ?? []) as (PushToken & { device_id: string | null })[])
+          .filter((t) => !(skip && t.device_id && skip.has(t.device_id)));
         if (tokens.length > 0) {
           const messages = tokens.map((t) => buildExpoMessage(n, t.token));
           const tickets = await sendExpoBatch(messages);
@@ -209,7 +217,8 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
     .from("p2p_push_tokens")
     .select("id, user_id, token")
     .in("user_id", userIds)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .neq("platform", "ios_voip"); // VoIP tokens go to Apple directly, never Expo
   if (tokenErr) {
     logger.error({ err: tokenErr }, "pushDispatch: failed to fetch push tokens");
     return { notifications: pending.length, pushed: 0, staleTokens: 0 };
@@ -252,4 +261,28 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
   await markPushed(pending.map((n) => n.id));
 
   return { notifications: pending.length, pushed: messages.length, staleTokens: staleTokens.length };
+}
+// Silent "this call stopped ringing" push for app builds that ring calls
+// natively (Android Telecom — modules/call-system). The ringing there lives
+// in native code and must stop even when the app's JS isn't running (e.g.
+// the caller hung up while the recipient's app was closed). Only tokens
+// registered with call_system (migration 172) get it: an older build would
+// show a payload with no title as an empty notification. No-op before 172.
+export async function sendCallStatePush(userId: string, callId: string, status: string): Promise<void> {
+  // Switched off (GET /calls/config): devices hand pushes back to Expo.
+  if (process.env.NATIVE_CALLS_ANDROID === "false") return;
+  const { data: rows, error } = await db
+    .from("p2p_push_tokens")
+    .select("token")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .eq("platform", "android")
+    .eq("call_system", true);
+  if (error || !rows?.length) return;
+  await sendExpoBatch(rows.map((r) => ({
+    to: r.token as string,
+    data: { notificationType: "call_state", callId, status },
+    priority: "high" as const,
+    ttl: 60,
+  })) as unknown as ReturnType<typeof buildExpoMessage>[]);
 }

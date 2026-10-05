@@ -11,6 +11,7 @@ import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallThe
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { dismissCallNotifications } from "@/lib/callNotifications";
+import { answerSystemCall, endSystemCall } from "@/lib/callSystem";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -159,6 +160,7 @@ export default function IncomingCallScreen() {
         if (data && (data.status !== "ringing" || ageMs > STALE_CALL_MS)) {
           console.log("CALL DEBUG incoming: call no longer ringing", { callId: params.callId, status: data.status, ageMs });
           settledRef.current = true;
+          endSystemCall(params.callId, data.status === "accepted" ? "answered_elsewhere" : "missed");
           showAlert("Call ended", `${callerName}'s call has already ended.`);
           dismissScreen();
           return;
@@ -172,6 +174,7 @@ export default function IncomingCallScreen() {
       ringTimerRef.current = setTimeout(() => {
         console.log("CALL DEBUG incoming: ring timeout, marking missed", { callId: params.callId });
         void ringtone.stop();
+        endSystemCall(params.callId, "missed");
         settle("missed").catch(() => { /* the server's no-answer sweep settles it instead */ });
         dismissScreen();
       }, Math.max(MIN_RING_MS, RING_TIMEOUT_MS - ageMs));
@@ -206,6 +209,7 @@ export default function IncomingCallScreen() {
             if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
             void ringtone.stop();
             void dismissCallNotifications(params.callId);
+            endSystemCall(params.callId, status === "accepted" ? "answered_elsewhere" : status === "declined" ? "declined_elsewhere" : "missed");
             dismissScreen();
           }
         }
@@ -219,6 +223,7 @@ export default function IncomingCallScreen() {
     console.log("CALL DEBUG incoming: declined", { callId: params.callId });
     if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
     await ringtone.stop();
+    endSystemCall(params.callId, "declined");
     try {
       await settle("declined");
     } catch (e: any) {
@@ -289,6 +294,10 @@ export default function IncomingCallScreen() {
     // symptom exactly on both ends. The invitation branch above already had
     // this try/catch; this mirrors it.
     setJoining(true);
+    // Tell the OS call (Telecom/CallKit, if reported) it was answered HERE
+    // before writing "accepted": that write's own realtime echo must not be
+    // mistaken for another device answering.
+    answerSystemCall(params.callId);
     let stillRinging: boolean;
     try {
       stillRinging = await settle("accepted");
@@ -303,6 +312,7 @@ export default function IncomingCallScreen() {
     // the ring and this tap — joining now would only wait on an empty channel.
     if (!stillRinging) {
       console.log("CALL DEBUG incoming: accept too late, call no longer ringing", { callId: params.callId });
+      endSystemCall(params.callId, "missed");
       showAlert("Call ended", `${callerName}'s call has already ended.`);
       dismissScreen();
       return;

@@ -15,6 +15,8 @@ import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
+import { endSystemCall, systemEndReason } from "@/lib/callSystem";
+import { useSystemCall } from "@/lib/useSystemCall";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -95,6 +97,8 @@ const RECONNECT_GRACE_MS = 15000;
 // from "react-native-agora" (that package breaks Metro's web bundle the
 // instant it's imported by any file reachable from a route).
 const AGORA_CONNECTION_STATE_FAILED = 5;
+// See audio.tsx: UserOfflineReasonType.UserOfflineQuit (=0), a deliberate leave.
+const AGORA_USER_OFFLINE_QUIT = 0;
 
 // CALL NAV TRACE (automatic-second-call investigation) — see mountIdRef
 // below; module-scope so it keeps counting across remounts within the
@@ -350,7 +354,8 @@ export default function VideoCallScreen() {
   // distinct "no_answer" reason — see audio.tsx's identical comment for the
   // full rationale (setToken(null) reuses useAgoraEngine's own existing
   // dependency-driven cleanup instead of navigating away).
-  const handleEndCall = useCallback(async (reason: "user" | "failed" | UnansweredOutcome = "user") => {
+  // "remote_end": see audio.tsx — the other side hung up on purpose.
+  const handleEndCall = useCallback(async (reason: "user" | "remote_end" | "failed" | UnansweredOutcome = "user") => {
     console.log("CALL END TRACE", {
       mountId: mountIdRef.current, source: reason, callId: params.callId, channelName: params.channelName,
       alreadyEnded: endedRef.current, timestamp: new Date().toISOString(),
@@ -359,6 +364,7 @@ export default function VideoCallScreen() {
     endedRef.current = true;
     // Stage 26B — see audio.tsx's identical comment.
     stopCallBackgroundSupport();
+    endSystemCall(params.callId, systemEndReason(reason, { isInitiator }));
     // Declined and busy share the "No answer" result screen and teardown.
     const unanswered = reason === "no_answer" || reason === "declined" || reason === "busy";
     if (unanswered) setUnansweredOutcome(reason);
@@ -405,6 +411,14 @@ export default function VideoCallScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.callLogId, params.callId, params.conversationId]);
+
+  // OS call integration — see audio.tsx's identical call.
+  useSystemCall({
+    callId: params.callId, isInitiator, callType: "video",
+    peerId: params.otherUserId, peerName: otherName, channelName: params.channelName,
+    conversationId: params.conversationId, callLogId: params.callLogId,
+    connected, onSystemEnd: () => { void handleEndCall("user"); },
+  });
 
   // Stage 22 — reuses the exact same shared helper every other call-
   // initiation site uses (lib/callStart.ts), not a second call mechanism.
@@ -582,27 +596,17 @@ export default function VideoCallScreen() {
         console.log("CALL DEBUG video: onRemoteVideoStateChanged", { channelName: connection.channelId, remoteUid: uid, state });
         setRemoteVideoOn((prev) => ({ ...prev, [uid]: state !== RemoteVideoState.RemoteVideoStateStopped }));
       },
-      // Video-call lifecycle audit — onUserOffline fires for BOTH a genuine
-      // hangup and a transient network drop; Agora itself does not
-      // distinguish them any further than this one event. Previously this
-      // immediately removed the uid and, once remoteUids hit zero, ended
-      // the call outright — a brief connectivity blip on the remote side
-      // was indistinguishable from a real hangup. Now: keep the uid in
-      // remoteUids/remoteVideoOn (so `connected` and the tile stay put) and
-      // only mark it "reconnecting" for the UI; a real removal/possible
-      // handleEndCall only happens if RECONNECT_GRACE_MS elapses with no
-      // rejoin (onUserJoined above cancels this if they come back).
-      onUserOffline: (connection, uid) => {
-        console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
+      // Video-call lifecycle audit — Agora's `reason` separates the two
+      // cases: UserOfflineQuit is a deliberate hang-up, so the call ends now
+      // with no "reconnecting" banner. UserOfflineDropped (a connection
+      // timeout) keeps the uid in remoteUids/remoteVideoOn (so `connected`
+      // and the tile stay put), marks it "reconnecting", and only removes it
+      // if RECONNECT_GRACE_MS elapses with no rejoin (onUserJoined above
+      // cancels this if they come back).
+      onUserOffline: (connection, uid, reason) => {
+        console.log("CALL DEBUG video: onUserOffline", { channelName: connection.channelId, remoteUid: uid, reason });
         activeSpeaker.clearIfActive(uid);
-        setDisconnectedUids((prev) => {
-          if (prev.has(uid)) return prev;
-          const next = new Set(prev);
-          next.add(uid);
-          return next;
-        });
-        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
-        const timer = setTimeout(() => {
+        const removeRemote = () => {
           reconnectTimersRef.current.delete(uid);
           setDisconnectedUids((prev) => {
             if (!prev.has(uid)) return prev;
@@ -612,7 +616,7 @@ export default function VideoCallScreen() {
           });
           setRemoteUids((prev) => {
             const next = prev.filter((u) => u !== uid);
-            if (next.length === 0) handleEndCall();
+            if (next.length === 0) handleEndCall(reason === AGORA_USER_OFFLINE_QUIT ? "remote_end" : "user");
             return next;
           });
           setRemoteVideoOn((prev) => {
@@ -632,8 +636,21 @@ export default function VideoCallScreen() {
               void liveStudy.reportParticipantDeparture(departed.userId);
             }
           }
-        }, RECONNECT_GRACE_MS);
-        reconnectTimersRef.current.set(uid, timer);
+        };
+        if (reason === AGORA_USER_OFFLINE_QUIT) {
+          const pending = reconnectTimersRef.current.get(uid);
+          if (pending) clearTimeout(pending);
+          removeRemote();
+          return;
+        }
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
+          return next;
+        });
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        reconnectTimersRef.current.set(uid, setTimeout(removeRemote, RECONNECT_GRACE_MS));
       },
       // Video-call lifecycle audit — this previously force-disabled the
       // local camera (setCameraOn(false) + engine.enableLocalVideo(false))

@@ -15,6 +15,8 @@ import { authedFetch } from "@/lib/adminFetch";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
+import { endSystemCall, systemEndReason } from "@/lib/callSystem";
+import { useSystemCall } from "@/lib/useSystemCall";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -108,6 +110,9 @@ const RECONNECT_GRACE_MS = 15000;
 // documented Agora SDK API, confirmed against node_modules/react-native-agora's
 // own type definitions.
 const AGORA_CONNECTION_STATE_FAILED = 5;
+// react-native-agora's UserOfflineReasonType.UserOfflineQuit (=0): the remote
+// user left the channel on purpose. UserOfflineDropped (=1) is a timeout.
+const AGORA_USER_OFFLINE_QUIT = 0;
 
 // CALL NAV TRACE (automatic-second-call investigation) — see video.tsx's
 // identical counter/comment.
@@ -349,7 +354,9 @@ export default function AudioCallScreen() {
   // same path already used on unmount) — and keeps this screen mounted so
   // the dedicated "No answer" result UI (rendered below) can take over in
   // place of navigation.
-  const handleEndCall = useCallback(async (reason: "user" | "failed" | UnansweredOutcome = "user") => {
+  // "remote_end": the other side hung up (Agora UserOfflineQuit) — ends
+  // exactly like a local hang-up, never through the "failed" path.
+  const handleEndCall = useCallback(async (reason: "user" | "remote_end" | "failed" | UnansweredOutcome = "user") => {
     console.log("CALL END TRACE", {
       mountId: mountIdRef.current, source: reason, callId: params.callId, channelName: params.channelName,
       alreadyEnded: endedRef.current, timestamp: new Date().toISOString(),
@@ -362,6 +369,8 @@ export default function AudioCallScreen() {
     // Idempotent and safe even if background support was never started
     // (e.g. this call never actually connected).
     stopCallBackgroundSupport();
+    // The OS's record of the call (Telecom/CallKit) ends with the real reason.
+    endSystemCall(params.callId, systemEndReason(reason, { isInitiator }));
     // Declined and busy share the "No answer" result screen and teardown;
     // only the label differs.
     const unanswered = reason === "no_answer" || reason === "declined" || reason === "busy";
@@ -417,6 +426,15 @@ export default function AudioCallScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.callLogId, params.callId, params.conversationId, callType]);
+
+  // OS call integration (Telecom/CallKit): outgoing registration, "active"
+  // once connected, and a hang-up from the system UI ends this call.
+  useSystemCall({
+    callId: params.callId, isInitiator, callType: "audio",
+    peerId: params.otherUserId, peerName: otherName, channelName: params.channelName,
+    conversationId: params.conversationId, callLogId: params.callLogId,
+    connected, onSystemEnd: () => { void handleEndCall("user"); },
+  });
 
   // Stage 22 — "Call again" reuses the exact same shared helper every other
   // call-initiation site in this codebase uses (lib/callStart.ts's
@@ -559,25 +577,18 @@ export default function AudioCallScreen() {
           });
         }
       },
-      // Video-call lifecycle audit — see video.tsx's identical comment:
-      // onUserOffline fires for both a genuine hangup and a transient
-      // network drop, indistinguishable at this event. Previously this
-      // immediately ended the call once remoteUids hit zero. Now: keep the
-      // uid in remoteUids (so `connected` stays true) and only mark it
-      // "reconnecting"; a real removal/possible handleEndCall only happens
-      // if RECONNECT_GRACE_MS elapses with no rejoin (onUserJoined above
-      // cancels this if they come back).
-      onUserOffline: (connection, uid) => {
-        console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid });
+      // Video-call lifecycle audit — a dropped connection keeps the uid in
+      // remoteUids (so `connected` stays true) and only marks it
+      // "reconnecting"; removal/handleEndCall happens if RECONNECT_GRACE_MS
+      // elapses with no rejoin (onUserJoined above cancels this).
+      // Agora's `reason` DOES tell the two apart: UserOfflineQuit means the
+      // other side deliberately left the channel (hung up), so the call
+      // ends now — no "reconnecting" banner. Only UserOfflineDropped (their
+      // connection timed out) gets the reconnect grace period below.
+      onUserOffline: (connection, uid, reason) => {
+        console.log("CALL DEBUG audio: onUserOffline", { channelName: connection.channelId, remoteUid: uid, reason });
         activeSpeaker.clearIfActive(uid);
-        setDisconnectedUids((prev) => {
-          if (prev.has(uid)) return prev;
-          const next = new Set(prev);
-          next.add(uid);
-          return next;
-        });
-        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
-        const timer = setTimeout(() => {
+        const removeRemote = () => {
           reconnectTimersRef.current.delete(uid);
           setDisconnectedUids((prev) => {
             if (!prev.has(uid)) return prev;
@@ -587,7 +598,7 @@ export default function AudioCallScreen() {
           });
           setRemoteUids((prev) => {
             const next = prev.filter((u) => u !== uid);
-            if (next.length === 0) handleEndCall();
+            if (next.length === 0) handleEndCall(reason === AGORA_USER_OFFLINE_QUIT ? "remote_end" : "user");
             return next;
           });
           // Study Together C4.7/C4.3 — report ANY departed study
@@ -605,8 +616,21 @@ export default function AudioCallScreen() {
               void liveStudy.reportParticipantDeparture(departed.userId);
             }
           }
-        }, RECONNECT_GRACE_MS);
-        reconnectTimersRef.current.set(uid, timer);
+        };
+        if (reason === AGORA_USER_OFFLINE_QUIT) {
+          const pending = reconnectTimersRef.current.get(uid);
+          if (pending) clearTimeout(pending);
+          removeRemote();
+          return;
+        }
+        setDisconnectedUids((prev) => {
+          if (prev.has(uid)) return prev;
+          const next = new Set(prev);
+          next.add(uid);
+          return next;
+        });
+        if (reconnectTimersRef.current.has(uid)) return; // no duplicate timers
+        reconnectTimersRef.current.set(uid, setTimeout(removeRemote, RECONNECT_GRACE_MS));
       },
       // Stage 11 — mirrors video.tsx/group.tsx's identical handler exactly:
       // only ever drives a "Connection unstable" warning, never touches

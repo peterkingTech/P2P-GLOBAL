@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["P2PCallSystemModule"],
+    "appDelegateSubscribers": ["P2PCallSystemAppDelegateSubscriber"]
+  },
+  "android": {
+    "modules": ["expo.modules.p2pcallsystem.P2PCallSystemModule"]
+  }
+}

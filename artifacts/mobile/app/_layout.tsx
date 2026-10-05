@@ -23,7 +23,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 // module is ever evaluated, so the call landed too late to matter.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
-import { registerForPushNotificationsAsync, pathForNotification } from "@/lib/push";
+import { registerForPushNotificationsAsync, pathForNotification, registerVoipTokenAsync } from "@/lib/push";
+import {
+  callSystemActive, callSystemInstalled, configureCallSystem, flushPendingCallSystemEvents,
+  getVoipToken, reportSystemIncomingCall, subscribeCallSystemEvents,
+} from "@/lib/callSystem";
+import { getApiUrl } from "@/lib/apiUrl";
+import Constants from "expo-constants";
 import { ACCEPT_ACTION, DECLINE_ACTION, dismissCallNotifications, sweepStaleCallNotifications } from "@/lib/callNotifications";
 import { supabase } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -248,6 +254,21 @@ function IncomingCallHost() {
       dismissIncomingCall();
       return;
     }
+    // Native phone-call integration (lib/callSystem.ts). iOS always rings
+    // through CallKit (its own UI, foreground included). Android rings
+    // natively when the app isn't on screen; on screen, the app's ringing
+    // screen below shows it and Telecom is only told about it. Crisis calls
+    // (can't be declined) and group invitations keep the app's screen.
+    if (callSystemActive() && incomingCall.callType !== "crisis" && !incomingCall.invitationId) {
+      const info = {
+        callId: incomingCall.callId, channelName: incomingCall.channelName, callType: incomingCall.callType,
+        callerId: incomingCall.callerId, callerName: incomingCall.callerName,
+        conversationId: incomingCall.conversationId, callLogId: incomingCall.callLogId,
+      };
+      const ringNatively = Platform.OS === "ios" || AppState.currentState !== "active";
+      reportSystemIncomingCall(info, ringNatively);
+      if (ringNatively) { dismissIncomingCall(); return; }
+    }
     // CALL INCOMING TRACE (automatic-second-call investigation).
     console.log("CALL INCOMING TRACE: IncomingCallHost navigating", {
       callId: incomingCall.callId, channelName: incomingCall.channelName,
@@ -276,6 +297,72 @@ function IncomingCallHost() {
     // call is judged.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingCall, dismissIncomingCall, router]);
+
+  return null;
+}
+
+// Native phone-call integration (lib/callSystem.ts): configures the native
+// side, registers the iOS VoIP token, and acts on native call events —
+// including ones queued before JS started (Answer tapped on the lock screen
+// while the app was launching).
+function CallSystemHost() {
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthenticated || !callSystemInstalled()) return;
+    let cancelled = false;
+    const apiUrl = getApiUrl();
+    const scheme = (Constants.expoConfig?.scheme as string | undefined) || "p2pglobalbiblestudy";
+    configureCallSystem(apiUrl, scheme, true);
+    // Server switch (NATIVE_CALLS_ANDROID / NATIVE_CALLS_IOS) — off means
+    // back to the plain push + in-app ringing path, no new build needed.
+    fetch(`${apiUrl}/calls/config`)
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cancelled) return;
+        const flags = cfg?.nativeCallSystem ?? {};
+        configureCallSystem(apiUrl, scheme, (Platform.OS === "ios" ? flags.ios : flags.android) !== false);
+      })
+      .catch(() => { /* keep the default */ });
+
+    const unsubscribe = subscribeCallSystemEvents((event) => {
+      switch (event.type) {
+        case "answered": {
+          // CallKit Answer → the app's ringing screen settles and joins,
+          // exactly like an in-app Accept.
+          const c = event.call;
+          router.replace({
+            pathname: "/call/incoming",
+            params: {
+              callId: c.callId, channelName: c.channelName, callType: c.callType,
+              callerId: c.callerId, callerName: c.callerName,
+              conversationId: c.conversationId ?? "", callLogId: c.callLogId ?? "",
+              invitationId: "", action: "accept",
+            },
+          } as any);
+          break;
+        }
+        case "declined":
+          // Native already told the server when it had the push's decline
+          // token; a call that arrived over realtime has none, so settle it here.
+          void supabase.from("p2p_incoming_calls")
+            .update({ status: "declined", responded_at: new Date().toISOString() })
+            .eq("id", event.callId).eq("status", "ringing");
+          break;
+        case "callBack":
+          router.push({ pathname: "/call/callback", params: { peerId: event.peerId, peerName: event.peerName, callType: event.callType } } as any);
+          break;
+        case "voipToken":
+          void registerVoipTokenAsync(event.token);
+          break;
+      }
+    });
+    flushPendingCallSystemEvents();
+    const voipToken = getVoipToken();
+    if (voipToken) void registerVoipTokenAsync(voipToken);
+    return () => { cancelled = true; unsubscribe(); };
+  }, [isAuthenticated, router]);
 
   return null;
 }
@@ -456,6 +543,7 @@ function RootLayoutNav() {
         <AuthGate />
         <GrowthCelebrationHost />
         <IncomingCallHost />
+        <CallSystemHost />
         <CircleSessionBannerHost />
         <FamilyWorshipBannerHost />
         <CompletionMomentHost />
