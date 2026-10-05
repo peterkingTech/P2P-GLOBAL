@@ -71,6 +71,13 @@ const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
 // worst-case join path room to complete.
 const NO_ANSWER_TIMEOUT_MS = 70000;
 
+// Caller-side outcomes where the call never connected and this screen stays
+// up as a result card (with Call again) instead of navigating away.
+type UnansweredOutcome = "no_answer" | "declined" | "busy";
+const UNANSWERED_LABEL: Record<UnansweredOutcome, string> = {
+  no_answer: "No answer", declined: "Call declined", busy: "Busy",
+};
+
 // CALL DEBUG forensic fix — two gaps the prior audit missed:
 //   1. Nothing timed out "joining_channel" itself. If Agora's joinChannel()
 //      call never reaches onJoinChannelSuccess (silent SDK-level stall —
@@ -191,6 +198,8 @@ export default function AudioCallScreen() {
   const [callState, setCallState] = useState<
     "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended" | "no_answer"
   >("requesting_token");
+  // Which unanswered outcome the "no_answer" result screen is showing.
+  const [unansweredOutcome, setUnansweredOutcome] = useState<UnansweredOutcome>("no_answer");
   // Stage 22 — guards "Call again" against a double-tap starting two calls.
   const [callingAgain, setCallingAgain] = useState(false);
   // CALL DEBUG fix — see video.tsx's identical declaration/comment: gates
@@ -340,7 +349,7 @@ export default function AudioCallScreen() {
   // same path already used on unmount) — and keeps this screen mounted so
   // the dedicated "No answer" result UI (rendered below) can take over in
   // place of navigation.
-  const handleEndCall = useCallback(async (reason: "user" | "failed" | "no_answer" = "user") => {
+  const handleEndCall = useCallback(async (reason: "user" | "failed" | UnansweredOutcome = "user") => {
     console.log("CALL END TRACE", {
       mountId: mountIdRef.current, source: reason, callId: params.callId, channelName: params.channelName,
       alreadyEnded: endedRef.current, timestamp: new Date().toISOString(),
@@ -353,7 +362,11 @@ export default function AudioCallScreen() {
     // Idempotent and safe even if background support was never started
     // (e.g. this call never actually connected).
     stopCallBackgroundSupport();
-    setCallState(reason === "no_answer" ? "no_answer" : "ended");
+    // Declined and busy share the "No answer" result screen and teardown;
+    // only the label differs.
+    const unanswered = reason === "no_answer" || reason === "declined" || reason === "busy";
+    if (unanswered) setUnansweredOutcome(reason);
+    setCallState(unanswered ? "no_answer" : "ended");
 
     // Video-call lifecycle audit — a real end must not leave a pending
     // reconnect-grace timer to fire afterward against an already-ended call.
@@ -388,7 +401,7 @@ export default function AudioCallScreen() {
     // already ran, so the engine only needs to actually leave. See this
     // function's own comment above for why setToken(null) is the correct,
     // already-existing mechanism for that.
-    if (reason === "no_answer") {
+    if (unanswered) {
       setToken(null);
       return;
     }
@@ -656,9 +669,12 @@ export default function AudioCallScreen() {
             mountId: mountIdRef.current, callId: params.callId, channelName: params.channelName,
             status, timestamp: new Date().toISOString(),
           });
-          if (status === "declined" || status === "missed" || status === "cancelled") {
-            handleEndCall();
-          }
+          // The recipient's answer (or the no-answer timeout) decides what
+          // the caller sees; "cancelled" is this side's own hang-up.
+          if (status === "declined") handleEndCall("declined");
+          else if (status === "busy") handleEndCall("busy");
+          else if (status === "missed") handleEndCall("no_answer");
+          else if (status === "cancelled") handleEndCall();
         }
       )
       .subscribe();
@@ -804,7 +820,7 @@ export default function AudioCallScreen() {
             )}
           </View>
           <Text style={styles.noAnswerName}>{otherName}</Text>
-          <Text style={styles.noAnswerStatus}>No answer</Text>
+          <Text style={styles.noAnswerStatus}>{UNANSWERED_LABEL[unansweredOutcome]}</Text>
         </View>
         <View style={styles.noAnswerActions}>
           <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={navigateBack} accessibilityRole="button" accessibilityLabel="Cancel">

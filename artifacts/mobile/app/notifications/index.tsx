@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData, AppNotification } from "@/contexts/DataContext";
 import { getCurrentGroupStudy } from "@/lib/groupStudy";
 import { getApiUrl } from "@/lib/apiUrl";
+import { pathForNotification } from "@/lib/push";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 
 function showAlert(title: string, message: string) {
@@ -27,6 +28,7 @@ const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   connection_request: "person-add-outline",
   connection_accepted: "checkmark-circle-outline",
   connection_declined: "close-circle-outline",
+  missed_call: "call-outline",
 };
 
 // Every Study Together notification type shares this prefix — one rule
@@ -108,6 +110,13 @@ export default function NotificationsScreen() {
     if (!n.isRead) {
       markNotificationRead(n.id);
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
+    }
+
+    // Missed call — same destination as tapping its push (the thread's
+    // missed-call card calls straight back).
+    if (n.notificationType === "missed_call") {
+      router.push(pathForNotification("missed_call", n.data) as any);
+      return;
     }
 
     // C7.6 — deep link, with an honest fallback if the session/call has

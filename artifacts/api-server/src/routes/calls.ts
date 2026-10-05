@@ -6,6 +6,7 @@ import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
 import { dispatchNotificationNow } from "../lib/pushDispatch";
 import { isEligibleStudyPartner, getEligibleStudyPartners } from "../lib/studyPartnerAuth";
 import { uidFromUserId } from "../lib/agoraUid";
+import { notifyMissedCall } from "../lib/callSweep";
 
 const router = Router();
 
@@ -1049,8 +1050,8 @@ router.post("/calls/start", async (req, res) => {
   const callerName = (callerNameProfile?.full_name as string | undefined) ?? "Someone";
   const { data: callNotification, error: notifyErr } = await supabaseWrite.from("p2p_notifications").insert({
     user_id: recipientId,
-    title: `Incoming ${callType === "video" ? "video" : "voice"} call`,
-    message: `${callerName} is calling you`,
+    title: `${callerName} is calling you`,
+    message: callType === "video" ? "📹 Video call" : "🎤 Audio call",
     notification_type: "incoming_call",
     data: {
       callId: incomingCall.id, channelName, callType, callerId, callerName,
@@ -1089,8 +1090,13 @@ const CALL_TYPE_SUMMARY_LABEL: Record<string, string> = {
 // incoming.tsx's settle() and the caller-side timeout/hangup paths) — this
 // reuses that existing data instead of inventing a new column.
 const UNANSWERED_LABEL: Record<string, string> = {
-  declined: "Declined", missed: "No answer", cancelled: "Cancelled",
+  declined: "Declined", missed: "No answer", cancelled: "Cancelled", busy: "Busy",
 };
+
+// incoming.tsx's ring window. A call reported unanswered while its row is
+// still "ringing" inside this window was hung up by the caller (cancelled);
+// past it, nobody answered (missed).
+const RING_WINDOW_MS = 30000;
 
 // POST /calls/end — closes out the call_log row and, if this call belonged
 // to a DM conversation, posts a read-only call-information system message
@@ -1111,7 +1117,7 @@ router.post("/calls/end", async (req, res) => {
   if (!callLogId) return err(res, "callLogId required");
 
   const { data: callLog } = await supabaseWrite
-    .from("p2p_call_logs").select("initiated_by, participants, connected_at").eq("id", callLogId).maybeSingle();
+    .from("p2p_call_logs").select("initiated_by, participants, connected_at, call_type").eq("id", callLogId).maybeSingle();
   if (!callLog) return err(res, "Call not found", 404);
   const participants = (callLog.participants as string[]) ?? [];
   if (!participants.includes(requesterId)) return err(res, "Not authorized for this call", 403);
@@ -1123,8 +1129,12 @@ router.post("/calls/end", async (req, res) => {
   let finalStatus = connected ? "ended" : "missed";
   if (!connected && incomingCallId) {
     const { data: incoming } = await supabaseWrite
-      .from("p2p_incoming_calls").select("status").eq("id", incomingCallId).maybeSingle();
-    if (incoming?.status === "declined" || incoming?.status === "cancelled") finalStatus = incoming.status;
+      .from("p2p_incoming_calls").select("status, created_at").eq("id", incomingCallId).maybeSingle();
+    if (incoming?.status === "declined" || incoming?.status === "cancelled" || incoming?.status === "busy") {
+      finalStatus = incoming.status;
+    } else if (incoming?.status === "ringing" && Date.now() - new Date(incoming.created_at as string).getTime() < RING_WINDOW_MS) {
+      finalStatus = "cancelled";
+    }
   }
 
   // Forensic calling audit — this is the only place a call's real
@@ -1135,11 +1145,33 @@ router.post("/calls/end", async (req, res) => {
   const updatePayload: Record<string, unknown> = { status: finalStatus, ended_at: new Date().toISOString(), duration_seconds: duration };
   if (connectedAt && !callLog.connected_at) updatePayload.connected_at = connectedAt;
 
-  const { error: updateErr } = await supabaseWrite
+  // Settle the log, noting whether THIS request is the one that moved it out
+  // of "initiated" — only that request announces a missed call, so the
+  // caller's and recipient's /calls/end (and the server's no-answer sweep,
+  // lib/callSweep.ts) never notify twice for one call.
+  const { data: transitioned, error: firstErr } = await supabaseWrite
     .from("p2p_call_logs")
     .update(updatePayload)
-    .eq("id", callLogId);
-  if (updateErr) return err(res, updateErr.message, 500);
+    .eq("id", callLogId).eq("status", "initiated")
+    .select("id");
+  if (firstErr) return err(res, firstErr.message, 500);
+  if (!transitioned?.length) {
+    const { error: updateErr } = await supabaseWrite
+      .from("p2p_call_logs")
+      .update(updatePayload)
+      .eq("id", callLogId);
+    if (updateErr) return err(res, updateErr.message, 500);
+  }
+  const logCallType = (callLog.call_type as string | undefined) ?? callType ?? "audio";
+  if (transitioned?.length && finalStatus === "missed" && logCallType !== "crisis" && participants.length === 2) {
+    const recipientId = participants.find((p) => p !== callLog.initiated_by);
+    if (recipientId) {
+      void notifyMissedCall({
+        recipientId, callerId: callLog.initiated_by as string, callType: logCallType,
+        callLogId, conversationId: conversationId ?? null,
+      }).catch(() => { /* a lost notice never fails the hang-up */ });
+    }
+  }
 
   // A call that never connected (caller gave up, hung up, or the no-answer
   // timeout fired) leaves its p2p_incoming_calls "ringing" row stuck there
@@ -1151,7 +1183,8 @@ router.post("/calls/end", async (req, res) => {
   if (incomingCallId && !connected) {
     await supabaseWrite
       .from("p2p_incoming_calls")
-      .update({ status: "cancelled", responded_at: new Date().toISOString() })
+      // Same outcome as the log: past the ring window it was a no-answer.
+      .update({ status: finalStatus === "missed" ? "missed" : "cancelled", responded_at: new Date().toISOString() })
       .eq("id", incomingCallId)
       .eq("status", "ringing");
   }
@@ -1211,7 +1244,7 @@ router.get("/calls/history/:userId", async (req, res) => {
   const { userId } = req.params;
   const { data: logs, error } = await supabaseWrite
     .from("p2p_call_logs")
-    .select("id, channel_name, call_type, status, duration_seconds, created_at, conversation_id, participants")
+    .select("id, channel_name, call_type, status, duration_seconds, created_at, conversation_id, participants, initiated_by")
     // supabase-js's .contains() helper mis-serializes a plain array against a
     // jsonb column here (errors "invalid input syntax for type json") —
     // .filter with an explicitly JSON-stringified value is the form that
@@ -1243,6 +1276,7 @@ router.get("/calls/history/:userId", async (req, res) => {
       conversationId: row.conversation_id ?? null,
       otherUserId: otherId,
       otherUserName: otherId ? (nameById.get(otherId) ?? "Someone") : null,
+      direction: row.initiated_by === userId ? "outgoing" : "incoming",
     };
   }));
 });

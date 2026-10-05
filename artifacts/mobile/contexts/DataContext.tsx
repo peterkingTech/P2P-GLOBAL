@@ -11,6 +11,7 @@ import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
+import { dismissCallNotifications } from "@/lib/callNotifications";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -3115,6 +3116,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "p2p_incoming_calls", filter: `recipient_id=eq.${userId}` },
         (payload) => { void applyIncomingCallRow(payload.new as Record<string, unknown>, "realtime"); }
+      )
+      // Once a call stops ringing (answered here or elsewhere, declined,
+      // cancelled by the caller, timed out, busy), its system notification
+      // must not linger as "Incoming call" for a call that has ended.
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_incoming_calls", filter: `recipient_id=eq.${userId}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row.status !== "ringing") void dismissCallNotifications(row.id as string);
+        }
       )
       .subscribe((status) => {
         console.log("CALL DEBUG incoming: subscription status", { userId, status });

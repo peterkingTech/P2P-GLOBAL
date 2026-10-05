@@ -3,6 +3,7 @@ package expo.modules.callforegroundservice
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -40,18 +41,27 @@ class CallForegroundService : Service() {
       val intent = Intent(context, CallForegroundService::class.java)
         .setAction(ACTION_START)
         .putExtra(EXTRA_IS_VIDEO, isVideo)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(intent)
-      } else {
-        context.startService(intent)
+      // Android 12+ throws ForegroundServiceStartNotAllowedException when the
+      // app is in the background at this moment (e.g. the call connected
+      // after the user switched apps). The call itself must carry on; it
+      // just runs without background protection.
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(intent)
+        } else {
+          context.startService(intent)
+        }
+      } catch (e: Exception) {
+        android.util.Log.w("CallForegroundService", "start refused: ${e.message}")
       }
     }
 
     /** Safe to call even if the service was never started, and safe to
-     * call more than once. */
+     * call more than once. stopService never starts anything, so unlike
+     * startService(ACTION_STOP) it can't hit Android 8+'s background-start
+     * restriction when a call ends while the app is in the background. */
     fun stop(context: Context) {
-      val intent = Intent(context, CallForegroundService::class.java).setAction(ACTION_STOP)
-      context.startService(intent)
+      context.stopService(Intent(context, CallForegroundService::class.java))
     }
   }
 
@@ -66,15 +76,25 @@ class CallForegroundService : Service() {
     val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) ?: false
     createChannelIfNeeded()
     val notification = buildNotification()
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      val type = if (isVideo) {
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+    // On Android 14+ a microphone/camera service can only enter the
+    // foreground while the app itself is in use (and camera needs its
+    // runtime permission). An uncaught SecurityException here would crash
+    // the app mid-call; stopping quietly keeps the call running in the
+    // foreground as before.
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val type = if (isVideo) {
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        } else {
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        }
+        startForeground(NOTIFICATION_ID, notification, type)
       } else {
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        startForeground(NOTIFICATION_ID, notification)
       }
-      startForeground(NOTIFICATION_ID, notification, type)
-    } else {
-      startForeground(NOTIFICATION_ID, notification)
+    } catch (e: Exception) {
+      android.util.Log.w("CallForegroundService", "startForeground refused: ${e.message}")
+      stopSelf()
     }
     // START_NOT_STICKY: if the OS kills this process outright, the service
     // must not be automatically restarted with a stale/no-op intent — the
@@ -106,10 +126,17 @@ class CallForegroundService : Service() {
     // This notification is visible on the lock screen by default; it must
     // never leak private content (matches the existing incoming-call
     // notification's own content restraint).
+    // Tapping it brings the existing app task (and the call screen still
+    // mounted in it) back to the front.
+    val launch = packageManager.getLaunchIntentForPackage(packageName)
+    val contentIntent = launch?.let {
+      PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
     return NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle("P2P Call")
       .setContentText("Call in progress")
       .setSmallIcon(applicationInfo.icon)
+      .setContentIntent(contentIntent)
       .setOngoing(true)
       .setCategory(NotificationCompat.CATEGORY_CALL)
       .setPriority(NotificationCompat.PRIORITY_LOW)

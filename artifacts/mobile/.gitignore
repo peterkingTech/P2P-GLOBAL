@@ -10,9 +10,12 @@ web-build/
 static-build/
 expo-env.d.ts
 
-# Native
-ios/
-android/
+# Native — only the generated top-level projects. Anchored so local Expo
+# modules' own native sources (modules/*/android) are not ignored: EAS
+# packages the project by these rules, so an unanchored "android/" silently
+# left the call foreground service out of Android builds.
+/ios/
+/android/
 *.orig.*
 *.jks
 *.p8

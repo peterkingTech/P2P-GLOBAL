@@ -31,14 +31,25 @@ type PendingNotification = {
   message: string | null;
   notification_type: string | null;
   data: Record<string, unknown> | null;
+  created_at?: string | null;
 };
 
 type PushToken = { id: string; user_id: string; token: string };
 
+// An incoming call only rings for 30s (mobile incoming.tsx RING_TIMEOUT_MS).
+// A ring push that would arrive after that announces a call that's already
+// over, so it is neither sent late by the cron nor kept in transit by Expo.
+const INCOMING_CALL_PUSH_TTL_SECONDS = 30;
+
+function isStaleIncomingCall(n: PendingNotification): boolean {
+  if (n.notification_type !== "incoming_call" || !n.created_at) return false;
+  return Date.now() - new Date(n.created_at).getTime() > INCOMING_CALL_PUSH_TTL_SECONDS * 1000;
+}
+
 async function fetchPending(): Promise<PendingNotification[]> {
   const { data, error } = await db
     .from("p2p_notifications")
-    .select("id, user_id, title, message, notification_type, data")
+    .select("id, user_id, title, message, notification_type, data, created_at")
     .is("pushed_at", null)
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
@@ -82,7 +93,12 @@ function buildExpoMessage(n: PendingNotification, to: string) {
     body: n.message ?? "",
     data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}) },
     sound: "default" as const,
-    ...(isIncomingCall ? { channelId: "calls", priority: "high" as const } : {}),
+    // categoryId shows the Accept/Decline buttons (registered client-side in
+    // lib/callNotifications.ts); ttl drops a ring push that can't be
+    // delivered while the call is still ringing.
+    ...(isIncomingCall
+      ? { channelId: "calls", priority: "high" as const, categoryId: "incoming_call", ttl: INCOMING_CALL_PUSH_TTL_SECONDS }
+      : {}),
   };
 }
 
@@ -208,6 +224,8 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
   const messages: ReturnType<typeof buildExpoMessage>[] = [];
   const messageTokens: string[] = []; // parallel array: which token each message went to
   for (const n of pending) {
+    // Still marked pushed below, so it's never retried either.
+    if (isStaleIncomingCall(n)) continue;
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
     for (const t of tokens) {
       messages.push(buildExpoMessage(n, t.token));

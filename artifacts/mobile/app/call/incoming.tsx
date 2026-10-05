@@ -10,6 +10,7 @@ import { useRingtone } from "@/hooks/useRingtone";
 import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { useTheme } from "@/contexts/ThemeContext";
+import { dismissCallNotifications } from "@/lib/callNotifications";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -17,6 +18,11 @@ function showAlert(title: string, message: string) {
 }
 
 const RING_TIMEOUT_MS = 30000;
+// Device clocks can disagree with the server's created_at by a few seconds:
+// never ring for less than this, and only treat a still-"ringing" row as
+// stale once it's past the server's own no-answer sweep (45s).
+const MIN_RING_MS = 10000;
+const STALE_CALL_MS = 45000;
 
 const CALL_TYPE_LABEL: Record<CallType, string> = {
   audio: "Audio Call",
@@ -34,7 +40,10 @@ export default function IncomingCallScreen() {
   const params = useLocalSearchParams<{
     callId: string; channelName: string; callType: CallType; callerId: string; callerName?: string;
     conversationId?: string; callLogId?: string; invitationId?: string;
+    // Set when Accept/Decline was pressed on the system notification.
+    action?: "accept" | "decline";
   }>();
+  const notificationAction = params.action === "accept" || params.action === "decline" ? params.action : null;
   const callType = (params.callType as CallType) ?? "audio";
   const callerName = params.callerName || "Someone";
   // Crisis calls cannot be declined — accepting is the only option (see
@@ -82,9 +91,10 @@ export default function IncomingCallScreen() {
   // remote cancellation, or an unexpected unmount (useRingtone's own
   // cleanup effect covers that last case even if none of the explicit
   // stop() calls below ever run).
+  // Ringing itself starts in the live-check effect below, only once the
+  // call is confirmed to still be ringing (and never for an Accept/Decline
+  // pressed on the notification).
   useEffect(() => {
-    console.log("CALL DEBUG incoming: screen mounted, starting ringtone", { callId: params.callId, channelName: params.channelName, callType });
-    void ringtone.start();
     return () => { void ringtone.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -109,27 +119,67 @@ export default function IncomingCallScreen() {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/messages" as any);
   }
-  async function settle(status: "accepted" | "declined" | "missed") {
-    if (settledRef.current) return;
+  // Only settles a row that is still "ringing": a late write (this device's
+  // timeout, a slow decline) must never overwrite the real outcome — e.g. a
+  // caller's cancellation or the server's no-answer sweep. Returns false
+  // when the call had already stopped ringing.
+  async function settle(status: "accepted" | "declined" | "missed"): Promise<boolean> {
+    if (settledRef.current) return false;
     settledRef.current = true;
-    if (params.callId) {
-      const update = supabase
-        .from("p2p_incoming_calls")
-        .update({ status, responded_at: new Date().toISOString() })
-        .eq("id", params.callId);
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("settle timed out")), SETTLE_TIMEOUT_MS));
-      await Promise.race([update, timeout]);
-    }
+    void dismissCallNotifications(params.callId);
+    if (!params.callId) return true;
+    const update = supabase
+      .from("p2p_incoming_calls")
+      .update({ status, responded_at: new Date().toISOString() })
+      .eq("id", params.callId)
+      .eq("status", "ringing")
+      .select("id");
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("settle timed out")), SETTLE_TIMEOUT_MS));
+    const { data, error } = await Promise.race([update, timeout]);
+    if (error) throw new Error(error.message);
+    return (data?.length ?? 0) > 0;
   }
 
+  // Live check — this screen can be opened from a push long after the call
+  // stopped ringing (caller hung up, timed out, answered elsewhere). Confirm
+  // the row is still ringing before ringing at all, and time the ring from
+  // when the call started, not from when this screen happened to open.
+  // A failed read rings normally rather than blocking a real call.
+  const ringTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      console.log("CALL DEBUG incoming: ring timeout, marking missed", { callId: params.callId });
-      void ringtone.stop();
-      settle("missed");
-      dismissScreen();
-    }, RING_TIMEOUT_MS);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    void dismissCallNotifications(params.callId);
+    (async () => {
+      let ageMs = 0;
+      if (params.callId) {
+        const { data } = await supabase
+          .from("p2p_incoming_calls").select("status, created_at").eq("id", params.callId).maybeSingle();
+        if (cancelled) return;
+        ageMs = data?.created_at ? Math.max(0, Date.now() - new Date(data.created_at as string).getTime()) : 0;
+        if (data && (data.status !== "ringing" || ageMs > STALE_CALL_MS)) {
+          console.log("CALL DEBUG incoming: call no longer ringing", { callId: params.callId, status: data.status, ageMs });
+          settledRef.current = true;
+          showAlert("Call ended", `${callerName}'s call has already ended.`);
+          dismissScreen();
+          return;
+        }
+      }
+      if (notificationAction === "accept") { void handleAnswer(); return; }
+      // Crisis calls can't be declined here either — they just ring.
+      if (notificationAction === "decline" && !isCrisis) { void handleDecline(); return; }
+      console.log("CALL DEBUG incoming: call live, starting ringtone", { callId: params.callId, channelName: params.channelName, callType, ageMs });
+      void ringtone.start();
+      ringTimerRef.current = setTimeout(() => {
+        console.log("CALL DEBUG incoming: ring timeout, marking missed", { callId: params.callId });
+        void ringtone.stop();
+        settle("missed").catch(() => { /* the server's no-answer sweep settles it instead */ });
+        dismissScreen();
+      }, Math.max(MIN_RING_MS, RING_TIMEOUT_MS - ageMs));
+    })();
+    return () => {
+      cancelled = true;
+      if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,10 +199,13 @@ export default function IncomingCallScreen() {
         (payload) => {
           const status = (payload.new as Record<string, unknown>).status as string;
           if (settledRef.current) return;
-          if (status === "cancelled" || status === "declined" || status === "missed") {
+          // "accepted" here means another of this user's devices answered.
+          if (status !== "ringing") {
             console.log("CALL DEBUG incoming: remote settled the call first", { callId: params.callId, status });
             settledRef.current = true;
+            if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
             void ringtone.stop();
+            void dismissCallNotifications(params.callId);
             dismissScreen();
           }
         }
@@ -164,6 +217,7 @@ export default function IncomingCallScreen() {
 
   async function handleDecline() {
     console.log("CALL DEBUG incoming: declined", { callId: params.callId });
+    if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
     await ringtone.stop();
     try {
       await settle("declined");
@@ -184,16 +238,20 @@ export default function IncomingCallScreen() {
   async function handleAnswer() {
     if (joining) return;
     console.log("CALL DEBUG incoming: answer pressed", { callId: params.callId, isInvitation });
+    if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
     await ringtone.stop();
+    void dismissCallNotifications(params.callId);
     // Invitation-derived ringing calls must run the real accept flow first
     // — capacity/expiry/authorization are all re-checked atomically
     // server-side (migration 083) — rather than settling and navigating
     // straight in, which would let a stale or full-call invitation through.
     if (isInvitation && params.invitationId) {
       setJoining(true);
+      // Set before the request: its own "accepted" write must not look like
+      // another device answering to the realtime watcher above.
+      settledRef.current = true; // this invitation flow owns settlement, not the plain p2p_incoming_calls update
       try {
         const result = await acceptCallInvitation(params.invitationId);
-        settledRef.current = true; // this invitation flow owns settlement, not the plain p2p_incoming_calls update
         const pathname = result.callType === "video" ? "/call/video" : "/call/audio";
         router.replace({
           pathname,
@@ -210,6 +268,7 @@ export default function IncomingCallScreen() {
           },
         } as any);
       } catch (e: any) {
+        settledRef.current = false; // a failed accept can be retried
         setJoining(false);
         showAlert("Couldn't join", e?.message ?? "Please try again.");
       }
@@ -230,13 +289,22 @@ export default function IncomingCallScreen() {
     // symptom exactly on both ends. The invitation branch above already had
     // this try/catch; this mirrors it.
     setJoining(true);
+    let stillRinging: boolean;
     try {
-      await settle("accepted");
+      stillRinging = await settle("accepted");
     } catch (e: any) {
       console.warn("CALL DEBUG incoming: accept FAILED, offering retry", { callId: params.callId, error: e?.message });
       settledRef.current = false; // allow a genuine retry, not a silent no-op
       setJoining(false);
       showAlert("Couldn't connect", "There was a problem answering this call. Please try again.");
+      return;
+    }
+    // The caller hung up / it timed out / another device answered between
+    // the ring and this tap — joining now would only wait on an empty channel.
+    if (!stillRinging) {
+      console.log("CALL DEBUG incoming: accept too late, call no longer ringing", { callId: params.callId });
+      showAlert("Call ended", `${callerName}'s call has already ended.`);
+      dismissScreen();
       return;
     }
     const pathname = callType === "video" ? "/call/video" : "/call/audio";

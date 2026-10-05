@@ -71,6 +71,12 @@ function formatClock(totalSeconds: number): string {
 // path room to complete.
 const NO_ANSWER_TIMEOUT_MS = 70000;
 
+// See audio.tsx's identical declaration.
+type UnansweredOutcome = "no_answer" | "declined" | "busy";
+const UNANSWERED_LABEL: Record<UnansweredOutcome, string> = {
+  no_answer: "No answer", declined: "Call declined", busy: "Busy",
+};
+
 // CALL DEBUG forensic fix — see audio.tsx's identical comment: bounds the
 // "joining_channel" step itself (both roles) and the recipient's side of
 // "waiting_for_peer" (previously unbounded — the 40s timer above only ever
@@ -219,6 +225,8 @@ export default function VideoCallScreen() {
   const [callState, setCallState] = useState<
     "requesting_token" | "joining_channel" | "waiting_for_peer" | "connected" | "failed" | "ended" | "no_answer"
   >("requesting_token");
+  // Which unanswered outcome the "no_answer" result screen is showing.
+  const [unansweredOutcome, setUnansweredOutcome] = useState<UnansweredOutcome>("no_answer");
   // Stage 22 — guards "Call again" against a double-tap starting two calls.
   const [callingAgain, setCallingAgain] = useState(false);
   const endedRef = useRef(false);
@@ -342,7 +350,7 @@ export default function VideoCallScreen() {
   // distinct "no_answer" reason — see audio.tsx's identical comment for the
   // full rationale (setToken(null) reuses useAgoraEngine's own existing
   // dependency-driven cleanup instead of navigating away).
-  const handleEndCall = useCallback(async (reason: "user" | "failed" | "no_answer" = "user") => {
+  const handleEndCall = useCallback(async (reason: "user" | "failed" | UnansweredOutcome = "user") => {
     console.log("CALL END TRACE", {
       mountId: mountIdRef.current, source: reason, callId: params.callId, channelName: params.channelName,
       alreadyEnded: endedRef.current, timestamp: new Date().toISOString(),
@@ -351,7 +359,10 @@ export default function VideoCallScreen() {
     endedRef.current = true;
     // Stage 26B — see audio.tsx's identical comment.
     stopCallBackgroundSupport();
-    setCallState(reason === "no_answer" ? "no_answer" : "ended");
+    // Declined and busy share the "No answer" result screen and teardown.
+    const unanswered = reason === "no_answer" || reason === "declined" || reason === "busy";
+    if (unanswered) setUnansweredOutcome(reason);
+    setCallState(unanswered ? "no_answer" : "ended");
 
     // Video-call lifecycle audit — a real end (explicit or genuine failure)
     // must not leave a pending reconnect-grace timer to fire afterward and
@@ -382,7 +393,7 @@ export default function VideoCallScreen() {
 
     // Stage 22 — no navigation here at all: the /calls/end report above
     // already ran, so the engine only needs to actually leave.
-    if (reason === "no_answer") {
+    if (unanswered) {
       setToken(null);
       return;
     }
@@ -709,7 +720,11 @@ export default function VideoCallScreen() {
             mountId: mountIdRef.current, callId: params.callId, channelName: params.channelName,
             status, timestamp: new Date().toISOString(),
           });
-          if (status === "declined" || status === "missed" || status === "cancelled") handleEndCall();
+          // See audio.tsx's identical mapping.
+          if (status === "declined") handleEndCall("declined");
+          else if (status === "busy") handleEndCall("busy");
+          else if (status === "missed") handleEndCall("no_answer");
+          else if (status === "cancelled") handleEndCall();
         }
       )
       .subscribe();
@@ -964,7 +979,7 @@ export default function VideoCallScreen() {
             )}
           </View>
           <Text style={styles.noAnswerName}>{otherName}</Text>
-          <Text style={styles.noAnswerStatus}>No answer</Text>
+          <Text style={styles.noAnswerStatus}>{UNANSWERED_LABEL[unansweredOutcome]}</Text>
         </View>
         <View style={styles.noAnswerActions}>
           <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={navigateBack} accessibilityRole="button" accessibilityLabel="Cancel">

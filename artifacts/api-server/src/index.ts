@@ -9,6 +9,7 @@ import { publishScheduledAnnouncements } from "./lib/churchAnnouncements";
 import { flagOverdueContactMessages } from "./lib/contactOverdue";
 import { dispatchPendingPushes } from "./lib/pushDispatch";
 import { sendDueChurchCallReminders } from "./lib/churchCallReminders";
+import { sweepUnansweredCalls } from "./lib/callSweep";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -78,6 +79,18 @@ cron.schedule("*/1 * * * *", async () => {
     }
   } catch (err) {
     logger.error({ err }, "Crisis call escalation sweep failed");
+  }
+});
+
+// Unanswered 1:1 calls — settle any call still ringing 45s after it started
+// when neither phone was alive to do it (see lib/callSweep.ts). Every 15s
+// (node-cron's seconds field) so a caller never waits long for "No answer".
+cron.schedule("*/15 * * * * *", async () => {
+  try {
+    const result = await sweepUnansweredCalls();
+    if (result.settled) logger.info(result, "Unanswered calls settled");
+  } catch (err) {
+    logger.error({ err }, "Unanswered call sweep failed");
   }
 });
 

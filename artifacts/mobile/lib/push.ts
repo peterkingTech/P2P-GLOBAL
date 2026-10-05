@@ -4,6 +4,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform, AppState } from "react-native";
 import { authedFetch } from "@/lib/adminFetch";
+import { registerIncomingCallCategory } from "@/lib/callNotifications";
 
 const LAST_TOKEN_KEY = "p2p_last_push_token";
 
@@ -14,17 +15,24 @@ const LAST_TOKEN_KEY = "p2p_last_push_token";
 // hear/see the system notification for the exact same event. Background
 // and killed states have no in-app banner to compete with, so the OS
 // notification behaves normally there.
+// An incoming call is the one exception to "still list it while open": the
+// in-app ringing screen (IncomingCallHost) already handles it, so a tray
+// entry would just be a duplicate that outlives the call.
 Notifications.setNotificationHandler({
-  handleNotification: async () => {
+  handleNotification: async (notification) => {
     const isForeground = AppState.currentState === "active";
+    const isIncomingCall = (notification.request.content.data as Record<string, unknown> | undefined)?.notificationType === "incoming_call";
     return {
       shouldShowBanner: !isForeground,
-      shouldShowList: true,
+      shouldShowList: !(isForeground && isIncomingCall),
       shouldPlaySound: !isForeground,
       shouldSetBadge: false,
     };
   },
 });
+
+// Accept/Decline buttons — must exist before an incoming-call push arrives.
+void registerIncomingCallCategory();
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   // Emulators/simulators without real push services (and web) can't get a
@@ -111,7 +119,13 @@ export async function unregisterCurrentPushToken(): Promise<void> {
 // Notification Center, reusing its existing handlePress logic (which
 // already does the "is this session still live" check and falls back
 // safely) instead of duplicating that validation here.
-export function pathForNotification(notificationType: string | null, data: Record<string, unknown> | null | undefined): string {
+export function pathForNotification(
+  notificationType: string | null,
+  data: Record<string, unknown> | null | undefined,
+  // Accept/Decline pressed on an incoming-call notification; the ringing
+  // screen runs that action itself once it has confirmed the call is live.
+  callAction?: "accept" | "decline",
+): string {
   const conversationId = data?.conversationId as string | undefined;
   const contactMessageId = data?.messageId as string | undefined;
 
@@ -136,7 +150,13 @@ export function pathForNotification(notificationType: string | null, data: Recor
       callerName: String(data.callerName ?? ""), conversationId: String(data.conversationId ?? ""),
       callLogId: String(data.callLogId ?? ""), invitationId: String(data.invitationId ?? ""),
     });
+    if (callAction) p.set("action", callAction);
     return `/call/incoming?${p.toString()}`;
+  }
+  // Missed call — the thread holds the missed-call card (tap to call back);
+  // history covers a call with no conversation.
+  if (notificationType === "missed_call") {
+    return conversationId ? `/messages/${conversationId}` : "/call/history";
   }
   return "/notifications";
 }

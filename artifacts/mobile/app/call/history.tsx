@@ -17,6 +17,23 @@ function showAlert(title: string, message: string) {
 interface CallHistoryEntry {
   id: string; callType: CallType | "group"; status: string; durationSeconds: number;
   createdAt: string; conversationId: string | null; otherUserId: string | null; otherUserName: string | null;
+  direction?: "incoming" | "outgoing";
+}
+
+// p2p_call_logs.status → what this user sees. The labels match the chat's
+// call-summary card (calls.ts UNANSWERED_LABEL); direction decides whether
+// an unanswered call reads as "Missed" (it rang here) or "No answer".
+const UNANSWERED_STATUSES = new Set(["missed", "declined", "cancelled", "busy"]);
+function outcomeLabel(item: CallHistoryEntry): string {
+  const incoming = item.direction === "incoming";
+  switch (item.status) {
+    case "ended": return formatDuration(item.durationSeconds);
+    case "missed": return incoming ? "Missed" : "No answer";
+    case "declined": return "Declined";
+    case "cancelled": return "Cancelled";
+    case "busy": return "Busy";
+    default: return "—"; // never settled (both apps closed mid-call)
+  }
 }
 
 const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -115,11 +132,16 @@ export default function CallHistoryScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }}
           renderItem={({ item }) => {
-            const missed = item.status === "missed";
-            // Only plain 1:1 audio/video calls with a known peer can be
-            // called back; group/pastoral/crisis calls, or a stale record
-            // with no peer id, keep the previous open-the-chat behavior.
-            const canCallBack = missed && !!item.otherUserId && (item.callType === "audio" || item.callType === "video");
+            const incoming = item.direction === "incoming";
+            const unanswered = UNANSWERED_STATUSES.has(item.status);
+            // Red = a call that rang here and nobody picked up.
+            const missed = incoming && (item.status === "missed" || item.status === "cancelled");
+            // Any unanswered plain 1:1 audio/video call with a known peer
+            // calls straight back; group/pastoral/crisis calls, or a stale
+            // record with no peer id, keep the open-the-chat behavior.
+            const canCallBack = unanswered && !!item.otherUserId && (item.callType === "audio" || item.callType === "video");
+            const typeLabel = TYPE_LABEL[item.callType] ?? "Call";
+            const directionLabel = item.direction ? (incoming ? "Incoming" : "Outgoing") : null;
             return (
               <TouchableOpacity
                 style={styles.row}
@@ -137,18 +159,18 @@ export default function CallHistoryScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowName} numberOfLines={1}>{item.otherUserName ?? "Someone"}</Text>
                   <Text style={[styles.rowMeta, missed && styles.rowDurationMissed]}>
-                    {missed ? `Missed ${(TYPE_LABEL[item.callType] ?? "call").toLowerCase()}` : TYPE_LABEL[item.callType] ?? "Call"} · {formatDate(item.createdAt)}
+                    {missed ? `Missed ${typeLabel.toLowerCase()}` : typeLabel}
+                    {directionLabel ? ` · ${directionLabel}` : ""} · {formatDate(item.createdAt)}
                   </Text>
                 </View>
+                <Text style={[styles.rowDuration, missed && styles.rowDurationMissed]}>
+                  {outcomeLabel(item)}
+                </Text>
                 {callingBackId === item.id ? (
-                  <ActivityIndicator size="small" color={colors.accentGreen} />
+                  <ActivityIndicator size="small" color={colors.accentGreen} style={{ marginLeft: 10 }} />
                 ) : canCallBack ? (
-                  <Ionicons name={item.callType === "video" ? "videocam-outline" : "call-outline"} size={20} color={colors.accentGreen} />
-                ) : (
-                  <Text style={[styles.rowDuration, missed && styles.rowDurationMissed]}>
-                    {missed ? "Missed" : formatDuration(item.durationSeconds)}
-                  </Text>
-                )}
+                  <Ionicons name={item.callType === "video" ? "videocam-outline" : "call-outline"} size={20} color={colors.accentGreen} style={{ marginLeft: 10 }} />
+                ) : null}
               </TouchableOpacity>
             );
           }}

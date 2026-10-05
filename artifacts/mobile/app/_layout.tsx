@@ -6,10 +6,10 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments, usePathname } from "expo-router";
+import { Stack, useRouter, useSegments, usePathname, useGlobalSearchParams } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
-import { Alert, I18nManager, Platform } from "react-native";
+import { Alert, AppState, I18nManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -24,6 +24,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync, pathForNotification } from "@/lib/push";
+import { ACCEPT_ACTION, DECLINE_ACTION, dismissCallNotifications, sweepStaleCallNotifications } from "@/lib/callNotifications";
+import { supabase } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
 import { CircleSessionBanner } from "@/components/CircleSessionBanner";
@@ -218,14 +220,34 @@ function GrowthCelebrationHost() {
 // pattern GrowthCelebrationHost uses for fruit celebrations — it works
 // regardless of which screen the user is currently on, since it's mounted
 // once at the root alongside the rest of the app.
+// Screens that mean "already on (or being rung for) a call". A second
+// ordinary call never interrupts one of these — there's no call waiting —
+// it's marked "busy" instead, which the caller's screen shows as "Busy".
+const BUSY_CALL_PATHS = ["/call/audio", "/call/video", "/call/group", "/call/church", "/call/room", "/call/prayer", "/call/incoming"];
+
 function IncomingCallHost() {
   const { incomingCall, dismissIncomingCall } = useData();
   const router = useRouter();
+  const pathname = usePathname();
+  const routeParams = useGlobalSearchParams<{ callId?: string }>();
   const shownForCallId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!incomingCall || shownForCallId.current === incomingCall.callId) return;
     shownForCallId.current = incomingCall.callId;
+    // Already on screen for this very call (e.g. opened from its push, then
+    // realtime's catch-up read delivered it again) — nothing to do.
+    if (routeParams.callId === incomingCall.callId) { dismissIncomingCall(); return; }
+    const busy = incomingCall.callType !== "crisis" && BUSY_CALL_PATHS.some((p) => pathname?.startsWith(p));
+    if (busy) {
+      console.log("CALL INCOMING TRACE: busy, not ringing", { callId: incomingCall.callId, pathname });
+      void supabase.from("p2p_incoming_calls")
+        .update({ status: "busy", responded_at: new Date().toISOString() })
+        .eq("id", incomingCall.callId).eq("status", "ringing")
+        .then(() => dismissCallNotifications(incomingCall.callId));
+      dismissIncomingCall();
+      return;
+    }
     // CALL INCOMING TRACE (automatic-second-call investigation).
     console.log("CALL INCOMING TRACE: IncomingCallHost navigating", {
       callId: incomingCall.callId, channelName: incomingCall.channelName,
@@ -250,6 +272,9 @@ function IncomingCallHost() {
       },
     } as any);
     dismissIncomingCall();
+    // pathname/routeParams are read, not watched: only a newly arriving
+    // call is judged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingCall, dismissIncomingCall, router]);
 
   return null;
@@ -382,7 +407,9 @@ function PushNotificationHost() {
       handledNotificationIds.current.add(id);
       const data = response.notification.request.content.data as Record<string, unknown> | undefined;
       const notificationType = (data?.notificationType as string | undefined) ?? null;
-      const path = pathForNotification(notificationType, data);
+      const callAction = response.actionIdentifier === ACCEPT_ACTION ? "accept"
+        : response.actionIdentifier === DECLINE_ACTION ? "decline" : undefined;
+      const path = pathForNotification(notificationType, data, callAction);
       // Incoming-call taps use replace, not push: IncomingCallHost below
       // already navigates to this exact same screen the instant realtime
       // detects the call (foreground/background-but-alive case) — a push
@@ -400,6 +427,18 @@ function PushNotificationHost() {
     const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
     return () => subscription.remove();
   }, [router]);
+
+  // A push can't be withdrawn server-side, so an "Incoming call" entry can
+  // outlive its call while the app was backgrounded or closed. Clear any
+  // such stale entry on launch and on every return to the foreground.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void sweepStaleCallNotifications(supabase);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void sweepStaleCallNotifications(supabase);
+    });
+    return () => sub.remove();
+  }, [isAuthenticated]);
 
   return null;
 }

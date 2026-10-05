@@ -60,7 +60,14 @@ if (Platform.OS === "android") {
  */
 export function startCallBackgroundSupport(isVideo: boolean): void {
   if (Platform.OS === "android") {
-    nativeModule?.start(isVideo);
+    // Android 12+ refuses to start a foreground service while the app is in
+    // the background (e.g. the call connects after the user switched away).
+    // That costs background survival for this call, never the call itself.
+    try {
+      nativeModule?.start(isVideo);
+    } catch (e) {
+      console.warn("callBackgroundSupport: start failed", e instanceof Error ? e.message : String(e));
+    }
   }
   // iOS/macOS/Windows: no imperative start step exists/applies (see above).
 }
@@ -74,6 +81,10 @@ export function startCallBackgroundSupport(isVideo: boolean): void {
  */
 export function stopCallBackgroundSupport(): void {
   if (Platform.OS === "android") {
-    nativeModule?.stop();
+    try {
+      nativeModule?.stop();
+    } catch (e) {
+      console.warn("callBackgroundSupport: stop failed", e instanceof Error ? e.message : String(e));
+    }
   }
 }
