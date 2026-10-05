@@ -187,6 +187,7 @@ export function pathForNotification(
       callType: String(data.callType ?? "audio"), callerId: String(data.callerId ?? ""),
       callerName: String(data.callerName ?? ""), conversationId: String(data.conversationId ?? ""),
       callLogId: String(data.callLogId ?? ""), invitationId: String(data.invitationId ?? ""),
+      callerPhotoUrl: String(data.callerPhotoUrl ?? ""),
     });
     if (callAction) p.set("action", callAction);
     return `/call/incoming?${p.toString()}`;

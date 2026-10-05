@@ -12,6 +12,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
 
 /**
  * The ringing notification for an incoming call: Android's call-style
@@ -65,7 +66,10 @@ object IncomingCallNotifier {
           .putExtra(CallActionReceiver.EXTRA_CALL_ID, info.callId),
         immutable
       )
-      val caller = Person.Builder().setName(info.peerName).setImportant(true).build()
+      val callerBuilder = Person.Builder().setName(info.peerName).setImportant(true)
+      // The caller's photo as the call notification's avatar, once cached.
+      CallPhotoCache.cached(context, info.photoUrl)?.let { callerBuilder.setIcon(IconCompat.createWithBitmap(it)) }
+      val caller = callerBuilder.build()
       val notification = NotificationCompat.Builder(context, CHANNEL_ID)
         .setSmallIcon(context.applicationInfo.icon)
         .setContentTitle(info.peerName)

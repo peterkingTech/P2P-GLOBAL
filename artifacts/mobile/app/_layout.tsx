@@ -264,6 +264,7 @@ function IncomingCallHost() {
         callId: incomingCall.callId, channelName: incomingCall.channelName, callType: incomingCall.callType,
         callerId: incomingCall.callerId, callerName: incomingCall.callerName,
         conversationId: incomingCall.conversationId, callLogId: incomingCall.callLogId,
+        callerPhotoUrl: incomingCall.callerPhotoUrl,
       };
       const ringNatively = Platform.OS === "ios" || AppState.currentState !== "active";
       reportSystemIncomingCall(info, ringNatively);
@@ -290,6 +291,7 @@ function IncomingCallHost() {
         conversationId: incomingCall.conversationId ?? "",
         callLogId: incomingCall.callLogId ?? "",
         invitationId: incomingCall.invitationId ?? "",
+        callerPhotoUrl: incomingCall.callerPhotoUrl ?? "",
       },
     } as any);
     dismissIncomingCall();
@@ -338,6 +340,7 @@ function CallSystemHost() {
               callId: c.callId, channelName: c.channelName, callType: c.callType,
               callerId: c.callerId, callerName: c.callerName,
               conversationId: c.conversationId ?? "", callLogId: c.callLogId ?? "",
+              callerPhotoUrl: c.callerPhotoUrl ?? "",
               invitationId: "", action: "accept",
             },
           } as any);

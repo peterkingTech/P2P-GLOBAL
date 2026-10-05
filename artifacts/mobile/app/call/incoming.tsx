@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, Animated, Easing, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, ActivityIndicator } from "react-native";
+import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +14,8 @@ import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { dismissCallNotifications } from "@/lib/callNotifications";
 import { answerSystemCall, endSystemCall } from "@/lib/callSystem";
+import { Avatar } from "@/components/Avatar";
+import appColors from "@/constants/colors";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -43,6 +47,9 @@ export default function IncomingCallScreen() {
     conversationId?: string; callLogId?: string; invitationId?: string;
     // Set when Accept/Decline was pressed on the system notification.
     action?: "accept" | "decline";
+    // The caller's profile photo when the opener already knows it (push
+    // payload, realtime host) — shown at once instead of after a lookup.
+    callerPhotoUrl?: string;
   }>();
   const notificationAction = params.action === "accept" || params.action === "decline" ? params.action : null;
   const callType = (params.callType as CallType) ?? "audio";
@@ -57,38 +64,25 @@ export default function IncomingCallScreen() {
   // just settling the row and navigating straight in.
   const isInvitation = !!params.invitationId;
 
-  const pulse = useRef(new Animated.Value(1)).current;
   const settledRef = useRef(false);
   const [joining, setJoining] = useState(false);
   const ringtone = useRingtone();
-  // The incoming-call invitation payload (push notification / p2p_incoming_calls
-  // row) has never carried a caller photo — only callerId/callerName — so this
-  // is a small additive read-only lookup, not a change to push/invitation
-  // architecture. Absence of a photo silently keeps the existing emoji fallback.
-  const [callerPhotoUrl, setCallerPhotoUrl] = useState<string | null>(null);
+  // The caller's profile photo is the whole screen. A URL passed in by the
+  // opener shows immediately (expo-image serves it from its disk cache when
+  // it has been seen before); the profile lookup then confirms/refreshes it.
+  // No photo → the standard P2P Avatar. Never blocks Answer/Decline.
+  const [callerPhotoUrl, setCallerPhotoUrl] = useState<string | null>(params.callerPhotoUrl || null);
   useEffect(() => {
     if (!params.callerId) return;
     let cancelled = false;
     supabase.from("p2p_profiles").select("photo_url").eq("id", params.callerId).maybeSingle().then(({ data }) => {
-      if (!cancelled) setCallerPhotoUrl((data as any)?.photo_url ?? null);
+      const url = (data as any)?.photo_url as string | null | undefined;
+      if (!cancelled && url) setCallerPhotoUrl(url);
     });
     return () => { cancelled = true; };
   }, [params.callerId]);
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.25, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
-  // Real ringing (audio + vibration), not just the pulse animation above.
-  // Starts the moment this screen mounts (a call invitation has been
-  // received) and stops on every exit path: answer, decline, timeout,
+  // Real ringing (audio + vibration). Stops on every exit path: answer, decline, timeout,
   // remote cancellation, or an unexpected unmount (useRingtone's own
   // cleanup effect covers that last case even if none of the explicit
   // stop() calls below ever run).
@@ -334,77 +328,100 @@ export default function IncomingCallScreen() {
     } as any);
   }
 
+  // "P2P Global Audio" / "P2P Global Video" — the special call types keep
+  // their own wording.
+  const subtitle = isCrisis
+    ? "Crisis alert · needs you now"
+    : isInvitation
+      ? "Invited you to a P2P Global call"
+      : callType === "pastoral"
+        ? `P2P Global · ${CALL_TYPE_LABEL.pastoral}`
+        : `P2P Global ${callType === "video" ? "Video" : "Audio"}`;
+
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+    <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      <View style={styles.center}>
-        <Animated.View style={[styles.avatarRing, { transform: [{ scale: pulse }] }]} />
-        <View style={styles.avatarCircle}>
-          {callerPhotoUrl ? (
-            <Image source={{ uri: callerPhotoUrl }} style={styles.avatarPhoto} />
-          ) : (
-            <Text style={styles.avatarEmoji}>🌳</Text>
-          )}
+      {/* The caller's photo IS the screen: cover-cropped around the centre,
+          never stretched; the disk cache makes a repeat caller instant. */}
+      {callerPhotoUrl ? (
+        <ExpoImage
+          source={{ uri: callerPhotoUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          contentPosition="center"
+          cachePolicy="memory-disk"
+          transition={180}
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+          <Avatar name={callerName} size={168} />
         </View>
+      )}
+      {/* Darken only the top (name) and bottom (controls) so the face in
+          the middle stays clear. */}
+      <LinearGradient
+        colors={["rgba(0,0,0,0.62)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0)", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.78)"]}
+        locations={[0, 0.26, 0.5, 0.68, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
 
-        <Text style={styles.callerName}>{callerName}</Text>
-        <Text style={styles.callingText}>
-          {isCrisis ? "needs you now" : isInvitation ? "invited you to join a call" : "is calling you..."}
-        </Text>
-
-        <View style={styles.typeChip}>
-          <Ionicons name={callType === "video" ? "videocam" : "call"} size={14} color={p2pColors.accent} />
-          <Text style={styles.typeChipText}>{CALL_TYPE_LABEL[callType]}</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 48 }]}>
+        <Text style={styles.callerName} numberOfLines={2}>{callerName}</Text>
+        <View style={styles.subtitleRow}>
+          <Ionicons name={callType === "video" ? "videocam" : "call"} size={15} color="rgba(255,255,255,0.9)" />
+          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </View>
 
-      <View style={styles.buttonRow}>
+      <View style={[styles.buttonRow, { paddingBottom: insets.bottom + 44 }]}>
         {!isCrisis && (
-          <TouchableOpacity style={[styles.circleBtn, styles.declineBtn]} onPress={handleDecline} activeOpacity={0.85}>
-            <Ionicons name="close" size={30} color="#fff" />
+          <View style={styles.buttonColumn}>
+            <TouchableOpacity
+              style={[styles.circleBtn, styles.declineBtn]} onPress={handleDecline} activeOpacity={0.85}
+              accessibilityRole="button" accessibilityLabel="Decline call"
+            >
+              <Ionicons name="call" size={30} color="#fff" style={styles.hangupIcon} />
+            </TouchableOpacity>
             <Text style={styles.circleBtnLabel}>Decline</Text>
-          </TouchableOpacity>
+          </View>
         )}
-        <TouchableOpacity style={[styles.circleBtn, styles.answerBtn]} onPress={handleAnswer} activeOpacity={0.85} disabled={joining}>
-          {joining ? <ActivityIndicator color="#fff" /> : <Ionicons name="checkmark" size={30} color="#fff" />}
-          <Text style={styles.circleBtnLabel}>Answer</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonColumn}>
+          <TouchableOpacity
+            style={[styles.circleBtn, styles.answerBtn]} onPress={handleAnswer} activeOpacity={0.85} disabled={joining}
+            accessibilityRole="button" accessibilityLabel="Accept call"
+          >
+            {joining ? <ActivityIndicator color="#fff" /> : <Ionicons name={callType === "video" ? "videocam" : "call"} size={30} color="#fff" />}
+          </TouchableOpacity>
+          <Text style={styles.circleBtnLabel}>Accept</Text>
+        </View>
       </View>
     </View>
   );
 }
 
 function makeStyles(p2p: P2PCallColors) {
+  const shadow = { textShadowColor: "rgba(0,0,0,0.45)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 };
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: p2p.bg, justifyContent: "space-between", alignItems: "center" },
-    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
-    avatarRing: {
-      position: "absolute", width: 160, height: 160, borderRadius: 80,
-      borderWidth: 2, borderColor: p2p.accentBorder,
+    screen: { flex: 1, backgroundColor: "#000", justifyContent: "space-between" },
+    fallback: { backgroundColor: p2p.bg, alignItems: "center", justifyContent: "center" },
+    header: { alignItems: "center", paddingHorizontal: 28 },
+    callerName: {
+      fontSize: 34, color: "#fff", fontFamily: "Inter_700Bold", textAlign: "center", letterSpacing: -0.3, ...shadow,
     },
-    avatarCircle: {
-      width: 130, height: 130, borderRadius: 65, backgroundColor: p2p.pillBg,
-      alignItems: "center", justifyContent: "center", marginBottom: 24,
-      borderWidth: 1.5, borderColor: p2p.accent,
-    },
-    avatarEmoji: { fontSize: 56 },
-    avatarPhoto: { width: "100%", height: "100%", borderRadius: 65 },
-    callerName: { fontSize: 26, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
-    callingText: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
-    typeChip: {
-      flexDirection: "row", alignItems: "center", gap: 6, marginTop: 20,
-      backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accentBorder,
-      borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-    },
-    typeChipText: { color: p2p.accent, fontSize: 13, fontFamily: "Inter_500Medium" },
-    buttonRow: { flexDirection: "row", gap: 40, paddingBottom: 20 },
-    circleBtn: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", gap: 4 },
+    subtitleRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 10 },
+    subtitle: { fontSize: 16, color: "rgba(255,255,255,0.92)", fontFamily: "Inter_500Medium", ...shadow },
+    buttonRow: { flexDirection: "row", justifyContent: "space-evenly", paddingHorizontal: 24 },
+    buttonColumn: { alignItems: "center", gap: 10 },
+    circleBtn: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center" },
     // Decline is the same "hang up" red-icon safety convention as the
     // in-call End Call button (see P2PControlButton's `danger` branch) —
-    // always P2P_END_CALL_RED, never themed.
+    // always P2P_END_CALL_RED, never themed. Accept is P2P's own green.
     declineBtn: { backgroundColor: P2P_END_CALL_RED },
-    answerBtn: { backgroundColor: p2p.accent },
-    circleBtnLabel: { position: "absolute", bottom: -22, color: "rgba(255,255,255,0.8)", fontSize: 11, fontFamily: "Inter_500Medium" },
+    answerBtn: { backgroundColor: appColors.accentGreen },
+    hangupIcon: { transform: [{ rotate: "135deg" }] },
+    circleBtnLabel: { color: "#fff", fontSize: 14, fontFamily: "Inter_500Medium", ...shadow },
   });
 }

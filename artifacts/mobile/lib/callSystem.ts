@@ -37,6 +37,8 @@ export type SystemCallInfo = {
   conversationId?: string | null;
   callLogId?: string | null;
   declineToken?: string;
+  /** Caller's profile photo — Android's native ringing screen shows it full-screen. */
+  callerPhotoUrl?: string | null;
 };
 
 export type CallSystemEvent =
@@ -96,7 +98,7 @@ function toNative(info: SystemCallInfo): Record<string, unknown> {
     callId: info.callId, channelName: info.channelName, callType: info.callType,
     callerId: info.callerId, callerName: info.callerName,
     conversationId: info.conversationId ?? "", callLogId: info.callLogId ?? "",
-    declineToken: info.declineToken ?? "",
+    declineToken: info.declineToken ?? "", callerPhotoUrl: info.callerPhotoUrl ?? "",
   };
 }
 

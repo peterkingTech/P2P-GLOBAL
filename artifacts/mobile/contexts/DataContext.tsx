@@ -13,6 +13,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { dismissCallNotifications } from "@/lib/callNotifications";
 import { endSystemCall } from "@/lib/callSystem";
+import { Image as ExpoImage } from "expo-image";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -959,6 +960,8 @@ export interface IncomingCallInfo {
   // Add People invitation (not an ordinary 1:1 call); tells
   // call/incoming.tsx to run the invitation-accept flow before navigating.
   invitationId: string | null;
+  // Caller's profile photo for the full-screen ringing UI (null = avatar).
+  callerPhotoUrl: string | null;
 }
 
 // A Peer Circle "Start Session" invite banner for the current user — set the
@@ -3082,7 +3085,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       console.log("CALL DEBUG incoming: applying ringing call", { callId, source });
 
       const { data: callerProfile } = await supabase
-        .from("p2p_profiles").select("full_name").eq("id", row.caller_id as string).maybeSingle();
+        .from("p2p_profiles").select("full_name, photo_url").eq("id", row.caller_id as string).maybeSingle();
+      const callerPhotoUrl = (callerProfile?.photo_url as string | null | undefined) ?? null;
+      // Start downloading the caller's photo into the image cache now, so
+      // the full-screen ringing UI usually opens with it already there.
+      if (callerPhotoUrl) void ExpoImage.prefetch(callerPhotoUrl, "memory-disk").catch(() => {});
 
       setIncomingCall({
         callId,
@@ -3093,6 +3100,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         conversationId: (row.conversation_id as string) ?? null,
         callLogId: (row.call_log_id as string) ?? null,
         invitationId: (row.invitation_id as string) ?? null,
+        callerPhotoUrl,
       });
     }
 

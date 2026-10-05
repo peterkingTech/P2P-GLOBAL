@@ -1049,10 +1049,13 @@ router.post("/calls/start", async (req, res) => {
   // through the existing, unmodified /calls/token flow once the recipient
   // is actually on the incoming-call screen and taps Answer.
   const { data: callerNameProfile } = await supabaseWrite
-    .from("p2p_profiles").select("full_name").eq("id", callerId).maybeSingle();
+    .from("p2p_profiles").select("full_name, photo_url").eq("id", callerId).maybeSingle();
   const callerName = (callerNameProfile?.full_name as string | undefined) ?? "Someone";
   const callData = {
     callId: incomingCall.id, channelName, callType, callerId, callerName,
+    // The caller's existing profile photo, for the full-screen ringing UI
+    // (null → the app's standard avatar).
+    callerPhotoUrl: (callerNameProfile?.photo_url as string | null | undefined) ?? null,
     conversationId: conversationId ?? null, callLogId: callLog.id, invitationId: null,
     // Lets the native call UI decline without the app's JS running
     // (lib/callActionToken.ts, POST /calls/native-decline).

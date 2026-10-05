@@ -20,6 +20,8 @@ data class CallInfo(
   val conversationId: String,
   val callLogId: String,
   val declineToken: String,
+  /** The other person's profile photo URL, or "" (ringing UI shows an avatar). */
+  val photoUrl: String = "",
 ) {
   val isVideo: Boolean get() = callType == "video"
 
@@ -32,8 +34,10 @@ data class CallInfo(
     .put("conversationId", conversationId)
     .put("callLogId", callLogId)
     .put("declineToken", declineToken)
+    .put("callerPhotoUrl", photoUrl)
 
   fun toEventMap(): Map<String, Any?> = mapOf(
+    "callerPhotoUrl" to photoUrl,
     "callId" to callId,
     "channelName" to channelName,
     "callType" to callType,
@@ -54,6 +58,7 @@ data class CallInfo(
       .appendQueryParameter("conversationId", conversationId)
       .appendQueryParameter("callLogId", callLogId)
       .appendQueryParameter("invitationId", "")
+      .appendQueryParameter("callerPhotoUrl", photoUrl)
     if (action != null) b.appendQueryParameter("action", action)
     return b.build()
   }
@@ -75,6 +80,7 @@ data class CallInfo(
         conversationId = o.str("conversationId"),
         callLogId = o.str("callLogId"),
         declineToken = o.str("declineToken"),
+        photoUrl = o.str("callerPhotoUrl"),
       )
     }
 

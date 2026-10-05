@@ -103,6 +103,13 @@ object CallSystem {
     val call = ActiveCall(info, incoming = true)
     calls[info.callId] = call
     if (showUi) IncomingCallNotifier.show(context, info)
+    // Fetch the caller's photo now: the full-screen ringing UI uses it, and
+    // the notification is refreshed (silently) to show it as the avatar.
+    if (info.photoUrl.isNotEmpty()) {
+      CallPhotoCache.load(context, info.photoUrl) { bitmap ->
+        if (bitmap != null && showUi && isRinging(info.callId)) IncomingCallNotifier.show(context, info)
+      }
+    }
     if (isSupported()) startTelecom(context.applicationContext, call)
     call.timeoutJob = scope.launch {
       delay(RING_TIMEOUT_MS)
