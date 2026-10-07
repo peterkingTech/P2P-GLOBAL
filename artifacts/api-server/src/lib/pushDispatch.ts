@@ -1,5 +1,6 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
+import { getDeactivatedUserIds } from "./accountStatus";
 
 // Centralized push delivery for the existing p2p_notifications event
 // system. Every one of this codebase's ~19 notification-insert call sites
@@ -223,6 +224,10 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
     logger.error({ err: tokenErr }, "pushDispatch: failed to fetch push tokens");
     return { notifications: pending.length, pushed: 0, staleTokens: 0 };
   }
+  // Users on a break (account deactivated) get no device pushes; their
+  // notifications are still stored and readable in-app when they return.
+  // Incoming-call rings are left to the call system untouched.
+  const deactivated = await getDeactivatedUserIds(userIds);
   const tokensByUser = new Map<string, PushToken[]>();
   for (const row of (tokenRows ?? []) as PushToken[]) {
     const list = tokensByUser.get(row.user_id) ?? [];
@@ -235,6 +240,7 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
   for (const n of pending) {
     // Still marked pushed below, so it's never retried either.
     if (isStaleIncomingCall(n)) continue;
+    if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") continue;
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
     for (const t of tokens) {
       messages.push(buildExpoMessage(n, t.token));

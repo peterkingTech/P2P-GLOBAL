@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
+import { getDeactivatedUserIds } from "./accountStatus";
 
 const SUPABASE_URL =
   process.env.SUPABASE_DB_URL?.startsWith("https://")
@@ -215,8 +216,12 @@ export async function detectInactiveUsers(): Promise<{ dormantSeedSent: number; 
 
   const profiles = (candidates ?? []) as CareProfile[];
   let dormantSeedSent = 0, elijahSent = 0, peerGuideAlertsSent = 0;
+  // Someone who chose to take a break (account deactivated) isn't "inactive":
+  // no Dormant Seed / Elijah messages, and no alert to their Peer Guide.
+  const onBreak = await getDeactivatedUserIds(profiles.map((p) => p.id));
 
   for (const profile of profiles) {
+    if (onBreak.has(profile.id)) continue;
     const lastActive = profile.last_active_at ? new Date(profile.last_active_at).getTime() : Date.now();
     const daysInactive = Math.floor((Date.now() - lastActive) / DAY_MS);
     const onRest = profile.elijah_rest_until && new Date(profile.elijah_rest_until).getTime() > Date.now();
