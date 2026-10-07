@@ -12,6 +12,7 @@ export type AccountStatusRow = {
   deactivated_at: string | null;
   deactivated_until: string | null;
   reactivated_at: string | null;
+  deletion_scheduled_for?: string | null;
 };
 
 // A break whose end date has passed counts as active again — no job has to
@@ -19,6 +20,12 @@ export type AccountStatusRow = {
 export function isEffectivelyDeactivated(row: Pick<AccountStatusRow, "status" | "deactivated_until"> | null | undefined): boolean {
   if (!row || row.status !== "deactivated") return false;
   return !row.deactivated_until || new Date(row.deactivated_until).getTime() > Date.now();
+}
+
+// "Paused" = no pushes or pastoral nudges: on a break, or waiting out the
+// grace period before a scheduled deletion.
+export function isPaused(row: Pick<AccountStatusRow, "status" | "deactivated_until"> | null | undefined): boolean {
+  return isEffectivelyDeactivated(row) || row?.status === "deletion_scheduled";
 }
 
 // Before migration 173 is applied the table doesn't exist; behave exactly as
@@ -30,7 +37,7 @@ function isMissingTable(error: { code?: string; message?: string } | null): bool
 export async function getAccountStatus(userId: string): Promise<AccountStatusRow | null> {
   const { data, error } = await db
     .from("p2p_account_status")
-    .select("user_id, status, deactivated_at, deactivated_until, reactivated_at")
+    .select("user_id, status, deactivated_at, deactivated_until, reactivated_at, deletion_scheduled_for")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) {
@@ -40,19 +47,20 @@ export async function getAccountStatus(userId: string): Promise<AccountStatusRow
   return (data as AccountStatusRow | null) ?? null;
 }
 
-// Which of these users are currently on a break. Used to suppress their
-// pushes and pastoral nudges. Fails open (empty set) on a read error, so a
-// status-table problem can never stop notifications for everyone else.
+// Which of these users are currently paused (on a break, or scheduled for
+// deletion). Used to suppress their pushes and pastoral nudges. Fails open
+// (empty set) on a read error, so a status-table problem can never stop
+// notifications for everyone else.
 export async function getDeactivatedUserIds(userIds: string[]): Promise<Set<string>> {
   if (!userIds.length) return new Set();
   const { data, error } = await db
     .from("p2p_account_status")
     .select("user_id, status, deactivated_until")
     .in("user_id", userIds)
-    .eq("status", "deactivated");
+    .in("status", ["deactivated", "deletion_scheduled"]);
   if (error) {
-    if (!isMissingTable(error)) logger.error({ err: error }, "accountStatus: failed to read deactivated users");
+    if (!isMissingTable(error)) logger.error({ err: error }, "accountStatus: failed to read paused users");
     return new Set();
   }
-  return new Set(((data ?? []) as AccountStatusRow[]).filter(isEffectivelyDeactivated).map((r) => r.user_id));
+  return new Set(((data ?? []) as AccountStatusRow[]).filter(isPaused).map((r) => r.user_id));
 }

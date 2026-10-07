@@ -10,6 +10,7 @@ import { flagOverdueContactMessages } from "./lib/contactOverdue";
 import { dispatchPendingPushes } from "./lib/pushDispatch";
 import { sendDueChurchCallReminders } from "./lib/churchCallReminders";
 import { sweepUnansweredCalls } from "./lib/callSweep";
+import { processScheduledDeletions } from "./lib/accountDeletion";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -91,6 +92,18 @@ cron.schedule("*/15 * * * * *", async () => {
     if (result.settled) logger.info(result, "Unanswered calls settled");
   } catch (err) {
     logger.error({ err }, "Unanswered call sweep failed");
+  }
+});
+
+// Permanent account deletion — runs requests whose 14-day grace period has
+// passed (lib/accountDeletion.ts). Resumable and idempotent; a no-op unless
+// ACCOUNT_DELETION_ENABLED=true.
+cron.schedule("*/15 * * * *", async () => {
+  try {
+    const result = await processScheduledDeletions();
+    if (Object.values(result).some((n) => n > 0)) logger.info(result, "Scheduled account deletions processed");
+  } catch (err) {
+    logger.error({ err }, "Scheduled account deletion run failed");
   }
 });
 

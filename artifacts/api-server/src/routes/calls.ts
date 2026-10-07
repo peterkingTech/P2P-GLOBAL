@@ -1530,7 +1530,7 @@ router.get("/calls/rooms", async (_req, res) => {
     .order("current_participants", { ascending: false });
   if (error) return err(res, error.message, 500);
 
-  const hostIds = Array.from(new Set((rooms ?? []).map((r) => r.host_id as string)));
+  const hostIds = Array.from(new Set((rooms ?? []).map((r) => r.host_id as string))).filter(Boolean); // null = deleted account
   const { data: profiles } = hostIds.length
     ? await supabaseWrite.from("p2p_profiles").select("id,full_name").in("id", hostIds)
     : { data: [] as { id: string; full_name: string }[] };

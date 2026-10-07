@@ -1064,7 +1064,7 @@ router.get("/worship/sessions/:sessionId/messages", async (req, res) => {
     .from("p2p_family_worship_messages").select("*").eq("session_id", sessionId).order("created_at", { ascending: true }).limit(200);
   if (error) return err(res, error.message, 500);
 
-  const userIds = Array.from(new Set((messages ?? []).map((m) => m.user_id as string)));
+  const userIds = Array.from(new Set((messages ?? []).map((m) => m.user_id as string))).filter(Boolean); // null = deleted account
   const { data: profiles } = userIds.length
     ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds)
     : { data: [] as { id: string; full_name: string }[] };
@@ -1133,7 +1133,7 @@ router.get("/worship/sessions/:sessionId/notes", async (req, res) => {
     .order("created_at", { ascending: true });
   if (error) return err(res, error.message, 500);
 
-  const userIds = Array.from(new Set((notes ?? []).map((n) => n.author_id as string)));
+  const userIds = Array.from(new Set((notes ?? []).map((n) => n.author_id as string))).filter(Boolean); // null = deleted account
   const { data: profiles } = userIds.length
     ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds)
     : { data: [] as { id: string; full_name: string }[] };

@@ -493,7 +493,7 @@ router.get("/churches/calls/:callId/messages", async (req, res) => {
   const { data: messages, error } = await db.from("p2p_church_call_messages").select("*").eq("call_id", callId).order("created_at", { ascending: true }).limit(200);
   if (error) return err(res, error.message, 500);
 
-  const userIds = Array.from(new Set((messages ?? []).map((m) => m.user_id as string)));
+  const userIds = Array.from(new Set((messages ?? []).map((m) => m.user_id as string))).filter(Boolean); // null = deleted account
   const { data: profiles } = userIds.length ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds) : { data: [] as { id: string; full_name: string }[] };
   const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
   return ok(res, (messages ?? []).map((m) => mapMessage(m as Record<string, unknown>, nameById.get(m.user_id as string) ?? "Someone")));
@@ -529,7 +529,7 @@ router.get("/churches/calls/:callId/notes", async (req, res) => {
     .or(`visibility.eq.shared,author_id.eq.${userId}`).order("created_at", { ascending: true });
   if (error) return err(res, error.message, 500);
 
-  const userIds = Array.from(new Set((notes ?? []).map((n) => n.author_id as string)));
+  const userIds = Array.from(new Set((notes ?? []).map((n) => n.author_id as string))).filter(Boolean); // null = deleted account
   const { data: profiles } = userIds.length ? await db.from("p2p_profiles").select("id,full_name").in("id", userIds) : { data: [] as { id: string; full_name: string }[] };
   const nameById = new Map((profiles ?? []).map((p) => [p.id as string, p.full_name as string]));
   return ok(res, (notes ?? []).map((n) => mapNote(n as Record<string, unknown>, nameById.get(n.author_id as string) ?? "Someone")));

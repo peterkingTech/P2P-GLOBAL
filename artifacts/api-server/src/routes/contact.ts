@@ -232,7 +232,7 @@ router.get("/contact/admin/inbox", async (req, res) => {
   if (error) return err(res, error.message, 500);
 
   let rows = data ?? [];
-  const senderIds = [...new Set(rows.map((r) => r.from_user_id as string))];
+  const senderIds = [...new Set(rows.map((r) => r.from_user_id as string))].filter(Boolean); // null = deleted account
   const senders = senderIds.length
     ? await selectInChunks<Record<string, unknown>>(
         "p2p_profiles", "id,username,full_name,photo_url,country,ministry_role,growth_level,is_verified,created_at", "id", senderIds
