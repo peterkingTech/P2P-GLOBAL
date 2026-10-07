@@ -1006,7 +1006,7 @@ router.get("/churches/:churchId/announcements", async (req, res) => {
     .order("is_featured", { ascending: false }).order("is_pinned", { ascending: false }).order("created_at", { ascending: false });
   if (error) return err(res, error.message, 500);
 
-  const authorIds = [...new Set((data ?? []).map((a) => a.author_id as string))];
+  const authorIds = [...new Set((data ?? []).map((a) => a.author_id as string))].filter(Boolean); // null = deleted account
   const authors = authorIds.length ? await selectInChunks<{ id: string; full_name: string }>("p2p_profiles", "id,full_name", "id", authorIds) : [];
   const nameById = new Map(authors.map((a) => [a.id, a.full_name]));
 

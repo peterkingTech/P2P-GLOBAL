@@ -31,6 +31,21 @@ export function isDeletionEnabled(): boolean {
   return process.env.ACCOUNT_DELETION_ENABLED === "true";
 }
 
+// Verification exception while the switch is off: throwaway QA accounts
+// (p2p-sectest-…@example.com, a domain that cannot receive mail) can run
+// the full flow against the deployed server. It only ever lets such an
+// account delete ITSELF, so it grants nothing over anyone else. Remove once
+// deletion is switched on for everyone.
+const TEST_ACCOUNT_EMAIL = /^p2p-sectest-[a-z0-9-]+@example\.com$/;
+export function isTestAccountEmail(email: string | null | undefined): boolean {
+  return !!email && TEST_ACCOUNT_EMAIL.test(email);
+}
+export async function isDeletionAllowedFor(userId: string): Promise<boolean> {
+  if (isDeletionEnabled()) return true;
+  const { data } = await db.auth.admin.getUserById(userId);
+  return isTestAccountEmail(data?.user?.email);
+}
+
 export type DeletionLogRow = {
   id: string;
   user_id: string;
@@ -42,7 +57,7 @@ export type DeletionLogRow = {
   completed_at: string | null;
   attempts: number;
   last_error: string | null;
-  summary: { storage?: { bucket_id: string; name: string }[]; purge?: unknown } | null;
+  summary: { storage?: { bucket_id: string; name: string }[]; purge?: unknown; test_account?: boolean } | null;
 };
 
 export async function getDeletionBlockers(userId: string): Promise<string[]> {
@@ -62,14 +77,14 @@ export async function getOpenDeletion(userId: string): Promise<DeletionLogRow | 
 
 // Schedules deletion for an already-authorised caller. Idempotent: an
 // existing open request is returned unchanged.
-export async function scheduleDeletion(userId: string, reasonCode: string | null): Promise<DeletionLogRow> {
+export async function scheduleDeletion(userId: string, reasonCode: string | null, testAccount = false): Promise<DeletionLogRow> {
   const existing = await getOpenDeletion(userId);
   if (existing) return existing;
 
   const scheduledFor = new Date(Date.now() + DELETION_GRACE_DAYS * DAY_MS).toISOString();
   const { data: log, error: logErr } = await db
     .from("p2p_account_deletions")
-    .insert({ user_id: userId, scheduled_for: scheduledFor, reason_code: reasonCode })
+    .insert({ user_id: userId, scheduled_for: scheduledFor, reason_code: reasonCode, summary: testAccount ? { test_account: true } : null })
     .select("*").single();
   if (logErr) {
     // Lost a race with a concurrent request: the unique open-row index won.
@@ -211,9 +226,9 @@ export async function executeDeletion(logId: string): Promise<DeletionRunResult>
 // whose file cleanup still has to complete.
 export async function processScheduledDeletions(): Promise<Record<DeletionRunResult, number>> {
   const out = { completed: 0, already_completed: 0, cancelled: 0, postponed_active_call: 0, blocked: 0, failed: 0 };
-  if (!isDeletionEnabled()) return out;
+  const enabled = isDeletionEnabled();
   const { data, error } = await db
-    .from("p2p_account_deletions").select("id")
+    .from("p2p_account_deletions").select("id, summary")
     .is("cancelled_at", null).is("completed_at", null)
     .lte("scheduled_for", new Date().toISOString())
     .order("scheduled_for", { ascending: true }).limit(BATCH);
@@ -221,6 +236,10 @@ export async function processScheduledDeletions(): Promise<Record<DeletionRunRes
     logger.error({ err: error }, "account deletion: failed to list due requests");
     return out;
   }
-  for (const r of data ?? []) out[await executeDeletion(r.id as string)] += 1;
+  for (const r of data ?? []) {
+    // Switched off: only throwaway QA accounts are processed.
+    if (!enabled && !(r.summary as DeletionLogRow["summary"])?.test_account) continue;
+    out[await executeDeletion(r.id as string)] += 1;
+  }
   return out;
 }

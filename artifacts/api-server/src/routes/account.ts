@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyCaller } from "../lib/supabase";
 import { getAccountStatus, isEffectivelyDeactivated, type AccountStatusRow } from "../lib/accountStatus";
 import { inLiveCallOrSession, leadsGroupWithOthers, precheckFailed } from "../lib/accountSafety";
-import { cancelDeletion, getDeletionBlockers, isDeletionEnabled, scheduleDeletion, DELETION_GRACE_DAYS } from "../lib/accountDeletion";
+import { cancelDeletion, getDeletionBlockers, isDeletionAllowedFor, isDeletionEnabled, scheduleDeletion, DELETION_GRACE_DAYS } from "../lib/accountDeletion";
 import { logger } from "../lib/logger";
 
 const SUPABASE_URL =
@@ -179,7 +179,7 @@ const REASON_CODES = new Set([
 router.post("/deletion/request", async (req, res) => {
   const callerId = await callerOrReject(req, res);
   if (!callerId) return;
-  if (!isDeletionEnabled()) return res.status(404).json({ error: "Not available.", code: "DELETION_DISABLED" });
+  if (!(await isDeletionAllowedFor(callerId))) return res.status(404).json({ error: "Not available.", code: "DELETION_DISABLED" });
 
   const { confirm, reasonCode } = (req.body ?? {}) as { confirm?: string; reasonCode?: string };
   if (confirm !== "DELETE") return res.status(400).json({ error: "Please confirm by typing DELETE.", code: "CONFIRMATION_REQUIRED" });
@@ -195,7 +195,7 @@ router.post("/deletion/request", async (req, res) => {
     if (await inLiveCallOrSession(callerId)) {
       return res.status(409).json({ error: "You're in a call or live session right now. Please leave it first.", code: "ACTIVE_CALL" });
     }
-    const log = await scheduleDeletion(callerId, reason);
+    const log = await scheduleDeletion(callerId, reason, !isDeletionEnabled());
     // Sign out every device; signing in again during the grace period shows
     // the option to cancel. Best effort — the request already stands.
     const token = req.headers.authorization?.slice(7);
