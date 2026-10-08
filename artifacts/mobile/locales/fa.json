@@ -539,5 +539,25 @@
     "manageTranslations": "مدیریت ترجمه‌ها",
     "translationJobs": "کارهای ترجمه",
     "contentManagement": "مدیریت محتوا"
+  },
+  "discovery": {
+    "location": "موقعیت",
+    "worldwide": "سراسر جهان",
+    "nearby": "نزدیک",
+    "worldwideHint": "جستجوی همراهان در همه کشورها",
+    "nearbyHint": "جستجوی همراهان نزدیک موقعیت تأییدشده شما",
+    "searchRadius": "شعاع جستجو",
+    "radiusKm": "{{km}} کیلومتر",
+    "searching": "در حال جستجو…",
+    "emptyTitle": "همراهی پیدا نشد",
+    "emptyBody": "نام یا مهارت دیگری را امتحان کنید.",
+    "emptyNearbyTitle": "همراهی در نزدیکی پیدا نشد",
+    "emptyNearbyBody": "شعاع جستجو را بیشتر کنید یا به سراسر جهان بروید.",
+    "needsLocationTitle": "جستجوی نزدیک به موقعیت شما نیاز دارد",
+    "needsLocationBody": "موقعیت خود را تأیید کنید تا همراهان اطراف خود را پیدا کنید.",
+    "verifyLocation": "تأیید موقعیت",
+    "errorTitle": "بارگیری نتایج ممکن نشد",
+    "errorBody": "لطفاً اتصال خود را بررسی کنید و دوباره امتحان کنید.",
+    "retry": "تلاش دوباره"
   }
 }

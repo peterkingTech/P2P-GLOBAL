@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image, Switch } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -49,7 +49,9 @@ export default function AccountSettingsScreen() {
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordField, setShowPasswordField] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [showLocationVerifier, setShowLocationVerifier] = useState(false);
+  // Discovery's Nearby search links here with ?verifyLocation=1 to open the verifier directly.
+  const { verifyLocation } = useLocalSearchParams<{ verifyLocation?: string }>();
+  const [showLocationVerifier, setShowLocationVerifier] = useState(verifyLocation === "1");
   const [showMinistryPicker, setShowMinistryPicker] = useState(false);
   const [savingMinistryRole, setSavingMinistryRole] = useState(false);
   const [bio, setBio] = useState(profile?.bio ?? "");

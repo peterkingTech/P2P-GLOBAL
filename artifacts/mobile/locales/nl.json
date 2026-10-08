@@ -539,5 +539,25 @@
     "manageTranslations": "Vertalingen beheren",
     "translationJobs": "Vertaalopdrachten",
     "contentManagement": "Contentbeheer"
+  },
+  "discovery": {
+    "location": "Locatie",
+    "worldwide": "Wereldwijd",
+    "nearby": "In de buurt",
+    "worldwideHint": "Zoek in alle landen",
+    "nearbyHint": "Zoek in de buurt van je geverifieerde locatie",
+    "searchRadius": "Zoekstraal",
+    "radiusKm": "{{km}} km",
+    "searching": "Zoeken…",
+    "emptyTitle": "Niemand gevonden",
+    "emptyBody": "Probeer een andere naam of vaardigheid.",
+    "emptyNearbyTitle": "Niemand in de buurt gevonden",
+    "emptyNearbyBody": "Vergroot de zoekstraal of schakel over naar Wereldwijd.",
+    "needsLocationTitle": "Zoeken in de buurt heeft je locatie nodig",
+    "needsLocationBody": "Verifieer je locatie om mensen in je omgeving te ontdekken.",
+    "verifyLocation": "Locatie verifiëren",
+    "errorTitle": "Resultaten konden niet worden geladen",
+    "errorBody": "Controleer je verbinding en probeer het opnieuw.",
+    "retry": "Opnieuw proberen"
   }
 }

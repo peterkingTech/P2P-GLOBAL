@@ -539,5 +539,25 @@
     "manageTranslations": "จัดการคำแปล",
     "translationJobs": "งานแปล",
     "contentManagement": "การจัดการเนื้อหา"
+  },
+  "discovery": {
+    "location": "ตำแหน่ง",
+    "worldwide": "ทั่วโลก",
+    "nearby": "ใกล้เคียง",
+    "worldwideHint": "ค้นหาเพื่อนในทุกประเทศ",
+    "nearbyHint": "ค้นหาเพื่อนใกล้ตำแหน่งที่ยืนยันแล้วของคุณ",
+    "searchRadius": "รัศมีการค้นหา",
+    "radiusKm": "{{km}} กม.",
+    "searching": "กำลังค้นหา…",
+    "emptyTitle": "ไม่พบเพื่อน",
+    "emptyBody": "ลองใช้ชื่อหรือทักษะอื่น",
+    "emptyNearbyTitle": "ไม่พบเพื่อนในบริเวณใกล้เคียง",
+    "emptyNearbyBody": "ลองขยายรัศมีการค้นหาหรือเปลี่ยนเป็นทั่วโลก",
+    "needsLocationTitle": "การค้นหาใกล้เคียงต้องใช้ตำแหน่งของคุณ",
+    "needsLocationBody": "ยืนยันตำแหน่งของคุณเพื่อค้นหาเพื่อนรอบตัว",
+    "verifyLocation": "ยืนยันตำแหน่ง",
+    "errorTitle": "โหลดผลลัพธ์ไม่ได้",
+    "errorBody": "โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+    "retry": "ลองอีกครั้ง"
   }
 }

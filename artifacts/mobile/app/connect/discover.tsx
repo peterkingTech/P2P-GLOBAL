@@ -1,13 +1,15 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useData, DiscoverablePeer } from "@/contexts/DataContext";
+import { useTranslation } from "react-i18next";
+import { useData, DiscoverablePeer, DiscoveryLocationMode } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
+import DiscoveryRadiusSlider, { DEFAULT_RADIUS_KM } from "@/components/DiscoveryRadiusSlider";
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
 import { publicLocationLabel, calledToValue, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
@@ -26,10 +28,17 @@ export default function Discover() {
   const router = useRouter();
   const { profile, supabase } = useAuth();
   const { highlight } = useLocalSearchParams<{ highlight?: string }>();
-  const { getDiscoverablePeers, getDiscoveryRelationshipStatus } = useData();
+  const { t } = useTranslation();
+  const { searchDiscoverablePeers, getDiscoveryRelationshipStatus } = useData();
   const [peers, setPeers] = useState<DiscoverablePeer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  // Worldwide is the default. The radius is remembered while the screen is
+  // open, but only ever sent in Nearby mode.
+  const [mode, setMode] = useState<DiscoveryLocationMode>("worldwide");
+  const [radiusKm, setRadiusKm] = useState<number>(DEFAULT_RADIUS_KM);
+  const [searchError, setSearchError] = useState<null | "location_required" | "failed">(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [messaging, setMessaging] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [responding, setResponding] = useState<string | null>(null);
@@ -106,32 +115,106 @@ export default function Discover() {
     }
   }
 
-  const load = useCallback(async (q?: string, skills?: string[]) => {
+  // Current filters, read at search time so the triggers below don't each
+  // need every filter as a dependency.
+  const filters = useRef({ search, skillFilter, mode, radiusKm });
+  filters.current = { search, skillFilter, mode, radiusKm };
+  // Only the newest search may update the screen (a slow earlier response
+  // must never overwrite a newer one).
+  const requestSeq = useRef(0);
+
+  const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
+    const { search: q, skillFilter: skills, mode: m, radiusKm: r } = filters.current;
+    // The current results stay on screen while the new search runs.
     setLoading(true);
-    const results = await getDiscoverablePeers(q, skills);
+    const { peers: results, error } = await searchDiscoverablePeers({ mode: m, radiusKm: r, search: q, skillKeys: skills });
+    if (seq !== requestSeq.current) return;
     setPeers(results);
+    setSearchError(error);
     setLoading(false);
+    setHasLoaded(true);
     // Relationship status loads in a second pass rather than blocking the
     // initial list render — the list itself (names/photos) doesn't depend
     // on it, only the action shown per row does.
     if (results.length > 0) {
       const statusById = await getDiscoveryRelationshipStatus(results.map((p) => p.id));
+      if (seq !== requestSeq.current) return;
       setPeers((prev) => prev.map((p) => (statusById[p.id] ? { ...p, ...statusById[p.id] } : p)));
     }
-  }, [getDiscoverablePeers, getDiscoveryRelationshipStatus]);
+  }, [searchDiscoverablePeers, getDiscoveryRelationshipStatus]);
 
-  useEffect(() => { load(search, skillFilter); }, [skillFilter, load]);
+  // Filters, mode and radius search immediately (the radius slider only
+  // reports a value when the finger lifts); typing a name is debounced.
+  useEffect(() => { load(); }, [skillFilter, mode, radiusKm, load]);
+  const typedOnce = useRef(false);
+  useEffect(() => {
+    if (!typedOnce.current) { typedOnce.current = true; return; }
+    const timer = setTimeout(() => load(), 400);
+    return () => clearTimeout(timer);
+  }, [search, load]);
 
   // Discover has no other refresh trigger (no realtime subscription, no
   // pull-to-refresh) — without this, connectionStatus goes stale whenever a
   // request is sent/accepted from another screen (e.g. the profile screen,
   // which already refreshes itself the same way) and the user navigates
-  // back here, since this screen stays mounted rather than remounting.
+  // back here, since this screen stays mounted rather than remounting. It
+  // also picks up a location verified from the Nearby prompt.
+  const focusedOnce = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      load(search, skillFilter);
-    }, [load, search, skillFilter])
+      if (!focusedOnce.current) { focusedOnce.current = true; return; }
+      load();
+    }, [load])
   );
+
+  const formatKm = useCallback((km: number) => t("discovery.radiusKm", { km }), [t]);
+
+  const renderEmpty = () => {
+    if (searchError === "location_required") {
+      return (
+        <View style={styles.empty}>
+          <Ionicons name="location-outline" size={32} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>{t("discovery.needsLocationTitle")}</Text>
+          <Text style={styles.emptyText}>{t("discovery.needsLocationBody")}</Text>
+          <TouchableOpacity
+            style={styles.emptyAction}
+            onPress={() => router.push("/settings/account?verifyLocation=1" as any)}
+            accessibilityRole="button"
+          >
+            <Ionicons name="navigate-outline" size={14} color="#fff" />
+            <Text style={styles.emptyActionText}>{t("discovery.verifyLocation")}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (searchError === "failed") {
+      return (
+        <View style={styles.empty}>
+          <Ionicons name="cloud-offline-outline" size={32} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>{t("discovery.errorTitle")}</Text>
+          <Text style={styles.emptyText}>{t("discovery.errorBody")}</Text>
+          <TouchableOpacity style={styles.emptyAction} onPress={() => load()} accessibilityRole="button">
+            <Ionicons name="refresh" size={14} color="#fff" />
+            <Text style={styles.emptyActionText}>{t("discovery.retry")}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    const nearby = mode === "nearby";
+    return (
+      <View style={styles.empty}>
+        <Ionicons name="people-outline" size={32} color={colors.textMuted} />
+        <Text style={styles.emptyTitle}>{t(nearby ? "discovery.emptyNearbyTitle" : "discovery.emptyTitle")}</Text>
+        <Text style={styles.emptyText}>{t(nearby ? "discovery.emptyNearbyBody" : "discovery.emptyBody")}</Text>
+      </View>
+    );
+  };
+
+  const modeOptions: { key: DiscoveryLocationMode; icon: "earth-outline" | "navigate-outline"; label: string; hint: string }[] = [
+    { key: "worldwide", icon: "earth-outline", label: t("discovery.worldwide"), hint: t("discovery.worldwideHint") },
+    { key: "nearby", icon: "navigate-outline", label: t("discovery.nearby"), hint: t("discovery.nearbyHint") },
+  ];
 
   return (
     <>
@@ -145,7 +228,7 @@ export default function Discover() {
             placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
-            onSubmitEditing={() => load(search, skillFilter)}
+            onSubmitEditing={() => load()}
             returnKeyType="search"
           />
         </View>
@@ -173,19 +256,55 @@ export default function Discover() {
           </View>
         )}
 
-        {loading ? (
+        <View style={styles.locationSection}>
+          <View style={styles.locationHeader}>
+            <Text style={styles.locationLabel}>{t("discovery.location")}</Text>
+            {loading && hasLoaded && (
+              <View style={styles.updating} accessibilityLiveRegion="polite">
+                <ActivityIndicator size="small" color={colors.primaryGreen} />
+                <Text style={styles.updatingText}>{t("discovery.searching")}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.segment} accessibilityRole="radiogroup" accessibilityLabel={t("discovery.location")}>
+            {modeOptions.map((o) => {
+              const selected = mode === o.key;
+              return (
+                <TouchableOpacity
+                  key={o.key}
+                  style={[styles.segmentItem, selected && styles.segmentItemActive]}
+                  onPress={() => setMode(o.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected, selected }}
+                  accessibilityLabel={o.label}
+                  accessibilityHint={o.hint}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={o.icon} size={15} color={selected ? "#fff" : colors.accentGreen} />
+                  <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{o.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {mode === "nearby" && (
+            <DiscoveryRadiusSlider
+              valueKm={radiusKm}
+              onChange={setRadiusKm}
+              label={t("discovery.searchRadius")}
+              formatKm={formatKm}
+            />
+          )}
+        </View>
+
+        {loading && !hasLoaded ? (
           <ActivityIndicator style={{ marginTop: 40 }} color={colors.primaryGreen} />
         ) : (
           <FlatList
             data={peers}
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 60 }}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Ionicons name="people-outline" size={32} color={colors.textMuted} />
-                <Text style={styles.emptyText}>No study partners found.</Text>
-              </View>
-            }
+            style={loading ? { opacity: 0.6 } : undefined}
+            ListEmptyComponent={loading ? null : renderEmpty()}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[styles.row, item.id === highlight && styles.rowHighlight]}
@@ -322,6 +441,28 @@ const styles = StyleSheet.create({
   connectBtnPendingText: { color: colors.textMuted, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   name: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   meta: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  empty: { alignItems: "center", gap: 12, marginTop: 60 },
-  emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  empty: { alignItems: "center", gap: 8, marginTop: 48, paddingHorizontal: 24 },
+  emptyTitle: { fontSize: 15, color: colors.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center", marginTop: 4 },
+  emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
+  emptyAction: {
+    flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8,
+    backgroundColor: colors.primaryGreen, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9,
+  },
+  emptyActionText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  locationSection: { marginHorizontal: 20, marginTop: 12 },
+  locationHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6, minHeight: 20 },
+  locationLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  updating: { flexDirection: "row", alignItems: "center", gap: 6 },
+  updatingText: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
+  segment: {
+    flexDirection: "row", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
+    borderRadius: 12, padding: 3, gap: 3,
+  },
+  segmentItem: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderRadius: 9, paddingVertical: 8, minHeight: 40,
+  },
+  segmentItemActive: { backgroundColor: colors.primaryGreen },
+  segmentText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  segmentTextActive: { color: "#fff" },
 });

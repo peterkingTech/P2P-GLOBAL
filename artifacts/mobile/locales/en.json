@@ -549,5 +549,25 @@
     "manageTranslations": "Manage Translations",
     "translationJobs": "Translation Jobs",
     "contentManagement": "Content Management"
+  },
+  "discovery": {
+    "location": "Location",
+    "worldwide": "Worldwide",
+    "nearby": "Nearby",
+    "worldwideHint": "Search peers in every country",
+    "nearbyHint": "Search peers near your verified location",
+    "searchRadius": "Search radius",
+    "radiusKm": "{{km}} km",
+    "searching": "Searching…",
+    "emptyTitle": "No peers found",
+    "emptyBody": "Try a different name or skill.",
+    "emptyNearbyTitle": "No peers found nearby",
+    "emptyNearbyBody": "Try expanding your search radius or switch to Worldwide.",
+    "needsLocationTitle": "Nearby Search needs your location",
+    "needsLocationBody": "Verify your location to discover peers around you.",
+    "verifyLocation": "Verify location",
+    "errorTitle": "Couldn't load peers",
+    "errorBody": "Please check your connection and try again.",
+    "retry": "Try again"
   }
 }

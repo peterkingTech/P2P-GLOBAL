@@ -539,5 +539,25 @@
     "manageTranslations": "Bestuur Vertalings",
     "translationJobs": "VertaalTake",
     "contentManagement": "Inhoudsbestuur"
+  },
+  "discovery": {
+    "location": "Ligging",
+    "worldwide": "Wêreldwyd",
+    "nearby": "Naby",
+    "worldwideHint": "Soek eweknieë in elke land",
+    "nearbyHint": "Soek eweknieë naby jou geverifieerde ligging",
+    "searchRadius": "Soekradius",
+    "radiusKm": "{{km}} km",
+    "searching": "Soek tans…",
+    "emptyTitle": "Geen eweknieë gevind nie",
+    "emptyBody": "Probeer 'n ander naam of vaardigheid.",
+    "emptyNearbyTitle": "Geen eweknieë naby gevind nie",
+    "emptyNearbyBody": "Probeer jou soekradius vergroot of skakel oor na Wêreldwyd.",
+    "needsLocationTitle": "Naby-soektog het jou ligging nodig",
+    "needsLocationBody": "Verifieer jou ligging om eweknieë om jou te ontdek.",
+    "verifyLocation": "Verifieer ligging",
+    "errorTitle": "Kon nie eweknieë laai nie",
+    "errorBody": "Gaan asseblief jou verbinding na en probeer weer.",
+    "retry": "Probeer weer"
   }
 }

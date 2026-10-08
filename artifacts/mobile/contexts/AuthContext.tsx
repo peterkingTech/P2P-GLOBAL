@@ -9,6 +9,7 @@ import { createClient, SupabaseClient, Session, User } from "@supabase/supabase-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/apiUrl";
 import { unregisterCurrentPushToken } from "@/lib/push";
+import { PROFILE_COLUMNS } from "@/lib/profileColumns";
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -322,13 +323,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // updateUsername) robust against the same race instead of silently no-op'ing.
   const fetchProfile = useCallback(async (userId: string, attempt = 1): Promise<void> => {
     try {
-      const { data, error } = await supabase
-        .from("p2p_profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      // Named columns, never "*": raw coordinates aren't readable from the
+      // app (migration 178). The user's OWN coordinates come from
+      // p2p_my_coordinates(); if that call fails the profile still loads,
+      // just without them (features fall back to the country).
+      const [{ data, error }, coords] = await Promise.all([
+        supabase.from("p2p_profiles").select(PROFILE_COLUMNS).eq("id", userId).single(),
+        supabase.rpc("p2p_my_coordinates").then((r) => r, () => ({ data: null })),
+      ]);
       if (data) {
-        setProfile(mapProfileRow(data as Record<string, unknown>));
+        const own = Array.isArray(coords?.data) ? (coords.data[0] as { latitude?: number | null; longitude?: number | null } | undefined) : undefined;
+        setProfile(mapProfileRow({ ...(data as unknown as Record<string, unknown>), latitude: own?.latitude ?? null, longitude: own?.longitude ?? null }));
         return;
       }
       if (error?.code === "PGRST116" && attempt < 5) {

@@ -539,5 +539,25 @@
     "manageTranslations": "Pamahalaan ang mga Salin",
     "translationJobs": "Mga Gawain sa Pagsasalin",
     "contentManagement": "Pamamahala ng Nilalaman"
+  },
+  "discovery": {
+    "location": "Lokasyon",
+    "worldwide": "Buong mundo",
+    "nearby": "Malapit",
+    "worldwideHint": "Maghanap ng kasama sa bawat bansa",
+    "nearbyHint": "Maghanap ng kasama malapit sa iyong na-verify na lokasyon",
+    "searchRadius": "Saklaw ng paghahanap",
+    "radiusKm": "{{km}} km",
+    "searching": "Naghahanap…",
+    "emptyTitle": "Walang nahanap",
+    "emptyBody": "Subukan ang ibang pangalan o kasanayan.",
+    "emptyNearbyTitle": "Walang nahanap sa malapit",
+    "emptyNearbyBody": "Subukang palawakin ang saklaw ng paghahanap o lumipat sa Buong mundo.",
+    "needsLocationTitle": "Kailangan ng Malapit na Paghahanap ang iyong lokasyon",
+    "needsLocationBody": "I-verify ang iyong lokasyon para makahanap ng mga kasama sa paligid mo.",
+    "verifyLocation": "I-verify ang lokasyon",
+    "errorTitle": "Hindi ma-load ang mga resulta",
+    "errorBody": "Pakisuri ang iyong koneksyon at subukang muli.",
+    "retry": "Subukang muli"
   }
 }

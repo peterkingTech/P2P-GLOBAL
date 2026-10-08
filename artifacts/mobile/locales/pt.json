@@ -539,5 +539,25 @@
     "manageTranslations": "Gerenciar Traduções",
     "translationJobs": "Tarefas de Tradução",
     "contentManagement": "Gestão de Conteúdo"
+  },
+  "discovery": {
+    "location": "Localização",
+    "worldwide": "Mundial",
+    "nearby": "Perto",
+    "worldwideHint": "Procure companheiros em todos os países",
+    "nearbyHint": "Procure companheiros perto da sua localização verificada",
+    "searchRadius": "Raio de busca",
+    "radiusKm": "{{km}} km",
+    "searching": "Buscando…",
+    "emptyTitle": "Nenhum companheiro encontrado",
+    "emptyBody": "Tente outro nome ou habilidade.",
+    "emptyNearbyTitle": "Nenhum companheiro encontrado por perto",
+    "emptyNearbyBody": "Tente aumentar o raio de busca ou mude para Mundial.",
+    "needsLocationTitle": "A busca por perto precisa da sua localização",
+    "needsLocationBody": "Verifique sua localização para descobrir companheiros ao seu redor.",
+    "verifyLocation": "Verificar localização",
+    "errorTitle": "Não foi possível carregar os resultados",
+    "errorBody": "Verifique sua conexão e tente novamente.",
+    "retry": "Tentar novamente"
   }
 }

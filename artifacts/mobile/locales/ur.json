@@ -539,5 +539,25 @@
     "manageTranslations": "ترجموں کا انتظام کریں",
     "translationJobs": "ترجمے کے کام",
     "contentManagement": "مواد کا انتظام"
+  },
+  "discovery": {
+    "location": "مقام",
+    "worldwide": "دنیا بھر میں",
+    "nearby": "قریب",
+    "worldwideHint": "ہر ملک میں ساتھی تلاش کریں",
+    "nearbyHint": "اپنے تصدیق شدہ مقام کے قریب ساتھی تلاش کریں",
+    "searchRadius": "تلاش کا دائرہ",
+    "radiusKm": "{{km}} کلومیٹر",
+    "searching": "تلاش جاری ہے…",
+    "emptyTitle": "کوئی ساتھی نہیں ملا",
+    "emptyBody": "کوئی دوسرا نام یا مہارت آزمائیں۔",
+    "emptyNearbyTitle": "قریب کوئی ساتھی نہیں ملا",
+    "emptyNearbyBody": "تلاش کا دائرہ بڑھائیں یا دنیا بھر میں پر جائیں۔",
+    "needsLocationTitle": "قریبی تلاش کے لیے آپ کا مقام درکار ہے",
+    "needsLocationBody": "اپنے اردگرد ساتھی تلاش کرنے کے لیے اپنے مقام کی تصدیق کریں۔",
+    "verifyLocation": "مقام کی تصدیق کریں",
+    "errorTitle": "نتائج لوڈ نہیں ہو سکے",
+    "errorBody": "براہ کرم اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "retry": "دوبارہ کوشش کریں"
   }
 }

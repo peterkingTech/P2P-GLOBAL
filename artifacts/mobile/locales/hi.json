@@ -539,5 +539,25 @@
     "manageTranslations": "अनुवाद प्रबंधित करें",
     "translationJobs": "अनुवाद कार्य",
     "contentManagement": "सामग्री प्रबंधन"
+  },
+  "discovery": {
+    "location": "स्थान",
+    "worldwide": "दुनिया भर में",
+    "nearby": "आस-पास",
+    "worldwideHint": "हर देश में साथी खोजें",
+    "nearbyHint": "अपने सत्यापित स्थान के पास साथी खोजें",
+    "searchRadius": "खोज का दायरा",
+    "radiusKm": "{{km}} किमी",
+    "searching": "खोज रहे हैं…",
+    "emptyTitle": "कोई साथी नहीं मिला",
+    "emptyBody": "कोई दूसरा नाम या कौशल आज़माएँ।",
+    "emptyNearbyTitle": "आस-पास कोई साथी नहीं मिला",
+    "emptyNearbyBody": "खोज का दायरा बढ़ाएँ या दुनिया भर में पर जाएँ।",
+    "needsLocationTitle": "आस-पास खोज के लिए आपका स्थान ज़रूरी है",
+    "needsLocationBody": "अपने आस-पास के साथियों को खोजने के लिए अपना स्थान सत्यापित करें।",
+    "verifyLocation": "स्थान सत्यापित करें",
+    "errorTitle": "परिणाम लोड नहीं हो सके",
+    "errorBody": "कृपया अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+    "retry": "फिर से कोशिश करें"
   }
 }

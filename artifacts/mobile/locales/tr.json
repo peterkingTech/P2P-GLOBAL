@@ -539,5 +539,25 @@
     "manageTranslations": "Çevirileri Yönet",
     "translationJobs": "Çeviri İşleri",
     "contentManagement": "İçerik Yönetimi"
+  },
+  "discovery": {
+    "location": "Konum",
+    "worldwide": "Dünya genelinde",
+    "nearby": "Yakınımda",
+    "worldwideHint": "Tüm ülkelerde ara",
+    "nearbyHint": "Doğrulanmış konumunun yakınında ara",
+    "searchRadius": "Arama yarıçapı",
+    "radiusKm": "{{km}} km",
+    "searching": "Aranıyor…",
+    "emptyTitle": "Kimse bulunamadı",
+    "emptyBody": "Farklı bir isim veya beceri dene.",
+    "emptyNearbyTitle": "Yakında kimse bulunamadı",
+    "emptyNearbyBody": "Arama yarıçapını genişlet veya Dünya geneline geç.",
+    "needsLocationTitle": "Yakında arama için konumun gerekli",
+    "needsLocationBody": "Çevrendeki kişileri keşfetmek için konumunu doğrula.",
+    "verifyLocation": "Konumu doğrula",
+    "errorTitle": "Sonuçlar yüklenemedi",
+    "errorBody": "Lütfen bağlantını kontrol edip tekrar dene.",
+    "retry": "Tekrar dene"
   }
 }

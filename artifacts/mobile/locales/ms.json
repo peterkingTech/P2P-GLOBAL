@@ -539,5 +539,25 @@
     "manageTranslations": "Urus Terjemahan",
     "translationJobs": "Kerja Terjemahan",
     "contentManagement": "Pengurusan Kandungan"
+  },
+  "discovery": {
+    "location": "Lokasi",
+    "worldwide": "Seluruh dunia",
+    "nearby": "Berdekatan",
+    "worldwideHint": "Cari rakan di semua negara",
+    "nearbyHint": "Cari rakan berhampiran lokasi anda yang disahkan",
+    "searchRadius": "Jejari carian",
+    "radiusKm": "{{km}} km",
+    "searching": "Mencari…",
+    "emptyTitle": "Tiada rakan ditemui",
+    "emptyBody": "Cuba nama atau kemahiran lain.",
+    "emptyNearbyTitle": "Tiada rakan ditemui berdekatan",
+    "emptyNearbyBody": "Cuba luaskan jejari carian atau tukar ke Seluruh dunia.",
+    "needsLocationTitle": "Carian berdekatan memerlukan lokasi anda",
+    "needsLocationBody": "Sahkan lokasi anda untuk mencari rakan di sekitar anda.",
+    "verifyLocation": "Sahkan lokasi",
+    "errorTitle": "Tidak dapat memuatkan keputusan",
+    "errorBody": "Sila semak sambungan anda dan cuba lagi.",
+    "retry": "Cuba lagi"
   }
 }

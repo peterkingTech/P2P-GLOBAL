@@ -539,5 +539,25 @@
     "manageTranslations": "Gestisci traduzioni",
     "translationJobs": "Lavori di traduzione",
     "contentManagement": "Gestione dei contenuti"
+  },
+  "discovery": {
+    "location": "Posizione",
+    "worldwide": "In tutto il mondo",
+    "nearby": "Nelle vicinanze",
+    "worldwideHint": "Cerca in tutti i paesi",
+    "nearbyHint": "Cerca vicino alla tua posizione verificata",
+    "searchRadius": "Raggio di ricerca",
+    "radiusKm": "{{km}} km",
+    "searching": "Ricerca in corso…",
+    "emptyTitle": "Nessun risultato",
+    "emptyBody": "Prova un altro nome o un'altra competenza.",
+    "emptyNearbyTitle": "Nessun risultato nelle vicinanze",
+    "emptyNearbyBody": "Prova ad ampliare il raggio di ricerca o passa a In tutto il mondo.",
+    "needsLocationTitle": "La ricerca nelle vicinanze richiede la tua posizione",
+    "needsLocationBody": "Verifica la tua posizione per scoprire persone intorno a te.",
+    "verifyLocation": "Verifica posizione",
+    "errorTitle": "Impossibile caricare i risultati",
+    "errorBody": "Controlla la connessione e riprova.",
+    "retry": "Riprova"
   }
 }

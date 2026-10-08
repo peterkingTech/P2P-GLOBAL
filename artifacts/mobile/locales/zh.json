@@ -539,5 +539,25 @@
     "manageTranslations": "管理翻译",
     "translationJobs": "翻译任务",
     "contentManagement": "内容管理"
+  },
+  "discovery": {
+    "location": "位置",
+    "worldwide": "全球",
+    "nearby": "附近",
+    "worldwideHint": "在所有国家中搜索",
+    "nearbyHint": "在你已验证的位置附近搜索",
+    "searchRadius": "搜索范围",
+    "radiusKm": "{{km}} 公里",
+    "searching": "正在搜索…",
+    "emptyTitle": "未找到同伴",
+    "emptyBody": "请尝试其他名字或技能。",
+    "emptyNearbyTitle": "附近未找到同伴",
+    "emptyNearbyBody": "请尝试扩大搜索范围或切换到全球。",
+    "needsLocationTitle": "附近搜索需要你的位置",
+    "needsLocationBody": "验证你的位置以发现身边的同伴。",
+    "verifyLocation": "验证位置",
+    "errorTitle": "无法加载结果",
+    "errorBody": "请检查网络连接后重试。",
+    "retry": "重试"
   }
 }

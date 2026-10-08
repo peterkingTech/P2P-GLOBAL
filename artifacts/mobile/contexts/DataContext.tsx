@@ -643,6 +643,20 @@ export interface DiscoverablePeer {
   connectionRequestId?: string | null;
 }
 
+export type DiscoveryLocationMode = "worldwide" | "nearby";
+export interface DiscoverySearchOptions {
+  mode?: DiscoveryLocationMode;
+  // Nearby only; 5–1000 km. The origin is always the caller's own verified location.
+  radiusKm?: number;
+  search?: string;
+  skillKeys?: string[];
+}
+export interface DiscoverySearchResult {
+  peers: DiscoverablePeer[];
+  // "location_required": Nearby needs the caller to verify their location first.
+  error: null | "location_required" | "failed";
+}
+
 export interface UsernameSearchResult {
   userId: string;
   username: string;
@@ -1230,6 +1244,7 @@ interface DataContextValue {
   getCrisisResponderIds: () => Promise<string[]>;
   setCrisisResponder: (userId: string, enabled: boolean) => Promise<string | null>;
   getDiscoverablePeers: (search?: string, skillKeys?: string[]) => Promise<DiscoverablePeer[]>;
+  searchDiscoverablePeers: (opts?: DiscoverySearchOptions) => Promise<DiscoverySearchResult>;
   getDiscoveryRelationshipStatus: (peerIds: string[]) => Promise<Record<string, { canContact: boolean; connectionStatus: DiscoveryConnectionStatus; connectionRequestId: string | null }>>;
   getSmartMatch: () => Promise<DiscoverablePeer | null>;
   getGroups: () => Promise<PeerGroup[]>;
@@ -3918,53 +3933,47 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const getDiscoverablePeers = useCallback(async (search?: string, skillKeys?: string[]): Promise<DiscoverablePeer[]> => {
-    if (!profile) return [];
+  // Discovery Search (migration 177). One server-side search for both
+  // Worldwide and Nearby: identity and the Nearby origin come from the
+  // session, the client never sends coordinates, and the result carries no
+  // coordinates or distances. Visibility (public/peers only, no admin or
+  // official accounts, no self, blocks hidden both ways) and the "Show my
+  // country" rule are enforced in the function itself.
+  const searchDiscoverablePeers = useCallback(async (opts: DiscoverySearchOptions = {}): Promise<DiscoverySearchResult> => {
+    if (!profile) return { peers: [], error: null };
+    const mode = opts.mode ?? "worldwide";
     try {
-      // Admin Identity Separation: admin/official accounts must not appear
-      // in Discover. The real enforcement is RLS (profiles_select_scoped,
-      // migration 101) — a direct query can't see them regardless of this
-      // filter — this just keeps the query's own intent explicit.
-      let query = supabase
-        .from("p2p_profiles")
-        .select("id, username, full_name, country, city, calling, show_country_on_profile, role, gifts, skills, photo_url")
-        .neq("id", profile.id)
-        .eq("is_official_account", false)
-        .order("full_name", { ascending: true })
-        .limit(50);
-      if (search && search.trim()) query = query.ilike("full_name", `%${search.trim()}%`);
-      if (skillKeys && skillKeys.length > 0) query = query.overlaps("skills", skillKeys);
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Forensic P2P Connection audit — this query never excluded blocked
-      // users before (either direction), unlike the profile screen's own
-      // isBlockedEitherWay check. Matches that same either-direction rule.
-      const { data: blocks } = await supabase
-        .from("p2p_user_blocks")
-        .select("blocker_id, blocked_id")
-        .or(`blocker_id.eq.${profile.id},blocked_id.eq.${profile.id}`);
-      const blockedIds = new Set(
-        (blocks ?? []).map((b: any) => (b.blocker_id === profile.id ? b.blocked_id : b.blocker_id) as string)
-      );
-
-      return (data || [])
-        .filter((p: any) => !blockedIds.has(p.id))
-        .map((p: any) => ({
-          id: p.id, username: p.username || null, fullName: p.full_name || "Unnamed",
-          // Respect "Show my country on my profile" (city goes with it).
-          country: p.show_country_on_profile === false ? null : p.country,
-          city: p.show_country_on_profile === false ? null : (p.city ?? null),
-          calling: p.calling ?? null,
-          role: p.role, gifts: p.gifts || [],
-          skills: p.skills || [],
-          photoUrl: p.photo_url || null,
-        }));
+      const { data, error } = await supabase.rpc("p2p_discover_peers", {
+        p_mode: mode,
+        p_radius_km: mode === "nearby" ? Math.round(opts.radiusKm ?? 50) : 50,
+        p_name: opts.search?.trim() || null,
+        p_skills: opts.skillKeys && opts.skillKeys.length > 0 ? opts.skillKeys : null,
+        p_limit: 50,
+      });
+      if (error) {
+        if (error.message?.includes("LOCATION_REQUIRED")) return { peers: [], error: "location_required" };
+        throw error;
+      }
+      const peers: DiscoverablePeer[] = ((data as any[]) || []).map((p: any) => ({
+        id: p.id, username: p.username || null, fullName: p.full_name || "Unnamed",
+        country: p.country ?? null,
+        city: p.city ?? null,
+        calling: p.calling ?? null,
+        role: p.role, gifts: p.gifts || [],
+        skills: p.skills || [],
+        photoUrl: p.photo_url || null,
+      }));
+      return { peers, error: null };
     } catch (e) {
-      console.error("getDiscoverablePeers failed", e);
-      return [];
+      console.error("searchDiscoverablePeers failed", e);
+      return { peers: [], error: "failed" };
     }
   }, [profile]);
+
+  const getDiscoverablePeers = useCallback(async (search?: string, skillKeys?: string[]): Promise<DiscoverablePeer[]> => {
+    const { peers } = await searchDiscoverablePeers({ mode: "worldwide", search, skillKeys });
+    return peers;
+  }, [searchDiscoverablePeers]);
 
   // Batched P2P Connection status for a page of Discovery results — one
   // RPC call for the whole list (p2p_discovery_relationship_status,
@@ -5876,7 +5885,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       verificationStatus, loadVerificationStatus, submitVerification, withdrawVerification, toggleBadgeVisibility,
       grainCount, inviteLink, peopleInvited, getMyInviteLink, refreshGrainCount,
       getAllProfiles, getCrisisResponderIds, setCrisisResponder,
-      getDiscoverablePeers, getDiscoveryRelationshipStatus, getSmartMatch, getGroups, joinGroup, leaveGroup,
+      getDiscoverablePeers, searchDiscoverablePeers, getDiscoveryRelationshipStatus, getSmartMatch, getGroups, joinGroup, leaveGroup,
       createGroup, getGroupMembers, addGroupMember, removeGroupMember,
       getMyNotes, addNote, updateNote, deleteNote, getMyHighlights, addHighlight, deleteHighlight,
       getHighlightsForLesson, addSectionHighlight,

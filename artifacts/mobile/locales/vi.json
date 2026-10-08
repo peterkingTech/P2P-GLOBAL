@@ -539,5 +539,25 @@
     "manageTranslations": "Quản lý bản dịch",
     "translationJobs": "Tác vụ dịch",
     "contentManagement": "Quản lý nội dung"
+  },
+  "discovery": {
+    "location": "Vị trí",
+    "worldwide": "Toàn cầu",
+    "nearby": "Gần đây",
+    "worldwideHint": "Tìm bạn đồng hành ở mọi quốc gia",
+    "nearbyHint": "Tìm bạn đồng hành gần vị trí đã xác minh của bạn",
+    "searchRadius": "Bán kính tìm kiếm",
+    "radiusKm": "{{km}} km",
+    "searching": "Đang tìm…",
+    "emptyTitle": "Không tìm thấy ai",
+    "emptyBody": "Hãy thử tên hoặc kỹ năng khác.",
+    "emptyNearbyTitle": "Không tìm thấy ai ở gần",
+    "emptyNearbyBody": "Hãy mở rộng bán kính tìm kiếm hoặc chuyển sang Toàn cầu.",
+    "needsLocationTitle": "Tìm kiếm gần đây cần vị trí của bạn",
+    "needsLocationBody": "Xác minh vị trí của bạn để tìm bạn đồng hành xung quanh.",
+    "verifyLocation": "Xác minh vị trí",
+    "errorTitle": "Không thể tải kết quả",
+    "errorBody": "Vui lòng kiểm tra kết nối và thử lại.",
+    "retry": "Thử lại"
   }
 }

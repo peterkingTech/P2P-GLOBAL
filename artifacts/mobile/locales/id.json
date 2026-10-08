@@ -539,5 +539,25 @@
     "manageTranslations": "Kelola Terjemahan",
     "translationJobs": "Pekerjaan Terjemahan",
     "contentManagement": "Manajemen Konten"
+  },
+  "discovery": {
+    "location": "Lokasi",
+    "worldwide": "Seluruh dunia",
+    "nearby": "Terdekat",
+    "worldwideHint": "Cari rekan di semua negara",
+    "nearbyHint": "Cari rekan di dekat lokasi terverifikasi Anda",
+    "searchRadius": "Radius pencarian",
+    "radiusKm": "{{km}} km",
+    "searching": "Mencari…",
+    "emptyTitle": "Tidak ada rekan ditemukan",
+    "emptyBody": "Coba nama atau keahlian lain.",
+    "emptyNearbyTitle": "Tidak ada rekan di dekat Anda",
+    "emptyNearbyBody": "Coba perluas radius pencarian atau beralih ke Seluruh dunia.",
+    "needsLocationTitle": "Pencarian terdekat memerlukan lokasi Anda",
+    "needsLocationBody": "Verifikasi lokasi Anda untuk menemukan rekan di sekitar Anda.",
+    "verifyLocation": "Verifikasi lokasi",
+    "errorTitle": "Tidak dapat memuat hasil",
+    "errorBody": "Periksa koneksi Anda dan coba lagi.",
+    "retry": "Coba lagi"
   }
 }

@@ -14,7 +14,7 @@ export function publicLocationLabel(city: string | null | undefined, country: st
   return `${getFlagEmoji(c)} ${ci ? `${ci}, ${c}` : c}`;
 }
 
-export const NO_PUBLIC_LOCATION = "Location not shared";
+export const NO_PUBLIC_LOCATION = "Location not added";
 
 // The person's own stated calling, if they've written one. The account's
 // permission role (e.g. "student") is never shown as a calling.

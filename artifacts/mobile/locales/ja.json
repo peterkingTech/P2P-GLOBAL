@@ -539,5 +539,25 @@
     "manageTranslations": "翻訳を管理",
     "translationJobs": "翻訳ジョブ",
     "contentManagement": "コンテンツ管理"
+  },
+  "discovery": {
+    "location": "地域",
+    "worldwide": "全世界",
+    "nearby": "近く",
+    "worldwideHint": "すべての国から探す",
+    "nearbyHint": "確認済みの現在地の近くから探す",
+    "searchRadius": "検索範囲",
+    "radiusKm": "{{km}} km",
+    "searching": "検索中…",
+    "emptyTitle": "見つかりませんでした",
+    "emptyBody": "別の名前やスキルで試してください。",
+    "emptyNearbyTitle": "近くに見つかりませんでした",
+    "emptyNearbyBody": "検索範囲を広げるか、全世界に切り替えてください。",
+    "needsLocationTitle": "近くの検索には位置情報が必要です",
+    "needsLocationBody": "位置情報を確認すると、近くの仲間を見つけられます。",
+    "verifyLocation": "位置情報を確認",
+    "errorTitle": "読み込めませんでした",
+    "errorBody": "接続を確認して、もう一度お試しください。",
+    "retry": "再試行"
   }
 }

@@ -539,5 +539,25 @@
     "manageTranslations": "Administrer oversettelser",
     "translationJobs": "Oversettelsesjobber",
     "contentManagement": "Innholdsadministrasjon"
+  },
+  "discovery": {
+    "location": "Sted",
+    "worldwide": "Hele verden",
+    "nearby": "I nærheten",
+    "worldwideHint": "Søk i alle land",
+    "nearbyHint": "Søk nær din bekreftede posisjon",
+    "searchRadius": "Søkeradius",
+    "radiusKm": "{{km}} km",
+    "searching": "Søker…",
+    "emptyTitle": "Ingen funnet",
+    "emptyBody": "Prøv et annet navn eller en annen ferdighet.",
+    "emptyNearbyTitle": "Ingen funnet i nærheten",
+    "emptyNearbyBody": "Prøv å utvide søkeradiusen eller bytt til Hele verden.",
+    "needsLocationTitle": "Søk i nærheten trenger posisjonen din",
+    "needsLocationBody": "Bekreft posisjonen din for å finne folk rundt deg.",
+    "verifyLocation": "Bekreft posisjon",
+    "errorTitle": "Kunne ikke laste inn resultater",
+    "errorBody": "Sjekk tilkoblingen og prøv igjen.",
+    "retry": "Prøv igjen"
   }
 }

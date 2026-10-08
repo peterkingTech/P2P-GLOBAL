@@ -539,5 +539,25 @@
     "manageTranslations": "Übersetzungen verwalten",
     "translationJobs": "Übersetzungsaufträge",
     "contentManagement": "Inhaltsverwaltung"
+  },
+  "discovery": {
+    "location": "Standort",
+    "worldwide": "Weltweit",
+    "nearby": "In der Nähe",
+    "worldwideHint": "Suche in allen Ländern",
+    "nearbyHint": "Suche in der Nähe deines bestätigten Standorts",
+    "searchRadius": "Suchradius",
+    "radiusKm": "{{km}} km",
+    "searching": "Suche läuft…",
+    "emptyTitle": "Keine Personen gefunden",
+    "emptyBody": "Versuche einen anderen Namen oder eine andere Fähigkeit.",
+    "emptyNearbyTitle": "Keine Personen in der Nähe gefunden",
+    "emptyNearbyBody": "Vergrößere den Suchradius oder wechsle zu Weltweit.",
+    "needsLocationTitle": "Die Suche in der Nähe benötigt deinen Standort",
+    "needsLocationBody": "Bestätige deinen Standort, um Personen in deiner Nähe zu finden.",
+    "verifyLocation": "Standort bestätigen",
+    "errorTitle": "Ergebnisse konnten nicht geladen werden",
+    "errorBody": "Bitte prüfe deine Verbindung und versuche es erneut.",
+    "retry": "Erneut versuchen"
   }
 }

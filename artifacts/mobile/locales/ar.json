@@ -539,5 +539,25 @@
     "manageTranslations": "إدارة الترجمات",
     "translationJobs": "مهام الترجمة",
     "contentManagement": "إدارة المحتوى"
+  },
+  "discovery": {
+    "location": "الموقع",
+    "worldwide": "حول العالم",
+    "nearby": "بالقرب",
+    "worldwideHint": "ابحث عن أقران في كل البلدان",
+    "nearbyHint": "ابحث عن أقران بالقرب من موقعك الموثّق",
+    "searchRadius": "نطاق البحث",
+    "radiusKm": "{{km}} كم",
+    "searching": "جارٍ البحث…",
+    "emptyTitle": "لم يتم العثور على أقران",
+    "emptyBody": "جرّب اسمًا أو مهارة مختلفة.",
+    "emptyNearbyTitle": "لم يتم العثور على أقران بالقرب منك",
+    "emptyNearbyBody": "جرّب توسيع نطاق البحث أو التبديل إلى حول العالم.",
+    "needsLocationTitle": "البحث القريب يحتاج إلى موقعك",
+    "needsLocationBody": "وثّق موقعك لاكتشاف الأقران من حولك.",
+    "verifyLocation": "توثيق الموقع",
+    "errorTitle": "تعذّر تحميل الأقران",
+    "errorBody": "يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+    "retry": "حاول مرة أخرى"
   }
 }

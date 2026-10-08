@@ -539,5 +539,25 @@
     "manageTranslations": "Zarządzaj tłumaczeniami",
     "translationJobs": "Zadania tłumaczeniowe",
     "contentManagement": "Zarządzanie treścią"
+  },
+  "discovery": {
+    "location": "Lokalizacja",
+    "worldwide": "Cały świat",
+    "nearby": "W pobliżu",
+    "worldwideHint": "Szukaj we wszystkich krajach",
+    "nearbyHint": "Szukaj w pobliżu Twojej zweryfikowanej lokalizacji",
+    "searchRadius": "Promień wyszukiwania",
+    "radiusKm": "{{km}} km",
+    "searching": "Wyszukiwanie…",
+    "emptyTitle": "Nikogo nie znaleziono",
+    "emptyBody": "Spróbuj innego imienia lub umiejętności.",
+    "emptyNearbyTitle": "Nikogo nie znaleziono w pobliżu",
+    "emptyNearbyBody": "Zwiększ promień wyszukiwania lub przełącz na Cały świat.",
+    "needsLocationTitle": "Wyszukiwanie w pobliżu wymaga Twojej lokalizacji",
+    "needsLocationBody": "Zweryfikuj swoją lokalizację, aby znaleźć osoby w okolicy.",
+    "verifyLocation": "Zweryfikuj lokalizację",
+    "errorTitle": "Nie udało się wczytać wyników",
+    "errorBody": "Sprawdź połączenie i spróbuj ponownie.",
+    "retry": "Spróbuj ponownie"
   }
 }

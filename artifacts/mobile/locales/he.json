@@ -539,5 +539,25 @@
     "manageTranslations": "ניהול תרגומים",
     "translationJobs": "משימות תרגום",
     "contentManagement": "ניהול תוכן"
+  },
+  "discovery": {
+    "location": "מיקום",
+    "worldwide": "בכל העולם",
+    "nearby": "בקרבת מקום",
+    "worldwideHint": "חיפוש בכל המדינות",
+    "nearbyHint": "חיפוש ליד המיקום המאומת שלך",
+    "searchRadius": "רדיוס חיפוש",
+    "radiusKm": "{{km}} ק\"מ",
+    "searching": "מחפש…",
+    "emptyTitle": "לא נמצאו תוצאות",
+    "emptyBody": "נסו שם או מיומנות אחרים.",
+    "emptyNearbyTitle": "לא נמצאו תוצאות בקרבת מקום",
+    "emptyNearbyBody": "נסו להגדיל את רדיוס החיפוש או לעבור לבכל העולם.",
+    "needsLocationTitle": "חיפוש בקרבת מקום דורש את המיקום שלך",
+    "needsLocationBody": "אמתו את המיקום שלכם כדי לגלות אנשים סביבכם.",
+    "verifyLocation": "אימות מיקום",
+    "errorTitle": "לא ניתן לטעון תוצאות",
+    "errorBody": "בדקו את החיבור ונסו שוב.",
+    "retry": "נסו שוב"
   }
 }

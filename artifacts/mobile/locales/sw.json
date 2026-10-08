@@ -539,5 +539,25 @@
     "manageTranslations": "Simamia Tafsiri",
     "translationJobs": "Kazi za Tafsiri",
     "contentManagement": "Usimamizi wa Maudhui"
+  },
+  "discovery": {
+    "location": "Mahali",
+    "worldwide": "Duniani kote",
+    "nearby": "Karibu",
+    "worldwideHint": "Tafuta wenzako katika kila nchi",
+    "nearbyHint": "Tafuta wenzako karibu na mahali pako palipothibitishwa",
+    "searchRadius": "Umbali wa utafutaji",
+    "radiusKm": "km {{km}}",
+    "searching": "Inatafuta…",
+    "emptyTitle": "Hakuna wenzako waliopatikana",
+    "emptyBody": "Jaribu jina au ujuzi mwingine.",
+    "emptyNearbyTitle": "Hakuna wenzako waliopatikana karibu",
+    "emptyNearbyBody": "Jaribu kuongeza umbali wa utafutaji au badilisha kuwa Duniani kote.",
+    "needsLocationTitle": "Utafutaji wa karibu unahitaji mahali ulipo",
+    "needsLocationBody": "Thibitisha mahali ulipo ili kugundua wenzako walio karibu nawe.",
+    "verifyLocation": "Thibitisha mahali",
+    "errorTitle": "Imeshindwa kupakia matokeo",
+    "errorBody": "Tafadhali angalia muunganisho wako kisha ujaribu tena.",
+    "retry": "Jaribu tena"
   }
 }

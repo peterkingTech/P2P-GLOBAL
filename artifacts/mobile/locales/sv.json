@@ -539,5 +539,25 @@
     "manageTranslations": "Hantera översättningar",
     "translationJobs": "Översättningsjobb",
     "contentManagement": "Innehållshantering"
+  },
+  "discovery": {
+    "location": "Plats",
+    "worldwide": "Hela världen",
+    "nearby": "I närheten",
+    "worldwideHint": "Sök i alla länder",
+    "nearbyHint": "Sök nära din verifierade plats",
+    "searchRadius": "Sökradie",
+    "radiusKm": "{{km}} km",
+    "searching": "Söker…",
+    "emptyTitle": "Inga hittades",
+    "emptyBody": "Försök med ett annat namn eller en annan färdighet.",
+    "emptyNearbyTitle": "Inga hittades i närheten",
+    "emptyNearbyBody": "Prova att utöka sökradien eller byt till Hela världen.",
+    "needsLocationTitle": "Sökning i närheten behöver din plats",
+    "needsLocationBody": "Verifiera din plats för att hitta personer omkring dig.",
+    "verifyLocation": "Verifiera plats",
+    "errorTitle": "Det gick inte att läsa in resultat",
+    "errorBody": "Kontrollera anslutningen och försök igen.",
+    "retry": "Försök igen"
   }
 }

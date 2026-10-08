@@ -539,5 +539,25 @@
     "manageTranslations": "Gestionează traducerile",
     "translationJobs": "Sarcini de traducere",
     "contentManagement": "Gestionarea conținutului"
+  },
+  "discovery": {
+    "location": "Locație",
+    "worldwide": "În toată lumea",
+    "nearby": "În apropiere",
+    "worldwideHint": "Caută în toate țările",
+    "nearbyHint": "Caută lângă locația ta verificată",
+    "searchRadius": "Raza de căutare",
+    "radiusKm": "{{km}} km",
+    "searching": "Se caută…",
+    "emptyTitle": "Nu s-a găsit nimeni",
+    "emptyBody": "Încearcă alt nume sau altă abilitate.",
+    "emptyNearbyTitle": "Nu s-a găsit nimeni în apropiere",
+    "emptyNearbyBody": "Mărește raza de căutare sau treci la În toată lumea.",
+    "needsLocationTitle": "Căutarea în apropiere are nevoie de locația ta",
+    "needsLocationBody": "Verifică-ți locația pentru a descoperi persoane din jurul tău.",
+    "verifyLocation": "Verifică locația",
+    "errorTitle": "Rezultatele nu au putut fi încărcate",
+    "errorBody": "Verifică-ți conexiunea și încearcă din nou.",
+    "retry": "Încearcă din nou"
   }
 }
