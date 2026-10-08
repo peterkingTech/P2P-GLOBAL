@@ -27,4 +27,4 @@ export const PROFILE_COLUMNS = `  id,email,full_name,photo_url,role,country,lang
   official_account_label,admin_zone,admin_country,admin_appointed_by,admin_appointed_at,
   admin_appointment_reason,admin_is_active,admin_last_active_at,ministry_role,
   ministry_role_updated_at,app_style_id,app_style_mode,app_style_illustration_level,
-  app_style_favorites,tree_growth_score,tree_environment_preference,tree_reduced_motion`.replace(/s+/g, "");
+  app_style_favorites,tree_growth_score,tree_environment_preference,tree_reduced_motion`.replace(/\s+/g, "");

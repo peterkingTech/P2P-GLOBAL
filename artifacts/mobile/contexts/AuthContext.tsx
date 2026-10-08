@@ -340,7 +340,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
         return fetchProfile(userId, attempt + 1);
       }
-    } catch {}
+      // Anything else (e.g. a bad column list, permissions) leaves the user
+      // signed in with no profile — never let that pass silently.
+      if (error) console.error("fetchProfile failed", error.code, error.message);
+    } catch (e) {
+      console.error("fetchProfile failed", e);
+    }
   }, []);
 
   const [accountStatus, setAccountStatus] = useState<AccountStatusInfo | null>(null);

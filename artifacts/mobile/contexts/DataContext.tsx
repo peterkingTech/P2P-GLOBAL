@@ -3940,7 +3940,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // official accounts, no self, blocks hidden both ways) and the "Show my
   // country" rule are enforced in the function itself.
   const searchDiscoverablePeers = useCallback(async (opts: DiscoverySearchOptions = {}): Promise<DiscoverySearchResult> => {
-    if (!profile) return { peers: [], error: null };
+    // No profile means the search can't run — report it rather than
+    // presenting an empty result as "no peers found".
+    if (!profile) return { peers: [], error: "failed" };
     const mode = opts.mode ?? "worldwide";
     try {
       const { data, error } = await supabase.rpc("p2p_discover_peers", {
