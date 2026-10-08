@@ -625,7 +625,11 @@ export interface DiscoverablePeer {
   id: string;
   username: string | null;
   fullName: string;
+  // Public location only: null when the person hides their country.
   country: string | null;
+  city: string | null;
+  // The person's own stated calling (free text); null if not written.
+  calling: string | null;
   role: string;
   gifts: string[];
   skills: string[];
@@ -3923,7 +3927,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // filter — this just keeps the query's own intent explicit.
       let query = supabase
         .from("p2p_profiles")
-        .select("id, username, full_name, country, role, gifts, skills, photo_url")
+        .select("id, username, full_name, country, city, calling, show_country_on_profile, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .eq("is_official_account", false)
         .order("full_name", { ascending: true })
@@ -3948,7 +3952,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .filter((p: any) => !blockedIds.has(p.id))
         .map((p: any) => ({
           id: p.id, username: p.username || null, fullName: p.full_name || "Unnamed",
-          country: p.country, role: p.role, gifts: p.gifts || [],
+          // Respect "Show my country on my profile" (city goes with it).
+          country: p.show_country_on_profile === false ? null : p.country,
+          city: p.show_country_on_profile === false ? null : (p.city ?? null),
+          calling: p.calling ?? null,
+          role: p.role, gifts: p.gifts || [],
           skills: p.skills || [],
           photoUrl: p.photo_url || null,
         }));
@@ -3990,7 +3998,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const mySkills: string[] = profile.skills || [];
       const { data, error } = await supabase
         .from("p2p_profiles")
-        .select("id, username, full_name, country, role, gifts, skills, photo_url")
+        .select("id, username, full_name, country, city, calling, show_country_on_profile, role, gifts, skills, photo_url")
         .neq("id", profile.id)
         .limit(200);
       if (error) throw error;
@@ -4008,7 +4016,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       return {
         id: best.id, username: best.username || null, fullName: best.full_name || "Unnamed",
-        country: best.country, role: best.role, gifts: best.gifts || [],
+        country: best.show_country_on_profile === false ? null : best.country,
+        city: best.show_country_on_profile === false ? null : (best.city ?? null),
+        calling: best.calling ?? null,
+        role: best.role, gifts: best.gifts || [],
         skills: best.skills || [],
         photoUrl: best.photo_url || null,
       };
@@ -5330,10 +5341,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(data),
       });
       const body = await res.json();
-      if (!res.ok) return { cohort: null, error: body?.error ?? "Couldn't create cohort" };
+      if (!res.ok) return { cohort: null, error: body?.error ?? "Couldn't create small group" };
       return { cohort: body as ChurchCohort, error: null };
     } catch {
-      return { cohort: null, error: "Couldn't create cohort. Please check your connection." };
+      return { cohort: null, error: "Couldn't create small group. Please check your connection." };
     }
   }, [profile?.id]);
 
@@ -5358,9 +5369,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(data),
       });
       const body = await res.json();
-      return res.ok ? null : (body?.error ?? "Couldn't update cohort");
+      return res.ok ? null : (body?.error ?? "Couldn't update small group");
     } catch {
-      return "Couldn't update cohort. Please check your connection.";
+      return "Couldn't update small group. Please check your connection.";
     }
   }, [profile?.id]);
 
@@ -5373,9 +5384,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(target),
       });
       const body = await res.json();
-      return res.ok ? null : (body?.error ?? "Couldn't add member to cohort");
+      return res.ok ? null : (body?.error ?? "Couldn't add member to small group");
     } catch {
-      return "Couldn't add member to cohort. Please check your connection.";
+      return "Couldn't add member to small group. Please check your connection.";
     }
   }, [profile?.id]);
 
@@ -5386,9 +5397,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         method: "DELETE",
       });
       const body = await res.json();
-      return res.ok ? null : (body?.error ?? "Couldn't remove member from cohort");
+      return res.ok ? null : (body?.error ?? "Couldn't remove member from small group");
     } catch {
-      return "Couldn't remove member from cohort. Please check your connection.";
+      return "Couldn't remove member from small group. Please check your connection.";
     }
   }, [profile?.id]);
 

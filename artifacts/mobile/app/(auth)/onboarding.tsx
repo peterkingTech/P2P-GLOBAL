@@ -20,6 +20,8 @@ import colors from "@/constants/colors";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { isSmallPhone, fs } from "@/lib/responsive";
 import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
+import ReadableText from "@/components/ReadableText";
+import { READABLE_WIDTH } from "@/lib/typography";
 
 const { width } = Dimensions.get("window");
 
@@ -138,12 +140,17 @@ export default function OnboardingScreen() {
           actually scrolls the visible content), which meant every slide
           silently showed slide 1's text. Rendering the current slide
           directly sidesteps that platform gap entirely. */}
-      <View
+      {/* Scrolls only when it has to (large accessibility text on a small
+          phone) — otherwise the content stays vertically centred. */}
+      <ScrollView
         style={[
-          styles.slide,
-          { width: isTablet ? MAX_CONTENT_WIDTH : width, backgroundColor: colors.darkBg },
+          styles.slideScroll,
+          { width: isTablet ? MAX_CONTENT_WIDTH : width },
           isTablet && { alignSelf: "center" },
         ]}
+        contentContainerStyle={styles.slide}
+        alwaysBounceVertical={false}
+        showsVerticalScrollIndicator={false}
       >
         {SLIDES[current].icon === null ? (
           <View style={styles.logoWrap}>
@@ -158,12 +165,12 @@ export default function OnboardingScreen() {
             />
           </View>
         )}
-        <Text style={[styles.title, isSmallPhone && { fontSize: fs(22) }, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</Text>
-        <Text style={styles.subtitle}>{SLIDES[current].subtitle}</Text>
+        <ReadableText style={[styles.title, isSmallPhone && { fontSize: fs(22), lineHeight: fs(30) }, SLIDES[current].id === "1" && styles.titleHero]}>{SLIDES[current].title}</ReadableText>
+        <ReadableText balance style={styles.subtitle}>{SLIDES[current].subtitle}</ReadableText>
         {SLIDES[current].id === "1" && (
           <Text style={styles.poweredBy}>{t("onboarding.poweredBy")}</Text>
         )}
-      </View>
+      </ScrollView>
 
       {/* Dots */}
       <View style={[styles.dots, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
@@ -181,7 +188,7 @@ export default function OnboardingScreen() {
       {/* CTA */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
         {isLast && (
-          <Text style={styles.kingdomSchoolIntro}>{t("onboarding.kingdomSchoolIntro")}</Text>
+          <ReadableText style={styles.kingdomSchoolIntro}>{t("onboarding.kingdomSchoolIntro")}</ReadableText>
         )}
         <TouchableOpacity
           style={styles.btn}
@@ -293,12 +300,15 @@ const styles = StyleSheet.create({
   },
   langBtnFlag: { fontSize: 15 },
   langBtnLabel: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  slideScroll: { flex: 1, backgroundColor: colors.darkBg },
+  // flexGrow (not flex) so the content centres when it fits and scrolls
+  // when it doesn't. Text widths come from READABLE_WIDTH maxWidths below.
   slide: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 36,
-    backgroundColor: colors.darkBg,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
   },
   logoWrap: {
     marginBottom: 36,
@@ -316,7 +326,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26, fontWeight: "700", color: colors.cream,
     textAlign: "center", marginBottom: 16, lineHeight: 34,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_700Bold", maxWidth: READABLE_WIDTH.heading,
   },
   titleHero: {
     fontSize: 22, letterSpacing: 0.8, color: "#FFFFFF",
@@ -331,7 +341,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15, color: colors.textMutedLight,
     textAlign: "center", lineHeight: 24,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_400Regular", maxWidth: READABLE_WIDTH.body,
   },
   discoverBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
@@ -341,25 +351,29 @@ const styles = StyleSheet.create({
   },
   discoverBtnText: {
     color: colors.accentGreen, fontSize: 15, fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold", flexShrink: 1, textAlign: "center",
   },
   dots: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 32 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   footer: { paddingHorizontal: 24, gap: 14 },
   kingdomSchoolIntro: {
     fontSize: 12, color: colors.lightGreen, textAlign: "center",
-    fontFamily: "Inter_400Regular", opacity: 0.8, lineHeight: 18, marginBottom: -2,
+    fontFamily: "Inter_400Regular", opacity: 0.8, lineHeight: 18,
+    maxWidth: READABLE_WIDTH.caption, alignSelf: "center",
   },
   btn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
+    // minHeight, not height: a long translation or large accessibility
+    // text grows the button instead of clipping its label.
+    backgroundColor: colors.accentGreen, borderRadius: 14, minHeight: 54,
+    paddingHorizontal: 20, paddingVertical: 12,
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   btnText: {
     color: colors.cream, fontSize: 16, fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold", flexShrink: 1, textAlign: "center",
   },
   skipBtn: { alignItems: "center", paddingVertical: 8 },
-  skipText: { color: colors.lightGreen, fontSize: 14, fontFamily: "Inter_400Regular" },
+  skipText: { color: colors.lightGreen, fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.darkBg,

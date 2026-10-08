@@ -33,6 +33,7 @@
     "reachOutSub": "Neem privé contact op voor ondersteuning en opvolging",
     "signOut": "Uitloggen",
     "calledIn": "Geroepen tot",
+    "calledTo": "Geroepen tot",
     "myProgress": "Mijn voortgang",
     "myProgressSub": "Inzendingen, beoordelingen en plannen in uitvoering",
     "skills": "Vaardigheden",
@@ -173,7 +174,9 @@
     "peerConnect": "Peerverbinding",
     "peerConnectSub": "Vind een studiepartner of peer-gids",
     "myDiscipleship": "Mijn Discipelschap",
-    "myDiscipleshipSub": "Loop samen met anderen en zie jouw impact"
+    "myDiscipleshipSub": "Loop samen met anderen en zie jouw impact",
+    "myFamily": "Familiekring",
+    "myFamilySub": "Media, Schrift, gebed en samenkomsten samen"
   },
   "learn": {
     "title": "Leren",

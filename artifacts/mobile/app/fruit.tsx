@@ -11,6 +11,7 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, FruitCatalogEntry, EarnedFruit, FruitProgressEntry } from "@/contexts/DataContext";
+import ReadableText from "@/components/ReadableText";
 
 // Deliberately dark, garden-at-night palette — distinct from the rest of the
 // app's light/cream theme. This screen is a keepsake, not a settings page.
@@ -85,7 +86,7 @@ function FruitCard({
         <View style={[styles.rarityBadge, { borderColor: rarityColor }]}>
           <Text style={[styles.rarityText, { color: rarityColor }]}>{fruit.rarity.toUpperCase()}</Text>
         </View>
-        {fruit.themeVerse && <Text style={styles.verseRef}>{fruit.themeVerse}</Text>}
+        {fruit.themeVerse && <ReadableText style={styles.verseRef}>{fruit.themeVerse}</ReadableText>}
         <Text style={styles.desc} numberOfLines={2}>{fruit.description}</Text>
         <Text style={styles.earnedDate}>
           Earned {new Date(earned.awardedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}

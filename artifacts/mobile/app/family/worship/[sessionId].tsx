@@ -30,6 +30,7 @@ import ShareRoomPanel from "@/components/ShareRoomPanel";
 import NotesPanel from "@/components/family/NotesPanel";
 import LessonPicker from "@/components/family/LessonPicker";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
+import type { FamilyIconName } from "@/components/family/FamilyIcon";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -40,14 +41,16 @@ function showAlert(title: string, message: string) {
 // values ("sharing", "silent_prayer", "teaching", ...) are the internal
 // identifiers used by the API/DB and are unchanged; only what's shown to
 // the user is renamed to the canonical product vocabulary.
-const MODES: { key: WorshipMode; label: string; icon: string }[] = [
-  { key: "worship", label: "Media", icon: "📺" },
-  { key: "scripture", label: "Bible", icon: "📖" },
-  { key: "prayer", label: "Prayer", icon: "🙏" },
-  { key: "sharing", label: "Share", icon: "🎤" },
-  { key: "silent_prayer", label: "Mute", icon: "🔕" },
-  { key: "teaching", label: "Study Workspace", icon: "📚" },
+const MODES: { key: WorshipMode; label: string; icon: FamilyIconName }[] = [
+  { key: "worship", label: "Media", icon: "media" },
+  { key: "scripture", label: "Bible", icon: "scripture" },
+  { key: "prayer", label: "Prayer", icon: "prayer" },
+  { key: "sharing", label: "Share", icon: "share" },
+  { key: "silent_prayer", label: "Mute", icon: "mute" },
+  { key: "teaching", label: "Study Workspace", icon: "study" },
 ];
+// The reactions people send each other (content, like a reaction picker's
+// choices) — the control that opens them is a vector icon (GatheringFooter).
 const REACTIONS = ["🙏", "❤️", "🔥", "👏", "✝️"];
 const MODE_BY_KEY = new Map(MODES.map((m) => [m.key, m]));
 
@@ -750,7 +753,7 @@ export default function FamilyWorshipScreen() {
 
       <ShareRoomPanel
         visible={shareOpen} onClose={() => setShareOpen(false)}
-        roomType="family_worship" roomId={session.id} roomTitle="Family Worship"
+        roomType="family_worship" roomId={session.id} roomTitle="Family Circle Gathering"
         statusLine={session.status === "ended" ? "This gathering has ended" : "Gathering in progress"}
       />
 

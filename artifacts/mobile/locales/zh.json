@@ -33,6 +33,7 @@
     "reachOutSub": "私下寻求支持和跟进",
     "signOut": "退出登录",
     "calledIn": "呼召于",
+    "calledTo": "蒙召于",
     "myProgress": "我的进度",
     "myProgressSub": "正在进行的提交、评估和计划",
     "skills": "技能",
@@ -173,7 +174,9 @@
     "myProfile": "我的个人资料",
     "myProfileSub": "查看你的门徒训练档案",
     "admin": "管理员",
-    "adminSub": "课程管理器与注册回复"
+    "adminSub": "课程管理器与注册回复",
+    "myFamily": "家庭圈",
+    "myFamilySub": "媒体、经文、祷告与聚会，一同进行"
   },
   "learn": {
     "title": "国度学校",

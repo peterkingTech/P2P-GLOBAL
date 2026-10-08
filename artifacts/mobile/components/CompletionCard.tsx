@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import ReadableText from "@/components/ReadableText";
 // expo-media-library has no web implementation (ExpoMediaLibraryNext is a
 // native-only module) — its top-level code throws immediately if loaded on
 // web, which previously crashed the ENTIRE app there (this file is pulled
@@ -107,7 +108,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
             <View style={styles.divider} />
 
             <Text style={styles.scripture}>"Well done, good and faithful servant"</Text>
-            <Text style={styles.scriptureRef}>Matthew 25:23</Text>
+            <ReadableText style={styles.scriptureRef}>Matthew 25:23</ReadableText>
           </View>
         </ViewShot>
 

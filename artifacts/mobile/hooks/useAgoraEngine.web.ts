@@ -17,7 +17,9 @@ interface UseAgoraEngineOptions {
   appId?: string;
   onCameraUnavailable?: () => void;
   onPermissionsResolved?: () => void;
+  onMicUnavailable?: () => void;
   initialPublishVideo?: boolean;
+  startWithCameraOff?: boolean;
 }
 
 // Same shape as useAgoraEngine.native.ts's AgoraEngineRef, so tsc (which

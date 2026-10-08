@@ -56,10 +56,23 @@ const queryClient = new QueryClient();
 // here before — an authenticated user landing on either got immediately
 // bounced back to /(tabs) by the effect below (isAuthenticated && inAuth &&
 // !inSetupFlow), since AUTH_SETUP_SCREENS didn't know about them yet.
+// Routes whose screen renders its own header bar (see the Stack below).
+const OWN_HEADER_ROUTES = [
+  "plan/[id]", "plans/pre-plan-questions",
+  "church/create-cohort", "church/grove", "church/join", "church/member-profile", "church/register",
+  "church/studies/index", "church/studies/[studyId]",
+  "circles/create", "family/studies/[studyId]",
+  "missions/create", "missions/field/[slug]", "missions/focus/[focus]", "missions/go", "missions/learn", "missions/story/[id]",
+  "prayer/availability", "prayer/build-confession", "prayer/discover", "prayer/gathering/[id]", "prayer/invitation/[id]",
+  "prayer/journal", "prayer/library/index", "prayer/my-prayer", "prayer/paths/index", "prayer/pray-the-word/index",
+  "prayer/pray-with-me", "prayer/requests", "prayer/sinners-prayer",
+  "prayer/testimony/feed", "prayer/testimony/record", "prayer/testimony/[id]",
+];
+
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, profile, isPasswordRecovery } = useAuth();
+  const { isAuthenticated, isLoading, profile, isPasswordRecovery, accountStatus } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
@@ -129,6 +142,17 @@ function AuthGate() {
     // bounce back into /journey once the real profile arrives.
     if (!profile) return;
 
+    // Account on a break or scheduled for deletion (server-written status, see
+    // AuthContext): the only place to go is the paused screen, which offers
+    // Reactivate / Keep my account and Sign out. Waits for the status read so
+    // an active user never flickers.
+    if (!accountStatus) return;
+    const onPausedScreen = inAuth && screenName === "account-paused";
+    if (accountStatus.status !== "active") {
+      if (!onPausedScreen) router.replace("/(auth)/account-paused" as any);
+      return;
+    }
+
     // Existing accounts created before the @username system (or accounts an
     // admin has force-flagged via Admin > Usernames) must pick/change a
     // username before doing anything else — checked ahead of the journey
@@ -151,7 +175,7 @@ function AuthGate() {
       pendingDeepLinkPath.current = null;
       router.replace((target ?? "/(tabs)") as any);
     }
-  }, [isAuthenticated, isLoading, segments, profile, pathname, router]);
+  }, [isAuthenticated, isLoading, segments, profile, pathname, router, accountStatus]);
 
   return (
     <Stack
@@ -159,11 +183,23 @@ function AuthGate() {
         headerShown: true,
         headerTintColor: "#1D9E75",
         headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        // Safety net: a screen that sets no title shows a blank header title
+        // instead of Expo Router's fallback, the route name ("plan/[id]").
+        title: "",
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
+      {/* Screens that draw their own header (back button + title, with
+          their own safe-area padding). They predate this Stack — the root
+          used to be a header-less <Slot /> — so without this they showed
+          the native header too, titled with the route name. */}
+      {OWN_HEADER_ROUTES.map((name) => (
+        <Stack.Screen key={name} name={name} options={{ headerShown: false }} />
+      ))}
+      <Stack.Screen name="church/index" options={{ title: "Church" }} />
+      <Stack.Screen name="prayer/complete/[id]" options={{ title: "Prayer" }} />
     </Stack>
   );
 }

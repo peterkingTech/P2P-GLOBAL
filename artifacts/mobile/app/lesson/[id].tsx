@@ -36,6 +36,7 @@ import { shareLesson } from "@/lib/sharing";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
+import ReadableText from "@/components/ReadableText";
 
 interface LessonContent {
   title: string;
@@ -796,10 +797,10 @@ export default function LessonScreen() {
                 }}
               >
                 <Text style={styles.verseText}>"{displayText}"</Text>
-                <Text style={styles.verseRef}>
+                <ReadableText style={styles.verseRef}>
                   — {s.reference}
                   {translationCode ? ` (${translationCode})` : ""}
-                </Text>
+                </ReadableText>
               </TouchableOpacity>
             );
           })}

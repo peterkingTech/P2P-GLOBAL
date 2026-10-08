@@ -67,6 +67,15 @@ interface UseAgoraEngineOptions {
    * only, nothing sent), then calls `publishVideoNow()` (returned below)
    * once acceptance is confirmed. Never affects audio publishing. */
   initialPublishVideo?: boolean;
+  /** Seamless Audio ↔ Video — a video-capable engine (enableVideo:true) that
+   * starts with the camera completely off: no camera permission request at
+   * join (Android), no preview, local video disabled, camera track not
+   * published. Remote video is still subscribed, so the other side's video
+   * shows the moment they turn it on. The screen turns its own camera on
+   * later (enableLocalVideo + publishVideoNow) on the same live engine — no
+   * rejoin. Read once at join, like initialPublishVideo. Default false:
+   * every existing caller is unchanged. */
+  startWithCameraOff?: boolean;
   /** Forensic calling audit — Android camera-permission denial previously
    * only logged a console.warn and otherwise vanished: the engine still
    * joined and published "video" that was actually empty frames, while the
@@ -106,7 +115,7 @@ export type AgoraEngineRef = MutableRefObject<IRtcEngine | null> & {
   publishVideoNow: () => void;
 };
 
-export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved, onMicUnavailable, initialPublishVideo }: UseAgoraEngineOptions): AgoraEngineRef {
+export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHandler, appId, onCameraUnavailable, onPermissionsResolved, onMicUnavailable, initialPublishVideo, startWithCameraOff = false }: UseAgoraEngineOptions): AgoraEngineRef {
   const engineRef = useRef<IRtcEngine | null>(null) as AgoraEngineRef;
   // WhatsApp-style ringing lifecycle — reads engineRef.current at CALL time
   // (not creation time), so it always reaches whichever engine instance is
@@ -172,7 +181,9 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       // present in app.json, so no equivalent call is needed there.
       if (Platform.OS === "android") {
         const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-        if (enableVideo) permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+        // Camera-off start: the camera permission is asked when the user
+        // actually turns video on (video.tsx), not for an audio call.
+        if (enableVideo && !startWithCameraOff) permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
         const results = await PermissionsAndroid.requestMultiple(permissions);
         const denied = permissions.filter((p) => results[p] !== PermissionsAndroid.RESULTS.GRANTED);
         if (denied.length > 0) {
@@ -205,7 +216,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
       // renderer on iOS (Android's capture pipeline tolerated the omission,
       // which is why this was never caught there). Gated on enableVideo so
       // audio-only calls (audio.tsx) never start the camera.
-      if (enableVideo) engine.startPreview();
+      if (enableVideo && !startWithCameraOff) engine.startPreview();
 
       if (enableVideo) {
         engine.enableVideo();
@@ -213,8 +224,9 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         // local video stream" (enableVideo's own doc says this is already
         // the default, but making it explicit removes any ambiguity rather
         // than relying on an implicit default during the local-preview
-        // investigation).
-        engine.enableLocalVideo(true);
+        // investigation). Camera-off start: capture explicitly disabled
+        // instead, keeping the video module (and remote video) available.
+        engine.enableLocalVideo(!startWithCameraOff);
       } else {
         engine.disableVideo();
       }
@@ -244,7 +256,7 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
         // ringing, so the camera track is never sent to the callee before
         // they accept. Subscribing to the REMOTE side's video is unaffected
         // either way (autoSubscribeVideo below).
-        publishCameraTrack: initialPublishVideo ?? enableVideo,
+        publishCameraTrack: startWithCameraOff ? false : (initialPublishVideo ?? enableVideo),
         autoSubscribeAudio: true,
         autoSubscribeVideo: enableVideo,
       });
@@ -287,8 +299,8 @@ export function useAgoraEngine({ channelName, token, uid, enableVideo, eventHand
     };
     // Video-call lifecycle audit — deliberately NOT including eventHandler/
     // onCameraUnavailable/onPermissionsResolved (read through refs above
-    // instead, see their declarations), nor initialPublishVideo (only read
-    // once, at the initial joinChannel call, for whether to start
+    // instead, see their declarations), nor initialPublishVideo or
+    // startWithCameraOff (only read once, at the initial joinChannel call, for whether to start
     // publishing camera immediately — a later acceptance uses
     // publishVideoNow() instead of changing this and retriggering a full
     // engine recreation). This effect — and the real

@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { FruitCatalogEntry, EarnedFruit } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import ReadableText from "@/components/ReadableText";
 
 const CATEGORY_LABEL: Record<string, string> = {
   personal_growth: "Personal Growth",
@@ -43,7 +44,7 @@ export default function FruitDetailCard({ visible, catalogEntry, earnedFruit, on
           {catalogEntry.themeVerse && (
             <View style={styles.verseBlock}>
               <Text style={styles.verseText}>{catalogEntry.themeVerseText}</Text>
-              <Text style={styles.verseRef}>{catalogEntry.themeVerse}</Text>
+              <ReadableText style={styles.verseRef}>{catalogEntry.themeVerse}</ReadableText>
             </View>
           )}
           {earnedDate && <Text style={styles.earnedDate}>Earned {earnedDate}</Text>}

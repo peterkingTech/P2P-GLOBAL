@@ -274,7 +274,7 @@ export default function PrayTheWordFlowScreen() {
             {topic.slug === "family" && (
               <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/family/prayer" as any)}>
                 <Ionicons name="home-outline" size={16} color={c.accentGreen} />
-                <Text style={styles.secondaryBtnText}>Take to Family Prayer</Text>
+                <Text style={styles.secondaryBtnText}>Take to Family Circle Prayer</Text>
               </TouchableOpacity>
             )}
 

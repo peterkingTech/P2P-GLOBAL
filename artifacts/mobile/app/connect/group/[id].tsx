@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData, GroupMember, DiscoverablePeer, PeerGroup } from "@/contexts/DataContext";
+import { publicLocationLabel, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
 import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 
@@ -90,7 +91,6 @@ export default function GroupDetail() {
                   <Avatar photoUrl={item.photoUrl} name={item.fullName} size={40} style={styles.avatar} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name}>{item.fullName}</Text>
-                    <Text style={styles.meta}>{item.role}</Text>
                   </View>
                   {group?.isCreator && item.userId !== group.peerGuideId && (
                     <TouchableOpacity onPress={() => handleRemove(item.userId)} disabled={busyId === item.userId}>
@@ -147,7 +147,7 @@ export default function GroupDetail() {
                     <Avatar photoUrl={item.photoUrl} name={item.fullName} size={40} style={styles.avatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.name}>{item.fullName}</Text>
-                      <Text style={styles.meta}>{item.country || "Unknown location"} · {item.role}</Text>
+                      <Text style={styles.meta}>{publicLocationLabel(item.city, item.country) ?? NO_PUBLIC_LOCATION}</Text>
                     </View>
                     <TouchableOpacity
                       style={[styles.smallBtn, already && styles.smallBtnDisabled]}

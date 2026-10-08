@@ -12,11 +12,11 @@ import { MIN_SIGNUP_AGE, isValidCalendarDate, toISODate, ageFromISODate, parseDM
 import DateOfBirthInput from "@/components/DateOfBirthInput";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
-import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import MinistryRolePicker, { MINISTRY_ROLE_OPTIONS } from "@/components/MinistryRolePicker";
 import { MinistryRole } from "@/contexts/AuthContext";
+
 
 function timeAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
@@ -49,7 +49,6 @@ export default function AccountSettingsScreen() {
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordField, setShowPasswordField] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [showLocationVerifier, setShowLocationVerifier] = useState(false);
   const [showMinistryPicker, setShowMinistryPicker] = useState(false);
   const [savingMinistryRole, setSavingMinistryRole] = useState(false);
@@ -160,39 +159,6 @@ export default function AccountSettingsScreen() {
       locationVerifiedAt: new Date().toISOString(),
     });
     setShowLocationVerifier(false);
-  }
-
-  function confirmDeleteAccount() {
-    Alert.alert(
-      "Delete your account?",
-      "This permanently deletes your profile and everything tied to it. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete Account", style: "destructive", onPress: handleDeleteAccount },
-      ]
-    );
-  }
-
-  async function handleDeleteAccount() {
-    if (!user?.id) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`${getApiUrl()}/account/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Something went wrong.");
-      }
-      await signOut();
-      router.replace("/(auth)/onboarding" as any);
-    } catch (e: any) {
-      Alert.alert("Couldn't delete account", e.message ?? "Please try again.");
-    } finally {
-      setDeleting(false);
-    }
   }
 
   return (
@@ -407,13 +373,14 @@ export default function AccountSettingsScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.deleteBtn} onPress={confirmDeleteAccount} disabled={deleting}>
-          {deleting ? <ActivityIndicator color="#B91C1C" size="small" /> : (
-            <>
-              <Ionicons name="trash-outline" size={16} color="#B91C1C" />
-              <Text style={styles.deleteBtnText}>Delete Account</Text>
-            </>
-          )}
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/account-status" as any)}>
+          <View style={styles.usernameRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Account status</Text>
+              <Text style={styles.locationSub}>Take a break · Delete account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </View>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -461,10 +428,5 @@ function makeStyles(c: AppColors) {
     locationRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
     locationText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
     locationSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-    deleteBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      borderWidth: 1.5, borderColor: "#B91C1C", borderRadius: 14, height: 50, marginTop: 8,
-    },
-    deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#B91C1C", fontFamily: "Inter_700Bold" },
   });
 }

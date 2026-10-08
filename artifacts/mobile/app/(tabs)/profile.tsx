@@ -28,6 +28,7 @@ import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import LivingTree, { stageLabel } from "@/components/LivingTree";
 import "@/lib/i18n";
+import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "school" },
@@ -335,7 +336,13 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.email}>{profile?.email ?? ""}</Text>
           <View style={styles.locationRow}>
-            {profile?.role && <Text style={styles.locationText}>{t("profile.calledIn")}: {profile.role.replace(/_/g, " ")}</Text>}
+            {/* WHERE + CALLED TO — same lines peers see (lib/publicIdentity).
+                The permission role (e.g. "student") is not a calling and is
+                no longer shown here. */}
+            {publicLocationLabel(profile?.city, profile?.country) && <Text style={styles.locationText}>{publicLocationLabel(profile?.city, profile?.country)}</Text>}
+          </View>
+          <View style={styles.locationRow}>
+            {calledToValue(profile?.calling) && <Text style={styles.locationText}>{t("profile.calledTo")}: {calledToValue(profile?.calling)}</Text>}
           </View>
           {(profile?.skills?.length ?? 0) > 0 && (
             <View style={styles.locationRow}>

@@ -7,7 +7,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
-import { getFlagEmoji } from "@/lib/countryGeo";
+import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
 import { Avatar } from "@/components/Avatar";
 import { shareProfile } from "@/lib/sharing";
 import { VerificationBadge } from "@/components/VerificationBadge";
@@ -19,7 +19,7 @@ type ConnectionStatus = "none" | "pending_sent" | "pending_received" | "connecte
 
 interface PublicProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
-  country: string | null; countryCode: string | null; bio: string | null;
+  country: string | null; countryCode: string | null; city?: string | null; calling?: string | null; bio: string | null;
   isPeerGuideEligible: boolean; joinedAt: string; showProgressPublicly: boolean;
   growthLevel: number | null; modulesCompleted: number | null; fruitCount: number | null;
   activeMenteesCount: number | null; isVerified: boolean;
@@ -309,8 +309,11 @@ export default function PublicProfileScreen() {
             <VerificationBadge isVerified={data.isVerified} username={data.username} size="large" />
           </View>
           {data.fullName && <Text style={styles.fullName}>{data.fullName}</Text>}
-          {data.country && (
-            <Text style={styles.countryLine}>{getFlagEmoji(data.country)} {data.country}</Text>
+          {publicLocationLabel(data.city, data.country) && (
+            <Text style={styles.countryLine}>{publicLocationLabel(data.city, data.country)}</Text>
+          )}
+          {calledToValue(data.calling) && (
+            <Text style={styles.countryLine}>Called to: {calledToValue(data.calling)}</Text>
           )}
           {data.bio && <Text style={styles.bio}>"{data.bio}"</Text>}
         </View>

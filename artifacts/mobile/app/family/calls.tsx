@@ -14,7 +14,7 @@ function showAlert(title: string, message: string) {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  shepherd: "Family Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
+  shepherd: "Family Circle Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
 };
 
 // Direct person-to-person calling with the SELECTED family's members —
@@ -51,7 +51,7 @@ export default function FamilyCallsScreen() {
   const load = useCallback(async () => {
     if (!familyId) return;
     try { setData(await getFamilyDetail(familyId)); }
-    catch (e: any) { showAlert("Couldn't load this family", e.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't load this Family Circle", e.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [familyId]);
 
@@ -95,12 +95,12 @@ export default function FamilyCallsScreen() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
       >
-        <Text style={styles.hint}>Start a voice or video call with family members.</Text>
+        <Text style={styles.hint}>Start a voice or video call with people in your Family Circle.</Text>
 
         {otherMembers.length === 0 ? (
           <View style={styles.emptyCard}>
             <Ionicons name="call-outline" size={32} color={c.textMuted} />
-            <Text style={styles.emptyText}>No other members in this family yet.</Text>
+            <Text style={styles.emptyText}>No one else is in this Family Circle yet.</Text>
           </View>
         ) : (
           <View style={styles.section}>

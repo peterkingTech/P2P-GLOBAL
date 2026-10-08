@@ -72,7 +72,7 @@ export default function ChurchCallsScreen() {
       setRecent(r);
       setCohorts(cohortRows.map((c) => ({ id: c.id, name: c.name, leaderId: c.leaderId })));
     } catch (e: any) {
-      showAlert("Couldn't load Church Calls", e.message ?? "Please try again.");
+      showAlert("Couldn't load Church Gatherings", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export default function ChurchCallsScreen() {
   async function handleStart() {
     if (!userChurch || !title.trim()) return;
     if (scope === "cohort" && !cohortId) {
-      showAlert("Choose a group", "Pick which small group this call is for.");
+      showAlert("Choose a small group", "Pick which small group this call is for.");
       return;
     }
     if (scheduleLater && !scheduledAt.trim()) {
@@ -129,7 +129,7 @@ export default function ChurchCallsScreen() {
       const started = await startScheduledChurchCall(call.id);
       router.push({ pathname: "/call/church", params: { callId: started.id, channelName: started.channelName, title: started.title } } as any);
     } catch (e: any) {
-      showAlert("Couldn't start the call", e.message ?? "Please try again.");
+      showAlert("Couldn't start the gathering", e.message ?? "Please try again.");
     }
   }
 
@@ -138,7 +138,7 @@ export default function ChurchCallsScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={[styles.container, styles.centerFill]}>
-          <Text style={styles.emptyText}>Join or register a church to use Church Calls.</Text>
+          <Text style={styles.emptyText}>Join or register a church to use Church Gatherings.</Text>
         </View>
       </>
     );
@@ -149,7 +149,7 @@ export default function ChurchCallsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
-        <Text style={styles.title}>Calls</Text>
+        <Text style={styles.title}>Gatherings</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -160,13 +160,13 @@ export default function ChurchCallsScreen() {
           {isChurchLeader && (
             <TouchableOpacity style={styles.startBtn} onPress={() => setStartOpen(true)} accessibilityRole="button">
               <Ionicons name="call" size={16} color="#fff" />
-              <Text style={styles.startBtnText}>Start Call</Text>
+              <Text style={styles.startBtnText}>Start Gathering</Text>
             </TouchableOpacity>
           )}
 
           <Text style={styles.sectionLabel}>LIVE NOW</Text>
           {live.length === 0 ? (
-            <Text style={styles.emptyText}>No Church Calls are live right now.</Text>
+            <Text style={styles.emptyText}>No Church Gatherings are live right now.</Text>
           ) : (
             live.map((c) => (
               <TouchableOpacity key={c.id} style={styles.card} onPress={() => handleJoin(c)} accessibilityRole="button">
@@ -182,7 +182,7 @@ export default function ChurchCallsScreen() {
 
           <Text style={styles.sectionLabel}>UPCOMING</Text>
           {upcoming.length === 0 ? (
-            <Text style={styles.emptyText}>No upcoming Church Calls scheduled.</Text>
+            <Text style={styles.emptyText}>No upcoming Church Gatherings scheduled.</Text>
           ) : (
             upcoming.map((c) => (
               <View key={c.id} style={styles.card}>
@@ -199,9 +199,9 @@ export default function ChurchCallsScreen() {
             ))
           )}
 
-          <Text style={styles.sectionLabel}>RECENT CALLS</Text>
+          <Text style={styles.sectionLabel}>RECENT GATHERINGS</Text>
           {recent.length === 0 ? (
-            <Text style={styles.emptyText}>No past Church Calls yet.</Text>
+            <Text style={styles.emptyText}>No past Church Gatherings yet.</Text>
           ) : (
             recent.map((c) => (
               <TouchableOpacity key={c.id} style={styles.card} onPress={() => router.push({ pathname: "/church/call-summary", params: { callId: c.id } } as any)}>
@@ -221,7 +221,7 @@ export default function ChurchCallsScreen() {
       <Modal visible={startOpen} transparent animationType="slide" onRequestClose={() => setStartOpen(false)}>
         <View style={styles.sheetOverlay}>
           <ScrollView contentContainerStyle={styles.sheetBox} keyboardShouldPersistTaps="handled">
-            <Text style={styles.sheetTitle}>{scheduleLater ? "Schedule a Church Call" : "Start a Church Call"}</Text>
+            <Text style={styles.sheetTitle}>{scheduleLater ? "Schedule a Church Gathering" : "Start a Church Gathering"}</Text>
             <TextInput
               style={styles.input}
               placeholder="Title (e.g. Wednesday Bible Study)"

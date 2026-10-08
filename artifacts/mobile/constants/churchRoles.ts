@@ -8,9 +8,9 @@ import type { ChurchRole } from "@/contexts/DataContext";
 // ownership gate (senior_pastor label "General Overseer" does NOT imply
 // ownership permissions; only the church's actual creator has those).
 export const CHURCH_ROLE_LABELS: Record<ChurchRole, string> = {
-  senior_pastor: "General Overseer",
+  senior_pastor: "Church Leader",
   discipleship_pastor: "Church Admin",
-  small_group_leader: "Church Admin",
+  small_group_leader: "Small Group Leader",
   peer_guide: "Peer Guide",
   member: "Member",
 };

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, RefreshControl } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import FamilyIcon from "@/components/family/FamilyIcon";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,7 +50,7 @@ export default function FamilyDetailScreen() {
       setData(detail);
       setContinueStudy(study);
     } catch (e: any) {
-      showAlert("Couldn't load this family", e.message ?? "Please try again.");
+      showAlert("Couldn't load this Family Circle", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -89,7 +90,7 @@ export default function FamilyDetailScreen() {
             await removeFamilyMember(data.family.id, profile.id);
             router.replace("/family" as any);
           } catch (e: any) {
-            showAlert("Couldn't leave family", e.message ?? "Please try again.");
+            showAlert("Couldn't leave Family Circle", e.message ?? "Please try again.");
           }
         },
       },
@@ -99,7 +100,7 @@ export default function FamilyDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "Family" }} />
+        <Stack.Screen options={{ title: "Family Circle" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -108,9 +109,9 @@ export default function FamilyDetailScreen() {
   if (!data?.family) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center", padding: 24 }]}>
-        <Stack.Screen options={{ title: "Family" }} />
+        <Stack.Screen options={{ title: "Family Circle" }} />
         <Text style={{ color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center" }}>
-          You're not a member of this Family Gathering.
+          You're not part of this Family Circle.
         </Text>
       </View>
     );
@@ -129,13 +130,13 @@ export default function FamilyDetailScreen() {
           <View style={styles.headerTopRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.familyName}>{data.family.name}</Text>
-              <Text style={styles.familySub}>{data.members.length} member{data.members.length === 1 ? "" : "s"}</Text>
+              <Text style={styles.familySub}>{data.members.length} {data.members.length === 1 ? "person" : "people"}</Text>
             </View>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => router.push({ pathname: "/family/members", params: { familyId } } as any)}
               accessibilityRole="button"
-              accessibilityLabel="Members"
+              accessibilityLabel="People"
             >
               <Ionicons name="people" size={18} color="#fff" />
             </TouchableOpacity>
@@ -145,7 +146,7 @@ export default function FamilyDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel="Prayer"
             >
-              <Text style={{ fontSize: 16 }}>🙏</Text>
+              <FamilyIcon name="prayer" size={17} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -175,14 +176,14 @@ export default function FamilyDetailScreen() {
               style={styles.headerIconBtn}
               onPress={() => router.push({ pathname: "/family/journey", params: { familyId } } as any)}
               accessibilityRole="button"
-              accessibilityLabel="Family Journey"
+              accessibilityLabel="Family Circle Highlights"
             >
               <Ionicons name="trail-sign-outline" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.gatheringBtn} onPress={handleStartGathering} disabled={startingGathering}>
             {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : (
-              <Text style={styles.gatheringBtnText}>{data.activeSessionId ? "Join Family Gathering" : "Start Gathering"}</Text>
+              <Text style={styles.gatheringBtnText}>{data.activeSessionId ? "Join Family Circle Gathering" : "Start Gathering"}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -248,7 +249,7 @@ export default function FamilyDetailScreen() {
         {!isShepherd && (
           <TouchableOpacity style={styles.leaveRow} onPress={handleLeaveFamily} accessibilityRole="button">
             <Ionicons name="exit-outline" size={18} color={c.textMuted} />
-            <Text style={styles.leaveText}>Leave this family</Text>
+            <Text style={styles.leaveText}>Leave this Family Circle</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

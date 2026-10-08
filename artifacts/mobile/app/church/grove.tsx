@@ -46,7 +46,7 @@ export default function GroveDashboardScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 40, paddingHorizontal: 20 }}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
-        <Text style={styles.title}>Grove Dashboard</Text>
+        <Text style={styles.title}>Church Community Dashboard</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -71,8 +71,8 @@ export default function GroveDashboardScreen() {
         <MetricCard value={grove.lessonsThisWeek} label="Lessons This Week" />
         <MetricCard value={grove.activePeerGuides} label="Peer Guides Active" />
         <MetricCard value={grove.nationsReached} label="Nations Reached" />
-        <MetricCard value={grove.totalGrainPlanted} label="Grain Planted" />
-        <MetricCard value={grove.deepestDiscipleshipChain} label="Generations Deep" />
+        <MetricCard value={grove.totalGrainPlanted} label="People Invited" />
+        <MetricCard value={grove.deepestDiscipleshipChain} label="Discipleship Generations" />
       </View>
 
       {(grove.inactiveMembers > 0 || grove.newBelieversWithoutGuides > 0) && (

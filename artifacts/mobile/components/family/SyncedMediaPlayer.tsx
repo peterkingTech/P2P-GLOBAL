@@ -6,6 +6,9 @@ import { useEventListener } from "expo";
 import colors from "@/constants/colors";
 import { computeWorshipPositionMs, type WorshipSession } from "@/lib/familyApi";
 import { rampVolume } from "@/lib/togetherAudio/mixer";
+import FamilyIcon from "./FamilyIcon";
+
+const PLACEHOLDER_ICON = "rgba(255,255,255,0.55)";
 import YouTubePlayer from "./YouTubePlayer";
 
 // Reconciles local playback against the session's server-anchored clock
@@ -203,7 +206,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
         />
         {errorMessage && (
           <View style={styles.errorOverlay}>
-            <Text style={styles.errorIcon}>⚠️</Text>
+            <FamilyIcon name="warning" size={18} color="#F5B400" />
             <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         )}
@@ -214,7 +217,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
   if (!session.mediaUrl && !session.mediaProvider) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderIcon}>🎵</Text>
+        <FamilyIcon name="media" size={36} color={PLACEHOLDER_ICON} />
         <Text style={styles.placeholderText}>No Media selected yet</Text>
       </View>
     );
@@ -223,7 +226,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
   if (errorMessage) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.placeholderIcon}>⚠️</Text>
+        <FamilyIcon name="warning" size={36} color={PLACEHOLDER_ICON} />
         <Text style={styles.placeholderText}>{errorMessage}</Text>
       </View>
     );
@@ -241,7 +244,7 @@ export default function SyncedMediaPlayer({ session, mediaVolume = 1, resyncNonc
   return (
     <View style={styles.audioBox}>
       <ActivityIndicator color={colors.accentGreen} size="small" style={{ opacity: session.isPlaying ? 0 : 1 }} />
-      <Text style={styles.placeholderIcon}>{session.isPlaying ? "🎵" : "⏸️"}</Text>
+      <FamilyIcon name={session.isPlaying ? "music" : "paused"} size={36} color={PLACEHOLDER_ICON} />
       <Text style={styles.placeholderText}>{session.isPlaying ? "Media playing" : "Paused"}</Text>
     </View>
   );
@@ -258,12 +261,10 @@ const styles = StyleSheet.create({
     width: "100%", aspectRatio: 16 / 9, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center", justifyContent: "center", gap: 6,
   },
-  placeholderIcon: { fontSize: 32 },
   placeholderText: { color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 16 },
   errorOverlay: {
     position: "absolute", bottom: 10, left: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 10, padding: 10,
   },
-  errorIcon: { fontSize: 14 },
   errorText: { color: "#fff", fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
 });

@@ -9,6 +9,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { getTestimony, type PrayerTestimony } from "@/lib/prayerTestimonyApi";
 import TestimonyVideoPlayer from "@/components/TestimonyVideoPlayer";
+import ReadableText from "@/components/ReadableText";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -123,7 +124,7 @@ export default function TestimonyDetailScreen() {
             onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureRef)}`)}
           >
             <Ionicons name="book" size={14} color={c.accentGreen} />
-            <Text style={styles.scriptureText}>{scriptureRef}</Text>
+            <ReadableText style={styles.scriptureText}>{scriptureRef}</ReadableText>
             <Ionicons name="open-outline" size={13} color={c.accentGreen} />
           </TouchableOpacity>
         )}

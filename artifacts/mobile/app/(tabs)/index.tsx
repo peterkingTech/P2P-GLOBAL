@@ -37,6 +37,7 @@ import LivingTree from "@/components/LivingTree";
 import { Avatar } from "@/components/Avatar";
 import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
 import { GetStartedCard } from "@/components/GetStartedCard";
+import ReadableText from "@/components/ReadableText";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -76,7 +77,7 @@ function HomeHero({ dayPart, greetingLine, firstName, verse, photoUrl, onPressAv
       {verse && (
         <View style={styles.heroVerseWrap}>
           <Text style={styles.heroVerseText}>"{verse.text}"</Text>
-          <Text style={styles.heroVerseRef}>— {verse.ref}</Text>
+          <ReadableText style={styles.heroVerseRef}>— {verse.ref}</ReadableText>
         </View>
       )}
     </LinearGradient>

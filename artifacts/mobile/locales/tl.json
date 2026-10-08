@@ -33,6 +33,7 @@
     "reachOutSub": "Makipag-ugnayan nang pribado para sa suporta at follow-up",
     "signOut": "Mag-sign Out",
     "calledIn": "Tinawag sa",
+    "calledTo": "Tinawag sa",
     "myProgress": "Aking Pag-unlad",
     "myProgressSub": "Mga isinumite, ebalwasyon at planong isinasagawa",
     "skills": "Mga Kasanayan",
@@ -173,7 +174,9 @@
     "peerConnect": "Koneksyon sa Kasama",
     "peerConnectSub": "Maghanap ng kasama sa pag-aaral o gabay na kasamahan",
     "myDiscipleship": "Ang Aking Pagpapamuridan",
-    "myDiscipleshipSub": "Lumakad kasama ang iba at makita ang iyong epekto"
+    "myDiscipleshipSub": "Lumakad kasama ang iba at makita ang iyong epekto",
+    "myFamily": "Bilog ng Pamilya",
+    "myFamilySub": "Media, Kasulatan, panalangin at mga pagtitipon nang sama-sama"
   },
   "learn": {
     "title": "Matuto",

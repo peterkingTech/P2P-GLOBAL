@@ -2,9 +2,10 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { colors, radii, spacing, type } from "@/lib/togetherTheme";
 import type { WorshipMode } from "@/lib/familyApi";
+import FamilyIcon, { type FamilyIconName } from "./FamilyIcon";
 
 interface Props {
-  modes: { key: WorshipMode; label: string; icon: string }[];
+  modes: { key: WorshipMode; label: string; icon: FamilyIconName }[];
   currentMode: WorshipMode;
   onChange: (mode: WorshipMode) => void;
 }
@@ -26,8 +27,8 @@ export default function GuideControls({ modes, currentMode, onChange }: Props) {
             accessibilityLabel={`Switch the Gathering to ${m.label}`}
             accessibilityState={{ selected: active }}
           >
-            <Text style={styles.icon}>{m.icon}</Text>
-            <Text style={styles.label}>{m.label}</Text>
+            <FamilyIcon name={m.icon} size={20} active={active} color={active ? colors.light : colors.textSecondary} />
+            <Text style={[styles.label, active && styles.labelActive]}>{m.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -37,8 +38,11 @@ export default function GuideControls({ modes, currentMode, onChange }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: spacing.sm, paddingTop: spacing.xs },
-  btn: { alignItems: "center", gap: 2, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radii.md, minWidth: 44 },
+  btn: {
+    alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: spacing.xs, paddingHorizontal: spacing.xs,
+    borderRadius: radii.md, minWidth: 44, minHeight: 44,
+  },
   btnActive: { backgroundColor: colors.lightSoft },
-  icon: { fontSize: 16 },
   label: { color: colors.textSecondary, ...type.micro },
+  labelActive: { color: colors.light },
 });

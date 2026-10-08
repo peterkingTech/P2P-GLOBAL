@@ -75,12 +75,12 @@ export default function ChurchMemberProfileScreen() {
       <Text style={styles.sectionTitle}>Achievements</Text>
       <View style={styles.card}>
         <Text style={styles.metaText}>🍇 {profile.fruits.length} Fruits earned</Text>
-        <Text style={styles.metaText}>🌾 {profile.grainCount} Grain planted</Text>
+        <Text style={styles.metaText}>🌾 {profile.grainCount} {profile.grainCount === 1 ? "person" : "people"} invited</Text>
       </View>
 
       {profile.cohorts.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Cohorts</Text>
+          <Text style={styles.sectionTitle}>Small Groups</Text>
           <View style={styles.card}>
             {profile.cohorts.map((c) => (
               <Text key={c.cohortId} style={styles.metaText}>{c.name} · {c.status}</Text>

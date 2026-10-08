@@ -171,7 +171,7 @@ export default function FamilyStudyPlanScreen() {
     try {
       await setFamilyStudySource(fid, { studySource: "custom_study_plan", activeStudyPlanId: planId });
       setIsActivePlan(true);
-      showAlert("Study source updated", "This plan is now Family Study's active Custom Study Plan.");
+      showAlert("Study source updated", "This plan is now this Family Circle's active Custom Study Plan.");
     } catch (e: any) {
       showAlert("Couldn't set this as the active plan", e.message ?? "Please try again.");
     } finally {

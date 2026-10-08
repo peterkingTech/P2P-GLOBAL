@@ -33,6 +33,7 @@
     "reachOutSub": "Ræk privat ud for at få støtte og opfølgning",
     "signOut": "Log ud",
     "calledIn": "Kaldet til",
+    "calledTo": "Kaldet til",
     "myProgress": "Min fremgang",
     "myProgressSub": "Afleveringer, evalueringer og igangværende planer",
     "skills": "Færdigheder",
@@ -173,7 +174,9 @@
     "peerConnect": "Ligeværdig Forbindelse",
     "peerConnectSub": "Find en studiepartner eller ligeværdig vejleder",
     "myDiscipleship": "Mit Discipelskab",
-    "myDiscipleshipSub": "Vandr sammen med andre, og se din indflydelse"
+    "myDiscipleshipSub": "Vandr sammen med andre, og se din indflydelse",
+    "myFamily": "Familiekreds",
+    "myFamilySub": "Medier, Skriften, bøn og samlinger sammen"
   },
   "learn": {
     "title": "Lær",

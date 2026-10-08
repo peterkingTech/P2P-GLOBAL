@@ -33,6 +33,7 @@
     "reachOutSub": "Contattaci privatamente per ricevere supporto e assistenza",
     "signOut": "Esci",
     "calledIn": "Chiamata",
+    "calledTo": "Chiamato a",
     "myProgress": "I miei progressi",
     "myProgressSub": "Consegne, valutazioni e piani in corso",
     "skills": "Competenze",
@@ -173,7 +174,9 @@
     "peerConnect": "Connessione tra Pari",
     "peerConnectSub": "Trova un compagno di studio o una guida tra pari",
     "myDiscipleship": "Il Mio Discepolato",
-    "myDiscipleshipSub": "Cammina insieme agli altri e vedi il tuo impatto"
+    "myDiscipleshipSub": "Cammina insieme agli altri e vedi il tuo impatto",
+    "myFamily": "Cerchia familiare",
+    "myFamilySub": "Media, Scrittura, preghiera e incontri insieme"
   },
   "learn": {
     "title": "Impara",

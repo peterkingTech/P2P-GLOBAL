@@ -33,6 +33,7 @@
     "reachOutSub": "Contactează-ne în privat pentru sprijin și urmărire",
     "signOut": "Deconectare",
     "calledIn": "Chemați în",
+    "calledTo": "Chemat la",
     "myProgress": "Progresul meu",
     "myProgressSub": "Teme trimise, evaluări și planuri în desfășurare",
     "skills": "Abilități",
@@ -173,7 +174,9 @@
     "peerConnect": "Conexiune între Parteneri",
     "peerConnectSub": "Găsește un partener de studiu sau un ghid partener",
     "myDiscipleship": "Ucenicia Mea",
-    "myDiscipleshipSub": "Mergi împreună cu alții și vezi impactul tău"
+    "myDiscipleshipSub": "Mergi împreună cu alții și vezi impactul tău",
+    "myFamily": "Cercul familiei",
+    "myFamilySub": "Media, Scriptura, rugăciune și întâlniri împreună"
   },
   "learn": {
     "title": "Învață",

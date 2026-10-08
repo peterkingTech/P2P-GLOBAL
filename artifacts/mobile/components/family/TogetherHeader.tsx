@@ -2,12 +2,13 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import GatheringBadge from "./GatheringBadge";
+import type { FamilyIconName } from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 
 interface Props {
   onBack: () => void;
   title: string;
-  modeIcon: string;
+  modeIcon: FamilyIconName;
   modeLabel: string;
   participantCount: number;
   showEnd: boolean;
@@ -23,7 +24,7 @@ interface Props {
 export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, participantCount, showEnd, onEnd, showShare, onShare }: Props) {
   return (
     <View style={styles.row}>
-      <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Leave Family Gathering">
+      <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Leave Family Circle Gathering">
         <Ionicons name="chevron-down" size={24} color={colors.textPrimary} />
       </TouchableOpacity>
       <View style={styles.center}>
@@ -40,6 +41,7 @@ export default function TogetherHeader({ onBack, title, modeIcon, modeLabel, par
       )}
       {showEnd && (
         <TouchableOpacity onPress={onEnd} style={styles.endBtn} accessibilityRole="button" accessibilityLabel="End this Gathering for everyone">
+          <Ionicons name="call" size={14} color={colors.textPrimary} style={styles.endIcon} />
           <Text style={styles.endBtnText}>End</Text>
         </TouchableOpacity>
       )}
@@ -53,6 +55,8 @@ const styles = StyleSheet.create({
   title: { color: colors.textPrimary, ...type.display },
   metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   count: { color: colors.textSecondary, ...type.caption },
-  endBtn: { borderWidth: 1, borderColor: colors.restSoft, backgroundColor: colors.restSoft, borderRadius: radii.sm, paddingHorizontal: spacing.md, minHeight: MIN_TOUCH_TARGET - 12, justifyContent: "center" },
+  endBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.restSoft, backgroundColor: colors.restSoft, borderRadius: radii.sm, paddingHorizontal: spacing.md, minHeight: MIN_TOUCH_TARGET - 12, justifyContent: "center" },
+  // The universal hang-up glyph: the phone handset turned down.
+  endIcon: { transform: [{ rotate: "135deg" }] },
   endBtnText: { color: colors.textPrimary, ...type.caption, fontFamily: "Inter_600SemiBold" },
 });

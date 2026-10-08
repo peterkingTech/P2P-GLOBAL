@@ -74,7 +74,7 @@ export default function FamilyGatheringHistoryScreen() {
           </View>
         ) : entries.length === 0 ? (
           <View style={styles.section}>
-            <Text style={styles.emptyText}>No Gatherings yet. Once your family completes a Family Gathering, it will appear here.</Text>
+            <Text style={styles.emptyText}>No Gatherings yet. Once your Family Circle completes a Gathering, it will appear here.</Text>
           </View>
         ) : (
           <View style={styles.section}>

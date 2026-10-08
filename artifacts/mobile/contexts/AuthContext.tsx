@@ -178,6 +178,11 @@ interface AuthContextValue {
   signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string, location?: SignUpLocation) => Promise<string | null>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  // Server-written account status (p2p_account_status, migration 173);
+  // null until loaded for the signed-in user. AuthGate shows the "taking a
+  // break" screen while it's deactivated.
+  accountStatus: AccountStatusInfo | null;
+  refreshAccountStatus: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<string | null>;
   username: string | null;
   usernameRequired: boolean;
@@ -186,6 +191,41 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+export type AccountStatusInfo = {
+  status: "active" | "deactivated" | "deletion_scheduled";
+  deactivatedAt: string | null;
+  // null while deactivated = "until I reactivate"
+  deactivatedUntil: string | null;
+  // When a requested permanent deletion will run (grace period end).
+  deletionScheduledFor: string | null;
+};
+
+const ACTIVE_STATUS: AccountStatusInfo = { status: "active", deactivatedAt: null, deactivatedUntil: null, deletionScheduledFor: null };
+
+// Reads the user's own row directly (RLS: select-own only — writes go through
+// the API). No row, a passed end date, or a read failure (offline, or the
+// table not created yet) all mean "active", so this can never lock anyone
+// out of the app; the server still enforces its own rules.
+async function loadAccountStatus(userId: string): Promise<AccountStatusInfo> {
+  try {
+    const { data, error } = await supabase
+      .from("p2p_account_status")
+      .select("status, deactivated_at, deactivated_until, deletion_scheduled_for")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) return ACTIVE_STATUS;
+    if (data.status === "deletion_scheduled") {
+      return { ...ACTIVE_STATUS, status: "deletion_scheduled", deletionScheduledFor: data.deletion_scheduled_for as string | null };
+    }
+    if (data.status !== "deactivated") return ACTIVE_STATUS;
+    const until = data.deactivated_until as string | null;
+    if (until && new Date(until).getTime() <= Date.now()) return ACTIVE_STATUS;
+    return { status: "deactivated", deactivatedAt: data.deactivated_at as string | null, deactivatedUntil: until, deletionScheduledFor: null };
+  } catch {
+    return ACTIVE_STATUS;
+  }
+}
 
 function mapProfileRow(row: Record<string, unknown>): UserProfile {
   const ministryRole = ((row.ministry_role as string) ?? "believer") as MinistryRole;
@@ -298,11 +338,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
+  const [accountStatus, setAccountStatus] = useState<AccountStatusInfo | null>(null);
+  const fetchAccountStatus = useCallback(async (userId: string) => {
+    setAccountStatus(await loadAccountStatus(userId));
+  }, []);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
-      if (s?.user) fetchProfile(s.user.id).finally(() => setIsLoading(false));
-      else setIsLoading(false);
+      if (s?.user) {
+        void fetchAccountStatus(s.user.id);
+        fetchProfile(s.user.id).finally(() => setIsLoading(false));
+      } else setIsLoading(false);
     }).catch(() => {
       setIsLoading(false);
     });
@@ -316,12 +363,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === "PASSWORD_RECOVERY") setIsPasswordRecovery(true);
       else if (event === "SIGNED_OUT") setIsPasswordRecovery(false);
       setSession(s);
-      if (s?.user) fetchProfile(s.user.id);
-      else setProfile(null);
+      if (s?.user) {
+        void fetchAccountStatus(s.user.id);
+        fetchProfile(s.user.id);
+      } else {
+        setProfile(null);
+        setAccountStatus(null);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchAccountStatus]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -469,6 +521,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (session?.user) await fetchProfile(session.user.id);
   }, [session, fetchProfile]);
 
+  const refreshAccountStatus = useCallback(async () => {
+    if (session?.user) await fetchAccountStatus(session.user.id);
+  }, [session, fetchAccountStatus]);
+
   const updateProfile = useCallback(async (
     updates: Partial<UserProfile>
   ): Promise<string | null> => {
@@ -556,6 +612,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         refreshProfile,
+        accountStatus,
+        refreshAccountStatus,
         updateProfile,
         username: profile?.username ?? null,
         usernameRequired: !!profile && !profile.username,

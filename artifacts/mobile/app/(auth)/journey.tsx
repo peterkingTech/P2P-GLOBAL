@@ -18,6 +18,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
+import ReadableText from "@/components/ReadableText";
 import colors from "@/constants/colors";
 
 // The Integration and Onboarding Journey — 5 mandatory steps every new user
@@ -303,19 +304,22 @@ export default function JourneyScreen() {
         {step === 1 && (
           <>
             <Text style={styles.title}>Meet Your Peer Guide</Text>
-            <Text style={styles.peerGuideExplainer}>
-              A peer guide is a fellow believer who is one step ahead of you{"\n"}
-              on the discipleship journey. They are not a pastor or a teacher —{"\n"}
-              they are simply someone who has walked this path before you and{"\n"}
+            {/* Natural wrapping — the hard line breaks that used to sit inside
+                these sentences only lined up at one screen width. The blank
+                line between the two paragraphs is intentional and kept. */}
+            <ReadableText style={styles.peerGuideExplainer}>
+              A peer guide is a fellow believer who is one step ahead of you
+              on the discipleship journey. They are not a pastor or a teacher —
+              they are simply someone who has walked this path before you and
               is ready to walk alongside you now.
               {"\n\n"}
-              Your peer guide will go through every lesson with you, answer{"\n"}
-              your questions, review your reflections, and pray with you.{"\n"}
+              Your peer guide will go through every lesson with you, answer
+              your questions, review your reflections, and pray with you.
               Think of them as a spiritual friend with a little more experience.
-            </Text>
+            </ReadableText>
             <View style={styles.verseBlock}>
               <Text style={styles.verseText}>"Accept one another, just as Christ accepted you."</Text>
-              <Text style={styles.verseRef}>Romans 15:7</Text>
+              <ReadableText style={styles.verseRef}>Romans 15:7</ReadableText>
             </View>
 
             {peerGuideLoading ? (
@@ -523,7 +527,7 @@ export default function JourneyScreen() {
 
             <View style={styles.moduleCard}>
               <Text style={styles.moduleCardDesc}>
-                See your congregation's discipleship activity in real time. Manage cohorts. Support your members.
+                See your congregation's discipleship activity in real time. Manage small groups. Support your members.
                 {"\n\n"}Completely free. Always.
               </Text>
             </View>

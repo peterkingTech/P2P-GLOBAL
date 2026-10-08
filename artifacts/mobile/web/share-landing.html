@@ -64,7 +64,7 @@
     <p class="invite-progress" id="inviteProgress"></p>
     <p class="tagline" id="inviteDesc"></p>
     <blockquote>"Go and make disciples of all nations." — Matthew 28:19</blockquote>
-    <button class="download-btn" id="inviteDownloadBtn">📱 Download P2P Global</button>
+    <button class="download-btn" id="inviteDownloadBtn">📱 Open in P2P Global</button>
     <p class="grain-note" id="grainNote"></p>
   </div>
 
@@ -75,16 +75,40 @@
     <p class="invite-progress" id="churchMemberCount"></p>
     <p class="tagline" id="churchDesc"></p>
     <blockquote>"Accept one another, just as Christ accepted you." — Romans 15:7</blockquote>
-    <button class="download-btn" id="churchDownloadBtn">📱 Download P2P Global</button>
+    <button class="download-btn" id="churchDownloadBtn">📱 Open in P2P Global</button>
     <p class="grain-note">Completely free — no subscription, no payment, no tiers.</p>
   </div>
 
+  <p id="installNote" style="display:none; max-width: 420px; margin: 16px auto 0; padding: 0 20px; text-align: center; color: #9AA4AE; font-size: 14px; line-height: 1.5;">
+    If P2P Global didn't open, make sure the app is installed on this phone, then tap the button again.
+  </p>
   <script>
     var params = new URLSearchParams(window.location.search);
     // Confirmed against app.json's android.package — not the
     // "com.amentech.p2pglobal" id that was floated at one point, which
     // doesn't match what's actually configured to build/publish.
-    var PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amentech.p2pglobalbiblestudy";
+    // Store listings: intentionally empty until the real production URLs are
+    // confirmed. The previous Play URL used the OLD package id
+    // (com.amentech.p2pglobalbiblestudy); the app is now
+    // com.amentech.p2pglobaldiscipleshipnetwork, and no App Store URL exists
+    // yet. With no URL, the page never redirects to a wrong listing — it
+    // shows a short note instead (see showInstallNote).
+    var PLAY_STORE_URL = "";
+    var APP_STORE_URL = "";
+    function storeUrl() {
+      var ua = navigator.userAgent || "";
+      return /iPhone|iPad|iPod/i.test(ua) ? APP_STORE_URL : PLAY_STORE_URL;
+    }
+    function showInstallNote() {
+      var note = document.getElementById("installNote");
+      if (note) note.style.display = "block";
+    }
+    // After trying the app link: go to the store if one is configured,
+    // otherwise explain what to do. Never an invented or outdated listing.
+    function afterAppAttempt() {
+      var url = storeUrl();
+      if (url) window.location = url; else showInstallNote();
+    }
     // Real, deployed production API — same URL every mobile build points at
     // (see EXPO_PUBLIC_API_URL in eas.json). Not a placeholder.
     var API_BASE = "https://workspaceapi-server-production-6d56.up.railway.app/api";
@@ -114,7 +138,7 @@
 
       function goToChurchApp() {
         window.location = churchDeepLink;
-        setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+        setTimeout(afterAppAttempt, 1500);
       }
       document.getElementById("churchDownloadBtn").addEventListener("click", goToChurchApp);
 
@@ -163,7 +187,7 @@
 
       function goToApp() {
         window.location = deepLink;
-        setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+        setTimeout(afterAppAttempt, 1500);
       }
       document.getElementById("inviteDownloadBtn").addEventListener("click", goToApp);
 
@@ -211,7 +235,11 @@
       // ── Static content preview (lesson / plan / category / profile) ──
       var title = params.get("title") || "";
       var desc = params.get("desc") || "";
-      var deepLink = params.get("link") || "";
+      // Only ever open the app's own scheme. Without this, a crafted share
+      // URL (link=javascript:… or link=https://elsewhere) would run script on
+      // this page or redirect the visitor anywhere.
+      var rawLink = params.get("link") || "";
+      var deepLink = /^p2pglobalbiblestudy:\/\/[A-Za-z0-9\-._~\/?=&%]*$/.test(rawLink) ? rawLink : "";
 
       var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : type === "room" ? "🔗 Room Invitation" : "";
       var preview = document.getElementById("preview");
@@ -232,9 +260,9 @@
           // If the app isn't installed, the custom-scheme navigation above is a
           // no-op and the page stays put — fall back to the Play Store after a
           // short delay so an installed app gets a chance to intercept first.
-          setTimeout(function () { window.location = PLAY_STORE_URL; }, 1500);
+          setTimeout(afterAppAttempt, 1500);
         } else {
-          window.location = PLAY_STORE_URL;
+          afterAppAttempt();
         }
       });
 

@@ -388,7 +388,7 @@ export default function DiscoverTab() {
           )}
           {!userChurch && (
             <TouchableOpacity style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church/join" as any)}>
-              <Text style={styles.circleCardName}>Join Your Church Grove</Text>
+              <Text style={styles.circleCardName}>Join Your Church Community</Text>
               <Text style={styles.circleCardMeta}>Has your church registered on P2P Global? Join with their invite code.</Text>
             </TouchableOpacity>
           )}

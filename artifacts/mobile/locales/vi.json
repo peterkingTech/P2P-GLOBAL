@@ -33,6 +33,7 @@
     "reachOutSub": "Liên hệ riêng tư để nhận hỗ trợ và được theo dõi",
     "signOut": "Đăng xuất",
     "calledIn": "Được kêu gọi vào",
+    "calledTo": "Được kêu gọi",
     "myProgress": "Tiến độ của tôi",
     "myProgressSub": "Bài nộp, đánh giá và kế hoạch đang thực hiện",
     "skills": "Kỹ năng",
@@ -173,7 +174,9 @@
     "peerConnect": "Kết Nối Bạn Đồng Hành",
     "peerConnectSub": "Tìm một bạn học hoặc người hướng dẫn đồng hành",
     "myDiscipleship": "Hành Trình Môn Đồ Của Tôi",
-    "myDiscipleshipSub": "Bước đi cùng người khác và xem ảnh hưởng của bạn"
+    "myDiscipleshipSub": "Bước đi cùng người khác và xem ảnh hưởng của bạn",
+    "myFamily": "Vòng tròn Gia đình",
+    "myFamilySub": "Phương tiện, Kinh Thánh, cầu nguyện và nhóm họp cùng nhau"
   },
   "learn": {
     "title": "Học",

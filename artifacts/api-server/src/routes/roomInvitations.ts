@@ -102,7 +102,7 @@ async function getRoomOwnershipAndPreview(roomType: RoomType, roomId: string) {
   const room = await getFamilyWorshipSession(roomId);
   if (!room) return null;
   return {
-    hostId: room.host_id as string, title: "Family Worship", roomState: familyWorshipState(room as any),
+    hostId: room.host_id as string, title: "Family Circle Gathering", roomState: familyWorshipState(room as any),
     subtitle: null as string | null, scheduledAt: room.started_at as string | null, familyId: room.family_id as string,
   };
 }

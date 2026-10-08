@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import ReadableText from "@/components/ReadableText";
 
 interface GrainExplanationSheetProps {
   visible: boolean;
@@ -22,7 +23,7 @@ export function GrainExplanationSheet({ visible, onClose, count, displayName }: 
           <Text style={styles.verse}>
             "Unless a grain of wheat falls into the earth and dies, it remains alone — but if it dies, it bears much fruit."
           </Text>
-          <Text style={styles.verseRef}>— John 12:24</Text>
+          <ReadableText style={styles.verseRef}>— John 12:24</ReadableText>
           <Text style={styles.body}>
             {displayName} has invited {count === 1 ? "1 person" : `${count} people`} to P2P Global Kingdom School.
           </Text>

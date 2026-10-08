@@ -33,6 +33,7 @@
     "reachOutSub": "지원과 후속 돌봄을 위해 비공개로 연락하세요",
     "signOut": "로그아웃",
     "calledIn": "부르심",
+    "calledTo": "소명",
     "myProgress": "나의 진도",
     "myProgressSub": "진행 중인 제출물, 평가 및 계획",
     "skills": "기술",
@@ -173,7 +174,9 @@
     "peerConnect": "동료 연결",
     "peerConnectSub": "학습 파트너나 동료 가이드를 찾으세요",
     "myDiscipleship": "나의 제자훈련",
-    "myDiscipleshipSub": "다른 사람들과 함께 걸으며 당신의 영향력을 확인하세요"
+    "myDiscipleshipSub": "다른 사람들과 함께 걸으며 당신의 영향력을 확인하세요",
+    "myFamily": "가족 서클",
+    "myFamilySub": "미디어, 성경, 기도와 모임을 함께"
   },
   "learn": {
     "title": "학습",

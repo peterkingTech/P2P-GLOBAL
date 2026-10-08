@@ -35,6 +35,7 @@ import {
 } from "@/lib/prayerCoordinationApi";
 import { savePrayer, getSavedPrayers } from "@/lib/prayerLibraryApi";
 import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
+import ReadableText from "@/components/ReadableText";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -670,7 +671,7 @@ export default function PrayerTab() {
               {categoryPrayers.map((p) => (
                 <TouchableOpacity key={p.id} style={styles.libraryRow} onPress={() => setActivePrayer(p)}>
                   <Text style={styles.libraryRowTitle}>{p.title}</Text>
-                  {p.scripture_reference ? <Text style={styles.libraryRowRef}>{p.scripture_reference}</Text> : null}
+                  {p.scripture_reference ? <ReadableText style={styles.libraryRowRef}>{p.scripture_reference}</ReadableText> : null}
                 </TouchableOpacity>
               ))}
             </>
@@ -846,7 +847,7 @@ export default function PrayerTab() {
               </TouchableOpacity>
             </View>
             <ScrollView>
-              {activePrayer?.scripture_reference ? <Text style={styles.prayerModalRef}>{activePrayer.scripture_reference}</Text> : null}
+              {activePrayer?.scripture_reference ? <ReadableText style={styles.prayerModalRef}>{activePrayer.scripture_reference}</ReadableText> : null}
               <Text style={styles.prayerModalText}>{activePrayer?.prayer_text}</Text>
               <View style={styles.prayerModalActionsRow}>
                 <TouchableOpacity style={styles.prayThisBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>

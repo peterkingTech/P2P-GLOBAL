@@ -144,7 +144,7 @@ export default function CallSummaryScreen() {
           <View style={styles.card}>
             <TextInput
               style={styles.textArea} value={hostSummaryInput} onChangeText={setHostSummaryInput}
-              placeholder="What happened in this call?" placeholderTextColor={colors.textMuted} multiline
+              placeholder="What happened in this gathering?" placeholderTextColor={colors.textMuted} multiline
             />
             <TouchableOpacity style={styles.saveBtn} onPress={handleSaveHostSummary} disabled={savingSummary}>
               {savingSummary ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}

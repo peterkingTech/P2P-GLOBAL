@@ -773,7 +773,7 @@ router.post("/churches/:churchId/cohorts", async (req, res) => {
   const { name, description, curriculumId, moduleId, leaderId, targetStartDate, targetEndDate, maxMembers } = req.body as Record<string, any>;
   if (!name?.trim()) return err(res, "name is required", 400);
   const requester = await getMembership(churchId, requesterId);
-  if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only senior/discipleship pastors can create cohorts", 403);
+  if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only the Church Leader or a Church Admin can create small groups.", 403);
 
   const { data, error } = await db.from("p2p_church_cohorts").insert({
     church_id: churchId, name: name.trim(), description: description?.trim() || null,
@@ -781,7 +781,7 @@ router.post("/churches/:churchId/cohorts", async (req, res) => {
     target_start_date: targetStartDate || null, target_end_date: targetEndDate || null,
     max_members: maxMembers || null, status: "forming", created_by: requesterId,
   }).select("*").single();
-  if (error || !data) return err(res, error?.message ?? "Failed to create cohort", 500);
+  if (error || !data) return err(res, error?.message ?? "Couldn't create the small group.", 500);
   return res.status(201).json(mapCohort(data as Record<string, unknown>));
 });
 
@@ -820,7 +820,7 @@ router.put("/churches/:churchId/cohorts/:cohortId", async (req, res) => {
   if (!requesterId) return err(res, "Unauthorized", 401);
   const fields = req.body as Record<string, any>;
   const requester = await getMembership(churchId, requesterId);
-  if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only senior/discipleship pastors can update cohorts", 403);
+  if (!requester || !PASTOR_ROLES.includes(requester.role)) return err(res, "Only the Church Leader or a Church Admin can update small groups.", 403);
 
   const updates: Record<string, unknown> = {};
   if (fields.name !== undefined) updates.name = fields.name;
@@ -833,7 +833,7 @@ router.put("/churches/:churchId/cohorts/:cohortId", async (req, res) => {
   if (!Object.keys(updates).length) return err(res, "No fields to update", 400);
 
   const { data, error } = await db.from("p2p_church_cohorts").update(updates).eq("id", cohortId).eq("church_id", churchId).select("*").single();
-  if (error || !data) return err(res, error?.message ?? "Cohort not found", 404);
+  if (error || !data) return err(res, error?.message ?? "Small group not found.", 404);
   return ok(res, mapCohort(data as Record<string, unknown>));
 });
 
@@ -1143,9 +1143,9 @@ router.post("/churches/:churchId/learning-goals", async (req, res) => {
   if (!(targetNum > 0)) return err(res, "targetValue must be greater than 0", 400);
   if (targetType === "percentage" && targetNum > 100) return err(res, "A percentage target cannot exceed 100", 400);
 
-  if (goalLevel === "lesson" && !lessonId) return err(res, "lessonId is required for a lesson-level goal", 400);
-  if (goalLevel === "module" && !moduleId) return err(res, "moduleId is required for a module-level goal", 400);
-  if (goalLevel === "curriculum" && !curriculumId) return err(res, "curriculumId is required for a curriculum-level goal", 400);
+  if (goalLevel === "lesson" && !lessonId) return err(res, "Please choose a lesson for this learning goal.", 400);
+  if (goalLevel === "module" && !moduleId) return err(res, "Please choose a module for this learning goal.", 400);
+  if (goalLevel === "curriculum" && !curriculumId) return err(res, "Please choose the curriculum for this learning goal.", 400);
 
   const window = computeGoalWindow(timeframe as string, startsAt as string | undefined, endsAt as string | undefined);
   if (!window) return err(res, "custom timeframe requires a valid startsAt/endsAt (startsAt must be before endsAt)", 400);

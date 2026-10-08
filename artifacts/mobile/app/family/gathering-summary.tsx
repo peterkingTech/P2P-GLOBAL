@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
+import FamilyIcon from "@/components/family/FamilyIcon";
 import { getFamilyDetail, getWorshipSessionSummary, updateGuideSummary, updateContinuityNotes, type WorshipSessionSummary } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
@@ -281,7 +282,10 @@ export default function GatheringSummaryScreen() {
               {summary.prayer.answeredPrayers.length > 0 && (
                 <View style={{ marginTop: 6 }}>
                   {summary.prayer.answeredPrayers.map((p) => (
-                    <Text key={p.id} style={styles.bodyText}>✓ {p.content} — Answered</Text>
+                    <View key={p.id} style={styles.answeredRow}>
+                      <FamilyIcon name="answered" size={15} active color={c.accentGreen} />
+                      <Text style={[styles.bodyText, styles.answeredText]}>{p.content} — Answered</Text>
+                    </View>
                   ))}
                 </View>
               )}
@@ -376,6 +380,8 @@ function makeStyles(c: AppColors) {
     sectionTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 6 },
     overviewLine: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 20 },
     bodyText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 20 },
+    answeredRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginBottom: 2 },
+    answeredText: { flex: 1 },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 19 },
     linkText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     textArea: {

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Switch } from "react-native";
 import type { FamilyPrayerRequest, WorshipScripture, WorshipSession } from "@/lib/familyApi";
 import { formatScriptureReference } from "@/lib/familyApi";
+import FamilyIcon from "./FamilyIcon";
 
 interface Props {
   session: WorshipSession;
@@ -41,8 +42,16 @@ export default function PrayerSpacePanel({
   function renderRequest(p: FamilyPrayerRequest, isFocused: boolean) {
     return (
       <View key={p.id} style={[styles.requestCard, isFocused && styles.requestCardFocused]}>
-        {isFocused && <Text style={styles.focusLabel}>🎯 GROUP FOCUS</Text>}
-        <Text style={styles.requestText}>🙏 {p.content}</Text>
+        {isFocused && (
+          <View style={styles.iconRow}>
+            <FamilyIcon name="focus" size={12} active color="#B8860B" />
+            <Text style={styles.focusLabel}>GROUP FOCUS</Text>
+          </View>
+        )}
+        <View style={styles.requestRow}>
+          <FamilyIcon name="prayer" size={15} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.requestText}>{p.content}</Text>
+        </View>
         {p.scripture_reference && <Text style={styles.requestScripture}>{formatScriptureReference(p.scripture_reference)}</Text>}
         <View style={styles.requestActions}>
           {p.status === "open" && <TouchableOpacity onPress={() => onMarkPrayed(p.id)}><Text style={styles.requestAction}>Prayed</Text></TouchableOpacity>}
@@ -63,8 +72,17 @@ export default function PrayerSpacePanel({
     <View>
       {focused && renderRequest(focused, true)}
 
-      <TouchableOpacity style={styles.prayingBtn} onPress={onTogglePraying}>
-        <Text style={styles.prayingBtnText}>{praying ? "🙏 You're praying" : "🙏 I'm praying"}</Text>
+      <TouchableOpacity
+        style={[styles.prayingBtn, praying && styles.prayingBtnActive]}
+        onPress={onTogglePraying}
+        accessibilityRole="button"
+        accessibilityLabel={praying ? "Stop praying" : "I'm praying"}
+        accessibilityState={{ selected: praying }}
+      >
+        <View style={styles.iconRow}>
+          <FamilyIcon name="prayer" size={17} active={praying} color={praying ? "#B8860B" : "#fff"} />
+          <Text style={styles.prayingBtnText}>{praying ? "You're praying" : "I'm praying"}</Text>
+        </View>
         {prayingCount > 0 && <Text style={styles.prayingCount}>{prayingCount} praying now</Text>}
       </TouchableOpacity>
 
@@ -103,8 +121,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(184,134,11,0.12)", borderRadius: 10, borderBottomWidth: 0,
     borderWidth: 1, borderColor: "rgba(184,134,11,0.4)", padding: 12, marginBottom: 10,
   },
-  focusLabel: { color: "#B8860B", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6, marginBottom: 4 },
-  requestText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  iconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  focusLabel: { color: "#B8860B", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  requestRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 4 },
+  requestText: { flex: 1, color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   requestScripture: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "Inter_400Regular", fontStyle: "italic", marginTop: 3 },
   requestActions: { flexDirection: "row", gap: 16, marginTop: 6 },
   requestAction: { color: "#1D9E75", fontSize: 12, fontFamily: "Inter_600SemiBold" },
@@ -113,6 +133,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: "rgba(29,158,117,0.15)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10,
   },
+  prayingBtnActive: { backgroundColor: "rgba(184,134,11,0.18)" },
   prayingBtnText: { color: "#fff", fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   prayingCount: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontFamily: "Inter_400Regular" },
 

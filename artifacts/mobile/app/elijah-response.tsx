@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
+import ReadableText from "@/components/ReadableText";
 
 // The Elijah Protocol response screen — reached from the Home screen's
 // "we noticed you've been quiet" card (see index.tsx), since this app has no
@@ -82,7 +83,7 @@ export default function ElijahResponseScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        <Text style={styles.reference}>1 Kings 19:4-8</Text>
+        <ReadableText style={styles.reference}>1 Kings 19:4-8</ReadableText>
         <Text style={styles.paragraph}>
           Elijah was exhausted and felt like giving up. God did not rebuke him. He gave him food, rest, and a gentle
           word. Whatever you are carrying right now, you are not alone.

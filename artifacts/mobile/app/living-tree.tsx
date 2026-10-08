@@ -31,6 +31,7 @@ import EnvironmentPicker from "@/components/tree/EnvironmentPicker";
 import FruitDetailCard from "@/components/tree/FruitDetailCard";
 import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import ReadableText from "@/components/ReadableText";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -438,7 +439,7 @@ export default function LivingTreeScreen() {
           <View style={styles.descSection}>
             <Text style={styles.descText}>{stage.description}</Text>
             <View style={styles.verseBlock}>
-              <Text style={styles.verseItalic}>{stage.verse} — {stage.verseRef}</Text>
+              <ReadableText style={styles.verseItalic}>{stage.verse} — {stage.verseRef}</ReadableText>
             </View>
           </View>
 

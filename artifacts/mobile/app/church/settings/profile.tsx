@@ -41,7 +41,7 @@ export default function ChurchProfileSettingsScreen() {
         {!isChurchCreator && (
           <View style={styles.lockBanner}>
             <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
-            <Text style={styles.lockBannerText}>Only the General Overseer can change this.</Text>
+            <Text style={styles.lockBannerText}>Only the Church Leader can change this.</Text>
           </View>
         )}
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import FamilyIcon from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 
 interface Props {
@@ -36,7 +37,7 @@ export default function CompanionCard({ name, isGuide, speaking, muted, praying,
       </View>
       <Text style={styles.name} numberOfLines={1}>{name}{isGuide ? " · Guide (Host)" : ""}</Text>
       <View style={styles.badges}>
-        {praying && <Text style={styles.badgeEmoji}>🙏</Text>}
+        {praying && <FamilyIcon name="prayer" size={12} active color={colors.light} />}
         {muted && <Ionicons name="mic-off" size={11} color={colors.textTertiary} />}
         {handUp && (
           <TouchableOpacity
@@ -46,7 +47,7 @@ export default function CompanionCard({ name, isGuide, speaking, muted, praying,
             accessibilityRole="button"
             accessibilityLabel={onHandUpPress ? `Respond to ${name}'s raised hand` : undefined}
           >
-            <Text style={styles.badgeEmoji}>✋</Text>
+            <FamilyIcon name="raiseHand" size={13} active color={colors.light} />
           </TouchableOpacity>
         )}
       </View>
@@ -64,5 +65,4 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.growth, fontSize: 12, fontFamily: "Inter_700Bold" },
   name: { color: colors.textSecondary, ...type.caption, flexShrink: 1 },
   badges: { flexDirection: "row", alignItems: "center", gap: 4 },
-  badgeEmoji: { fontSize: 11 },
 });

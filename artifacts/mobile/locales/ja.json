@@ -33,6 +33,7 @@
     "reachOutSub": "サポートとフォローアップを個別に依頼する",
     "signOut": "サインアウト",
     "calledIn": "召されています",
+    "calledTo": "召し",
     "myProgress": "進捗状況",
     "myProgressSub": "提出物、評価、進行中のプラン",
     "skills": "スキル",
@@ -173,7 +174,9 @@
     "peerConnect": "ピア・コネクト",
     "peerConnectSub": "学びのパートナーやピアガイドを見つける",
     "myDiscipleship": "私の弟子訓練",
-    "myDiscipleshipSub": "他の人と共に歩み、あなたの影響を見る"
+    "myDiscipleshipSub": "他の人と共に歩み、あなたの影響を見る",
+    "myFamily": "ファミリーサークル",
+    "myFamilySub": "メディア、聖書、祈り、集いをともに"
   },
   "learn": {
     "title": "学ぶ",

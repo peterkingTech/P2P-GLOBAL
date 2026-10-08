@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import FamilyIcon from "@/components/family/FamilyIcon";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus, type FamilyPrayerRequest } from "@/lib/familyApi";
@@ -81,7 +82,10 @@ export default function FamilyPrayerScreen() {
             <Text style={styles.emptySmallText}>No prayer requests yet.</Text>
           ) : prayerRequests.map((p) => (
             <View key={p.id} style={styles.prayerRow}>
-              <Text style={styles.prayerContent}>🙏 {p.content}</Text>
+              <View style={styles.prayerContentRow}>
+                <FamilyIcon name="prayer" size={15} color={c.textMuted} />
+                <Text style={styles.prayerContent}>{p.content}</Text>
+              </View>
               <View style={styles.prayerMetaRow}>
                 <Text style={styles.prayerMeta}>
                   {p.visibility === "private" ? "Only you" : "Shared"} · {p.status === "answered" ? "Answered" : p.status === "prayed" ? "Prayed" : "Open"}
@@ -106,7 +110,7 @@ export default function FamilyPrayerScreen() {
           <View style={styles.inviteRow}>
             <TouchableOpacity style={styles.secondaryBtnSmall} onPress={() => setNewPrayerPrivate((v) => !v)}>
               <Ionicons name={newPrayerPrivate ? "lock-closed" : "people"} size={14} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnSmallText}>{newPrayerPrivate ? "Private" : "Family"}</Text>
+              <Text style={styles.secondaryBtnSmallText}>{newPrayerPrivate ? "Private" : "Family Circle"}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.primaryBtnSmall} onPress={handleAddPrayer} disabled={!newPrayer.trim()}>
               <Text style={styles.primaryBtnSmallText}>Share</Text>
@@ -134,7 +138,8 @@ function makeStyles(c: AppColors) {
     secondaryBtnSmallText: { color: c.accentGreen, fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
     inviteRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 },
     prayerRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
-    prayerContent: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 19 },
+    prayerContentRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+    prayerContent: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 19 },
     prayerMetaRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
     prayerMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     prayerAction: { fontSize: 11, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },

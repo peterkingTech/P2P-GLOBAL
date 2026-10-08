@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Alert, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import FamilyIcon from "@/components/family/FamilyIcon";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
@@ -99,7 +100,7 @@ export default function FamilyStudyDetailScreen() {
 
   function handleArchive() {
     if (!study) return;
-    confirmAction("Archive this Study?", "It will no longer be shown to family members. This can be reviewed later.", async () => {
+    confirmAction("Archive this Study?", "It will no longer be shown to people in this Family Circle. This can be reviewed later.", async () => {
       try {
         setStudy(await archiveFamilyStudy(study.id));
       } catch (e: any) {
@@ -270,7 +271,10 @@ export default function FamilyStudyDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.lessonTitle}>{lesson.title}</Text>
                 {!!lesson.scriptureReferences?.length && (
-                  <Text style={styles.lessonMeta}>📖 {(lesson.scriptureReferences[0] as any).book} {(lesson.scriptureReferences[0] as any).chapter}</Text>
+                  <View style={styles.lessonMetaRow}>
+                    <FamilyIcon name="scripture" size={12} color={c.textMuted} />
+                    <Text style={styles.lessonMeta}>{(lesson.scriptureReferences[0] as any).book} {(lesson.scriptureReferences[0] as any).chapter}</Text>
+                  </View>
                 )}
               </View>
               {canManage && (
@@ -390,7 +394,8 @@ function makeStyles(c: AppColors) {
     lessonCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 8 },
     lessonNumber: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_700Bold", width: 20 },
     lessonTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    lessonMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
+    lessonMetaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+    lessonMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
     sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
     lessonSheetBox: { maxHeight: "88%" },

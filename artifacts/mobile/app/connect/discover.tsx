@@ -10,6 +10,7 @@ import { Avatar } from "@/components/Avatar";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
+import { publicLocationLabel, calledToValue, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
 
 // P2P Connection audit — Discovery used to show a Report/Flag icon and an
 // always-available Message icon for every listed peer, regardless of any
@@ -191,11 +192,14 @@ export default function Discover() {
                 onPress={() => { if (item.username) router.push(`/profile/${item.username}` as any); }}
                 disabled={!item.username}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={[item.fullName, publicLocationLabel(item.city, item.country)?.replace(/^\S+\s/, "") ?? NO_PUBLIC_LOCATION, calledToValue(item.calling) ? `called to ${calledToValue(item.calling)}` : null].filter(Boolean).join(", ")}
               >
                 <Avatar photoUrl={item.photoUrl} name={item.fullName} size={44} style={styles.avatar} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{item.fullName}</Text>
-                  <Text style={styles.meta}>{item.country || "Unknown location"} · {item.role}</Text>
+                  <Text style={styles.meta}>{publicLocationLabel(item.city, item.country) ?? NO_PUBLIC_LOCATION}</Text>
+                  {calledToValue(item.calling) && <Text style={styles.meta}>Called to: {calledToValue(item.calling)}</Text>}
                   {item.skills.length > 0 && (
                     <Text style={styles.skillsMeta} numberOfLines={1}>
                       {item.skills.slice(0, 3).map(skillLabel).join(", ")}

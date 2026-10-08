@@ -39,7 +39,7 @@ export default function CreateCohortScreen() {
     }
     setSubmitting(false);
     if (error || !cohort) {
-      Alert.alert("Couldn't create cohort", error ?? "Please try again.");
+      Alert.alert("Couldn't create small group", error ?? "Please try again.");
       return;
     }
     router.replace("/church/cohorts" as any);
@@ -50,15 +50,15 @@ export default function CreateCohortScreen() {
       <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
         <Ionicons name="arrow-back" size={22} color={colors.textDark} />
       </TouchableOpacity>
-      <Text style={styles.title}>Create a Cohort</Text>
+      <Text style={styles.title}>Create a Small Group</Text>
 
       <Text style={styles.label}>Name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="New Believers" placeholderTextColor={colors.textMuted} />
 
       <Text style={styles.label}>Description</Text>
-      <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="What is this cohort for?" placeholderTextColor={colors.textMuted} multiline />
+      <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="What is this small group for?" placeholderTextColor={colors.textMuted} multiline />
 
-      <Text style={styles.label}>Cohort leader (optional)</Text>
+      <Text style={styles.label}>Small Group Leader (optional)</Text>
       <View style={styles.searchRow}>
         <Text style={styles.atPrefix}>@</Text>
         <TextInput
@@ -76,7 +76,7 @@ export default function CreateCohortScreen() {
       <TextInput style={styles.input} value={maxMembers} onChangeText={setMaxMembers} placeholder="12" placeholderTextColor={colors.textMuted} keyboardType="number-pad" />
 
       <TouchableOpacity style={[styles.primaryBtn, !name.trim() && styles.btnDisabled]} onPress={handleCreate} disabled={submitting || !name.trim()}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Cohort</Text>}
+        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Small Group</Text>}
       </TouchableOpacity>
     </ScrollView>
   );

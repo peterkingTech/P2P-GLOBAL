@@ -34,7 +34,7 @@ export default function ChurchPrivacySettingsScreen() {
         {!isChurchCreator && (
           <View style={styles.lockBanner}>
             <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
-            <Text style={styles.lockBannerText}>Only the General Overseer can change this.</Text>
+            <Text style={styles.lockBannerText}>Only the Church Leader can change this.</Text>
           </View>
         )}
 
@@ -54,7 +54,7 @@ export default function ChurchPrivacySettingsScreen() {
         <View style={styles.divider} />
         <Text style={styles.sectionLabel}>Member Profile Visibility</Text>
         <Text style={styles.helperText}>
-          Individual members control whether their own progress is visible to church leadership from their own church settings — this is a per-member choice, not something the General Overseer sets church-wide.
+          Individual members control whether their own progress is visible to church leadership from their own church settings — this is a per-member choice, not something the Church Leader sets church-wide.
         </Text>
       </ScrollView>
     </View>

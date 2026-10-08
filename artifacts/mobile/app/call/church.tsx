@@ -97,7 +97,7 @@ export default function ChurchCallScreen() {
         setVideoDisabledByHost(me.videoDisabledByHost);
       }
     } catch (e: any) {
-      showAlert("Couldn't load this call", e.message ?? "Please try again.");
+      showAlert("Couldn't load this gathering", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -181,7 +181,7 @@ export default function ChurchCallScreen() {
             break;
           case "removed":
             if (payload.data?.userId === myId) {
-              showAlert("Removed", "The host removed you from this call.");
+              showAlert("Removed", "The host removed you from this gathering.");
               handleLeave();
             }
             break;
@@ -235,13 +235,13 @@ export default function ChurchCallScreen() {
   });
 
   function toggleMute() {
-    if (micDisabledByHost) { showAlert("Muted by host", "The host has muted your microphone for this call."); return; }
+    if (micDisabledByHost) { showAlert("Muted by host", "The host has muted your microphone for this gathering."); return; }
     const next = !muted;
     setMuted(next);
     engineRef.current?.muteLocalAudioStream(next);
   }
   function toggleCamera() {
-    if (videoDisabledByHost) { showAlert("Video disabled by host", "The host has turned off your video for this call."); return; }
+    if (videoDisabledByHost) { showAlert("Video disabled by host", "The host has turned off your video for this gathering."); return; }
     const next = !cameraOn;
     setCameraOn(next);
     engineRef.current?.enableLocalVideo(next);
@@ -276,7 +276,7 @@ export default function ChurchCallScreen() {
     } catch (e: any) { showAlert("Couldn't update", e.message ?? "Please try again."); }
   }
   function handleRemoveParticipant(p: ChurchCallParticipant) {
-    Alert.alert(`Remove ${p.name}?`, "They'll be disconnected from this call.", [
+    Alert.alert(`Remove ${p.name}?`, "They'll be disconnected from this gathering.", [
       { text: "Cancel", style: "cancel" },
       { text: "Remove", style: "destructive", onPress: async () => {
         if (!params.callId) return;
@@ -355,7 +355,7 @@ export default function ChurchCallScreen() {
       if (router.canGoBack()) router.back();
       else router.replace("/church/calls" as any);
     } catch (e: any) {
-      showAlert("Couldn't end the call", e.message ?? "Please try again.");
+      showAlert("Couldn't end the gathering", e.message ?? "Please try again.");
     } finally {
       setEnding(false);
     }
@@ -480,7 +480,7 @@ export default function ChurchCallScreen() {
       {isHost && (
         <View style={styles.hostBar}>
           <TouchableOpacity style={styles.hostBtn} onPress={handleEnd} disabled={ending}>
-            {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.hostBtnText}>End Call for Everyone</Text>}
+            {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.hostBtnText}>End Gathering for Everyone</Text>}
           </TouchableOpacity>
         </View>
       )}

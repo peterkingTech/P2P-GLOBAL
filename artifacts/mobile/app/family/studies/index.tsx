@@ -60,7 +60,7 @@ export default function FamilyStudiesScreen() {
       setPlans(planList);
       setStudySource(detail.family.studySource);
     } catch (e: any) {
-      showAlert("Couldn't load Family Studies", e.message ?? "Please try again.");
+      showAlert("Couldn't load Studies", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
@@ -184,7 +184,7 @@ export default function FamilyStudiesScreen() {
         {loading ? (
           <View style={styles.centerFill}><ActivityIndicator color={c.accentGreen} /></View>
         ) : studies.length === 0 ? (
-          <Text style={styles.emptyText}>{canManage ? "No Family Studies yet. Create one above." : "No Family Studies have been published yet."}</Text>
+          <Text style={styles.emptyText}>{canManage ? "No Studies yet. Create one above." : "No Studies have been published yet."}</Text>
         ) : (
           studies.map((s) => (
             <TouchableOpacity
@@ -207,7 +207,7 @@ export default function FamilyStudiesScreen() {
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.sheetOverlay}>
           <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
-            <Text style={styles.sheetTitle}>Create Family Study</Text>
+            <Text style={styles.sheetTitle}>Create Study</Text>
             <Text style={styles.fieldLabel}>Study Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. The Book of Romans" placeholderTextColor={c.textMuted} />
             <Text style={styles.fieldLabel}>Study Description</Text>
@@ -248,7 +248,7 @@ export default function FamilyStudiesScreen() {
         <View style={styles.sheetOverlay}>
           <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Study Source</Text>
-            <Text style={styles.fieldLabel}>Choose what Family Study uses for this family. This does not change what's already been studied.</Text>
+            <Text style={styles.fieldLabel}>Choose what Study uses for this Family Circle. This does not change what's already been studied.</Text>
             <TouchableOpacity style={styles.sourceOption} onPress={() => handleChooseSource("p2p_curriculum")}>
               <Ionicons name={studySource === "p2p_curriculum" ? "radio-button-on" : "radio-button-off"} size={20} color={c.accentGreen} />
               <View style={{ flex: 1 }}>

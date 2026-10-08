@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView,
 import { Ionicons } from "@expo/vector-icons";
 import type { MessageContext, SharedMediaProvider, WorshipMessage, WorshipScripture } from "@/lib/familyApi";
 import { formatScriptureReference } from "@/lib/familyApi";
+import FamilyIcon, { type FamilyIconName } from "./FamilyIcon";
+
+const CHIP_ICON = "rgba(255,255,255,0.7)";
 
 interface Props {
   visible: boolean;
@@ -25,10 +28,26 @@ interface Props {
   dockRight?: boolean;
 }
 
-function contextLabel(c: MessageContext): string {
-  if (c.type === "scripture") return `📖 ${formatScriptureReference(c)}`;
-  if (c.type === "media") return "🎬 This moment";
-  return "❓ Question";
+function contextIcon(c: MessageContext): FamilyIconName {
+  if (c.type === "scripture") return "scripture";
+  if (c.type === "media") return "moment";
+  return "question";
+}
+
+function contextText(c: MessageContext): string {
+  if (c.type === "scripture") return formatScriptureReference(c);
+  if (c.type === "media") return "This moment";
+  return "Question";
+}
+
+// A message's Scripture / media-moment / question reference: icon + text.
+function ContextTag({ context, textStyle, color }: { context: MessageContext; textStyle: object; color: string }) {
+  return (
+    <View style={styles.contextRow}>
+      <FamilyIcon name={contextIcon(context)} size={12} color={color} />
+      <Text style={textStyle}>{contextText(context)}</Text>
+    </View>
+  );
 }
 
 function formatTime(iso: string) {
@@ -69,7 +88,7 @@ export default function ChatPanel({
                   <View key={m.id} style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
                     <View style={[styles.bubble, mine && styles.bubbleMine]}>
                       {!mine && <Text style={styles.authorName}>{m.authorName}</Text>}
-                      {m.context && <Text style={styles.contextTag}>{contextLabel(m.context)}</Text>}
+                      {m.context && <ContextTag context={m.context} textStyle={styles.contextTag} color="#B8860B" />}
                       <Text style={styles.bubbleText}>{m.content}</Text>
                       <Text style={styles.bubbleTime}>{formatTime(m.createdAt)}</Text>
                     </View>
@@ -81,7 +100,7 @@ export default function ChatPanel({
 
           {pendingContext && (
             <View style={styles.pendingRow}>
-              <Text style={styles.pendingText}>{contextLabel(pendingContext)}</Text>
+              <ContextTag context={pendingContext} textStyle={styles.pendingText} color="#B8860B" />
               <TouchableOpacity onPress={() => onSetPendingContext(null)} accessibilityRole="button" accessibilityLabel="Remove attachment" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.6)" />
               </TouchableOpacity>
@@ -91,16 +110,19 @@ export default function ChatPanel({
             <View style={styles.attachRow}>
               {currentScripture && (
                 <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "scripture", ...currentScripture })} accessibilityRole="button" accessibilityLabel="Attach the current passage">
-                  <Text style={styles.attachChipText}>📖 Passage</Text>
+                  <FamilyIcon name="scripture" size={14} color={CHIP_ICON} />
+                  <Text style={styles.attachChipText}>Passage</Text>
                 </TouchableOpacity>
               )}
               {currentMedia && (
                 <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "media", ...currentMedia })} accessibilityRole="button" accessibilityLabel="Attach this moment in Media">
-                  <Text style={styles.attachChipText}>🎬 Moment</Text>
+                  <FamilyIcon name="moment" size={14} color={CHIP_ICON} />
+                  <Text style={styles.attachChipText}>Moment</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.attachChip} onPress={() => onSetPendingContext({ type: "question" })} accessibilityRole="button" accessibilityLabel="Tag this message as a question">
-                <Text style={styles.attachChipText}>❓ Question</Text>
+                <FamilyIcon name="question" size={14} color={CHIP_ICON} />
+                <Text style={styles.attachChipText}>Question</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -142,12 +164,13 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: "80%", backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
   bubbleMine: { backgroundColor: "rgba(29,158,117,0.25)" },
   authorName: { color: "#1D9E75", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 2 },
-  contextTag: { color: "#B8860B", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 3 },
+  contextRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
+  contextTag: { color: "#B8860B", fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold" },
   bubbleText: { color: "#fff", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   bubbleTime: { color: "rgba(255,255,255,0.4)", fontSize: 9, fontFamily: "Inter_400Regular", marginTop: 3, alignSelf: "flex-end" },
 
   attachRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  attachChip: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  attachChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   attachChipText: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontFamily: "Inter_500Medium" },
   pendingRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

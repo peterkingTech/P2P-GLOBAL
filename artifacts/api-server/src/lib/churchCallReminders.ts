@@ -36,7 +36,7 @@ export async function sendDueChurchCallReminders(): Promise<{ reminded: number }
     if (recipientIds.length) {
       await db.from("p2p_notifications").insert(
         recipientIds.map((id) => ({
-          user_id: id, title: "⏰ Church Call reminder",
+          user_id: id, title: "⏰ Church Gathering reminder",
           message: `"${call.title}" starts in 15 minutes.`,
           notification_type: "church_call_reminder",
           data: { callId: call.id, churchId: call.church_id },

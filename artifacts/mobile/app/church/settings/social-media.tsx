@@ -66,7 +66,7 @@ export default function ChurchSocialMediaSettingsScreen() {
         {!isChurchCreator && (
           <View style={styles.lockBanner}>
             <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
-            <Text style={styles.lockBannerText}>Only the General Overseer can change this.</Text>
+            <Text style={styles.lockBannerText}>Only the Church Leader can change this.</Text>
           </View>
         )}
         <Text style={styles.helperText}>Add the social media accounts your church would like members to see on its P2P church profile.</Text>

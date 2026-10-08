@@ -16,7 +16,7 @@ function showAlert(title: string, message: string) {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  shepherd: "Family Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
+  shepherd: "Family Circle Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
 };
 
 // MY FAMILIES — a user may belong to several families at once (a Member of
@@ -53,10 +53,10 @@ export default function MyFamiliesScreen() {
       setData(await getMyFamilies());
     } catch (e: any) {
       const message = e instanceof FamilyApiError && e.status === 401
-        ? "Please sign in again to view your families."
+        ? "Please sign in again to view your Family Circles."
         : e.message ?? "Please try again.";
       setLoadError(message);
-      showAlert("Couldn't load your families", message);
+      showAlert("Couldn't load your Family Circles", message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -79,7 +79,7 @@ export default function MyFamiliesScreen() {
       await load();
       router.push({ pathname: "/family/[familyId]", params: { familyId: family.id } } as any);
     } catch (e: any) {
-      showAlert("Couldn't create family", e.message ?? "Please try again.");
+      showAlert("Couldn't create Family Circle", e.message ?? "Please try again.");
     } finally {
       setCreating(false);
     }
@@ -97,7 +97,7 @@ export default function MyFamiliesScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "My Families" }} />
+        <Stack.Screen options={{ title: "Family Circles" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -108,7 +108,7 @@ export default function MyFamiliesScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "My Families" }} />
+      <Stack.Screen options={{ title: "Family Circles" }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
@@ -118,7 +118,7 @@ export default function MyFamiliesScreen() {
             <Text style={styles.sectionTitle}>INVITATIONS</Text>
             {pendingInvitations.map((inv) => (
               <View key={inv.id} style={styles.inviteCard}>
-                <Text style={styles.inviteText}>You've been invited to join a family as {ROLE_LABEL[inv.role] ?? inv.role}.</Text>
+                <Text style={styles.inviteText}>You've been invited to join a Family Circle as {ROLE_LABEL[inv.role] ?? inv.role}.</Text>
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
                   <TouchableOpacity style={styles.secondaryBtn} onPress={() => handleRespond(inv.id, "decline")}>
                     <Text style={styles.secondaryBtnText}>Decline</Text>
@@ -134,7 +134,7 @@ export default function MyFamiliesScreen() {
 
         {families.length > 0 && (
           <View style={{ gap: 10 }}>
-            <Text style={styles.sectionTitle}>MY FAMILIES</Text>
+            <Text style={styles.sectionTitle}>MY FAMILY CIRCLES</Text>
             {families.map(({ family, myRole, memberCount }) => (
               <TouchableOpacity
                 key={family.id}
@@ -145,7 +145,7 @@ export default function MyFamiliesScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.familyCardName}>{family.name}</Text>
                   <Text style={styles.familyCardSub}>
-                    {memberCount} member{memberCount === 1 ? "" : "s"} · {ROLE_LABEL[myRole] ?? myRole}
+                    {memberCount} {memberCount === 1 ? "person" : "people"} · {ROLE_LABEL[myRole] ?? myRole}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={c.textMuted} />
@@ -161,7 +161,7 @@ export default function MyFamiliesScreen() {
             // families" (the exact confusable-states bug this screen had).
             <View style={styles.emptyCard}>
               <Ionicons name="alert-circle-outline" size={40} color={c.textMuted} />
-              <Text style={styles.emptyTitle}>Couldn't load your families</Text>
+              <Text style={styles.emptyTitle}>Couldn't load your Family Circles</Text>
               <Text style={styles.emptyText}>{loadError}</Text>
               <TouchableOpacity onPress={load} style={{ marginTop: 10 }}>
                 <Text style={{ color: c.accentGreen, fontWeight: "600" }}>Try again</Text>
@@ -170,18 +170,18 @@ export default function MyFamiliesScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="people-circle-outline" size={40} color={c.primaryGreen} />
-              <Text style={styles.emptyTitle}>No families yet</Text>
-              <Text style={styles.emptyText}>Create a family to gather, study, and pray together.</Text>
+              <Text style={styles.emptyTitle}>No Family Circles yet</Text>
+              <Text style={styles.emptyText}>Create a Family Circle to gather, study, and pray together.</Text>
             </View>
           )
         )}
 
         {showCreateForm ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>CREATE A FAMILY</Text>
+            <Text style={styles.sectionTitle}>CREATE A FAMILY CIRCLE</Text>
             <TextInput
               style={styles.input}
-              placeholder="Family name (e.g. The Johnsons)"
+              placeholder="Family Circle name (e.g. The Johnsons)"
               placeholderTextColor={c.textMuted}
               value={newFamilyName}
               onChangeText={setNewFamilyName}
@@ -198,7 +198,7 @@ export default function MyFamiliesScreen() {
         ) : (
           <TouchableOpacity style={styles.addFamilyRow} onPress={() => setShowCreateForm(true)} accessibilityRole="button">
             <Ionicons name="add-circle-outline" size={20} color={c.primaryGreen} />
-            <Text style={styles.addFamilyText}>Start another family</Text>
+            <Text style={styles.addFamilyText}>Start another Family Circle</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator,
 import { Ionicons } from "@expo/vector-icons";
 import { lookupVerseForAdmin } from "@/lib/bibleClient";
 import type { useStudySession } from "@/hooks/useStudySession";
+import ReadableText from "@/components/ReadableText";
 
 // Scripture supports the learning (spec: "a supporting tool inside Study
 // Together"), lesson content stays primary. Reuses the exact same lookup
@@ -45,7 +46,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
       {result && (
         <View style={styles.resultCard}>
           <Text style={styles.resultText}>"{result.text}"</Text>
-          <Text style={styles.resultRef}>— {result.reference}</Text>
+          <ReadableText style={styles.resultRef}>— {result.reference}</ReadableText>
           <TouchableOpacity style={styles.shareBtn} onPress={() => session.shareScripture(result.reference, result.text)}>
             <Ionicons name="people" size={14} color="#fff" />
             <Text style={styles.shareBtnText}>Share with Group</Text>
@@ -57,7 +58,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
         <View style={styles.resultCard}>
           <Text style={styles.sharedLabel}>Shared with the group</Text>
           <Text style={styles.resultText}>"{session.sharedScripture.verse}"</Text>
-          <Text style={styles.resultRef}>— {session.sharedScripture.reference}</Text>
+          <ReadableText style={styles.resultRef}>— {session.sharedScripture.reference}</ReadableText>
         </View>
       )}
 
@@ -65,7 +66,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
         <View>
           <Text style={styles.historyTitle}>Scriptures Discussed</Text>
           {session.scripturesDiscussed.map((s, i) => (
-            <Text key={i} style={styles.historyItem}>{s.reference}</Text>
+            <ReadableText key={i} style={styles.historyItem}>{s.reference}</ReadableText>
           ))}
         </View>
       )}

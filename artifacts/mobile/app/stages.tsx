@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import ReadableText from "@/components/ReadableText";
 
 export default function StagesScreen() {
   const router = useRouter();
@@ -98,9 +99,9 @@ export default function StagesScreen() {
                   {stage.description}
                 </Text>
 
-                <Text style={styles.verse}>
+                <ReadableText style={styles.verse}>
                   {stage.verse} — {stage.verseRef}
-                </Text>
+                </ReadableText>
 
                 {isCurrent && (
                   <View style={styles.currentProgressWrap}>

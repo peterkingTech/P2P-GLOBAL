@@ -33,6 +33,7 @@
     "reachOutSub": "Wasiliana kwa siri kupata msaada na ufuatiliaji",
     "signOut": "Toka",
     "calledIn": "Aliyeitwa",
+    "calledTo": "Ameitwa kwa",
     "myProgress": "Maendeleo Yangu",
     "myProgressSub": "Mawasilisho, tathmini na mipango inayoendelea",
     "skills": "Ujuzi",
@@ -173,7 +174,9 @@
     "myProfile": "Wasifu Wangu",
     "myProfileSub": "Angalia wasifu wako wa uanafunzi",
     "admin": "Msimamizi",
-    "adminSub": "Msimamizi wa mtaala na majibu ya usajili"
+    "adminSub": "Msimamizi wa mtaala na majibu ya usajili",
+    "myFamily": "Mduara wa Familia",
+    "myFamilySub": "Vyombo vya habari, Maandiko, maombi na mikusanyiko pamoja"
   },
   "learn": {
     "title": "Kingdom School",

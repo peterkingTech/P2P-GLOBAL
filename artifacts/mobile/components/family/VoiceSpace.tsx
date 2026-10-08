@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ConnectionHealth from "./ConnectionHealth";
+import FamilyIcon from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import type { VoicePhase } from "@/hooks/useVoiceSpace";
 
@@ -27,7 +28,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
 
       {phase === "idle" && (
         <TouchableOpacity style={styles.joinBtn} onPress={onJoin} accessibilityRole="button" accessibilityLabel="Join Voice">
-          <Text style={styles.joinIcon}>🎙️</Text>
+          <FamilyIcon name="voice" size={20} color={colors.textPrimary} />
           <Text style={styles.joinText}>Join Voice</Text>
         </TouchableOpacity>
       )}
@@ -66,7 +67,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
               accessibilityLabel={micMuted ? "Unmute microphone" : "Mute microphone"}
               accessibilityState={{ selected: micMuted }}
             >
-              <Ionicons name={micMuted ? "mic-off" : "mic"} size={16} color={colors.textPrimary} />
+              <Ionicons name={micMuted ? "mic-off" : "mic-outline"} size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.iconBtn, !listening && styles.iconBtnActive]}
@@ -75,7 +76,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
               accessibilityLabel={listening ? "Stop Voice Audio" : "Resume Voice Audio"}
               accessibilityState={{ selected: !listening }}
             >
-              <Ionicons name={listening ? "ear" : "ear-outline"} size={16} color={colors.textPrimary} />
+              <Ionicons name={listening ? "ear" : "ear-outline"} size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryBtnSmall} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Voice">
               <Text style={styles.secondaryBtnText}>Leave Voice</Text>
@@ -94,7 +95,6 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm,
     backgroundColor: colors.connectionSoft, borderRadius: radii.lg, minHeight: MIN_TOUCH_TARGET, paddingVertical: spacing.md,
   },
-  joinIcon: { fontSize: 15 },
   joinText: { color: colors.textPrimary, ...type.bodyEmph },
 
   statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

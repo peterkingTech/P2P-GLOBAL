@@ -150,6 +150,10 @@ export default function PlanDetailScreen() {
   // status in case completing that lesson just unlocked this very plan.
   useFocusEffect(useCallback(() => { loadPlan(); }, [loadPlan]));
 
+  // Opened from a shared link (cold start) there's no screen to go back to;
+  // fall back to Home instead of a back button that does nothing.
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)" as any));
+
   if (loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
@@ -162,7 +166,7 @@ export default function PlanDetailScreen() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Back">
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
           <Text style={styles.headerBarTitle} numberOfLines={1}>{lockedInfo.title}</Text>
@@ -193,8 +197,17 @@ export default function PlanDetailScreen() {
 
   if (!plan) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
-        <Text style={styles.errorText}>Plan not found.</Text>
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Back">
+            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerBarTitle} numberOfLines={1}>Plan</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+          <Text style={styles.errorText}>This plan isn't available. It may have been removed, or the link may be incomplete.</Text>
+        </View>
       </View>
     );
   }
@@ -207,7 +220,7 @@ export default function PlanDetailScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Back">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{plan.title}</Text>
@@ -386,7 +399,7 @@ function makeStyles(c: AppColors) {
     lockedBtn: { backgroundColor: c.accentGreen, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
     lockedBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
     scroll: { paddingHorizontal: 20, paddingTop: 20 },
-    errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    errorText: { fontSize: 15, lineHeight: 22, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
 
     cover: { width: "100%", height: COVER_HEIGHT },
     coverPlaceholder: { alignItems: "center", justifyContent: "center" },

@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getFamilyJourney, type FamilyJourneyResponse } from "@/lib/familyApi";
+import FamilyIcon from "@/components/family/FamilyIcon";
 
 function providerLabel(provider: string): string {
   if (provider === "youtube") return "YouTube";
@@ -31,7 +32,7 @@ export default function FamilyJourneyScreen() {
       setError(null);
       setJourney(await getFamilyJourney(familyId));
     } catch (e: any) {
-      setError(e.message ?? "Couldn't load the Family Journey.");
+      setError(e.message ?? "Couldn't load the Family Circle Highlights.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -43,7 +44,7 @@ export default function FamilyJourneyScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "Family Journey" }} />
+        <Stack.Screen options={{ title: "Family Circle Highlights" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -52,9 +53,9 @@ export default function FamilyJourneyScreen() {
   if (error || !journey) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center", padding: 24 }]}>
-        <Stack.Screen options={{ title: "Family Journey" }} />
+        <Stack.Screen options={{ title: "Family Circle Highlights" }} />
         <Text style={{ color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center" }}>
-          {error ?? "This family's journey isn't available yet."}
+          {error ?? "This Family Circle's highlights aren't available yet."}
         </Text>
       </View>
     );
@@ -62,13 +63,13 @@ export default function FamilyJourneyScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "Family Journey" }} />
+      <Stack.Screen options={{ title: "Family Circle Highlights" }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Family Journey</Text>
+          <Text style={styles.sectionTitle}>Family Circle Highlights</Text>
           <Text style={styles.bodyText}>{journey.gatheringCount} Gathering{journey.gatheringCount === 1 ? "" : "s"}</Text>
           <Text style={styles.bodyText}>{journey.lessonsCoveredCount} Lesson{journey.lessonsCoveredCount === 1 ? "" : "s"} covered</Text>
           <Text style={styles.bodyText}>{journey.scripture.count} Scripture passage{journey.scripture.count === 1 ? "" : "s"} explored</Text>
@@ -90,7 +91,10 @@ export default function FamilyJourneyScreen() {
           {journey.prayer.recentAnswered.length > 0 && (
             <View style={{ marginTop: 8 }}>
               {journey.prayer.recentAnswered.map((p) => (
-                <Text key={p.id} style={styles.bodyText}>✓ {p.content} — Answered</Text>
+                <View key={p.id} style={styles.answeredRow}>
+                  <FamilyIcon name="answered" size={15} active color={c.accentGreen} />
+                  <Text style={[styles.bodyText, styles.answeredText]}>{p.content} — Answered</Text>
+                </View>
               ))}
             </View>
           )}
@@ -116,6 +120,8 @@ function makeStyles(c: AppColors) {
     section: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 16, gap: 4 },
     sectionTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 6 },
     bodyText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 20 },
+    answeredRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginBottom: 2 },
+    answeredText: { flex: 1 },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 19 },
   });
 }

@@ -58,7 +58,7 @@ export default function ChurchHomeScreen() {
         <Text style={styles.emptyEmoji}>⛪</Text>
         <Text style={styles.emptyTitle}>Your Church on P2P Global</Text>
         <Text style={styles.emptyBody}>
-          Connect your local church to P2P Global Kingdom School. Track discipleship. Support your congregation. See your grove grow.
+          Connect your local church to P2P Global Kingdom School. Track discipleship. Support your congregation. See your church community grow.
         </Text>
         <Text style={styles.freeText}>Completely free. Always.{"\n"}No subscription. No payment. No catch.</Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/church/register" as any)}>
@@ -115,13 +115,13 @@ export default function ChurchHomeScreen() {
 
       {isChurchLeader ? (
         <>
-          <Text style={styles.sectionTitle}>Grove Overview</Text>
+          <Text style={styles.sectionTitle}>Church Community Overview</Text>
           {grove ? (
             <View style={styles.statsCard}>
               <StatRow icon="pulse" label="Active learners" value={grove.activeLearners} />
               <StatRow icon="book" label="Lessons this week" value={grove.lessonsThisWeek} />
               <StatRow icon="earth" label="Nations reached" value={grove.nationsReached} />
-              <StatRow icon="leaf" label="Grain planted" value={grove.totalGrainPlanted} />
+              <StatRow icon="leaf" label="People invited" value={grove.totalGrainPlanted} />
             </View>
           ) : (
             <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 12 }} />
@@ -140,14 +140,14 @@ export default function ChurchHomeScreen() {
           <ChurchQRCode church={{ name: userChurch.name, city: userChurch.city, country: userChurch.country, inviteLink: userChurch.inviteLink, inviteCode: userChurch.inviteCode }} />
 
           <View style={{ gap: 10, marginTop: 16 }}>
-            <NavRow icon="call-outline" label="Calls" onPress={() => router.push("/church/calls" as any)} />
+            <NavRow icon="call-outline" label="Gatherings" onPress={() => router.push("/church/calls" as any)} />
             <NavRow icon="book-outline" label="Study" onPress={() => router.push("/church/studies" as any)} />
-            <NavRow icon="leaf-outline" label="Grove Dashboard" onPress={() => router.push("/church/grove" as any)} />
+            <NavRow icon="leaf-outline" label="Church Community Dashboard" onPress={() => router.push("/church/grove" as any)} />
             <NavRow icon="people-outline" label="Members" onPress={() => router.push("/church/members" as any)} />
             {isChurchCreator && (
               <NavRow icon="shield-checkmark-outline" label="Church Admins" onPress={() => router.push("/church/settings/admins" as any)} />
             )}
-            <NavRow icon="school-outline" label="Cohorts" onPress={() => router.push("/church/cohorts" as any)} />
+            <NavRow icon="school-outline" label="Small Groups" onPress={() => router.push("/church/cohorts" as any)} />
             <NavRow icon="megaphone-outline" label="Announcements" onPress={() => router.push("/church/announcements" as any)} />
             <NavRow icon="settings-outline" label="Church Settings" onPress={() => router.push("/church/settings" as any)} />
           </View>
@@ -155,8 +155,8 @@ export default function ChurchHomeScreen() {
       ) : (
         <>
           <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/calls" as any)}>
-            <Text style={styles.attentionTitle}>📞 Church Calls</Text>
-            <Text style={styles.attentionLink}>View Live &amp; Recent Calls →</Text>
+            <Text style={styles.attentionTitle}>📞 Church Gatherings</Text>
+            <Text style={styles.attentionLink}>View Live &amp; Recent Gatherings →</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/studies" as any)}>
@@ -164,9 +164,9 @@ export default function ChurchHomeScreen() {
             <Text style={styles.attentionLink}>P2P Curriculum & Church Studies →</Text>
           </TouchableOpacity>
 
-          <Text style={styles.sectionTitle}>My Cohorts</Text>
+          <Text style={styles.sectionTitle}>My Small Groups</Text>
           {cohorts.length === 0 ? (
-            <Text style={styles.emptyInlineText}>You are not in a cohort yet.</Text>
+            <Text style={styles.emptyInlineText}>You are not in a small group yet.</Text>
           ) : (
             cohorts.slice(0, 3).map((c) => (
               <TouchableOpacity key={c.id} style={styles.cohortRow} onPress={() => router.push("/church/cohorts" as any)}>

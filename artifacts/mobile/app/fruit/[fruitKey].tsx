@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
+import ReadableText from "@/components/ReadableText";
 
 interface ConfirmedEncouragement {
   id: string;
@@ -135,7 +136,7 @@ export default function FruitDetailScreen() {
             {fruit.themeVerse && (
               <View style={styles.verseCard}>
                 <Text style={styles.verseText}>"{fruit.themeVerseText}"</Text>
-                <Text style={styles.verseRef}>— {fruit.themeVerse}</Text>
+                <ReadableText style={styles.verseRef}>— {fruit.themeVerse}</ReadableText>
               </View>
             )}
 

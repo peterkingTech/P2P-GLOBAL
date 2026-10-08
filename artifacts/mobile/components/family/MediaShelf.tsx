@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Image, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
+import FamilyIcon from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import type { WorshipQueueItem, MediaPermission } from "@/lib/familyApi";
 
@@ -127,7 +128,7 @@ export default function MediaShelf({
                   {item.thumbnailUrl ? (
                     <Image source={{ uri: item.thumbnailUrl }} style={styles.thumb} />
                   ) : (
-                    <View style={[styles.thumb, styles.thumbFallback]}><Text style={{ fontSize: 16 }}>🎵</Text></View>
+                    <View style={[styles.thumb, styles.thumbFallback]}><FamilyIcon name="music" size={18} color={colors.textSecondary} /></View>
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemTitle} numberOfLines={1}>{item.title ?? item.mediaId}</Text>

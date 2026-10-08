@@ -33,6 +33,7 @@
     "reachOutSub": "Napisz prywatnie, aby otrzymać wsparcie i dalszą pomoc",
     "signOut": "Wyloguj się",
     "calledIn": "Powołanie",
+    "calledTo": "Powołany do",
     "myProgress": "Mój postęp",
     "myProgressSub": "Przesłane prace, oceny i plany w toku",
     "skills": "Umiejętności",
@@ -173,7 +174,9 @@
     "peerConnect": "Połączenie Rówieśnicze",
     "peerConnectSub": "Znajdź partnera do studium lub rówieśniczego przewodnika",
     "myDiscipleship": "Moje Uczniostwo",
-    "myDiscipleshipSub": "Krocz razem z innymi i zobacz swój wpływ"
+    "myDiscipleshipSub": "Krocz razem z innymi i zobacz swój wpływ",
+    "myFamily": "Krąg rodzinny",
+    "myFamilySub": "Media, Pismo, modlitwa i spotkania razem"
   },
   "learn": {
     "title": "Nauka",

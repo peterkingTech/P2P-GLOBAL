@@ -115,7 +115,7 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
             </ViewShot>
 
             <Text style={styles.instructions}>
-              Members scan this with their phone camera to join your church grove instantly.
+              Members scan this with their phone camera to join your church community instantly.
             </Text>
 
             <View style={styles.actions}>

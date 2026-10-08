@@ -33,6 +33,7 @@
     "reachOutSub": "Destek ve takip için özel olarak iletişime geçin",
     "signOut": "Çıkış Yap",
     "calledIn": "Çağrıldığım alan",
+    "calledTo": "Çağrıldığı alan",
     "myProgress": "İlerlemem",
     "myProgressSub": "Gönderimler, değerlendirmeler ve devam eden planlar",
     "skills": "Beceriler",
@@ -173,7 +174,9 @@
     "peerConnect": "Akran Bağlantısı",
     "peerConnectSub": "Bir çalışma arkadaşı veya akran rehberi bulun",
     "myDiscipleship": "Öğrenciliğim",
-    "myDiscipleshipSub": "Başkalarıyla birlikte yürüyün ve etkinizi görün"
+    "myDiscipleshipSub": "Başkalarıyla birlikte yürüyün ve etkinizi görün",
+    "myFamily": "Aile Çemberi",
+    "myFamilySub": "Medya, Kutsal Yazılar, dua ve buluşmalar birlikte"
   },
   "learn": {
     "title": "Öğren",

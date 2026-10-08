@@ -43,7 +43,7 @@ export default function ChurchAdminsScreen() {
     if (!userChurch) return;
     Alert.alert(
       `Make ${member.displayName ?? "this member"} a Church Admin?`,
-      "They'll be able to manage members, cohorts, announcements, and learning goals for this church.",
+      "They'll be able to manage members, small groups, announcements, and learning goals for this church.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -110,7 +110,7 @@ export default function ChurchAdminsScreen() {
       {!isChurchCreator && (
         <View style={styles.lockBanner}>
           <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
-          <Text style={styles.lockBannerText}>Only the General Overseer can manage Church Admins.</Text>
+          <Text style={styles.lockBannerText}>Only the Church Leader can manage Church Admins.</Text>
         </View>
       )}
 
@@ -118,7 +118,7 @@ export default function ChurchAdminsScreen() {
         <View style={styles.centerFill}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionLabel}>General Overseer</Text>
+          <Text style={styles.sectionLabel}>Church Leader</Text>
           {overseer ? (
             <View style={styles.row}>
               <View style={styles.avatar}><Ionicons name="star" size={18} color="#D97706" /></View>
@@ -142,7 +142,7 @@ export default function ChurchAdminsScreen() {
           </View>
 
           {admins.length === 0 ? (
-            <Text style={styles.emptyInlineText}>No Church Admins yet. Only the General Overseer manages church-wide settings.</Text>
+            <Text style={styles.emptyInlineText}>No Church Admins yet. Only the Church Leader manages church-wide settings.</Text>
           ) : (
             admins.map((m) => (
               <View key={m.userId} style={styles.row}>

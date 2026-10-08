@@ -33,6 +33,7 @@
     "reachOutSub": "私下尋求支援與後續關懷",
     "signOut": "登出",
     "calledIn": "蒙召投入",
+    "calledTo": "蒙召於",
     "myProgress": "我的進度",
     "myProgressSub": "進行中的提交、評估與計畫",
     "skills": "技能",
@@ -173,7 +174,9 @@
     "peerConnect": "夥伴連結",
     "peerConnectSub": "尋找查經夥伴或同儕引導者",
     "myDiscipleship": "我的門徒訓練",
-    "myDiscipleshipSub": "與他人同行，看見你的影響力"
+    "myDiscipleshipSub": "與他人同行，看見你的影響力",
+    "myFamily": "家庭圈",
+    "myFamilySub": "媒體、經文、禱告與聚會，一同進行"
   },
   "learn": {
     "title": "學習",

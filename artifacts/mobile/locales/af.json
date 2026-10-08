@@ -33,6 +33,7 @@
     "reachOutSub": "Reik privaat uit vir ondersteuning en opvolg",
     "signOut": "Meld af",
     "calledIn": "Ingeroep",
+    "calledTo": "Geroep tot",
     "myProgress": "My Vorderings",
     "myProgressSub": "Voorleggings, evaluasies en planne in uitvoering",
     "skills": "Vaardighede",
@@ -173,7 +174,9 @@
     "peerConnect": "Portuurverbinding",
     "peerConnectSub": "Vind 'n studievennoot of portuurgids",
     "myDiscipleship": "My Dissipelskap",
-    "myDiscipleshipSub": "Loop saam met ander en sien jou impak"
+    "myDiscipleshipSub": "Loop saam met ander en sien jou impak",
+    "myFamily": "Familiekring",
+    "myFamilySub": "Media, Skrif, gebed en byeenkomste saam"
   },
   "learn": {
     "title": "Leer",

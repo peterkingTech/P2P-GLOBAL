@@ -15,6 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { dismissCallNotifications } from "@/lib/callNotifications";
 import { answerSystemCall, endSystemCall } from "@/lib/callSystem";
 import { Avatar } from "@/components/Avatar";
+import { usePeerPhoto } from "@/lib/usePeerPhoto";
 import appColors from "@/constants/colors";
 
 function showAlert(title: string, message: string) {
@@ -67,20 +68,10 @@ export default function IncomingCallScreen() {
   const settledRef = useRef(false);
   const [joining, setJoining] = useState(false);
   const ringtone = useRingtone();
-  // The caller's profile photo is the whole screen. A URL passed in by the
-  // opener shows immediately (expo-image serves it from its disk cache when
-  // it has been seen before); the profile lookup then confirms/refreshes it.
+  // The caller's profile photo is the whole screen (lib/usePeerPhoto: shown
+  // at once from the opener's URL / image cache, confirmed from the profile).
   // No photo → the standard P2P Avatar. Never blocks Answer/Decline.
-  const [callerPhotoUrl, setCallerPhotoUrl] = useState<string | null>(params.callerPhotoUrl || null);
-  useEffect(() => {
-    if (!params.callerId) return;
-    let cancelled = false;
-    supabase.from("p2p_profiles").select("photo_url").eq("id", params.callerId).maybeSingle().then(({ data }) => {
-      const url = (data as any)?.photo_url as string | null | undefined;
-      if (!cancelled && url) setCallerPhotoUrl(url);
-    });
-    return () => { cancelled = true; };
-  }, [params.callerId]);
+  const callerPhotoUrl = usePeerPhoto(params.callerId, params.callerPhotoUrl);
 
   // Real ringing (audio + vibration). Stops on every exit path: answer, decline, timeout,
   // remote cancellation, or an unexpected unmount (useRingtone's own

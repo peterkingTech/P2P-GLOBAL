@@ -13,7 +13,7 @@ function showAlert(title: string, message: string) {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  shepherd: "Family Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
+  shepherd: "Family Circle Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
 };
 
 // Scoped to one familyId (passed via route params from app/family/[familyId].tsx)
@@ -33,7 +33,7 @@ export default function FamilyMembersScreen() {
   const load = useCallback(async () => {
     if (!familyId) return;
     try { setData(await getFamilyDetail(familyId)); }
-    catch (e: any) { showAlert("Couldn't load this family", e.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't load this Family Circle", e.message ?? "Please try again."); }
     finally { setLoading(false); setRefreshing(false); }
   }, [familyId]);
 
@@ -61,7 +61,7 @@ export default function FamilyMembersScreen() {
       {
         text: "Remove", style: "destructive", onPress: async () => {
           try { await removeFamilyMember(familyId, userId); await load(); }
-          catch (e: any) { showAlert("Couldn't remove member", e.message ?? "Please try again."); }
+          catch (e: any) { showAlert("Couldn't remove this person", e.message ?? "Please try again."); }
         },
       },
     ]);
@@ -70,7 +70,7 @@ export default function FamilyMembersScreen() {
   if (loading) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
-        <Stack.Screen options={{ title: "Members" }} />
+        <Stack.Screen options={{ title: "People" }} />
         <ActivityIndicator color={c.primaryGreen} />
       </View>
     );
@@ -78,7 +78,7 @@ export default function FamilyMembersScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "Members" }} />
+      <Stack.Screen options={{ title: "People" }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}

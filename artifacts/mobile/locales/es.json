@@ -33,6 +33,7 @@
     "reachOutSub": "Comunícate en privado para recibir apoyo y seguimiento",
     "signOut": "Cerrar Sesión",
     "calledIn": "Llamado a",
+    "calledTo": "Llamado a",
     "myProgress": "Mi Progreso",
     "myProgressSub": "Envíos, evaluaciones y planes en curso",
     "skills": "Habilidades",
@@ -173,7 +174,9 @@
     "myProfile": "Mi Perfil",
     "myProfileSub": "Ve tu perfil de discipulado",
     "admin": "Administrador",
-    "adminSub": "Gestor de currículo y respuestas de registro"
+    "adminSub": "Gestor de currículo y respuestas de registro",
+    "myFamily": "Círculo familiar",
+    "myFamilySub": "Multimedia, Escritura, oración y reuniones juntos"
   },
   "learn": {
     "title": "Kingdom School",

@@ -3,6 +3,16 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 
 const router = Router();
 
+// Invitation wording: "The Johnsons" -> "The Johnsons Family Circle". A name
+// that already says "Family Circle" is used as-is (no "Family Circle Family
+// Circle"), and a missing/blank name reads "a Family Circle". Display only —
+// the stored name is never changed.
+export function familyCircleDisplayName(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return "a Family Circle";
+  return /family\s+circle/i.test(trimmed) ? trimmed : `${trimmed} Family Circle`;
+}
+
 function ok(res: import("express").Response, data: unknown) { return res.json(data); }
 function err(res: import("express").Response, message: string, status = 400) {
   return res.status(status).json({ error: message });
@@ -202,8 +212,8 @@ router.post("/:familyId/invite", async (req, res) => {
 
   await db.from("p2p_notifications").insert({
     user_id: targetProfile.id,
-    title: "Family invitation",
-    message: `You've been invited to join ${(family?.name as string) ?? "a family"} on P2P Global.`,
+    title: "Family Circle invitation",
+    message: `You've been invited to join ${familyCircleDisplayName(family?.name as string | null | undefined)} on P2P Global.`,
     notification_type: "family_invitation",
     data: { familyId, invitationId: invitation.id },
   });

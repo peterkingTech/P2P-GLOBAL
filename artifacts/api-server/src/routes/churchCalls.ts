@@ -139,7 +139,7 @@ router.post("/churches/:churchId/calls", async (req, res) => {
 
   let cohort: { id: string; leader_id: string | null; church_id: string } | null = null;
   if (resolvedScope === "cohort") {
-    if (!cohortId) return err(res, "cohortId is required for a cohort-scoped call");
+    if (!cohortId) return err(res, "Please select a small group before starting this gathering.");
     const { data } = await db.from("p2p_church_cohorts").select("id,leader_id,church_id").eq("id", cohortId).maybeSingle();
     if (!data || data.church_id !== churchId) return err(res, "Cohort not found", 404);
     cohort = data as { id: string; leader_id: string | null; church_id: string };
@@ -205,7 +205,7 @@ router.post("/churches/:churchId/calls/schedule", async (req, res) => {
 
   let cohort: { id: string; leader_id: string | null; church_id: string } | null = null;
   if (resolvedScope === "cohort") {
-    if (!cohortId) return err(res, "cohortId is required for a cohort-scoped call");
+    if (!cohortId) return err(res, "Please select a small group before starting this gathering.");
     const { data } = await db.from("p2p_church_cohorts").select("id,leader_id,church_id").eq("id", cohortId).maybeSingle();
     if (!data || data.church_id !== churchId) return err(res, "Cohort not found", 404);
     cohort = data as { id: string; leader_id: string | null; church_id: string };

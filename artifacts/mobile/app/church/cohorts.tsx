@@ -38,7 +38,7 @@ export default function ChurchCohortsScreen() {
       {isChurchLeader && (
         <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/church/create-cohort" as any)}>
           <Ionicons name="add" size={16} color="#fff" />
-          <Text style={styles.createBtnText}>Create New Cohort</Text>
+          <Text style={styles.createBtnText}>Create New Small Group</Text>
         </TouchableOpacity>
       )}
 
@@ -49,7 +49,7 @@ export default function ChurchCohortsScreen() {
           data={cohorts}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ padding: 16, gap: 10 }}
-          ListEmptyComponent={<Text style={styles.emptyText}>No cohorts yet.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>No small groups yet.</Text>}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cohortName}>{item.name}</Text>

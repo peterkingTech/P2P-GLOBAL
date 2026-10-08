@@ -98,7 +98,8 @@ async function isBlockedEitherWay(viewerId: string, targetId: string): Promise<b
 
 type PublicProfileRow = {
   id: string; username: string | null; full_name: string | null; photo_url: string | null;
-  country: string | null; country_code: string | null; growth_level: number | null; bio: string | null;
+  country: string | null; country_code: string | null; city: string | null; calling: string | null;
+  show_country_on_profile: boolean | null; growth_level: number | null; bio: string | null;
   is_peer_guide_eligible: boolean | null; created_at: string; profile_visibility: string | null;
   show_real_name_publicly: boolean | null; show_progress_publicly: boolean | null;
   is_verified: boolean | null; verification_badge_visible: boolean | null;
@@ -110,12 +111,16 @@ async function mapPublicProfile(row: PublicProfileRow) {
     supabaseRead.from("p2p_discipleship_links").select("id", { count: "exact", head: true }).eq("mentor_id", row.id).eq("active", true),
   ]);
   const showProgress = row.show_progress_publicly ?? true;
+  // "Show my country on my profile" — city goes with it. Never coordinates.
+  const showLocation = row.show_country_on_profile ?? true;
   return {
     username: row.username,
     fullName: row.show_real_name_publicly ?? true ? row.full_name : null,
     photoUrl: row.photo_url ?? null,
-    country: row.country ?? null,
-    countryCode: row.country_code ?? null,
+    country: showLocation ? (row.country ?? null) : null,
+    countryCode: showLocation ? (row.country_code ?? null) : null,
+    city: showLocation ? (row.city ?? null) : null,
+    calling: row.calling?.trim() || null,
     bio: row.bio ?? null,
     isPeerGuideEligible: row.is_peer_guide_eligible ?? false,
     joinedAt: row.created_at,
@@ -128,7 +133,7 @@ async function mapPublicProfile(row: PublicProfileRow) {
   };
 }
 
-const PUBLIC_PROFILE_COLUMNS = "id,username,full_name,photo_url,country,country_code,growth_level,bio,is_peer_guide_eligible,created_at,profile_visibility,show_real_name_publicly,show_progress_publicly,is_verified,verification_badge_visible";
+const PUBLIC_PROFILE_COLUMNS = "id,username,full_name,photo_url,country,country_code,city,calling,show_country_on_profile,growth_level,bio,is_peer_guide_eligible,created_at,profile_visibility,show_real_name_publicly,show_progress_publicly,is_verified,verification_badge_visible";
 
 // GET /profiles/username/:username — public profile by username.
 // Resolves the P2P Connection status between viewerId and targetId from the

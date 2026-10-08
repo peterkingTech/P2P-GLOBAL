@@ -31,7 +31,7 @@ type ResolveState =
   | { kind: "ready"; preview: RoomInvitationPreview };
 
 const ROOM_TYPE_LABEL: Record<RoomType, string> = {
-  break_room: "Break Room", church_call: "Church Call", family_worship: "Family Worship",
+  break_room: "Break Room", church_call: "Church Gathering", family_worship: "Family Circle Gathering",
 };
 const ROOM_TYPE_ICON: Record<RoomType, keyof typeof Ionicons.glyphMap> = {
   break_room: "people-circle-outline", church_call: "business-outline", family_worship: "home-outline",

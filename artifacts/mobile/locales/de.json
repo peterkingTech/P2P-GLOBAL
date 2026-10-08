@@ -33,6 +33,7 @@
     "reachOutSub": "Wende dich vertraulich für Unterstützung an uns",
     "signOut": "Abmelden",
     "calledIn": "Berufen",
+    "calledTo": "Berufen zu",
     "myProgress": "Mein Fortschritt",
     "myProgressSub": "Einreichungen, Bewertungen & Pläne in Bearbeitung",
     "skills": "Fähigkeiten",
@@ -128,7 +129,9 @@
     "peerConnect": "Peer-Verbindung",
     "peerConnectSub": "Finde einen Studienpartner oder Peer-Guide",
     "myDiscipleship": "Meine Jüngerschaft",
-    "myDiscipleshipSub": "Gehe gemeinsam mit anderen und sieh deinen Einfluss"
+    "myDiscipleshipSub": "Gehe gemeinsam mit anderen und sieh deinen Einfluss",
+    "myFamily": "Familienkreis",
+    "myFamilySub": "Medien, Schrift, Gebet und Treffen gemeinsam"
   },
   "learn": {
     "title": "Lernen",

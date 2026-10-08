@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert, useWindowDimensions } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,9 @@ import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
 import { endSystemCall, systemEndReason } from "@/lib/callSystem";
 import { useSystemCall } from "@/lib/useSystemCall";
+import { usePeerPhoto } from "@/lib/usePeerPhoto";
+import { Avatar } from "@/components/Avatar";
+import VideoCallScreen from "./video";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
@@ -118,7 +122,18 @@ const AGORA_USER_OFFLINE_QUIT = 0;
 // identical counter/comment.
 let audioMountCounter = 0;
 
-export default function AudioCallScreen() {
+// Seamless Audio ↔ Video — a plain 1:1 audio call runs on the video call
+// screen in audio mode (camera off until the user taps Video, then the same
+// live engine turns it on — no rejoin). Pastoral/crisis calls and group/
+// study joins (which arrive without a single other person) keep this
+// audio-only screen. Every caller still navigates to /call/audio as before.
+export default function AudioCallRoute() {
+  const params = useLocalSearchParams<{ callType?: string; otherUserId?: string }>();
+  if (params.callType === "audio" && params.otherUserId) return <VideoCallScreen />;
+  return <AudioCallScreen />;
+}
+
+function AudioCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
@@ -230,6 +245,10 @@ export default function AudioCallScreen() {
   const [chooseLessonOpen, setChooseLessonOpen] = useState(false);
   const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
   const otherName = params.otherUserName || "Peer";
+  // The other person's profile photo — the caller's side is never handed
+  // one in its route params, so this resolves it (lib/usePeerPhoto).
+  const peerPhotoUrl = usePeerPhoto(params.otherUserId, params.otherUserAvatarUrl);
+  const { width: screenWidth } = useWindowDimensions();
   // Study Together C3 — otherParticipants replaces the old single otherUserId
   // param. remoteUids.length <= 1 keeps using the exact 1:1 route params
   // (byte-identical to before C3); group calls use the resolved roster from
@@ -821,7 +840,7 @@ export default function AudioCallScreen() {
     uid, isSelf: false,
     name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
     videoOn: false, muted: false,
-    photoUrl: remoteUids.length === 1 ? (params.otherUserAvatarUrl || null) : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
+    photoUrl: remoteUids.length === 1 ? peerPhotoUrl : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
   }));
   const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted, photoUrl: profile?.avatarUrl ?? null };
   const allTiles = [selfTile, ...otherTiles];
@@ -837,8 +856,8 @@ export default function AudioCallScreen() {
         <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <View style={styles.center}>
           <View style={styles.noAnswerAvatarWrap}>
-            {params.otherUserAvatarUrl ? (
-              <Image source={{ uri: params.otherUserAvatarUrl }} style={styles.noAnswerAvatarPhoto} />
+            {peerPhotoUrl ? (
+              <Image source={{ uri: peerPhotoUrl }} style={styles.noAnswerAvatarPhoto} />
             ) : (
               <Ionicons name="person" size={48} color={p2pColors.textMuted} />
             )}
@@ -899,9 +918,29 @@ export default function AudioCallScreen() {
     );
   }
 
+  // Active 1:1 audio (the common case) gets the person-centred layout; a
+  // call grown into a group keeps the tiled stage.
+  const isOneToOne = remoteUids.length <= 1;
+  const peerSpeaking = remoteUids.some((uid) => activeSpeaker.speakingUids.has(uid));
+  const portraitSize = Math.round(Math.min(screenWidth * 0.52, 220));
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 30 }]}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+
+      {/* Active-call backdrop: the other person's photo, softly blurred and
+          dimmed — deliberately unlike the sharp full-screen ringing photo. */}
+      {isOneToOne && peerPhotoUrl && (
+        <ExpoImage
+          source={{ uri: peerPhotoUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          blurRadius={40}
+          cachePolicy="memory-disk"
+          accessibilityIgnoresInvertColors
+        />
+      )}
+      {isOneToOne && peerPhotoUrl && <View style={[StyleSheet.absoluteFill, styles.backdropShade]} pointerEvents="none" />}
 
       {/* Minimal header (section 11) — no participant-count badge here:
           Direct Calls has no Participants button today (confirmed — none
@@ -909,20 +948,14 @@ export default function AudioCallScreen() {
           nothing to deduplicate against; one is not invented here per
           section 23's "do not invent new call functionality." */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="Back">
+        <TouchableOpacity onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="End call and go back">
           <Ionicons name="chevron-back" size={22} color={p2pColors.textPrimary} />
         </TouchableOpacity>
-        <View style={{ alignItems: "center" }}>
-          <Text style={styles.brand}>P2P Global</Text>
-          <Text style={styles.brandSub}>Discipleship Network</Text>
+        <View style={styles.callTypePill}>
+          <Ionicons name="call-outline" size={12} color={p2pColors.accent} />
+          <Text style={styles.callTypePillText}>P2P Global Audio</Text>
         </View>
         <View style={{ width: 22 }} />
-      </View>
-      <View style={styles.callTypePillWrap}>
-        <View style={styles.callTypePill}>
-          <Ionicons name="pulse" size={12} color={p2pColors.accent} />
-          <Text style={styles.callTypePillText}>Audio Call</Text>
-        </View>
       </View>
 
       {/* Video-call lifecycle audit — see video.tsx's identical banner: a
@@ -951,13 +984,40 @@ export default function AudioCallScreen() {
       )}
 
       <View style={styles.center}>
-        <P2PRectStage
-          tiles={allTiles}
-          speakingUids={activeSpeaker.speakingUids}
-          showWaveform
-          renderVideo={false}
-          colors={p2pColors}
-        />
+        {isOneToOne ? (
+          <View style={styles.peerBlock}>
+            {/* The ring lights up while they're speaking. */}
+            <View
+              style={[
+                styles.peerRing,
+                { width: portraitSize + 16, height: portraitSize + 16, borderRadius: (portraitSize + 16) / 2 },
+                peerSpeaking && styles.peerRingSpeaking,
+              ]}
+            >
+              {peerPhotoUrl ? (
+                <ExpoImage
+                  source={{ uri: peerPhotoUrl }}
+                  style={{ width: portraitSize, height: portraitSize, borderRadius: portraitSize / 2 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={150}
+                  accessibilityIgnoresInvertColors
+                />
+              ) : (
+                <Avatar name={otherName} size={portraitSize} />
+              )}
+            </View>
+            <Text style={styles.peerName} numberOfLines={1} accessibilityRole="header">{otherName}</Text>
+          </View>
+        ) : (
+          <P2PRectStage
+            tiles={allTiles}
+            speakingUids={activeSpeaker.speakingUids}
+            showWaveform
+            renderVideo={false}
+            colors={p2pColors}
+          />
+        )}
 
         {callState !== "connected" && callState !== "ended" ? (
           <View style={styles.statusRow}>
@@ -1011,19 +1071,19 @@ export default function AudioCallScreen() {
         )}
 
         {callState === "connected" && !study.pendingGroupStudy?.active && (!hasAutoStudy || autoStudyDismissed) && (
-          <TouchableOpacity style={styles.studyBtn} onPress={handleOpenStudy}>
-            <Text style={styles.studyBtnEmoji}>📖</Text>
+          <TouchableOpacity style={styles.studyBtn} onPress={handleOpenStudy} accessibilityRole="button" accessibilityLabel="Study Together">
+            <Ionicons name="book-outline" size={16} color={p2pColors.accent} />
             <Text style={styles.studyBtnText}>Study Together</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.controlsRow}>
-        <P2PControlButton onPress={toggleMute} active={muted} label={muted ? "Unmute" : "Mute"} accessibilityLabel="Mute microphone" colors={p2pColors}>
-          <Ionicons name={muted ? "mic-off" : "mic"} size={22} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
-        </P2PControlButton>
-        <P2PControlButton onPress={toggleSpeaker} active={speakerOn} label="Speaker" accessibilityLabel="Speaker output" colors={p2pColors}>
+        <P2PControlButton onPress={toggleSpeaker} active={speakerOn} label="Speaker" accessibilityLabel={speakerOn ? "Turn speaker off" : "Turn speaker on"} colors={p2pColors}>
           <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={22} color={speakerOn ? p2pColors.accent : p2pColors.textPrimary} />
+        </P2PControlButton>
+        <P2PControlButton onPress={toggleMute} active={muted} label={muted ? "Unmute" : "Mute"} accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} colors={p2pColors}>
+          <Ionicons name={muted ? "mic-off" : "mic-outline"} size={22} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
         </P2PControlButton>
         {canAddPeople && (
           <P2PControlButton onPress={() => setAddPeopleOpen(true)} label="Add" accessibilityLabel="Add someone to this call" colors={p2pColors}>
@@ -1072,9 +1132,19 @@ function makeStyles(p2p: P2PCallColors) {
     },
     noAnswerPrimaryText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 20 },
-    brand: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_700Bold" },
-    brandSub: { color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
-    callTypePillWrap: { marginTop: 10 },
+    // Active 1:1 audio: dim the blurred photo backdrop so the portrait,
+    // name and controls read clearly over any photo.
+    backdropShade: { backgroundColor: "rgba(6,12,9,0.62)" },
+    peerBlock: { alignItems: "center", gap: 18 },
+    peerRing: {
+      alignItems: "center", justifyContent: "center",
+      borderWidth: 3, borderColor: "rgba(255,255,255,0.14)",
+    },
+    peerRingSpeaking: { borderColor: p2p.accent },
+    peerName: {
+      color: p2p.textPrimary, fontSize: 28, fontFamily: "Inter_700Bold", textAlign: "center",
+      letterSpacing: -0.3, paddingHorizontal: 24, maxWidth: "100%",
+    },
     callTypePill: {
       flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: p2p.pillBg,
       borderWidth: 1, borderColor: p2p.accentBorder, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
@@ -1097,7 +1167,6 @@ function makeStyles(p2p: P2PCallColors) {
       backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accent,
       borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
     },
-    studyBtnEmoji: { fontSize: 16 },
     studyBtnText: { color: p2p.accent, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     studyParticipantStrip: {
       flexDirection: "row", alignItems: "center", gap: 8,

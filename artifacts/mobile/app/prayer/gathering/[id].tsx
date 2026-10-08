@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGathering, cancelGathering, type PrayerGathering, type PrayerGatheringParticipant } from "@/lib/prayerCoordinationApi";
 import { deviceTimezone, zoneShortLabel, formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
+import ReadableText from "@/components/ReadableText";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -156,7 +157,7 @@ export default function PrayerGatheringScreen() {
             onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureRef)}`).catch(() => {})}
           >
             <Ionicons name="book" size={16} color={c.accentGreen} />
-            <Text style={styles.scriptureText}>{scriptureRef}</Text>
+            <ReadableText style={styles.scriptureText}>{scriptureRef}</ReadableText>
             <Ionicons name="open-outline" size={14} color={c.textMuted} />
           </TouchableOpacity>
         )}

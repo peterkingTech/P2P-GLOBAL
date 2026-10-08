@@ -33,6 +33,7 @@
     "reachOutSub": "Hubungi kami secara peribadi untuk mendapatkan sokongan dan susulan",
     "signOut": "Log Keluar",
     "calledIn": "Dipanggil",
+    "calledTo": "Dipanggil untuk",
     "myProgress": "Kemajuan Saya",
     "myProgressSub": "Penghantaran, penilaian & rancangan yang sedang berjalan",
     "skills": "Kemahiran",
@@ -173,7 +174,9 @@
     "peerConnect": "Hubungan Rakan Sebaya",
     "peerConnectSub": "Cari rakan pembelajaran atau pembimbing rakan sebaya",
     "myDiscipleship": "Pemuridan Saya",
-    "myDiscipleshipSub": "Berjalan bersama orang lain dan lihat impak anda"
+    "myDiscipleshipSub": "Berjalan bersama orang lain dan lihat impak anda",
+    "myFamily": "Lingkaran Keluarga",
+    "myFamilySub": "Media, Kitab Suci, doa dan perhimpunan bersama"
   },
   "learn": {
     "title": "Belajar",

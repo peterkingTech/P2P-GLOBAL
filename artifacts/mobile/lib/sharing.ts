@@ -20,16 +20,14 @@ export const EFFECTIVE_INVITE_BASE = "https://peer-to-peer-globalbiblestudynetwo
 
 // Raw custom-scheme links (p2pglobalbiblestudy://...) aren't reliably
 // clickable inside chat apps, so shared messages point at an HTTPS landing
-// page (web/share-landing.html) that redirects into the app if installed,
-// or to the Play Store if not.
+// page (web/share-landing.html) that opens the app if it's installed.
 //
-// This is the real, deterministic GitHub Pages URL for this repo
-// (https://<owner>.github.io/<repo>/<path>) — it is NOT live yet. GitHub
-// Pages has to be enabled for peterkingTech/P2P-GLOBAL (Settings > Pages)
-// and web/share-landing.html deployed to the branch/folder Pages serves
-// from before this URL actually resolves. See web/share-landing.html for
-// the file to deploy.
-const SHARE_LANDING_BASE_URL = "https://peterkingtech.github.io/P2P-GLOBAL";
+// Hosted on the same production Netlify site as Kingdom School invites
+// (WEB_APP_URL / EFFECTIVE_INVITE_BASE) — one public HTTPS entry point for
+// every shared link. Replaces the earlier GitHub Pages URL, which was never
+// live (HTTP 404). share-landing.html + _redirects must be deployed to this
+// site for links to resolve — see web/_redirects.
+const SHARE_LANDING_BASE_URL = WEB_APP_URL;
 
 function buildWebShareUrl(params: { type: "lesson" | "plan" | "category" | "profile" | "room"; title: string; desc: string; deepLink: string }): string {
   const q = new URLSearchParams({
@@ -116,7 +114,7 @@ export async function shareChurchInvite(church: { name: string; inviteLink: stri
 // — only the opaque invitation token, exactly what routes/roomInvitations.ts
 // already treats as the only safe thing to hand out.
 const ROOM_TYPE_LABEL: Record<"break_room" | "church_call" | "family_worship", string> = {
-  break_room: "Break Room", church_call: "Church Call", family_worship: "Family Worship",
+  break_room: "Break Room", church_call: "Church Gathering", family_worship: "Family Circle Gathering",
 };
 export async function shareRoomInvitation(room: { title: string; roomType: "break_room" | "church_call" | "family_worship"; statusLine: string; token: string }) {
   const deepLink = `${APP_SCHEME}://rooms/join/${room.token}`;

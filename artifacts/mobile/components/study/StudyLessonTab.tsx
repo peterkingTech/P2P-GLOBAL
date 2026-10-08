@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { useStudySession, StudyLessonData } from "@/hooks/useStudySession";
+import ReadableText from "@/components/ReadableText";
 
 // The primary content of Study Together (spec: "lesson = primary, video =
 // small floating windows") — renders the current section, leader-controlled
@@ -67,7 +68,7 @@ export function StudyLessonTab({ session }: { session: ReturnType<typeof useStud
             {data.scriptures.map((s) => (
               <View key={s.id} style={styles.scriptureCard}>
                 <Text style={styles.scriptureText}>"{s.verse}"</Text>
-                <Text style={styles.scriptureRef}>— {s.reference}</Text>
+                <ReadableText style={styles.scriptureRef}>— {s.reference}</ReadableText>
               </View>
             ))}
           </View>

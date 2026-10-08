@@ -202,8 +202,8 @@ router.post("/worship/start", async (req, res) => {
   if (members?.length) {
     await db.from("p2p_notifications").insert(
       members.map((m) => ({
-        user_id: m.user_id, title: "📺 Family Media",
-        message: `${(hostProfile?.full_name as string) ?? "Someone"} started Family Media.`,
+        user_id: m.user_id, title: "📺 Family Circle Media",
+        message: `${(hostProfile?.full_name as string) ?? "Someone"} started Family Circle Media.`,
         notification_type: "family_worship_invite",
         data: { sessionId, familyId, hostName: (hostProfile?.full_name as string) ?? "Someone" },
       }))

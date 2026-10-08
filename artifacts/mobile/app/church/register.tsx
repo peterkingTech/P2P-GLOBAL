@@ -208,7 +208,7 @@ export default function RegisterChurchScreen() {
         <View style={styles.linkBox}>
           <Text style={styles.linkText} numberOfLines={2}>{createdChurch.inviteLink}</Text>
         </View>
-        <Text style={styles.helperText}>Share this link with your congregation to invite them to your church grove.</Text>
+        <Text style={styles.helperText}>Share this link with your congregation to invite them to your church community.</Text>
 
         <TouchableOpacity
           style={styles.secondaryBtn}
@@ -283,7 +283,7 @@ export default function RegisterChurchScreen() {
 
       {step === 2 && (
         <View style={styles.form}>
-          <Text style={styles.subtitle}>You'll be registered as this church's General Overseer.</Text>
+          <Text style={styles.subtitle}>You'll be registered as this church's Church Leader.</Text>
           <Text style={styles.label}>Are you the primary contact for this church?</Text>
           <View style={styles.yesNoRow}>
             <TouchableOpacity style={[styles.yesNoBtn, isPrimaryContact === true && styles.yesNoBtnActive]} onPress={() => setIsPrimaryContact(true)}>
