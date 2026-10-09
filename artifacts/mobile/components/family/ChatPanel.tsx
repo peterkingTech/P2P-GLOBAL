@@ -5,6 +5,7 @@ import type { MessageContext, SharedMediaProvider, WorshipMessage, WorshipScript
 import { formatScriptureReference } from "@/lib/familyApi";
 import FamilyIcon, { type FamilyIconName } from "./FamilyIcon";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const CHIP_ICON = "rgba(255,255,255,0.7)";
 
 interface Props {
@@ -61,6 +62,7 @@ export default function ChatPanel({
   visible, onClose, messages, myUserId, draft, onChangeDraft, onSend,
   currentScripture, currentMedia, pendingContext, onSetPendingContext, dockRight,
 }: Props) {
+  const sheetWidth = useSheetWidth();
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function ChatPanel({
   return (
     <Modal visible={visible} transparent animationType={dockRight ? "fade" : "slide"} onRequestClose={onClose}>
       <KeyboardAvoidingView style={[styles.overlay, dockRight && styles.overlayDockRight]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={[styles.sheet, dockRight && styles.sheetDockRight]}>
+        <View style={[styles.sheet, sheetWidth, dockRight && styles.sheetDockRight]}>
           <View style={styles.header}>
             <Text style={styles.title}>CHAT</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Chat">
@@ -150,7 +152,7 @@ export default function ChatPanel({
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   overlayDockRight: { flexDirection: "row", justifyContent: "flex-end", alignItems: "stretch" },
-  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, height: "70%" },
+  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, height: "70%", width: "100%", alignSelf: "center" },
   sheetDockRight: { borderTopLeftRadius: 20, borderTopRightRadius: 0, borderBottomLeftRadius: 20, width: 360, height: "100%" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, paddingBottom: 10 },
   title: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },

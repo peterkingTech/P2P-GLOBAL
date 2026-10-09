@@ -6,6 +6,7 @@ import FamilyIcon from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import type { WorshipQueueItem, MediaPermission } from "@/lib/familyApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -37,6 +38,7 @@ export default function MediaShelf({
   mediaPermission, onChangePermission, autoAdvance, onChangeAutoAdvance, myUserId,
   companions, trustedUserIds, onToggleTrusted,
 }: Props) {
+  const sheetWidth = useSheetWidth();
   const [input, setInput] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -66,7 +68,7 @@ export default function MediaShelf({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>QUEUE</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Queue">
@@ -194,7 +196,7 @@ export default function MediaShelf({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.sheet, borderTopLeftRadius: radii.xl + 4, borderTopRightRadius: radii.xl + 4, maxHeight: "80%" },
+  sheet: { backgroundColor: colors.sheet, borderTopLeftRadius: radii.xl + 4, borderTopRightRadius: radii.xl + 4, maxHeight: "80%", width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.xl, paddingBottom: spacing.sm },
   title: { color: colors.textPrimary, ...type.title, letterSpacing: 0.6 },
 

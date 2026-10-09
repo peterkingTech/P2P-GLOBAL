@@ -30,7 +30,7 @@ import { EnvironmentSetting } from "@/components/tree/TreeEnvironment";
 import EnvironmentPicker from "@/components/tree/EnvironmentPicker";
 import FruitDetailCard from "@/components/tree/FruitDetailCard";
 import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import ReadableText from "@/components/ReadableText";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -105,7 +105,7 @@ export default function LivingTreeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
   const { profile } = useAuth();
   const { forestNodes, forestStats, isLoading, treeData, treeMentees, fruitCatalog, userFruits, refreshTreeData } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
@@ -307,7 +307,7 @@ export default function LivingTreeScreen() {
           contentContainerStyle={[
             styles.content,
             { paddingBottom: insets.bottom + 120 },
-            isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+            centeredMaxWidth(contentMaxWidth),
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -499,7 +499,7 @@ export default function LivingTreeScreen() {
               contentContainerStyle={[
                 styles.list,
                 { paddingBottom: insets.bottom + 100 },
-                isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+                centeredMaxWidth(contentMaxWidth),
               ]}
               showsVerticalScrollIndicator={false}
             >

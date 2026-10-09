@@ -43,6 +43,7 @@ import { CategoryCompletionModal } from "@/components/CategoryCompletionModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { PageFrame } from "@/components/PageFrame";
 import { getStageFromPoints } from "@/constants/stages";
 import i18n, { SUPPORTED_LANGUAGES } from "@/lib/i18n";
 import { usePresenceHeartbeat } from "@/lib/presence";
@@ -179,6 +180,9 @@ function AuthGate() {
 
   return (
     <Stack
+      // Large screens: every screen's content sits in the shared fluid page
+      // column (see PageFrame); phones and full-bleed routes are unchanged.
+      screenLayout={({ route, children }) => <PageFrame routeName={route.name}>{children}</PageFrame>}
       screenOptions={{
         headerShown: true,
         headerTintColor: "#1D9E75",

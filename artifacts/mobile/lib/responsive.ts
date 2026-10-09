@@ -1,5 +1,5 @@
 import { Dimensions } from "react-native";
-import { TABLET_BREAKPOINT, MAX_CONTENT_WIDTH, useLayout } from "@/hooks/useLayout";
+import { TABLET_BREAKPOINT, MAX_CONTENT_WIDTH, pageContentWidth, useLayout } from "@/hooks/useLayout";
 
 // Deliberately NOT a second responsive system — isTablet here is derived
 // from the exact same TABLET_BREAKPOINT (768) hooks/useLayout.ts already
@@ -20,14 +20,21 @@ export const isTablet = INITIAL_WIDTH >= TABLET_BREAKPOINT;
 export const SCREEN_W = INITIAL_WIDTH;
 export const SCREEN_H = INITIAL_HEIGHT;
 
+// On tablets, proportional scaling stops at +15% (the same ceiling fs() has
+// always used) — otherwise a 1024–1366px iPad would get 2.6–3.5× spacing.
+// Below the tablet breakpoint the factors are exactly what they were.
+const TABLET_MAX_SCALE = 1.15;
+const WIDTH_SCALE = isTablet ? Math.min(INITIAL_WIDTH / BASE_WIDTH, TABLET_MAX_SCALE) : INITIAL_WIDTH / BASE_WIDTH;
+const HEIGHT_SCALE = isTablet ? Math.min(INITIAL_HEIGHT / BASE_HEIGHT, TABLET_MAX_SCALE) : INITIAL_HEIGHT / BASE_HEIGHT;
+
 // Scale a size proportionally to screen width.
 export function sw(size: number): number {
-  return (INITIAL_WIDTH / BASE_WIDTH) * size;
+  return WIDTH_SCALE * size;
 }
 
 // Scale a size proportionally to screen height.
 export function sh(size: number): number {
-  return (INITIAL_HEIGHT / BASE_HEIGHT) * size;
+  return HEIGHT_SCALE * size;
 }
 
 // Font scaling — never shrinks/grows more than 15% off the base size, so
@@ -51,10 +58,12 @@ export const spacing = {
 export const screenPadding = isSmallPhone ? 14 : isTablet ? 40 : 20;
 
 // Even column width for a grid, accounting for screen padding + inter-item gaps.
+// On tablets the grid spans the capped content width, not the whole screen.
 export function columnWidth(columns: number, gap: number = 12): number {
   const totalGap = gap * (columns - 1);
   const totalPadding = screenPadding * 2;
-  return (INITIAL_WIDTH - totalPadding - totalGap) / columns;
+  const available = pageContentWidth(INITIAL_WIDTH) ?? INITIAL_WIDTH;
+  return (available - totalPadding - totalGap) / columns;
 }
 
 // Re-exported so screens needing live tablet/rotation awareness (not just

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
+import type { ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,7 +32,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth, useAdaptiveTiles } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import LivingTree from "@/components/LivingTree";
 import { Avatar } from "@/components/Avatar";
@@ -147,13 +148,15 @@ function ContinueJourneyCard({ module, status, onOpenModule, onExplore, styles, 
 
 // The five journey features, as tiles rather than the old vertical list.
 // Subtitles are descriptive text — no counts are fetched just to decorate.
-function JourneyTile({ icon, tint, title, sub, onPress, styles, wide }: {
+function JourneyTile({ icon, tint, title, sub, onPress, styles, wide, tileStyle }: {
   icon: keyof typeof Ionicons.glyphMap; tint: string; title: string; sub: string;
   onPress: () => void; styles: ReturnType<typeof makeStyles>; wide?: boolean;
+  // Tablet-only measured width (null on phones, which keep the 48.4% tiles).
+  tileStyle?: ViewStyle | null;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.journeyTile, wide && styles.journeyTileWide]}
+      style={[styles.journeyTile, tileStyle, wide && styles.journeyTileWide]}
       activeOpacity={0.85}
       onPress={onPress}
       accessibilityRole="button"
@@ -541,7 +544,10 @@ export default function HomeTab() {
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { isTablet, contentMaxWidth, screenWidth, screenHeight } = useLayout();
+  // Four journey tiles: 2 or 4 per row on tablets (never a lone orphan),
+  // then the wide Family tile; phones keep the two-column percentage grid.
+  const journeyTiles = useAdaptiveTiles({ minItemWidth: 250, maxColumns: 4, gap: 12, columnChoices: [1, 2, 4] });
   const { t } = useTranslation();
 
   const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
@@ -685,7 +691,7 @@ export default function HomeTab() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
+      contentContainerStyle={[styles.content, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -710,7 +716,10 @@ export default function HomeTab() {
           photo falls back to the SVG tree if it fails to load (e.g. offline). */}
       <View style={styles.growthCard}>
         <TouchableOpacity
-          style={[styles.treeCard, isTablet && { aspectRatio: 21 / 9 }]}
+          // Tablets: a 21:9 band, made wider (shorter) when that would take
+          // more than ~42% of the window height — in landscape the photo
+          // otherwise fills most of the screen.
+          style={[styles.treeCard, isTablet && { aspectRatio: Math.max(21 / 9, ((contentMaxWidth ?? screenWidth) - 40) / (screenHeight * 0.42)) }]}
           onPress={go("/living-tree")}
           activeOpacity={0.9}
           accessibilityRole="button"
@@ -894,11 +903,11 @@ export default function HomeTab() {
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.yourJourney")}</Text>
       </View>
-      <View style={styles.journeyGrid}>
-        <JourneyTile icon="leaf" tint="#3FB37F" title={t("home.livingTree")} sub={t("home.livingTreeSub")} onPress={go("/living-tree")} styles={styles} />
-        <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} />
-        <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/connect")} styles={styles} />
-        <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} />
+      <View style={[styles.journeyGrid, journeyTiles.containerStyle]} onLayout={journeyTiles.onLayout}>
+        <JourneyTile icon="leaf" tint="#3FB37F" title={t("home.livingTree")} sub={t("home.livingTreeSub")} onPress={go("/living-tree")} styles={styles} tileStyle={journeyTiles.tileStyle} />
+        <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} tileStyle={journeyTiles.tileStyle} />
+        <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/connect")} styles={styles} tileStyle={journeyTiles.tileStyle} />
+        <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="home" tint="#E8873A" title={t("home.myFamily")} sub={t("home.myFamilySub")} onPress={go("/family")} styles={styles} wide />
       </View>
       {/* Previously only reachable from the old "More" list — kept here as

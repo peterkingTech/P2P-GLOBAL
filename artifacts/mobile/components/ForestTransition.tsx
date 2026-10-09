@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Dimensions, Modal, StyleSheet, Text, View } from "react-native";
+import { Animated, Modal, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import colors from "@/constants/colors";
 
-const { width: SW, height: SH } = Dimensions.get("window");
 const PARTICLE_COUNT = 14;
 
 interface ForestTransitionProps {
@@ -10,6 +9,7 @@ interface ForestTransitionProps {
 }
 
 export function ForestTransition({ onDone }: ForestTransitionProps) {
+  const { width: SW, height: SH } = useWindowDimensions();
   const particles = useRef(
     [...Array(PARTICLE_COUNT)].map(() => ({
       progress: new Animated.Value(0),
@@ -39,7 +39,7 @@ export function ForestTransition({ onDone }: ForestTransitionProps) {
   return (
     <Modal visible animationType="fade" statusBarTranslucent>
       <View style={styles.screen}>
-        <View style={styles.center}>
+        <View style={[styles.center, { width: SW, height: SH * 0.5 }]}>
           {particles.map((p, i) => {
             const translateX = p.progress.interpolate({
               inputRange: [0, 1],
@@ -68,7 +68,7 @@ export function ForestTransition({ onDone }: ForestTransitionProps) {
           })}
           <Text style={styles.emoji}>🌳</Text>
         </View>
-        <Animated.Text style={[styles.caption, { opacity: textOpacity }]}>
+        <Animated.Text style={[styles.caption, { bottom: SH * 0.18, opacity: textOpacity }]}>
           Your growth is reaching others now…
         </Animated.Text>
       </View>
@@ -84,8 +84,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   center: {
-    width: SW,
-    height: SH * 0.5,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -102,7 +100,6 @@ const styles = StyleSheet.create({
   },
   caption: {
     position: "absolute",
-    bottom: SH * 0.18,
     color: "#E8F5EE",
     fontSize: 16,
     fontFamily: "Inter_500Medium",

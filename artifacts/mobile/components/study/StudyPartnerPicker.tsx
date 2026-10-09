@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 // "Who would you like to study with?" — the Kingdom School lesson entry
 // point's person picker (Study Together Phase 1, discoverability slice).
 // Only resolves WHO; the caller starts the call itself once a person is
@@ -25,6 +26,7 @@ const RELATIONSHIP_LABEL: Record<StudyPartner["relationship"], string> = {
 export function StudyPartnerPicker({
   visible, onClose, onSelectPerson,
 }: { visible: boolean; onClose: () => void; onSelectPerson: (person: { id: string; name: string }) => void }) {
+  const sheetWidth = useSheetWidth();
   const router = useRouter();
   const { user } = useAuth();
   const [people, setPeople] = useState<StudyPartner[]>([]);
@@ -47,7 +49,7 @@ export function StudyPartnerPicker({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>Who would you like to study with?</Text>
             <TouchableOpacity onPress={onClose}>
@@ -94,7 +96,7 @@ export function StudyPartnerPicker({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8, minHeight: 200 },
+  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8, minHeight: 200, width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4, gap: 12 },
   title: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold", flex: 1 },
   centerFill: { paddingVertical: 32, alignItems: "center" },

@@ -8,6 +8,7 @@ import colors from "@/constants/colors";
 import { getChurchStudies, createChurchStudy, type ChurchStudy } from "@/lib/churchStudyApi";
 import { getChurchStudyPlans, createChurchStudyPlan, type ChurchStudyPlan } from "@/lib/churchStudyPlanApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -22,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = { draft: "Draft", published: "Publi
 // only ever possible from inside this church context — there is no
 // individual/peer-to-peer "Create Custom Study" anywhere in the app.
 export default function ChurchStudiesScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userChurch, isChurchLeader } = useData();
@@ -185,7 +187,7 @@ export default function ChurchStudiesScreen() {
 
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Create Church Study</Text>
             <Text style={styles.fieldLabel}>Study Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. The Book of Romans" placeholderTextColor={colors.textMuted} />
@@ -208,7 +210,7 @@ export default function ChurchStudiesScreen() {
 
       <Modal visible={createPlanOpen} transparent animationType="slide" onRequestClose={() => setCreatePlanOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Create Custom Study Plan</Text>
             <Text style={styles.fieldLabel}>Plan Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. New Believers Foundations" placeholderTextColor={colors.textMuted} />
@@ -261,7 +263,7 @@ const styles = StyleSheet.create({
   },
   statusPillArchived: { color: colors.textMuted, backgroundColor: "rgba(0,0,0,0.06)" },
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
   sheetTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   input: {

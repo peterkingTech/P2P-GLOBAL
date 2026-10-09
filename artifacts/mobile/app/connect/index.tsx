@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import colors from "@/constants/colors";
+import { useAdaptiveTiles } from "@/hooks/useLayout";
 
 // My Peer Guide / My Disciples / Pending Confirmations / Peer Guide
 // Requests / Completion Letters used to live on this hub — they've moved to
@@ -83,6 +84,8 @@ export default function ConnectHub() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  // As many path cards per row as fit on tablets; phones keep the 47% pair.
+  const pathTiles = useAdaptiveTiles({ minItemWidth: 240, maxColumns: 4, gap: 12 });
 
   return (
     <>
@@ -98,11 +101,11 @@ export default function ConnectHub() {
         <Text style={styles.sectionTitle}>Find a Study Partner</Text>
         <Text style={styles.sectionSub}>Choose how you want to connect</Text>
 
-        <View style={styles.pathGrid}>
+        <View style={[styles.pathGrid, pathTiles.containerStyle]} onLayout={pathTiles.onLayout}>
           {MATCH_PATHS.map((path) => (
             <TouchableOpacity
               key={path.id}
-              style={styles.pathCard}
+              style={[styles.pathCard, pathTiles.tileStyle]}
               activeOpacity={0.85}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

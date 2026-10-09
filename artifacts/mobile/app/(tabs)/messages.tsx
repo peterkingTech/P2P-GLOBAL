@@ -13,6 +13,7 @@ import { AppColors } from "@/constants/themes";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import { Avatar } from "@/components/Avatar";
 import { useActivityStatus } from "@/lib/presence";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import "@/lib/i18n";
 
 type TabKey = "all" | "unread" | "favourites" | "peer_groups" | "circles";
@@ -130,6 +131,7 @@ function makeStyles(c: AppColors) {
 
 export default function MessagesTab() {
   const insets = useSafeAreaInsets();
+  const { contentMaxWidth } = useLayout();
   const router = useRouter();
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -196,6 +198,7 @@ export default function MessagesTab() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16) }]}>
+      <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("tabs.messages")}</Text>
         <TouchableOpacity style={styles.historyBtn} onPress={() => router.push("/call/history" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -333,6 +336,7 @@ export default function MessagesTab() {
           }}
         />
       )}
+      </View>
     </View>
   );
 }

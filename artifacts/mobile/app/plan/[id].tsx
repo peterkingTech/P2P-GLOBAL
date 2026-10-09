@@ -18,7 +18,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { sharePlan } from "@/lib/sharing";
-import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, centeredMaxWidth } from "@/hooks/useLayout";
 
 const COVER_HEIGHT = 200;
 
@@ -71,7 +71,7 @@ export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isTablet } = useLayout();
+  const { readingMaxWidth } = useLayout();
   const photoWidth = useCardPhotoWidth(96);
   const { profile } = useAuth();
   const { getPlanProgress, checkCategoryCompletion } = useData();
@@ -245,7 +245,7 @@ export default function PlanDetailScreen() {
       <ScrollView
         contentContainerStyle={[
           { paddingBottom: insets.bottom + 40 },
-          isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+          centeredMaxWidth(readingMaxWidth),
         ]}
         showsVerticalScrollIndicator={false}
       >

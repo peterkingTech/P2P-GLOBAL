@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 export type BadgeSize = "small" | "medium" | "large";
 
 interface VerificationBadgeProps {
@@ -29,6 +30,7 @@ export function VerificationBadge({
   verifiedAt,
   style,
 }: VerificationBadgeProps) {
+  const sheetWidth = useSheetWidth();
   const [explainOpen, setExplainOpen] = useState(false);
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -55,7 +57,7 @@ export function VerificationBadge({
 
       <Modal visible={explainOpen} animationType="slide" transparent onRequestClose={() => setExplainOpen(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+          <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
             <View style={styles.sheetHeaderRow}>
               <View style={styles.checkCircle}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
@@ -99,6 +101,9 @@ function makeStyles(c: AppColors) {
     sheet: {
       backgroundColor: c.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24,
       padding: 24, paddingBottom: 36,
+      // Width follows the window: full width when narrow, a centered
+      // panel of at most 600pt once tablet-wide (useSheetWidth).
+      width: "100%", alignSelf: "center",
     },
     sheetHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
     checkCircle: {

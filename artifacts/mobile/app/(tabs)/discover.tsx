@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, TextInput, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
+import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
@@ -128,7 +129,7 @@ export default function DiscoverTab() {
   const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions, userChurch } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
 
   const [loading, setLoading] = useState(true);
   const [peerCount, setPeerCount] = useState(0);
@@ -239,7 +240,7 @@ export default function DiscoverTab() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
+      <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.headerTitle}>{t("discover.title")}</Text>
         <Text style={styles.headerSub}>{t("discover.subtitle")}</Text>
@@ -339,6 +340,7 @@ export default function DiscoverTab() {
             </>
           )}
 
+          <ResponsiveGrid minItemWidth={340} maxColumns={3} gap={12}>
           {cards.map((c) => (
             <TouchableOpacity key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route as any)}>
               <View style={styles.iconWrap}>
@@ -356,6 +358,7 @@ export default function DiscoverTab() {
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </TouchableOpacity>
           ))}
+          </ResponsiveGrid>
 
           <Text style={styles.sectionHeading}>Peer Circles</Text>
           <View style={styles.circlesActionsRow}>

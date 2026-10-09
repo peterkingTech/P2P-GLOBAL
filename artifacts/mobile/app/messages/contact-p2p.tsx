@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData, ContactDepartment } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface DeptInfo {
   key: ContactDepartment; label: string; icon: string; description: string; estimatedResponse: string;
 }
@@ -56,6 +57,7 @@ function SentConfirmation({ department, referenceNumber }: { department: DeptInf
 }
 
 export default function ContactP2P() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -151,7 +153,7 @@ export default function ContactP2P() {
 
         <Modal visible={showDepartmentPicker} transparent animationType="slide" onRequestClose={() => setShowDepartmentPicker(false)}>
           <View style={styles.pickerModal}>
-            <View style={styles.pickerCard}>
+            <View style={[styles.pickerCard, sheetWidth]}>
               <Text style={styles.pickerTitle}>Select Department</Text>
               {DEPARTMENTS.map((dept) => (
                 <TouchableOpacity
@@ -253,7 +255,7 @@ const styles = StyleSheet.create({
   selectedDept: { flexDirection: "row", alignItems: "center", gap: 10 },
   selectedDeptLabel: { fontSize: 14, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   pickerModal: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
-  pickerCard: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
+  pickerCard: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4, width: "100%", alignSelf: "center" },
   pickerTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 8 },
   deptOption: {
     flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12,

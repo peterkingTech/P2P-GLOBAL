@@ -6,7 +6,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, UserNote } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 export default function Notes() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { compose } = useLocalSearchParams<{ compose?: string }>();
@@ -121,7 +123,7 @@ export default function Notes() {
 
       <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => setModalOpen(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>New Note</Text>
               <TouchableOpacity onPress={() => setModalOpen(false)}><Ionicons name="close" size={20} color={colors.textMid} /></TouchableOpacity>
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, elevation: 4,
   },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, width: "100%", alignSelf: "center" },
   sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   sheetTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   input: {

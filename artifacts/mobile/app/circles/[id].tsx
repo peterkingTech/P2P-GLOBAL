@@ -589,7 +589,7 @@ function makeStyles(c: AppColors) {
     reviseEvalBtnText: { color: "#C0392B", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
-    modalBox: { width: "85%", backgroundColor: "#fff", borderRadius: 18, padding: 22, gap: 4 },
+    modalBox: { width: "85%", backgroundColor: "#fff", borderRadius: 18, padding: 22, gap: 4, maxWidth: 560 },
     modalTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 8 },
     fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 6, fontFamily: "Inter_600SemiBold" },
     input: { backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },

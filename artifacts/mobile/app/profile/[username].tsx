@@ -15,6 +15,7 @@ import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import { PeerGuideRequestModal } from "@/components/PeerGuideRequestModal";
 import { grainLabel } from "@/lib/grain";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 type ConnectionStatus = "none" | "pending_sent" | "pending_received" | "connected";
 
 interface PublicProfile {
@@ -43,6 +44,7 @@ function showAlert(title: string, message: string) {
 }
 
 export default function PublicProfileScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile: viewer } = useAuth();
@@ -414,7 +416,7 @@ export default function PublicProfileScreen() {
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
-          <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.menuSheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
             <TouchableOpacity style={styles.menuRow} onPress={handleShare}>
               <Ionicons name="share-outline" size={18} color={colors.textDark} />
               <Text style={styles.menuRowText}>Share Profile</Text>
@@ -477,7 +479,7 @@ function makeStyles(c: AppColors) {
     incomingRequestText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
     joinedText: { fontSize: 12, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", marginTop: 8 },
     menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    menuSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 10 },
+    menuSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 10, width: "100%", alignSelf: "center" },
     menuRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
     menuRowText: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
   });

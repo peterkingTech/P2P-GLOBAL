@@ -12,6 +12,7 @@ import {
   type ChurchStudyPlanDetail,
 } from "@/lib/churchStudyPlanApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -28,6 +29,7 @@ const STATUS_LABEL: Record<string, string> = { draft: "Draft", published: "Publi
 // (app/lesson/[id].tsx) — no second lesson renderer, no second progress
 // table.
 export default function ChurchStudyPlanScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { planId } = useLocalSearchParams<{ planId: string }>();
@@ -264,7 +266,7 @@ export default function ChurchStudyPlanScreen() {
 
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Edit Custom Study Plan</Text>
             <Text style={styles.fieldLabel}>Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholderTextColor={colors.textMuted} />
@@ -319,7 +321,7 @@ const styles = StyleSheet.create({
   },
   statusPillArchived: { color: colors.textMuted, backgroundColor: "rgba(0,0,0,0.06)" },
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
   sheetTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   input: {

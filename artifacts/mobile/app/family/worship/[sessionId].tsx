@@ -32,6 +32,7 @@ import LessonPicker from "@/components/family/LessonPicker";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 import type { FamilyIconName } from "@/components/family/FamilyIcon";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -67,6 +68,7 @@ function FloatingReaction({ emoji }: { emoji: string }) {
 }
 
 export default function FamilyWorshipScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
@@ -772,7 +774,7 @@ export default function FamilyWorshipScreen() {
 
       <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={styles.sheetBox}>
+          <View style={[styles.sheetBox, sheetWidth]}>
             <Text style={styles.sheetTitle}>Transfer Guide</Text>
             {activeParticipants.filter((p) => p.user_id !== session.hostId).map((p) => {
               const m = memberById.get(p.user_id);
@@ -892,7 +894,7 @@ const styles = StyleSheet.create({
   floatingReaction: { position: "absolute", fontSize: 26 },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: colors.sheet, borderTopLeftRadius: radii.xl + 4, borderTopRightRadius: radii.xl + 4, padding: spacing.xl, gap: spacing.xs },
+  sheetBox: { backgroundColor: colors.sheet, borderTopLeftRadius: radii.xl + 4, borderTopRightRadius: radii.xl + 4, padding: spacing.xl, gap: spacing.xs, width: "100%", alignSelf: "center" },
   sheetTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: spacing.sm },
   transferRow: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderFaint, minHeight: 44, justifyContent: "center" },
   transferName: { color: colors.textPrimary, ...type.body },

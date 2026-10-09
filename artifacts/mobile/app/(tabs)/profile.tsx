@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, MAX_CONTENT_WIDTH, centeredMaxWidth, useSheetWidth } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
@@ -187,6 +187,9 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.lightCream,
       borderTopLeftRadius: 24, borderTopRightRadius: 24,
       padding: 20, maxHeight: "85%",
+      // Width follows the window: full width when narrow, a centered
+      // panel of at most 600pt once tablet-wide (useSheetWidth).
+      width: "100%", alignSelf: "center",
     },
     sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
     sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -233,6 +236,7 @@ function makeStyles(c: AppColors) {
 }
 
 export default function ProfileScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
@@ -240,7 +244,7 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const { colors, style } = useTheme();
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { isTablet, contentMaxWidth } = useLayout();
 
   const [grainSheetOpen, setGrainSheetOpen] = useState(false);
   const [invitingBusy, setInvitingBusy] = useState(false);
@@ -322,7 +326,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' as any, width: '100%' }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]}
         showsVerticalScrollIndicator={false}
       >
         {/* Avatar & Name */}
@@ -550,7 +554,7 @@ export default function ProfileScreen() {
       {/* Reach Out Modal */}
       <Modal visible={reachOutOpen} animationType="slide" transparent onRequestClose={() => setReachOutOpen(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
+          <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Reach Out</Text>
               <TouchableOpacity onPress={() => setReachOutOpen(false)} style={styles.closeBtn}>
@@ -610,7 +614,7 @@ export default function ProfileScreen() {
       {/* Gifts Modal */}
       <Modal visible={giftsOpen} animationType="slide" transparent onRequestClose={() => setGiftsOpen(false)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
+          <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t("profile.spiritualGifts")}</Text>
               <TouchableOpacity onPress={() => setGiftsOpen(false)} style={styles.closeBtn}>

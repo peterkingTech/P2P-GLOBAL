@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchAnnouncement, ChurchAnnouncementType } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
   general: "General", bible_study: "Bible Study", discipleship: "Discipleship", prayer: "Prayer",
   learning_goal: "Learning Goal", study_plan: "Study Plan", event: "Event", important: "Important",
@@ -13,6 +14,7 @@ const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
 };
 
 export default function ChurchAnnouncementsScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userChurch, isChurchLeader, getAnnouncements, createAnnouncement, pinAnnouncement } = useData();
@@ -110,7 +112,7 @@ export default function ChurchAnnouncementsScreen() {
 
       <Modal visible={composerOpen} animationType="slide" transparent onRequestClose={() => setComposerOpen(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>New Announcement</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
             <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
   videoBadgeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   cardMeta: { fontSize: 11, color: colors.textMuted, marginTop: 8, fontFamily: "Inter_400Regular" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, marginBottom: 6, fontFamily: "Inter_700Bold" },
   input: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10,

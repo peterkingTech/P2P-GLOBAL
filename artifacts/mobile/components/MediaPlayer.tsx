@@ -5,8 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
-} from "react-native";
+  } from "react-native";
+import { useMediaBox } from "@/hooks/useLayout";
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from "expo-audio";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,10 +19,8 @@ interface Props {
   durationSeconds?: number | null;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const VIDEO_HEIGHT = Math.round((SCREEN_WIDTH - 64) * (9 / 16));
-
 export default function MediaPlayer({ storagePath, submissionType, durationSeconds }: Props) {
+  const mediaBox = useMediaBox(64, 9 / 16);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -119,7 +117,7 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
       <View style={styles.videoBox}>
         <VideoView
           player={videoPlayer}
-          style={[styles.video, { height: VIDEO_HEIGHT }]}
+          style={[styles.video, mediaBox]}
           nativeControls
           contentFit="contain"
         />

@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, ComposeUserSearchResult, ComposeDepartment, OfficialMailDraft } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
   { value: "support_help", label: "Support & Help" },
   { value: "crisis_safeguarding", label: "Crisis & Safeguarding" },
@@ -45,6 +46,7 @@ interface ComposeMessageModalProps {
 // message and leaves before sending, save it as a draft"). Opening with
 // initialDraft resumes that same draft row rather than creating a new one.
 export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: ComposeMessageModalProps) {
+  const sheetWidth = useSheetWidth();
   const { searchUsersForCompose, sendOfficialMessage, saveOfficialMailDraft, deleteOfficialMailDraft } = useData();
 
   const [query, setQuery] = useState("");
@@ -133,7 +135,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={[styles.sheet, sheetWidth]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{draftId && !sentOk ? "Compose (Draft)" : "Compose"}</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -299,7 +301,7 @@ export default ComposeMessageModal;
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90%" },
+  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90%", width: "100%", alignSelf: "center" },
   sheetHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8,

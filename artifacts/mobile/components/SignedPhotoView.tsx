@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ActivityIndicator, Image, Dimensions } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Image } from "react-native";
+import { useMediaBox } from "@/hooks/useLayout";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 
@@ -8,10 +9,8 @@ import colors from "@/constants/colors";
 // writing the same fetch-signed-url-then-render-Image logic per screen.
 interface Props { bucket: string; path: string }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const HEIGHT = Math.round((SCREEN_WIDTH - 40) * (3 / 4));
-
 export default function SignedPhotoView({ bucket, path }: Props) {
+  const mediaBox = useMediaBox(40, 3 / 4);
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -25,8 +24,8 @@ export default function SignedPhotoView({ bucket, path }: Props) {
   }, [bucket, path]);
 
   if (failed) return null;
-  if (!url) return <View style={[styles.box, { height: HEIGHT }]}><ActivityIndicator color={colors.accentGreen} /></View>;
-  return <Image source={{ uri: url }} style={[styles.image, { height: HEIGHT }]} resizeMode="cover" />;
+  if (!url) return <View style={[styles.box, mediaBox]}><ActivityIndicator color={colors.accentGreen} /></View>;
+  return <Image source={{ uri: url }} style={[styles.image, mediaBox]} resizeMode="cover" />;
 }
 
 const styles = StyleSheet.create({

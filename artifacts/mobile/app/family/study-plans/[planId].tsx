@@ -14,6 +14,7 @@ import {
   type FamilyStudyPlanDetail,
 } from "@/lib/familyStudyPlanApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -32,6 +33,7 @@ const STATUS_LABEL: Record<string, string> = { draft: "Draft", published: "Publi
 // Discipleship Journey convention rather than any one member's personal
 // progress.
 export default function FamilyStudyPlanScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: c } = useTheme();
@@ -304,7 +306,7 @@ export default function FamilyStudyPlanScreen() {
 
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Edit Custom Study Plan</Text>
             <Text style={styles.fieldLabel}>Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholderTextColor={c.textMuted} />
@@ -366,7 +368,7 @@ function makeStyles(c: AppColors) {
       backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
     },
     sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
     sheetTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     fieldLabel: { fontSize: 12, color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 4 },
     input: {

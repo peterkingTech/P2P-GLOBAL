@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 export type OfficialAccountType = "crisis_response" | "announcement" | "support" | "general";
 export type BadgeSize = "small" | "medium";
 
@@ -20,6 +21,7 @@ const BADGE_CONFIG: Record<OfficialAccountType, { icon: keyof typeof Ionicons.gl
 };
 
 export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgeProps) {
+  const sheetWidth = useSheetWidth();
   const [explainOpen, setExplainOpen] = useState(false);
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -39,7 +41,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
 
       <Modal visible={explainOpen} animationType="slide" transparent onRequestClose={() => setExplainOpen(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+          <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
             <View style={styles.sheetHeaderRow}>
               <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
                 <Ionicons name={config.icon} size={16} color="#fff" />
@@ -80,6 +82,9 @@ function makeStyles(c: AppColors) {
     sheet: {
       backgroundColor: c.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24,
       padding: 24, paddingBottom: 36,
+      // Width follows the window: full width when narrow, a centered
+      // panel of at most 600pt once tablet-wide (useSheetWidth).
+      width: "100%", alignSelf: "center",
     },
     sheetHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
     iconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },

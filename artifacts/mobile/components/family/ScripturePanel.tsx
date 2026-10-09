@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal,
 import { BIBLE_BOOKS, nextChapter, previousChapter } from "@/lib/bibleBooks";
 import { getBibleTranslations, getBiblePassage, formatScriptureReference, type WorshipScripture, type BibleTranslation, type BiblePassage } from "@/lib/familyApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface Props {
   currentScripture: WorshipScripture | null;
   isGuide: boolean;
@@ -17,6 +18,7 @@ const MAX_VERSE_SPAN = 29;
 // Gathering's Scripture mode, sharing the room's existing card/typography
 // language rather than a separate reading-app aesthetic.
 export default function ScripturePanel({ currentScripture, isGuide, onSelect }: Props) {
+  const sheetWidth = useSheetWidth();
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [book, setBook] = useState(currentScripture?.book ?? "Psalms");
   const [chapter, setChapter] = useState(currentScripture?.chapter ?? 23);
@@ -138,7 +140,7 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect }: 
 
       <Modal visible={bookPickerOpen} transparent animationType="slide" onRequestClose={() => setBookPickerOpen(false)}>
         <View style={styles.bookModalOverlay}>
-          <View style={styles.bookModalSheet}>
+          <View style={[styles.bookModalSheet, sheetWidth]}>
             <Text style={styles.bookModalTitle}>Select a Book</Text>
             <ScrollView>
               {BIBLE_BOOKS.map((b) => (
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
   verseNumber: { color: "#B8860B", fontSize: 11, fontStyle: "normal", fontFamily: "Inter_700Bold" },
 
   bookModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  bookModalSheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "70%" },
+  bookModalSheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "70%", width: "100%", alignSelf: "center" },
   bookModalTitle: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 10 },
   bookRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
   bookRowText: { color: "#fff", fontSize: 14, fontFamily: "Inter_400Regular" },

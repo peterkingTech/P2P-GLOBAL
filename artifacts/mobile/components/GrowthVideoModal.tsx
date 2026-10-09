@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View, Dimensions } from "react-native";
+import { Modal, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEventListener } from "expo";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { GROWTH_VIDEO_SOURCE } from "@/constants/growthVideo";
 
-const { width: SW } = Dimensions.get("window");
 
 interface GrowthVideoModalProps {
   startSec: number;
@@ -29,6 +28,7 @@ export function GrowthVideoModal({
   onClose,
 }: GrowthVideoModalProps) {
   const insets = useSafeAreaInsets();
+  const { width: SW } = useWindowDimensions();
   const [reachedEnd, setReachedEnd] = useState(false);
   const hasSeekedRef = useRef(false);
 
@@ -69,7 +69,7 @@ export function GrowthVideoModal({
         </TouchableOpacity>
 
         <View style={styles.videoWrap}>
-          <VideoView player={player} style={styles.video} contentFit="cover" nativeControls={false} />
+          <VideoView player={player} style={[styles.video, { width: SW }]} contentFit="cover" nativeControls={false} />
         </View>
 
         <View style={[styles.infoPanel, { paddingBottom: insets.bottom + 20 }]}>
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   videoWrap: { flex: 1, backgroundColor: "#000" },
-  video: { width: SW, height: "100%" },
+  video: { height: "100%" },
   infoPanel: {
     paddingHorizontal: 24,
     paddingTop: 18,

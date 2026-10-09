@@ -8,6 +8,7 @@ import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { SUPPORTED_LANGUAGES, BIBLE_STUDY_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 // Multilingual Expansion Stage 2 — generated directly from lib/i18n.ts's
 // SUPPORTED_LANGUAGES/LANGUAGE_DISPLAY instead of a separately hardcoded
 // list. Previously this array silently omitted hi/sw (which already had
@@ -43,6 +44,7 @@ const DATE_FORMATS: { value: "DD.MM.YYYY" | "MM/DD/YYYY"; label: string; example
 ];
 
 export default function LanguageSettingsScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const { profile, updateProfile } = useAuth();
   const { colors } = useTheme();
@@ -121,7 +123,7 @@ export default function LanguageSettingsScreen() {
 
       <Modal visible={!!langPickerOpen} animationType="slide" transparent onRequestClose={() => setLangPickerOpen(null)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{langPickerOpen === "app" ? "App Language" : "Content Language"}</Text>
               <TouchableOpacity onPress={() => setLangPickerOpen(null)} style={styles.closeBtn}>
@@ -170,7 +172,7 @@ function makeStyles(c: AppColors) {
     linkRowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
     linkRowValue: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    sheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "75%" },
+    sheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "75%", width: "100%", alignSelf: "center" },
     sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
     sheetTitle: { flex: 1, fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     closeBtn: { padding: 4 },

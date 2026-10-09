@@ -9,6 +9,7 @@ import { useData, ChurchAnnouncement, ChurchAnnouncementType } from "@/contexts/
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const TYPE_OPTIONS: { value: ChurchAnnouncementType; label: string }[] = [
   { value: "general", label: "General" }, { value: "bible_study", label: "Bible Study" },
   { value: "discipleship", label: "Discipleship" }, { value: "prayer", label: "Prayer" },
@@ -23,6 +24,7 @@ const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 90;
 
 export default function ChurchAnnouncementsManagementScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { supabase } = useAuth();
@@ -160,7 +162,7 @@ export default function ChurchAnnouncementsManagementScreen() {
 
       <Modal visible={composerOpen} animationType="slide" transparent onRequestClose={() => setComposerOpen(false)}>
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalSheet} contentContainerStyle={{ gap: 10 }}>
+          <ScrollView style={[styles.modalSheet, sheetWidth]} contentContainerStyle={{ gap: 10 }}>
             <Text style={styles.modalTitle}>New Announcement</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
             <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
@@ -211,7 +213,7 @@ export default function ChurchAnnouncementsManagementScreen() {
 
       <Modal visible={typePickerOpen} animationType="slide" transparent onRequestClose={() => setTypePickerOpen(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setTypePickerOpen(false)}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Announcement Type</Text>
             <FlatList data={TYPE_OPTIONS} keyExtractor={(o) => o.value} renderItem={({ item }) => (
               <TouchableOpacity style={styles.optionRow} onPress={() => { setAnnouncementType(item.value); setTypePickerOpen(false); }}>
@@ -247,7 +249,7 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 11, color: colors.textMuted, marginTop: 8, fontFamily: "Inter_400Regular" },
   archiveText: { fontSize: 12, color: "#B91C1C", marginTop: 8, fontFamily: "Inter_500Medium" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
+  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%", width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, marginBottom: 6, fontFamily: "Inter_700Bold" },
   input: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10,

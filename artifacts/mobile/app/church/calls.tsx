@@ -10,6 +10,7 @@ import {
   type ChurchCall, type ChurchCallPurpose, type ChurchCallScope,
 } from "@/lib/churchCallApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -39,6 +40,7 @@ const PURPOSES: ChurchCallPurpose[] = ["meeting", "teaching", "bible_study", "pr
 // convention already established by church/settings/announcements.tsx —
 // no new date-picker dependency.
 export default function ChurchCallsScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userChurch, isChurchLeader, getChurchCohorts } = useData();
@@ -220,7 +222,7 @@ export default function ChurchCallsScreen() {
 
       <Modal visible={startOpen} transparent animationType="slide" onRequestClose={() => setStartOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <ScrollView contentContainerStyle={styles.sheetBox} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={[styles.sheetBox, sheetWidth]} keyboardShouldPersistTaps="handled">
             <Text style={styles.sheetTitle}>{scheduleLater ? "Schedule a Church Gathering" : "Start a Church Gathering"}</Text>
             <TextInput
               style={styles.input}
@@ -313,7 +315,7 @@ const styles = StyleSheet.create({
   joinText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
   sheetTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },

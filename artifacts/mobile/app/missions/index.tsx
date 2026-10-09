@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Platform, ActivityIndicator, TouchableOpacity, ScrollView } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PrayerWallPost } from "@/contexts/DataContext";
@@ -123,7 +123,7 @@ export default function MissionsScreen() {
   const { getPrayerWallPosts } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
   const { t } = useTranslation();
 
   const [testimonies, setTestimonies] = useState<PrayerWallPost[]>([]);
@@ -171,7 +171,7 @@ export default function MissionsScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
+      <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <TouchableOpacity
         onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/discover" as any))}
         style={{ paddingHorizontal: 16, paddingTop: 8, alignSelf: "flex-start" }}

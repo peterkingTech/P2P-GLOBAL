@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { WorshipNote, WorshipScripture } from "@/lib/familyApi";
 import { formatScriptureReference } from "@/lib/familyApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -18,6 +19,7 @@ interface Props {
 // Scripture-linked notes architecture, not a full notes app: add, list,
 // delete-your-own. No editing, no folders, no search.
 export default function NotesPanel({ visible, onClose, notes, myUserId, currentScripture, onAdd, onDelete }: Props) {
+  const sheetWidth = useSheetWidth();
   const [draft, setDraft] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [attachPassage, setAttachPassage] = useState(false);
@@ -32,7 +34,7 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>NOTES</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Notes">
@@ -94,7 +96,7 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, height: "70%" },
+  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, height: "70%", width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, paddingBottom: 10 },
   title: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
 

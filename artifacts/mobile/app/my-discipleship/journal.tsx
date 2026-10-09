@@ -7,6 +7,7 @@ import { useData, JournalReflection, JournalTimelineEntry } from "@/contexts/Dat
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 // My Discipleship Journal — "What is this learning doing in my life?"
 // Aggregates three already-existing private screens (notes.tsx,
 // highlights.tsx, prayer/journal.tsx — all real, all RLS-private, all
@@ -42,6 +43,7 @@ function formatEntryDate(iso: string): string {
 }
 
 export default function MyDiscipleshipJournalScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getJournalTimeline, getMyReflections } = useData();
@@ -191,7 +193,7 @@ export default function MyDiscipleshipJournalScreen() {
 
       <Modal visible={newEntryOpen} transparent animationType="slide" onRequestClose={() => setNewEntryOpen(false)}>
         <View style={s.chooserOverlay}>
-          <View style={s.chooserSheet}>
+          <View style={[s.chooserSheet, sheetWidth]}>
             <View style={s.chooserHeader}>
               <Text style={s.chooserTitle}>What would you like to add?</Text>
               <TouchableOpacity onPress={() => setNewEntryOpen(false)}>
@@ -272,7 +274,7 @@ function makeStyles(c: AppColors) {
     entryPreview: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 17 },
 
     chooserOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    chooserSheet: { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8 },
+    chooserSheet: { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8, width: "100%", alignSelf: "center" },
     chooserHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
     chooserTitle: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     chooserOption: {

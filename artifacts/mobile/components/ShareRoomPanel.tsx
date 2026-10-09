@@ -24,6 +24,7 @@ import {
 } from "@/lib/roomInvitationsApi";
 import { shareRoomInvitation } from "@/lib/sharing";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roomTitle, statusLine }: Props) {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
@@ -169,7 +171,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+        <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>Share Room</Text>
@@ -280,7 +282,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    sheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 20, paddingTop: 10 },
+    sheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 20, paddingTop: 10, width: "100%", alignSelf: "center" },
     handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.borderBeige, alignSelf: "center", marginBottom: 12 },
     headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     headerTitle: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },

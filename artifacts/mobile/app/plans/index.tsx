@@ -24,7 +24,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getPlanCategoryMeta } from "@/lib/planCategories";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
+import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -310,7 +311,7 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
 
 export default function PlansHubScreen() {
   const insets = useSafeAreaInsets();
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { profile } = useAuth();
@@ -540,7 +541,7 @@ export default function PlansHubScreen() {
 
       {/* ── My Plans ── */}
       {tab === "my" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
           {myPlansLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : (
@@ -555,7 +556,7 @@ export default function PlansHubScreen() {
                   onAction={() => setTab("find")}
                 />
               ) : (
-                recentActive.map((p) => (
+                <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{recentActive.map((p) => (
                   <PlanCard
                     key={p.id}
                     plan={p}
@@ -567,7 +568,7 @@ export default function PlansHubScreen() {
                     onPrimary={() => router.push(`/plan/${p.id}` as any)}
                     onPress={() => router.push(`/plan/${p.id}` as any)}
                   />
-                ))
+                ))}</ResponsiveGrid>
               )}
 
               {staleEnrolled.length > 0 && (
@@ -629,7 +630,7 @@ export default function PlansHubScreen() {
 
           {/* ── Categories sub-tab ── */}
           {findSubTab === "categories" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
               {recommended.length > 0 && (
                 <>
                   <View style={styles.recommendedHeaderRow}>
@@ -713,7 +714,7 @@ export default function PlansHubScreen() {
 
           {/* ── Search Results sub-tab ── */}
           {findSubTab === "search" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {searchLoading ? (
                 <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
               ) : searchResults.length === 0 ? (
@@ -738,13 +739,13 @@ export default function PlansHubScreen() {
 
       {/* ── Saved ── */}
       {tab === "saved" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
           {savedLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : savedPlans.length === 0 ? (
             <EmptyState colors={colors} icon="bookmark-outline" text="Save plans to come back to them later. Tap the bookmark icon on any plan." />
           ) : (
-            savedPlans.map((p) => (
+            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{savedPlans.map((p) => (
               <PlanCard
                 key={p.id}
                 plan={p}
@@ -758,20 +759,20 @@ export default function PlansHubScreen() {
                 onSecondary={() => toggleSave(p.id)}
                 onPress={() => router.push(`/plan/${p.id}` as any)}
               />
-            ))
+            ))}</ResponsiveGrid>
           )}
         </ScrollView>
       )}
 
       {/* ── Completed ── */}
       {tab === "completed" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
           {completedLoading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
           ) : completedPlans.length === 0 ? (
             <EmptyState colors={colors} icon="ribbon-outline" text="Complete your first plan to see it here." />
           ) : (
-            completedPlans.map((p) => (
+            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{completedPlans.map((p) => (
               <PlanCard
                 key={p.id}
                 plan={p}
@@ -783,7 +784,7 @@ export default function PlansHubScreen() {
                 onSecondary={() => setShareTarget(p)}
                 onPress={() => router.push(`/plan/${p.id}` as any)}
               />
-            ))
+            ))}</ResponsiveGrid>
           )}
         </ScrollView>
       )}
@@ -890,7 +891,7 @@ function makeStyles(c: AppColors) {
     categoryCardCount: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_500Medium", marginTop: 2 },
 
     filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-    filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+    filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, width: "100%", alignSelf: "center" },
     filterHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
     filterTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     filterLabel: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8, marginTop: 8 },

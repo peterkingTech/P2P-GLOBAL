@@ -15,6 +15,7 @@ const MediaLibrary = Platform.OS !== "web" ? (require("expo-media-library") as t
 import { shareChurchInvite } from "@/lib/sharing";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface ChurchQRCodeProps {
   church: { name: string; city: string | null; country: string; inviteLink: string; inviteCode: string };
 }
@@ -23,6 +24,7 @@ interface ChurchQRCodeProps {
 // expo-sharing + expo-media-library with a permission check) — reused
 // rather than reinvented.
 export function ChurchQRCode({ church }: ChurchQRCodeProps) {
+  const sheetWidth = useSheetWidth();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState<"share" | "save" | null>(null);
   const shotRef = useRef<ViewShot>(null);
@@ -81,7 +83,7 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
         <View style={styles.overlay}>
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, sheetWidth]}>
             <View style={styles.header}>
               <Text style={styles.title}>Church Invite QR</Text>
               <TouchableOpacity onPress={() => setVisible(false)}>
@@ -152,7 +154,7 @@ const styles = StyleSheet.create({
   },
   triggerText: { color: colors.accentGreen, fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, alignItems: "center" },
+  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, alignItems: "center", width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: 16 },
   title: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   qrCard: {

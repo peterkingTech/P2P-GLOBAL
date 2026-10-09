@@ -12,6 +12,7 @@ import { shareChurchInvite } from "@/lib/sharing";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const CHURCH_TYPES = [
   { value: "local_church", label: "Local Church" },
   { value: "christian_fellowship", label: "Christian Fellowship" },
@@ -50,6 +51,7 @@ function PickerField({ label, value, options, onSelect, placeholder }: {
   label: string; value: string | null; options: { value: string; label: string }[];
   onSelect: (v: string) => void; placeholder: string;
 }) {
+  const sheetWidth = useSheetWidth();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
@@ -61,7 +63,7 @@ function PickerField({ label, value, options, onSelect, placeholder }: {
       </TouchableOpacity>
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>{label}</Text>
             <FlatList
               data={options}
@@ -459,7 +461,7 @@ const styles = StyleSheet.create({
   },
   pickerBtnText: { color: colors.cream, fontSize: 15, fontFamily: "Inter_400Regular" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: colors.darkBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
+  modalSheet: { backgroundColor: colors.darkBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.cream, marginBottom: 10, fontFamily: "Inter_700Bold" },
   optionRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

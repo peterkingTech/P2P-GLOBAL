@@ -13,6 +13,7 @@ import {
   type FamilyStudyPlan, type FamilyStudySource,
 } from "@/lib/familyStudyPlanApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -28,6 +29,7 @@ const STATUS_LABEL: Record<string, string> = { draft: "Draft", published: "Publi
 // duplicates progress). Creating either is gated on Shepherd/Co-Shepherd —
 // there is no individual/peer-to-peer "Create Custom Study(/Plan)" anywhere.
 export default function FamilyStudiesScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: c } = useTheme();
@@ -206,7 +208,7 @@ export default function FamilyStudiesScreen() {
 
       <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Create Study</Text>
             <Text style={styles.fieldLabel}>Study Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. The Book of Romans" placeholderTextColor={c.textMuted} />
@@ -226,7 +228,7 @@ export default function FamilyStudiesScreen() {
 
       <Modal visible={createPlanOpen} transparent animationType="slide" onRequestClose={() => setCreatePlanOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Create Custom Study Plan</Text>
             <Text style={styles.fieldLabel}>Plan Title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Foundations of Faith" placeholderTextColor={c.textMuted} />
@@ -246,7 +248,7 @@ export default function FamilyStudiesScreen() {
 
       <Modal visible={sourceSheetOpen} transparent animationType="slide" onRequestClose={() => setSourceSheetOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Study Source</Text>
             <Text style={styles.fieldLabel}>Choose what Study uses for this Family Circle. This does not change what's already been studied.</Text>
             <TouchableOpacity style={styles.sourceOption} onPress={() => handleChooseSource("p2p_curriculum")}>
@@ -308,7 +310,7 @@ function makeStyles(c: AppColors) {
     sourceOptionTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     sourceOptionSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
     sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
     sheetTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     fieldLabel: { fontSize: 12, color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 4 },
     input: {

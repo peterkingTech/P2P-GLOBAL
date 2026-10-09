@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   Image,
   Platform,
@@ -17,13 +16,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import i18next from "i18next";
 import colors from "@/constants/colors";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, MAX_CONTENT_WIDTH, useSheetWidth } from "@/hooks/useLayout";
 import { isSmallPhone, fs } from "@/lib/responsive";
 import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
 
-const { width } = Dimensions.get("window");
 
 const LOGO = require("@/assets/images/logo.png");
 
@@ -49,9 +47,10 @@ const LANGUAGES = SUPPORTED_LANGUAGES
   .sort((a, b) => LANGUAGE_DISPLAY[a.code].label.localeCompare(LANGUAGE_DISPLAY[b.code].label));
 
 export default function OnboardingScreen() {
+  const sheetWidth = useSheetWidth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isTablet } = useLayout();
+  const { isTablet, screenWidth } = useLayout();
   const { t } = useTranslation();
   const [current, setCurrent] = useState(0);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
@@ -145,7 +144,7 @@ export default function OnboardingScreen() {
       <ScrollView
         style={[
           styles.slideScroll,
-          { width: isTablet ? MAX_CONTENT_WIDTH : width },
+          { width: isTablet ? MAX_CONTENT_WIDTH : screenWidth },
           isTablet && { alignSelf: "center" },
         ]}
         contentContainerStyle={styles.slide}
@@ -234,7 +233,7 @@ export default function OnboardingScreen() {
           onPress={() => setLangPickerOpen(false)}
         >
           <View
-            style={[styles.sheet, { paddingBottom: insets.bottom + 24 }]}
+            style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}
             onStartShouldSetResponder={() => true}
           >
             <View style={styles.sheetHeader}>
@@ -380,6 +379,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, maxHeight: "75%",
     borderTopWidth: 1, borderTopColor: "rgba(29,158,117,0.2)",
+    // Width follows the window: full width when narrow, a centered
+      // panel of at most 600pt once tablet-wide (useSheetWidth).
+    width: "100%", alignSelf: "center",
   },
   sheetHeader: {
     flexDirection: "row", alignItems: "center",

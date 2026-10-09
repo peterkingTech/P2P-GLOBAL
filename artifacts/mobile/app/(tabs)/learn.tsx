@@ -14,7 +14,8 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLayout, useCardPhotoWidth, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, centeredMaxWidth } from "@/hooks/useLayout";
+import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
@@ -418,7 +419,7 @@ export default function LearnTab() {
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
   const { t } = useTranslation();
 
   const [completionCard, setCompletionCard] = useState<{ date: string } | null>(null);
@@ -504,7 +505,7 @@ export default function LearnTab() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" } : { flex: 1 }}>
+      <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={styles.topBarRow}>
           <TouchableOpacity
             style={[styles.topBarMenuBtn, schoolMenuOpen && styles.topBarMenuBtnActive]}
@@ -612,6 +613,7 @@ export default function LearnTab() {
               </View>
             ) : (
               <View>
+                <ResponsiveGrid minItemWidth={350} maxColumns={3} gap={12} rowGap={0}>
                 {foundationsCatalog.map((item) => (
                   <FoundationCategoryCard
                     key={item.id}
@@ -620,6 +622,7 @@ export default function LearnTab() {
                     onPress={() => router.push(`/curriculum/${item.id}` as any)}
                   />
                 ))}
+                </ResponsiveGrid>
               </View>
             )}
           </View>

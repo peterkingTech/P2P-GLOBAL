@@ -11,6 +11,7 @@ import {
 } from "@/lib/prayerCoordinationApi";
 import { deviceTimezone, zoneShortLabel } from "@/lib/prayerTimeDisplay";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -31,6 +32,7 @@ function isValidTime(t: string): boolean {
 }
 
 export default function PrayerAvailabilityScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: c } = useTheme();
@@ -161,7 +163,7 @@ export default function PrayerAvailabilityScreen() {
 
       <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Add Availability</Text>
 
             <View style={styles.recRow}>
@@ -248,7 +250,7 @@ function makeStyles(c: AppColors) {
     slotTime: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 2 },
     slotVis: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
     sheetTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
     recRow: { flexDirection: "row", gap: 8 },
     recBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },

@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth, useAdaptiveTiles, useSheetWidth } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -257,6 +257,7 @@ function PostCard({
 }
 
 export default function PrayerTab() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
@@ -297,7 +298,9 @@ export default function PrayerTab() {
 
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const { isTablet } = useLayout();
+  const { contentMaxWidth } = useLayout();
+  // Library categories: as many tiles per row as fit on tablets; phones keep 47%.
+  const libraryTiles = useAdaptiveTiles({ minItemWidth: 200, maxColumns: 4, gap: 10 });
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -484,7 +487,7 @@ export default function PrayerTab() {
 
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: topPad }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={isTablet ? { flex: 1, maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' } : { flex: 1 }}>
+      <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: 20 }]}>
           <View>
@@ -676,9 +679,9 @@ export default function PrayerTab() {
               ))}
             </>
           ) : (
-            <View style={styles.libraryGrid}>
+            <View style={[styles.libraryGrid, libraryTiles.containerStyle]} onLayout={libraryTiles.onLayout}>
               {LIBRARY_CATEGORIES.map((c) => (
-                <TouchableOpacity key={c.key} style={styles.libraryCard} onPress={() => setActiveCategory(c.key)}>
+                <TouchableOpacity key={c.key} style={[styles.libraryCard, libraryTiles.tileStyle]} onPress={() => setActiveCategory(c.key)}>
                   <Ionicons name={c.icon} size={22} color={colors.upperRoomAmber} />
                   <Text style={styles.libraryCardLabel}>{c.label}</Text>
                 </TouchableOpacity>
@@ -839,7 +842,7 @@ export default function PrayerTab() {
       {/* Prayer detail modal (Prayer Library) */}
       <Modal visible={!!activePrayer} animationType="slide" transparent onRequestClose={() => setActivePrayer(null)}>
         <View style={styles.prayerModalOverlay}>
-          <View style={styles.prayerModalBox}>
+          <View style={[styles.prayerModalBox, sheetWidth]}>
             <View style={styles.prayerModalHeader}>
               <Text style={styles.prayerModalTitle}>{activePrayer?.title}</Text>
               <TouchableOpacity onPress={() => setActivePrayer(null)}>
@@ -865,7 +868,7 @@ export default function PrayerTab() {
       {/* Request Prayer modal (Prayer 2.0 — Pray Now) */}
       <Modal visible={!!requestingMatch} transparent animationType="slide" onRequestClose={() => setRequestingMatch(null)}>
         <View style={styles.prayerModalOverlay}>
-          <View style={[styles.prayerModalBox, { maxHeight: undefined }]}>
+          <View style={[styles.prayerModalBox, sheetWidth, { maxHeight: undefined }]}>
             <View style={styles.prayerModalHeader}>
               <Text style={styles.prayerModalTitle}>Request Prayer</Text>
               <TouchableOpacity onPress={() => setRequestingMatch(null)}>
@@ -1120,7 +1123,7 @@ function makeStyles(c: AppColors) {
   commentSendBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
 
   prayerModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  prayerModalBox: { backgroundColor: c.upperRoomBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%", borderWidth: 1, borderColor: c.upperRoomBorder },
+  prayerModalBox: { backgroundColor: c.upperRoomBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%", borderWidth: 1, borderColor: c.upperRoomBorder, width: "100%", alignSelf: "center" },
   prayerModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   prayerModalTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold" },
   prayerModalRef: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold", marginBottom: 10 },

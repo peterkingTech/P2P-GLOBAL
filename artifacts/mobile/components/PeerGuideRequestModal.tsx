@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface PeerGuideRequestModalProps {
   visible: boolean;
   onClose: () => void;
@@ -20,6 +21,7 @@ const MAX_MESSAGE_LENGTH = 500;
 // (app/connect/smart-match.tsx), though both go through the same
 // POST /discipleship/request endpoint and p2p_discipleship_links table.
 export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetName, onSent }: PeerGuideRequestModalProps) {
+  const sheetWidth = useSheetWidth();
   const { profile } = useAuth();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -59,7 +61,7 @@ export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetNa
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <KeyboardAvoidingView style={styles.sheet} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={[styles.sheet, sheetWidth]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           {sentOk ? (
             <View style={styles.confirmWrap}>
               <Ionicons name="checkmark-circle" size={44} color={colors.accentGreen} />
@@ -115,7 +117,7 @@ export default PeerGuideRequestModal;
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  sheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 },
   title: { flex: 1, fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", lineHeight: 23 },
   explainer: { fontSize: 13, color: colors.textMid, lineHeight: 20, fontFamily: "Inter_400Regular", marginBottom: 16 },

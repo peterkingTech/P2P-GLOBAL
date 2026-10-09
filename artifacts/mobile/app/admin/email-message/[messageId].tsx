@@ -10,6 +10,7 @@ import {
 } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
   help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
 };
@@ -26,6 +27,7 @@ const QUICK_RESPONSES = [
 function ForwardModal({
   visible, onClose, onSubmit,
 }: { visible: boolean; onClose: () => void; onSubmit: (data: { toDepartment?: ContactDepartment; toUsername?: string; note?: string }) => void }) {
+  const sheetWidth = useSheetWidth();
   const [mode, setMode] = useState<"department" | "admin">("department");
   const [department, setDepartment] = useState<ContactDepartment>("help_request");
   const [username, setUsername] = useState("");
@@ -34,7 +36,7 @@ function ForwardModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, sheetWidth]}>
           <Text style={styles.modalTitle}>Forward Message</Text>
 
           <View style={styles.modeRow}>
@@ -397,7 +399,7 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   closeBtn: { backgroundColor: colors.textDark, borderColor: colors.textDark },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  modalCard: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
+  modalCard: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   modeRow: { flexDirection: "row", gap: 8 },
   modeChip: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },

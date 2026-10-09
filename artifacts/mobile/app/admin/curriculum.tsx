@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
   saveBtnText: { fontSize: 15, fontWeight: "600", color: "#fff", fontFamily: "Inter_600SemiBold" },
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
-  modalBox: { width: "85%", backgroundColor: "#fff", borderRadius: 18, padding: 24, gap: 16 },
+  modalBox: { width: "85%", backgroundColor: "#fff", borderRadius: 18, padding: 24, gap: 16, maxWidth: 560 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   modalInput: { backgroundColor: colors.lightCream, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 12, fontSize: 15, color: colors.textDark, fontFamily: "Inter_400Regular" },
   modalBtns: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },

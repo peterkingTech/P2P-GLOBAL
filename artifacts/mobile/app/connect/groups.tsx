@@ -7,7 +7,9 @@ import * as Haptics from "expo-haptics";
 import { useData, PeerGroup } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 export default function Groups() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getGroups, joinGroup, leaveGroup, createGroup } = useData();
@@ -117,7 +119,7 @@ export default function Groups() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, sheetWidth]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Group</Text>
               <TouchableOpacity onPress={() => setCreateOpen(false)}>
@@ -184,7 +186,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", gap: 12, marginTop: 60, paddingHorizontal: 30 },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  modalCard: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36 },
+  modalCard: { backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, width: "100%", alignSelf: "center" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   input: {

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchSocialAccountData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const SOCIAL_PLATFORMS = [
   { value: "facebook", label: "Facebook" }, { value: "instagram", label: "Instagram" },
   { value: "youtube", label: "YouTube" }, { value: "tiktok", label: "TikTok" },
@@ -15,6 +16,7 @@ const SOCIAL_PLATFORMS = [
 const MAX_SOCIAL_ACCOUNTS = 8;
 
 export default function ChurchSocialMediaSettingsScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userChurch, isChurchCreator, getSocialAccounts, updateSocialAccounts } = useData();
@@ -118,7 +120,7 @@ export default function ChurchSocialMediaSettingsScreen() {
 
       <Modal visible={pickerOpenFor !== null} animationType="slide" transparent onRequestClose={() => setPickerOpenFor(null)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPickerOpenFor(null)}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Platform</Text>
             <FlatList
               data={SOCIAL_PLATFORMS}
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: colors.accentGreen, borderRadius: 12, height: 50, alignItems: "center", justifyContent: "center" },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "60%" },
+  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "60%", width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, marginBottom: 10, fontFamily: "Inter_700Bold" },
   optionRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   optionRowText: { color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },

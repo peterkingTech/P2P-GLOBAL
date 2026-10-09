@@ -9,6 +9,7 @@ import { AppColors } from "@/constants/themes";
 import { getMyJournal, updateJournalEntry, type JournalEntry2, type JournalStatus } from "@/lib/prayerJournal2Api";
 import { getScriptureReference } from "@/lib/prayerTopicsApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 type Filter = "all" | "answered" | "unanswered";
 const PAGE_SIZE = 20;
 
@@ -28,6 +29,7 @@ function showAlert(title: string, message: string) {
 // user's whole history at once); the existing simple "Write a Prayer"
 // modal and "Mark as Answered" flow are preserved exactly as before.
 export default function PrayerJournalScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { compose } = useLocalSearchParams<{ compose?: string }>();
@@ -270,7 +272,7 @@ export default function PrayerJournalScreen() {
 
       <Modal visible={writeOpen} animationType="slide" transparent onRequestClose={() => setWriteOpen(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, sheetWidth]}>
             <Text style={styles.modalTitle}>Write a Prayer</Text>
             <TextInput style={styles.modalInput} value={newCategory} onChangeText={setNewCategory} placeholder="Category (optional)" placeholderTextColor={colors.upperRoomMuted} />
             <TextInput style={[styles.modalInput, styles.modalTextarea]} value={newText} onChangeText={setNewText} placeholder="Write your prayer..." placeholderTextColor={colors.upperRoomMuted} multiline />
@@ -330,7 +332,7 @@ function makeStyles(c: AppColors) {
     loadMoreText: { fontSize: 13, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
     sectionHeading: { fontSize: 12, fontWeight: "700", color: c.upperRoomMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    modalBox: { backgroundColor: c.upperRoomBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: c.upperRoomBorder },
+    modalBox: { backgroundColor: c.upperRoomBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: c.upperRoomBorder, width: "100%", alignSelf: "center" },
     modalTitle: { fontSize: 17, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold", marginBottom: 14 },
     modalInput: { backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 12, color: c.upperRoomCream, fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 10 },
     modalTextarea: { minHeight: 100, textAlignVertical: "top" },

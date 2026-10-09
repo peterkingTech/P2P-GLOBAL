@@ -10,6 +10,7 @@ import {
   type ChurchStudy, type ChurchStudyLesson, type CustomStudyStatus,
 } from "@/lib/churchStudyApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -46,6 +47,7 @@ function lessonToFormState(lesson?: ChurchStudyLesson) {
 // bare YouTube video ID, same as Church Calls' media attachment — no new
 // media system, no change to YouTube embed/playback code anywhere.
 export default function ChurchStudyDetailScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { studyId } = useLocalSearchParams<{ studyId: string }>();
@@ -286,7 +288,7 @@ export default function ChurchStudyDetailScreen() {
       {/* Edit study title/description */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Edit Study</Text>
             <Text style={styles.fieldLabel}>Study Title</Text>
             <TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle} placeholderTextColor={colors.textMuted} />
@@ -307,7 +309,7 @@ export default function ChurchStudyDetailScreen() {
       {/* Lesson editor */}
       <Modal visible={!!lessonEditor} transparent animationType="slide" onRequestClose={() => setLessonEditor(null)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, styles.lessonSheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, styles.lessonSheetBox, { paddingBottom: insets.bottom + 20 }]}>
             <ScrollView>
               <Text style={styles.sheetTitle}>{lessonEditor?.lesson ? "Edit Lesson" : "Add Lesson"}</Text>
 
@@ -391,7 +393,7 @@ const styles = StyleSheet.create({
   lessonTitle: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   lessonMeta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  sheetBox: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
   lessonSheetBox: { maxHeight: "88%" },
   sheetTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 10 },

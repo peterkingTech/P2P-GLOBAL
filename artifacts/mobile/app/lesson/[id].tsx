@@ -33,7 +33,7 @@ import { fetchBatchVerseText, VerseResult } from "@/lib/bibleClient";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getLanguageName } from "@/lib/languageNames";
 import { shareLesson } from "@/lib/sharing";
-import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
 import ReadableText from "@/components/ReadableText";
@@ -405,7 +405,7 @@ export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isTablet } = useLayout();
+  const { readingMaxWidth } = useLayout();
   const { user, profile: authProfile } = useAuth();
   const {
     lessons, markLessonComplete,
@@ -763,7 +763,7 @@ export default function LessonScreen() {
           contentContainerStyle={[
             styles.content,
             { paddingBottom: insets.bottom + 40 },
-            isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" as any, width: "100%" },
+            centeredMaxWidth(readingMaxWidth),
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -998,6 +998,7 @@ function makeStyles(c: AppColors) {
   colorPickerCard: {
     backgroundColor: c.lightCream, borderRadius: 20, padding: 20,
     width: "82%", alignItems: "center",
+    maxWidth: 560,
   },
   colorPickerTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 16 },
   colorSwatchRow: { flexDirection: "row", gap: 14, marginBottom: 6 },

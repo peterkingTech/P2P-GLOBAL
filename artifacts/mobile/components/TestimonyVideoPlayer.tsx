@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { useMediaBox } from "@/hooks/useLayout";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { getTestimonySignedUrl } from "@/lib/prayerTestimonyApi";
@@ -13,10 +14,8 @@ interface Props {
   durationSeconds?: number | null;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const VIDEO_HEIGHT = Math.round((SCREEN_WIDTH - 64) * (9 / 16));
-
 export default function TestimonyVideoPlayer({ mediaPath, durationSeconds }: Props) {
+  const mediaBox = useMediaBox(64, 9 / 16);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   // Must be called unconditionally (hook rules) even though this component
@@ -56,7 +55,7 @@ export default function TestimonyVideoPlayer({ mediaPath, durationSeconds }: Pro
   }
   return (
     <View style={styles.videoBox}>
-      <VideoView player={player} style={[styles.video, { height: VIDEO_HEIGHT }]} nativeControls contentFit="contain" />
+      <VideoView player={player} style={[styles.video, mediaBox]} nativeControls contentFit="contain" />
       {durationSeconds != null && (
         <View style={styles.durationBadge}>
           <Ionicons name="videocam" size={11} color={colors.textMid} />

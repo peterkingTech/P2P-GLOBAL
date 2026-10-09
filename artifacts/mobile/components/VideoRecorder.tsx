@@ -5,8 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
-} from "react-native";
+  } from "react-native";
+import { useMediaBox } from "@/hooks/useLayout";
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,10 +19,8 @@ interface Props {
   disabled?: boolean;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const PREVIEW_HEIGHT = Math.round((SCREEN_WIDTH - 40) * (9 / 16));
-
 export default function VideoRecorder({ onSubmit, disabled }: Props) {
+  const mediaBox = useMediaBox(40, 9 / 16);
   const [state, setState] = useState<RecorderState>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -122,7 +120,7 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
       <View style={styles.cameraContainer}>
         <CameraView
           ref={cameraRef}
-          style={[styles.camera, { height: PREVIEW_HEIGHT }]}
+          style={[styles.camera, mediaBox]}
           facing="front"
           mode="video"
         />
@@ -164,7 +162,7 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
         {recordedUri && (
           <VideoView
             player={reviewPlayer}
-            style={[styles.videoPreview, { height: PREVIEW_HEIGHT }]}
+            style={[styles.videoPreview, mediaBox]}
             nativeControls
             contentFit="contain"
           />

@@ -13,6 +13,7 @@ import {
   type FamilyStudy, type FamilyStudyLesson, type CustomStudyStatus,
 } from "@/lib/familyStudyApi";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -44,6 +45,7 @@ function lessonToFormState(lesson?: FamilyStudyLesson) {
 // Mirrors app/church/studies/[studyId].tsx exactly, scoped to Family
 // authorization (Shepherd/Co-Shepherd) instead of church leadership.
 export default function FamilyStudyDetailScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors: c } = useTheme();
@@ -294,7 +296,7 @@ export default function FamilyStudyDetailScreen() {
 
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Edit Study</Text>
             <Text style={styles.fieldLabel}>Study Title</Text>
             <TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle} placeholderTextColor={c.textMuted} />
@@ -314,7 +316,7 @@ export default function FamilyStudyDetailScreen() {
 
       <Modal visible={!!lessonEditor} transparent animationType="slide" onRequestClose={() => setLessonEditor(null)}>
         <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, styles.lessonSheetBox, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetBox, sheetWidth, styles.lessonSheetBox, { paddingBottom: insets.bottom + 20 }]}>
             <ScrollView>
               <Text style={styles.sheetTitle}>{lessonEditor?.lesson ? "Edit Lesson" : "Add Lesson"}</Text>
 
@@ -397,7 +399,7 @@ function makeStyles(c: AppColors) {
     lessonMetaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
     lessonMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+    sheetBox: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10, width: "100%", alignSelf: "center" },
     lessonSheetBox: { maxHeight: "88%" },
     sheetTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     fieldLabel: { fontSize: 12, color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 10 },

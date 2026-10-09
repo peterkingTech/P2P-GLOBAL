@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import SignedPhotoView from "@/components/SignedPhotoView";
 import KingdomStoryVideoPlayer from "@/components/KingdomStoryVideoPlayer";
 import colors from "@/constants/colors";
@@ -12,14 +12,22 @@ import type { KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
 // just media + caption + a simple position indicator.
 interface Props { media: KingdomStoryMedia[] }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function KingdomStoryMediaGallery({ media }: Props) {
+  // Pages are as wide as the gallery itself — measured, because on tablets
+  // the story sits in a page column narrower than the window. Phones: the
+  // gallery spans the window, so this equals the window width as before.
+  const { width: windowWidth } = useWindowDimensions();
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const SCREEN_WIDTH = measuredWidth ?? windowWidth;
   const [index, setIndex] = useState(0);
   if (!media.length) return null;
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} onLayout={(e) => {
+      const w = Math.round(e.nativeEvent.layout.width);
+      setMeasuredWidth((prev) => (prev === w ? prev : w));
+    }}>
       <ScrollView
         horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH))}

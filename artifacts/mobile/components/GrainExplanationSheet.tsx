@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import ReadableText from "@/components/ReadableText";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 interface GrainExplanationSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -12,13 +13,14 @@ interface GrainExplanationSheetProps {
 }
 
 export function GrainExplanationSheet({ visible, onClose, count, displayName }: GrainExplanationSheetProps) {
+  const sheetWidth = useSheetWidth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.sheet}>
+        <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
           <Text style={styles.title}>🌾 {count} Grain · {count === 1 ? "1 person" : `${count} people`} invited</Text>
           <Text style={styles.verse}>
             "Unless a grain of wheat falls into the earth and dies, it remains alone — but if it dies, it bears much fruit."
@@ -45,6 +47,9 @@ function makeStyles(c: AppColors) {
     sheet: {
       backgroundColor: c.lightCream, borderTopLeftRadius: 24, borderTopRightRadius: 24,
       padding: 24, paddingBottom: 36,
+      // Width follows the window: full width when narrow, a centered
+      // panel of at most 600pt once tablet-wide (useSheetWidth).
+      width: "100%", alignSelf: "center",
     },
     title: { fontSize: 17, fontWeight: "700", color: c.textDark, marginBottom: 16, fontFamily: "Inter_700Bold" },
     verse: { fontSize: 14, color: c.textMid, lineHeight: 20, fontStyle: "italic", fontFamily: "Inter_400Regular" },

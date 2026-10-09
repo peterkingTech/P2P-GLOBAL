@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, BackHandler, ActivityIndicator, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Animated, BackHandler, ActivityIndicator, TouchableOpacity, useWindowDimensions } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +15,6 @@ import colors from "@/constants/colors";
 // Core Curriculum modules are complete (see checkCurriculumCompletion /
 // pendingCompletionMoment / CompletionMomentHost in _layout.tsx).
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 type Phase = 1 | 2 | 3 | 4;
 
 interface Letter {
@@ -91,6 +90,7 @@ export default function CompletionMomentScreen() {
 
 // ── PHASE 1 — The Tree Transforms (~45s, non-skippable) ─────────────────────
 function Phase1TreeTransforms({ treeData, fruits, onDone }: { treeData: any; fruits: any[]; onDone: () => void }) {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const treeScale = useRef(new Animated.Value(1)).current;
   const fruitGlow = useRef(new Animated.Value(0)).current;
   const forestOpacity = useRef(new Animated.Value(0)).current;
@@ -196,6 +196,7 @@ function Phase1TreeTransforms({ treeData, fruits, onDone }: { treeData: any; fru
           style={[
             styles.particle,
             {
+              top: SCREEN_H * 0.55,
               left: SCREEN_W / 2 + p.dx,
               opacity: p.opacity,
               transform: [{ translateY: p.translateY }],
@@ -204,7 +205,7 @@ function Phase1TreeTransforms({ treeData, fruits, onDone }: { treeData: any; fru
         />
       ))}
 
-      <Animated.Text style={[styles.faithfulText, { opacity: faithfulOpacity }]}>Faithful.</Animated.Text>
+      <Animated.Text style={[styles.faithfulText, { bottom: SCREEN_H * 0.12, opacity: faithfulOpacity }]}>Faithful.</Animated.Text>
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.blackOverlay, { opacity: blackOverlay }]} pointerEvents="none" />
     </View>
@@ -425,10 +426,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,215,0,0.25)", borderRadius: 200,
   },
   particle: {
-    position: "absolute", top: SCREEN_H * 0.55, width: 5, height: 5, borderRadius: 3, backgroundColor: "#FFD700",
+    position: "absolute", width: 5, height: 5, borderRadius: 3, backgroundColor: "#FFD700",
   },
   faithfulText: {
-    position: "absolute", bottom: SCREEN_H * 0.12,
+    position: "absolute",
     fontSize: 32, fontWeight: "700", color: "#E0A441", fontFamily: "Inter_700Bold", letterSpacing: 1,
   },
   blackOverlay: { backgroundColor: "#06110D" },

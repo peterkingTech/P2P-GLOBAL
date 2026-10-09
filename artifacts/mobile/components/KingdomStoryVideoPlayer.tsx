@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { useMediaBox } from "@/hooks/useLayout";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { getKingdomStoryMediaSignedUrl } from "@/lib/kingdomStoriesApi";
@@ -9,10 +10,8 @@ import colors from "@/constants/colors";
 // sourced from the separate "kingdom-stories-media" bucket (migration 152).
 interface Props { mediaPath: string }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const VIDEO_HEIGHT = Math.round((SCREEN_WIDTH - 40) * (9 / 16));
-
 export default function KingdomStoryVideoPlayer({ mediaPath }: Props) {
+  const mediaBox = useMediaBox(40, 9 / 16);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   // Must be called unconditionally (hook rules) even though this component
@@ -48,7 +47,7 @@ export default function KingdomStoryVideoPlayer({ mediaPath }: Props) {
   }
   return (
     <View style={styles.videoBox}>
-      <VideoView player={player} style={[styles.video, { height: VIDEO_HEIGHT }]} nativeControls contentFit="contain" />
+      <VideoView player={player} style={[styles.video, mediaBox]} nativeControls contentFit="contain" />
     </View>
   );
 }

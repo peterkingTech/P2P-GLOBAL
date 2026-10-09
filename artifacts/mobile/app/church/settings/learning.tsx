@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, LearningGoal, LearningGoalLevel, LearningGoalTimeframe, LearningGoalTargetType } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 const TIMEFRAME_OPTIONS: { value: LearningGoalTimeframe; label: string }[] = [
   { value: "today", label: "Today" }, { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" }, { value: "custom", label: "Custom" },
@@ -15,6 +16,7 @@ const LEVEL_OPTIONS: { value: LearningGoalLevel; label: string }[] = [
 ];
 
 export default function ChurchLearningGoalsScreen() {
+  const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userChurch, isChurchLeader, modules, lessons, getLearningGoals, createLearningGoal, updateLearningGoal } = useData();
@@ -199,7 +201,7 @@ export default function ChurchLearningGoalsScreen() {
 
       <Modal visible={modulePickerOpen} animationType="slide" transparent onRequestClose={() => setModulePickerOpen(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModulePickerOpen(false)}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Choose a Module</Text>
             <FlatList data={modules} keyExtractor={(m) => m.id} style={{ maxHeight: 340 }} renderItem={({ item }) => (
               <TouchableOpacity style={styles.optionRow} onPress={() => { setModuleId(item.id); setLessonId(null); setModulePickerOpen(false); }}>
@@ -211,7 +213,7 @@ export default function ChurchLearningGoalsScreen() {
       </Modal>
       <Modal visible={lessonPickerOpen} animationType="slide" transparent onRequestClose={() => setLessonPickerOpen(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setLessonPickerOpen(false)}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Choose a Lesson</Text>
             <FlatList data={lessonsInModule} keyExtractor={(l) => l.id} style={{ maxHeight: 340 }} renderItem={({ item }) => (
               <TouchableOpacity style={styles.optionRow} onPress={() => { setLessonId(item.id); setLessonPickerOpen(false); }}>
@@ -271,7 +273,7 @@ const styles = StyleSheet.create({
   goalProgressText: { fontSize: 12, color: colors.textMid, marginTop: 6, fontFamily: "Inter_400Regular" },
   archiveText: { fontSize: 12, color: "#B91C1C", marginTop: 8, fontFamily: "Inter_500Medium" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  modalSheet: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, marginBottom: 10, fontFamily: "Inter_700Bold" },
   optionRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   optionRowText: { color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },

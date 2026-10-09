@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
 
+import { useSheetWidth } from "@/hooks/useLayout";
 // Shown the moment "Study Together" is tapped. Reuses the exact same
 // "current lesson" logic progress.tsx already uses (first lesson that's
 // neither completed nor locked) and the already-loaded modules/lessons
@@ -21,6 +22,7 @@ export function ChooseLessonSheet({
   continueOverride?: { lesson: StudyLessonMeta; label: string };
   initialMode?: "menu" | "browse";
 }) {
+  const sheetWidth = useSheetWidth();
   const { modules, lessons } = useData();
   const [browsing, setBrowsing] = useState(initialMode === "browse");
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function ChooseLessonSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>{browsing ? "Choose a Lesson" : "Study Together"}</Text>
             <TouchableOpacity onPress={browsing ? () => setBrowsing(false) : onClose}>
@@ -112,7 +114,7 @@ export function ChooseLessonSheet({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8 },
+  sheet: { backgroundColor: "#141F19", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8, width: "100%", alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   title: { color: "#fff", fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold" },
   sub: { color: "rgba(255,255,255,0.6)", fontSize: 13, fontFamily: "Inter_400Regular" },
