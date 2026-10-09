@@ -159,6 +159,15 @@ export interface SignUpLocation {
   longitude: number;
 }
 
+export interface SignUpResult {
+  // Non-null: registration failed; show it and stay on the form.
+  error: string | null;
+  // Only when a location was supplied: false = the account was created but
+  // the location could not be saved (it is NOT marked verified). null = no
+  // location was supplied, or registration failed before that step.
+  locationSaved: boolean | null;
+}
+
 interface AuthContextValue {
   supabase: SupabaseClient;
   session: Session | null;
@@ -176,7 +185,7 @@ interface AuthContextValue {
   isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithUsername: (username: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string, location?: SignUpLocation) => Promise<string | null>;
+  signUp: (email: string, password: string, name: string, dateOfBirth: string, username: string, location?: SignUpLocation) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   // Server-written account status (p2p_account_status, migration 173);
@@ -430,14 +439,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dateOfBirth: string,
     username: string,
     location?: SignUpLocation
-  ): Promise<string | null> => {
-    if (!dateOfBirth) return "Date of birth is required.";
+  ): Promise<SignUpResult> => {
+    if (!dateOfBirth) return { error: "Date of birth is required.", locationSaved: null };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { display_name: name } },
     });
-    if (error) return error.message;
+    if (error) return { error: error.message, locationSaved: null };
 
     if (data.user) {
       const onboardingLanguage = await AsyncStorage.getItem("@p2p/appLanguage");
@@ -451,30 +460,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
       if (onboardingLanguage) profileRow.app_language = onboardingLanguage;
-      if (location) {
-        profileRow.city = location.city || null;
-        profileRow.country = location.country;
-        profileRow.country_code = location.countryCode || null;
-        profileRow.latitude = location.latitude;
-        profileRow.longitude = location.longitude;
-        profileRow.location_verified = true;
-        profileRow.location_verified_at = new Date().toISOString();
-      }
+      // The profile is created WITHOUT the location. PostgREST's upsert sets
+      // every payload column from EXCLUDED, and Postgres requires SELECT on a
+      // column to read it from EXCLUDED — once migration 178 removes SELECT on
+      // latitude/longitude, an upsert carrying them fails with 42501.
       const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
       if (profileErr) {
         // Someone else claimed this exact username between the real-time
         // check on the registration screen and this insert — surface a
         // clear, actionable message instead of the raw constraint error.
         if (profileErr.message.toLowerCase().includes("duplicate") || profileErr.message.toLowerCase().includes("unique")) {
-          return "That username was just taken. Please go back and choose another.";
+          return { error: "That username was just taken. Please go back and choose another.", locationSaved: null };
         }
-        return profileErr.message;
+        return { error: profileErr.message, locationSaved: null };
       }
+
+      // Then the verified location, all fields in ONE plain UPDATE (the same
+      // path updateProfile uses): either the whole location is saved and
+      // marked verified, or none of it is. A failure here never fails the
+      // registration — the account and profile already exist, and the user
+      // can verify their location later in Settings → Account.
+      let locationFields: Record<string, unknown> = {};
+      let locationSaved: boolean | null = null;
+      if (location) {
+        const fields = {
+          city: location.city || null,
+          country: location.country,
+          country_code: location.countryCode || null,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          location_verified: true,
+          location_verified_at: new Date().toISOString(),
+        };
+        try {
+          const { error: locationErr } = await supabase.from("p2p_profiles").update(fields).eq("id", data.user.id);
+          locationSaved = !locationErr;
+          if (locationErr) console.error("signUp location save failed", locationErr.code, locationErr.message);
+          else locationFields = fields;
+        } catch (e) {
+          locationSaved = false;
+          console.error("signUp location save failed", e);
+        }
+      }
+
       // Set the profile immediately so the UI shows the real name before
       // onAuthStateChange triggers fetchProfile (which may race with the upsert).
-      setProfile(mapProfileRow({ ...profileRow, role: "student", growth_level: 0, gifts: [], skills: [] }));
+      setProfile(mapProfileRow({ ...profileRow, ...locationFields, role: "student", growth_level: 0, gifts: [], skills: [] }));
+      return { error: null, locationSaved };
     }
-    return null;
+    return { error: null, locationSaved: null };
   }, []);
 
   const checkUsernameAvailable = useCallback(async (username: string): Promise<{ available: boolean; reason?: string }> => {
