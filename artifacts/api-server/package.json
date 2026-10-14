@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start:staging": "node scripts/start-staging.mjs",
     "check:staging": "node scripts/start-staging.mjs --check-only",
-    "test:env-guards": "node tests/serverEnv.test.mjs && node tests/stagingIsolation.test.mjs"
+    "test:env-guards": "node tests/serverEnv.test.mjs && node tests/stagingIsolation.test.mjs",
+    "test:push": "node tests/pushDelivery.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

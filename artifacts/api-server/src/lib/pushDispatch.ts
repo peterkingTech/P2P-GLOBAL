@@ -1,6 +1,10 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 import { getDeactivatedUserIds } from "./accountStatus";
+import {
+  decideNotification, sendExpoMessages,
+  type ExpoMessage, type ExpoSendDeps, type MessageOutcome, type NotificationVerdict,
+} from "./expoPush";
 
 // Centralized push delivery for the existing p2p_notifications event
 // system. Every one of this codebase's ~19 notification-insert call sites
@@ -23,7 +27,6 @@ import { getDeactivatedUserIds } from "./accountStatus";
 // an acceptable fit for this app's existing notification types, none of
 // which are meant to feel like an instant-messenger typing indicator.
 const BATCH_SIZE = 50;
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
 type PendingNotification = {
   id: string;
@@ -103,20 +106,42 @@ function buildExpoMessage(n: PendingNotification, to: string) {
   };
 }
 
-async function sendExpoBatch(messages: ReturnType<typeof buildExpoMessage>[]): Promise<unknown[]> {
-  if (!messages.length) return [];
-  const res = await fetch(EXPO_PUSH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(messages),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    logger.error({ status: res.status, body: json }, "pushDispatch: Expo push API request failed");
-    return [];
-  }
-  // Expo's response shape: { data: [{ status: "ok" | "error", ... }, ...] }
-  return (json as { data?: unknown[] })?.data ?? [];
+// Sending itself lives in lib/expoPush.ts: at most 100 messages per Expo
+// request, one outcome per message in order, bounded retries with jitter
+// for transient failures, no re-send after an ambiguous timeout, and a
+// per-project split only when Expo itself says which token belongs to which
+// project. EXPO_ACCESS_TOKEN is optional (only needed if Expo "enhanced push
+// security" is switched on for the project); it is never logged.
+const expoDeps: ExpoSendDeps = {
+  fetch: (url, init) => fetch(url, init),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  random: Math.random,
+  logger,
+  accessToken: process.env.EXPO_ACCESS_TOKEN || undefined,
+};
+function sendExpo(messages: ExpoMessage[], label: string): Promise<MessageOutcome[]> {
+  return messages.length ? sendExpoMessages(messages, expoDeps, { label }) : Promise.resolve([]);
+}
+
+// Ordinary notifications whose pushes only failed transiently are retried by
+// the cron for up to this long, then recorded as abandoned (logged) so a
+// prolonged provider outage can never block the queue forever.
+const PUSH_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+function outcomeCounts(outcomes: MessageOutcome[]): Record<string, number> {
+  return outcomes.reduce((a, x) => ({ ...a, [x.kind]: (a[x.kind] ?? 0) + 1 }), {} as Record<string, number>);
+}
+
+function invalidTokens(tokens: string[], outcomes: MessageOutcome[]): string[] {
+  return tokens.filter((_, i) => outcomes[i]?.kind === "token_invalid");
+}
+
+function logVerdict(n: PendingNotification, verdict: NotificationVerdict, outcomes: MessageOutcome[], path: string) {
+  const level = verdict === "accepted" || verdict === "no_devices" ? "info" : verdict === "retry" || verdict === "partial" ? "warn" : "error";
+  logger[level]({
+    provider: "expo", path, notificationId: n.id, notificationType: n.notification_type,
+    verdict, devices: outcomes.length, outcomes: outcomeCounts(outcomes),
+  }, "pushDispatch: notification outcome");
 }
 
 // Stage 26A — immediate dispatch for latency-sensitive notification types
@@ -174,26 +199,14 @@ export async function dispatchNotificationNow(
         const skip = opts.skipDeviceIds;
         const tokens = ((tokenRows ?? []) as (PushToken & { device_id: string | null })[])
           .filter((t) => !(skip && t.device_id && skip.has(t.device_id)));
-        if (tokens.length > 0) {
-          const messages = tokens.map((t) => buildExpoMessage(n, t.token));
-          const tickets = await sendExpoBatch(messages);
-          if (tickets.length === 0) {
-            // sendExpoBatch already logged the Expo API failure.
-            sendFailed = true;
-          } else {
-            const staleTokens: string[] = [];
-            tickets.forEach((ticket, i) => {
-              const t = ticket as { status?: string; details?: { error?: string } };
-              if (t?.status === "error" && t.details?.error === "DeviceNotRegistered") {
-                staleTokens.push(tokens[i].token);
-              }
-            });
-            await deactivateTokens(staleTokens);
-          }
-        }
-        // Zero active tokens is not a failure -- matches the batch
-        // dispatcher's own "still marked pushed" behavior for a user with
-        // no registered devices at send time.
+        // Zero active tokens is not a failure (verdict "no_devices").
+        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token)), n.notification_type ?? "immediate");
+        await deactivateTokens(invalidTokens(tokens.map((t) => t.token), outcomes));
+        const { verdict, finished } = decideNotification(outcomes, { ageMs: 0, maxRetryAgeMs: Number.POSITIVE_INFINITY });
+        logVerdict(n, verdict, outcomes, "immediate");
+        // Only transient failures hand the row back to the cron; an incoming
+        // call that is still unsent by then is recorded there as "expired".
+        sendFailed = !finished;
       }
     }
   } catch (err) {
@@ -209,7 +222,10 @@ export async function dispatchNotificationNow(
   }
 }
 
-export async function dispatchPendingPushes(): Promise<{ notifications: number; pushed: number; staleTokens: number }> {
+export async function dispatchPendingPushes(): Promise<{
+  notifications: number; pushed: number; staleTokens: number;
+  verdicts?: Partial<Record<NotificationVerdict | "paused", number>>; retrying?: number;
+}> {
   const pending = await fetchPending();
   if (!pending.length) return { notifications: 0, pushed: 0, staleTokens: 0 };
 
@@ -235,38 +251,61 @@ export async function dispatchPendingPushes(): Promise<{ notifications: number; 
     tokensByUser.set(row.user_id, list);
   }
 
-  const messages: ReturnType<typeof buildExpoMessage>[] = [];
-  const messageTokens: string[] = []; // parallel array: which token each message went to
-  for (const n of pending) {
-    // Still marked pushed below, so it's never retried either.
-    if (isStaleIncomingCall(n)) continue;
-    if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") continue;
+  const messages: ExpoMessage[] = [];
+  const messageTokens: string[] = []; // parallel arrays: which token / which notification each message is for
+  const messageOwner: number[] = [];
+  const preVerdict = new Map<number, NotificationVerdict | "paused">();
+  pending.forEach((n, ni) => {
+    // An incoming-call ring past its ring window announces a call that is
+    // already over: not sent, recorded as "expired" (never as delivered).
+    if (isStaleIncomingCall(n)) { preVerdict.set(ni, "expired"); return; }
+    if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") { preVerdict.set(ni, "paused"); return; }
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
     for (const t of tokens) {
       messages.push(buildExpoMessage(n, t.token));
       messageTokens.push(t.token);
-    }
-  }
-
-  const tickets = await sendExpoBatch(messages);
-  const staleTokens: string[] = [];
-  tickets.forEach((ticket, i) => {
-    const t = ticket as { status?: string; details?: { error?: string } };
-    if (t?.status === "error" && t.details?.error === "DeviceNotRegistered") {
-      staleTokens.push(messageTokens[i]);
+      messageOwner.push(ni);
     }
   });
+
+  // Chunked (<= 100 per request), retried and split inside sendExpo; one
+  // failing chunk never stops the others.
+  const outcomes = await sendExpo(messages, "cron");
+  const staleTokens = invalidTokens(messageTokens, outcomes);
   await deactivateTokens(staleTokens);
 
-  // Marked as pushed regardless of individual ticket outcome (including
-  // users with zero active devices) -- this is a best-effort fan-out, not
-  // a guaranteed-delivery queue, so it never retries indefinitely and spams
-  // a device once connectivity returns. A notification with no devices
-  // still exists and is still readable in-app; it simply had nothing to
-  // push to at send time.
-  await markPushed(pending.map((n) => n.id));
+  // A notification is recorded as handled (pushed_at) only when its outcome
+  // is final: accepted, partially accepted, no devices, permanent failure,
+  // ambiguous (not re-sent to avoid duplicates), expired ring, paused user,
+  // or transient failures past the retry window ("abandoned"). Notifications
+  // whose pushes only failed transiently stay pending for the next run.
+  const outcomesByOwner = new Map<number, MessageOutcome[]>();
+  messageOwner.forEach((ni, i) => outcomesByOwner.set(ni, [...(outcomesByOwner.get(ni) ?? []), outcomes[i]]));
+  const finishedIds: string[] = [];
+  const verdicts: Partial<Record<NotificationVerdict | "paused", number>> = {};
+  const now = Date.now();
+  pending.forEach((n, ni) => {
+    const pre = preVerdict.get(ni);
+    let verdict: NotificationVerdict | "paused";
+    let finished = true;
+    const outs = outcomesByOwner.get(ni) ?? [];
+    if (pre) {
+      verdict = pre;
+    } else {
+      const ageMs = n.created_at ? Math.max(0, now - new Date(n.created_at).getTime()) : 0;
+      ({ verdict, finished } = decideNotification(outs, { ageMs, maxRetryAgeMs: PUSH_RETRY_WINDOW_MS }));
+    }
+    verdicts[verdict] = (verdicts[verdict] ?? 0) + 1;
+    if (verdict !== "accepted" && verdict !== "no_devices" && verdict !== "paused") logVerdict(n, verdict as NotificationVerdict, outs, "cron");
+    if (finished) finishedIds.push(n.id);
+  });
+  await markPushed(finishedIds);
 
-  return { notifications: pending.length, pushed: messages.length, staleTokens: staleTokens.length };
+  const acceptedMessages = outcomes.filter((o) => o.kind === "accepted").length;
+  return {
+    notifications: pending.length, pushed: acceptedMessages, staleTokens: staleTokens.length,
+    verdicts, retrying: pending.length - finishedIds.length,
+  };
 }
 // Silent "this call stopped ringing" push for app builds that ring calls
 // natively (Android Telecom — modules/call-system). The ringing there lives
@@ -285,10 +324,12 @@ export async function sendCallStatePush(userId: string, callId: string, status: 
     .eq("platform", "android")
     .eq("call_system", true);
   if (error || !rows?.length) return;
-  await sendExpoBatch(rows.map((r) => ({
-    to: r.token as string,
+  const tokens = rows.map((r) => r.token as string);
+  const outcomes = await sendExpo(tokens.map((to) => ({
+    to,
     data: { notificationType: "call_state", callId, status },
     priority: "high" as const,
     ttl: 60,
-  })) as unknown as ReturnType<typeof buildExpoMessage>[]);
+  })), "call_state");
+  await deactivateTokens(invalidTokens(tokens, outcomes));
 }

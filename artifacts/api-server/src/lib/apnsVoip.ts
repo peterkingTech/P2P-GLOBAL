@@ -2,6 +2,7 @@ import http2 from "node:http2";
 import crypto from "node:crypto";
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
+import { classifyApnsResult, voipConfigStatus } from "./apnsVoipStatus";
 
 // iOS PushKit VoIP pushes, sent straight to Apple. Expo's push service can't
 // send these, and they are the only way iOS will wake a closed app to ring
@@ -38,6 +39,18 @@ const HOST = process.env.APNS_SANDBOX === "true" ? "https://api.sandbox.push.app
 export function voipConfigured(): boolean {
   // NATIVE_CALLS_IOS=false (see GET /calls/config) switches CallKit off.
   return !!(KEY_ID && TEAM_ID && AUTH_KEY) && process.env.NATIVE_CALLS_IOS !== "false";
+}
+
+// Reported once at start-up (variable NAMES only, never values), so a missing
+// setting is visible in the logs instead of silently disabling VoIP ringing.
+{
+  const s = voipConfigStatus(process.env);
+  if (s.configured) {
+    logger.info({ provider: "apns-voip", topic: s.topic, environment: s.sandbox ? "sandbox" : "production" }, "apnsVoip: VoIP ringing configured");
+  } else {
+    logger.warn({ provider: "apns-voip", missing: s.missing, disabledByFlag: s.disabledByFlag },
+      "apnsVoip: VoIP ringing NOT configured — closed iPhones only get the ordinary Expo push for calls");
+  }
 }
 
 // APNs accepts a provider token for up to an hour; refresh well before.
@@ -85,25 +98,39 @@ function sendOne(client: http2.ClientHttp2Session, deviceToken: string, body: st
  */
 export async function sendIncomingCallVoip(userId: string, payload: Record<string, unknown>): Promise<Set<string>> {
   const reached = new Set<string>();
-  if (!voipConfigured()) return reached;
+  if (!voipConfigured()) {
+    const s = voipConfigStatus(process.env);
+    logger.warn({ provider: "apns-voip", reason: "not_configured", missing: s.missing, disabledByFlag: s.disabledByFlag },
+      "apnsVoip: VoIP push not attempted");
+    return reached;
+  }
   const { data: rows } = await db.from("p2p_push_tokens")
     .select("token, device_id").eq("user_id", userId).eq("platform", "ios_voip").eq("is_active", true);
-  if (!rows?.length) return reached;
+  if (!rows?.length) {
+    logger.info({ provider: "apns-voip", devices: 0 }, "apnsVoip: recipient has no VoIP devices");
+    return reached;
+  }
 
   const client = http2.connect(HOST);
   client.on("error", (e) => logger.error({ err: e }, "apnsVoip: connection error"));
   try {
     const body = JSON.stringify({ aps: {}, ...payload });
     const stale: string[] = [];
+    const summary: Record<string, number> = {};
     await Promise.all(rows.map(async (r) => {
       const result = await sendOne(client, r.token as string, body);
-      if (result.status === 200) {
+      const kind = classifyApnsResult(result.status, result.reason);
+      summary[kind] = (summary[kind] ?? 0) + 1;
+      if (kind === "accepted") {
         if (r.device_id) reached.add(r.device_id as string);
       } else {
-        logger.warn({ status: result.status, reason: result.reason }, "apnsVoip: push not accepted");
-        if (result.status === 410 || result.reason === "BadDeviceToken" || result.reason === "Unregistered") stale.push(r.token as string);
+        logger.warn({ provider: "apns-voip", status: result.status, reason: result.reason, kind }, "apnsVoip: push not accepted");
+        if (kind === "token_invalid") stale.push(r.token as string);
       }
     }));
+    // Apple accepting a VoIP push (200) is not proof the phone rang; the
+    // device-side CallKit report is what rings it.
+    logger.info({ provider: "apns-voip", devices: rows.length, outcomes: summary, reached: reached.size }, "apnsVoip: incoming-call push outcome");
     if (stale.length) await db.from("p2p_push_tokens").update({ is_active: false }).in("token", stale);
   } catch (e) {
     logger.error({ err: e }, "apnsVoip: send failed");
