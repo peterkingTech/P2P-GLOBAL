@@ -4,6 +4,7 @@ import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { countryNameFromCode } from "@/lib/countryNames";
 
 export interface VerifiedLocation {
   city: string;
@@ -31,7 +32,9 @@ async function getVerifiedLocation(): Promise<VerifiedLocation> {
 
   return {
     city: place.city || place.subregion || "",
-    country: place.country,
+    // English name from the ISO code — place.country is in the phone's
+    // language ("Deutschland"), which split one country into several names.
+    country: countryNameFromCode(place.isoCountryCode) ?? place.country,
     countryCode: place.isoCountryCode || "",
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,

@@ -4,6 +4,8 @@
 // actually likely to have — an unmatched country still gets listed in the
 // flag strip below the map, it just doesn't light up a continent zone.
 
+import { countryCodeFromName, countryNameFromCode, flagFromCode } from "@/lib/countryNames";
+
 export type Continent = "north_america" | "south_america" | "europe" | "africa" | "asia" | "oceania";
 
 const COUNTRY_TO_CONTINENT: Record<string, Continent> = {
@@ -58,12 +60,21 @@ const COUNTRY_TO_FLAG: Record<string, string> = {
 
 export function getContinent(country: string | null | undefined): Continent | null {
   if (!country) return null;
-  return COUNTRY_TO_CONTINENT[country.trim().toLowerCase()] ?? null;
+  const direct = COUNTRY_TO_CONTINENT[country.trim().toLowerCase()];
+  if (direct) return direct;
+  // Country stored in another language ("Deutschland") -> its English name.
+  const english = countryNameFromCode(countryCodeFromName(country));
+  return english ? COUNTRY_TO_CONTINENT[english.toLowerCase()] ?? null : null;
 }
 
-export function getFlagEmoji(country: string | null | undefined): string {
+// The flag never depends on the language the country name was saved in:
+// an ISO code (when the caller has one) wins, then any recognised name —
+// English, the country's own language, or a 2-letter code.
+export function getFlagEmoji(country: string | null | undefined, countryCode?: string | null): string {
+  const fromCode = flagFromCode(countryCode);
+  if (fromCode) return fromCode;
   if (!country) return "🌐";
-  return COUNTRY_TO_FLAG[country.trim().toLowerCase()] ?? "🌐";
+  return COUNTRY_TO_FLAG[country.trim().toLowerCase()] ?? flagFromCode(countryCodeFromName(country)) ?? "🌐";
 }
 
 export const CONTINENT_LABELS: Record<Continent, string> = {
