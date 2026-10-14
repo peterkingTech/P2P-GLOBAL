@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, TextInput, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 import { useTranslation } from "react-i18next";
@@ -124,6 +125,9 @@ function makeStyles(c: AppColors) {
 
 export default function DiscoverTab() {
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect("discover", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions, userChurch } = useData();
@@ -225,7 +229,7 @@ export default function DiscoverTab() {
     setJoiningRoomId(null);
   }
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
 
   const cards = [
     { key: "peers", icon: "people-outline" as const, title: t("discover.discoverablePeers"), count: peerCount, sub: t("discover.discoverablePeersSub"), route: "/connect/discover" as const },
@@ -272,7 +276,7 @@ export default function DiscoverTab() {
             <Text style={styles.searchEmptySub}>Try another search, or check the spelling.</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
+          <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
             {searchGroups.map((group) => (
               <View key={group.type} style={{ marginBottom: 18 }}>
                 <Text style={styles.sectionHeading}>{group.label}</Text>
@@ -299,7 +303,7 @@ export default function DiscoverTab() {
           <ActivityIndicator color={colors.accentGreen} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.liveSectionHeaderRow}>
             <Text style={styles.liveSectionHeading}>🔴 LIVE NOW</Text>
             <TouchableOpacity onPress={() => router.push("/call/create-room" as any)}>

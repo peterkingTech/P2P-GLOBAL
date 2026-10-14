@@ -13,6 +13,7 @@ import {
 import type { ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -538,6 +539,9 @@ function makeStyles(c: AppColors) {
 
 export default function HomeTab() {
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect("index", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread, userChurch, isChurchLeader, churchMemberCount, getGroveData, getAnnouncements } = useData();
@@ -686,10 +690,11 @@ export default function HomeTab() {
       )
     : 100;
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
 
   return (
     <ScrollView
+      ref={tabScrollRef}
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]}
       showsVerticalScrollIndicator={false}

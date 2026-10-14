@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useLayout, centeredMaxWidth, useAdaptiveTiles, useSheetWidth } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
@@ -259,6 +260,9 @@ function PostCard({
 export default function PrayerTab() {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect("prayer", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, reportContent } = useData();
@@ -302,7 +306,7 @@ export default function PrayerTab() {
   // Library categories: as many tiles per row as fit on tablets; phones keep 47%.
   const libraryTiles = useAdaptiveTiles({ minItemWidth: 200, maxColumns: 4, gap: 10 });
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
 
   const loadWall = useCallback(async (which: "recent" | "engaged") => {
     setWallLoading(true);
@@ -488,7 +492,7 @@ export default function PrayerTab() {
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: topPad }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={tabScrollRef} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: 20 }]}>
           <View>
             <Text style={styles.headerTitle}>{t("prayer.title")}</Text>

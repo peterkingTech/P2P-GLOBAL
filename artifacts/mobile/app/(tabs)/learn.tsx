@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLayout, useCardPhotoWidth, centeredMaxWidth } from "@/hooks/useLayout";
 import { ResponsiveGrid } from "@/components/ResponsiveGrid";
@@ -410,6 +411,9 @@ function makeStyles(c: AppColors) {
 
 export default function LearnTab() {
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect("learn", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   // Title/description arrive already translated — DataContext.loadPlans
@@ -454,7 +458,7 @@ export default function LearnTab() {
       .then(({ count }) => setEnrolledCount(count ?? 0));
   }, [profile?.id]);
 
-  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
   const totalLessons = modules.reduce((a, m) => a + m.lessonCount, 0);
 
   const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
@@ -556,7 +560,7 @@ export default function LearnTab() {
           </TouchableOpacity>
         </Modal>
 
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
           <KingdomSchoolCards
             selected={selectedSection}
             onSelect={setSelectedSection}

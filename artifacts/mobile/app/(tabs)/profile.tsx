@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { useLayout, MAX_CONTENT_WIDTH, centeredMaxWidth, useSheetWidth } from "@/hooks/useLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -238,6 +239,9 @@ function makeStyles(c: AppColors) {
 export default function ProfileScreen() {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect("profile", tabScrollRef);
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
   const { submitHelpRequest, treeData, getMyInviteLink } = useData();
@@ -318,7 +322,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+    <View style={[styles.container, { paddingTop: insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       {/* Profile is a tab now, so there is no back button here. */}
       <View style={styles.header}>
@@ -326,6 +330,7 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView
+        ref={tabScrollRef}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]}
         showsVerticalScrollIndicator={false}
       >

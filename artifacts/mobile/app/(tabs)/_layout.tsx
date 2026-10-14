@@ -5,11 +5,14 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, StyleSheet, Text } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
 import { isSmallPhone } from "@/lib/responsive";
+import {
+  IPadTabCapsule, TabCapsuleContentTopContext, TabReselectContext, capsuleContentTop, createTabReselectEmitter, useIPadTabCapsuleVisible,
+} from "@/components/IPadTabCapsule";
 import "@/lib/i18n";
 
 // "Kingdom School" only actually needs shortening on narrow phones — every
@@ -48,8 +51,19 @@ function TabLabel({ label, color, baseFontSize }: { label: string; color: string
 function NativeTabLayout() {
   const { t, i18n } = useTranslation();
   const { totalUnreadCount } = useData();
+  // iPad: the native floating top bar can only show five of the six tabs, so
+  // it is hidden and IPadTabCapsule draws all six in its place (same
+  // navigator, routes and state). iPhone and narrow iPad windows: unchanged.
+  const capsuleVisible = useIPadTabCapsuleVisible();
+  // Root (window) safe area: this layout sits outside the tab screens'
+  // per-screen safe-area providers, so this is the status bar inset.
+  const windowInsets = useSafeAreaInsets();
+  const tabReselect = React.useMemo(createTabReselectEmitter, []);
   return (
-    <NativeTabs>
+    <TabReselectContext.Provider value={tabReselect}>
+    <TabCapsuleContentTopContext.Provider value={capsuleVisible ? capsuleContentTop(windowInsets.top) : null}>
+    <View style={{ flex: 1 }}>
+    <NativeTabs hidden={capsuleVisible}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
         <NativeTabs.Trigger.Label>{t("tabs.home")}</NativeTabs.Trigger.Label>
@@ -76,6 +90,21 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Label>{profileTabLabel(t)}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
+    {capsuleVisible && (
+      <IPadTabCapsule
+        items={[
+          { name: "index", label: t("tabs.home") },
+          { name: "learn", label: getLearnTabLabel(t("tabs.learn"), i18n.language) },
+          { name: "messages", label: t("tabs.messages"), badge: totalUnreadCount },
+          { name: "prayer", label: t("tabs.prayer") },
+          { name: "discover", label: t("tabs.discover") },
+          { name: "profile", label: profileTabLabel(t) },
+        ]}
+      />
+    )}
+    </View>
+    </TabCapsuleContentTopContext.Provider>
+    </TabReselectContext.Provider>
   );
 }
 
