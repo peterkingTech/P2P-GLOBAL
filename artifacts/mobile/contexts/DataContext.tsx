@@ -8,6 +8,13 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "./AuthContext";
+import { deliveryAcker } from "@/lib/receiptSession";
+import {
+  applyReceipts, deriveOutgoingStatus, isReceiptEligible, receiptFromRow,
+  type ConversationMember, type OutgoingStatus, type ReceiptIndex,
+} from "@/lib/messageReceipts";
+import { receiptsAvailable } from "@/lib/messageReceiptsApi";
+import { isMissingFunction } from "@/lib/profileColumns";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
@@ -334,6 +341,8 @@ export interface ConversationSummary {
   memberCount: number;
   lastMessage: string | null;
   lastMessageAt: string | null;
+  /** Receipt status of the last message when the user sent it; null otherwise. */
+  lastMessageStatus: OutgoingStatus | null;
   unreadCount: number;
   isPinnedBySystem: boolean;
   isPinnedByUser: boolean;
@@ -3886,8 +3895,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const getAllProfiles = useCallback(async (): Promise<TeamProfile[]> => {
     try {
+      // Other people's email is privileged (migration 185): the admin Team
+      // directory comes from p2p_admin_team_directory(), which only serves
+      // super_admin / admin_supervisor. A server that predates 185 has no such
+      // function and still allows the direct read.
+      const loadDirectory = async () => {
+        const r = await supabase.rpc("p2p_admin_team_directory");
+        if (!r.error || !isMissingFunction(r.error)) return r;
+        return supabase.from("p2p_profiles").select("id, full_name, email, role").order("full_name", { ascending: true });
+      };
       const [{ data: profilesData, error: profilesErr }, { data: rolesData, error: rolesErr }] = await Promise.all([
-        supabase.from("p2p_profiles").select("id, full_name, email, role").order("full_name", { ascending: true }),
+        loadDirectory(),
         supabase.from("p2p_admin_roles").select("user_id").eq("role", "crisis_responder"),
       ]);
       if (profilesErr) throw profilesErr;
@@ -4833,12 +4851,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ),
         selectInChunks<any>(
           "p2p_conversation_members",
-          "conversation_id, user_id, p2p_profiles(full_name, is_verified, is_official_account, official_account_type, photo_url)",
+          "conversation_id, user_id, joined_at, p2p_profiles(full_name, is_verified, is_official_account, official_account_type, photo_url)",
           "conversation_id", convIds,
           (q) => q.neq("user_id", profile.id), reportChunkError
         ),
         selectInChunks<any>(
-          "p2p_messages", "conversation_id, body, sender_id, created_at, message_type", "conversation_id", convIds,
+          "p2p_messages", "id, conversation_id, body, sender_id, created_at, message_type", "conversation_id", convIds,
           (q) => q.order("created_at", { ascending: false }).limit(500), reportChunkError
         ),
         selectInChunks<any>(
@@ -4865,6 +4883,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       const settingsByConv = new Map((settingsRows ?? []).map((s: any) => [s.conversation_id, s]));
 
+      // Message receipts — status of the user's OWN last message per
+      // conversation (Sent / Delivered / Read), derived exactly like the
+      // ticks inside a conversation: every eligible recipient (members other
+      // than the user who had joined by the time it was sent) must have
+      // acknowledged it. RLS only returns receipts on the user's own messages.
+      const membersByConv = new Map<string, ConversationMember[]>();
+      for (const m of allMembers as any[]) {
+        if (!m.joined_at) continue;
+        const list = membersByConv.get(m.conversation_id) ?? [];
+        list.push({ userId: m.user_id, joinedAt: m.joined_at });
+        membersByConv.set(m.conversation_id, list);
+      }
+      const ownLast = Array.from(lastMsgByConv.values()).filter((m: any) =>
+        m.sender_id === profile.id && isReceiptEligible({ id: m.id, sender_id: m.sender_id, created_at: m.created_at, message_type: m.message_type }));
+      let receiptIndex: ReceiptIndex = {};
+      if (ownLast.length && receiptsAvailable()) {
+        const rows = await selectInChunks<any>(
+          "p2p_message_receipts", "message_id, user_id, delivered_at, read_at", "message_id", ownLast.map((m: any) => m.id as string),
+          undefined, () => { /* ticks fall back to "sent"; the inbox itself still loads */ },
+        );
+        receiptIndex = applyReceipts({}, (rows ?? []).map((r: any) => receiptFromRow(r)).filter((r): r is NonNullable<typeof r> => !!r));
+      }
+      const lastStatusByConv = new Map<string, OutgoingStatus>();
+      for (const m of ownLast as any[]) {
+        lastStatusByConv.set(m.conversation_id, deriveOutgoingStatus(
+          { id: m.id, sender_id: m.sender_id, created_at: m.created_at, message_type: m.message_type },
+          membersByConv.get(m.conversation_id) ?? [], receiptIndex[m.id], receiptsAvailable(),
+        ));
+      }
+
+      // Message receipts — these rows have now reached this device, so
+      // acknowledge them as delivered (the server validates each one).
+      deliveryAcker.enqueue(
+        ((recentMessages ?? []) as any[])
+          .filter((m) => m.id && m.sender_id && m.sender_id !== profile.id && m.message_type !== "call_summary")
+          .map((m) => m.id as string)
+      );
+
       const results: ConversationSummary[] = ((convs ?? []) as any[]).map((c) => {
         const other = otherMemberByConv.get(c.id);
         const otherProfile = other?.p2p_profiles;
@@ -4885,6 +4941,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           memberCount: memberCountByConv.get(c.id) ?? 0,
           lastMessage: lastMsg?.message_type === "voice" ? "🎤 Voice message" : lastMsg?.body ?? null,
           lastMessageAt: lastMsg?.created_at ?? null,
+          lastMessageStatus: lastStatusByConv.get(c.id) ?? null,
           unreadCount: unreadCountByConv.get(c.id) ?? 0,
           isPinnedBySystem: c.is_pinned_by_system ?? false,
           // P2P Official conversations default to pinned until the user
@@ -4953,14 +5010,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!profile?.id) return;
     loadConversations();
+    const myId = profile.id;
+    let receiptRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel(`p2p_inbox_${profile.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "p2p_messages" }, (payload) => {
         loadConversations();
         handleIncomingMessageForBanner(payload.new as Record<string, unknown>);
+        // Message receipts — received live by this device: delivered.
+        const row = payload.new as { id?: string; sender_id?: string | null; message_type?: string };
+        if (row.id && row.sender_id && row.sender_id !== myId && row.message_type !== "call_summary") {
+          deliveryAcker.enqueue([row.id]);
+        }
+      })
+      // Message receipts — someone else delivered/read one of the user's
+      // messages (RLS only streams receipts on the user's own messages, plus
+      // their own): refresh the inbox ticks, debounced. The user's own
+      // acknowledgements as a reader are ignored here.
+      .on("postgres_changes", { event: "*", schema: "public", table: "p2p_message_receipts" }, (payload) => {
+        const r = payload.new as { user_id?: string } | null;
+        if (!r?.user_id || r.user_id === myId) return;
+        if (receiptRefreshTimer) clearTimeout(receiptRefreshTimer);
+        receiptRefreshTimer = setTimeout(() => { receiptRefreshTimer = null; loadConversations(); }, 1500);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (receiptRefreshTimer) clearTimeout(receiptRefreshTimer);
+      supabase.removeChannel(channel);
+      deliveryAcker.reset();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 

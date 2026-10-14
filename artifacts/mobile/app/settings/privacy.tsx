@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Platform, Switch, Alert } from "react-native";
 import { getMyActivityVisibility, setMyActivityVisibility } from "@/lib/presence";
+import { getReadReceiptsEnabled, receiptsAvailable, setReadReceiptsEnabled } from "@/lib/messageReceiptsApi";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -14,17 +15,37 @@ const TOGGLES: { key: keyof UserProfile; label: string; desc: string }[] = [
 
 export default function PrivacySettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useAuth();
+  const { profile, updateProfile, supabase } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   // Activity status lives in p2p_presence (migration 171), not on the
   // profile, so it is loaded and saved separately from the toggles above.
   const [showActivity, setShowActivity] = useState(true);
+  // Read receipts (migration 179) are read/written only through their own
+  // functions; null = not known yet / not available on this server.
+  const [readReceipts, setReadReceipts] = useState<boolean | null>(null);
+  const [readReceiptsLoad, setReadReceiptsLoad] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
 
   useEffect(() => {
     if (!profile?.id) return;
     void getMyActivityVisibility(profile.id).then(setShowActivity);
-  }, [profile?.id]);
+    setReadReceiptsLoad("loading");
+    void getReadReceiptsEnabled(supabase).then((v) => {
+      setReadReceipts(v);
+      // null is either "server not migrated" or a failed request (e.g. offline).
+      setReadReceiptsLoad(v !== null ? "ready" : receiptsAvailable() ? "error" : "unavailable");
+    });
+  }, [profile?.id, supabase]);
+
+  async function handleReadReceiptsToggle(next: boolean) {
+    setReadReceipts(next);
+    const err = await setReadReceiptsEnabled(supabase, next);
+    if (err) {
+      setReadReceipts(!next);
+      if (Platform.OS === "web") window.alert("Couldn't save this setting. Please try again.");
+      else Alert.alert("Couldn't save", "Please try again.");
+    }
+  }
 
   async function handleActivityToggle(next: boolean) {
     setShowActivity(next);
@@ -71,6 +92,32 @@ export default function PrivacySettingsScreen() {
               onValueChange={(v) => { void handleActivityToggle(v); }}
               trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
               thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Messages</Text>
+        <View style={styles.card}>
+          <View style={[styles.row, styles.rowLast]}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.label}>Send read receipts</Text>
+              <Text style={styles.desc}>
+                {readReceiptsLoad === "loading"
+                  ? "Loading…"
+                  : readReceiptsLoad === "unavailable"
+                    ? "Read receipts aren't available yet."
+                    : readReceiptsLoad === "error"
+                      ? "Couldn't load this setting. Check your connection and open this screen again."
+                      : "When this is off, people won't see blue ticks when you read their messages. They still see when a message was delivered, and you still see when yours are read."}
+              </Text>
+            </View>
+            <Switch
+              value={readReceipts ?? true}
+              disabled={readReceipts === null}
+              onValueChange={(v) => { void handleReadReceiptsToggle(v); }}
+              trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
+              thumbColor="#fff"
+              accessibilityLabel="Send read receipts"
             />
           </View>
         </View>

@@ -13,8 +13,10 @@ import {
   Share,
   Keyboard,
   Modal,
+  AppState,
+  type ViewToken,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Swipeable } from "react-native-gesture-handler";
@@ -32,6 +34,16 @@ import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { useActivityStatus, activityLabel } from "@/lib/presence";
+import { MessageTicks } from "@/components/MessageTicks";
+import { MessageInfoSheet } from "@/components/MessageInfoSheet";
+import {
+  applyReceipts, deriveOutgoingStatus, isReceiptEligible, newMessageId, receiptFromRow, selectDeliveryCandidates,
+  selectReadCandidates, type ConversationMember, type OutgoingStatus, type ReceiptIndex,
+} from "@/lib/messageReceipts";
+import {
+  acknowledgeMessages, fetchConversationMembers, fetchConversationReceipts, receiptsAvailable,
+} from "@/lib/messageReceiptsApi";
+import { deliveryAcker } from "@/lib/receiptSession";
 
 interface Message {
   id: string;
@@ -52,6 +64,8 @@ interface Message {
   call_log_id?: string | null;
   replyToMessageId?: string | null;
   deletedAt?: string | null;
+  /** Client-only send state for the user's own message (absent once persisted). */
+  localStatus?: "sending" | "failed";
 }
 
 // Shared row -> Message normalization — used by BOTH the initial historical
@@ -199,9 +213,13 @@ const SUGGESTED_REACTIONS = ["❤️", "🙏", "👍", "😂", "🔥", "😮", "
 function MessageBubbleRow({
   item, mine, otherUserOfficialType, replyPreviewTarget, reactions, currentUserId,
   onLongPress, onOpenProfile, onSwipeReply, onScrollToReply, onToggleReaction,
+  status, onPressStatus,
 }: {
   item: Message;
   mine: boolean;
+  /** Receipt status — only for the user's own, non-deleted messages. */
+  status?: OutgoingStatus;
+  onPressStatus?: () => void;
   otherUserOfficialType: OfficialAccountType | null;
   replyPreviewTarget: Message | undefined;
   reactions: { emoji: string; userId: string }[];
@@ -287,6 +305,9 @@ function MessageBubbleRow({
               />
             )}
             {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
+            {mine && status && !item.deletedAt && (
+              <MessageTicks status={status} timeLabel={formatCallTimestamp(item.created_at)} onPress={onPressStatus} onLight={emojiOnly} />
+            )}
           </TouchableOpacity>
           {reactionCounts.size > 0 && (
             <View style={[styles.reactionRow, mine && styles.reactionRowMine]}>
@@ -356,6 +377,126 @@ export default function ChatScreen() {
   const [pinnedLoadError, setPinnedLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  // ── Message receipts (migration 179) ──────────────────────────────────────
+  // members/receipts drive the ticks on the user's own messages; read
+  // acknowledgements are sent only for incoming messages that are actually
+  // on screen while this conversation is focused and the app is foreground.
+  const [members, setMembers] = useState<ConversationMember[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptIndex>({});
+  const [receiptsOk, setReceiptsOk] = useState(receiptsAvailable());
+  const [infoMessageId, setInfoMessageId] = useState<string | null>(null);
+  const viewableIdsRef = useRef<Set<string>>(new Set());
+  const readAckedRef = useRef<Set<string>>(new Set());
+  const focusedRef = useRef(false);
+  const appActiveRef = useRef(AppState.currentState === "active");
+  const readTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesByIdRef = useRef(messagesById);
+  messagesByIdRef.current = messagesById;
+
+  const refreshReceipts = useCallback(async () => {
+    if (!id) return;
+    const [m, r] = await Promise.all([fetchConversationMembers(supabase, id), fetchConversationReceipts(supabase, id)]);
+    if (m) setMembers(m);
+    if (r) setReceipts((prev) => applyReceipts(prev, r));
+    setReceiptsOk(receiptsAvailable());
+  }, [id, supabase]);
+
+  const flushReadAcks = useCallback(() => {
+    if (readTimerRef.current) clearTimeout(readTimerRef.current);
+    readTimerRef.current = setTimeout(async () => {
+      readTimerRef.current = null;
+      const ids = selectReadCandidates({
+        viewableIds: viewableIdsRef.current,
+        messagesById: messagesByIdRef.current,
+        currentUserId: user?.id,
+        alreadyRead: readAckedRef.current,
+        isActive: focusedRef.current && appActiveRef.current,
+      });
+      if (!ids.length) return;
+      ids.forEach((mid) => readAckedRef.current.add(mid)); // no duplicate in-flight acks
+      const res = await acknowledgeMessages(supabase, ids, true);
+      if (res === null) {
+        // Retry when visible/foreground again, and on a timer in case the
+        // user keeps reading without scrolling (visibility is re-checked).
+        ids.forEach((mid) => readAckedRef.current.delete(mid));
+        if (!readRetryRef.current) {
+          readRetryRef.current = setTimeout(() => { readRetryRef.current = null; flushReadAcksRef.current(); }, 5_000);
+        }
+      } else ids.forEach((mid) => deliveryAcker.acknowledged.add(mid)); // read implies delivered
+      setReceiptsOk(receiptsAvailable());
+    }, 300);
+  }, [supabase, user?.id]);
+  // Rows re-render when anything that changes a tick changes.
+  const receiptRenderKey = useMemo(() => ({ receipts, members, receiptsOk }), [receipts, members, receiptsOk]);
+  const flushReadAcksRef = useRef(flushReadAcks);
+  flushReadAcksRef.current = flushReadAcks;
+
+  // FlatList requires these two to keep the same identity for its lifetime.
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 250 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    viewableIdsRef.current = new Set(
+      viewableItems.filter((v) => v.isViewable && v.item).map((v) => (v.item as Message).id)
+    );
+    flushReadAcksRef.current();
+  }).current;
+
+  // New conversation: start from a clean slate (no carry-over between threads).
+  useEffect(() => {
+    setReceipts({});
+    setMembers([]);
+    readAckedRef.current = new Set();
+    viewableIdsRef.current = new Set();
+  }, [id]);
+
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    flushReadAcks();
+    return () => { focusedRef.current = false; };
+  }, [flushReadAcks]));
+
+  // Foreground: reconcile against the server and retry anything missed.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      appActiveRef.current = state === "active";
+      if (state === "active") {
+        void refreshReceipts();
+        void deliveryAcker.flushNow();
+        flushReadAcks();
+      }
+    });
+    return () => sub.remove();
+  }, [refreshReceipts, flushReadAcks]);
+
+  useEffect(() => () => {
+    if (readTimerRef.current) clearTimeout(readTimerRef.current);
+    if (readRetryRef.current) clearTimeout(readRetryRef.current);
+  }, []);
+
+  // Live receipts for this conversation (RLS: only receipts on this user's own
+  // messages, plus their own). Re-subscription after a dropped connection
+  // triggers a full reconcile, since events may have been missed meanwhile.
+  useEffect(() => {
+    if (!id) return;
+    let subscribedOnce = false;
+    const channel = supabase
+      .channel(`p2p_message_receipts_${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "p2p_message_receipts", filter: `conversation_id=eq.${id}` },
+        (payload) => {
+          const r = receiptFromRow(payload.new as Record<string, unknown>);
+          if (r) setReceipts((prev) => applyReceipts(prev, [r]));
+        }
+      )
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        if (subscribedOnce) void refreshReceipts();
+        subscribedOnce = true;
+      });
+    return () => { supabase.removeChannel(channel); };
+  }, [id, supabase, refreshReceipts]);
   const [callLogsById, setCallLogsById] = useState<Record<string, CallLogInfo>>({});
 
   const fetchCallLogs = useCallback(async (callLogIds: string[]) => {
@@ -470,8 +611,16 @@ export default function ChatScreen() {
     }
 
     const mappedMsgs = (msgs ?? []).map(mapMessageRow);
-    setMessages(mappedMsgs);
+    // Keep unsent (sending/failed) local messages across reloads — e.g. the
+    // load() that follows a pin/unpin — unless the server now has them.
+    const loadedIds = new Set(mappedMsgs.map((m) => m.id));
+    setMessages((prev) => [...mappedMsgs, ...prev.filter((m) => m.localStatus && !loadedIds.has(m.id))]);
     setLoading(false);
+
+    // Message receipts: these incoming messages have reached this device
+    // (delivered); ticks for the user's own messages need members + receipts.
+    deliveryAcker.enqueue(selectDeliveryCandidates(mappedMsgs, user.id, deliveryAcker.acknowledged));
+    void refreshReceipts();
 
     // Delete-for-me is a per-viewer hide, not a security boundary (the
     // sender/other members still see the message) — filtered client-side
@@ -508,7 +657,7 @@ export default function ChatScreen() {
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", id)
       .eq("user_id", user.id);
-  }, [id, supabase, user, fetchCallLogs]);
+  }, [id, supabase, user, fetchCallLogs, refreshReceipts]);
 
   useEffect(() => {
     load();
@@ -551,8 +700,21 @@ export default function ChatScreen() {
             mapped.senderPhotoUrl = otherUserPhotoUrl ?? mapped.senderPhotoUrl;
             mapped.senderUsername = otherUserUsername ?? mapped.senderUsername;
           }
-          setMessages((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [...prev, mapped]));
+          setMessages((prev) => {
+            const idx = prev.findIndex((p) => p.id === mapped.id);
+            if (idx === -1) return [...prev, mapped];
+            // The user's own optimistic message: the row now exists, so it is
+            // persisted (Sent) even if the insert response itself was lost.
+            if (!prev[idx].localStatus) return prev;
+            const next = prev.slice();
+            next[idx] = { ...prev[idx], localStatus: undefined, created_at: mapped.created_at };
+            return next;
+          });
           if (mapped.message_type === "call_summary" && mapped.call_log_id) void fetchCallLogs([mapped.call_log_id]);
+          // Message receipts — received live by this device: delivered.
+          if (raw.sender_id && raw.sender_id !== user?.id && raw.message_type !== "call_summary") {
+            deliveryAcker.enqueue([raw.id as string]);
+          }
         }
       )
       // Message-restoration repair — pin/unpin and delete-for-everyone
@@ -726,6 +888,7 @@ export default function ChatScreen() {
   // reconciles it (including for the other party) without a full reload.
   async function handleToggleReaction(messageId: string, emoji: string) {
     if (!user) return;
+    if (messagesById.get(messageId)?.localStatus) return; // not persisted yet
     const mine = (reactionsByMessage[messageId] ?? []).find((r) => r.userId === user.id);
     setReactionPickerFor(null);
     if (mine && mine.emoji === emoji) {
@@ -749,6 +912,17 @@ export default function ChatScreen() {
 
   function handleLongPressMessage(item: Message) {
     if (item.message_type === "call_summary" || !item.sender_id) return;
+    // Not persisted yet: only send-related actions make sense.
+    if (item.localStatus) {
+      if (item.localStatus === "failed") {
+        Alert.alert("Message not sent", undefined, [
+          { text: "Retry", onPress: () => handleRetry(item) },
+          { text: "Delete", style: "destructive", onPress: () => handleDiscardFailed(item.id) },
+          { text: "Cancel", style: "cancel" },
+        ]);
+      }
+      return;
+    }
     const senderId = item.sender_id;
     const mine = senderId === user?.id;
     const canPin = isDirect || true; // either DM party, or a group/circle leader — enforced server-side by p2p_can_pin_message
@@ -777,6 +951,13 @@ export default function ChatScreen() {
       text: "↩️ Reply",
       onPress: () => setReplyTarget(item),
     });
+
+    if (mine && receiptsOk && isReceiptEligible(item)) {
+      options.push({
+        text: "ℹ️ Message Info",
+        onPress: () => setInfoMessageId(item.id),
+      });
+    }
 
     if (item.message_type !== "voice" && item.body) {
       options.push({
@@ -903,25 +1084,84 @@ export default function ChatScreen() {
     if (!body || !id || !user) return;
     const replyingTo = replyTarget?.id ?? null;
     setStartersVisible(false);
-    setSending(true);
     setText("");
     setMentionResults([]);
     setReplyTarget(null);
+    // Shown immediately as "Sending"; becomes Sent only once the insert (or
+    // its realtime echo) confirms the row exists. A failure stays visible as
+    // "Not sent · Retry" instead of silently disappearing.
+    const optimistic: Message = {
+      id: newMessageId(),
+      conversation_id: id,
+      sender_id: user.id,
+      body,
+      created_at: new Date().toISOString(),
+      message_type: "text",
+      replyToMessageId: replyingTo,
+      senderName: profile?.displayName,
+      senderPhotoUrl: profile?.avatarUrl ?? null,
+      senderUsername: profile?.username ?? null,
+      localStatus: "sending",
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    await submitMessage(optimistic);
+  }
+
+  function markPersisted(messageId: string, createdAt: string | null | undefined) {
+    setMessages((prev) => prev.map((m) => (
+      m.id === messageId ? { ...m, localStatus: undefined, created_at: createdAt ?? m.created_at } : m
+    )));
+  }
+
+  // Persists a text message under its client-generated id. Retry-safe: if a
+  // previous attempt actually reached the server (lost response), the retry
+  // hits the primary key, and the existing row is verified to be this user's
+  // own message in this conversation before it is treated as sent.
+  async function submitMessage(msg: Message) {
+    if (!user) return;
+    setSending(true);
     const { data, error } = await supabase
       .from("p2p_messages")
-      .insert({ conversation_id: id, sender_id: user.id, body, reply_to_message_id: replyingTo })
-      .select("id, flagged_self_harm")
+      .insert({
+        id: msg.id, conversation_id: msg.conversation_id, sender_id: user.id,
+        body: msg.body, reply_to_message_id: msg.replyToMessageId ?? null,
+      })
+      .select("id, created_at, flagged_self_harm")
       .single();
     setSending(false);
     if (error) {
-      setText(body);
-      if (replyingTo) setReplyTarget(messages.find((m) => m.id === replyingTo) ?? null);
+      if (error.code === "23505") {
+        const { data: existing } = await supabase
+          .from("p2p_messages")
+          .select("id, created_at")
+          .eq("id", msg.id)
+          .eq("conversation_id", msg.conversation_id)
+          .eq("sender_id", user.id)
+          .maybeSingle();
+        if (existing) { markPersisted(msg.id, existing.created_at as string); return; }
+        // Id taken by an unrelated row (practically impossible): retry later under a new id.
+        const freshId = newMessageId();
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, id: freshId, localStatus: "failed" } : m)));
+      } else {
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, localStatus: "failed" } : m)));
+      }
       Alert.alert("Message not sent", error.message);
       return;
     }
+    markPersisted(msg.id, data?.created_at as string | undefined);
     if (data?.flagged_self_harm) {
       Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
     }
+  }
+
+  function handleRetry(item: Message) {
+    if (item.localStatus !== "failed") return;
+    setMessages((prev) => prev.map((m) => (m.id === item.id ? { ...m, localStatus: "sending" } : m)));
+    void submitMessage({ ...item, localStatus: "sending" });
+  }
+
+  function handleDiscardFailed(messageId: string) {
+    setMessages((prev) => prev.filter((m) => !(m.id === messageId && m.localStatus === "failed")));
   }
 
   // Mirrors DataContext's uploadSubmissionMedia (same fetch→arrayBuffer→
@@ -1096,6 +1336,9 @@ export default function ChatScreen() {
             contentContainerStyle={{ padding: 16, gap: 8 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             onScrollToIndexFailed={() => {}}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            extraData={receiptRenderKey}
             renderItem={({ item }) => {
               if (item.message_type === "call_summary") {
                 // sender_id is the real call initiator (calls.ts /calls/end)
@@ -1163,17 +1406,26 @@ export default function ChatScreen() {
                 );
               }
               const mine = item.sender_id === user?.id;
+              const status = mine && isReceiptEligible(item)
+                ? deriveOutgoingStatus(item, members, receipts[item.id], receiptsOk)
+                : undefined;
               return (
                 <MessageBubbleRow
                   item={item}
                   mine={mine}
+                  status={status}
+                  onPressStatus={
+                    item.localStatus === "failed" ? () => handleRetry(item)
+                      : !item.localStatus && receiptsOk ? () => setInfoMessageId(item.id)
+                      : undefined
+                  }
                   otherUserOfficialType={otherUserOfficialType}
                   replyPreviewTarget={item.replyToMessageId ? messagesById.get(item.replyToMessageId) : undefined}
                   reactions={reactionsByMessage[item.id] ?? []}
                   currentUserId={user?.id}
                   onLongPress={() => handleLongPressMessage(item)}
                   onOpenProfile={() => openProfile(item.senderUsername)}
-                  onSwipeReply={() => { if (!item.deletedAt) setReplyTarget(item); }}
+                  onSwipeReply={() => { if (!item.deletedAt && !item.localStatus) setReplyTarget(item); }}
                   onScrollToReply={() => { if (item.replyToMessageId) scrollToMessage(item.replyToMessageId); }}
                   onToggleReaction={(emoji) => handleToggleReaction(item.id, emoji)}
                 />
@@ -1320,6 +1572,13 @@ export default function ChatScreen() {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        <MessageInfoSheet
+          supabase={supabase}
+          messageId={infoMessageId}
+          sentAt={infoMessageId ? messagesById.get(infoMessageId)?.created_at ?? null : null}
+          onClose={() => setInfoMessageId(null)}
+        />
       </View>
     </KeyboardAvoidingView>
   );

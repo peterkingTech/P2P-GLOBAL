@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useData, ConversationSummary } from "@/contexts/DataContext";
@@ -12,6 +13,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import { Avatar } from "@/components/Avatar";
+import { StatusGlyph, TICK_COLORS_ON_LIGHT } from "@/components/MessageTicks";
+import { statusAccessibilityLabel } from "@/lib/messageReceipts";
 import { useActivityStatus } from "@/lib/presence";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import "@/lib/i18n";
@@ -118,6 +121,9 @@ function makeStyles(c: AppColors) {
     systemPin: { marginLeft: 4 },
     userPin: { marginRight: 4 },
     rowSub: { fontSize: 13, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
+    rowSubLine: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+    rowSubFlex: { flex: 1, marginTop: 0 },
+    rowTicks: { marginRight: 4 },
     rowSubUnread: { color: c.textDark, fontFamily: "Inter_500Medium" },
     rowRight: { alignItems: "flex-end", gap: 4 },
     timeText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
@@ -131,6 +137,9 @@ function makeStyles(c: AppColors) {
 
 export default function MessagesTab() {
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const tabScrollRef = React.useRef<FlatList>(null);
+  useScrollToTopOnTabReselect("messages", tabScrollRef);
   const { contentMaxWidth } = useLayout();
   const router = useRouter();
   const { t } = useTranslation();
@@ -197,7 +206,7 @@ export default function MessagesTab() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16) }]}>
+    <View style={[styles.container, { paddingTop: insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 16) }]}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("tabs.messages")}</Text>
@@ -283,6 +292,7 @@ export default function MessagesTab() {
         </View>
       ) : (
         <FlatList
+          ref={tabScrollRef}
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
@@ -316,9 +326,24 @@ export default function MessagesTab() {
                     {item.otherUserOfficialType && <OfficialBadge accountType={item.otherUserOfficialType} size="small" />}
                     {item.isPinnedBySystem && !item.otherUserOfficialType && <MaterialIcons name="push-pin" size={13} color="#C0392B" style={styles.systemPin} />}
                   </View>
-                  <Text style={[styles.rowSub, unread && styles.rowSubUnread]} numberOfLines={1}>
-                    {item.lastMessage ?? "No messages yet"}
-                  </Text>
+                  <View style={styles.rowSubLine}>
+                    {item.lastMessageStatus && (
+                      <View
+                        style={styles.rowTicks}
+                        accessible
+                        accessibilityLabel={`Your last message: ${statusAccessibilityLabel(item.lastMessageStatus)}`}
+                      >
+                        <StatusGlyph
+                          status={item.lastMessageStatus}
+                          size={15}
+                          palette={{ grey: colors.textMuted, read: TICK_COLORS_ON_LIGHT.read, failed: TICK_COLORS_ON_LIGHT.failed }}
+                        />
+                      </View>
+                    )}
+                    <Text style={[styles.rowSub, styles.rowSubFlex, unread && styles.rowSubUnread]} numberOfLines={1}>
+                      {item.lastMessage ?? "No messages yet"}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.rowRight}>
                   {item.isPinnedByUser && (

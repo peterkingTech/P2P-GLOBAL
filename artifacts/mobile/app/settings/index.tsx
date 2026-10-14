@@ -25,7 +25,7 @@ const CATEGORIES: Category[] = [
   { emoji: "⚙️", title: "Account", subtitle: "Profile, Email, Password, Account status", route: "/settings/account" },
   { emoji: "🌍", title: "Language and Region", subtitle: "App Language, Content Language, Date Format", route: "/settings/language" },
   { emoji: "🔔", title: "Notifications", subtitle: "Session Reminders, Peer Guide Alerts, Fruit Awards, Weekly Encouragement, Elijah Protocol", route: "/settings/notifications" },
-  { emoji: "🔒", title: "Privacy", subtitle: "Profile Visibility, Data and Analytics", route: "/settings/privacy" },
+  { emoji: "🔒", title: "Privacy", subtitle: "Profile Visibility, Read Receipts, Data and Analytics", route: "/settings/privacy" },
   { emoji: "🎯", title: "My Goals", subtitle: "View and update your discipleship goals", route: "/settings/goals" },
   { emoji: "📖", title: "Kingdom School", subtitle: "Learning preferences, Session format", route: "/settings/kingdom-school" },
   { emoji: "🙏", title: "Prayer", subtitle: "Morning confession reminder, Prayer notification", route: "/settings/prayer" },
