@@ -14,6 +14,8 @@ import {
   type KingdomStory, type KingdomStoryCategory, type KingdomStoryContentType,
 } from "@/lib/kingdomStoriesApi";
 import { createOrFindScriptureReference, parseScriptureInput, getScriptureReference } from "@/lib/prayerTopicsApi";
+import { useAuth } from "@/contexts/AuthContext";
+import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -41,6 +43,17 @@ export default function EditKingdomStoryScreen() {
   const [scriptureDisplay, setScriptureDisplay] = useState<string | null>(null);
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourcePublisher, setSourcePublisher] = useState("");
+  // Refusals from the Publishing Studio approval gate / live-story freeze
+  // (migration 188): shown in the screen, never as a bare error.
+  const [studioNotice, setStudioNotice] = useState<{ message: string; where: "top" | "lifecycle" } | null>(null);
+  const { profile } = useAuth();
+  const canOpenStudio = !!profile && STUDIO_VIEW_ROLES.includes(profile.role);
+  // Shown next to where the action happened: field edits at the top,
+  // Publish / Unpublish / Archive next to the lifecycle buttons.
+  function reportError(title: string, e: any, where: "top" | "lifecycle" = "top") {
+    if (e?.studioRequired) setStudioNotice({ message: e.message, where });
+    else showAlert(title, e?.message ?? "Please try again.");
+  }
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -66,7 +79,7 @@ export default function EditKingdomStoryScreen() {
       const updated = await updateKingdomStory(story.id, updates);
       setStory({ ...story, ...updated });
     } catch (e: any) {
-      showAlert("Couldn't save", e.message ?? "Please try again.");
+      reportError("Couldn't save", e);
     } finally {
       setSaving(false);
     }
@@ -99,6 +112,8 @@ export default function EditKingdomStoryScreen() {
       if (!uploaded) { showAlert("Upload failed", "Please check your connection and try again."); return; }
       await addKingdomStoryMedia(story.id, { mediaType: "image", mediaPath: uploaded.mediaPath, displayOrder: story.media?.length ?? 0, isCover: !story.media?.length });
       await load();
+    } catch (e: any) {
+      reportError("Couldn't add photo", e);
     } finally {
       setSaving(false);
     }
@@ -112,6 +127,8 @@ export default function EditKingdomStoryScreen() {
       if (!uploaded) { showAlert("Upload failed", "Please check your connection and try again."); return; }
       await addKingdomStoryMedia(story.id, { mediaType: "video", mediaPath: uploaded.mediaPath, displayOrder: story.media?.length ?? 0, isCover: !story.media?.length, durationSeconds });
       await load();
+    } catch (e: any) {
+      reportError("Couldn't add video", e);
     } finally {
       setSaving(false);
     }
@@ -129,7 +146,7 @@ export default function EditKingdomStoryScreen() {
       await updateKingdomStoryMedia(story.id, mediaId, { isCover: true });
       await load();
     } catch (e: any) {
-      showAlert("Couldn't set cover", e.message ?? "Please try again.");
+      reportError("Couldn't set cover", e);
     } finally {
       setSaving(false);
     }
@@ -139,6 +156,7 @@ export default function EditKingdomStoryScreen() {
     if (!story) return;
     setSaving(true);
     try { await deleteKingdomStoryMedia(story.id, mediaId); await load(); }
+    catch (e: any) { reportError("Couldn't remove media", e); }
     finally { setSaving(false); }
   }
 
@@ -149,6 +167,8 @@ export default function EditKingdomStoryScreen() {
       await addKingdomStorySource(story.id, { title: sourceTitle.trim(), publisher: sourcePublisher.trim() || undefined, displayOrder: story.sources?.length ?? 0 });
       setSourceTitle(""); setSourcePublisher("");
       await load();
+    } catch (e: any) {
+      reportError("Couldn't add source", e);
     } finally {
       setSaving(false);
     }
@@ -158,6 +178,7 @@ export default function EditKingdomStoryScreen() {
     if (!story) return;
     setSaving(true);
     try { await deleteKingdomStorySource(story.id, sourceId); await load(); }
+    catch (e: any) { reportError("Couldn't remove source", e); }
     finally { setSaving(false); }
   }
 
@@ -167,9 +188,10 @@ export default function EditKingdomStoryScreen() {
     try {
       const updated = await updateKingdomStory(story.id, { status });
       setStory({ ...story, ...updated });
+      setStudioNotice(null);
       showAlert("Updated", `Story is now ${status}.`);
     } catch (e: any) {
-      showAlert("Couldn't update status", e.message ?? "Please try again.");
+      reportError("Couldn't update status", e, "lifecycle");
     } finally {
       setSaving(false);
     }
@@ -190,6 +212,24 @@ export default function EditKingdomStoryScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, gap: 4, paddingBottom: 80 }}>
+      {studioNotice?.where === "top" ? (
+        <View style={styles.studioNotice} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#8A5410" />
+            <Text style={styles.studioNoticeText}>{studioNotice.message}</Text>
+          </View>
+          <View style={styles.studioNoticeRow}>
+            {canOpenStudio ? (
+              <TouchableOpacity style={styles.studioNoticeBtn} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Open Publishing Studio">
+                <Text style={styles.studioNoticeBtnText}>Open Publishing Studio</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.studioNoticeDismiss} onPress={() => setStudioNotice(null)} accessibilityRole="button" accessibilityLabel="Dismiss">
+              <Text style={styles.studioNoticeDismissText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.topRow}>
         <View style={[styles.statusPill, styles[`statusPill_${story.status}` as const]]}>
           <Text style={styles.statusPillText}>{story.status.toUpperCase()}</Text>
@@ -303,8 +343,34 @@ export default function EditKingdomStoryScreen() {
       <View style={styles.lifecycleRow}>
         {story.status === "draft" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("review")}><Text style={styles.lifecycleBtnText}>Move to Review</Text></TouchableOpacity>}
         {(story.status === "draft" || story.status === "review") && <TouchableOpacity style={[styles.lifecycleBtn, styles.publishBtn]} onPress={() => handleStatusChange("published")}><Text style={styles.publishBtnText}>Publish</Text></TouchableOpacity>}
+        {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")} accessibilityRole="button" accessibilityLabel="Unpublish to edit"><Text style={styles.lifecycleBtnText}>Unpublish to edit</Text></TouchableOpacity>}
         {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("archived")}><Text style={styles.lifecycleBtnText}>Archive</Text></TouchableOpacity>}
         {story.status === "archived" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")}><Text style={styles.lifecycleBtnText}>Restore to Draft</Text></TouchableOpacity>}
+      </View>
+      {studioNotice?.where === "lifecycle" ? (
+        <View style={[styles.studioNotice, { marginTop: 10 }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#8A5410" />
+            <Text style={styles.studioNoticeText}>{studioNotice.message}</Text>
+          </View>
+          <View style={styles.studioNoticeRow}>
+            {canOpenStudio ? (
+              <TouchableOpacity style={styles.studioNoticeBtn} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Open Publishing Studio">
+                <Text style={styles.studioNoticeBtnText}>Open Publishing Studio</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.studioNoticeDismiss} onPress={() => setStudioNotice(null)} accessibilityRole="button" accessibilityLabel="Dismiss">
+              <Text style={styles.studioNoticeDismissText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+      <View>
+        {story.status === "draft" || story.status === "review"
+          ? <Text style={styles.lifecycleHint}>Publishing needs approval by another editor in the Publishing Studio. Until then, Publish leaves the story unpublished.</Text>
+          : story.status === "published"
+            ? <Text style={styles.lifecycleHint}>This story is live, so its text, media and sources are locked. Unpublish it to make changes, then get it approved again.</Text>
+            : null}
       </View>
       <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
         <Text style={styles.deleteBtnText}>Delete Story</Text>
@@ -356,6 +422,14 @@ const styles = StyleSheet.create({
   sourceTitle: { fontSize: 12, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   sourceMeta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   lifecycleRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  lifecycleHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
+  studioNotice: { backgroundColor: "#FDF6EA", borderColor: "#EBCB95", borderWidth: 1, borderRadius: 12, padding: 12, gap: 10, marginBottom: 8 },
+  studioNoticeText: { flex: 1, fontSize: 13, color: "#5C3A0B", fontFamily: "Inter_500Medium", lineHeight: 19 },
+  studioNoticeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  studioNoticeBtn: { backgroundColor: colors.primaryGreen, borderRadius: 9, paddingHorizontal: 14, minHeight: 44, justifyContent: "center" },
+  studioNoticeBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  studioNoticeDismiss: { borderRadius: 9, paddingHorizontal: 14, minHeight: 44, justifyContent: "center", borderWidth: 1, borderColor: "#EBCB95" },
+  studioNoticeDismissText: { color: "#5C3A0B", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   lifecycleBtn: { borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   lifecycleBtnText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold" },
   publishBtn: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },

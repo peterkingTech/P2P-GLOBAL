@@ -13,6 +13,7 @@ import prayerLibraryRouter from "./prayerLibrary";
 import missionsRouter from "./missions";
 import kingdomWinsRouter from "./kingdomWins";
 import kingdomStoriesRouter from "./kingdomStories";
+import studioRouter from "./studio";
 import searchRouter from "./search";
 import roomInvitationsRouter from "./roomInvitations";
 import sessionsRouter from "./sessions";
@@ -58,6 +59,7 @@ router.use("/prayer", prayerLibraryRouter); // "Pray the Word" Stage 5 — Perso
 router.use("/missions", missionsRouter); // Missions — new independent content domain (fields/stories/prayer points), separate from legacy p2p_missions and the Prayer Wall
 router.use("/kingdom-wins", kingdomWinsRouter); // Kingdom Wins / Testimonies — peer-authored "look what God has done" domain, independent from the Prayer Wall and Missions
 router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P-curated EDITORIAL content (Christian history/revival/missions/etc.), admin_content/super_admin write-gated, distinct from peer-authored Kingdom Wins
+router.use("/studio", studioRouter); // Publishing Studio — review + scheduled publishing over existing content via adapters (migration 188); every route admin + Studio-role gated
 router.use("/search", searchRouter); // P2P Global Search — bounded, parallel, multi-domain search extending the existing Discover search field; reuses each domain's own visibility rules, never bypasses RLS
 router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareable invitation links over Break Rooms/Church Calls/Family Worship; resolves safe preview info only, actual join always goes through each room's existing, unmodified join endpoint
 router.use("/sessions", sessionsRouter);

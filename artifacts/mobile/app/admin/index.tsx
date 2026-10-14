@@ -265,15 +265,28 @@ function SuperAdminDashboard() {
   return (
     <View style={styles.container}>
       <DashboardHeader role="super_admin" />
-      <View style={styles.tabsRow}>
-        {(["activity", "monitor", "stats", "management"] as const).map((tb) => (
-          <TouchableOpacity key={tb} style={[styles.tabChip, tab === tb && styles.tabChipActive]} onPress={() => setTab(tb)}>
-            <Text style={[styles.tabChipText, tab === tb && styles.tabChipTextActive]}>
-              {tb === "activity" ? "Live Activity" : tb === "monitor" ? "Admin Monitor" : tb === "stats" ? "Platform Stats" : "Management"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Scrolls sideways when the four tabs are wider than the screen (phones),
+          instead of widening the page. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsRow} accessibilityRole="tablist">
+        {(["activity", "monitor", "stats", "management"] as const).map((tb) => {
+          const label = tb === "activity" ? "Live Activity" : tb === "monitor" ? "Admin Monitor" : tb === "stats" ? "Platform Stats" : "Management";
+          return (
+            <TouchableOpacity
+              key={tb}
+              style={[styles.tabChip, tab === tb && styles.tabChipActive]}
+              onPress={() => setTab(tb)}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: tab === tb }}
+              aria-selected={tab === tb}
+            >
+              <Text style={[styles.tabChipText, tab === tb && styles.tabChipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       {loading ? <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} /> : (
         <>
@@ -457,8 +470,11 @@ const styles = StyleSheet.create({
   feedTime: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   feedAction: { fontSize: 13, fontWeight: "600", color: colors.textDark, textTransform: "capitalize", fontFamily: "Inter_600SemiBold" },
   feedAdmin: { fontSize: 11, color: colors.textMuted, marginTop: 1, fontFamily: "Inter_400Regular" },
-  tabsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, paddingBottom: 8 },
-  tabChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
+  // flexGrow 0: the horizontal ScrollView takes only the row's height.
+  tabsScroll: { flexGrow: 0, flexShrink: 0 },
+  tabsRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 6, paddingBottom: 8 },
+  // minHeight/minWidth 44: a full-size touch target (was ~30px tall).
+  tabChip: { paddingHorizontal: 12, paddingVertical: 7, minHeight: 44, minWidth: 44, justifyContent: "center", borderRadius: 22, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
   tabChipActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
   tabChipText: { fontSize: 11, color: colors.textMid, fontFamily: "Inter_500Medium" },
   tabChipTextActive: { color: "#fff", fontWeight: "700" },

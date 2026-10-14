@@ -13,7 +13,12 @@ async function authedFetch(path: string, init?: RequestInit) {
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
+  if (!res.ok) {
+    // `studioRequired`: refused by the Publishing Studio approval gate or the
+    // live-story freeze (migration 188) — the story was left unchanged.
+    const b = body as { error?: string; code?: string; studioRequired?: boolean };
+    throw Object.assign(new Error(b.error ?? "Request failed"), { status: res.status, code: b.code, studioRequired: b.studioRequired === true });
+  }
   return body;
 }
 

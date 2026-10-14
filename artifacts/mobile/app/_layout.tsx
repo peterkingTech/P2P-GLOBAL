@@ -31,6 +31,7 @@ import {
 import { getApiUrl } from "@/lib/apiUrl";
 import Constants from "expo-constants";
 import { ACCEPT_ACTION, DECLINE_ACTION, dismissCallNotifications, sweepStaleCallNotifications } from "@/lib/callNotifications";
+import { getLaunchNotificationResponse } from "@/lib/launchNotification";
 import { supabase } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GrowthToast } from "@/components/GrowthToast";
@@ -553,7 +554,8 @@ function PushNotificationHost() {
       else router.push(path as any);
     }
 
-    Notifications.getLastNotificationResponseAsync().then((response) => {
+    // Native-only API (throws on web) — see lib/launchNotification.ts.
+    void getLaunchNotificationResponse(Platform.OS, () => Notifications.getLastNotificationResponseAsync()).then((response) => {
       if (response) handleResponse(response);
     });
     const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);

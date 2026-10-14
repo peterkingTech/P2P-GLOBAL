@@ -25,6 +25,18 @@ export const supabaseServiceRole = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY
 );
 
+// A client that acts AS the signed-in user: requests carry their own verified
+// access token, so the database sees auth.uid() = that user and applies their
+// grants and RLS. Used for writes whose identity must come from the session,
+// never from a parameter (the Publishing Studio functions, migration 188) —
+// the service key cannot act as an arbitrary user through these.
+export function supabaseAsUser(accessToken: string) {
+  return createClient(supabaseUrl, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 // Study Together C2 introduced this as a scoped exception to the rest of
 // this API's "trust the caller-supplied id" pattern (see calls.ts):
 // verifies a real Supabase session via its access token rather than

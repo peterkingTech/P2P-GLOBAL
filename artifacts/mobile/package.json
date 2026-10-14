@@ -13,7 +13,9 @@
     "test:profile-privacy": "node tests/profilePrivacy.test.mjs",
     "test:backend-config": "node tests/backendConfig.test.mjs",
     "test:app-version": "node tests/appVersionPolicy.test.mjs",
-    "test:release": "npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts"
+    "test:studio-ui": "node tests/studioUi.test.mjs",
+    "test:admin-shell": "node tests/adminShell.test.mjs",
+    "test:release": "npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts && npm run -s test:studio-ui && npm run -s test:admin-shell"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

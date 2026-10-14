@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
+import { supabaseServiceRole as db, supabaseAsUser, verifyCaller } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
@@ -22,6 +22,29 @@ function err(res: import("express").Response, message: string, status = 400) {
 // failure would otherwise return.
 function dbErrStatus(error: { code?: string } | null): number {
   return error?.code === "23503" || error?.code === "23514" || error?.code === "23505" ? 400 : 500;
+}
+
+// Refusals from the Publishing Studio publication gate and live-story freeze
+// (migration 188, SQLSTATE S0423). A refused change leaves the story as it was.
+const GATE_MESSAGES: Record<string, string> = {
+  studio_approval_required: "This story must be approved in the Publishing Studio before it can be published. It remains unpublished.",
+  studio_approval_stale: "This story changed after it was approved. It remains unpublished until it is reviewed again in the Publishing Studio.",
+  studio_four_eyes: "This story's approval came from its own submitter. It remains unpublished until another editor approves it in the Publishing Studio.",
+  studio_reviewer_ineligible: "The editor who approved this story can no longer approve content. It remains unpublished until another editor reviews it in the Publishing Studio.",
+  studio_reviewer_missing: "This story's approval no longer has a reviewer. It remains unpublished until it is reviewed again in the Publishing Studio.",
+  scripture_reference_required: "A Scripture Story must have a Scripture reference attached before it can be published. It remains unpublished.",
+  studio_live_edit_blocked: "This story is live, so its content (text, media and sources) cannot be changed in place. Unpublish it, make the change, and get it approved again in the Publishing Studio.",
+};
+function storyDbError(res: import("express").Response, error: { code?: string; message?: string } | null, fallback: string) {
+  if (error?.code === "S0423") return res.status(409).json({ error: GATE_MESSAGES[error.message ?? ""] ?? GATE_MESSAGES.studio_approval_required, code: error.message, studioRequired: true });
+  if (error?.code === "S0403") return err(res, "Your role cannot do this.", 403);
+  if (error?.code === "S0401") return err(res, "Sign in again to continue.", 401);
+  return err(res, error?.message ?? fallback, dbErrStatus(error));
+}
+
+/** The migration 188 status function does not exist on this database (not applied yet). */
+function setStatusMissing(error: { code?: string; message?: string }) {
+  return (error.code === "PGRST202" || error.code === "42883") && /p2p_kingdom_story_set_status/.test(error.message ?? "");
 }
 
 const CONTENT_TYPES = ["historical_story", "person", "movement", "event", "place", "present_day_story", "documentary", "scripture_story"];
@@ -246,14 +269,37 @@ router.put("/:id", async (req, res) => {
     updates.related_story_id = relatedStoryId;
   }
   if (isFeatured !== undefined) updates.is_featured = !!isFeatured;
-  if (status !== undefined) {
-    updates.status = status;
-    if (status === "published" && existing.status !== "published") updates.published_at = new Date().toISOString();
-    if (status === "archived" && !existing.archived_at) updates.archived_at = new Date().toISOString();
-  }
 
-  const { data, error } = await db.from("p2p_kingdom_stories").update(updates).eq("id", req.params.id).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to update story", dbErrStatus(error));
+  // Field edits first (as before). A status change is a separate, named call
+  // (migration 188): it is attributed to this editor, audited in the same
+  // transaction, and publishing passes the Publishing Studio approval gate —
+  // a story is published only if it was approved, by someone other than the
+  // submitter, for exactly its current content.
+  let data: Record<string, unknown> | null = existing as Record<string, unknown>;
+  if (Object.keys(updates).length > 1) {
+    const r = await db.from("p2p_kingdom_stories").update(updates).eq("id", req.params.id).select().single();
+    if (r.error || !r.data) return storyDbError(res, r.error, "Failed to update story");
+    data = r.data as Record<string, unknown>;
+  }
+  if (status !== undefined && status !== existing.status) {
+    // As the signed-in editor (their verified token): the database takes the
+    // actor from auth.uid(), never from a parameter.
+    const r = await supabaseAsUser((req as any).adminToken as string).rpc("p2p_kingdom_story_set_status", { p_story_id: req.params.id, p_status: status });
+    if (r.error && setStatusMissing(r.error)) {
+      // Migration 188 is not applied on this database yet: the pre-188 status
+      // update, unchanged. Once 188 is applied the function exists, and its
+      // trigger gates this table on every path anyway.
+      const legacy: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+      if (status === "published") legacy.published_at = new Date().toISOString();
+      if (status === "archived" && !existing.archived_at) legacy.archived_at = new Date().toISOString();
+      const l = await db.from("p2p_kingdom_stories").update(legacy).eq("id", req.params.id).select().single();
+      if (l.error || !l.data) return storyDbError(res, l.error, "Failed to update story status");
+      data = l.data as Record<string, unknown>;
+    } else {
+      if (r.error) return storyDbError(res, r.error, "Failed to update story status");
+      data = r.data as Record<string, unknown>;
+    }
+  }
   return ok(res, mapStory(data as Record<string, unknown>));
 });
 
@@ -261,9 +307,10 @@ router.delete("/:id", async (req, res) => {
   const { data: existing } = await db.from("p2p_kingdom_stories").select("id").eq("id", req.params.id).maybeSingle();
   if (!existing) return err(res, "Story not found", 404);
   const media = await loadMedia(req.params.id);
-  if (media.length) await db.storage.from("kingdom-stories-media").remove(media.map((m: any) => m.mediaPath));
+  // Row first (audited by migration 188), files only once it is gone.
   const { error } = await db.from("p2p_kingdom_stories").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
+  if (error) return storyDbError(res, error, "Failed to delete story");
+  if (media.length) await db.storage.from("kingdom-stories-media").remove(media.map((m: any) => m.mediaPath));
   return ok(res, { removed: true });
 });
 
@@ -281,7 +328,7 @@ router.post("/:id/media", async (req, res) => {
     caption: (caption as string)?.trim() || null, display_order: displayOrder ?? 0, is_cover: !!isCover,
     duration_seconds: durationSeconds ?? null,
   }).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to add media", dbErrStatus(error));
+  if (error || !data) return storyDbError(res, error, "Failed to add media");
   return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds });
 });
 
@@ -292,7 +339,7 @@ router.put("/:id/media/:mediaId", async (req, res) => {
   if (displayOrder !== undefined) updates.display_order = displayOrder;
   if (isCover !== undefined) updates.is_cover = !!isCover;
   const { data, error } = await db.from("p2p_kingdom_story_media").update(updates).eq("id", req.params.mediaId).eq("story_id", req.params.id).select().maybeSingle();
-  if (error) return err(res, error.message, 500);
+  if (error) return storyDbError(res, error, "Failed to update media");
   if (!data) return err(res, "Media item not found", 404);
   return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover });
 });
@@ -300,9 +347,10 @@ router.put("/:id/media/:mediaId", async (req, res) => {
 router.delete("/:id/media/:mediaId", async (req, res) => {
   const { data: media } = await db.from("p2p_kingdom_story_media").select("media_path").eq("id", req.params.mediaId).eq("story_id", req.params.id).maybeSingle();
   if (!media) return err(res, "Media item not found", 404);
-  await db.storage.from("kingdom-stories-media").remove([media.media_path as string]);
+  // Row first: if it is refused (a live story's media is frozen), the file stays.
   const { error } = await db.from("p2p_kingdom_story_media").delete().eq("id", req.params.mediaId);
-  if (error) return err(res, error.message, 500);
+  if (error) return storyDbError(res, error, "Failed to remove media");
+  await db.storage.from("kingdom-stories-media").remove([media.media_path as string]);
   return ok(res, { removed: true });
 });
 
@@ -319,13 +367,13 @@ router.post("/:id/sources", async (req, res) => {
     url: (url as string)?.trim() || null, citation: (citation as string)?.trim() || null,
     source_type: sourceType ?? null, display_order: displayOrder ?? 0,
   }).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to add source", dbErrStatus(error));
+  if (error || !data) return storyDbError(res, error, "Failed to add source");
   return ok(res, { id: data.id, title: data.title, publisher: data.publisher, url: data.url, citation: data.citation, sourceType: data.source_type, displayOrder: data.display_order });
 });
 
 router.delete("/:id/sources/:sourceId", async (req, res) => {
   const { error } = await db.from("p2p_kingdom_story_sources").delete().eq("id", req.params.sourceId).eq("story_id", req.params.id);
-  if (error) return err(res, error.message, 500);
+  if (error) return storyDbError(res, error, "Failed to remove source");
   return ok(res, { removed: true });
 });
 

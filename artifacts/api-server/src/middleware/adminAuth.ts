@@ -81,6 +81,9 @@ export async function requireAdmin(
   // Attach user ID + role for downstream use
   (req as any).adminUserId = user.id;
   (req as any).adminRole = profile.role as string;
+  // The verified access token, for routes that must act AS this user in the
+  // database (supabaseAsUser) rather than as the service role.
+  (req as any).adminToken = token;
   next();
 }
 

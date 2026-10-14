@@ -14,6 +14,7 @@ import { dispatchPendingPushes } from "./lib/pushDispatch";
 import { sendDueChurchCallReminders } from "./lib/churchCallReminders";
 import { sweepUnansweredCalls } from "./lib/callSweep";
 import { processScheduledDeletions } from "./lib/accountDeletion";
+import { runStudioScheduler } from "./lib/studio/runtime";
 
 // Translation calls fail silently into an English fallback (see
 // curriculum.ts's GET /lessons/:lessonId) by design — a missing key would
@@ -46,6 +47,14 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+});
+
+// Publishing Studio — runs scheduled publish/unpublish/archive jobs. No-op
+// unless STUDIO_SCHEDULER_ENABLED=true (set only after migration 188 is
+// applied); claims are atomic, so several instances are safe.
+cron.schedule("*/1 * * * *", async () => {
+  const result = await runStudioScheduler();
+  if (result?.claimed) logger.info(result, "Studio scheduler run complete");
 });
 
 // Elijah Protocol + Dormant Seed pastoral care — daily inactivity scan.
