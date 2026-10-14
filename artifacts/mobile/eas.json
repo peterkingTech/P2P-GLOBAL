@@ -32,6 +32,13 @@
         "EXPO_PUBLIC_AGORA_APP_ID": "c942d2beda3449d78fab24ac5bf6e0ba"
       }
     },
+    "staging": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_P2P_ENV": "staging"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "android": {

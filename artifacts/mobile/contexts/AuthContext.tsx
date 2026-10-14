@@ -9,13 +9,33 @@ import { createClient, SupabaseClient, Session, User } from "@supabase/supabase-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/apiUrl";
 import { unregisterCurrentPushToken } from "@/lib/push";
-import { PROFILE_COLUMNS } from "@/lib/profileColumns";
+import { PROFILE_COLUMNS, isMissingFunction } from "@/lib/profileColumns";
+import { resolveSupabaseConfig } from "@/config/supabaseEnv";
 
 const SUPABASE_URL = "https://omkqkasniakcnmfcwrvs.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ta3FrYXNuaWFrY25tZmN3cnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4ODM5MzYsImV4cCI6MjA5ODQ1OTkzNn0.093jpH0sX9gAcCBirXunIL0i1qNm6jzIZm8JqwVnIxM";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Which backend this build talks to (config/supabaseEnv.js — the same rules
+// app.config.js enforces at build time). Production is the default; a
+// staging build must carry its own URL + anon key and can never point at
+// production. Each variable is written out literally so Expo inlines it.
+const BACKEND = resolveSupabaseConfig(
+  {
+    EXPO_PUBLIC_P2P_ENV: process.env.EXPO_PUBLIC_P2P_ENV,
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+  },
+  { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY },
+);
+if (!BACKEND.ok) {
+  // Never fall back to another backend silently.
+  throw new Error(`Invalid backend configuration: ${BACKEND.errors.join("; ")}`);
+}
+export const BACKEND_TARGET = BACKEND.config.target;
+
+export const supabase = createClient(BACKEND.config.url, BACKEND.config.anonKey as string, {
   auth: {
     storage: AsyncStorage as any,
     autoRefreshToken: true,
@@ -237,6 +257,30 @@ async function loadAccountStatus(userId: string): Promise<AccountStatusInfo> {
   }
 }
 
+// The signed-in user's OWN private profile fields. p2p_my_private_profile()
+// identifies the caller by the session (auth.uid()) and takes no id, so it can
+// never return someone else's fields. On a server that predates migration 185
+// the function doesn't exist yet and the columns are still readable, so this
+// build then reads them for this user only — it works before and after 185.
+async function loadOwnPrivateFields(userId: string): Promise<{ email: string | null; date_of_birth: string | null } | null> {
+  try {
+    const { data, error } = await supabase.rpc("p2p_my_private_profile");
+    if (!error) {
+      const row = (Array.isArray(data) ? data[0] : data) as { email?: string | null; date_of_birth?: string | null } | undefined;
+      return row ? { email: row.email ?? null, date_of_birth: row.date_of_birth ?? null } : null;
+    }
+    if (isMissingFunction(error)) {
+      const { data: legacy } = await supabase.from("p2p_profiles").select("email,date_of_birth").eq("id", userId).maybeSingle();
+      return legacy ? { email: (legacy.email as string | null) ?? null, date_of_birth: (legacy.date_of_birth as string | null) ?? null } : null;
+    }
+    console.error("p2p_my_private_profile failed", error.code);
+    return null;
+  } catch (e) {
+    console.error("p2p_my_private_profile failed", e);
+    return null;
+  }
+}
+
 function mapProfileRow(row: Record<string, unknown>): UserProfile {
   const ministryRole = ((row.ministry_role as string) ?? "believer") as MinistryRole;
   return {
@@ -332,17 +376,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // updateUsername) robust against the same race instead of silently no-op'ing.
   const fetchProfile = useCallback(async (userId: string, attempt = 1): Promise<void> => {
     try {
-      // Named columns, never "*": raw coordinates aren't readable from the
-      // app (migration 178). The user's OWN coordinates come from
-      // p2p_my_coordinates(); if that call fails the profile still loads,
-      // just without them (features fall back to the country).
-      const [{ data, error }, coords] = await Promise.all([
+      // Named columns, never "*": owner-only fields (email, date of birth,
+      // coordinates, read-receipt preference) aren't readable from the app
+      // for anyone (migration 185). The user's OWN email/date of birth come
+      // from p2p_my_private_profile() and coordinates from
+      // p2p_my_coordinates(); if coordinates fail the profile still loads
+      // (features fall back to the country).
+      const [{ data, error }, coords, priv] = await Promise.all([
         supabase.from("p2p_profiles").select(PROFILE_COLUMNS).eq("id", userId).single(),
         supabase.rpc("p2p_my_coordinates").then((r) => r, () => ({ data: null })),
+        loadOwnPrivateFields(userId),
       ]);
       if (data) {
         const own = Array.isArray(coords?.data) ? (coords.data[0] as { latitude?: number | null; longitude?: number | null } | undefined) : undefined;
-        setProfile(mapProfileRow({ ...(data as unknown as Record<string, unknown>), latitude: own?.latitude ?? null, longitude: own?.longitude ?? null }));
+        // If the private-fields call failed transiently (e.g. offline during a
+        // session restore), keep this SAME user's previously loaded values
+        // rather than blanking them; never carry values across users.
+        setProfile((prev) => {
+          const keep = !priv && prev?.id === userId ? prev : null;
+          return mapProfileRow({
+            ...(data as unknown as Record<string, unknown>),
+            email: priv ? priv.email : keep?.email ?? null,
+            date_of_birth: priv ? priv.date_of_birth : keep?.dateOfBirth ?? null,
+            latitude: own?.latitude ?? null,
+            longitude: own?.longitude ?? null,
+          });
+        });
         return;
       }
       if (error?.code === "PGRST116" && attempt < 5) {
@@ -460,11 +519,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
       if (onboardingLanguage) profileRow.app_language = onboardingLanguage;
-      // The profile is created WITHOUT the location. PostgREST's upsert sets
-      // every payload column from EXCLUDED, and Postgres requires SELECT on a
-      // column to read it from EXCLUDED — once migration 178 removes SELECT on
-      // latitude/longitude, an upsert carrying them fails with 42501.
-      const { error: profileErr } = await supabase.from("p2p_profiles").upsert(profileRow);
+      // The profile is created with a plain INSERT, WITHOUT the location. An
+      // upsert (INSERT … ON CONFLICT DO UPDATE) makes Postgres require SELECT
+      // on every payload column it reads from EXCLUDED, and signed-in users
+      // cannot select email/date_of_birth/coordinates (migration 185), so an
+      // upsert carrying them fails with 42501. Nothing else creates this row,
+      // so a duplicate is either a retried sign-up whose earlier insert already
+      // landed (this user's row exists — success) or a genuine clash such as
+      // a username someone else just took (handled below).
+      const { error: insertErr } = await supabase.from("p2p_profiles").insert(profileRow);
+      let alreadyCreated = false;
+      if (insertErr?.code === "23505") {
+        const { data: own } = await supabase.from("p2p_profiles").select("id").eq("id", data.user.id).maybeSingle();
+        alreadyCreated = !!own;
+      }
+      const profileErr = alreadyCreated ? null : insertErr;
       if (profileErr) {
         // Someone else claimed this exact username between the real-time
         // check on the registration screen and this insert — surface a

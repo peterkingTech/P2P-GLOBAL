@@ -19,6 +19,14 @@
 export function getApiUrl(): string {
   let resolved = "";
 
+  // A staging build without its own API server sets "disabled": API-backed
+  // features then fail closed (callers already guard an empty base URL)
+  // instead of reaching the PRODUCTION API with staging credentials.
+  if (process.env.EXPO_PUBLIC_API_URL === "disabled") {
+    console.warn("API server disabled for this build (EXPO_PUBLIC_API_URL=disabled) — API-backed features are unavailable.");
+    return "";
+  }
+
   if (process.env.EXPO_PUBLIC_API_URL) {
     resolved = process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
   } else if (process.env.EXPO_PUBLIC_DOMAIN) {

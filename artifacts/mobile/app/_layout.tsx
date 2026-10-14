@@ -41,6 +41,8 @@ import { ModuleCelebrationModal } from "@/components/ModuleCelebrationModal";
 import { FruitCelebrationModal } from "@/components/FruitCelebrationModal";
 import { CategoryCompletionModal } from "@/components/CategoryCompletionModal";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AppVersionGate } from "@/components/AppVersionGate";
+import { ClientBuildReporter } from "@/components/ClientBuildReporter";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { PageFrame } from "@/components/PageFrame";
@@ -593,6 +595,7 @@ function RootLayoutNav() {
         <MessageBannerHost />
         <PushNotificationHost />
         <PresenceHost />
+        <ClientBuildReporter />
       </DataProvider>
     </AuthProvider>
   );
@@ -640,7 +643,12 @@ export default function RootLayout() {
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#06110D" }}>
               <KeyboardProvider>
-                <RootLayoutNav />
+                {/* Below the server's minimum supported build: update screen
+                    instead of the app (migration 186). Never blocks while
+                    checking, offline, or when anything is unknown. */}
+                <AppVersionGate>
+                  <RootLayoutNav />
+                </AppVersionGate>
               </KeyboardProvider>
             </GestureHandlerRootView>
           </QueryClientProvider>

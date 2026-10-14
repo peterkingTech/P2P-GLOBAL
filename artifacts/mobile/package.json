@@ -8,7 +8,12 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "audit:translations": "node scripts/audit-translations.js"
+    "audit:translations": "node scripts/audit-translations.js",
+    "test:receipts": "node tests/messageReceipts.test.mjs && node tests/messageReceiptsUi.test.mjs",
+    "test:profile-privacy": "node tests/profilePrivacy.test.mjs",
+    "test:backend-config": "node tests/backendConfig.test.mjs",
+    "test:app-version": "node tests/appVersionPolicy.test.mjs",
+    "test:release": "npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
