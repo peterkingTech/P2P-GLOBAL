@@ -1,3 +1,6 @@
+// Must stay the first import: validates the backend target before any module
+// creates a Supabase client (no-op for production).
+import "./lib/envGuard";
 import cron from "node-cron";
 import app from "./app";
 import { logger } from "./lib/logger";
