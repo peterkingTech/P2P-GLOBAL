@@ -94,7 +94,7 @@ export function makeTranslator(db, role, uid = null) {
       };
       return c;
     },
-    async rpc(fn, args) {
+    async rpc(fn, args = {}) {
       const keys = Object.keys(args);
       const named = keys.map((k, i) => `${k} => $${i + 1}`).join(", ");
       try {
@@ -120,7 +120,7 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
   };
   const posix = (p) => p.replace(/\\/g, "/");
   const plugin = { name: "lab", setup(b) {
-    b.onResolve({ filter: /(^|\/)lib\/supabase$|^\.\.\/supabase$/ }, () => ({ path: "supabase", namespace: "lab" }));
+    b.onResolve({ filter: /(^|\/)lib\/supabase$|^\.\.?\/supabase$/ }, () => ({ path: "supabase", namespace: "lab" }));
     b.onResolve({ filter: /(^|\/)logger$/ }, () => ({ path: "logger", namespace: "lab" }));
     b.onResolve({ filter: /^@supabase\/supabase-js$/ }, () => ({ path: "sbjs", namespace: "lab" }));
     b.onLoad({ filter: /.*/, namespace: "lab" }, (a) => ({ loader: "js", contents: {
@@ -136,12 +136,15 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
   writeFileSync(entry, `import express from "express";
 import studio from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/studio.ts")))};
 import stories from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/kingdomStories.ts")))};
+import wins from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/kingdomWins.ts")))};
+export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
 ${extraRoutes}
 app.use(express.json());
 app.use("/api/studio", studio);
 app.use("/api/kingdom-stories", stories);
+app.use("/api/kingdom-wins", wins);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

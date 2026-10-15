@@ -92,11 +92,12 @@ const Admin = loadFile(path.join(root, "app/admin/_layout.tsx")).default;
 const src = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
 // Expected tabs per role, from the NAV_ITEMS role lists (unchanged by this fix).
 const EXPECTED = {
-  super_admin: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Registrations", "Help Requests", "P2P Official Mail", "Moderation", "Usernames", "Verification", "Translations", "Team"],
-  admin_content: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio"],
-  admin_moderation: ["Dashboard", "Publishing Studio", "Moderation"],
-  moderator: ["Dashboard", "Publishing Studio", "Help Requests", "Moderation", "Usernames", "Verification"],
-  admin_supervisor: ["Dashboard", "Publishing Studio", "Team"],
+  // "Kingdom Wins" review: Wins moderators + the admin_content P2P Impact reviewer (migration 189).
+  super_admin: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Registrations", "Help Requests", "P2P Official Mail", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Translations", "Team"],
+  admin_content: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Kingdom Wins"],
+  admin_moderation: ["Dashboard", "Publishing Studio", "Moderation", "Kingdom Wins"],
+  moderator: ["Dashboard", "Publishing Studio", "Help Requests", "Moderation", "Kingdom Wins", "Usernames", "Verification"],
+  admin_supervisor: ["Dashboard", "Publishing Studio", "Kingdom Wins", "Team"],
   admin_translation: ["Dashboard", "Publishing Studio", "Translations"],
   admin_marketing: ["Dashboard", "Publishing Studio", "P2P Official Mail"],
   admin_help: ["Dashboard", "Help Requests", "P2P Official Mail"],

@@ -60,6 +60,12 @@ export interface KingdomWin {
   isAnonymous: boolean; visibility: "p2p_network" | "private"; status: KingdomStatus; moderationNote: string | null;
   consentConfirmedAt: string | null; createdAt: string; updatedAt: string; submittedAt: string | null;
   publishedAt: string | null; archivedAt: string | null;
+  /** Kept out of the feed by automated screening until a moderator decides (migration 189). */
+  heldForReview?: boolean;
+  /** Matched screening categories — staff views only. */
+  screeningCategories?: string[];
+  /** English translation used to screen a non-English post — staff views only. */
+  screeningTranslation?: string | null;
   reactionCounts?: Record<string, number>; myReactions?: string[];
 }
 
@@ -107,12 +113,30 @@ export function unreactToKingdomWin(id: string, reactionType: KingdomReactionTyp
   return authedFetch(`/kingdom-wins/${id}/react/${reactionType}`, { method: "DELETE" });
 }
 
-// ── Admin moderation (P2P Impact review queue) ──────────────────────────────
-export function getKingdomWinsAdminQueue(status: "submitted" | "published" | "rejected" | "archived" = "submitted"): Promise<KingdomWin[]> {
+/** The signed-in member's own posting status (migration 189). */
+export function getMyWinsPostingStatus(): Promise<{ restricted: boolean; until: string | null }> {
+  return authedFetch("/kingdom-wins/me/posting-status");
+}
+
+// ── Admin moderation (review queue + posting restrictions) ──────────────────
+export function getKingdomWinsAdminQueue(status: "submitted" | "published" | "rejected" | "archived" | "removed" = "submitted"): Promise<KingdomWin[]> {
   return authedFetch(`/kingdom-wins/admin/queue?status=${status}`);
 }
 export function moderateKingdomWin(id: string, action: "approve" | "reject" | "archive", note?: string): Promise<KingdomWin> {
   return authedFetch(`/kingdom-wins/${id}/moderate`, { method: "POST", body: JSON.stringify({ action, note }) });
+}
+export interface WinsRestriction {
+  id: string; userId: string; reason: string; imposedBy: string | null; imposedAt: string; expiresAt: string | null;
+  liftedAt: string | null; liftedBy: string | null; liftReason: string | null; active: boolean;
+}
+export function getWinsRestrictions(userId: string): Promise<WinsRestriction[]> {
+  return authedFetch(`/kingdom-wins/admin/restrictions?userId=${encodeURIComponent(userId)}`);
+}
+export function restrictWinsPosting(userId: string, reason: string, expiresAt: string | null): Promise<unknown> {
+  return authedFetch("/kingdom-wins/admin/restrictions", { method: "POST", body: JSON.stringify({ userId, reason, expiresAt }) });
+}
+export function liftWinsRestriction(restrictionId: string, reason: string): Promise<unknown> {
+  return authedFetch(`/kingdom-wins/admin/restrictions/${restrictionId}/lift`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
 // Media upload — identical client-generated-id shape used throughout this

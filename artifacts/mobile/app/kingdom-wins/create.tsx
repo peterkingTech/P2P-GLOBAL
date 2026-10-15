@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Image, Platform, Alert } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,9 +9,10 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoRecorder from "@/components/VideoRecorder";
 import {
-  createKingdomWin, uploadKingdomWinVideo, uploadKingdomWinPhoto,
+  createKingdomWin, uploadKingdomWinVideo, uploadKingdomWinPhoto, getMyWinsPostingStatus,
   KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomEntryType, type KingdomCategory, type ImpactTheme,
 } from "@/lib/kingdomWinsApi";
+import { WINS_COMMUNITY_RULES, WINS_RULES_NOTE, postingStatusMessage, shareOutcome } from "@/lib/winsModerationModel";
 import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
 
 function showAlert(title: string, message: string) {
@@ -65,6 +66,12 @@ export default function CreateKingdomWinScreen() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [photoAsset, setPhotoAsset] = useState<{ uri: string; mimeType?: string; fileName?: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Posting restriction (migration 189). The server enforces it either way;
+  // this only explains it up front. Drafts stay available.
+  const [restrictedNotice, setRestrictedNotice] = useState<string | null>(null);
+  useEffect(() => {
+    getMyWinsPostingStatus().then((s) => setRestrictedNotice(postingStatusMessage(s))).catch(() => {});
+  }, []);
 
   const isImpact = entryType === "p2p_impact";
   const hasContent = isImpact
@@ -109,7 +116,7 @@ export default function CreateKingdomWinScreen() {
         const ref = await createOrFindScriptureReference(parsed);
         scriptureReferenceId = ref.id;
       }
-      await createKingdomWin({
+      const saved = await createKingdomWin({
         ...mediaFields, entryType, title: title.trim(),
         ...(isImpact
           ? { guidedSections: { before: before.trim() || undefined, journey: journey.trim() || undefined, whatGodDid: whatGodDid.trim() || undefined, today: today.trim() || undefined, encouragement: encouragement.trim() || undefined } }
@@ -119,11 +126,9 @@ export default function CreateKingdomWinScreen() {
         scriptureReferenceId, isAnonymous, visibility: "p2p_network", status,
         consentConfirmed: isImpact ? consentConfirmed : undefined,
       });
-      const shared = status === "published" || status === "submitted";
-      showAlert(
-        status === "published" ? "Shared!" : status === "submitted" ? "Submitted for review" : "Draft saved",
-        status === "published" ? "Your story is now live." : status === "submitted" ? "A team member will review your story before it's shared with the community." : "You can continue it later from My Stories."
-      );
+      // Report what the server actually did (a post may be held for review).
+      const outcome = shareOutcome(status, saved);
+      showAlert(outcome.title, outcome.message);
       router.replace("/kingdom-wins" as any);
     } catch (e: any) {
       showAlert("Couldn't save your story", e.message ?? "Please try again.");
@@ -253,14 +258,34 @@ export default function CreateKingdomWinScreen() {
           </TouchableOpacity>
         )}
 
+        <View style={styles.rulesBox} accessibilityLabel="Kingdom Wins community rules">
+          <Text style={styles.rulesTitle}>Community rules</Text>
+          {WINS_COMMUNITY_RULES.map((rule) => (
+            <View key={rule} style={styles.ruleRow}>
+              <Ionicons name="checkmark-circle-outline" size={14} color={c.accentGreen} />
+              <Text style={styles.ruleText}>{rule}</Text>
+            </View>
+          ))}
+          <Text style={styles.rulesNote}>{WINS_RULES_NOTE}</Text>
+        </View>
+
+        {restrictedNotice ? (
+          <View style={styles.restrictedBox} accessibilityRole="alert">
+            <Ionicons name="lock-closed-outline" size={16} color="#8A5410" />
+            <Text style={styles.restrictedText}>{restrictedNotice}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.btnRow}>
           <TouchableOpacity style={styles.draftBtn} onPress={() => handleSubmit("draft")} disabled={submitting || !title.trim() || !hasContent}>
             <Text style={styles.draftBtnText}>Save Draft</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.publishBtn}
+            style={[styles.publishBtn, !!restrictedNotice && { opacity: 0.5 }]}
             onPress={() => handleSubmit(isImpact ? "submitted" : "published")}
-            disabled={submitting || !title.trim() || !hasContent || (isImpact && !consentConfirmed)}
+            disabled={submitting || !title.trim() || !hasContent || (isImpact && !consentConfirmed) || !!restrictedNotice}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !!restrictedNotice }}
           >
             {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>{isImpact ? "Submit for Review" : "Share"}</Text>}
           </TouchableOpacity>
@@ -302,6 +327,13 @@ function makeStyles(c: AppColors) {
     anonLabel: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     consentRow: { flexDirection: "row", gap: 10, alignItems: "flex-start", marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     consentText: { flex: 1, fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    rulesBox: { marginTop: 18, padding: 12, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, gap: 4 },
+    rulesTitle: { fontSize: 12, color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 2 },
+    ruleRow: { flexDirection: "row", gap: 6, alignItems: "flex-start" },
+    ruleText: { flex: 1, fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    rulesNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16, marginTop: 4 },
+    restrictedBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: "#FFF4E0", borderWidth: 1, borderColor: "#F0C987" },
+    restrictedText: { flex: 1, fontSize: 12, color: "#8A5410", fontFamily: "Inter_500Medium", lineHeight: 17 },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 24 },
     draftBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
     draftBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },

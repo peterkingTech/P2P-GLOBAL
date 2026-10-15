@@ -1,6 +1,8 @@
 import { Router } from "express";
-import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
-import { requireAdmin } from "../middleware/adminAuth";
+import { supabaseServiceRole as db, supabaseAsUser, verifyCaller } from "../lib/supabase";
+import { requireAdmin, requireRole } from "../middleware/adminAuth";
+import { IMPACT_REVIEWER_ROLES, WINS_MODERATOR_ROLES, isImpactReviewerRole, isWinsModeratorRole, winsDbRefusal } from "../lib/winsModeration";
+import { prepareWinsTranslation } from "../lib/winsTranslation";
 
 // Kingdom Wins / Testimonies — "Look what God has done." A genuinely
 // independent peer-authored domain (migration 150, extended 151 for P2P
@@ -61,15 +63,36 @@ function assembleBodyFromSections(sections: GuidedSections): string | null {
   return parts.length ? parts.join("\n\n") : null;
 }
 
-async function isAdmin(userId: string): Promise<boolean> {
+async function callerRole(userId: string): Promise<string | null> {
   const { data } = await db.from("p2p_profiles").select("role").eq("id", userId).maybeSingle();
-  return !!data && data.role !== "student";
+  return (data?.role as string | undefined) ?? null;
+}
+// Writes run AS the signed-in member (their verified token), so migration
+// 189's database guard applies to the API exactly as to any other client:
+// ownership, allowed states, consent, media ownership, screening and posting
+// restrictions. The actor is the token's user, never a request field.
+function bearer(req: import("express").Request): string {
+  const h = req.headers.authorization ?? "";
+  return h.startsWith("Bearer ") ? h.slice(7) : "";
+}
+const asUser = (req: import("express").Request) => supabaseAsUser((req as any).adminToken ?? bearer(req));
+/** A restricted member's post will be refused anyway: don't pay to translate it. */
+async function isRestricted(req: import("express").Request): Promise<boolean> {
+  const { data } = await asUser(req).rpc("p2p_my_wins_posting_status");
+  return !!(data as { restricted?: boolean } | null)?.restricted;
+}
+function dbFail(res: import("express").Response, error: { code?: string; message?: string } | null, fallback: string) {
+  const refusal = winsDbRefusal(error);
+  if (refusal) return res.status(refusal.status).json({ error: refusal.error, code: refusal.code });
+  // A write that matched no row the caller may change (row-level security).
+  if (error?.code === "PGRST116") return res.status(403).json({ error: "You can't change this entry.", code: "wins_forbidden" });
+  return err(res, error?.message ?? fallback, 500);
 }
 async function notify(userId: string, title: string, message: string, notificationType: string, data: Record<string, unknown> = {}) {
   await db.from("p2p_notifications").insert({ user_id: userId, title, message, notification_type: notificationType, data });
 }
 
-function mapEntry(row: Record<string, unknown>, extra?: { authorName?: string | null; reactionCounts?: Record<string, number>; myReactions?: string[] }) {
+function mapEntry(row: Record<string, unknown>, extra?: { authorName?: string | null; reactionCounts?: Record<string, number>; myReactions?: string[]; staff?: boolean }) {
   // "Not our work, His work": an anonymous author is a deliberate choice
   // by the author; a NULL author_id means the account no longer exists —
   // both hide the name, but for different reasons, and the second must
@@ -85,8 +108,18 @@ function mapEntry(row: Record<string, unknown>, extra?: { authorName?: string | 
     visibility: row.visibility, status: row.status, moderationNote: row.moderation_note,
     consentConfirmedAt: row.consent_confirmed_at, createdAt: row.created_at, updatedAt: row.updated_at,
     submittedAt: row.submitted_at, publishedAt: row.published_at, archivedAt: row.archived_at,
+    // Kept out of the feed by automated screening until a moderator decides.
+    heldForReview: !!row.moderation_hold,
+    // Which rule categories matched — staff views only (never the author's).
+    screeningCategories: extra?.staff ? screeningCategories(row.screening) : undefined,
+    // English translation used for screening a non-English post — staff views only.
+    screeningTranslation: extra?.staff ? ((row.screening as { translation?: { text?: string } } | null)?.translation?.text ?? null) : undefined,
     reactionCounts: extra?.reactionCounts ?? undefined, myReactions: extra?.myReactions ?? undefined,
   };
+}
+function screeningCategories(screening: unknown): string[] {
+  const hits = (screening as { hits?: Array<{ category?: string }> } | null)?.hits ?? [];
+  return [...new Set(hits.map((h) => h.category).filter((c): c is string => !!c))];
 }
 async function profileName(userId: string): Promise<string> {
   const { data } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
@@ -177,7 +210,13 @@ router.post("/", async (req, res) => {
   }
 
   const isPublishing = status === "published";
-  const { data, error } = await db.from("p2p_kingdom_wins").insert({
+  // A post in another language is translated for screening before it is
+  // shared (same field values as the insert below; failure → held).
+  if ((status === "published" || status === "submitted") && !(await isRestricted(req))) {
+    await prepareWinsTranslation(userId, { title: title.trim(), body: resolvedBody, lessonLearned: lessonLearned?.trim() || null, guidedSections: guidedSections ?? null });
+  }
+  // Timestamps below are informational: the database sets them itself.
+  const { data, error } = await asUser(req).from("p2p_kingdom_wins").insert({
     ...(id ? { id } : {}),
     author_id: userId, entry_type: entryType, title: title.trim(), body: resolvedBody,
     guided_sections: guidedSections ?? null,
@@ -190,8 +229,17 @@ router.post("/", async (req, res) => {
     submitted_at: status === "submitted" || isPublishing ? new Date().toISOString() : null,
     published_at: isPublishing ? new Date().toISOString() : null,
   }).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to create entry", 500);
+  if (error || !data) return dbFail(res, error, "Failed to create entry");
   return ok(res, mapEntry(data as Record<string, unknown>, { authorName: await profileName(userId) }));
+});
+
+// The signed-in member's own posting status (no reason, no moderator).
+router.get("/me/posting-status", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { data, error } = await asUser(req).rpc("p2p_my_wins_posting_status");
+  if (error) return dbFail(res, error, "Failed to load posting status");
+  return ok(res, data ?? { restricted: false, until: null });
 });
 
 router.get("/mine", async (req, res) => {
@@ -207,8 +255,12 @@ router.put("/:id", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { data: existing } = await db.from("p2p_kingdom_wins").select("*").eq("id", req.params.id).maybeSingle();
   if (!existing) return err(res, "Entry not found", 404);
-  const callerIsAdmin = await isAdmin(userId);
+  const role = await callerRole(userId);
   const isOwner = existing.author_id === userId;
+  // Staff = an explicit Wins moderator, or the P2P Impact reviewer for a P2P
+  // Impact entry. Not "any role except student" (that included peer guides,
+  // finance and marketing admins).
+  const callerIsAdmin = !isOwner && (isWinsModeratorRole(role) || (existing.entry_type === "p2p_impact" && isImpactReviewerRole(role)));
   if (!isOwner && !callerIsAdmin) return err(res, "Only the author can edit this entry", 403);
 
   const {
@@ -263,9 +315,15 @@ router.put("/:id", async (req, res) => {
     if (status === "archived" && !existing.archived_at) updates.archived_at = new Date().toISOString();
   }
 
-  const { data, error } = await db.from("p2p_kingdom_wins").update(updates).eq("id", req.params.id).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to update entry", 500);
-  return ok(res, mapEntry(data as Record<string, unknown>, { authorName: existing.author_id ? await profileName(existing.author_id as string) : null }));
+  // The author is sharing (or editing a shared post): translate the resulting
+  // text for screening if it isn't English.
+  if (isOwner && ["submitted", "published"].includes(effectiveStatus) && !(await isRestricted(req))) {
+    const pick = (k: string) => (k in updates ? updates[k] : existing[k]) as string | null;
+    await prepareWinsTranslation(userId, { title: pick("title"), body: pick("body"), lessonLearned: pick("lesson_learned"), guidedSections: "guided_sections" in updates ? updates.guided_sections : existing.guided_sections });
+  }
+  const { data, error } = await asUser(req).from("p2p_kingdom_wins").update(updates).eq("id", req.params.id).select().single();
+  if (error || !data) return dbFail(res, error, "Failed to update entry");
+  return ok(res, mapEntry(data as Record<string, unknown>, { authorName: existing.author_id ? await profileName(existing.author_id as string) : null, staff: callerIsAdmin }));
 });
 
 router.delete("/:id", async (req, res) => {
@@ -274,9 +332,10 @@ router.delete("/:id", async (req, res) => {
   const { data: existing } = await db.from("p2p_kingdom_wins").select("id,author_id,media_path").eq("id", req.params.id).maybeSingle();
   if (!existing) return err(res, "Entry not found", 404);
   if (existing.author_id !== userId) return err(res, "Only the author can delete this entry", 403);
+  // Row first (as the author), files only once it is gone.
+  const { error } = await asUser(req).from("p2p_kingdom_wins").delete().eq("id", req.params.id);
+  if (error) return dbFail(res, error, "Failed to delete entry");
   if (existing.media_path) await db.storage.from("kingdom-wins-media").remove([existing.media_path as string]);
-  const { error } = await db.from("p2p_kingdom_wins").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
   return ok(res, { removed: true });
 });
 
@@ -321,7 +380,8 @@ router.get("/:id", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { data: entry } = await db.from("p2p_kingdom_wins").select("*").eq("id", req.params.id).maybeSingle();
   if (!entry) return err(res, "Entry not found", 404);
-  const callerIsAdmin = entry.author_id === userId ? true : await isAdmin(userId);
+  const role = entry.author_id === userId ? null : await callerRole(userId);
+  const callerIsAdmin = isWinsModeratorRole(role) || (entry.entry_type === "p2p_impact" && isImpactReviewerRole(role));
   const viewable = (entry.status === "published" && entry.visibility === "p2p_network") || entry.author_id === userId || callerIsAdmin;
   if (!viewable) return err(res, "This entry is not available", 404);
 
@@ -367,16 +427,56 @@ router.delete("/:id/react/:reactionType", async (req, res) => {
 // as before for authors who use it — this is an ADDITIONAL path, gated by
 // the existing requireAdmin middleware, not a replacement.
 
-router.get("/admin/queue", requireAdmin, async (req, res) => {
+// Queue and actions: Wins moderators, plus admin_content for P2P Impact
+// review. Reads and writes run as the moderator, so the database decides
+// what each role may see and do (admin_content: P2P Impact only).
+const reviewOnly = [requireAdmin, requireRole(...IMPACT_REVIEWER_ROLES)];
+const moderatorsOnly = [requireAdmin, requireRole(...WINS_MODERATOR_ROLES)];
+
+router.get("/admin/queue", ...reviewOnly, async (req, res) => {
   const { status = "submitted" } = req.query as { status?: string };
-  if (!["submitted", "published", "rejected", "archived"].includes(status)) return err(res, "invalid status filter");
-  const { data, error } = await db.from("p2p_kingdom_wins").select("*").eq("status", status).order("submitted_at", { ascending: true, nullsFirst: false });
-  if (error) return err(res, error.message, 500);
-  const withNames = await Promise.all((data ?? []).map(async (r) => mapEntry(r as Record<string, unknown>, { authorName: r.author_id ? await profileName(r.author_id as string) : null })));
+  if (!["submitted", "published", "rejected", "archived", "removed"].includes(status)) return err(res, "invalid status filter");
+  const { data, error } = await asUser(req).from("p2p_kingdom_wins").select("*").eq("status", status).order("submitted_at", { ascending: true, nullsFirst: false });
+  if (error) return dbFail(res, error, "Failed to load queue");
+  const withNames = await Promise.all((data ?? []).map(async (r) => mapEntry(r as Record<string, unknown>, { authorName: r.author_id ? await profileName(r.author_id as string) : null, staff: true })));
   return ok(res, withNames);
 });
 
-router.post("/:id/moderate", requireAdmin, async (req, res) => {
+// ── Posting restrictions (Wins moderators only) ──────────────────────────────
+router.get("/admin/restrictions", ...moderatorsOnly, async (req, res) => {
+  const userId = String(req.query.userId ?? "");
+  if (!UUID_RE.test(userId)) return err(res, "userId must be a valid UUID");
+  const { data, error } = await asUser(req).from("p2p_kingdom_win_restrictions").select("*").eq("user_id", userId).order("imposed_at", { ascending: false });
+  if (error) return dbFail(res, error, "Failed to load restrictions");
+  const now = Date.now();
+  return ok(res, (data ?? []).map((r: any) => ({
+    id: r.id, userId: r.user_id, reason: r.reason, imposedBy: r.imposed_by, imposedAt: r.imposed_at, expiresAt: r.expires_at,
+    liftedAt: r.lifted_at, liftedBy: r.lifted_by, liftReason: r.lift_reason,
+    active: !r.lifted_at && (!r.expires_at || Date.parse(r.expires_at) > now),
+  })));
+});
+
+router.post("/admin/restrictions", ...moderatorsOnly, async (req, res) => {
+  const { userId, reason, expiresAt } = req.body as { userId?: string; reason?: string; expiresAt?: string | null };
+  if (!userId || !UUID_RE.test(userId)) return err(res, "userId must be a valid UUID");
+  if (!reason?.trim()) return err(res, "A reason is required");
+  if (expiresAt != null && Number.isNaN(Date.parse(expiresAt))) return err(res, "expiresAt must be a date-time or null");
+  const { data, error } = await asUser(req).rpc("p2p_wins_restrict_user", { p_user_id: userId, p_reason: reason, p_expires_at: expiresAt ?? null });
+  if (error) return dbFail(res, error, "Failed to restrict posting");
+  return ok(res, data);
+});
+
+router.post("/admin/restrictions/:restrictionId/lift", ...moderatorsOnly, async (req, res) => {
+  const { reason } = req.body as { reason?: string };
+  const restrictionId = String(req.params.restrictionId);
+  if (!UUID_RE.test(restrictionId)) return err(res, "invalid restriction id");
+  if (!reason?.trim()) return err(res, "A reason is required");
+  const { data, error } = await asUser(req).rpc("p2p_wins_lift_restriction", { p_restriction_id: restrictionId, p_reason: reason });
+  if (error) return dbFail(res, error, "Failed to lift restriction");
+  return ok(res, data);
+});
+
+router.post("/:id/moderate", ...reviewOnly, async (req, res) => {
   const { action, note } = req.body as { action?: string; note?: string };
   if (!action || !["approve", "reject", "archive"].includes(action)) return err(res, "action must be approve, reject, or archive");
   const { data: entry } = await db.from("p2p_kingdom_wins").select("id,author_id,title,status").eq("id", req.params.id).maybeSingle();
@@ -395,8 +495,10 @@ router.post("/:id/moderate", requireAdmin, async (req, res) => {
     notifyTitle = "Your story was archived"; notifyMessage = `"${entry.title}" has been archived and is no longer publicly visible.`;
   }
 
-  const { data, error } = await db.from("p2p_kingdom_wins").update(updates).eq("id", req.params.id).select().single();
-  if (error || !data) return err(res, error?.message ?? "Failed to update entry", 500);
+  // As the moderator: the database checks the role, records the action in the
+  // admin activity log and refuses anything outside that role's remit.
+  const { data, error } = await asUser(req).from("p2p_kingdom_wins").update(updates).eq("id", req.params.id).select().single();
+  if (error || !data) return dbFail(res, error, "Failed to update entry");
   if (entry.author_id) {
     await notify(entry.author_id as string, notifyTitle, notifyMessage, "kingdom_win_moderation", { kingdomWinId: entry.id, action });
   }

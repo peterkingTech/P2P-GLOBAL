@@ -12,7 +12,8 @@
     "check:staging": "node scripts/start-staging.mjs --check-only",
     "test:env-guards": "node tests/serverEnv.test.mjs && node tests/stagingIsolation.test.mjs",
     "test:push": "node tests/pushDelivery.test.mjs",
-    "test:studio": "node tests/studio.test.mjs"
+    "test:studio": "node tests/studio.test.mjs",
+    "test:wins": "node tests/winsModeration.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
