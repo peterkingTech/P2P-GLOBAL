@@ -321,6 +321,18 @@ async function suite(db, with188) {
   await db.exec(`reset role; set test.uid = '';`);
   await db.query(`delete from auth.users where id = $1`, [x]);
   ok("account deletion keeps the published testimony (author set null)", (await row(xw))?.author_id === null && (await row(xw)).status === "published");
+  // Production keeps reports when an author deletes their account (author_id set null).
+  await db.query(`insert into auth.users values ($1)`, ["00000000-0000-0000-0000-0000000000ab"]);
+  await db.query(`insert into p2p_profiles (id, role) values ($1, 'student')`, ["00000000-0000-0000-0000-0000000000ab"]);
+  await db.exec(`set test.uid = '00000000-0000-0000-0000-0000000000ab'; set role authenticated;`);
+  const yw = (await db.query(`insert into p2p_kingdom_wins (author_id, entry_type, title, body, category, status) values ('00000000-0000-0000-0000-0000000000ab', 'kingdom_win', 't', 'God answered.', 'healing', 'published') returning id`)).rows[0].id;
+  await db.exec(`reset role; set test.uid = '';`);
+  const yFlag = await report("Q", yw);
+  await db.query(`delete from p2p_profiles where id = $1`, ["00000000-0000-0000-0000-0000000000ab"]);
+  await db.query(`delete from auth.users where id = $1`, ["00000000-0000-0000-0000-0000000000ab"]);
+  ok("report about a deleted author's post survives (author null)", (await db.query(`select author_id from p2p_content_flags where id = $1`, [yFlag])).rows[0]?.author_id === null);
+  ok("a moderator can still resolve it (self-resolution rule not misfiring on null)", !isErr(await as(db, "O", `select p2p_moderate_flag($1, 'remove', 'Ownerless spam')`, [yFlag]))
+    && (await row(yw)).status === "removed");
 
   return out;
 }

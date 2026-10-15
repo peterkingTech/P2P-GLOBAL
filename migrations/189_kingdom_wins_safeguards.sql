@@ -539,7 +539,9 @@ begin
     end if;
     new.created_at := old.created_at; new.updated_at := now();
     new.submitted_at := old.submitted_at; new.published_at := old.published_at; new.archived_at := old.archived_at;
-    v_is_author := old.author_id = v_actor;
+    -- coalesce: a post whose author deleted their account (author_id null)
+    -- has no author — a NULL here would wrongly skip the moderator rules.
+    v_is_author := coalesce(old.author_id = v_actor, false);
     v_content_changed :=
       (new.title, new.body, new.lesson_learned, new.guided_sections, new.category, new.impact_themes, new.scripture_reference_id,
        new.mission_story_id, new.mission_field_id, new.prayer2_request_id, new.media_type, new.media_path,

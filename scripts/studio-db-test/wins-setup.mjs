@@ -59,8 +59,10 @@ export async function buildWinsDb(PGlite, { with188 = false, with189 = false, ti
     create table public.p2p_help_requests (id uuid primary key default gen_random_uuid(), user_id uuid, tier text, category text, note text, status text);
     create table public.p2p_notifications (id uuid primary key default gen_random_uuid(), user_id uuid, title text, message text, notification_type text, data jsonb, created_at timestamptz default now());
     -- 013's table (content_type check widened by 150), RLS on like production.
+    -- author_id as it exists in production (seen on staging, which mirrors the
+    -- production schema): nullable, ON DELETE SET NULL — not 013's NOT NULL/CASCADE.
     create table public.p2p_content_flags (id uuid primary key default gen_random_uuid(), content_type text not null, content_id uuid not null,
-      author_id uuid not null references public.p2p_profiles(id) on delete cascade, reporter_id uuid references public.p2p_profiles(id) on delete set null,
+      author_id uuid references public.p2p_profiles(id) on delete set null, reporter_id uuid references public.p2p_profiles(id) on delete set null,
       reason text, content_snapshot text, status text not null default 'open' check (status in ('open', 'dismissed', 'warned', 'removed', 'escalated')),
       resolved_by uuid, resolved_at timestamptz, resolution_note text, escalation_help_request_id uuid, created_at timestamptz not null default now());
     alter table public.p2p_content_flags enable row level security;
