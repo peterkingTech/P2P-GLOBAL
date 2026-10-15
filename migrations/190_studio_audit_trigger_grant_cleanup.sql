@@ -1,0 +1,13 @@
+-- 190: tidy-up for 188 — remove the default EXECUTE grant left on the Studio
+-- audit-log trigger function p2p_studio_audit_immutable() (found by the 188
+-- production postcheck). Harmless before this change: PostgreSQL refuses to
+-- call a trigger function directly, and it is not SECURITY DEFINER. Removing
+-- the grant just makes it match every other Studio trigger function.
+--
+-- The trigger keeps working: EXECUTE on a trigger function is checked when
+-- the trigger is created, not each time it fires (188's other trigger
+-- functions already have no grants and fire normally).
+--
+-- Re-runnable. Rollback (manual):
+--   grant execute on function public.p2p_studio_audit_immutable() to public;
+revoke all on function public.p2p_studio_audit_immutable() from public, anon, authenticated, service_role;
