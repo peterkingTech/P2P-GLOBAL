@@ -10,6 +10,8 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { Avatar } from "@/components/Avatar";
+import { QrShareSheet } from "@/components/qr/QrShareSheet";
+import { circleQr } from "@/lib/qrLinks";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null; isVerified: boolean }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -50,6 +52,30 @@ export default function CircleDetailScreen() {
   const [transferring, setTransferring] = useState(false);
 
   const isLeader = circle?.leaderId === profile?.id;
+  // Active members can show the Circle's QR. Everyone else signed in sees the
+  // same "Request to Join" as Find a Circle: the leader still approves.
+  const isMember = !!profile?.id && !!circle?.members?.some((m) => m.userId === profile.id);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [joinState, setJoinState] = useState<"idle" | "sending" | "sent">("idle");
+
+  async function requestToJoin() {
+    if (!profile?.id || !circleId) return;
+    setJoinState("sending");
+    try {
+      // Same request as app/circles/discover.tsx. Signed: the server checks
+      // the request is really from this person.
+      const res = await authedFetch(`/circles/${circleId}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setJoinState("sent");
+    } catch {
+      setJoinState("idle");
+      Alert.alert("Couldn't send request", "Please try again.");
+    }
+  }
 
   const load = useCallback(async () => {
     if (!circleId) return;
@@ -57,12 +83,15 @@ export default function CircleDetailScreen() {
     try {
       const apiUrl = getApiUrl();
       const res = await fetch(`${apiUrl}/circles/${circleId}`);
+      // A removed or mistyped Circle (e.g. from an old QR code) is a 404 with
+      // an error body: show "not found", never a half-rendered Circle.
+      if (!res.ok) { setCircle(null); return; }
       const data = (await res.json()) as CircleDetail;
       setCircle(data);
 
       if (data.leaderId === profile?.id) {
-        const jrRes = await fetch(`${apiUrl}/circles/${circleId}/join-requests`);
-        setJoinRequests(await jrRes.json());
+        const jrRes = await authedFetch(`/circles/${circleId}/join-requests`);
+        setJoinRequests(jrRes.ok ? await jrRes.json() : []);
       }
       if (profile?.id) {
         const pendingRes = await fetch(`${apiUrl}/circles/${circleId}/evaluations/pending?userId=${profile.id}`);
@@ -79,11 +108,12 @@ export default function CircleDetailScreen() {
 
   async function respondToRequest(requestId: string, action: "approve" | "decline") {
     if (!profile?.id) return;
-    await fetch(`${getApiUrl()}/circles/${circleId}/join-requests/${requestId}`, {
+    const res = await authedFetch(`/circles/${circleId}/join-requests/${requestId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, respondedBy: profile.id }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) Alert.alert("Couldn't update the request", "Please try again.");
     load();
   }
 
@@ -269,7 +299,10 @@ export default function CircleDetailScreen() {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Text style={styles.errorText}>Circle not found.</Text>
+        <Text style={styles.errorText}>This Circle isn't available.</Text>
+        <TouchableOpacity style={styles.notFoundBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/circles" as any))} accessibilityRole="button">
+          <Text style={styles.notFoundBtnText}>Go back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -285,11 +318,33 @@ export default function CircleDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{circle.name}</Text>
-        <View style={{ width: 22 }} />
+        {isMember ? (
+          <TouchableOpacity onPress={() => setQrOpen(true)} hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }} accessibilityRole="button" accessibilityLabel="Show Circle QR code">
+            <Ionicons name="qr-code-outline" size={22} color={colors.textDark} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
       </View>
+      <QrShareSheet spec={qrOpen ? circleQr({ id: circle.id, name: circle.name }) : null} visible={qrOpen} onClose={() => setQrOpen(false)} />
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 60 }]} showsVerticalScrollIndicator={false}>
         {circle.description ? <Text style={styles.description}>{circle.description}</Text> : null}
+
+        {profile?.id && !isMember ? (
+          <View style={styles.joinCard}>
+            {joinState === "sent" ? (
+              <Text style={styles.joinNote}>Request sent. The Circle leader will review it.</Text>
+            ) : (
+              <>
+                <TouchableOpacity style={styles.startSessionBtn} onPress={requestToJoin} disabled={joinState === "sending"} accessibilityRole="button">
+                  {joinState === "sending" ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.startSessionBtnText}>Request to Join</Text>}
+                </TouchableOpacity>
+                <Text style={styles.joinNote}>The Circle leader reviews every request.</Text>
+              </>
+            )}
+          </View>
+        ) : null}
 
         {pendingEvals.length > 0 && (
           <TouchableOpacity style={styles.reviewBanner} onPress={() => setReviewOpen(true)}>
@@ -537,6 +592,10 @@ function makeStyles(c: AppColors) {
     headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     scroll: { padding: 20 },
     errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    notFoundBtn: { minHeight: 44, paddingHorizontal: 24, marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
+    notFoundBtnText: { color: c.accentGreen, fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
+    joinCard: { marginBottom: 16 },
+    joinNote: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: -8 },
     description: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 21, marginBottom: 16 },
     startSessionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 14, marginBottom: 16 },
     startSessionBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },

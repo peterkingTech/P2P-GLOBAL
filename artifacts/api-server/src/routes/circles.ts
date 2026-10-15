@@ -34,6 +34,25 @@ async function verifyCaller(req: import("express").Request): Promise<string | nu
   return data.user.id;
 }
 
+// Identity for the join-request routes. A signed-in token always wins: a
+// userId/respondedBy in the body must match it. App builds from before this
+// change send no token; they keep the old body-trusted behaviour until
+// CIRCLES_REQUIRE_AUTH=true is set, once the new build is widely installed
+// (same staged approach as migration 185). Writes the error response and
+// returns null when the request can't proceed.
+async function joinRequestCaller(
+  req: import("express").Request, res: import("express").Response, claimed: string | undefined,
+): Promise<{ id: string | null; verified: boolean } | null> {
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    const caller = await verifyCaller(req);
+    if (!caller) { res.status(401).json({ error: "Please sign in again." }); return null; }
+    if (claimed && claimed !== caller) { res.status(403).json({ error: "Not allowed" }); return null; }
+    return { id: caller, verified: true };
+  }
+  if (process.env.CIRCLES_REQUIRE_AUTH === "true") { res.status(401).json({ error: "Please sign in." }); return null; }
+  return { id: claimed ?? null, verified: false };
+}
+
 function mapCircle(row: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   return {
     id: row.id,
@@ -214,8 +233,13 @@ router.post("/", async (req, res) => {
 // POST /circles/:circleId/join — request to join
 router.post("/:circleId/join", async (req, res) => {
   const { circleId } = req.params;
-  const { userId, message } = req.body as { userId?: string; message?: string };
+  const { userId: claimedUserId, message } = req.body as { userId?: string; message?: string };
+  const caller = await joinRequestCaller(req, res, claimedUserId);
+  if (!caller) return;
+  const userId = caller.id;
   if (!userId) return res.status(400).json({ error: "userId is required" });
+  const { data: circleRow } = await supabaseRead.from("p2p_peer_circles").select("id").eq("id", circleId).maybeSingle();
+  if (!circleRow) return res.status(404).json({ error: "Circle not found" });
 
   const { data, error } = await supabaseRead
     .from("p2p_peer_circle_join_requests")
@@ -229,6 +253,13 @@ router.post("/:circleId/join", async (req, res) => {
 // GET /circles/:circleId/join-requests — pending requests, for the leader's review UI
 router.get("/:circleId/join-requests", async (req, res) => {
   const { circleId } = req.params;
+  const caller = await joinRequestCaller(req, res, undefined);
+  if (!caller) return;
+  if (caller.verified) {
+    // Requesters' names and photos are for the leader only.
+    const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id").eq("id", circleId).maybeSingle();
+    if (!circle || circle.leader_id !== caller.id) return res.status(403).json({ error: "Only the circle leader can view join requests" });
+  }
   const { data: requests } = await supabaseRead
     .from("p2p_peer_circle_join_requests")
     .select("*")
@@ -256,7 +287,10 @@ router.get("/:circleId/join-requests", async (req, res) => {
 // PUT /circles/:circleId/join-requests/:requestId — leader approves/declines
 router.put("/:circleId/join-requests/:requestId", async (req, res) => {
   const { circleId, requestId } = req.params;
-  const { action, respondedBy } = req.body as { action?: "approve" | "decline"; respondedBy?: string };
+  const { action, respondedBy: claimedResponder } = req.body as { action?: "approve" | "decline"; respondedBy?: string };
+  const caller = await joinRequestCaller(req, res, claimedResponder);
+  if (!caller) return;
+  const respondedBy = caller.id;
   if (!action || !respondedBy) return res.status(400).json({ error: "action and respondedBy are required" });
 
   const { data: circle } = await supabaseRead.from("p2p_peer_circles").select("leader_id").eq("id", circleId).maybeSingle();

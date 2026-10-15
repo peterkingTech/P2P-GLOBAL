@@ -4,12 +4,12 @@ import { Share } from "react-native";
 // deep links use these, not invented placeholders. expo-router maps
 // `<scheme>://plan/abc` straight to app/plan/[id].tsx with no extra native
 // config beyond the scheme already being set in app.json.
-const APP_SCHEME = "p2pglobalbiblestudy";
-// Confirmed against app.json's android.package — NOT
-// "com.amentech.p2pglobal" (that id was requested at one point but doesn't
-// match what's actually configured to build/publish; using it here would
-// point the download button at a Play Store listing that doesn't exist).
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.amentech.p2pglobalbiblestudy";
+export const APP_SCHEME = "p2pglobalbiblestudy";
+// No store listing URL is used anywhere: the app's package is now
+// com.amentech.p2pglobaldiscipleshipnetwork (app.json) and no confirmed
+// Play Store or App Store listing exists for it yet. The old Play URL here
+// pointed at the previous package id. App sharing points at the official
+// website (WEB_APP_URL) instead, same decision as web/share-landing.html.
 
 // Live Netlify deployment (confirmed reachable — HTTP 200 on the root as of
 // this change). /join/* isn't wired up there yet (404s), so invite links
@@ -130,6 +130,6 @@ export async function shareRoomInvitation(room: { title: string; roomType: "brea
 export async function shareApp() {
   await Share.share({
     title: "Peer to Peer Global Discipleship Network",
-    message: `🌳 P2P Global — a peer-to-peer Bible discipleship network.\n\nGo through the Kingdom School curriculum with a personal peer guide. Connect with believers worldwide.\n\nDownload free: ${PLAY_STORE_URL}`,
+    message: `🌳 P2P Global — a peer-to-peer Bible discipleship network.\n\nGo through the Kingdom School curriculum with a personal peer guide. Connect with believers worldwide.\n\nGet it free: ${WEB_APP_URL}`,
   });
 }

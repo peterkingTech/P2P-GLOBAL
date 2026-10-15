@@ -1,22 +1,15 @@
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
-import { verifyCaller } from "../lib/supabase";
+import { supabaseServiceRole as supabase, verifyCaller } from "../lib/supabase";
+import { notificationActorId } from "../lib/notificationActors";
 
 const router = Router();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // p2p_notifications' RLS policies both require auth.uid() = user_id — the
-// shared lib/supabase.ts anon client carries no forwarded session, so a
-// service-role client is used here, with identity coming from verifyCaller
-// (a real Supabase JWT) rather than from RLS on this connection.
-const SUPABASE_URL =
-  process.env.SUPABASE_DB_URL?.startsWith("https://")
-    ? process.env.SUPABASE_DB_URL
-    : (process.env.SUPABASE_URL ?? "https://omkqkasniakcnmfcwrvs.supabase.co");
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ta3FrYXNuaWFrY25tZmN3cnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4ODM5MzYsImV4cCI6MjA5ODQ1OTkzNn0.093jpH0sX9gAcCBirXunIL0i1qNm6jzIZm8JqwVnIxM";
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || ANON_KEY);
+// shared lib/supabase.ts anon client carries no forwarded session, so the
+// shared service-role client is used here (same URL/key resolution this file
+// used to duplicate), with identity coming from verifyCaller (a real
+// Supabase JWT) rather than from RLS on this connection.
 
 function mapNotification(row: Record<string, unknown>) {
   return {
@@ -43,38 +36,85 @@ function mapNotification(row: Record<string, unknown>) {
 // Confirmed dead code, not a guess, so removed outright rather than left as
 // a documented-but-live vulnerability — this is the "verify no callers
 // remain, then deprecate" path the hardening spec asked for.
+// GET /notifications/me — newest first. Still a plain array (older app
+// builds read it as one). Optional paging: ?limit=1..100 (default 100) and
+// ?before=<createdAt of the last row seen>. Each row carries `actor`: the
+// acting person's public name/photo/username for the types listed in
+// lib/notificationActors.ts, null for system events.
 router.get("/me", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit ?? "100"), 10) || 100));
+  const before = typeof req.query.before === "string" && !Number.isNaN(Date.parse(req.query.before)) ? req.query.before : null;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("p2p_notifications")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(limit);
+  if (before) query = query.lt("created_at", before);
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json(((data ?? []) as Record<string, unknown>[]).map(mapNotification));
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  // One batched profile read for every acting person on this page; only
+  // public fields (never email, date of birth or other private columns).
+  const actorIds = [...new Set(rows.map((r) => notificationActorId(r.notification_type as string, r.data as Record<string, unknown>)).filter((x): x is string => !!x))];
+  const { data: profiles } = actorIds.length
+    ? await supabase.from("p2p_profiles").select("id,full_name,photo_url,username").in("id", actorIds)
+    : { data: [] as Record<string, unknown>[] };
+  const byId = new Map(((profiles ?? []) as Record<string, unknown>[]).map((p) => [p.id as string, p]));
+  return res.json(rows.map((r) => {
+    const actorId = notificationActorId(r.notification_type as string, r.data as Record<string, unknown>);
+    const p = actorId ? byId.get(actorId) : undefined;
+    return {
+      ...mapNotification(r),
+      actor: p ? { id: p.id, name: (p.full_name as string) ?? null, photoUrl: (p.photo_url as string) ?? null, username: (p.username as string) ?? null } : null,
+    };
+  }));
+});
+
+// GET /notifications/me/unread-count — exact, across ALL of the caller's
+// notifications (not just the newest page), so badges and counters agree
+// on every device.
+router.get("/me/unread-count", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const { count, error } = await supabase
+    .from("p2p_notifications").select("id", { count: "exact", head: true })
+    .eq("user_id", userId).eq("read", false);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ count: count ?? 0 });
 });
 
 // POST /notifications/me/:id/read — scoped to the verified caller's own id,
 // never a route param, so a manipulated notification id can at most target
 // a notification that isn't the caller's own (404, not another user's data).
+// Idempotent: repeating it (duplicate taps, retries) changes nothing and
+// reports wasUnread=false, so a client never counts the same read twice.
 router.post("/me/:id/read", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  const { id } = req.params;
+  const id = String(req.params.id);
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Notification not found" });
 
-  const { data, error } = await supabase
+  const { data: changed, error } = await supabase
     .from("p2p_notifications")
     .update({ read: true })
     .eq("id", id)
     .eq("user_id", userId)
+    .eq("read", false)
     .select()
     .maybeSingle();
   if (error) return res.status(500).json({ error: error.message });
-  if (!data) return res.status(404).json({ error: "Notification not found" });
-  return res.json(mapNotification(data as Record<string, unknown>));
+  if (changed) return res.json({ ...mapNotification(changed as Record<string, unknown>), wasUnread: true });
+
+  const { data: existing, error: readErr } = await supabase
+    .from("p2p_notifications").select("*").eq("id", id).eq("user_id", userId).maybeSingle();
+  if (readErr) return res.status(500).json({ error: readErr.message });
+  if (!existing) return res.status(404).json({ error: "Notification not found" });
+  return res.json({ ...mapNotification(existing as Record<string, unknown>), wasUnread: false });
 });
 
 // POST /notifications/me/read-all — same identity/scoping model as the

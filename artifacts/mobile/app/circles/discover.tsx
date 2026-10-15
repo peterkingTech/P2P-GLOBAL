@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { CircleCard } from "@/components/CircleCard";
 
 interface DiscoverCircle {
@@ -55,11 +56,12 @@ export default function DiscoverCirclesScreen() {
     if (!profile?.id) return;
     setRequestingId(circleId);
     try {
-      await fetch(`${getApiUrl()}/circles/${circleId}/join`, {
+      const res = await authedFetch(`/circles/${circleId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
+      if (!res.ok) throw new Error(String(res.status));
       Alert.alert("Request sent", "The circle leader will review your request.");
     } catch {
       Alert.alert("Couldn't send request", "Please try again.");

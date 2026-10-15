@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.amentech.p2pglobaldiscipleshipnetwork",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera for video calls with peer guides and circles.",
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to use your camera for video calls with peer guides and circles, and to scan P2P Global QR codes.",
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use your microphone for audio and video calls.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["audio"],

@@ -13,7 +13,8 @@
     "test:env-guards": "node tests/serverEnv.test.mjs && node tests/stagingIsolation.test.mjs",
     "test:push": "node tests/pushDelivery.test.mjs",
     "test:studio": "node tests/studio.test.mjs",
-    "test:wins": "node tests/winsModeration.test.mjs"
+    "test:wins": "node tests/winsModeration.test.mjs",
+    "test:notifications": "node tests/notificationActors.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

@@ -32,7 +32,7 @@ export function makeTranslator(db, role, uid = null) {
         if (op === "in") { params.push(v); return `${c} = any($${params.length})`; }
         if (op === "notin") { params.push(v); return `not (${c} = any($${params.length}))`; }
         params.push(v);
-        const sqlOp = { eq: "=", gte: ">=", lt: "<", lte: "<=", gt: ">", ilike: "ilike", like: "like" }[op];
+        const sqlOp = { eq: "=", neq: "<>", gte: ">=", lt: "<", lte: "<=", gt: ">", ilike: "ilike", like: "like" }[op];
         return `${c} ${sqlOp} $${params.length}`;
       }).join(" and ") : "";
       const exec = async () => {
@@ -59,6 +59,12 @@ export function makeTranslator(db, role, uid = null) {
           const keys = Object.keys(q.payload);
           keys.forEach((k) => params.push(q.payload[k]));
           sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")})${q.returning ? ` returning ${q.cols}` : ""}`;
+        } else if (q.op === "upsert") {
+          const keys = Object.keys(q.payload);
+          keys.forEach((k) => params.push(q.payload[k]));
+          const conflict = q.onConflict.split(",").map((k) => k.trim());
+          const sets = keys.filter((k) => !conflict.includes(k)).map((k) => `${k} = excluded.${k}`);
+          sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")}) on conflict (${conflict.join(", ")}) do ${sets.length ? `update set ${sets.join(", ")}` : "nothing"}${q.returning ? ` returning ${q.cols}` : ""}`;
         } else if (q.op === "delete") {
           sql = `delete from ${table}${where(params)}`;
         }
@@ -74,6 +80,7 @@ export function makeTranslator(db, role, uid = null) {
       const c = {
         select(cols = "*", opts) { q.cols = cols.replace(/\s+/g, ""); if (opts?.count) q.count = true; if (opts?.head) q.head = true; if (q.op !== "select") q.returning = true; return c; },
         eq(k, v) { q.filters.push(["eq", k, v]); return c; },
+        neq(k, v) { q.filters.push(["neq", k, v]); return c; },
         in(k, v) { q.filters.push(["in", k, v]); return c; },
         not(k, op, v) { if (op !== "in") throw new Error("translator: only not(..., 'in', ...)"); q.filters.push(["notin", k, String(v).replace(/^\(|\)$/g, "").split(",").filter(Boolean)]); return c; },
         gte(k, v) { q.filters.push(["gte", k, v]); return c; },
@@ -87,6 +94,7 @@ export function makeTranslator(db, role, uid = null) {
         range(a, b) { q.offset = a; q.limit = b - a + 1; return c; },
         update(p) { q.op = "update"; q.payload = p; return c; },
         insert(p) { q.op = "insert"; q.payload = p; return c; },
+        upsert(p, o) { if (!o?.onConflict) throw new Error("translator: upsert needs onConflict"); q.op = "upsert"; q.payload = p; q.onConflict = o.onConflict; return c; },
         delete() { q.op = "delete"; return c; },
         single() { q.single = true; return c; },
         maybeSingle() { q.maybe = true; return c; },
@@ -128,7 +136,11 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
         export const supabase = { auth: { getUser: (t) => L.getUser(t) } };
         export async function verifyCaller(req) { const h = req.headers.authorization || ""; const t = h.startsWith("Bearer ") ? h.slice(7) : null; return t && L.roleOf(t) ? t : null; }`,
       logger: "export const logger = globalThis.__studioLab.logger;",
-      sbjs: `export function createClient(url, key, opts) { const t = (opts?.global?.headers?.Authorization ?? "").replace("Bearer ", ""); const role = globalThis.__studioLab.roleOf(t);
+      // A client created WITHOUT a forwarded user token (e.g. routes/circles.ts's
+      // own service-role client) gets the service translator plus auth.getUser.
+      sbjs: `export function createClient(url, key, opts) { const L = globalThis.__studioLab;
+        if (!opts?.global?.headers?.Authorization) return { ...L.service, auth: { getUser: (tok) => L.getUser(tok) } };
+        const t = (opts?.global?.headers?.Authorization ?? "").replace("Bearer ", ""); const role = globalThis.__studioLab.roleOf(t);
         const c = { from: () => c, select: () => c, eq: () => c, single: async () => (role ? { data: { role }, error: null } : { data: null, error: { message: "none" } }) }; return c; }`,
     }[a.path] }));
   } };
@@ -137,6 +149,9 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
 import studio from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/studio.ts")))};
 import stories from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/kingdomStories.ts")))};
 import wins from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/kingdomWins.ts")))};
+import family from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/family.ts")))};
+import notifications from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/notifications.ts")))};
+import circles from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/circles.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -145,6 +160,9 @@ app.use(express.json());
 app.use("/api/studio", studio);
 app.use("/api/kingdom-stories", stories);
 app.use("/api/kingdom-wins", wins);
+app.use("/api/family", family);
+app.use("/api/notifications", notifications);
+app.use("/api/circles", circles);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,25 +10,13 @@ import { getCurrentGroupStudy } from "@/lib/groupStudy";
 import { getApiUrl } from "@/lib/apiUrl";
 import { pathForNotification } from "@/lib/push";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { NotificationRow } from "@/components/notifications/NotificationRow";
+import { NOTIFICATION_PAGE_SIZE } from "@/lib/notificationModel";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
 }
-
-const TYPE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
-  study_leader_transfer: "school-outline",
-  circle_session_start: "people-outline",
-  study_invitation_received: "mail-unread-outline",
-  study_invitation_accepted: "checkmark-circle-outline",
-  study_invitation_declined: "close-circle-outline",
-  study_participant_removed: "exit-outline",
-  study_ended: "flag-outline",
-  connection_request: "person-add-outline",
-  connection_accepted: "checkmark-circle-outline",
-  connection_declined: "close-circle-outline",
-  missed_call: "call-outline",
-};
 
 // Every Study Together notification type shares this prefix — one rule
 // covers the whole lifecycle (invitation received/accepted/declined,
@@ -61,6 +48,8 @@ export default function NotificationsScreen() {
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [navigatingId, setNavigatingId] = useState<string | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   // Requests already responded to from this screen, keyed by requestId —
@@ -80,7 +69,7 @@ export default function NotificationsScreen() {
       });
       if (res.ok) {
         setRespondedRequestIds((prev) => new Set(prev).add(requestId));
-        if (!n.isRead) { markNotificationRead(n.id); setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))); }
+        markOneRead(n);
       } else {
         const body = await res.json();
         showAlert("Couldn't respond", body.error ?? "This request may have already been handled.");
@@ -100,17 +89,36 @@ export default function NotificationsScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setNotifications(await getMyNotifications());
+    const page = await getMyNotifications({ limit: NOTIFICATION_PAGE_SIZE });
+    setNotifications(page);
+    setHasMore(page.length === NOTIFICATION_PAGE_SIZE);
     setLoading(false);
   }, [getMyNotifications]);
 
   useEffect(() => { load(); }, [load]);
 
+  async function loadMore() {
+    const last = notifications[notifications.length - 1];
+    if (!last || loadingMore) return;
+    setLoadingMore(true);
+    const page = await getMyNotifications({ limit: NOTIFICATION_PAGE_SIZE, before: last.createdAt });
+    setNotifications((prev) => [...prev, ...page.filter((p) => !prev.some((x) => x.id === p.id))]);
+    setHasMore(page.length === NOTIFICATION_PAGE_SIZE);
+    setLoadingMore(false);
+  }
+
+  // Marks only this notification; the row turns read immediately and is
+  // restored if the server refuses (the shared count reconciles itself).
+  function markOneRead(n: AppNotification) {
+    if (n.isRead) return;
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
+    void markNotificationRead(n.id).then((r) => {
+      if (r === "failed") setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: false } : x)));
+    });
+  }
+
   async function handlePress(n: AppNotification) {
-    if (!n.isRead) {
-      markNotificationRead(n.id);
-      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
-    }
+    markOneRead(n);
 
     // Missed call — same destination as tapping its push (the thread's
     // missed-call card calls straight back).
@@ -153,7 +161,7 @@ export default function NotificationsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <SettingsSubHeader title="Notifications" />
       {hasUnread && (
-        <TouchableOpacity style={styles.markAllRow} onPress={handleMarkAllRead}>
+        <TouchableOpacity style={styles.markAllRow} onPress={handleMarkAllRead} accessibilityRole="button" accessibilityLabel="Mark all as read">
           <Text style={styles.markAllText}>Mark all as read</Text>
         </TouchableOpacity>
       )}
@@ -173,27 +181,14 @@ export default function NotificationsScreen() {
               !respondedRequestIds.has(requestId);
             return (
               <View key={n.id} style={[styles.row, styles.rowColumn, !n.isRead && styles.rowUnread]}>
-                <TouchableOpacity
-                  style={styles.rowMain}
-                  onPress={() => handlePress(n)}
-                  disabled={navigatingId === n.id}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name={TYPE_ICON[n.notificationType ?? ""] ?? "notifications-outline"} size={20} color={n.isRead ? colors.textMuted : colors.accentGreen} />
-                  <View style={{ flex: 1 }}>
-                    {category && <Text style={styles.categoryLabel}>{category.emoji} {category.label}</Text>}
-                    <Text style={[styles.rowTitle, !n.isRead && styles.rowTitleUnread]}>{n.title}</Text>
-                    {n.message && <Text style={styles.rowMessage} numberOfLines={2}>{n.message}</Text>}
-                    <Text style={styles.rowDate}>{new Date(n.createdAt).toLocaleString()}</Text>
-                  </View>
-                  {navigatingId === n.id ? <ActivityIndicator size="small" color={colors.accentGreen} /> : !n.isRead && <View style={styles.unreadDot} />}
-                </TouchableOpacity>
+                <NotificationRow n={n} category={category} busy={navigatingId === n.id} onPress={() => handlePress(n)} />
                 {showConnectionActions && (
                   <View style={styles.connectionActionsRow}>
                     <TouchableOpacity
                       style={styles.connectionAcceptBtn}
                       onPress={() => handleConnectionRespond(n, "accepted")}
                       disabled={respondingId === n.id}
+                      accessibilityRole="button" accessibilityLabel="Accept connection request"
                     >
                       {respondingId === n.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.connectionAcceptText}>Accept</Text>}
                     </TouchableOpacity>
@@ -201,6 +196,7 @@ export default function NotificationsScreen() {
                       style={styles.connectionDeclineBtn}
                       onPress={() => handleConnectionRespond(n, "declined")}
                       disabled={respondingId === n.id}
+                      accessibilityRole="button" accessibilityLabel="Decline connection request"
                     >
                       <Text style={styles.connectionDeclineText}>Decline</Text>
                     </TouchableOpacity>
@@ -210,6 +206,11 @@ export default function NotificationsScreen() {
             );
           })
         )}
+        {!loading && hasMore ? (
+          <TouchableOpacity style={styles.loadMore} onPress={loadMore} disabled={loadingMore} accessibilityRole="button" accessibilityLabel="Load older notifications">
+            {loadingMore ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Text style={styles.markAllText}>Load older notifications</Text>}
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -220,7 +221,8 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     content: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },
     emptyText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 40 },
-    markAllRow: { alignItems: "flex-end", paddingHorizontal: 20, paddingTop: 10 },
+    markAllRow: { alignItems: "flex-end", justifyContent: "center", paddingHorizontal: 20, minHeight: 44 },
+    loadMore: { alignItems: "center", justifyContent: "center", minHeight: 44 },
     markAllText: { color: c.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
     categoryLabel: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginBottom: 2 },
     row: {
@@ -236,12 +238,12 @@ function makeStyles(c: AppColors) {
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen },
     connectionActionsRow: { flexDirection: "row", gap: 8 },
     connectionAcceptBtn: {
-      flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 9,
+      flex: 1, alignItems: "center", justifyContent: "center", minHeight: 44,
       borderRadius: 10, backgroundColor: c.accentGreen,
     },
     connectionAcceptText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     connectionDeclineBtn: {
-      flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 9,
+      flex: 1, alignItems: "center", justifyContent: "center", minHeight: 44,
       borderRadius: 10, borderWidth: 1.5, borderColor: c.accentGreen,
     },
     connectionDeclineText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },

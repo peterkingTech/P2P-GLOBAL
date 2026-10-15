@@ -23,6 +23,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
 import { shareInviteLink } from "@/lib/sharing";
+import { QrShareSheet } from "@/components/qr/QrShareSheet";
+import { appQr, profileQr, type QrSpec } from "@/lib/qrLinks";
 import { Avatar } from "@/components/Avatar";
 import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
@@ -176,6 +178,12 @@ function makeStyles(c: AppColors) {
     inviteIconWrap: { backgroundColor: c.accentGreen, borderRadius: 8, padding: 8 },
     inviteTitle: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     inviteSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
+    qrRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+    qrAction: {
+      flex: 1, minHeight: 64, alignItems: "center", justifyContent: "center", gap: 4,
+      backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 10, paddingHorizontal: 6,
+    },
+    qrActionText: { fontSize: 12, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
     signOutBtn: {
       flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
       backgroundColor: "rgba(185,28,28,0.08)",
@@ -252,6 +260,16 @@ export default function ProfileScreen() {
 
   const [grainSheetOpen, setGrainSheetOpen] = useState(false);
   const [invitingBusy, setInvitingBusy] = useState(false);
+  const [qrSpec, setQrSpec] = useState<QrSpec | null>(null);
+
+  function showMyQr() {
+    const spec = profileQr(profile?.username);
+    if (!spec) {
+      Alert.alert("Set a username first", "Your QR code links to your public @username profile.");
+      return;
+    }
+    setQrSpec(spec);
+  }
 
   async function handleShareInvite() {
     if (!profile?.username) {
@@ -447,6 +465,23 @@ export default function ProfileScreen() {
           </View>
           {invitingBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="share-social-outline" size={20} color={colors.accentGreen} />}
         </TouchableOpacity>
+
+        {/* QR codes: my profile, scan someone else's, share the app */}
+        <View style={styles.qrRow}>
+          <TouchableOpacity style={styles.qrAction} activeOpacity={0.85} onPress={showMyQr} accessibilityRole="button" accessibilityLabel="My QR code" accessibilityHint="Shows a QR code for your public profile">
+            <Ionicons name="qr-code-outline" size={22} color={colors.accentGreen} />
+            <Text style={styles.qrActionText}>My QR code</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.qrAction} activeOpacity={0.85} onPress={() => router.push("/qr/scan" as any)} accessibilityRole="button" accessibilityLabel="Scan a QR code">
+            <Ionicons name="scan-outline" size={22} color={colors.accentGreen} />
+            <Text style={styles.qrActionText}>Scan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.qrAction} activeOpacity={0.85} onPress={() => setQrSpec(appQr())} accessibilityRole="button" accessibilityLabel="Share P2P Global" accessibilityHint="Shows a QR code for the P2P Global app, not your profile">
+            <Ionicons name="phone-portrait-outline" size={22} color={colors.accentGreen} />
+            <Text style={styles.qrActionText}>Share P2P Global</Text>
+          </TouchableOpacity>
+        </View>
+        <QrShareSheet spec={qrSpec} visible={qrSpec !== null} onClose={() => setQrSpec(null)} />
 
         {/* Spiritual Gifts */}
         <Text style={styles.sectionTitle}>{t("profile.spiritualGifts")}</Text>

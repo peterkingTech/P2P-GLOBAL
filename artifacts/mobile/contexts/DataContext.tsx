@@ -7,6 +7,8 @@ import React, {
   useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
+import type { MarkReadResult } from "@/lib/notificationTap";
 import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "./AuthContext";
 import { deliveryAcker } from "@/lib/receiptSession";
 import {
@@ -767,6 +769,8 @@ export interface AppNotification {
   createdAt: string;
   notificationType: string | null;
   data: Record<string, unknown> | null;
+  /** Who it's from (public name/photo), for types with a verified sender; null for system events. */
+  actor?: { id: string; name: string | null; photoUrl: string | null; username: string | null } | null;
 }
 
 export interface JournalTimelineEntry {
@@ -1324,9 +1328,10 @@ interface DataContextValue {
   // (never the legacy :userId-trusting ones) since identity here must come
   // from the real authenticated session, not a route param.
   unreadNotificationCount: number;
-  getMyNotifications: () => Promise<AppNotification[]>;
-  markNotificationRead: (id: string) => Promise<void>;
+  getMyNotifications: (opts?: { limit?: number; before?: string }) => Promise<AppNotification[]>;
+  markNotificationRead: (id: string) => Promise<MarkReadResult>;
   markAllNotificationsRead: () => Promise<void>;
+  refreshUnreadNotificationCount: () => Promise<void>;
   searchUsersByUsername: (query: string) => Promise<UsernameSearchResult[]>;
   getProfileByUsername: (username: string) => Promise<PublicUserProfile | null>;
   sendConnectionRequest: (params: {
@@ -3268,12 +3273,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // RLS-protected direct-client realtime pattern above (auth.uid()=user_id
   // on p2p_notifications), just for every notification type rather than
   // one specific one, since a badge count has no reason to filter by type.
-  const getMyNotifications = useCallback(async (): Promise<AppNotification[]> => {
+  // Newest first; optional paging (limit + before=createdAt of the last row seen).
+  const getMyNotifications = useCallback(async (opts?: { limit?: number; before?: string }): Promise<AppNotification[]> => {
     if (!profile) return [];
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
-      const res = await fetch(`${getApiUrl()}/notifications/me`, {
+      const q = new URLSearchParams();
+      if (opts?.limit) q.set("limit", String(opts.limit));
+      if (opts?.before) q.set("before", opts.before);
+      const res = await fetch(`${getApiUrl()}/notifications/me${q.toString() ? `?${q}` : ""}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) return [];
@@ -3282,6 +3291,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         id: r.id as string, title: r.title as string, message: (r.message as string) ?? null,
         isRead: (r.isRead as boolean) ?? false, createdAt: r.createdAt as string,
         notificationType: (r.notificationType as string) ?? null, data: (r.data as Record<string, unknown>) ?? null,
+        actor: (r.actor as AppNotification["actor"]) ?? null,
       }));
     } catch (e) {
       console.error("getMyNotifications failed", e);
@@ -3289,19 +3299,53 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
-  const markNotificationRead = useCallback(async (id: string): Promise<void> => {
+  // Exact unread count from the server (all notifications, not one page) —
+  // the single source of truth that every device reconciles to.
+  const refreshUnreadNotificationCount = useCallback(async (): Promise<void> => {
+    if (!profile?.id) return;
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
-      await fetch(`${getApiUrl()}/notifications/me/${id}/read`, {
+      if (!token) return;
+      const res = await fetch(`${getApiUrl()}/notifications/me/unread-count`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const body = await res.json();
+        if (typeof body?.count === "number") setUnreadNotificationCount(body.count);
+        return;
+      }
+      if (res.status === 404) {
+        // An older API without the count route: count the newest page.
+        const rows = await getMyNotifications();
+        setUnreadNotificationCount(rows.filter((r) => !r.isRead).length);
+      }
+    } catch {
+      // Offline: keep the current count; the next foreground/realtime event reconciles.
+    }
+  }, [profile?.id, getMyNotifications]);
+
+  // Marks ONE notification read. Idempotent on the server (wasUnread tells
+  // whether this call changed it), so a duplicate tap or a retry never
+  // lowers the count twice; a failure leaves the count untouched.
+  const markNotificationRead = useCallback(async (id: string): Promise<MarkReadResult> => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return "failed";
+      const res = await fetch(`${getApiUrl()}/notifications/me/${encodeURIComponent(id)}/read`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setUnreadNotificationCount((c) => Math.max(0, c - 1));
+      if (res.status === 404) return "not_found";
+      if (!res.ok) return "failed";
+      const body = await res.json().catch(() => ({}));
+      if (body?.wasUnread === true) setUnreadNotificationCount((c) => Math.max(0, c - 1));
+      void refreshUnreadNotificationCount();
+      return body?.wasUnread === false ? "already_read" : "marked";
     } catch (e) {
       console.error("markNotificationRead failed", e);
+      return "failed";
     }
-  }, []);
+  }, [refreshUnreadNotificationCount]);
 
   const markAllNotificationsRead = useCallback(async (): Promise<void> => {
     try {
@@ -3310,11 +3354,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("markAllNotificationsRead failed", e);
     }
-  }, []);
+    void refreshUnreadNotificationCount();
+  }, [refreshUnreadNotificationCount]);
 
   useEffect(() => {
     if (!profile?.id) return;
-    getMyNotifications().then((rows) => setUnreadNotificationCount(rows.filter((r) => !r.isRead).length));
+    void refreshUnreadNotificationCount();
+    // New notification → +1 immediately. A read/unread change made anywhere
+    // (another device, the Notification Center, a push tap) → reconcile with
+    // the server count, debounced so a "mark all" burst is one request.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const reconcile = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => { void refreshUnreadNotificationCount(); }, 400); };
     const channel = supabase
       .channel(`p2p_notifications_unread_${profile.id}`)
       .on(
@@ -3322,9 +3372,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         { event: "INSERT", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${profile.id}` },
         () => setUnreadNotificationCount((c) => c + 1)
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "p2p_notifications", filter: `user_id=eq.${profile.id}` },
+        reconcile
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [profile?.id, getMyNotifications]);
+    const appState = AppState.addEventListener("change", (state) => { if (state === "active") reconcile(); });
+    return () => { if (timer) clearTimeout(timer); appState.remove(); supabase.removeChannel(channel); };
+  }, [profile?.id, refreshUnreadNotificationCount]);
 
   const checkGrowthEvents = useCallback(async (userId: string) => {
     try {
@@ -5983,7 +6039,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       incomingCall, dismissIncomingCall,
       circleSessionInvite, dismissCircleSessionInvite,
       familyWorshipInvite, dismissFamilyWorshipInvite,
-      unreadNotificationCount, getMyNotifications, markNotificationRead, markAllNotificationsRead,
+      unreadNotificationCount, getMyNotifications, markNotificationRead, markAllNotificationsRead, refreshUnreadNotificationCount,
       conversations, conversationsLoading, conversationsLoadError, totalUnreadCount, mostRecentUnread, loadConversations,
       pinMessage, unpinMessage, pinConversation, unpinConversation, addToFavourites, removeFromFavourites,
       submitAdminFeedback, pendingConnectionRequestCount,

@@ -24,6 +24,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync, pathForNotification, registerVoipTokenAsync } from "@/lib/push";
+import { createNotificationTapHandler } from "@/lib/notificationTap";
 import {
   callSystemActive, callSystemInstalled, configureCallSystem, flushPendingCallSystemEvents,
   getVoipToken, reportSystemIncomingCall, subscribeCallSystemEvents,
@@ -522,9 +523,9 @@ function MessageBannerHost() {
 // handled twice or missed depending on app state.
 function PushNotificationHost() {
   const { isAuthenticated, profile } = useAuth();
+  const { markNotificationRead, unreadNotificationCount } = useData();
   const router = useRouter();
   const registeredForUserId = useRef<string | null>(null);
-  const handledNotificationIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated || !profile?.id) return;
@@ -533,25 +534,45 @@ function PushNotificationHost() {
     void registerForPushNotificationsAsync();
   }, [isAuthenticated, profile?.id]);
 
+  // Latest auth/mark-read for the long-lived tap handler (created once).
+  const canSyncRef = useRef(false);
+  canSyncRef.current = isAuthenticated && !!profile?.id;
+  const markReadRef = useRef(markNotificationRead);
+  markReadRef.current = markNotificationRead;
+
+  // lib/notificationTap.ts: navigate once per notification, mark ONLY the
+  // tapped notification read (deferred until signed in, retried if it
+  // fails), and clear the cold-start response so it can't replay.
+  const tapHandler = useRef<ReturnType<typeof createNotificationTapHandler> | null>(null);
+  if (!tapHandler.current) {
+    tapHandler.current = createNotificationTapHandler({
+      route: (input) => {
+        const notificationType = (input.data?.notificationType as string | undefined) ?? null;
+        const callAction = input.actionIdentifier === ACCEPT_ACTION ? "accept"
+          : input.actionIdentifier === DECLINE_ACTION ? "decline" : undefined;
+        // Incoming-call taps use replace, not push: IncomingCallHost below
+        // already navigates to this exact same screen the instant realtime
+        // detects the call (foreground/background-but-alive case) — a push
+        // tap arriving after that already happened would otherwise stack a
+        // second copy of the ringing screen instead of landing on the one
+        // already there. Cold start has nothing to replace, so this is a
+        // normal first navigation in that case.
+        return { path: pathForNotification(notificationType, input.data, callAction), replace: notificationType === "incoming_call" };
+      },
+      navigate: (path, replace) => { if (replace) router.replace(path as any); else router.push(path as any); },
+      markRead: (id) => markReadRef.current(id),
+      canSync: () => canSyncRef.current,
+      clearLaunchResponse: () => { if (Platform.OS !== "web") void Notifications.clearLastNotificationResponseAsync().catch(() => {}); },
+    });
+  }
+
   useEffect(() => {
     function handleResponse(response: Notifications.NotificationResponse) {
-      const id = response.notification.request.identifier;
-      if (handledNotificationIds.current.has(id)) return;
-      handledNotificationIds.current.add(id);
-      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-      const notificationType = (data?.notificationType as string | undefined) ?? null;
-      const callAction = response.actionIdentifier === ACCEPT_ACTION ? "accept"
-        : response.actionIdentifier === DECLINE_ACTION ? "decline" : undefined;
-      const path = pathForNotification(notificationType, data, callAction);
-      // Incoming-call taps use replace, not push: IncomingCallHost below
-      // already navigates to this exact same screen the instant realtime
-      // detects the call (foreground/background-but-alive case) — a push
-      // tap arriving after that already happened would otherwise stack a
-      // second copy of the ringing screen instead of landing on the one
-      // already there. Cold start has nothing to replace, so this is a
-      // normal first navigation in that case.
-      if (notificationType === "incoming_call") router.replace(path as any);
-      else router.push(path as any);
+      void tapHandler.current!.handle({
+        osIdentifier: response.notification.request.identifier,
+        data: response.notification.request.content.data as Record<string, unknown> | undefined,
+        actionIdentifier: response.actionIdentifier,
+      });
     }
 
     // Native-only API (throws on web) — see lib/launchNotification.ts.
@@ -561,6 +582,21 @@ function PushNotificationHost() {
     const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
     return () => subscription.remove();
   }, [router]);
+
+  // A tap that arrived before the session was ready (cold start) or whose
+  // mark-read failed (offline) is marked once signed in / back in front.
+  useEffect(() => {
+    if (!isAuthenticated || !profile?.id) return;
+    void tapHandler.current?.flushPending();
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") void tapHandler.current?.flushPending(); });
+    return () => sub.remove();
+  }, [isAuthenticated, profile?.id]);
+
+  // App-icon badge = the server's unread notification count (native only).
+  useEffect(() => {
+    if (Platform.OS === "web" || !isAuthenticated) return;
+    void Notifications.setBadgeCountAsync(unreadNotificationCount).catch(() => {});
+  }, [unreadNotificationCount, isAuthenticated]);
 
   // A push can't be withdrawn server-side, so an "Incoming call" entry can
   // outlive its call while the app was backgrounded or closed. Clear any
