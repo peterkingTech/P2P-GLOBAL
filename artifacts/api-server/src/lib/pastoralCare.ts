@@ -121,7 +121,7 @@ async function sendDormantSeedMessage(profile: CareProfile): Promise<void> {
   const name = profile.full_name?.split(" ")[0] ?? "Friend";
   const message = pickNextDormantSeedMessage(lastLog?.message ?? null, name);
 
-  await db.from("p2p_notifications").insert({ user_id: profile.id, title: "A gentle word", message });
+  await db.from("p2p_notifications").insert({ user_id: profile.id, title: "A gentle word", message, notification_type: "pastoral_gentle_word" });
   await db.from("p2p_pastoral_care_log").insert({ user_id: profile.id, care_type: "dormant_seed_message", message_sent: message });
 }
 
@@ -129,7 +129,7 @@ async function sendElijahProtocol(profile: CareProfile): Promise<void> {
   const title = "We noticed you have been quiet";
   const message = "Elijah sat under a tree and said it was enough. The angel did not rebuke him — he fed him. What do you need right now?";
 
-  await db.from("p2p_notifications").insert({ user_id: profile.id, title, message });
+  await db.from("p2p_notifications").insert({ user_id: profile.id, title, message, notification_type: "elijah_checkin" });
   await db.from("p2p_pastoral_care_log").insert({ user_id: profile.id, care_type: "elijah_protocol", message_sent: message });
   await db.from("p2p_profiles").update({ elijah_protocol_sent_at: new Date().toISOString() }).eq("id", profile.id);
 }

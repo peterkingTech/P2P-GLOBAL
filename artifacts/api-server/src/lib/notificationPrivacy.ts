@@ -1,6 +1,7 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 import { notificationActorId } from "./notificationActors";
+import { MIGRATION_196_COLUMNS, PREFERENCE_COLUMNS } from "./notificationCategories";
 
 // Message-preview privacy — the server is the authority for what a push may
 // show (migration 194, p2p_profiles.notify_message_preview; 193's
@@ -142,4 +143,24 @@ export function pushPresentation(
     ...(previewToken ? { previewToken } : {}),
     mutableContent: !!image || !!previewToken,
   };
+}
+
+// ── Per-category push preferences (lib/notificationCategories.ts) ─────────
+// The recipients' existing notify_* switches, by user id. Fails OPEN: on any
+// lookup error every push is sent as before (an unread in-app notification
+// is never at risk either way — preferences only gate the phone alert).
+export async function getPushPreferences(userIds: string[]): Promise<Map<string, Record<string, unknown>>> {
+  const out = new Map<string, Record<string, unknown>>();
+  if (!userIds.length) return out;
+  try {
+    const lookup = (cols: readonly string[]) => db.from("p2p_profiles").select(["id", ...cols].join(", ")).in("id", userIds);
+    let { data, error } = await lookup(PREFERENCE_COLUMNS);
+    // Before migration 196: no notify_admin_overdue yet — read the rest.
+    if (error && MISSING_COLUMN.has(error.code ?? "")) ({ data, error } = await lookup(PREFERENCE_COLUMNS.filter((c) => !MIGRATION_196_COLUMNS.includes(c))));
+    if (error) { logger.warn({ err: error }, "notificationPrivacy: push preference lookup failed; sending all pushes"); return out; }
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) out.set(String(r.id), r);
+  } catch (err) {
+    logger.warn({ err }, "notificationPrivacy: push preference lookup failed; sending all pushes");
+  }
+  return out;
 }

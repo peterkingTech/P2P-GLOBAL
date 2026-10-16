@@ -342,6 +342,7 @@ router.post("/:circleId/members/by-username", async (req, res) => {
 
   await supabaseRead.from("p2p_notifications").insert({
     user_id: targetProfile.id, title: `You've been added to ${circle.name}`, message: "Tap to view the circle.",
+    notification_type: "circle_member_added",
   });
 
   return res.json({ userId: targetProfile.id, fullName: targetProfile.full_name });
@@ -378,6 +379,7 @@ router.delete("/:circleId/members/:userId", async (req, res) => {
 
   await supabaseRead.from("p2p_notifications").insert({
     user_id: userId, title: `You've been removed from ${circle.name}`, message: "",
+    notification_type: "circle_member_removed",
   });
   return res.json({ ok: true });
 });
@@ -406,6 +408,7 @@ router.put("/:circleId/transfer-leadership", async (req, res) => {
   const newLeaderName = (newLeaderProfile?.username as string | undefined) ? `@${newLeaderProfile!.username}` : (newLeaderProfile?.full_name as string | undefined) ?? "The new leader";
   await supabaseRead.from("p2p_notifications").insert({
     user_id: newLeaderId, title: `You're now leading ${circle.name}`, message: "",
+    notification_type: "circle_leader_transfer",
   });
 
   return res.json({ ok: true, newLeaderId, newLeaderName });

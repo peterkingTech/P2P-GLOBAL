@@ -90,7 +90,8 @@ class IncomingCallActivity : Activity() {
 
   /**
    * Full-screen caller photo (cover-cropped around the centre), a gradient
-   * that darkens only the top (name) and bottom (controls), the caller's
+   * that darkens only the top (name) and bottom (controls), a P2P Global
+   * brand bar at the top (the app's own icon + name), the caller's
    * name, "P2P Global Audio/Video", and Decline/Accept. No photo → the P2P
    * avatar (initial in a green circle) on the call theme's dark background.
    * The photo loads asynchronously and never delays answering.
@@ -150,10 +151,37 @@ class IncomingCallActivity : Activity() {
     // Keep the name and controls clear of the status and navigation bars.
     content.setOnApplyWindowInsetsListener { v, insets ->
       @Suppress("DEPRECATION")
-      v.setPadding(dp(28), insets.systemWindowInsetTop + dp(48), dp(28), insets.systemWindowInsetBottom + dp(44))
+      v.setPadding(dp(28), insets.systemWindowInsetTop + dp(14), dp(28), insets.systemWindowInsetBottom + dp(44))
       insets
     }
     fun TextView.shadow() = setShadowLayer(dp(6).toFloat(), 0f, dp(1).toFloat(), 0x73000000)
+    // P2P Global brand bar, always at the top. The mark is the app's own
+    // launcher icon, so it needs no extra resource in this module.
+    val brand = LinearLayout(this).apply {
+      orientation = LinearLayout.HORIZONTAL
+      gravity = Gravity.CENTER_VERTICAL
+      setPadding(dp(10), dp(6), dp(14), dp(6))
+      background = GradientDrawable().apply { cornerRadius = dp(999).toFloat(); setColor(0x59000000) }
+      contentDescription = "P2P Global call"
+      importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
+    runCatching { applicationInfo.loadIcon(packageManager) }.getOrNull()?.let { icon ->
+      brand.addView(ImageView(this).apply {
+        setImageDrawable(icon)
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+      }, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(8) })
+    }
+    brand.addView(TextView(this).apply {
+      text = "P2P Global"
+      setTextColor(Color.WHITE)
+      textSize = 15f
+      typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+      importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    })
+    content.addView(brand, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+      gravity = Gravity.CENTER_HORIZONTAL
+      bottomMargin = dp(26)
+    })
     content.addView(TextView(this).apply {
       text = call.peerName
       setTextColor(Color.WHITE)

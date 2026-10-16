@@ -18,6 +18,8 @@ import { Avatar } from "@/components/Avatar";
 import { usePeerPhoto } from "@/lib/usePeerPhoto";
 import appColors from "@/constants/colors";
 
+const LOGO = require("@/assets/images/logo.png");
+
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -359,7 +361,13 @@ export default function IncomingCallScreen() {
         pointerEvents="none"
       />
 
-      <View style={[styles.header, { paddingTop: insets.top + 48 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        {/* P2P Global brand bar — always on top of the ringing screen, so a
+            call is recognisably P2P whatever photo is behind it. */}
+        <View style={styles.brandBar} accessible accessibilityRole="header" accessibilityLabel="P2P Global call">
+          <ExpoImage source={LOGO} style={styles.brandLogo} contentFit="contain" accessibilityIgnoresInvertColors />
+          <Text style={styles.brandText}>P2P Global</Text>
+        </View>
         <Text style={styles.callerName} numberOfLines={2}>{callerName}</Text>
         <View style={styles.subtitleRow}>
           <Ionicons name={callType === "video" ? "videocam" : "call"} size={15} color="rgba(255,255,255,0.9)" />
@@ -399,6 +407,12 @@ function makeStyles(p2p: P2PCallColors) {
     screen: { flex: 1, backgroundColor: "#000", justifyContent: "space-between" },
     fallback: { backgroundColor: p2p.bg, alignItems: "center", justifyContent: "center" },
     header: { alignItems: "center", paddingHorizontal: 28 },
+    brandBar: {
+      flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 26,
+      paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.35)",
+    },
+    brandLogo: { width: 36, height: 24 },
+    brandText: { fontSize: 15, color: "#fff", fontFamily: "Inter_600SemiBold", letterSpacing: 0.4 },
     callerName: {
       fontSize: 34, color: "#fff", fontFamily: "Inter_700Bold", textAlign: "center", letterSpacing: -0.3, ...shadow,
     },

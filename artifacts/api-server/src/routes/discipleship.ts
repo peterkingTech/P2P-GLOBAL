@@ -423,6 +423,7 @@ router.post("/notify-peer-guide", async (req, res) => {
     user_id: link.mentor_id,
     title,
     message,
+    notification_type: "peer_guide_update",
   });
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ notified: true });
@@ -455,7 +456,7 @@ router.post("/notify-user", async (req, res) => {
     .maybeSingle();
   if (!link) return err(res, "No active discipleship relationship with this user", 403);
 
-  const { error } = await supabaseWrite.from("p2p_notifications").insert({ user_id: userId, title, message });
+  const { error } = await supabaseWrite.from("p2p_notifications").insert({ user_id: userId, title, message, notification_type: "peer_guide_update" });
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ notified: true });
 });
@@ -1000,14 +1001,15 @@ router.put("/request/:linkId/respond", async (req, res) => {
     const { data: learnerProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", learnerId).maybeSingle();
     const learnerName = (learnerProfile as Record<string, unknown> | null)?.full_name ?? "A learner";
     await supabaseWrite.from("p2p_notifications").insert([
-      { user_id: next.id, title: "A new peer guide request", message: `${learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?` },
-      { user_id: learnerId, title: "We found you another match", message: `${next.fullName} may be a great peer guide for you. We've sent them your request.` },
+      { user_id: next.id, title: "A new peer guide request", message: `${learnerName} is looking for a peer guide and you are a great match. Will you walk alongside them?`, notification_type: "peer_guide_request" },
+      { user_id: learnerId, title: "We found you another match", message: `${next.fullName} may be a great peer guide for you. We've sent them your request.`, notification_type: "peer_guide_match" },
     ]);
   } else {
     await supabaseWrite.from("p2p_notifications").insert({
       user_id: learnerId,
       title: "Still finding your match",
       message: "We are still finding the best peer guide for you. We will notify you when someone becomes available. You can begin Module 1 on your own in the meantime.",
+      notification_type: "peer_guide_match",
     });
   }
 

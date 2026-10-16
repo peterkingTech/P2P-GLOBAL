@@ -122,11 +122,13 @@ const AGORA_USER_OFFLINE_QUIT = 0;
 // identical counter/comment.
 let audioMountCounter = 0;
 
-// Seamless Audio ↔ Video — a plain 1:1 audio call runs on the video call
-// screen in audio mode (camera off until the user taps Video, then the same
-// live engine turns it on — no rejoin). Pastoral/crisis calls and group/
-// study joins (which arrive without a single other person) keep this
-// audio-only screen. Every caller still navigates to /call/audio as before.
+// A plain 1:1 audio call shares the video call screen's engine/lifecycle
+// (one call engine, not two), but that screen renders it with its
+// audio-only voice layout because callType is "audio" (video.tsx
+// isAudioCall): no full-screen photo, camera or video controls. Pastoral/
+// crisis calls and group/study joins (which arrive without a single other
+// person) keep this audio-only screen. Every caller still navigates to
+// /call/audio as before.
 export default function AudioCallRoute() {
   const params = useLocalSearchParams<{ callType?: string; otherUserId?: string }>();
   if (params.callType === "audio" && params.otherUserId) return <VideoCallScreen />;
@@ -928,19 +930,9 @@ function AudioCallScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 30 }]}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      {/* Active-call backdrop: the other person's photo, softly blurred and
-          dimmed — deliberately unlike the sharp full-screen ringing photo. */}
-      {isOneToOne && peerPhotoUrl && (
-        <ExpoImage
-          source={{ uri: peerPhotoUrl }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          blurRadius={40}
-          cachePolicy="memory-disk"
-          accessibilityIgnoresInvertColors
-        />
-      )}
-      {isOneToOne && peerPhotoUrl && <View style={[StyleSheet.absoluteFill, styles.backdropShade]} pointerEvents="none" />}
+      {/* Audio-only call: plain call background. The other person's photo
+          appears only as the avatar below, never full screen (the full-
+          screen photo belongs to the ringing screen alone). */}
 
       {/* Minimal header (section 11) — no participant-count badge here:
           Direct Calls has no Participants button today (confirmed — none
@@ -1134,7 +1126,6 @@ function makeStyles(p2p: P2PCallColors) {
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 20 },
     // Active 1:1 audio: dim the blurred photo backdrop so the portrait,
     // name and controls read clearly over any photo.
-    backdropShade: { backgroundColor: "rgba(6,12,9,0.62)" },
     peerBlock: { alignItems: "center", gap: 18 },
     peerRing: {
       alignItems: "center", justifyContent: "center",

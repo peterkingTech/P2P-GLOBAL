@@ -132,10 +132,16 @@ export default function VideoCallScreen() {
     autoStudyLessonId?: string; autoStudyModuleId?: string; autoStudyLessonTitle?: string;
   }>();
   const isInitiator = params.isInitiator === "true";
-  // Seamless Audio ↔ Video — a 1:1 AUDIO call runs on this screen in audio
-  // mode (app/call/audio.tsx routes it here): same engine, camera off until
-  // the user taps Video. The call stays an audio call in its history.
+  // A 1:1 AUDIO call runs on this screen (app/call/audio.tsx routes it
+  // here): same engine and lifecycle, shown with the voice layout below
+  // (isAudioCall). The camera is never started for it.
   const startsAsAudio = params.callType === "audio";
+  // The call's explicit type decides the screen, never whether a photo or a
+  // remote video track happens to exist: an AUDIO call always shows the
+  // voice layout (avatar, name, time, Speaker · Mute · More · End) — no
+  // full-screen photo, camera preview, video stage or video controls. A
+  // VIDEO call keeps the full video experience (incl. its own audio mode).
+  const isAudioCall = startsAsAudio;
   const callTypeForRecord: "audio" | "video" = startsAsAudio ? "audio" : "video";
   const markedInProgressRef = useRef(false);
   // CALL NAV TRACE (automatic-second-call investigation) — a fresh id per
@@ -217,7 +223,7 @@ export default function VideoCallScreen() {
   // audio-only presentation" concept that also drives which controls show.
   // It never touches the Agora channel/engine/token — see switchTo*Mode.
   const [mediaMode, setMediaMode] = useState<"video" | "audio">(startsAsAudio ? "audio" : "video");
-  const controlSize = controlSizeFor(mediaMode === "video" ? 7 : 5);
+  const controlSize = controlSizeFor(isAudioCall ? 4 : mediaMode === "video" ? 7 : 5);
   // WhatsApp-style call redesign — which participant is the large tile.
   // Pure UI state: P2PRectStage's tap handler below only flips this, never
   // touches Agora. false (the default) preserves this screen's original,
@@ -983,12 +989,12 @@ export default function VideoCallScreen() {
   const participantStrip = (
     <View style={styles.studyParticipantStrip}>
       <View style={styles.studyMiniTile}>
-        {remoteUid !== null ? <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} /> : <Ionicons name="person" size={16} color="rgba(255,255,255,0.5)" />}
+        {remoteUid !== null && !isAudioCall ? <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: remoteUid }} /> : <Ionicons name="person" size={16} color="rgba(255,255,255,0.5)" />}
       </View>
       {/* LOCAL VIDEO FIX — same localJoined gate as selfTile above, same
           race-prevention rationale (this is a second, separate local
           RtcSurfaceView instance). */}
-      {cameraOn && localJoined && (
+      {!isAudioCall && cameraOn && localJoined && (
         <View style={styles.studyMiniTile}>
           <RtcSurfaceView style={StyleSheet.absoluteFill} canvas={{ uid: 0 }} zOrderMediaOverlay />
         </View>
@@ -997,9 +1003,11 @@ export default function VideoCallScreen() {
       <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleMute}>
         <Ionicons name={muted ? "mic-off" : "mic"} size={16} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleCamera}>
-        <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={16} color="#fff" />
-      </TouchableOpacity>
+      {!isAudioCall && (
+        <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleCamera}>
+          <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={16} color="#fff" />
+        </TouchableOpacity>
+      )}
       <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={() => handleEndCall()}>
         <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
       </TouchableOpacity>
@@ -1020,7 +1028,8 @@ export default function VideoCallScreen() {
   const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({
     uid, isSelf: false,
     name: remoteUids.length === 1 ? otherName : (groupParticipants.find((p) => p.uid === uid)?.name ?? "Someone"),
-    videoOn: !!remoteVideoOn[uid], muted: false,
+    // An audio call never renders video, even if a remote side publishes some.
+    videoOn: !isAudioCall && !!remoteVideoOn[uid], muted: false,
     photoUrl: remoteUids.length === 1 ? peerPhotoUrl : (groupParticipants.find((p) => p.uid === uid)?.photoUrl ?? null),
   }));
   // LOCAL VIDEO FIX (iOS local-preview investigation) — videoOn gated on
@@ -1041,12 +1050,12 @@ export default function VideoCallScreen() {
   // first mount until the engine genuinely exists, matching remote's
   // natural timing. Does not touch P2PRectStage.tsx/Tile, remote rendering,
   // or any Agora/token/channel call.
-  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: cameraOn && localJoined, muted, photoUrl: profile?.avatarUrl ?? null };
+  const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: !isAudioCall && cameraOn && localJoined, muted, photoUrl: profile?.avatarUrl ?? null };
   const allTiles = [selfTile, ...otherTiles];
   // Audio mode with no video from either side in a 1:1 call → the
   // person-centred audio presentation instead of an empty video stage.
   const anyRemoteVideo = remoteUids.some((uid) => !!remoteVideoOn[uid]);
-  const audioPresentation = mediaMode === "audio" && !anyRemoteVideo && remoteUids.length <= 1;
+  const audioPresentation = remoteUids.length <= 1 && (isAudioCall || (mediaMode === "audio" && !anyRemoteVideo));
   const peerSpeaking = remoteUids.some((uid) => activeSpeaker.speakingUids.has(uid));
   const portraitSize = Math.round(Math.min(screenWidth * 0.52, 220));
 
@@ -1088,7 +1097,7 @@ export default function VideoCallScreen() {
           >
             {callingAgain ? <ActivityIndicator color="#fff" size="small" /> : (
               <>
-                <Ionicons name="videocam" size={16} color="#fff" />
+                <Ionicons name={isAudioCall ? "call" : "videocam"} size={16} color="#fff" />
                 <Text style={styles.noAnswerPrimaryText}>Call again</Text>
               </>
             )}
@@ -1166,7 +1175,9 @@ export default function VideoCallScreen() {
             {/* Audio mode with no video on either side: the person-centred
                 audio presentation (same as the audio call screen). The
                 video stage returns the moment either side turns video on. */}
-            {peerPhotoUrl && (
+            {/* Audio calls: plain call background — the photo appears only
+                as the avatar below, never full screen. */}
+            {peerPhotoUrl && !isAudioCall && (
               <ExpoImage
                 source={{ uri: peerPhotoUrl }}
                 style={StyleSheet.absoluteFill}
@@ -1176,7 +1187,7 @@ export default function VideoCallScreen() {
                 accessibilityIgnoresInvertColors
               />
             )}
-            {peerPhotoUrl && <View style={[StyleSheet.absoluteFill, styles.backdropShade]} pointerEvents="none" />}
+            {peerPhotoUrl && !isAudioCall && <View style={[StyleSheet.absoluteFill, styles.backdropShade]} pointerEvents="none" />}
             <View style={styles.peerBlock}>
               <View
                 style={[
@@ -1199,6 +1210,9 @@ export default function VideoCallScreen() {
                 )}
               </View>
               <Text style={styles.peerName} numberOfLines={1} accessibilityRole="header">{otherName}</Text>
+              {isAudioCall && callState === "connected" && (
+                <Text style={styles.peerElapsed} accessibilityLabel={"Call time " + formatClock(elapsed)}>{formatClock(elapsed)}</Text>
+              )}
             </View>
           </>
         ) : (
@@ -1222,7 +1236,7 @@ export default function VideoCallScreen() {
 
       {/* Smoothing filter sits beside your own video because it is about how
           you look; background blur moved into the More sheet. */}
-      {cameraOn && mediaMode === "video" && (
+      {!isAudioCall && cameraOn && mediaMode === "video" && (
         <TouchableOpacity
           style={[styles.filterPill, filterOn && { borderColor: p2pColors.accent, backgroundColor: p2pColors.pillBg }]}
           onPress={toggleFilter}
@@ -1248,7 +1262,7 @@ export default function VideoCallScreen() {
         </View>
       )}
 
-      {cameraUnavailable && (
+      {cameraUnavailable && !isAudioCall && (
         <View style={[styles.banner, { top: insets.top + (poorConnection ? 54 : 10) }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Ionicons name="videocam-off" size={14} color="#fff" />
           <Text style={styles.bannerText}>Camera unavailable — you're still connected by audio. Use the camera button below to retry.</Text>
@@ -1270,7 +1284,7 @@ export default function VideoCallScreen() {
       )}
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {callState === "connected" && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
+        {callState === "connected" && !isAudioCall && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
 
         {callState === "connected" && study.pendingGroupStudy?.active && (
           <View style={styles.autoStudyCard}>
@@ -1312,18 +1326,20 @@ export default function VideoCallScreen() {
           <P2PControlButton size={controlSize} onPress={toggleSpeaker} active={speakerOn} accessibilityLabel={speakerOn ? "Turn speaker off" : "Turn speaker on"} colors={p2pColors}>
             <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={20} color={speakerOn ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          <P2PControlButton
-            size={controlSize}
-            onPress={mediaMode === "video" ? switchToAudioMode : switchToVideoMode}
-            accessibilityLabel={mediaMode === "video" ? "Switch to audio" : "Switch to video"}
-            colors={p2pColors}
-          >
-            <Ionicons name={mediaMode === "video" ? "call-outline" : "videocam-outline"} size={20} color={p2pColors.textPrimary} />
-          </P2PControlButton>
+          {!isAudioCall && (
+            <P2PControlButton
+              size={controlSize}
+              onPress={mediaMode === "video" ? switchToAudioMode : switchToVideoMode}
+              accessibilityLabel={mediaMode === "video" ? "Switch to audio" : "Switch to video"}
+              colors={p2pColors}
+            >
+              <Ionicons name={mediaMode === "video" ? "call-outline" : "videocam-outline"} size={20} color={p2pColors.textPrimary} />
+            </P2PControlButton>
+          )}
           <P2PControlButton size={controlSize} onPress={toggleMute} active={muted} accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} colors={p2pColors}>
             <Ionicons name={muted ? "mic-off" : "mic"} size={20} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          {mediaMode === "video" && (
+          {!isAudioCall && mediaMode === "video" && (
             <P2PControlButton
               size={controlSize}
               onPress={toggleCamera}
@@ -1334,7 +1350,7 @@ export default function VideoCallScreen() {
               <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={20} color={!cameraOn ? p2pColors.accent : p2pColors.textPrimary} />
             </P2PControlButton>
           )}
-          {mediaMode === "video" && (
+          {!isAudioCall && mediaMode === "video" && (
             <P2PControlButton size={controlSize} onPress={flipCamera} disabled={!cameraOn} accessibilityLabel="Switch camera" colors={p2pColors}>
               <Ionicons name="camera-reverse" size={20} color={cameraOn ? p2pColors.textPrimary : p2pColors.textMuted} />
             </P2PControlButton>
@@ -1353,7 +1369,7 @@ export default function VideoCallScreen() {
         onClose={() => setMoreOpen(false)}
         colors={p2pColors}
         actions={[
-          ...(mediaMode === "video" && cameraOn
+          ...(!isAudioCall && mediaMode === "video" && cameraOn
             ? [{ key: "blur", icon: "aperture-outline", label: "Background blur", detail: blurOn ? "On" : "Off", active: blurOn, onPress: toggleBlur } as CallMoreAction]
             : []),
           ...(callState === "connected"
@@ -1445,6 +1461,8 @@ function makeStyles(p2p: P2PCallColors) {
       color: p2p.textPrimary, fontSize: 28, fontFamily: "Inter_700Bold", textAlign: "center",
       letterSpacing: -0.3, paddingHorizontal: 24, maxWidth: "100%",
     },
+    // Audio calls: the elapsed time sits under the name.
+    peerElapsed: { color: p2p.textMuted, fontSize: 16, fontFamily: "Inter_500Medium", marginTop: -8, fontVariant: ["tabular-nums"] },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
     statusText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
     // Just below the PiP tile (P2PRectStage's pipTile: top 16 + height 122).

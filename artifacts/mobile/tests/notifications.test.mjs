@@ -205,5 +205,17 @@ ok("preview setting loads on its own (new level, then 193's switch) and hides it
 ok("preview setting saves only the caller's own row", /\.eq\("id", userId\)/.test(previewLib) && /savePreviewSetting\(profile\.id, next\)/.test(settings));
 ok("a failed save puts the previous choice back", /if \(!\(await savePreviewSetting\(profile\.id, next\)\)\) setPreview\(previous\);/.test(settings));
 
+// Per-category phone alerts (enforced server-side: api-server lib/notificationCategories.ts).
+ok("settings: Messages / Community / Prayer switches added to the existing six", ["notifyMessages", "notifyGroups", "notifyPrayer", "notifySessionReminders", "notifyPeerGuideAlerts", "notifyFruitAwards", "notifyWeeklyEncouragement", "notifyElijahCheckins", "notifyBreakRooms"].every((k) => settings.includes(`key: "${k}"`)));
+ok("settings: says calls + safety always come through and muted items stay in Notifications", /Calls, missed calls and account or safety alerts always come through/.test(settings) && /it still appears in Notifications/.test(settings));
+ok("the three switches save through updateProfile to their existing columns", /dbUpdates\.notify_messages = updates\.notifyMessages/.test(auth) && /dbUpdates\.notify_groups = updates\.notifyGroups/.test(auth) && /dbUpdates\.notify_prayer = updates\.notifyPrayer/.test(auth));
+ok("master switch: saved as notifications_enabled, greys out + disables every category", /onValueChange=\{\(v\) => \{ updateProfile\(\{ notificationsEnabled: v \}\); \}\}/.test(settings)
+  && /dbUpdates\.notifications_enabled = updates\.notificationsEnabled/.test(auth) && /!masterOn && styles\.cardDimmed/.test(settings) && (settings.match(/disabled=\{!masterOn\}/g) ?? []).length === 2);
+const overdueLib = readFileSync(path.join(root, "lib/adminOverdueSetting.ts"), "utf8");
+ok("overdue reminders switch: super admins only, hidden without migration 196", /const isSuperAdmin = profile\?\.role === "super_admin";/.test(settings) && /\{isSuperAdmin && adminOverdue\.available \? \(/.test(settings)
+  && /if \(error \|\| !data\) return \{ available: false \};/.test(overdueLib));
+ok("overdue switch: own row only, not in the main profile load, failed save restores", /\.update\(\{ notify_admin_overdue: on \}\)\.eq\("id", userId\)/.test(overdueLib) && !/notify_admin_overdue/.test(auth)
+  && /if \(!\(await saveAdminOverdueSetting\(profile\.id, on\)\)\) setAdminOverdue\(previous\);/.test(settings));
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

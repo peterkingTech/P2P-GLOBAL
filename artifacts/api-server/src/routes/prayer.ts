@@ -40,6 +40,7 @@ router.post("/sinners-prayer/notify-peer-guide", async (req, res) => {
     user_id: link.mentor_id,
     title: "A sacred moment",
     message: `${name} prayed the prayer of commitment today. This is a sacred moment — reach out to them.`,
+    notification_type: "prayer_of_commitment",
   });
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ notified: true });

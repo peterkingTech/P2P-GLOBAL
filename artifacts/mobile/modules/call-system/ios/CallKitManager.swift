@@ -3,6 +3,7 @@ import CallKit
 import Foundation
 import Intents
 import PushKit
+import UIKit
 
 /**
  Native side of P2P calls on iOS.
@@ -53,9 +54,27 @@ final class CallKitManager: NSObject {
     config.maximumCallsPerCallGroup = 1
     config.supportedHandleTypes = [.generic]
     config.includesCallsInRecents = true
+    // P2P Global mark on the system call screen (the app button). CallKit
+    // only uses the image's alpha, so the mark is drawn here — no asset.
+    config.iconTemplateImageData = Self.brandTemplateIcon()
     provider = CXProvider(configuration: config)
     super.init()
     provider.setDelegate(self, queue: nil)
+  }
+
+  /// "P2P" as a template mask (transparent background, opaque text).
+  private static func brandTemplateIcon() -> Data? {
+    let size = CGSize(width: 120, height: 120)
+    let image = UIGraphicsImageRenderer(size: size).image { _ in
+      let attrs: [NSAttributedString.Key: Any] = [
+        .font: UIFont.systemFont(ofSize: 44, weight: .heavy),
+        .foregroundColor: UIColor.white,
+      ]
+      let text = "P2P" as NSString
+      let t = text.size(withAttributes: attrs)
+      text.draw(at: CGPoint(x: (size.width - t.width) / 2, y: (size.height - t.height) / 2), withAttributes: attrs)
+    }
+    return image.pngData()
   }
 
   // MARK: - Setup

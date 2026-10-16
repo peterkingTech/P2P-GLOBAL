@@ -1,7 +1,8 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 import { getDeactivatedUserIds } from "./accountStatus";
-import { getPreviewLevels, getSenderPhotos, pushPresentation, PREVIEW_CONTENT_LEVELS, type PreviewLevel, type PushPresentation } from "./notificationPrivacy";
+import { getPreviewLevels, getPushPreferences, getSenderPhotos, pushPresentation, PREVIEW_CONTENT_LEVELS, type PreviewLevel, type PushPresentation } from "./notificationPrivacy";
+import { isPushMuted } from "./notificationCategories";
 import { issuePreviewToken } from "./previewToken";
 import {
   decideNotification, sendExpoMessages,
@@ -205,6 +206,12 @@ export async function dispatchNotificationNow(
   const n = claimed as PendingNotification;
   let sendFailed = false;
   try {
+    // The recipient switched this category's phone alerts off: the claim
+    // stands (handled, never retried); the in-app notification is untouched.
+    if (n.user_id && isPushMuted(n.notification_type, (await getPushPreferences([n.user_id])).get(n.user_id))) {
+      logger.info({ notificationId, notificationType: n.notification_type, verdict: "muted", path: "immediate" }, "pushDispatch: notification outcome");
+      return;
+    }
     if (n.user_id) {
       const { data: tokenRows, error: tokenErr } = await db
         .from("p2p_push_tokens")
@@ -247,7 +254,7 @@ export async function dispatchNotificationNow(
 
 export async function dispatchPendingPushes(): Promise<{
   notifications: number; pushed: number; staleTokens: number;
-  verdicts?: Partial<Record<NotificationVerdict | "paused", number>>; retrying?: number;
+  verdicts?: Partial<Record<NotificationVerdict | "paused" | "muted", number>>; retrying?: number;
 }> {
   const pending = await fetchPending();
   if (!pending.length) return { notifications: 0, pushed: 0, staleTokens: 0 };
@@ -269,6 +276,9 @@ export async function dispatchPendingPushes(): Promise<{
   const deactivated = await getDeactivatedUserIds(userIds);
   const levels = await getPreviewLevels(userIds);
   const senderPhotos = await getSenderPhotos(pending);
+  // Per-category preferences (lib/notificationCategories.ts): only the
+  // phone alert is skipped; the in-app notification stays.
+  const pushPrefs = await getPushPreferences(userIds);
   const tokensByUser = new Map<string, PushToken[]>();
   for (const row of (tokenRows ?? []) as PushToken[]) {
     const list = tokensByUser.get(row.user_id) ?? [];
@@ -279,12 +289,13 @@ export async function dispatchPendingPushes(): Promise<{
   const messages: ExpoMessage[] = [];
   const messageTokens: string[] = []; // parallel arrays: which token / which notification each message is for
   const messageOwner: number[] = [];
-  const preVerdict = new Map<number, NotificationVerdict | "paused">();
+  const preVerdict = new Map<number, NotificationVerdict | "paused" | "muted">();
   pending.forEach((n, ni) => {
     // An incoming-call ring past its ring window announces a call that is
     // already over: not sent, recorded as "expired" (never as delivered).
     if (isStaleIncomingCall(n)) { preVerdict.set(ni, "expired"); return; }
     if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") { preVerdict.set(ni, "paused"); return; }
+    if (n.user_id && isPushMuted(n.notification_type, pushPrefs.get(n.user_id))) { preVerdict.set(ni, "muted"); return; }
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
     if (!tokens.length) return;
     const level = (n.user_id && levels.get(n.user_id)) || "none";
@@ -310,11 +321,11 @@ export async function dispatchPendingPushes(): Promise<{
   const outcomesByOwner = new Map<number, MessageOutcome[]>();
   messageOwner.forEach((ni, i) => outcomesByOwner.set(ni, [...(outcomesByOwner.get(ni) ?? []), outcomes[i]]));
   const finishedIds: string[] = [];
-  const verdicts: Partial<Record<NotificationVerdict | "paused", number>> = {};
+  const verdicts: Partial<Record<NotificationVerdict | "paused" | "muted", number>> = {};
   const now = Date.now();
   pending.forEach((n, ni) => {
     const pre = preVerdict.get(ni);
-    let verdict: NotificationVerdict | "paused";
+    let verdict: NotificationVerdict | "paused" | "muted";
     let finished = true;
     const outs = outcomesByOwner.get(ni) ?? [];
     if (pre) {
@@ -324,7 +335,7 @@ export async function dispatchPendingPushes(): Promise<{
       ({ verdict, finished } = decideNotification(outs, { ageMs, maxRetryAgeMs: PUSH_RETRY_WINDOW_MS }));
     }
     verdicts[verdict] = (verdicts[verdict] ?? 0) + 1;
-    if (verdict !== "accepted" && verdict !== "no_devices" && verdict !== "paused") logVerdict(n, verdict as NotificationVerdict, outs, "cron");
+    if (verdict !== "accepted" && verdict !== "no_devices" && verdict !== "paused" && verdict !== "muted") logVerdict(n, verdict as NotificationVerdict, outs, "cron");
     if (finished) finishedIds.push(n.id);
   });
   await markPushed(finishedIds);
