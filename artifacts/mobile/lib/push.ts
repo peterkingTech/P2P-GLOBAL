@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform, AppState } from "react-native";
 import { authedFetch } from "@/lib/adminFetch";
-import { registerIncomingCallCategory } from "@/lib/callNotifications";
+import { registerNotificationCategories } from "@/lib/notificationCategories";
 import { callSystemInstalled } from "@/lib/callSystem";
 
 const LAST_TOKEN_KEY = "p2p_last_push_token";
@@ -32,8 +32,9 @@ Notifications.setNotificationHandler({
   },
 });
 
-// Accept/Decline buttons — must exist before an incoming-call push arrives.
-void registerIncomingCallCategory();
+// Accept/Decline buttons (incoming_call) and, on iPhone, the long-press
+// message view (p2p_message) — must exist before a push arrives.
+void registerNotificationCategories();
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   // Emulators/simulators without real push services (and web) can't get a

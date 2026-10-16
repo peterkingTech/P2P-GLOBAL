@@ -1,7 +1,8 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 import { getDeactivatedUserIds } from "./accountStatus";
-import { getHiddenSenderUserIds, getSenderPhotos, lockScreenText } from "./notificationPrivacy";
+import { getPreviewLevels, getSenderPhotos, pushPresentation, PREVIEW_CONTENT_LEVELS, type PreviewLevel, type PushPresentation } from "./notificationPrivacy";
+import { issuePreviewToken } from "./previewToken";
 import {
   decideNotification, sendExpoMessages,
   type ExpoMessage, type ExpoSendDeps, type MessageOutcome, type NotificationVerdict,
@@ -90,20 +91,31 @@ async function deactivateTokens(tokens: string[]): Promise<void> {
 // an ordinary background message notification deliberately doesn't.
 // `priority: "high"` is the equivalent instruction to FCM itself, so the
 // message wakes a dozing device instead of waiting for the next batch.
-// hideSender: the recipient turned off sender names on message pushes
-// (lib/notificationPrivacy.ts, migration 193).
-// senderPhoto: the sender's public photo (lib/notificationPrivacy.ts
-// getSenderPhotos), dropped whenever the sender's name is hidden.
-function buildExpoMessage(n: PendingNotification, to: string, hideSender = false, senderPhoto?: string) {
+// One presentation per notification (same for all of the recipient's
+// devices). A preview token is issued only for a 'full' / 'hold' recipient of a
+// message push, and only when the server has NOTIFICATION_PREVIEW_SECRET.
+function presentationFor(n: PendingNotification, level: PreviewLevel, senderPhoto?: string): PushPresentation {
+  const d = n.data ?? {};
+  const previewToken = PREVIEW_CONTENT_LEVELS.has(level) && n.notification_type === "new_message" && n.user_id
+    ? issuePreviewToken({ notificationId: n.id, recipientId: n.user_id, messageId: String(d.messageId ?? ""), conversationId: String(d.conversationId ?? "") })
+    : null;
+  return pushPresentation(n, level, { senderPhoto, previewToken });
+}
+
+// pres: what this recipient's privacy level allows (lib/notificationPrivacy.ts
+// pushPresentation — title/body, sender photo, iOS preview category, preview
+// token). Never contains message content. The preview token goes in data,
+// which iOS hands the Notification Service Extension as userInfo["body"].
+function buildExpoMessage(n: PendingNotification, to: string, pres: PushPresentation) {
   const isIncomingCall = n.notification_type === "incoming_call";
-  const { title, body } = lockScreenText(n, hideSender);
-  const image = !hideSender && !isIncomingCall ? senderPhoto : undefined;
   return {
     to,
-    title,
-    body,
-    ...(image ? { richContent: { image }, mutableContent: true } : {}),
-    data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}) },
+    title: pres.title,
+    body: pres.body,
+    ...(pres.image ? { richContent: { image: pres.image } } : {}),
+    ...(pres.mutableContent ? { mutableContent: true } : {}),
+    ...(pres.categoryId && !isIncomingCall ? { categoryId: pres.categoryId } : {}),
+    data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}), ...(pres.previewToken ? { previewToken: pres.previewToken } : {}) },
     sound: "default" as const,
     // categoryId shows the Accept/Decline buttons (registered client-side in
     // lib/callNotifications.ts); ttl drops a ring push that can't be
@@ -208,9 +220,10 @@ export async function dispatchNotificationNow(
         const tokens = ((tokenRows ?? []) as (PushToken & { device_id: string | null })[])
           .filter((t) => !(skip && t.device_id && skip.has(t.device_id)));
         // Zero active tokens is not a failure (verdict "no_devices").
-        const hideSender = (await getHiddenSenderUserIds([n.user_id])).has(n.user_id);
-        const photo = hideSender ? undefined : (await getSenderPhotos([n])).get(n.id);
-        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token, hideSender, photo)), n.notification_type ?? "immediate");
+        const level = (await getPreviewLevels([n.user_id])).get(n.user_id) ?? "none";
+        const photo = level === "none" ? undefined : (await getSenderPhotos([n])).get(n.id);
+        const pres = presentationFor(n, level, photo);
+        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token, pres)), n.notification_type ?? "immediate");
         await deactivateTokens(invalidTokens(tokens.map((t) => t.token), outcomes));
         const { verdict, finished } = decideNotification(outcomes, { ageMs: 0, maxRetryAgeMs: Number.POSITIVE_INFINITY });
         logVerdict(n, verdict, outcomes, "immediate");
@@ -254,7 +267,7 @@ export async function dispatchPendingPushes(): Promise<{
   // notifications are still stored and readable in-app when they return.
   // Incoming-call rings are left to the call system untouched.
   const deactivated = await getDeactivatedUserIds(userIds);
-  const hiddenSender = await getHiddenSenderUserIds(userIds);
+  const levels = await getPreviewLevels(userIds);
   const senderPhotos = await getSenderPhotos(pending);
   const tokensByUser = new Map<string, PushToken[]>();
   for (const row of (tokenRows ?? []) as PushToken[]) {
@@ -273,8 +286,11 @@ export async function dispatchPendingPushes(): Promise<{
     if (isStaleIncomingCall(n)) { preVerdict.set(ni, "expired"); return; }
     if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") { preVerdict.set(ni, "paused"); return; }
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
+    if (!tokens.length) return;
+    const level = (n.user_id && levels.get(n.user_id)) || "none";
+    const pres = presentationFor(n, level, level === "none" ? undefined : senderPhotos.get(n.id));
     for (const t of tokens) {
-      messages.push(buildExpoMessage(n, t.token, !!n.user_id && hiddenSender.has(n.user_id), senderPhotos.get(n.id)));
+      messages.push(buildExpoMessage(n, t.token, pres));
       messageTokens.push(t.token);
       messageOwner.push(ni);
     }

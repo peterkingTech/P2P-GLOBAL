@@ -29,25 +29,14 @@ try {
 
   const msg = { notification_type: "new_message", title: "Grace", message: "sent you a message" };
   const voice = { notification_type: "new_message", title: "Grace", message: "sent you a voice message" };
-  ok("setting on (default): name shown as today", JSON.stringify(NP.lockScreenText(msg, false)) === JSON.stringify({ title: "Grace", body: "sent you a message" }));
-  ok("setting off: 'P2P Global — New message'", JSON.stringify(NP.lockScreenText(msg, true)) === JSON.stringify({ title: "P2P Global", body: "New message" }));
-  ok("setting off, voice: 'New voice message'", NP.lockScreenText(voice, true).body === "New voice message" && NP.lockScreenText(voice, true).title === "P2P Global");
-  ok("calls still show the caller", NP.lockScreenText({ notification_type: "incoming_call", title: "Grace is calling you", message: null }, true).title === "Grace is calling you");
-  ok("other types untouched", NP.lockScreenText({ notification_type: "family_join_request", title: "Family Circle join request", message: "Olu asked" }, true).body === "Olu asked");
-  ok("null title falls back to P2P Global", NP.lockScreenText({ notification_type: "x", title: null, message: null }, false).title === "P2P Global");
-
-  const calls = [];
-  const chain = (result) => { const c = { select: () => c, in: (k, v) => { calls.push(["in", k, v]); return c; }, eq: (k, v) => { calls.push(["eq", k, v]); return c; }, then: (r) => r(result) }; return c; };
-  globalThis.__np = { warns: [], from: (t) => { calls.push(["from", t]); return chain({ data: [{ id: "u1" }], error: null }); } };
-  const hidden = await NP.getHiddenSenderUserIds(["u1", "u2"]);
-  ok("lookup: only users who turned it off", hidden.has("u1") && !hidden.has("u2") && calls.some((c) => c[0] === "eq" && c[1] === "notify_show_sender_name" && c[2] === false));
-  ok("lookup: no users → no query", (await NP.getHiddenSenderUserIds([])).size === 0);
-  globalThis.__np = { warns: [], from: () => chain({ data: null, error: { code: "42703", message: "column does not exist" } }) };
-  ok("before the migration (missing column): names shown, no warning", (await NP.getHiddenSenderUserIds(["u1"])).size === 0 && globalThis.__np.warns.length === 0);
-  globalThis.__np = { warns: [], from: () => chain({ data: null, error: { code: "57014", message: "timeout" } }) };
-  ok("lookup error: names shown, warning logged", (await NP.getHiddenSenderUserIds(["u1"])).size === 0 && globalThis.__np.warns.length === 1);
-  globalThis.__np = { warns: [], from: () => { throw new Error("boom"); } };
-  ok("lookup throws: names shown, never crashes", (await NP.getHiddenSenderUserIds(["u1"])).size === 0);
+  ok("Name only (default): name shown as today", JSON.stringify(NP.lockScreenText(msg, "name")) === JSON.stringify({ title: "Grace", body: "sent you a message" }));
+  ok("Name and message: same lock-screen text (content only via the secure preview)", JSON.stringify(NP.lockScreenText(msg, "full")) === JSON.stringify({ title: "Grace", body: "sent you a message" }));
+  ok("Nothing: 'P2P Global — New message'", JSON.stringify(NP.lockScreenText(msg, "none")) === JSON.stringify({ title: "P2P Global", body: "New message" }));
+  ok("Nothing, voice: 'New voice message'", NP.lockScreenText(voice, "none").body === "New voice message" && NP.lockScreenText(voice, "none").title === "P2P Global");
+  ok("calls still show the caller", NP.lockScreenText({ notification_type: "incoming_call", title: "Grace is calling you", message: null }, "none").title === "Grace is calling you");
+  ok("other types untouched", NP.lockScreenText({ notification_type: "family_join_request", title: "Family Circle join request", message: "Olu asked" }, "none").body === "Olu asked");
+  ok("null title falls back to P2P Global", NP.lockScreenText({ notification_type: "x", title: null, message: null }, "name").title === "P2P Global");
+  // Level lookup (getPreviewLevels) is covered in tests/notificationPreview.test.mjs.
 
   // Sender photos (item 10).
   const A = "00000000-0000-0000-0000-0000000000a1", B = "00000000-0000-0000-0000-0000000000b1", C = "00000000-0000-0000-0000-0000000000c1";
@@ -71,12 +60,10 @@ try {
   ok("no person senders → no query", (await NP.getSenderPhotos([{ id: "x", notification_type: "admin_report_ready", data: {} }])).size === 0);
 
   const pd = readFileSync(path.join(root, "src/lib/pushDispatch.ts"), "utf8");
-  ok("push: image only when the sender is shown and it isn't a call", /const image = !hideSender && !isIncomingCall \? senderPhoto : undefined;/.test(pd)
-    && /\.\.\.\(image \? \{ richContent: \{ image \}, mutableContent: true \} : \{\}\)/.test(pd));
-  ok("push: both paths pass the sender photo", /buildExpoMessage\(n, t\.token, hideSender, photo\)/.test(pd) && /senderPhotos\.get\(n\.id\)/.test(pd) && /const photo = hideSender \? undefined :/.test(pd));
-  ok("pushDispatch: both paths use the setting", /const hiddenSender = await getHiddenSenderUserIds\(userIds\);/.test(pd) && /getHiddenSenderUserIds\(\[n\.user_id\]\)/.test(pd)
-    && /buildExpoMessage\(n, t\.token, !!n\.user_id && hiddenSender\.has\(n\.user_id\), senderPhotos\.get\(n\.id\)\)/.test(pd) && /buildExpoMessage\(n, t\.token, hideSender, photo\)/.test(pd));
-  ok("pushDispatch: title/body come from lockScreenText", /const \{ title, body \} = lockScreenText\(n, hideSender\);/.test(pd));
+  ok("push: title/body/photo/category/token all come from pushPresentation", /return pushPresentation\(n, level, \{ senderPhoto, previewToken \}\);/.test(pd)
+    && /\.\.\.\(pres\.image \? \{ richContent: \{ image: pres\.image \} \} : \{\}\)/.test(pd));
+  ok("push: both paths read the level and skip the photo under Nothing", /const levels = await getPreviewLevels\(userIds\);/.test(pd) && /getPreviewLevels\(\[n\.user_id\]\)/.test(pd)
+    && /const photo = level === "none" \? undefined :/.test(pd) && /level === "none" \? undefined : senderPhotos\.get\(n\.id\)/.test(pd));
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

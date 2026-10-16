@@ -1,6 +1,8 @@
 import { Router } from "express";
-import { supabaseServiceRole as supabase, verifyCaller } from "../lib/supabase";
+import { supabaseServiceRole as supabase, verifyCaller, SUPABASE_PUBLIC_URL } from "../lib/supabase";
 import { notificationActorId } from "../lib/notificationActors";
+import { verifyPreviewToken } from "../lib/previewToken";
+import { getPreviewLevels, PREVIEW_CONTENT_LEVELS } from "../lib/notificationPrivacy";
 
 const router = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -131,6 +133,80 @@ router.post("/me/read-all", async (req, res) => {
     .eq("read", false);
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ ok: true });
+});
+
+// ── iPhone long-press preview (secure fetch) ───────────────────────────────
+// POST /notifications/preview with header X-P2P-Preview-Token (never a URL
+// query, so it can't land in access logs; the header is also redacted in
+// lib/logger.ts). The token (lib/previewToken.ts) proves only "this recipient
+// may see this one message's preview until it expires"; every request
+// re-checks, against the database:
+//   the notification belongs to that recipient and points at that message +
+//   conversation; the recipient is still a member; the message still exists
+//   in that conversation and isn't deleted; the recipient's CURRENT level is
+//   "Name and message" ('full') or "Name, reveal message on hold" ('hold');
+//   for voice, the link is our own public voice-messages storage.
+// `display` tells the iPhone where it may show the text: "banner" ('full')
+// or only the press-and-hold view, "hold" ('hold') — decided from the
+// CURRENT level on every fetch, so a change of mind applies immediately.
+// Any failure — missing secret, bad/expired token, any check — is the same
+// 404 "Preview unavailable", so nothing about a message's existence leaks.
+// Read-only: it never marks anything read or changes any state.
+const PREVIEW_MAX_TEXT = 1000;
+const previewUnavailable = (res: import("express").Response) =>
+  res.status(404).set("Cache-Control", "no-store").json({ error: "Preview unavailable" });
+
+export function trustedVoiceUrl(raw: unknown, supabaseBase: string): string | null {
+  if (typeof raw !== "string" || raw.length > 2048) return null;
+  let u: URL, base: URL;
+  try { u = new URL(raw); base = new URL(supabaseBase); } catch { return null; }
+  if (u.protocol !== "https:" || u.host !== base.host || u.username || u.password) return null;
+  if (!u.pathname.startsWith("/storage/v1/object/public/voice-messages/") || u.pathname.includes("..") || u.pathname.includes("%2e") || u.pathname.includes("%2E")) return null;
+  return u.toString();
+}
+
+router.post("/preview", async (req, res) => {
+  const claims = verifyPreviewToken(req.get("x-p2p-preview-token"));
+  if (!claims) return previewUnavailable(res);
+  try {
+    const { data: note } = await supabase.from("p2p_notifications")
+      .select("id, user_id, notification_type, data").eq("id", claims.notificationId).maybeSingle();
+    const nd = (note?.data ?? {}) as Record<string, unknown>;
+    if (!note || note.user_id !== claims.recipientId || note.notification_type !== "new_message"
+      || nd.messageId !== claims.messageId || nd.conversationId !== claims.conversationId) return previewUnavailable(res);
+
+    const level = (await getPreviewLevels([claims.recipientId])).get(claims.recipientId) ?? "none";
+    if (!PREVIEW_CONTENT_LEVELS.has(level)) return previewUnavailable(res);
+    const display = level === "hold" ? "hold" : "banner";
+
+    const { data: member } = await supabase.from("p2p_conversation_members")
+      .select("user_id").eq("conversation_id", claims.conversationId).eq("user_id", claims.recipientId).maybeSingle();
+    if (!member) return previewUnavailable(res);
+
+    const { data: msg } = await supabase.from("p2p_messages")
+      .select("id, conversation_id, sender_id, body, message_type, media_url, media_duration_seconds, deleted_at")
+      .eq("id", claims.messageId).maybeSingle();
+    if (!msg || msg.conversation_id !== claims.conversationId || msg.deleted_at || msg.sender_id === claims.recipientId) return previewUnavailable(res);
+
+    res.set("Cache-Control", "no-store");
+    if (msg.message_type === "voice") {
+      const d = Number(msg.media_duration_seconds);
+      return res.json({
+        kind: "voice",
+        display,
+        voice: {
+          url: trustedVoiceUrl(msg.media_url, SUPABASE_PUBLIC_URL),
+          durationSeconds: Number.isFinite(d) && d > 0 && d < 24 * 3600 ? Math.round(d) : null,
+        },
+      });
+    }
+    if ((msg.message_type ?? "text") !== "text") return previewUnavailable(res);
+    const text = typeof msg.body === "string" ? msg.body.trim() : "";
+    if (!text) return previewUnavailable(res);
+    return res.json({ kind: "text", display, text: text.length > PREVIEW_MAX_TEXT ? `${text.slice(0, PREVIEW_MAX_TEXT - 1)}…` : text });
+  } catch {
+    return previewUnavailable(res);
+  }
 });
 
 export default router;

@@ -95,7 +95,8 @@
       "expo-asset",
       "./modules/call-system/app.plugin.js",
       "./plugins/withTabletOrientation.js",
-      "./plugins/withNotificationServiceExtension.js"
+      "./plugins/withNotificationServiceExtension.js",
+      "./plugins/withNotificationContentExtension.js"
     ],
     "experiments": {
       "typedRoutes": true,

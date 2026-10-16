@@ -115,7 +115,7 @@ export function makeTranslator(db, role, uid = null) {
 }
 
 /** Bundles the real API pieces with Supabase replaced by translators over `db`. */
-export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
+export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "", supabaseUrl = "https://lab.supabase.co" }) {
   const require = createRequire(path.join(apiRoot, "package.json"));
   const { build } = require("esbuild");
   const roleOf = Object.fromEntries((await db.query(`select id, role from p2p_profiles`)).rows.map((r) => [r.id, r.role]));
@@ -124,6 +124,7 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
     asUser: (token) => makeTranslator(db, "authenticated", roleOf[token] ? token : null),
     getUser: async (t) => (roleOf[t] ? { data: { user: { id: t } }, error: null } : { data: { user: null }, error: { message: "bad" } }),
     roleOf: (t) => roleOf[t],
+    supabaseUrl,
     logger: { info() {}, warn() {}, error() {}, debug() {}, child() { return this; } },
   };
   const posix = (p) => p.replace(/\\/g, "/");
@@ -133,6 +134,7 @@ export async function bundleApp({ apiRoot, tmpDir, db, extraRoutes = "" }) {
     b.onResolve({ filter: /^@supabase\/supabase-js$/ }, () => ({ path: "sbjs", namespace: "lab" }));
     b.onLoad({ filter: /.*/, namespace: "lab" }, (a) => ({ loader: "js", contents: {
       supabase: `const L = globalThis.__studioLab; export const supabaseServiceRole = L.service; export const supabaseAsUser = (t) => L.asUser(t);
+        export const SUPABASE_PUBLIC_URL = L.supabaseUrl ?? "https://lab.supabase.co";
         export const supabase = { auth: { getUser: (t) => L.getUser(t) } };
         export async function verifyCaller(req) { const h = req.headers.authorization || ""; const t = h.startsWith("Bearer ") ? h.slice(7) : null; return t && L.roleOf(t) ? t : null; }`,
       logger: "export const logger = globalThis.__studioLab.logger;",

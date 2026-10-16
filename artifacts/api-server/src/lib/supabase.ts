@@ -13,6 +13,8 @@ const supabaseUrl =
     : SUPABASE_URL;
 
 export const supabase = createClient(supabaseUrl, SUPABASE_ANON_KEY);
+/** The project's public base URL (trusted host for storage links, e.g. voice previews). */
+export const SUPABASE_PUBLIC_URL: string = supabaseUrl;
 
 // p2p_lesson_progress, p2p_modules, and several other tables' RLS policies
 // are scoped to the `authenticated` role only (owner/auth checks via

@@ -20,6 +20,12 @@
   <string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key>
   <string>$(CURRENT_PROJECT_VERSION)</string>
+  <!-- Written at prebuild by plugins/withNotificationServiceExtension.js.
+       Empty → previews are skipped (the notification shows as sent). -->
+  <key>P2PApiBaseURL</key>
+  <string>__P2P_API_BASE_URL__</string>
+  <key>P2PTrustedMediaHost</key>
+  <string>__P2P_TRUSTED_MEDIA_HOST__</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key>

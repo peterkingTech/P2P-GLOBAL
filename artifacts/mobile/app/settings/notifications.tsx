@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Platform, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Platform, Switch, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
-import { loadPreviewSetting, savePreviewSetting, type PreviewSettingState } from "@/lib/messagePreviewSetting";
+import { loadPreviewSetting, savePreviewSetting, PREVIEW_LEVELS, type PreviewLevel, type PreviewSettingState } from "@/lib/messagePreviewSetting";
 
 const TOGGLES: { key: keyof UserProfile; label: string; desc: string }[] = [
   { key: "notifySessionReminders", label: "Session Reminders", desc: "Remind me when it's time for my next study session" },
@@ -30,11 +30,15 @@ export default function NotificationsSettingsScreen() {
     return () => { live = false; };
   }, [profile?.id]);
 
-  async function togglePreview(v: boolean) {
-    if (!profile?.id || !preview.available) return;
-    setPreview({ available: true, showSenderName: v });
-    if (!(await savePreviewSetting(profile.id, v))) setPreview({ available: true, showSenderName: !v });
+  async function choosePreview(level: PreviewLevel) {
+    if (!profile?.id || !preview.available || level === preview.level) return;
+    const previous = preview;
+    const next = { ...preview, level };
+    setPreview(next);
+    if (!(await savePreviewSetting(profile.id, next))) setPreview(previous);
   }
+  // Before migration 194 only Name only / Nothing exist on the server.
+  const levels = preview.available && preview.source === "legacy" ? PREVIEW_LEVELS.filter((l) => l.value !== "full" && l.value !== "hold") : PREVIEW_LEVELS;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -58,22 +62,30 @@ export default function NotificationsSettingsScreen() {
         </View>
 
         {preview.available ? (
-          <View style={[styles.card, { marginTop: 16 }]}>
-            <View style={[styles.row, styles.rowLast]}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={styles.label}>Show sender's name</Text>
-                <Text style={styles.desc}>
-                  Message notifications never show what was said. Turn this off to also hide who it's from on your lock screen ("New message").
-                </Text>
-              </View>
-              <Switch
-                value={preview.showSenderName}
-                onValueChange={togglePreview}
-                trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
-                thumbColor="#fff"
-                accessibilityLabel="Show sender's name in message notifications"
-              />
-            </View>
+          <View style={[styles.card, { marginTop: 16 }]} accessibilityRole="radiogroup" accessibilityLabel="Message notification previews">
+            <Text style={styles.label}>Message previews</Text>
+            <Text style={[styles.desc, { marginBottom: 6 }]}>What message notifications may show.</Text>
+            {levels.map((l, i) => {
+              const selected = preview.level === l.value;
+              return (
+                <TouchableOpacity
+                  key={l.value}
+                  style={[styles.row, i === levels.length - 1 && styles.rowLast]}
+                  onPress={() => choosePreview(l.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={`${l.label}. ${l.desc}`}
+                >
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text style={styles.label}>{l.label}</Text>
+                    <Text style={styles.desc}>{l.desc}</Text>
+                  </View>
+                  <View style={[styles.radio, selected && { borderColor: colors.accentGreen }]}>
+                    {selected ? <View style={[styles.radioDot, { backgroundColor: colors.accentGreen }]} /> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ) : null}
       </ScrollView>
@@ -93,5 +105,7 @@ function makeStyles(c: AppColors) {
     rowLast: { borderBottomWidth: 0, paddingBottom: 0 },
     label: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     desc: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3, lineHeight: 17 },
+    radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
+    radioDot: { width: 10, height: 10, borderRadius: 5 },
   });
 }
