@@ -16,7 +16,7 @@
 
 import { APP_SCHEME, WEB_APP_URL } from "./sharing";
 
-export type QrKind = "profile" | "circle" | "app";
+export type QrKind = "profile" | "circle" | "family" | "app";
 export interface QrSpec {
   kind: QrKind;
   /** Exactly what is encoded in the QR. */
@@ -36,6 +36,8 @@ const USERNAME_RE = /^[A-Za-z0-9._]{1,30}$/;
 const SLUG_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 // Room invitation tokens are 24 random bytes in base64url (routes/roomInvitations.ts).
 const ROOM_TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+// Family invite-link tokens: 24 random bytes in base64url (routes/family.ts, migration 192).
+const FAMILY_TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
 // Church invite codes: slugified name + random suffix (routes/churches.ts).
 const CHURCH_CODE_RE = /^[a-z0-9-]{1,100}$/;
 export const MAX_SCAN_LENGTH = 2048;
@@ -68,6 +70,23 @@ export function circleQr(circle: { id: string; name: string }): QrSpec | null {
   };
 }
 
+/**
+ * Family Circle invite link. The token is the only thing in the code (no
+ * family name or id); it expires, can be revoked, and only lets someone ASK
+ * to join — a Shepherd or Co-Shepherd approves (routes/family.ts).
+ */
+export function familyInviteQr(invite: { token: string; familyName: string; expiresAt: string }): QrSpec | null {
+  if (!FAMILY_TOKEN_RE.test(invite.token)) return null;
+  const url = landingUrl({ type: "family", link: `${APP_SCHEME}://family/join/${invite.token}` });
+  const until = new Date(invite.expiresAt);
+  const expiry = Number.isNaN(until.getTime()) ? "" : ` It expires on ${until.toLocaleDateString(undefined, { day: "numeric", month: "short" })}.`;
+  return {
+    kind: "family", url, title: invite.familyName, caption: "Scan to ask to join this Family Circle",
+    note: `Scanning doesn't add anyone: you approve each request.${expiry} Only share it with people you know.`,
+    shareMessage: `You're invited to ask to join ${invite.familyName} on P2P Global:\n${url}`,
+  };
+}
+
 export function appQr(): QrSpec {
   return {
     kind: "app", url: WEB_APP_URL, title: "Share P2P Global", caption: "Scan to get P2P Global",
@@ -77,7 +96,7 @@ export function appQr(): QrSpec {
 }
 
 // ── Scanning ────────────────────────────────────────────────────────────────
-export type ScanKind = "profile" | "circle" | "room" | "lesson" | "plan" | "category" | "church" | "app";
+export type ScanKind = "profile" | "circle" | "family" | "room" | "lesson" | "plan" | "category" | "church" | "app";
 export type ScanResult =
   | { ok: true; kind: ScanKind; path: string }
   | { ok: false; reason: "empty" | "not_p2p" | "unsupported" };
@@ -91,6 +110,7 @@ function routeFromAppPath(p: string): ScanResult {
   if ((m = clean.match(/^profile\/@?([^/]+)$/)) && USERNAME_RE.test(m[1])) return { ok: true, kind: "profile", path: `/profile/${m[1]}` };
   if ((m = clean.match(/^circles\/([^/]+)$/)) && UUID_RE.test(m[1])) return { ok: true, kind: "circle", path: `/circles/${m[1].toLowerCase()}` };
   if ((m = clean.match(/^rooms\/join\/([^/]+)$/)) && ROOM_TOKEN_RE.test(m[1])) return { ok: true, kind: "room", path: `/rooms/join/${m[1]}` };
+  if ((m = clean.match(/^family\/join\/([^/]+)$/)) && FAMILY_TOKEN_RE.test(m[1])) return { ok: true, kind: "family", path: `/family/join/${m[1]}` };
   if ((m = clean.match(/^lesson\/([^/]+)$/)) && SLUG_ID_RE.test(m[1])) return { ok: true, kind: "lesson", path: `/lesson/${m[1]}` };
   if ((m = clean.match(/^plan\/([^/]+)$/)) && SLUG_ID_RE.test(m[1])) return { ok: true, kind: "plan", path: `/plan/${m[1]}` };
   if ((m = clean.match(/^plans\/category\/([^/]+)$/)) && SLUG_ID_RE.test(m[1])) return { ok: true, kind: "category", path: `/plans/category/${m[1]}` };

@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Platform, Switch } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { loadPreviewSetting, savePreviewSetting, type PreviewSettingState } from "@/lib/messagePreviewSetting";
 
 const TOGGLES: { key: keyof UserProfile; label: string; desc: string }[] = [
   { key: "notifySessionReminders", label: "Session Reminders", desc: "Remind me when it's time for my next study session" },
@@ -20,6 +21,20 @@ export default function NotificationsSettingsScreen() {
   const { profile, updateProfile } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const [preview, setPreview] = useState<PreviewSettingState>({ available: false });
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let live = true;
+    void loadPreviewSetting(profile.id).then((s) => { if (live) setPreview(s); });
+    return () => { live = false; };
+  }, [profile?.id]);
+
+  async function togglePreview(v: boolean) {
+    if (!profile?.id || !preview.available) return;
+    setPreview({ available: true, showSenderName: v });
+    if (!(await savePreviewSetting(profile.id, v))) setPreview({ available: true, showSenderName: !v });
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -41,6 +56,26 @@ export default function NotificationsSettingsScreen() {
             </View>
           ))}
         </View>
+
+        {preview.available ? (
+          <View style={[styles.card, { marginTop: 16 }]}>
+            <View style={[styles.row, styles.rowLast]}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.label}>Show sender's name</Text>
+                <Text style={styles.desc}>
+                  Message notifications never show what was said. Turn this off to also hide who it's from on your lock screen ("New message").
+                </Text>
+              </View>
+              <Switch
+                value={preview.showSenderName}
+                onValueChange={togglePreview}
+                trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
+                thumbColor="#fff"
+                accessibilityLabel="Show sender's name in message notifications"
+              />
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

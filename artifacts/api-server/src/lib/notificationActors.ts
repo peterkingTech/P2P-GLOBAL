@@ -12,6 +12,7 @@ export const NOTIFICATION_ACTOR_FIELD: Readonly<Record<string, string>> = {
   connection_request: "fromUserId",   // routes/connections.ts
   connection_accepted: "responderId", // routes/connections.ts
   connection_declined: "responderId", // routes/connections.ts
+  family_join_request: "requesterId", // routes/family.ts (invite links, migration 192)
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

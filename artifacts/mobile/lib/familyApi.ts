@@ -78,6 +78,34 @@ export function inviteToFamily(familyId: string, username: string, role?: Family
 export function respondToFamilyInvitation(invitationId: string, action: "accept" | "decline") {
   return authedFetch(`/family/invitations/${invitationId}/respond`, { method: "POST", body: JSON.stringify({ action }) });
 }
+
+// Invite links / QR codes (migration 192). A link only lets someone ASK to
+// join; a Shepherd or Co-Shepherd approves. The token is returned once.
+export type LinkRole = "adult" | "teen" | "child";
+export interface FamilyInviteLink { id: string; role: LinkRole; expiresAt: string; useCount: number; maxUses: number; createdAt: string }
+export interface FamilyInvitePreview { familyName: string; invitedBy: string | null; role: LinkRole; status: "none" | "pending" | "member" }
+export interface FamilyJoinRequest { id: string; userId: string; role: LinkRole; requestedAt: string; name: string; avatarUrl: string | null; username: string | null }
+export function createFamilyInviteLink(familyId: string, role: LinkRole = "adult"): Promise<FamilyInviteLink & { token: string }> {
+  return authedFetch(`/family/${familyId}/invite-links`, { method: "POST", body: JSON.stringify({ role }) });
+}
+export function listFamilyInviteLinks(familyId: string): Promise<FamilyInviteLink[]> {
+  return authedFetch(`/family/${familyId}/invite-links`);
+}
+export function revokeFamilyInviteLink(familyId: string, linkId: string) {
+  return authedFetch(`/family/${familyId}/invite-links/${linkId}/revoke`, { method: "POST" });
+}
+export function previewFamilyInvite(token: string): Promise<FamilyInvitePreview> {
+  return authedFetch(`/family/invite-links/${encodeURIComponent(token)}/preview`);
+}
+export function requestToJoinFamily(token: string): Promise<{ status: "pending" | "member" }> {
+  return authedFetch(`/family/invite-links/${encodeURIComponent(token)}/request`, { method: "POST" });
+}
+export function getFamilyJoinRequests(familyId: string): Promise<FamilyJoinRequest[]> {
+  return authedFetch(`/family/${familyId}/join-requests`);
+}
+export function respondToFamilyJoinRequest(familyId: string, requestId: string, action: "approve" | "decline", role?: LinkRole) {
+  return authedFetch(`/family/${familyId}/join-requests/${requestId}/respond`, { method: "POST", body: JSON.stringify({ action, role }) });
+}
 export function updateFamilyMemberRole(familyId: string, userId: string, role: FamilyRole) {
   return authedFetch(`/family/${familyId}/members/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) });
 }

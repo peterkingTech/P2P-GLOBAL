@@ -230,6 +230,33 @@ slots[enlargedSlot] = true; slot = 0;
 const big = expand(QrShareSheet({ spec: circ, visible: true, onClose() {} })).find((n) => n.type === QRCode);
 ok("sheet: enlarged code is bigger", big && big.props.size > qr.props.size, `${big?.props.size} vs ${qr?.props.size}`);
 
+// ── Family invite codes (migration 192) ────────────────────────────────────
+const FTOK = "AbCdEfGhIjKlMnOpQrStUvWxYz012345";
+const fam = Q.familyInviteQr({ token: FTOK, familyName: "The Okafors Family Circle", expiresAt: "2026-10-23T10:00:00Z" });
+const famParams = Object.fromEntries(fam.url.split("?")[1].split("&").map((p) => p.split("=")).map(([k, v]) => [k, decodeURIComponent(v)]));
+ok("family QR: only type and app link — no family name or id", JSON.stringify(Object.keys(famParams).sort()) === JSON.stringify(["link", "type"]) && !fam.url.includes("Okafor"));
+ok("family QR: link carries the invite token", famParams.link === `p2pglobalbiblestudy://family/join/${FTOK}`);
+ok("family QR: says scanning doesn't add anyone, and when it expires", /doesn't add anyone/.test(fam.note) && /expires/.test(fam.note) && fam.caption === "Scan to ask to join this Family Circle");
+ok("family QR: bad token → no code", Q.familyInviteQr({ token: "short", familyName: "x", expiresAt: "" }) === null && Q.familyInviteQr({ token: `${FTOK}/x`, familyName: "x", expiresAt: "" }) === null);
+eq("scan family QR → join screen", P(fam.url), "family", `/family/join/${FTOK}`);
+eq("family app link", P(`p2pglobalbiblestudy://family/join/${FTOK}`), "family", `/family/join/${FTOK}`);
+no("family token wrong length", P("p2pglobalbiblestudy://family/join/abc"), "unsupported");
+no("family path without join", P(`p2pglobalbiblestudy://family/${FTOK}`), "unsupported");
+if (lm) ok("landing page accepts the family app link", vm.runInNewContext(lm[1]).test(famParams.link));
+
+const join = src("app/family/join/[token].tsx");
+ok("join screen: asking is a button press, never automatic", (join.match(/requestToJoinFamily\(/g) ?? []).length === 1 && /async function ask\(\)/.test(join) && /onPress=\{ask\}/.test(join));
+ok("join screen: one message for every invalid link", /status === 404 \? "invalid"/.test(join) && /This invite isn't valid any more/.test(join));
+ok("join screen: says the Shepherd reviews every request", /reviews every request/.test(join) && /Request sent\. The Family Shepherd will review it\./.test(join));
+const panel = src("components/family/FamilyInvitePanel.tsx");
+ok("panel: only for managers on the members screen", /data\?\.canManage && familyId \? \(\s*<FamilyInvitePanel/.test(src("app/family/members.tsx")));
+ok("panel: roles offered are adult / teen / child only", /const ROLES: LinkRole\[\] = \["adult", "teen", "child"\];/.test(panel) && !/co_shepherd/.test(panel));
+ok("panel: approve and decline are explicit, labelled buttons", /accessibilityLabel=\{`Approve \$\{r\.name\}`\}/.test(panel) && /accessibilityLabel=\{`Decline \$\{r\.name\}`\}/.test(panel));
+ok("panel: codes can be turned off", /revokeFamilyInviteLink\(familyId, l\.id\)/.test(panel));
+const pushSrc = src("lib/push.ts");
+ok("push taps: join request → members screen, approval → the family", /family_join_request" && familyId\) return `\/family\/members\?familyId=\$\{familyId\}`/.test(pushSrc) && /family_join_approved" && familyId\) return `\/family\/\$\{familyId\}`/.test(pushSrc));
+ok("in-app taps use the same routing", /n\.notificationType === "family_join_request" \|\| n\.notificationType === "family_join_approved"/.test(src("app/notifications/index.tsx")));
+
 // ── Entry points (source checks) ───────────────────────────────────────────
 const tab = src("app/(tabs)/profile.tsx");
 ok("profile tab: My QR code uses profileQr(@username)", /profileQr\(profile\?\.username\)/.test(tab) && /My QR code/.test(tab));

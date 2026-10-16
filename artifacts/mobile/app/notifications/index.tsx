@@ -126,6 +126,13 @@ export default function NotificationsScreen() {
       router.push(pathForNotification("missed_call", n.data) as any);
       return;
     }
+    // Family Circle join request / approval (invite links) — same
+    // destination as tapping the push.
+    if (n.notificationType === "family_join_request" || n.notificationType === "family_join_approved") {
+      const path = pathForNotification(n.notificationType, n.data);
+      if (path !== "/notifications") router.push(path as any);
+      return;
+    }
 
     // C7.6 — deep link, with an honest fallback if the session/call has
     // since ended rather than navigating into a broken/stale screen. Shared

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 
 const router = Router();
@@ -252,6 +253,201 @@ router.post("/invitations/:invitationId/respond", async (req, res) => {
     .eq("id", invitationId);
 
   return ok(res, { status: action === "accept" ? "accepted" : "declined" });
+});
+
+// ── Invite links (QR codes) and join requests — migration 192 ─────────────
+// A link never adds anyone: redeeming it files a join request that a
+// Shepherd or Co-Shepherd approves. Tokens are only ever returned once, to
+// the manager who created the link; the table stores a SHA-256 hash. Every
+// invalid case (unknown, expired, revoked, used up, malformed) answers with
+// the same 404 so a token can't be used to probe which families exist.
+const INVITE_LINK_DAYS = 7;
+const INVITE_LINK_MAX_USES = 25;
+const MAX_ACTIVE_LINKS = 5;
+const LINK_ROLES = ["adult", "teen", "child"] as const;
+const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
+const LINK_INVALID = "This invite link isn't valid any more. Ask the Family Shepherd for a new one.";
+const hashToken = (t: string) => crypto.createHash("sha256").update(t).digest("hex");
+const isLinkRole = (r: unknown): r is (typeof LINK_ROLES)[number] => LINK_ROLES.includes(r as (typeof LINK_ROLES)[number]);
+const linkIsLive = (l: Record<string, unknown>) =>
+  !l.revoked_at && new Date(l.expires_at as string).getTime() > Date.now() && (l.use_count as number) < (l.max_uses as number);
+
+async function usableLink(token: string) {
+  if (!TOKEN_RE.test(token)) return null;
+  const { data } = await db.from("p2p_family_invite_links").select("*").eq("token_hash", hashToken(token)).maybeSingle();
+  const link = data as Record<string, unknown> | null;
+  return link && linkIsLive(link) ? link : null;
+}
+
+function mapLink(row: Record<string, unknown>) {
+  return { id: row.id, role: row.role, expiresAt: row.expires_at, useCount: row.use_count, maxUses: row.max_uses, createdAt: row.created_at };
+}
+
+async function familyManagerIds(familyId: string): Promise<string[]> {
+  const { data: family } = await db.from("p2p_families").select("shepherd_id").eq("id", familyId).maybeSingle();
+  const { data: cos } = await db.from("p2p_family_members").select("user_id").eq("family_id", familyId).eq("role", "co_shepherd").eq("status", "active");
+  const ids = [family?.shepherd_id as string | undefined, ...((cos ?? []) as { user_id: string }[]).map((c) => c.user_id)];
+  return Array.from(new Set(ids.filter((x): x is string => !!x)));
+}
+
+// POST /family/:familyId/invite-links — { role? } → the raw token, once.
+router.post("/:familyId/invite-links", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId } = req.params;
+  if (!(await isShepherdOrCoShepherd(familyId, userId))) return err(res, "Only the Family Shepherd or a Co-Shepherd can create invite links", 403);
+  const role = isLinkRole(req.body?.role) ? req.body.role : "adult";
+
+  const { data: existing } = await db.from("p2p_family_invite_links").select("id,expires_at,revoked_at,use_count,max_uses").eq("family_id", familyId);
+  if (((existing ?? []) as Record<string, unknown>[]).filter(linkIsLive).length >= MAX_ACTIVE_LINKS) {
+    return err(res, `This family already has ${MAX_ACTIVE_LINKS} active invite links. Revoke one first.`, 409);
+  }
+
+  const token = crypto.randomBytes(24).toString("base64url");
+  const expiresAt = new Date(Date.now() + INVITE_LINK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: link, error } = await db.from("p2p_family_invite_links")
+    .insert({ family_id: familyId, created_by: userId, token_hash: hashToken(token), role, expires_at: expiresAt, max_uses: INVITE_LINK_MAX_USES })
+    .select().single();
+  if (error || !link) return err(res, "Couldn't create an invite link", 500);
+  return ok(res, { ...mapLink(link as Record<string, unknown>), token });
+});
+
+// GET /family/:familyId/invite-links — managers: active links (never tokens).
+router.get("/:familyId/invite-links", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId } = req.params;
+  if (!(await isShepherdOrCoShepherd(familyId, userId))) return err(res, "Only the Family Shepherd or a Co-Shepherd can view invite links", 403);
+  const { data } = await db.from("p2p_family_invite_links")
+    .select("id,role,expires_at,revoked_at,use_count,max_uses,created_at").eq("family_id", familyId).order("created_at", { ascending: false });
+  return ok(res, ((data ?? []) as Record<string, unknown>[]).filter(linkIsLive).map(mapLink));
+});
+
+// POST /family/:familyId/invite-links/:linkId/revoke — managers.
+router.post("/:familyId/invite-links/:linkId/revoke", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId, linkId } = req.params;
+  if (!(await isShepherdOrCoShepherd(familyId, userId))) return err(res, "Only the Family Shepherd or a Co-Shepherd can revoke invite links", 403);
+  const { data } = await db.from("p2p_family_invite_links")
+    .update({ revoked_at: new Date().toISOString() }).eq("id", linkId).eq("family_id", familyId).select("id").maybeSingle();
+  if (!data) return err(res, "Invite link not found", 404);
+  return ok(res, { revoked: true });
+});
+
+// GET /family/invite-links/:token/preview — any signed-in holder of the link.
+router.get("/invite-links/:token/preview", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const link = await usableLink(req.params.token);
+  if (!link) return err(res, LINK_INVALID, 404);
+  const familyId = link.family_id as string;
+  const { data: family } = await db.from("p2p_families").select("name").eq("id", familyId).maybeSingle();
+  const { data: inviter } = await db.from("p2p_profiles").select("full_name").eq("id", link.created_by as string).maybeSingle();
+  const member = await getMembership(userId, familyId);
+  const { data: request } = await db.from("p2p_family_join_requests").select("status").eq("family_id", familyId).eq("user_id", userId).maybeSingle();
+  return ok(res, {
+    familyName: familyCircleDisplayName(family?.name as string | null | undefined),
+    invitedBy: (inviter?.full_name as string | undefined) ?? null,
+    role: link.role,
+    status: member ? "member" : request?.status === "pending" ? "pending" : "none",
+  });
+});
+
+// POST /family/invite-links/:token/request — ask to join (never joins directly).
+router.post("/invite-links/:token/request", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const link = await usableLink(req.params.token);
+  if (!link) return err(res, LINK_INVALID, 404);
+  const familyId = link.family_id as string;
+  if (await getMembership(userId, familyId)) return ok(res, { status: "member" });
+
+  const { data: existing } = await db.from("p2p_family_join_requests").select("status").eq("family_id", familyId).eq("user_id", userId).maybeSingle();
+  if (existing?.status === "pending") return ok(res, { status: "pending" });
+
+  const { error } = await db.from("p2p_family_join_requests").upsert(
+    { family_id: familyId, user_id: userId, link_id: link.id, role: link.role, status: "pending", requested_at: new Date().toISOString(), responded_at: null, responded_by: null },
+    { onConflict: "family_id,user_id" },
+  );
+  if (error) return err(res, "Couldn't send your request", 500);
+  await db.from("p2p_family_invite_links").update({ use_count: (link.use_count as number) + 1 }).eq("id", link.id as string);
+
+  const { data: requester } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
+  const { data: family } = await db.from("p2p_families").select("name").eq("id", familyId).maybeSingle();
+  const managers = await familyManagerIds(familyId);
+  for (const managerId of managers) {
+    await db.from("p2p_notifications").insert({
+      user_id: managerId,
+      title: "Family Circle join request",
+      message: `${(requester?.full_name as string | undefined) ?? "Someone"} asked to join ${familyCircleDisplayName(family?.name as string | null | undefined)}.`,
+      notification_type: "family_join_request",
+      data: { familyId, requesterId: userId },
+    });
+  }
+  return ok(res, { status: "pending" });
+});
+
+// GET /family/:familyId/join-requests — managers: pending requests.
+router.get("/:familyId/join-requests", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId } = req.params;
+  if (!(await isShepherdOrCoShepherd(familyId, userId))) return err(res, "Only the Family Shepherd or a Co-Shepherd can view join requests", 403);
+  const { data } = await db.from("p2p_family_join_requests")
+    .select("id,user_id,role,requested_at").eq("family_id", familyId).eq("status", "pending").order("requested_at", { ascending: true });
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const ids = rows.map((r) => r.user_id as string);
+  const { data: profiles } = ids.length
+    ? await db.from("p2p_profiles").select("id,full_name,photo_url,username").in("id", ids)
+    : { data: [] as Record<string, unknown>[] };
+  const byId = new Map(((profiles ?? []) as Record<string, unknown>[]).map((p) => [p.id as string, p]));
+  return ok(res, rows.map((r) => {
+    const p = byId.get(r.user_id as string);
+    return {
+      id: r.id, userId: r.user_id, role: r.role, requestedAt: r.requested_at,
+      name: (p?.full_name as string | undefined) ?? "Someone",
+      avatarUrl: (p?.photo_url as string | null | undefined) ?? null,
+      username: (p?.username as string | null | undefined) ?? null,
+    };
+  }));
+});
+
+// POST /family/:familyId/join-requests/:requestId/respond — { action, role? } managers.
+router.post("/:familyId/join-requests/:requestId/respond", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { familyId, requestId } = req.params;
+  const { action, role } = (req.body ?? {}) as { action?: string; role?: string };
+  if (action !== "approve" && action !== "decline") return err(res, "action must be 'approve' or 'decline'");
+  if (!(await isShepherdOrCoShepherd(familyId, userId))) return err(res, "Only the Family Shepherd or a Co-Shepherd can respond to join requests", 403);
+
+  const { data: request } = await db.from("p2p_family_join_requests").select("*").eq("id", requestId).eq("family_id", familyId).maybeSingle();
+  if (!request) return err(res, "Join request not found", 404);
+  if (request.status !== "pending") return err(res, "This request has already been answered", 409);
+  const finalRole = isLinkRole(role) ? role : (request.role as string);
+
+  if (action === "approve") {
+    const { error: memberError } = await db.from("p2p_family_members").upsert(
+      { family_id: familyId, user_id: request.user_id, role: finalRole, status: "active", joined_at: new Date().toISOString() },
+      { onConflict: "family_id,user_id" },
+    );
+    if (memberError) return err(res, "Couldn't add them to this family", 409);
+  }
+  await db.from("p2p_family_join_requests")
+    .update({ status: action === "approve" ? "approved" : "declined", role: finalRole, responded_at: new Date().toISOString(), responded_by: userId })
+    .eq("id", requestId);
+  if (action === "approve") {
+    const { data: family } = await db.from("p2p_families").select("name").eq("id", familyId).maybeSingle();
+    await db.from("p2p_notifications").insert({
+      user_id: request.user_id,
+      title: "You've joined a Family Circle",
+      message: `Your request to join ${familyCircleDisplayName(family?.name as string | null | undefined)} was approved.`,
+      notification_type: "family_join_approved",
+      data: { familyId },
+    });
+  }
+  return ok(res, { status: action === "approve" ? "approved" : "declined" });
 });
 
 // PUT /family/:familyId/members/:userId/role — shepherd-only.

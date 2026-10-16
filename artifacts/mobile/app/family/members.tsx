@@ -6,6 +6,7 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFamilyDetail, inviteToFamily, removeFamilyMember, type FamilyDetailResponse, type FamilyMember } from "@/lib/familyApi";
 import { FamilyMemberList } from "@/components/family/FamilyMemberList";
+import { FamilyInvitePanel } from "@/components/family/FamilyInvitePanel";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -117,6 +118,14 @@ export default function FamilyMembersScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        ) : null}
+
+        {data?.canManage && familyId ? (
+          <FamilyInvitePanel
+            familyId={familyId}
+            familyName={/family\s+circle/i.test(data.family.name ?? "") ? data.family.name : `${data.family.name} Family Circle`}
+            onMembersChanged={load}
+          />
         ) : null}
       </ScrollView>
     </View>

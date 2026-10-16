@@ -195,5 +195,14 @@ const center = readFileSync(path.join(root, "app/notifications/index.tsx"), "utf
 ok("center: uses the identity row and paging", /<NotificationRow /.test(center) && /before: last\.createdAt/.test(center));
 ok("center: failed mark restores the row to unread", /if \(r === "failed"\) setNotifications/.test(center));
 
+// ── Message-preview privacy setting (migration 193) ──
+const auth = readFileSync(path.join(root, "contexts/AuthContext.tsx"), "utf8");
+const settings = readFileSync(path.join(root, "app/settings/notifications.tsx"), "utf8");
+const previewLib = readFileSync(path.join(root, "lib/messagePreviewSetting.ts"), "utf8");
+ok("preview setting is NOT in the main profile load (old databases keep working)", !/notify_show_sender_name/.test(auth));
+ok("preview setting loads on its own and hides itself if unavailable", /select\("notify_show_sender_name"\)/.test(previewLib) && /if \(error \|\| !data/.test(previewLib) && /\{preview\.available \? \(/.test(settings));
+ok("preview setting saves only the caller's own row", /\.update\(\{ notify_show_sender_name: showSenderName \}\)\.eq\("id", userId\)/.test(previewLib) && /savePreviewSetting\(profile\.id, v\)/.test(settings));
+ok("a failed save puts the switch back", /if \(!\(await savePreviewSetting\(profile\.id, v\)\)\) setPreview\(\{ available: true, showSenderName: !v \}\)/.test(settings));
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

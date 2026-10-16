@@ -1,6 +1,7 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { logger } from "./logger";
 import { getDeactivatedUserIds } from "./accountStatus";
+import { getHiddenSenderUserIds, getSenderPhotos, lockScreenText } from "./notificationPrivacy";
 import {
   decideNotification, sendExpoMessages,
   type ExpoMessage, type ExpoSendDeps, type MessageOutcome, type NotificationVerdict,
@@ -89,12 +90,19 @@ async function deactivateTokens(tokens: string[]): Promise<void> {
 // an ordinary background message notification deliberately doesn't.
 // `priority: "high"` is the equivalent instruction to FCM itself, so the
 // message wakes a dozing device instead of waiting for the next batch.
-function buildExpoMessage(n: PendingNotification, to: string) {
+// hideSender: the recipient turned off sender names on message pushes
+// (lib/notificationPrivacy.ts, migration 193).
+// senderPhoto: the sender's public photo (lib/notificationPrivacy.ts
+// getSenderPhotos), dropped whenever the sender's name is hidden.
+function buildExpoMessage(n: PendingNotification, to: string, hideSender = false, senderPhoto?: string) {
   const isIncomingCall = n.notification_type === "incoming_call";
+  const { title, body } = lockScreenText(n, hideSender);
+  const image = !hideSender && !isIncomingCall ? senderPhoto : undefined;
   return {
     to,
-    title: n.title ?? "P2P Global",
-    body: n.message ?? "",
+    title,
+    body,
+    ...(image ? { richContent: { image }, mutableContent: true } : {}),
     data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}) },
     sound: "default" as const,
     // categoryId shows the Accept/Decline buttons (registered client-side in
@@ -200,7 +208,9 @@ export async function dispatchNotificationNow(
         const tokens = ((tokenRows ?? []) as (PushToken & { device_id: string | null })[])
           .filter((t) => !(skip && t.device_id && skip.has(t.device_id)));
         // Zero active tokens is not a failure (verdict "no_devices").
-        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token)), n.notification_type ?? "immediate");
+        const hideSender = (await getHiddenSenderUserIds([n.user_id])).has(n.user_id);
+        const photo = hideSender ? undefined : (await getSenderPhotos([n])).get(n.id);
+        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token, hideSender, photo)), n.notification_type ?? "immediate");
         await deactivateTokens(invalidTokens(tokens.map((t) => t.token), outcomes));
         const { verdict, finished } = decideNotification(outcomes, { ageMs: 0, maxRetryAgeMs: Number.POSITIVE_INFINITY });
         logVerdict(n, verdict, outcomes, "immediate");
@@ -244,6 +254,8 @@ export async function dispatchPendingPushes(): Promise<{
   // notifications are still stored and readable in-app when they return.
   // Incoming-call rings are left to the call system untouched.
   const deactivated = await getDeactivatedUserIds(userIds);
+  const hiddenSender = await getHiddenSenderUserIds(userIds);
+  const senderPhotos = await getSenderPhotos(pending);
   const tokensByUser = new Map<string, PushToken[]>();
   for (const row of (tokenRows ?? []) as PushToken[]) {
     const list = tokensByUser.get(row.user_id) ?? [];
@@ -262,7 +274,7 @@ export async function dispatchPendingPushes(): Promise<{
     if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") { preVerdict.set(ni, "paused"); return; }
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];
     for (const t of tokens) {
-      messages.push(buildExpoMessage(n, t.token));
+      messages.push(buildExpoMessage(n, t.token, !!n.user_id && hiddenSender.has(n.user_id), senderPhotos.get(n.id)));
       messageTokens.push(t.token);
       messageOwner.push(ni);
     }

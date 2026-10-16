@@ -192,6 +192,11 @@ export function pathForNotification(
     if (callAction) p.set("action", callAction);
     return `/call/incoming?${p.toString()}`;
   }
+  // Family Circle invite links (migration 192): a join request opens the
+  // members screen where managers approve; an approval opens the family.
+  const familyId = typeof data?.familyId === "string" && /^[0-9a-f-]{36}$/i.test(data.familyId) ? data.familyId : null;
+  if (notificationType === "family_join_request" && familyId) return `/family/members?familyId=${familyId}`;
+  if (notificationType === "family_join_approved" && familyId) return `/family/${familyId}`;
   // Missed call — the thread holds the missed-call card (tap to call back);
   // history covers a call with no conversation.
   if (notificationType === "missed_call") {
