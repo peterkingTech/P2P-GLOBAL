@@ -86,6 +86,7 @@ function withExtensionTarget(config) {
       bundleId: extensionBundleId(c),
       files: ["NotificationService.swift", "NotificationService-Info.plist", "NotificationService.entitlements"],
       sources: ["NotificationService.swift"],
+      frameworks: ["UserNotifications.framework", "Intents.framework"],
       infoPlist: "NotificationService-Info.plist",
       entitlements: "NotificationService.entitlements",
     });

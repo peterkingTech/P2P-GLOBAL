@@ -29,10 +29,41 @@ function declareAppExtension(config, entry) {
 }
 
 /**
- * Adds `name` as an app-extension target. files: everything in the group;
- * sources: compiled; resources: copied into the extension bundle.
+ * Explicitly link Apple system frameworks into one target's Frameworks phase
+ * (its own PBXBuildFile entries; a framework file reference already in the
+ * project is reused). Needed because Swift's automatic linking only keeps a
+ * framework whose symbols the code references by name: the content
+ * extension uses UserNotificationsUI only through its protocol and
+ * Objective-C messages, so the linker silently dropped it (build 58: the
+ * long-press view loaded but showed an empty box).
  */
-function addExtensionTarget(project, c, { name, bundleId, files, sources, resources = [], infoPlist, entitlements }) {
+function linkSystemFrameworks(project, frameworksPhaseUuid, groupUuid, names) {
+  const objects = project.hash.project.objects;
+  const refs = objects.PBXFileReference;
+  const phase = objects.PBXFrameworksBuildPhase[frameworksPhaseUuid];
+  const group = objects.PBXGroup[groupUuid];
+  for (const name of names) {
+    const fwPath = `System/Library/Frameworks/${name}`;
+    let refUuid = Object.keys(refs).find((k) => !k.endsWith("_comment") && String(refs[k].path).replace(/"/g, "") === fwPath);
+    if (!refUuid) {
+      refUuid = project.generateUuid();
+      refs[refUuid] = { isa: "PBXFileReference", lastKnownFileType: "wrapper.framework", name: `"${name}"`, path: `"${fwPath}"`, sourceTree: "SDKROOT" };
+      refs[`${refUuid}_comment`] = name;
+      if (group) group.children.push({ value: refUuid, comment: name });
+    }
+    const buildFileUuid = project.generateUuid();
+    objects.PBXBuildFile[buildFileUuid] = { isa: "PBXBuildFile", fileRef: refUuid, fileRef_comment: name };
+    objects.PBXBuildFile[`${buildFileUuid}_comment`] = `${name} in Frameworks`;
+    phase.files.push({ value: buildFileUuid, comment: `${name} in Frameworks` });
+  }
+}
+
+/**
+ * Adds `name` as an app-extension target. files: everything in the group;
+ * sources: compiled; resources: copied into the extension bundle;
+ * frameworks: Apple system frameworks linked explicitly.
+ */
+function addExtensionTarget(project, c, { name, bundleId, files, sources, resources = [], frameworks = [], infoPlist, entitlements }) {
   if (hasTarget(project, name)) return;
   const objects = project.hash.project.objects;
   objects.PBXTargetDependency = objects.PBXTargetDependency || {};
@@ -54,7 +85,8 @@ function addExtensionTarget(project, c, { name, bundleId, files, sources, resour
   const target = project.addTarget(name, "app_extension", name, bundleId);
   project.addBuildPhase(sources, "PBXSourcesBuildPhase", "Sources", target.uuid);
   project.addBuildPhase(resources, "PBXResourcesBuildPhase", "Resources", target.uuid);
-  project.addBuildPhase([], "PBXFrameworksBuildPhase", "Frameworks", target.uuid);
+  const frameworksPhase = project.addBuildPhase([], "PBXFrameworksBuildPhase", "Frameworks", target.uuid);
+  if (frameworks.length) linkSystemFrameworks(project, frameworksPhase.uuid, group.uuid, frameworks);
 
   const configs = project.pbxXCBuildConfigurationSection();
   for (const key of Object.keys(configs)) {

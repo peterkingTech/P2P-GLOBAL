@@ -42,6 +42,11 @@ const ep = nse.previewEndpoints({ EXPO_PUBLIC_API_URL: "https://api.example.com/
 ok("API base for previews: https, no trailing slash", ep.apiUrl === "https://api.example.com/api" || ep.apiUrl.startsWith("https://"), JSON.stringify(ep));
 ok("helper: extensions follow the app's iOS minimum (16.4 unless app.json says otherwise)", /DEFAULT_IOS_DEPLOYMENT_TARGET = "16\.4"/.test(src("plugins/appExtensionTarget.js")) && /config\.ios\?\.deploymentTarget/.test(src("plugins/appExtensionTarget.js")));
 ok("helper: a prebuild re-run never adds a second target", /if \(hasTarget\(project, name\)\) return;/.test(src("plugins/appExtensionTarget.js")));
+// Build 58 regression: the long-press view showed an empty box because the
+// linker dropped UserNotificationsUI (only used via protocol/ObjC messages).
+ok("long-press view links UserNotificationsUI explicitly (build 58 blank-box fix)", /frameworks: \["UserNotificationsUI\.framework", "UserNotifications\.framework"\]/.test(src("plugins/withNotificationContentExtension.js")));
+ok("service extension links UserNotifications + Intents explicitly", /frameworks: \["UserNotifications\.framework", "Intents\.framework"\]/.test(src("plugins/withNotificationServiceExtension.js")));
+ok("helper adds frameworks to the extension's own Frameworks phase", /linkSystemFrameworks\(project, frameworksPhase\.uuid, group\.uuid, frameworks\)/.test(src("plugins/appExtensionTarget.js")) && /sourceTree: "SDKROOT"/.test(src("plugins/appExtensionTarget.js")));
 
 // ── Service extension ─────────────────────────────────────────────────────
 const s = src("plugins/notification-service/NotificationService.swift");

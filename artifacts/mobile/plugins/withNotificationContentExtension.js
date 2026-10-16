@@ -43,6 +43,8 @@ function withExtensionTarget(config) {
       files: ["NotificationViewController.swift", "NotificationContent-Info.plist", "P2PLogo.png"],
       sources: ["NotificationViewController.swift"],
       resources: ["P2PLogo.png"],
+      // Hosts the long-press view; must be linked explicitly (see appExtensionTarget.js).
+      frameworks: ["UserNotificationsUI.framework", "UserNotifications.framework"],
       infoPlist: "NotificationContent-Info.plist",
     });
     return c;
