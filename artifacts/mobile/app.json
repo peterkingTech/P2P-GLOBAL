@@ -94,7 +94,8 @@
       "expo-video",
       "expo-asset",
       "./modules/call-system/app.plugin.js",
-      "./plugins/withTabletOrientation.js"
+      "./plugins/withTabletOrientation.js",
+      "./plugins/withNotificationServiceExtension.js"
     ],
     "experiments": {
       "typedRoutes": true,
