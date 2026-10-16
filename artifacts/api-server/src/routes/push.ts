@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { verifyCaller, supabaseServiceRole as db } from "../lib/supabase";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -49,6 +50,22 @@ router.post("/push/register", async (req, res) => {
   }
   if (error && (error as { code?: string }).code === "23514") return err(res, "This token type isn't supported yet.", 409);
   if (error) return err(res, error.message, 500);
+
+  // One install has ONE current token per platform. A token can change
+  // under the same install (e.g. a build from a different EAS project gets
+  // a new Expo push token) and the old one keeps reaching the same phone —
+  // so a phone once signed in as someone else kept receiving THEIR pushes,
+  // including the messages this user sent them (2026-10-16). Retire every
+  // other active token of this install + platform, whoever owned it.
+  if (deviceId) {
+    const { error: retireErr } = await db.from("p2p_push_tokens")
+      .update({ is_active: false, updated_at: now })
+      .eq("device_id", deviceId)
+      .eq("platform", platform)
+      .eq("is_active", true)
+      .neq("token", token.trim());
+    if (retireErr) logger.warn({ err: retireErr }, "push/register: could not retire older tokens for this install");
+  }
   return ok(res, { registered: true });
 });
 
@@ -64,11 +81,26 @@ router.post("/push/unregister", async (req, res) => {
   const { token } = req.body as { token?: string };
   if (!token?.trim()) return err(res, "token is required", 400);
 
-  const { error } = await db.from("p2p_push_tokens")
-    .update({ is_active: false, updated_at: new Date().toISOString() })
+  const now = new Date().toISOString();
+  const { data: retired, error } = await db.from("p2p_push_tokens")
+    .update({ is_active: false, updated_at: now })
     .eq("token", token.trim())
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("device_id");
   if (error) return err(res, error.message, 500);
+  // Signing out also retires this user's OTHER tokens on the same install
+  // (an older token from a previous build would otherwise keep delivering
+  // this user's pushes to a phone they signed out of). Still scoped to the
+  // caller's own rows.
+  const deviceId = ((retired ?? []) as { device_id: string | null }[]).find((r) => r.device_id)?.device_id;
+  if (deviceId) {
+    const { error: e2 } = await db.from("p2p_push_tokens")
+      .update({ is_active: false, updated_at: now })
+      .eq("device_id", deviceId)
+      .eq("user_id", userId)
+      .eq("is_active", true);
+    if (e2) logger.warn({ err: e2 }, "push/unregister: could not retire older tokens for this install");
+  }
   return ok(res, { unregistered: true });
 });
 

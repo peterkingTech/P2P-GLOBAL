@@ -154,6 +154,7 @@ import wins from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/kingdomWi
 import family from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/family.ts")))};
 import notifications from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/notifications.ts")))};
 import circles from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/circles.ts")))};
+import push from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/push.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -165,6 +166,7 @@ app.use("/api/kingdom-wins", wins);
 app.use("/api/family", family);
 app.use("/api/notifications", notifications);
 app.use("/api/circles", circles);
+app.use("/api", push);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });
