@@ -138,8 +138,8 @@ export default function FamilyDetailScreen() {
     }] : []),
     {
       key: "learning", icon: <Ionicons name="book-outline" size={20} color={c.accentGreen} />,
-      label: "Learning", detail: "Studies and plans for your family",
-      onPress: () => router.push({ pathname: "/family/studies", params: { familyId } } as any),
+      label: "Learning", detail: "P2P Library, your series and custom lessons",
+      onPress: () => router.push({ pathname: "/learning/[scope]/[groupId]", params: { scope: "family", groupId: familyId } } as any),
     },
     {
       key: "prayer", icon: <FamilyIcon name="prayer" size={19} color={c.accentGreen} />,

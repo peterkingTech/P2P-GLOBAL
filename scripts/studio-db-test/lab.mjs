@@ -66,7 +66,7 @@ export function makeTranslator(db, role, uid = null) {
           keys.forEach((k) => params.push(q.payload[k]));
           const conflict = q.onConflict.split(",").map((k) => k.trim());
           const sets = keys.filter((k) => !conflict.includes(k)).map((k) => `${k} = excluded.${k}`);
-          sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")}) on conflict (${conflict.join(", ")}) do ${sets.length ? `update set ${sets.join(", ")}` : "nothing"}${q.returning ? ` returning ${q.cols}` : ""}`;
+          sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")}) on conflict (${conflict.join(", ")}) do ${sets.length && !q.ignoreDuplicates ? `update set ${sets.join(", ")}` : "nothing"}${q.returning ? ` returning ${q.cols}` : ""}`;
         } else if (q.op === "delete") {
           sql = `delete from ${table}${where(params)}`;
         }
@@ -102,7 +102,7 @@ export function makeTranslator(db, role, uid = null) {
         range(a, b) { q.offset = a; q.limit = b - a + 1; return c; },
         update(p) { q.op = "update"; q.payload = p; return c; },
         insert(p) { q.op = "insert"; q.payload = p; return c; },
-        upsert(p, o) { if (!o?.onConflict) throw new Error("translator: upsert needs onConflict"); q.op = "upsert"; q.payload = p; q.onConflict = o.onConflict; return c; },
+        upsert(p, o) { if (!o?.onConflict) throw new Error("translator: upsert needs onConflict"); q.op = "upsert"; q.payload = p; q.onConflict = o.onConflict; q.ignoreDuplicates = !!o.ignoreDuplicates; return c; },
         delete() { q.op = "delete"; return c; },
         single() { q.single = true; return c; },
         maybeSingle() { q.maybe = true; return c; },
@@ -166,6 +166,7 @@ import push from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/push.ts")
 import churches from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churches.ts")))};
 import familyWorship from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyWorship.ts")))};
 import search from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/search.ts")))};
+import groupLearning from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/groupLearning.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -181,6 +182,7 @@ app.use("/api", push);
 app.use("/api", churches);
 app.use("/api/family", familyWorship);
 app.use("/api/search", search);
+app.use("/api/learning", groupLearning);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

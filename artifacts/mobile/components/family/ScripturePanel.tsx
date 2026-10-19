@@ -8,6 +8,8 @@ interface Props {
   currentScripture: WorshipScripture | null;
   isGuide: boolean;
   onSelect: (scripture: WorshipScripture) => void;
+  // Expanded (focus) view: larger, more comfortable reading text.
+  largeText?: boolean;
 }
 
 const DEFAULT_LANGUAGE = "en"; // Scope limit for this pass — see ScripturePanel's report note.
@@ -17,7 +19,7 @@ const MAX_VERSE_SPAN = 29;
 // picker (not a paginated Bible-app reader) sitting inline in the
 // Gathering's Scripture mode, sharing the room's existing card/typography
 // language rather than a separate reading-app aesthetic.
-export default function ScripturePanel({ currentScripture, isGuide, onSelect }: Props) {
+export default function ScripturePanel({ currentScripture, isGuide, onSelect, largeText = false }: Props) {
   const sheetWidth = useSheetWidth();
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [book, setBook] = useState(currentScripture?.book ?? "Psalms");
@@ -126,9 +128,9 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect }: 
 
       {passage && (
         <View style={styles.passageBox}>
-          <Text style={styles.passageRef}>{currentScripture ? formatScriptureReference(currentScripture) : ""}</Text>
+          <Text style={[styles.passageRef, largeText && styles.passageRefLarge]}>{currentScripture ? formatScriptureReference(currentScripture) : ""}</Text>
           {passage.verses.map((v) => (
-            <Text key={v.verse} style={styles.passageText}>
+            <Text key={v.verse} style={[styles.passageText, largeText && styles.passageTextLarge]}>
               <Text style={styles.verseNumber}>{v.verse} </Text>
               {v.text}
             </Text>
@@ -189,6 +191,8 @@ const styles = StyleSheet.create({
 
   passageBox: { marginTop: 12, gap: 4 },
   passageRef: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 4 },
+  passageRefLarge: { fontSize: 19, marginBottom: 8 },
+  passageTextLarge: { fontSize: 20, lineHeight: 32 },
   passageText: { color: "rgba(255,255,255,0.85)", fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 24, fontStyle: "italic" },
   verseNumber: { color: "#B8860B", fontSize: 11, fontStyle: "normal", fontFamily: "Inter_700Bold" },
 

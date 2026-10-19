@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { supabase, useAuth } from "@/contexts/AuthContext";
+import { useDraft, draftKey } from "@/lib/drafts";
 import {
   useData,
   Assignment,
@@ -125,12 +126,21 @@ export function QuestionResponseCard({
   onSubmitted?: () => void;
 }) {
   const { submitContent } = useData();
+  const { profile } = useAuth();
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const qStyles = makeQStyles(colors);
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<SubmissionType>("text");
-  const [text, setText] = useState("");
+  // The written answer is a persisted draft (lib/drafts): it survives leaving
+  // the lesson, the focus view, backgrounding and app restarts; cleared on submit.
+  const draft = useDraft(profile?.id ? draftKey(profile.id, `lesson:${lessonId}:${kind}:${question.id}`) : null);
+  const text = draft.text;
+  const setText = draft.setText;
+  // Full-screen writing view. The text lives in `draft`, so opening/closing
+  // the view never loses a word.
+  const [focusWriting, setFocusWriting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<QuestionSubmission | null>(existingSub ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +151,12 @@ export function QuestionResponseCard({
   useEffect(() => {
     setSubmitted(existingSub ?? null);
   }, [existingSub]);
+
+  // A saved draft re-opens the composer so the writer sees it right away.
+  useEffect(() => {
+    if (draft.restored && !submitted) { setExpanded(true); setMode("text"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.restored]);
 
   async function handleTextSubmit() {
     if (!text.trim() || submitting) return;
@@ -159,6 +175,8 @@ export function QuestionResponseCard({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: "text", textContent: text.trim(), mediaUrl: null, durationSeconds: null, createdAt: new Date().toISOString(), evaluationStatus: "pending" });
     setExpanded(false);
+    setFocusWriting(false);
+    await draft.clear();
     onSubmitted?.();
   }
 
@@ -195,8 +213,36 @@ export function QuestionResponseCard({
     }
   })();
 
+  const focusModal = (
+    <Modal visible={focusWriting} animationType="slide" onRequestClose={() => setFocusWriting(false)} presentationStyle="fullScreen">
+      <View style={[qStyles.focusScreen, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
+        <View style={qStyles.focusBar}>
+          <Text style={qStyles.focusTitle} numberOfLines={1}>Question {questionIndex + 1}</Text>
+          <TouchableOpacity style={qStyles.focusDone} onPress={() => setFocusWriting(false)} accessibilityRole="button" accessibilityLabel="Done, return to the lesson">
+            <Ionicons name="contract-outline" size={18} color={colors.accentGreen} />
+            <Text style={qStyles.expandBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={qStyles.focusQuestion}>{question.question}</Text>
+        <TextInput
+          style={qStyles.focusInput}
+          multiline
+          autoFocus
+          textAlignVertical="top"
+          placeholder={t("lesson.writeReflection")}
+          placeholderTextColor={colors.textMuted}
+          value={text}
+          onChangeText={setText}
+          accessibilityLabel={`Your answer to question ${questionIndex + 1}`}
+        />
+        <Text style={qStyles.draftNote}>{text.trim() ? "Draft saved on this device" : "Your writing is saved as you type"}</Text>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={qStyles.wrapper}>
+      {focusModal}
       <View style={qStyles.questionRow}>
         <View style={qStyles.questionNum}>
           <Text style={qStyles.questionNumText}>{questionIndex + 1}</Text>
@@ -252,6 +298,16 @@ export function QuestionResponseCard({
                 value={text}
                 onChangeText={setText}
               />
+              <View style={qStyles.draftRow}>
+                <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">{text.trim() ? "Draft saved on this device" : " "}</Text>
+                <TouchableOpacity
+                  style={qStyles.expandBtn} onPress={() => setFocusWriting(true)}
+                  accessibilityRole="button" accessibilityLabel="Expand writing to full screen"
+                >
+                  <Ionicons name="expand-outline" size={16} color={colors.accentGreen} />
+                  <Text style={qStyles.expandBtnText}>Expand</Text>
+                </TouchableOpacity>
+              </View>
               {error && <Text style={qStyles.error}>{error}</Text>}
               <TouchableOpacity
                 style={[qStyles.submitBtn, (!text.trim() || submitting) && qStyles.submitBtnDisabled]}
@@ -317,6 +373,19 @@ function makeQStyles(c: AppColors) {
   },
   shareToggleText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular" },
   inputArea: { marginLeft: 36, marginTop: 8 },
+  draftRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  draftNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
+  expandBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, paddingHorizontal: 8 },
+  expandBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
+  focusScreen: { flex: 1, backgroundColor: c.lightCream, paddingHorizontal: 18 },
+  focusBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 },
+  focusTitle: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
+  focusDone: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, minWidth: 44, paddingHorizontal: 10, justifyContent: "center" },
+  focusQuestion: { fontSize: 17, lineHeight: 25, color: c.textDark, fontFamily: "Inter_600SemiBold", marginTop: 6, marginBottom: 12 },
+  focusInput: {
+    flex: 1, fontSize: 17, lineHeight: 26, color: c.textDark, fontFamily: "Inter_400Regular",
+    backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 8,
+  },
   textInput: {
     borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
     padding: 10, minHeight: 80, textAlignVertical: "top",

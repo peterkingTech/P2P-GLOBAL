@@ -30,9 +30,23 @@ import ShareRoomPanel from "@/components/ShareRoomPanel";
 import NotesPanel from "@/components/family/NotesPanel";
 import LessonPicker from "@/components/family/LessonPicker";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
+import { useFocusMode } from "@/hooks/useFocusMode";
+import { Ionicons } from "@expo/vector-icons";
+import { formatScriptureReference } from "@/lib/familyApi";
+import FocusBar from "@/components/focus/FocusBar";
 import type { FamilyIconName } from "@/components/family/FamilyIcon";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+// "Expand" on a Gathering resource panel (Bible, Media, Study Workspace).
+function ExpandButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.expandBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Expand ${label} to full screen`}>
+      <Ionicons name="expand-outline" size={16} color={colors.connection} />
+      <Text style={styles.shelfLink}>Expand</Text>
+    </TouchableOpacity>
+  );
+}
+
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -73,7 +87,7 @@ export default function FamilyWorshipScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const params = useLocalSearchParams<{ sessionId: string }>();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
   // Below the breakpoint: mobile composition (large content area, simple
   // stacked bottom controls). At/above it: desktop composition
   // (content-focused center + a companion gathering area side by side,
@@ -594,6 +608,17 @@ export default function FamilyWorshipScreen() {
     ]);
   }
 
+  // Focus mode (Bible / Media / Workspace full screen). Only the current
+  // mode's resource can be expanded; a Guide changing mode restores the
+  // layout. The voice connection (useVoiceSpace above) is untouched by it.
+  type FocusKey = "media" | "bible" | "workspace";
+  const focusable: FocusKey[] = session?.currentMode === "worship" ? ["media"]
+    : session?.currentMode === "scripture" ? ["bible"]
+    : session?.currentMode === "teaching" ? ["workspace"] : [];
+  const focusMode = useFocusMode<FocusKey>(focusable);
+  const focused = focusMode.focus;
+  const focusMinHeight = Math.max(320, windowHeight - insets.top - insets.bottom - 84);
+
   if (loading || !session) {
     return (
       <View style={[styles.screen, { alignItems: "center", justifyContent: "center" }]}>
@@ -616,21 +641,27 @@ export default function FamilyWorshipScreen() {
   const modeContent = (
     <>
       {session.currentMode === "worship" && (
-        <View style={styles.panel}>
+        <View style={[styles.panel, focused === "media" && [styles.panelFocused, { minHeight: focusMinHeight, justifyContent: "center" }]]}>
           <View style={styles.panelLabelRow}>
             <Text style={styles.panelLabel}>MEDIA</Text>
-            <TouchableOpacity onPress={() => setMediaShelfOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Queue${queue.length > 0 ? `, ${queue.length} items` : ""}`}>
-              <Text style={styles.shelfLink}>Queue{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
-            </TouchableOpacity>
+            <View style={styles.panelActions}>
+              <TouchableOpacity onPress={() => setMediaShelfOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Queue${queue.length > 0 ? `, ${queue.length} items` : ""}`}>
+                <Text style={styles.shelfLink}>Queue{queue.length > 0 ? ` (${queue.length})` : ""}</Text>
+              </TouchableOpacity>
+              {!focused && <ExpandButton label="Media" onPress={() => focusMode.enter("media")} />}
+            </View>
           </View>
           <SharedMedia {...sharedMediaProps} />
         </View>
       )}
 
       {session.currentMode === "scripture" && (
-        <View style={styles.panel}>
-          <Text style={styles.panelLabel}>BIBLE</Text>
-          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
+        <View style={[styles.panel, focused === "bible" && [styles.panelFocused, { minHeight: focusMinHeight }]]}>
+          <View style={styles.panelLabelRow}>
+            <Text style={styles.panelLabel}>BIBLE</Text>
+            {!focused && <ExpandButton label="Bible" onPress={() => focusMode.enter("bible")} />}
+          </View>
+          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} largeText={focused === "bible"} />
         </View>
       )}
 
@@ -655,12 +686,15 @@ export default function FamilyWorshipScreen() {
       )}
 
       {session.currentMode === "teaching" && (
-        <View style={styles.panel}>
+        <View style={[styles.panel, focused === "workspace" && [styles.panelFocused, { minHeight: focusMinHeight }]]}>
           <View style={styles.panelLabelRow}>
             <Text style={styles.panelLabel}>STUDY WORKSPACE</Text>
-            <TouchableOpacity onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Notes${notes.length > 0 ? `, ${notes.length} notes` : ""}`}>
-              <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
-            </TouchableOpacity>
+            <View style={styles.panelActions}>
+              <TouchableOpacity onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel={`Open Notes${notes.length > 0 ? `, ${notes.length} notes` : ""}`}>
+                <Text style={styles.shelfLink}>Notes{notes.length > 0 ? ` (${notes.length})` : ""}</Text>
+              </TouchableOpacity>
+              {!focused && <ExpandButton label="Study Workspace" onPress={() => focusMode.enter("workspace")} />}
+            </View>
           </View>
           <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
           <View style={styles.lessonRow}>
@@ -671,7 +705,7 @@ export default function FamilyWorshipScreen() {
               </TouchableOpacity>
             )}
           </View>
-          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} />
+          <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} largeText={focused === "workspace"} />
           {(session.mediaId || canControl) && <SharedMedia {...sharedMediaProps} />}
         </View>
       )}
@@ -721,7 +755,19 @@ export default function FamilyWorshipScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
-      <View style={{ paddingTop: insets.top + 10 }}>
+      {focused ? (
+        <FocusBar
+          title={focused === "media" ? "Media" : focused === "bible" ? "Bible" : "Study Workspace"}
+          subtitle={focused === "bible" || focused === "workspace"
+            ? (session.currentScripture ? formatScriptureReference(session.currentScripture) : attachedLesson?.title ?? null)
+            : null}
+          onDone={focusMode.exit}
+          mic={{ connected: voiceSpace.phase === "connected", muted: voiceSpace.micMuted, onToggle: voiceSpace.toggleMic }}
+          onOpenChat={() => setChatOpen(true)}
+          topInset={insets.top}
+        />
+      ) : null}
+      <View style={[{ paddingTop: insets.top + 10 }, focused && styles.hidden]}>
         <TogetherHeader
           onBack={leave}
           title="Study Workspace"
@@ -737,13 +783,13 @@ export default function FamilyWorshipScreen() {
 
       {isDesktop ? (
         <View style={styles.desktopRow}>
-          <ScrollView style={styles.desktopContentPane} contentContainerStyle={styles.scroll}>{modeContent}</ScrollView>
-          <ScrollView style={styles.desktopCompanionsPane} contentContainerStyle={styles.desktopCompanionsPaneContent}>{companionsArea}</ScrollView>
+          <ScrollView style={styles.desktopContentPane} contentContainerStyle={[styles.scroll, focused && styles.scrollFocused]} {...focusMode.scrollProps}>{modeContent}</ScrollView>
+          {focused ? null : <ScrollView style={styles.desktopCompanionsPane} contentContainerStyle={styles.desktopCompanionsPaneContent}>{companionsArea}</ScrollView>}
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={[styles.scroll, focused && styles.scrollFocused]} {...focusMode.scrollProps}>
           {modeContent}
-          {companionsArea}
+          {focused ? null : companionsArea}
         </ScrollView>
       )}
 
@@ -751,7 +797,7 @@ export default function FamilyWorshipScreen() {
         {reactions.map((r) => <FloatingReaction key={r.id} emoji={r.emoji} />)}
       </View>
 
-      {isHost && <GuideControls modes={MODES} currentMode={session.currentMode} onChange={changeMode} />}
+      {isHost && !focused && <GuideControls modes={MODES} currentMode={session.currentMode} onChange={changeMode} />}
 
       <ShareRoomPanel
         visible={shareOpen} onClose={() => setShareOpen(false)}
@@ -759,7 +805,7 @@ export default function FamilyWorshipScreen() {
         statusLine={session.status === "ended" ? "This gathering has ended" : "Gathering in progress"}
       />
 
-      <GatheringFooter
+      {!focused && <GatheringFooter
         reactionEmojis={REACTIONS}
         onSendReaction={sendReaction}
         handRaised={handRaised}
@@ -770,7 +816,7 @@ export default function FamilyWorshipScreen() {
         isHost={isHost}
         onOpenTransfer={() => setTransferOpen(true)}
         bottomInset={insets.bottom}
-      />
+      />}
 
       <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <View style={styles.sheetOverlay}>
@@ -874,6 +920,12 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing.lg, gap: spacing.xs },
   panelLabel: { color: colors.light, ...type.label },
   panelLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  panelActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  panelFocused: { paddingVertical: spacing.lg },
+  scrollFocused: { flexGrow: 1, paddingBottom: 12 },
+  // Kept mounted but out of the way while a resource is expanded.
+  hidden: { display: "none" },
+  expandBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, minWidth: 44, justifyContent: "center" },
   shelfLink: { color: colors.connection, ...type.caption, fontFamily: "Inter_600SemiBold" },
   silentHint: { color: colors.textSecondary, ...type.body, marginTop: spacing.xs },
   lessonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm },

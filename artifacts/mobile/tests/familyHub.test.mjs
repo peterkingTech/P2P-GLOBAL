@@ -28,14 +28,14 @@ ok("live Gathering announced for screen readers", /A Gathering is happening now/
 
 // ── No duplicate entry points; nothing lost ──────────────────────────────
 ok("six equal header icons removed", !/headerIconBtn/.test(hub));
-for (const [label, route] of [["Learning", "/family/studies"], ["Prayer", "/family/prayer"], ["People", "/family/members"], ["History & highlights", "/family/history"]]) {
+for (const [label, route] of [["Learning", "/learning/[scope]/[groupId]"], ["Prayer", "/family/prayer"], ["People", "/family/members"], ["History & highlights", "/family/history"]]) {
   const at = hub.indexOf(`label: "${label}"`);
   const row = at < 0 ? "" : hub.slice(at, hub.indexOf("\n    },", at));
   ok(`list row "${label}" → ${route}`, hub.includes(`label: "${label}"`) && (row.includes(`pathname: "${route}"`) || (route === "/family/members" && row.includes("onPress: openPeople"))), row.slice(0, 200));
 }
 ok("openPeople (People row + header) → /family/members", /const openPeople = \(\) => router\.push\(\{ pathname: "\/family\/members", params: \{ familyId \} \}/.test(hub));
 ok("Family chat row only when the caller is in the family conversation", /\.\.\.\(data\.conversationId \? \[\{/.test(hub) && /pathname: "\/messages\/\[id\]", params: \{ id: data\.conversationId! \}/.test(hub));
-ok("each destination linked once from the hub (no duplicate links)", ["/family/studies", "/family/prayer", "/family/history"].every((r) => hub.split(`pathname: "${r}"`).length - 1 === 1)
+ok("each destination linked once from the hub (no duplicate links)", ["/learning/[scope]/[groupId]", "/family/prayer", "/family/history"].every((r) => hub.split(`pathname: "${r}"`).length - 1 === 1)
   && hub.split('pathname: "/lesson/[id]"').length - 1 === 1);
 ok("Calls and Highlights no longer hub icons — still reachable (People rows; History)", !/pathname: "\/family\/calls"/.test(hub) && !/pathname: "\/family\/journey"/.test(hub)
   && existsSync(path.join(root, "app/family/calls.tsx")) && existsSync(path.join(root, "app/family/journey.tsx")));

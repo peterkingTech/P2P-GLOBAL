@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { logger } from "../lib/logger";
+import { getActiveJourney, summarizeJourney } from "../lib/groupLearning";
 
 const router = Router();
 
@@ -903,6 +904,31 @@ router.get("/worship/continue-study", async (req, res) => {
     };
   }
 
+  // A chosen group learning journey (migration 199, routes/groupLearning.ts)
+  // comes first: Continue = the group's current lesson in it, Journey = its
+  // lessons marked done (covered together) / current / upcoming.
+  const activeJourney = await getActiveJourney("family", familyId);
+  const journey = activeJourney ? await summarizeJourney("family", familyId, activeJourney, userId) : null;
+  if (journey) {
+    if (previousGathering && lastHistory!.lesson_id) {
+      const { data: lessonRow } = await db.from("p2p_lessons").select("title").eq("id", lastHistory!.lesson_id as string).maybeSingle();
+      previousGathering.lessonTitle = lessonRow?.title ?? null;
+    }
+    const coveredIds = new Set(journey.group.coveredLessonIds);
+    return ok(res, {
+      previousGathering,
+      continueStudy: journey.currentLesson ? {
+        curriculumTitle: journey.curriculum.title, previousLessonId: null, previousLessonTitle: null,
+        nextLessonId: journey.currentLesson.id, nextLessonTitle: journey.currentLesson.title, nextModuleTitle: journey.currentLesson.moduleTitle,
+      } : null,
+      discipleshipJourney: {
+        curriculumTitle: journey.curriculum.title,
+        lessons: journey.modules.flatMap((m) => m.lessons).map((l) => ({
+          id: l.id, title: l.title, status: coveredIds.has(l.id) ? "done" : l.id === journey.currentLesson?.id ? "current" : "upcoming",
+        })),
+      },
+    });
+  }
   if (usingPlan) {
     const { continueStudy, discipleshipJourney } = await computePlanContinuity(familyId, family!.active_study_plan_id as string);
     if (previousGathering && lastHistory!.lesson_id) {
