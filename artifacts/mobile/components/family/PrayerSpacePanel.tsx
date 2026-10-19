@@ -108,7 +108,7 @@ export default function PrayerSpacePanel({
               <Switch value={attachCurrentPassage} onValueChange={setAttachCurrentPassage} />
             </View>
           )}
-          <TouchableOpacity style={styles.shareBtn} onPress={submit}><Text style={styles.shareBtnText}>Share</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.shareBtn} onPress={submit} accessibilityRole="button" accessibilityLabel="Add prayer request"><Text style={styles.shareBtnText}>Add request</Text></TouchableOpacity>
         </View>
       </View>
     </View>

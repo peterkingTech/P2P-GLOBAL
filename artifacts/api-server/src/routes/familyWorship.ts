@@ -78,6 +78,16 @@ function canControlMedia(session: Record<string, unknown>, userId: string): bool
   return false;
 }
 
+// Children (family role 'child') never control Shared Media — not as Guide,
+// trusted participant or under "Everyone" (migration 198 safeguards; teens
+// follow the existing trusted setting). Used at every media-control site.
+async function canControlMediaFor(session: Record<string, unknown>, userId: string): Promise<boolean> {
+  if (!canControlMedia(session, userId)) return false;
+  const { data } = await db.from("p2p_family_members").select("role")
+    .eq("family_id", session.family_id as string).eq("user_id", userId).eq("status", "active").maybeSingle();
+  return data?.role !== "child";
+}
+
 async function isActiveFamilyMember(familyId: string, userId: string): Promise<boolean> {
   const { data } = await db.from("p2p_family_members").select("id").eq("family_id", familyId).eq("user_id", userId).eq("status", "active").maybeSingle();
   return !!data;
@@ -202,8 +212,8 @@ router.post("/worship/start", async (req, res) => {
   if (members?.length) {
     await db.from("p2p_notifications").insert(
       members.map((m) => ({
-        user_id: m.user_id, title: "📺 Family Circle Media",
-        message: `${(hostProfile?.full_name as string) ?? "Someone"} started Family Circle Media.`,
+        user_id: m.user_id, title: "Family Gathering",
+        message: `${(hostProfile?.full_name as string) ?? "Someone"} started a Family Gathering.`,
         notification_type: "family_worship_invite",
         data: { sessionId, familyId, hostName: (hostProfile?.full_name as string) ?? "Someone" },
       }))
@@ -330,7 +340,7 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     req.body?.mediaProvider !== undefined || req.body?.mediaType !== undefined || req.body?.mediaId !== undefined ||
     req.body?.mediaUrl !== undefined || req.body?.isPlaying !== undefined || req.body?.positionMs !== undefined ||
     req.body?.playbackRate !== undefined;
-  if (bodyHasMediaChange && !canControlMedia(session as Record<string, unknown>, userId)) {
+  if (bodyHasMediaChange && !(await canControlMediaFor(session as Record<string, unknown>, userId))) {
     return err(res, "You don't have permission to control Shared Media right now", 403);
   }
 
@@ -525,7 +535,7 @@ router.post("/worship/sessions/:sessionId/queue", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
   if (!session) return err(res, "Session not found", 404);
-  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to add to the Media Shelf", 403);
+  if (!(await canControlMediaFor(session as Record<string, unknown>, userId))) return err(res, "You don't have permission to add to the Media Shelf", 403);
 
   const { mediaProvider, mediaId, title, thumbnailUrl } = req.body as { mediaProvider?: string; mediaId?: string; title?: string; thumbnailUrl?: string };
   if (!mediaProvider || !VALID_PROVIDERS.includes(mediaProvider as (typeof VALID_PROVIDERS)[number])) return err(res, `mediaProvider must be one of: ${VALID_PROVIDERS.join(", ")}`);
@@ -555,7 +565,7 @@ router.delete("/worship/sessions/:sessionId/queue/:itemId", async (req, res) => 
 
   const { data: item } = await db.from("p2p_family_worship_queue").select("added_by").eq("id", req.params.itemId).eq("session_id", session.id).maybeSingle();
   if (!item) return err(res, "Queue item not found", 404);
-  if (item.added_by !== userId && !canControlMedia(session as Record<string, unknown>, userId)) {
+  if (item.added_by !== userId && !(await canControlMediaFor(session as Record<string, unknown>, userId))) {
     return err(res, "You don't have permission to remove this item", 403);
   }
 
@@ -570,7 +580,7 @@ router.put("/worship/sessions/:sessionId/queue/reorder", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
   if (!session) return err(res, "Session not found", 404);
-  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to reorder the Media Shelf", 403);
+  if (!(await canControlMediaFor(session as Record<string, unknown>, userId))) return err(res, "You don't have permission to reorder the Media Shelf", 403);
 
   const { orderedItemIds } = req.body as { orderedItemIds?: string[] };
   if (!Array.isArray(orderedItemIds) || orderedItemIds.length === 0) return err(res, "orderedItemIds is required");
@@ -596,7 +606,7 @@ router.post("/worship/sessions/:sessionId/queue/next", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
   if (!session) return err(res, "Session not found", 404);
-  if (!canControlMedia(session as Record<string, unknown>, userId)) return err(res, "You don't have permission to control Shared Media right now", 403);
+  if (!(await canControlMediaFor(session as Record<string, unknown>, userId))) return err(res, "You don't have permission to control Shared Media right now", 403);
 
   const { data: next } = await db.from("p2p_family_worship_queue").select("*").eq("session_id", session.id).order("position", { ascending: true }).limit(1).maybeSingle();
   if (!next) return err(res, "The Media Shelf is empty", 404);

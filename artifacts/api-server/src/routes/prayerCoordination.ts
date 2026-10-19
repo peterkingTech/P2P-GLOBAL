@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { safeguardRefusal } from "../lib/minors";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { isValidTimezone, computeOnceOccurrence, computeWeeklyOccurrencesInWindow, occurrenceContains } from "../lib/prayerTime";
 
@@ -520,6 +521,7 @@ router.post("/invitations", async (req, res) => {
   }).select().single();
   if (error) {
     if ((error as { code?: string }).code === "23505") return err(res, "You already have a pending invitation to this person for this time", 409);
+    if (safeguardRefusal(error)) return err(res, "This person can't be invited.", 403);
     return err(res, error.message, 500);
   }
 

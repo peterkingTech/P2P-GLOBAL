@@ -19,6 +19,7 @@ import {
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { readableSendError } from "@/lib/safeguardMessage";
 import { Swipeable } from "react-native-gesture-handler";
 import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1145,7 +1146,7 @@ export default function ChatScreen() {
       } else {
         setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, localStatus: "failed" } : m)));
       }
-      Alert.alert("Message not sent", error.message);
+      Alert.alert("Message not sent", readableSendError(error.message));
       return;
     }
     markPersisted(msg.id, data?.created_at as string | undefined);
@@ -1202,7 +1203,7 @@ export default function ChatScreen() {
         .select("id, flagged_self_harm")
         .single();
       if (error) {
-        Alert.alert("Voice message not sent", error.message);
+        Alert.alert("Voice message not sent", readableSendError(error.message));
         return;
       }
       setReplyTarget(null);

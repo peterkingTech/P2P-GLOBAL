@@ -308,9 +308,9 @@ export default function GatheringSummaryScreen() {
           )}
         </View>
 
-        {/* Share / Discussion — aggregate counts only, no message content, no AI summarization */}
+        {/* Discussion — aggregate counts only, no message content, no AI summarization */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Share</Text>
+          <Text style={styles.sectionTitle}>Discussion</Text>
           {summary.share.messageCount === 0 ? (
             <Text style={styles.emptyText}>No messages were shared during this Gathering.</Text>
           ) : (

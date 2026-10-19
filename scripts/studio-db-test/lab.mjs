@@ -31,6 +31,8 @@ export function makeTranslator(db, role, uid = null) {
       const where = (params) => q.filters.length ? " where " + q.filters.map(([op, c, v]) => {
         if (op === "in") { params.push(v); return `${c} = any($${params.length})`; }
         if (op === "notin") { params.push(v); return `not (${c} = any($${params.length}))`; }
+        if (op === "is") return `${c} is ${v === null ? "null" : v ? "true" : "false"}`;
+        if (op === "or") return "(" + v.map(([o, col, val]) => { params.push(val); return `${col} ${{ eq: "=", neq: "<>", ilike: "ilike", like: "like" }[o]} $${params.length}`; }).join(" or ") + ")";
         params.push(v);
         const sqlOp = { eq: "=", neq: "<>", gte: ">=", lt: "<", lte: "<=", gt: ">", ilike: "ilike", like: "like" }[op];
         return `${c} ${sqlOp} $${params.length}`;
@@ -88,6 +90,12 @@ export function makeTranslator(db, role, uid = null) {
         lt(k, v) { q.filters.push(["lt", k, v]); return c; },
         lte(k, v) { q.filters.push(["lte", k, v]); return c; },
         ilike(k, v) { q.filters.push(["ilike", k, v]); return c; },
+        is(k, v) { q.filters.push(["is", k, v]); return c; },
+        // PostgREST or("a.op.value,b.op.value") — flat eq/neq/ilike/like only.
+        or(expr) {
+          const parts = String(expr).split(",").map((t) => { const m = t.match(/^([a-z_]+)\.(eq|neq|ilike|like)\.(.*)$/); if (!m) throw new Error(`translator: unsupported or() part ${t}`); return [m[2], m[1], m[3]]; });
+          q.filters.push(["or", null, parts]); return c;
+        },
         like(k, v) { q.filters.push(["like", k, v]); return c; },
         order(k, o) { q.order = [k, o?.ascending !== false]; return c; },
         limit(n) { q.limit = n; return c; },
@@ -98,7 +106,7 @@ export function makeTranslator(db, role, uid = null) {
         delete() { q.op = "delete"; return c; },
         single() { q.single = true; return c; },
         maybeSingle() { q.maybe = true; return c; },
-        then(res, rej) { exec().then(res, rej); },
+        then(res, rej) { return exec().then(res, rej); },
       };
       return c;
     },
@@ -155,6 +163,9 @@ import family from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/family.
 import notifications from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/notifications.ts")))};
 import circles from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/circles.ts")))};
 import push from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/push.ts")))};
+import churches from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churches.ts")))};
+import familyWorship from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyWorship.ts")))};
+import search from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/search.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -167,6 +178,9 @@ app.use("/api/family", family);
 app.use("/api/notifications", notifications);
 app.use("/api/circles", circles);
 app.use("/api", push);
+app.use("/api", churches);
+app.use("/api/family", familyWorship);
+app.use("/api/search", search);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

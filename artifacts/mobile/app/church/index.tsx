@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView, Alert, Platform } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +11,22 @@ import colors from "@/constants/colors";
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { userChurch, userChurchRole, isChurchLeader, isChurchCreator, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData, getLearningGoalsDashboard } = useData();
+  const { userChurch, userChurchRole, isChurchLeader, isChurchCreator, churchMemberCount, loadUserChurch, getChurchCohorts, getAnnouncements, getGroveData, getLearningGoalsDashboard,
+    userChurches, churchConversationId, switchCurrentChurch } = useData();
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+
+  // A person may belong to several churches; this screen shows the CURRENT
+  // one and lets them switch (server checks they're an active member).
+  async function handleSwitch(churchId: string) {
+    if (switchingTo) return;
+    setSwitchingTo(churchId);
+    const error = await switchCurrentChurch(churchId);
+    setSwitchingTo(null);
+    if (error) {
+      if (Platform.OS === "web") window.alert(error);
+      else Alert.alert("Couldn't switch church", error);
+    }
+  }
   const [loading, setLoading] = useState(true);
   const [cohorts, setCohorts] = useState<ChurchCohort[]>([]);
   const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>([]);
@@ -93,6 +108,30 @@ export default function ChurchHomeScreen() {
           </View>
         </View>
       </View>
+
+      {userChurches.length > 1 && (
+        <View style={styles.switchRow} accessibilityRole="tablist" accessibilityLabel="Your churches">
+          {userChurches.map((ch) => (
+            <TouchableOpacity
+              key={ch.id}
+              style={[styles.switchChip, ch.isCurrent && styles.switchChipActive]}
+              onPress={() => !ch.isCurrent && handleSwitch(ch.id)}
+              disabled={ch.isCurrent || !!switchingTo}
+              accessibilityRole="tab" accessibilityState={{ selected: ch.isCurrent }} accessibilityLabel={ch.name}
+            >
+              {switchingTo === ch.id ? <ActivityIndicator size="small" color={colors.accentGreen} /> : (
+                <Text style={[styles.switchChipText, ch.isCurrent && styles.switchChipTextActive]} numberOfLines={1}>{ch.name}</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {churchConversationId && (
+        <View style={{ marginTop: 14 }}>
+          <NavRow icon="chatbubbles-outline" label="Church chat" onPress={() => router.push({ pathname: "/messages/[id]", params: { id: churchConversationId } } as any)} />
+        </View>
+      )}
 
       {goalDashboard.length > 0 && (
         <>
@@ -218,6 +257,11 @@ function NavRow({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap
 }
 
 const styles = StyleSheet.create({
+  switchRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  switchChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: colors.card, justifyContent: "center", maxWidth: "100%" },
+  switchChipActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
+  switchChipText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
+  switchChipTextActive: { color: "#fff" },
   container: { flex: 1, backgroundColor: colors.darkBg },
   centerFill: { alignItems: "center", justifyContent: "center" },
   emptyContent: { paddingHorizontal: 32, alignItems: "center", paddingBottom: 60 },

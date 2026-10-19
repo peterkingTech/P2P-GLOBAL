@@ -217,27 +217,78 @@ router.get("/churches/check-duplicate", async (req, res) => {
   return ok(res, { matches: (data ?? []).map((c) => ({ id: c.id, name: c.name, city: c.city, country: c.country, website: c.website })) });
 });
 
-// GET /churches/my-church (identity from Bearer token)
+// A person may belong to several churches. p2p_profiles.church_id is their
+// CURRENT church (the one the Church tab opens): it must be one of their
+// active memberships; otherwise the most recently joined active church is
+// used. Returns all active memberships, newest first.
+async function getActiveChurchMemberships(userId: string) {
+  const { data } = await db
+    .from("p2p_church_members").select("church_id, role, joined_at").eq("user_id", userId).eq("is_active", true)
+    .order("joined_at", { ascending: false });
+  return (data ?? []) as { church_id: string; role: string; joined_at: string }[];
+}
+
+// After leaving/removal: keep church_id pointing at a church the person
+// still belongs to (most recently joined), or null when there is none.
+async function repointCurrentChurch(userId: string, leftChurchId: string) {
+  const { data: profile } = await db.from("p2p_profiles").select("church_id").eq("id", userId).maybeSingle();
+  if (profile?.church_id && profile.church_id !== leftChurchId) return;
+  const next = (await getActiveChurchMemberships(userId)).find((m) => m.church_id !== leftChurchId)?.church_id ?? null;
+  await db.from("p2p_profiles").update({ church_id: next }).eq("id", userId);
+}
+
+// GET /churches/my-church (identity from Bearer token) — the caller's
+// current church, plus `churches`: every church they actively belong to.
 router.get("/churches/my-church", async (req, res) => {
   const requesterId = await verifyCaller(req);
   if (!requesterId) return err(res, "Unauthorized", 401);
 
-  const { data: membership } = await db
-    .from("p2p_church_members").select("church_id, role").eq("user_id", requesterId).eq("is_active", true).maybeSingle();
-  if (!membership) return ok(res, { church: null, userRole: null, memberCount: 0, cohortCount: 0 });
+  const memberships = await getActiveChurchMemberships(requesterId);
+  if (!memberships.length) return ok(res, { church: null, userRole: null, memberCount: 0, cohortCount: 0, churches: [] });
+
+  const { data: profile } = await db.from("p2p_profiles").select("church_id").eq("id", requesterId).maybeSingle();
+  const membership = memberships.find((m) => m.church_id === profile?.church_id) ?? memberships[0];
+
+  const { data: churchRows } = await db.from("p2p_churches").select("id, name, logo_url").in("id", memberships.map((m) => m.church_id));
+  const byId = new Map(((churchRows ?? []) as { id: string; name: string; logo_url: string | null }[]).map((c) => [c.id, c]));
+  const churches = memberships.filter((m) => byId.has(m.church_id))
+    .map((m) => ({ id: m.church_id, name: byId.get(m.church_id)!.name, logoUrl: byId.get(m.church_id)!.logo_url ?? null, role: m.role, isCurrent: m.church_id === membership.church_id }));
 
   const { data: church } = await db.from("p2p_churches").select("*").eq("id", membership.church_id).maybeSingle();
-  if (!church) return ok(res, { church: null, userRole: null, memberCount: 0, cohortCount: 0 });
+  if (!church) return ok(res, { church: null, userRole: null, memberCount: 0, cohortCount: 0, churches });
 
   const [{ count: memberCount }, { count: cohortCount }] = await Promise.all([
     db.from("p2p_church_members").select("id", { count: "exact", head: true }).eq("church_id", membership.church_id).eq("is_active", true),
     db.from("p2p_church_cohorts").select("id", { count: "exact", head: true }).eq("church_id", membership.church_id),
   ]);
 
+  // The church's permanent group conversation (migration 197) — only when
+  // the caller is in it; null before 197 is applied.
+  const { data: conv } = await db.from("p2p_conversations").select("id").eq("church_id", membership.church_id).maybeSingle();
+  const { data: inConv } = conv?.id
+    ? await db.from("p2p_conversation_members").select("conversation_id").eq("conversation_id", conv.id as string).eq("user_id", requesterId).maybeSingle()
+    : { data: null };
+
   return ok(res, {
     church: mapChurch(church as Record<string, unknown>),
-    userRole: membership.role, memberCount: memberCount ?? 0, cohortCount: cohortCount ?? 0,
+    userRole: membership.role, memberCount: memberCount ?? 0, cohortCount: cohortCount ?? 0, churches,
+    conversationId: inConv ? (conv!.id as string) : null,
   });
+});
+
+// PUT /churches/current — { churchId } — switch the caller's current church.
+// Only to a church they actively belong to. Registered before
+// PUT /churches/:churchId so "current" is never read as a church id.
+router.put("/churches/current", async (req, res) => {
+  const requesterId = await verifyCaller(req);
+  if (!requesterId) return err(res, "Unauthorized", 401);
+  const { churchId } = req.body as { churchId?: string };
+  if (!churchId) return err(res, "churchId is required");
+  const membership = await getMembership(churchId, requesterId);
+  if (!membership?.is_active) return err(res, "You're not a member of this church", 403);
+  const { error } = await db.from("p2p_profiles").update({ church_id: churchId }).eq("id", requesterId);
+  if (error) return err(res, error.message, 500);
+  return ok(res, { churchId });
 });
 
 // GET /churches/:churchId — members only (identity from Bearer token).
@@ -453,7 +504,7 @@ router.delete("/churches/:churchId/members/:userId", async (req, res) => {
 
   const { error } = await db.from("p2p_church_members").update({ is_active: false }).eq("church_id", churchId).eq("user_id", userId);
   if (error) return err(res, error.message, 500);
-  await db.from("p2p_profiles").update({ church_id: null }).eq("id", userId).eq("church_id", churchId);
+  await repointCurrentChurch(userId, churchId);
 
   if (!isSelf) {
     await db.from("p2p_notifications").insert({

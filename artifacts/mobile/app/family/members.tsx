@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { useAuth } from "@/contexts/AuthContext";
+import { supabase, useAuth } from "@/contexts/AuthContext";
+import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { getFamilyDetail, inviteToFamily, removeFamilyMember, type FamilyDetailResponse, type FamilyMember } from "@/lib/familyApi";
 import { FamilyMemberList } from "@/components/family/FamilyMemberList";
 import { FamilyInvitePanel } from "@/components/family/FamilyInvitePanel";
@@ -17,7 +18,9 @@ function showAlert(title: string, message: string) {
 // — a member of several families sees each family's own independent roster here.
 // The roster comes only from GET /family/:familyId (active members of THIS
 // family, members-only); tapping a person opens their public profile, which
-// applies its own privacy rules.
+// applies its own privacy rules. Voice/video call buttons on each row use the
+// app's existing call flow (lib/callStart — the same one app/family/calls.tsx
+// uses; eligibility is enforced server-side by p2p_start_direct_conversation).
 export default function FamilyMembersScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
@@ -32,6 +35,7 @@ export default function FamilyMembersScreen() {
   const [query, setQuery] = useState("");
   const [inviteUsername, setInviteUsername] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [callingUserId, setCallingUserId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!familyId) return;
@@ -60,6 +64,26 @@ export default function FamilyMembersScreen() {
       showAlert("Couldn't send invitation", e.message ?? "Please try again.");
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleCall(member: FamilyMember, callType: "audio" | "video") {
+    if (!profile?.id || callingUserId) return;
+    setCallingUserId(member.userId);
+    try {
+      const result = await startPeerCall({
+        supabase, currentUserId: profile.id, otherUserId: member.userId, callType, onAlert: showAlert,
+      });
+      if (!result) return;
+      router.push({
+        pathname: callType === "video" ? "/call/video" : "/call/audio",
+        params: buildCallRouteParams({
+          channelName: result.channelName, otherUserId: member.userId, otherUserName: member.name,
+          callType, callId: result.incomingCallId, conversationId: result.conversationId, callLogId: result.callLogId,
+        }),
+      } as any);
+    } finally {
+      setCallingUserId(null);
     }
   }
 
@@ -95,6 +119,8 @@ export default function FamilyMembersScreen() {
           onOpenProfile={(path) => router.push(path as any)}
           onRemove={handleRemoveMember}
           onRetry={() => { setLoading(true); load(); }}
+          onCall={handleCall}
+          callingUserId={callingUserId}
         />
 
         {data?.canManage ? (

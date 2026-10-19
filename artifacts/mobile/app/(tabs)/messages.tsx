@@ -19,11 +19,13 @@ import { useActivityStatus } from "@/lib/presence";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import "@/lib/i18n";
 
-type TabKey = "all" | "unread" | "favourites" | "peer_groups" | "circles";
+type TabKey = "all" | "unread" | "favourites" | "family_church" | "peer_groups" | "circles";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "favourites", label: "Favourites" },
+  // Permanent Family Circle and Church conversations (migration 197).
+  { key: "family_church", label: "Family & Church" },
   { key: "peer_groups", label: "Peer Groups" },
   { key: "circles", label: "Circles" },
 ];
@@ -165,6 +167,7 @@ export default function MessagesTab() {
     let rows = conversations;
     if (tab === "unread") rows = rows.filter((c) => c.unreadCount > 0);
     else if (tab === "favourites") rows = rows.filter((c) => c.isFavourite);
+    else if (tab === "family_church") rows = rows.filter((c) => c.conversationType === "family" || c.conversationType === "church");
     else if (tab === "peer_groups") rows = rows.filter((c) => c.conversationType === "peer_group");
     else if (tab === "circles") rows = rows.filter((c) => c.conversationType === "circle");
 
@@ -201,6 +204,7 @@ export default function MessagesTab() {
     all: { title: "No conversations yet", sub: "Start a conversation from a peer's profile or a study group." },
     unread: { title: "You are all caught up ✓", sub: "No unread messages right now." },
     favourites: { title: "No favourites yet", sub: "Star conversations to find them quickly here." },
+    family_church: { title: "No family or church chats yet", sub: "Your Family Circle and church conversations appear here." },
     peer_groups: { title: "No peer groups yet", sub: "Create one from the Connect tab." },
     circles: { title: "Not in any circles yet", sub: "Find one in Discover." },
   };

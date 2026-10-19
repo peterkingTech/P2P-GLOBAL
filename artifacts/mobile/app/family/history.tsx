@@ -68,6 +68,17 @@ export default function FamilyGatheringHistoryScreen() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
       >
+        {/* Highlights (app/family/journey.tsx) used to be its own icon on the
+            family hub; it lives here now, next to the Gatherings it summarises. */}
+        <TouchableOpacity
+          style={[styles.section, styles.highlightsRow]}
+          onPress={() => router.push({ pathname: "/family/journey", params: { familyId } } as any)}
+          accessibilityRole="button" accessibilityLabel="Family Circle Highlights"
+        >
+          <Ionicons name="trail-sign-outline" size={18} color={c.accentGreen} />
+          <Text style={styles.highlightsText}>Family Circle Highlights</Text>
+          <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+        </TouchableOpacity>
         {error ? (
           <View style={styles.section}>
             <Text style={styles.emptyText}>{error}</Text>
@@ -109,6 +120,8 @@ function makeStyles(c: AppColors) {
     screen: { flex: 1, backgroundColor: c.lightCream },
     scroll: { padding: 16, paddingBottom: 40 },
     section: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 16 },
+    highlightsRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12, minHeight: 52, paddingVertical: 12 },
+    highlightsText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 19 },
     row: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
     rowDate: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },

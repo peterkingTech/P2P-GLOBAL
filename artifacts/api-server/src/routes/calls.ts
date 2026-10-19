@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Router } from "express";
+import { safeguardRefusal } from "../lib/minors";
 import { createClient } from "@supabase/supabase-js";
 import { RtcTokenBuilder, RtcRole } from "agora-token";
 import { notifyInterestedUsers, notifyModerators } from "../lib/breakRooms";
@@ -427,6 +428,7 @@ router.post("/calls/:callId/invitations", async (req, res) => {
     if (reason.includes("not_participant")) return err(res, "Not authorized for this call", 403);
     if (reason.includes("call_ended")) return err(res, "This call has ended", 410);
     if (reason.includes("call_not_found")) return err(res, "Call not found", 404);
+    if (safeguardRefusal(rpcErr)) return err(res, "This person can't be added to this call.", 403);
     return err(res, "Unable to invite this person.", 500);
   }
 
@@ -1009,6 +1011,21 @@ router.post("/calls/start", async (req, res) => {
   if (!callAuthorized) {
     return err(res, "Connect with this person first to start a call.", 403);
   }
+  // Child/teen safeguards (migration 198) apply even inside an existing
+  // shared conversation (e.g. a Circle chat): a minor is only callable
+  // within the minor rules. A check that fails for any reason other than
+  // "198 not applied yet" (function missing → no safeguards exist) refuses.
+  {
+    const { data: minorOk, error: minorErr } = await supabaseWrite.rpc("p2p_minor_contact_allowed", { p_a: callerId, p_b: recipientId });
+    const missing = !!minorErr && ["PGRST202", "42883"].includes((minorErr as { code?: string }).code ?? "");
+    if (minorErr && !missing) return err(res, "Couldn't start this call right now. Please try again.", 503);
+    if (!minorErr && minorOk === false) {
+      // The contact gate (p2p_can_contact_directly) still lets a responder
+      // reach a minor who asked for help; nothing else.
+      const { data: canContact } = await supabaseWrite.rpc("p2p_can_contact_directly", { p_user_a: callerId, p_user_b: recipientId });
+      if (!canContact) return err(res, "This call isn't available for this account.", 403);
+    }
+  }
 
   const { data: callLog, error: logErr } = await supabaseWrite
     .from("p2p_call_logs")
@@ -1590,7 +1607,7 @@ router.post("/calls/rooms", async (req, res) => {
     })
     .select("*")
     .single();
-  if (error || !room) return err(res, error?.message ?? "Failed to create room", 500);
+  if (error || !room) { const refusal = safeguardRefusal(error); return err(res, refusal ?? error?.message ?? "Failed to create room", refusal ? 403 : 500); }
 
   await supabaseWrite.from("p2p_break_room_participants").insert({ room_id: roomId, user_id: hostId });
 
@@ -1619,10 +1636,12 @@ router.post("/calls/rooms/:roomId/join", async (req, res) => {
     return err(res, "Room is full", 409);
   }
 
-  await supabaseWrite.from("p2p_break_room_participants").upsert(
+  const { error: joinErr } = await supabaseWrite.from("p2p_break_room_participants").upsert(
     { room_id: roomId, user_id: userId, joined_at: new Date().toISOString(), left_at: null },
     { onConflict: "room_id,user_id" }
   );
+  // Never hand out the channel when the join was refused (e.g. child/teen safeguards).
+  if (joinErr) { const refusal = safeguardRefusal(joinErr); return err(res, refusal ?? "Couldn't join this room", refusal ? 403 : 500); }
   await supabaseWrite.from("p2p_break_rooms").update({ current_participants: (room.current_participants as number) + 1 }).eq("id", roomId);
 
   return ok(res, {

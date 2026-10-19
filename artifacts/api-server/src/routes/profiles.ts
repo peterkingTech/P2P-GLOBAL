@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import { supabaseServiceRole as supabase } from "../lib/supabase";
 import { validateUsername, formatUsername } from "../lib/username";
+import { withoutChildren } from "../lib/minors";
 
 const router = Router();
 
@@ -248,6 +249,9 @@ router.get("/search", async (req, res) => {
       return a.i - b.i;
     })
     .map(({ r }) => r);
+
+  // Children are never discoverable (child/teen safeguards, rule 5).
+  results = await withoutChildren(results, (r) => r.id);
 
   if (viewerId) {
     const { data: blocks } = await supabaseRead

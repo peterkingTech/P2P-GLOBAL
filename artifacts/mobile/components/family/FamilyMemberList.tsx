@@ -21,11 +21,15 @@ interface Props {
   onOpenProfile: (path: string) => void;
   onRemove: (m: FamilyMember) => void;
   onRetry: () => void;
+  // Optional: voice/video call buttons on everyone else's row, through the
+  // app's existing call flow (the screen passes lib/callStart's startPeerCall).
+  onCall?: (m: FamilyMember, callType: "audio" | "video") => void;
+  callingUserId?: string | null;
 }
 
 // Presentational member list for one Family Circle. Data, permissions and
 // actions come from the screen (app/family/members.tsx); this only renders.
-export function FamilyMemberList({ members, myId, canManage, loading, error, query, onQueryChange, onOpenProfile, onRemove, onRetry }: Props) {
+export function FamilyMemberList({ members, myId, canManage, loading, error, query, onQueryChange, onOpenProfile, onRemove, onRetry, onCall, callingUserId }: Props) {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
 
@@ -94,6 +98,26 @@ export function FamilyMemberList({ members, myId, canManage, loading, error, que
               ) : (
                 <View style={styles.memberMain} accessibilityLabel={memberAccessibilityLabel(m, isMe)}>{body}</View>
               )}
+              {onCall && !isMe ? (
+                callingUserId === m.userId ? (
+                  <View style={styles.removeBtn}><ActivityIndicator size="small" color={c.accentGreen} /></View>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.removeBtn} onPress={() => onCall(m, "audio")} disabled={!!callingUserId}
+                      accessibilityRole="button" accessibilityLabel={`Voice call ${m.name}`}
+                    >
+                      <Ionicons name="call-outline" size={19} color={c.accentGreen} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeBtn} onPress={() => onCall(m, "video")} disabled={!!callingUserId}
+                      accessibilityRole="button" accessibilityLabel={`Video call ${m.name}`}
+                    >
+                      <Ionicons name="videocam-outline" size={20} color={c.accentGreen} />
+                    </TouchableOpacity>
+                  </>
+                )
+              ) : null}
               {canRemoveMember(m, myId, canManage) ? (
                 <TouchableOpacity
                   style={styles.removeBtn} onPress={() => onRemove(m)}

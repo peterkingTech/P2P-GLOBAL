@@ -146,6 +146,14 @@ router.get("/:familyId", async (req, res) => {
   const { data: activeSession } = await db
     .from("p2p_family_worship_sessions").select("id").eq("family_id", familyId).neq("status", "ended").maybeSingle();
 
+  // The family's permanent group conversation (migration 197). Returned only
+  // when the caller is actually in it; null before 197 is applied (the
+  // family_id column doesn't exist yet → error → null).
+  const { data: conv } = await db.from("p2p_conversations").select("id").eq("family_id", familyId).maybeSingle();
+  const { data: inConv } = conv?.id
+    ? await db.from("p2p_conversation_members").select("conversation_id").eq("conversation_id", conv.id as string).eq("user_id", userId).maybeSingle()
+    : { data: null };
+
   return ok(res, {
     family: mapFamily(family as Record<string, unknown>),
     members: (members ?? []).map((m) => mapMember(m as Record<string, unknown>, profileById.get(m.user_id as string))),
@@ -153,6 +161,7 @@ router.get("/:familyId", async (req, res) => {
     canManage,
     pendingInvitations: pendingRosterInvitations ?? [],
     activeSessionId: activeSession?.id ?? null,
+    conversationId: inConv ? (conv!.id as string) : null,
   });
 });
 

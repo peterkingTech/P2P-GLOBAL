@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
+import { withoutChildren } from "../lib/minors";
 
 // P2P Global Search — the EXISTING Discover search field (people-only,
 // via /profiles/search) extended into one bounded, parallel, multi-domain
@@ -85,7 +86,9 @@ router.get("/", async (req, res) => {
     if (!matches?.length) return [];
     const { data: blocks } = await db.from("p2p_user_blocks").select("blocker_id,blocked_id").or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
     const blockedIds = new Set((blocks ?? []).map((b) => (b.blocker_id === userId ? b.blocked_id : b.blocker_id) as string));
-    return matches.filter((m) => !blockedIds.has(m.id) && m.id !== userId).map((m) => ({ userId: m.id, username: m.username as string, fullName: m.full_name as string | null }));
+    // Children are never discoverable (child/teen safeguards, rule 5).
+    const visible = await withoutChildren(matches.filter((m) => !blockedIds.has(m.id) && m.id !== userId), (m) => m.id as string);
+    return visible.map((m) => ({ userId: m.id, username: m.username as string, fullName: m.full_name as string | null }));
   }
 
   const [people, curricula, prayerTopics, prayerPaths, missionFields, missionStories, kingdomStories, kingdomWins] =

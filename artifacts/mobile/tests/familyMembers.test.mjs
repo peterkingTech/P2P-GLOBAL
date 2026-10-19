@@ -165,7 +165,8 @@ ok("screen: load errors shown inline, not as a pop-up", /setError\(/.test(screen
 ok("screen: tap navigates to the computed profile path", /onOpenProfile=\{\(path\) => router\.push\(path as any\)\}/.test(screen));
 ok("screen: invite and remove preserved", /inviteToFamily\(familyId/.test(screen) && /removeFamilyMember\(familyId, m\.userId\)/.test(screen));
 const detail = readFileSync(path.join(root, "app/family/[familyId].tsx"), "utf8");
-ok("entry point: Family detail links to People", /pathname: "\/family\/members"/.test(detail) && /accessibilityLabel="People"/.test(detail));
+// Simplified hub (2026-10-18): People is a list row (accessibilityLabel={r.label}) and the header identity row.
+ok("entry point: Family detail links to People", /pathname: "\/family\/members"/.test(detail) && /label: "People"[\s\S]{0,120}onPress: openPeople/.test(detail) && /accessibilityRole="button" accessibilityLabel=\{r\.label\}/.test(detail));
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -328,7 +328,8 @@ export interface HelpRequest {
   createdAt: string;
 }
 
-export type ConversationType = "direct" | "crisis_response" | "help_request" | "pastoral" | "support" | "peer_group" | "circle";
+export interface UserChurchSummary { id: string; name: string; logoUrl: string | null; role: ChurchRole; isCurrent: boolean }
+export type ConversationType = "direct" | "crisis_response" | "help_request" | "pastoral" | "support" | "peer_group" | "circle" | "family" | "church";
 
 export interface ConversationSummary {
   id: string;
@@ -1394,6 +1395,12 @@ interface DataContextValue {
   isChurchCreator: boolean;
   churchMemberCount: number;
   churchCohortCount: number;
+  // Every church the user actively belongs to (a person may belong to
+  // several); userChurch is the CURRENT one (GET /churches/my-church).
+  userChurches: UserChurchSummary[];
+  // The current church's permanent group conversation (migration 197).
+  churchConversationId: string | null;
+  switchCurrentChurch: (churchId: string) => Promise<string | null>;
   loadUserChurch: () => Promise<void>;
   registerChurch: (data: ChurchRegistrationData) => Promise<{ church: Church | null; error: string | null }>;
   updateChurch: (churchId: string, data: ChurchUpdateData) => Promise<{ church: Church | null; error: string | null }>;
@@ -1576,6 +1583,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [userChurchRole, setUserChurchRole] = useState<ChurchRole | null>(null);
   const [churchMemberCount, setChurchMemberCount] = useState(0);
   const [churchCohortCount, setChurchCohortCount] = useState(0);
+  const [userChurches, setUserChurches] = useState<UserChurchSummary[]>([]);
+  const [churchConversationId, setChurchConversationId] = useState<string | null>(null);
   const [incomingMessageBanner, setIncomingMessageBanner] = useState<IncomingMessageBannerInfo | null>(null);
   // Ref, not state — read inside the realtime callback's closure without
   // forcing the channel to resubscribe every time the user opens/leaves a
@@ -5266,7 +5275,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const isChurchCreator = !!profile?.id && !!userChurch && profile.id === userChurch.createdBy;
 
   const loadUserChurch = useCallback(async () => {
-    if (!profile?.id) { setUserChurch(null); setUserChurchRole(null); setChurchMemberCount(0); setChurchCohortCount(0); return; }
+    if (!profile?.id) { setUserChurch(null); setUserChurchRole(null); setChurchMemberCount(0); setChurchCohortCount(0); setUserChurches([]); setChurchConversationId(null); return; }
     try {
       const res = await authedFetch("/churches/my-church");
       const body = await res.json();
@@ -5274,12 +5283,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setUserChurchRole(body?.userRole ?? null);
       setChurchMemberCount(body?.memberCount ?? 0);
       setChurchCohortCount(body?.cohortCount ?? 0);
+      setUserChurches(Array.isArray(body?.churches) ? body.churches : []);
+      setChurchConversationId(body?.conversationId ?? null);
     } catch (e) {
       console.error("loadUserChurch failed", e);
     }
   }, [profile?.id]);
 
   useEffect(() => { loadUserChurch(); }, [loadUserChurch]);
+
+  // Returns an error message, or null on success (then reloads the church).
+  const switchCurrentChurch = useCallback(async (churchId: string): Promise<string | null> => {
+    try {
+      const res = await authedFetch("/churches/current", {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ churchId }),
+      });
+      if (!res.ok) return (await res.json().catch(() => null))?.error ?? "Couldn't switch church";
+      await loadUserChurch();
+      return null;
+    } catch {
+      return "Couldn't switch church";
+    }
+  }, [loadUserChurch]);
 
   const registerChurch = useCallback(async (data: ChurchRegistrationData): Promise<{ church: Church | null; error: string | null }> => {
     if (!profile?.id) return { church: null, error: "Not authenticated" };
@@ -6047,6 +6072,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       adminRole, adminStats, loadAdminStats, submitAdminReport,
       appointAdmin, removeAdmin, suspendAdmin, getAdminList, getAdminActivityFeed,
       userChurch, userChurchRole, isChurchLeader, isChurchCreator, churchMemberCount, churchCohortCount, loadUserChurch,
+      userChurches, churchConversationId, switchCurrentChurch,
       registerChurch, updateChurch, checkDuplicateChurch, getSocialAccounts, updateSocialAccounts,
       joinChurch, leaveChurch, getGroveData, getChurchMembers, getChurchMemberProfile,
       updateChurchMemberNotes, updateMemberRole, removeChurchMember, createCohort, getChurchCohorts,

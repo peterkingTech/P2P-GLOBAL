@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import FamilyIcon from "@/components/family/FamilyIcon";
+import { Avatar } from "@/components/Avatar";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,12 +22,14 @@ function showAlert(title: string, message: string) {
 // a user who belongs to several families sees each one's own independent
 // roster, prayer list, and Gathering sessions when they open it.
 //
-// Members and Prayer are reachable via the small icon buttons in the
-// header (not full-width cards) — they used to be duplicated as their own
-// landing-page cards here, which read as redundant next to the same
-// information already surfaced elsewhere (member count in the header,
-// Prayer itself inside the Study Workspace). The routes/screens
-// (app/family/members.tsx, app/family/prayer.tsx) are unchanged.
+// Layout (simplified 2026-10-18): one primary action chosen by state —
+// Join the live Gathering, else Continue Learning (with Start Gathering
+// beside it), else Start Gathering — then a short list: Family chat (the
+// permanent group conversation, migration 197), Learning, Prayer, People
+// (roster, roles, invitations and per-person calls) and History & highlights.
+// This replaces six equal header icons. Every destination screen is
+// unchanged; app/family/calls.tsx and app/family/journey.tsx stay reachable
+// (calling now lives on People's rows; Highlights from History).
 export default function FamilyDetailScreen() {
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
@@ -118,90 +121,122 @@ export default function FamilyDetailScreen() {
   }
 
   const isShepherd = data.myRole === "shepherd";
+  const family = data.family;
+  const live = !!data.activeSessionId;
+  const next = continueStudy?.continueStudy ?? null;
+  // The most relevant action for right now.
+  const primary: "join" | "continue" | "start" = live ? "join" : next ? "continue" : "start";
+  const openPeople = () => router.push({ pathname: "/family/members", params: { familyId } } as any);
+  const openLesson = () => next && router.push({ pathname: "/lesson/[id]", params: { id: next.nextLessonId } } as any);
+  const shownAvatars = data.members.slice(0, 5);
+
+  const rows: { key: string; icon: React.ReactNode; label: string; detail?: string; onPress: () => void }[] = [
+    ...(data.conversationId ? [{
+      key: "chat", icon: <Ionicons name="chatbubbles-outline" size={20} color={c.accentGreen} />,
+      label: "Family chat", detail: "Messages and voice notes with everyone",
+      onPress: () => router.push({ pathname: "/messages/[id]", params: { id: data.conversationId! } } as any),
+    }] : []),
+    {
+      key: "learning", icon: <Ionicons name="book-outline" size={20} color={c.accentGreen} />,
+      label: "Learning", detail: "Studies and plans for your family",
+      onPress: () => router.push({ pathname: "/family/studies", params: { familyId } } as any),
+    },
+    {
+      key: "prayer", icon: <FamilyIcon name="prayer" size={19} color={c.accentGreen} />,
+      label: "Prayer", detail: "Your family's prayer requests",
+      onPress: () => router.push({ pathname: "/family/prayer", params: { familyId } } as any),
+    },
+    {
+      key: "people", icon: <Ionicons name="people-outline" size={20} color={c.accentGreen} />,
+      label: "People", detail: data.canManage ? "Members, roles, invitations and calls" : "Members and calls",
+      onPress: openPeople,
+    },
+    {
+      key: "history", icon: <Ionicons name="time-outline" size={20} color={c.accentGreen} />,
+      label: "History & highlights", detail: "Past Gatherings and what you've covered",
+      onPress: () => router.push({ pathname: "/family/history", params: { familyId } } as any),
+    },
+  ];
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: data.family.name }} />
+      <Stack.Screen options={{ title: family.name }} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}
       >
         <View style={styles.headerCard}>
-          <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.identityRow} onPress={openPeople}
+            accessibilityRole="button" accessibilityLabel={`${family.name}, ${data.members.length} ${data.members.length === 1 ? "person" : "people"}`} accessibilityHint="Opens People"
+          >
             <View style={{ flex: 1 }}>
-              <Text style={styles.familyName}>{data.family.name}</Text>
+              <Text style={styles.familyName}>{family.name}</Text>
               <Text style={styles.familySub}>{data.members.length} {data.members.length === 1 ? "person" : "people"}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/members", params: { familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="People"
-            >
-              <Ionicons name="people" size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/prayer", params: { familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Prayer"
-            >
-              <FamilyIcon name="prayer" size={17} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/calls", params: { fid: familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Calls"
-            >
-              <Ionicons name="call" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/studies", params: { familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Study"
-            >
-              <Ionicons name="book-outline" size={16} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/history", params: { familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Gathering History"
-            >
-              <Ionicons name="time-outline" size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => router.push({ pathname: "/family/journey", params: { familyId } } as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Family Circle Highlights"
-            >
-              <Ionicons name="trail-sign-outline" size={18} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.gatheringBtn} onPress={handleStartGathering} disabled={startingGathering}>
-            {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : (
-              <Text style={styles.gatheringBtnText}>{data.activeSessionId ? "Join Family Circle Gathering" : "Start Gathering"}</Text>
+            <View style={styles.avatarStack} importantForAccessibility="no-hide-descendants">
+              {shownAvatars.map((m, i) => (
+                <View key={m.id} style={[styles.avatarRing, i > 0 && { marginLeft: -10 }]}>
+                  <Avatar photoUrl={m.avatarUrl} name={m.name} size={30} />
+                </View>
+              ))}
+            </View>
+          </TouchableOpacity>
+
+          {live && (
+            <View style={styles.liveRow} accessibilityLiveRegion="polite">
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>A Gathering is happening now</Text>
+            </View>
+          )}
+          {primary === "continue" && next && (
+            <Text style={styles.nextText} numberOfLines={2}>Next: {next.nextLessonTitle}</Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={primary === "continue" ? openLesson : handleStartGathering}
+            disabled={startingGathering && primary !== "continue"}
+            accessibilityRole="button"
+          >
+            {startingGathering && primary !== "continue" ? <ActivityIndicator color={c.primaryGreen} size="small" /> : (
+              <Text style={styles.primaryBtnText}>
+                {primary === "join" ? "Join Gathering" : primary === "continue" ? "Continue Learning" : "Start Gathering"}
+              </Text>
             )}
           </TouchableOpacity>
+          {primary === "continue" && (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={handleStartGathering} disabled={startingGathering} accessibilityRole="button">
+              {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.secondaryBtnText}>Start Gathering</Text>}
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Continue Study — only when the last Gathering was explicitly
-            about a lesson and the curriculum has a next one. Never assumes
-            an unrelated (prayer-only/fellowship) Gathering continues
-            anything — see familyWorship.ts's GET /worship/continue-study. */}
-        {continueStudy?.continueStudy && (
+        <View style={styles.listCard}>
+          {rows.map((r, i) => (
+            <TouchableOpacity
+              key={r.key} style={[styles.listRow, i === rows.length - 1 && styles.listRowLast]} onPress={r.onPress}
+              accessibilityRole="button" accessibilityLabel={r.label} accessibilityHint={r.detail}
+            >
+              <View style={styles.listIcon}>{r.icon}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.listLabel}>{r.label}</Text>
+                {r.detail ? <Text style={styles.listDetail} numberOfLines={1}>{r.detail}</Text> : null}
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Continue Study — shown as a card only when the main button isn't
+            already "Continue Learning" (a Gathering is live), so the same
+            lesson link never appears twice. */}
+        {live && next && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Continue Study</Text>
-            {!!continueStudy.continueStudy.curriculumTitle && <Text style={styles.cardSub}>{continueStudy.continueStudy.curriculumTitle}</Text>}
-            <Text style={styles.cardBody}>Next: {continueStudy.continueStudy.nextLessonTitle}</Text>
-            <TouchableOpacity
-              style={styles.cardLinkBtn}
-              onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: continueStudy.continueStudy!.nextLessonId } } as any)}
-              accessibilityRole="button"
-            >
+            {!!next.curriculumTitle && <Text style={styles.cardSub}>{next.curriculumTitle}</Text>}
+            <Text style={styles.cardBody}>Next: {next.nextLessonTitle}</Text>
+            <TouchableOpacity style={styles.cardLinkBtn} onPress={openLesson} accessibilityRole="button">
               <Text style={styles.cardLinkBtnText}>Open Study Workspace →</Text>
             </TouchableOpacity>
           </View>
@@ -265,18 +300,32 @@ function makeStyles(c: AppColors) {
     headerCard: {
       backgroundColor: c.primaryGreen, borderRadius: 18, padding: 20, gap: 4,
     },
-    headerTopRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-    headerIconBtn: {
-      width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.16)",
-      alignItems: "center", justifyContent: "center",
-    },
+    identityRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 },
     familyName: { fontSize: 20, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     familySub: { fontSize: 13, color: "rgba(255,255,255,0.8)", fontFamily: "Inter_400Regular" },
-    gatheringBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 12, paddingVertical: 13, marginTop: 14,
+    avatarStack: { flexDirection: "row", alignItems: "center" },
+    avatarRing: { borderRadius: 17, borderWidth: 2, borderColor: c.primaryGreen },
+    liveRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
+    liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#4ADE80" },
+    liveText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+    nextText: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 12 },
+    primaryBtn: {
+      alignItems: "center", justifyContent: "center", minHeight: 48,
+      backgroundColor: "#fff", borderRadius: 12, paddingVertical: 13, marginTop: 14,
     },
-    gatheringBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    primaryBtnText: { color: c.primaryGreen, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+    secondaryBtn: {
+      alignItems: "center", justifyContent: "center", minHeight: 44,
+      backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 12, paddingVertical: 11, marginTop: 8,
+    },
+    secondaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+
+    listCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14 },
+    listRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
+    listRowLast: { borderBottomWidth: 0 },
+    listIcon: { width: 32, alignItems: "center" },
+    listLabel: { fontSize: 15, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    listDetail: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
     leaveRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10 },
     leaveText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium" },

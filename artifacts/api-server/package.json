@@ -14,7 +14,8 @@
     "test:push": "node tests/pushDelivery.test.mjs",
     "test:studio": "node tests/studio.test.mjs",
     "test:wins": "node tests/winsModeration.test.mjs",
-    "test:notifications": "node tests/notificationActors.test.mjs && node tests/notificationPrivacy.test.mjs && node tests/notificationPreview.test.mjs && node tests/notificationCategories.test.mjs"
+    "test:notifications": "node tests/notificationActors.test.mjs && node tests/notificationPrivacy.test.mjs && node tests/notificationPreview.test.mjs && node tests/notificationCategories.test.mjs",
+    "test:minors": "node tests/minorSafeguards.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

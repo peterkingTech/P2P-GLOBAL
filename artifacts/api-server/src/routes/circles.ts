@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { safeguardRefusal } from "../lib/minors";
 import { createClient } from "@supabase/supabase-js";
 
 const router = Router();
@@ -223,7 +224,7 @@ router.post("/", async (req, res) => {
     })
     .select()
     .single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) { const refusal = safeguardRefusal(error); return res.status(refusal ? 403 : 500).json({ error: refusal ?? error.message }); }
 
   await supabaseRead.from("p2p_peer_circle_members").insert({ circle_id: circle.id, user_id: body.leaderId, role: "leader", status: "active" });
 
@@ -307,10 +308,17 @@ router.put("/:circleId/join-requests/:requestId", async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
 
   if (action === "approve") {
-    await supabaseRead.from("p2p_peer_circle_members").upsert(
+    const { error: addErr } = await supabaseRead.from("p2p_peer_circle_members").upsert(
       { circle_id: circleId, user_id: request.user_id, role: "member", status: "active" },
       { onConflict: "circle_id,user_id" }
     );
+    if (addErr) {
+      // Not added (e.g. child/teen safeguards) — don't leave the request
+      // looking approved.
+      await supabaseRead.from("p2p_peer_circle_join_requests").update({ status: "pending", responded_at: null, responded_by: null }).eq("id", requestId);
+      const refusal = safeguardRefusal(addErr);
+      return res.status(refusal ? 403 : 500).json({ error: refusal ?? addErr.message });
+    }
   }
   return res.json({ status: newStatus });
 });
@@ -338,7 +346,7 @@ router.post("/:circleId/members/by-username", async (req, res) => {
     { circle_id: circleId, user_id: targetProfile.id, role: "member", status: "active", joined_at: new Date().toISOString() },
     { onConflict: "circle_id,user_id" }
   );
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) { const refusal = safeguardRefusal(error); return res.status(refusal ? 403 : 500).json({ error: refusal ?? error.message }); }
 
   await supabaseRead.from("p2p_notifications").insert({
     user_id: targetProfile.id, title: `You've been added to ${circle.name}`, message: "Tap to view the circle.",

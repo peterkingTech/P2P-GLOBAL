@@ -58,6 +58,9 @@ export interface FamilyDetailResponse {
   // Non-null when a Gathering is already in progress for this family — lets
   // the UI offer "Join Family Gathering" instead of "Start Gathering".
   activeSessionId: string | null;
+  // The family's permanent group conversation in Messages (migration 197);
+  // null when the caller isn't in it or before 197 is applied.
+  conversationId?: string | null;
 }
 
 export function getMyFamilies(): Promise<MyFamiliesResponse> {

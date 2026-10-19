@@ -112,8 +112,8 @@ export default function FamilyPrayerScreen() {
               <Ionicons name={newPrayerPrivate ? "lock-closed" : "people"} size={14} color={c.accentGreen} />
               <Text style={styles.secondaryBtnSmallText}>{newPrayerPrivate ? "Private" : "Family Circle"}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtnSmall} onPress={handleAddPrayer} disabled={!newPrayer.trim()}>
-              <Text style={styles.primaryBtnSmallText}>Share</Text>
+            <TouchableOpacity style={styles.primaryBtnSmall} onPress={handleAddPrayer} disabled={!newPrayer.trim()} accessibilityRole="button" accessibilityLabel="Add prayer request">
+              <Text style={styles.primaryBtnSmallText}>Add request</Text>
             </TouchableOpacity>
           </View>
         </View>
