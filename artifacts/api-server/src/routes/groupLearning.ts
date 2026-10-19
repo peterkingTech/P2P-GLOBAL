@@ -102,9 +102,14 @@ router.get("/:scope/:groupId", async (req, res) => {
   studiesQ = canManage ? studiesQ.neq("status", "archived") : studiesQ.eq("status", "published");
   const { data: studies } = await studiesQ;
   const studyIds = ((studies ?? []) as { id: string }[]).map((x) => x.id);
-  const { data: studyLessons } = studyIds.length ? await db.from(lessonTable).select("study_id").in("study_id", studyIds) : { data: [] };
+  // Members count published lessons only (lesson status, migration 200; before it every lesson counted).
+  let lessonRows: { study_id: string; status?: string }[] = [];
+  if (studyIds.length) {
+    const withStatus = await db.from(lessonTable).select("study_id,status").in("study_id", studyIds);
+    lessonRows = (withStatus.error ? (await db.from(lessonTable).select("study_id").in("study_id", studyIds)).data ?? [] : withStatus.data ?? []) as typeof lessonRows;
+  }
   const counts = new Map<string, number>();
-  for (const l of (studyLessons ?? []) as { study_id: string }[]) counts.set(l.study_id, (counts.get(l.study_id) ?? 0) + 1);
+  for (const l of lessonRows) if (canManage || l.status === undefined || l.status === "published") counts.set(l.study_id, (counts.get(l.study_id) ?? 0) + 1);
 
   return ok(res, {
     scope: s.scope, groupId: s.groupId, canManage,

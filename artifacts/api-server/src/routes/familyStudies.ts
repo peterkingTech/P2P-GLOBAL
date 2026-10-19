@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { mountCustomLessonRoutes, visibleLessons } from "../lib/customLessonRoutes";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 
 const router = Router();
@@ -29,15 +30,6 @@ function mapStudy(row: Record<string, unknown>) {
   return {
     id: row.id, familyId: row.family_id, createdBy: row.created_by,
     title: row.title, description: row.description, status: row.status,
-    orderIndex: row.order_index, createdAt: row.created_at, updatedAt: row.updated_at,
-  };
-}
-function mapLesson(row: Record<string, unknown>) {
-  return {
-    id: row.id, studyId: row.study_id, title: row.title, description: row.description,
-    scriptureReferences: row.scripture_references ?? [], teachingMaterial: row.teaching_material,
-    questions: row.questions ?? [], prayerFocus: row.prayer_focus,
-    media: row.media_provider ? { provider: row.media_provider, id: row.media_id, url: row.media_url } : null,
     orderIndex: row.order_index, createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
@@ -72,7 +64,8 @@ router.get("/studies/:studyId", async (req, res) => {
   }
 
   const { data: lessons } = await db.from("p2p_family_study_lessons").select("*").eq("study_id", study.id as string).order("order_index", { ascending: true });
-  return ok(res, { study: mapStudy(study as Record<string, unknown>), lessons: (lessons ?? []).map(mapLesson) });
+  // Members see published lessons only; leaders also see drafts and archived ones.
+  return ok(res, { study: mapStudy(study as Record<string, unknown>), lessons: visibleLessons((lessons ?? []) as Record<string, unknown>[], canManage), canManage });
 });
 
 // POST /family/:familyId/studies — Shepherd/Co-Shepherd only. Always
@@ -147,73 +140,12 @@ async function loadStudyForManageCheck(studyId: string, userId: string) {
   return { study, authorized: await isShepherdOrCoShepherd(study.family_id as string, userId) };
 }
 
-router.post("/studies/:studyId/lessons", async (req, res) => {
-  const userId = await verifyCaller(req);
-  if (!userId) return err(res, "Unauthorized", 401);
-  const { studyId } = req.params;
-  const { title, description, scriptureReferences, teachingMaterial, questions, prayerFocus, orderIndex, media } = req.body as {
-    title?: string; description?: string; scriptureReferences?: unknown[]; teachingMaterial?: string;
-    questions?: unknown[]; prayerFocus?: string; orderIndex?: number; media?: { provider: string; id: string; url?: string | null } | null;
-  };
-  if (!title?.trim()) return err(res, "title is required");
-
-  const { study, authorized } = await loadStudyForManageCheck(studyId, userId);
-  if (!study) return err(res, "Study not found", 404);
-  if (!authorized) return err(res, "Only the Family Shepherd or a Co-Shepherd can add lessons to this study", 403);
-
-  const { data: lesson, error } = await db.from("p2p_family_study_lessons").insert({
-    study_id: studyId, title: title.trim(), description: description?.trim() || null,
-    scripture_references: scriptureReferences ?? null, teaching_material: teachingMaterial?.trim() || null,
-    questions: questions ?? null, prayer_focus: prayerFocus?.trim() || null, order_index: orderIndex ?? 0,
-    media_provider: media?.provider ?? null, media_id: media?.id ?? null, media_url: media?.url ?? null,
-  }).select().single();
-  if (error || !lesson) return err(res, error?.message ?? "Failed to add the lesson", 500);
-  return ok(res, mapLesson(lesson as Record<string, unknown>));
-});
-
-router.put("/studies/:studyId/lessons/:lessonId", async (req, res) => {
-  const userId = await verifyCaller(req);
-  if (!userId) return err(res, "Unauthorized", 401);
-  const { studyId, lessonId } = req.params;
-  const { study, authorized } = await loadStudyForManageCheck(studyId, userId);
-  if (!study) return err(res, "Study not found", 404);
-  if (!authorized) return err(res, "Only the Family Shepherd or a Co-Shepherd can edit this lesson", 403);
-
-  const { title, description, scriptureReferences, teachingMaterial, questions, prayerFocus, media, orderIndex } = req.body as {
-    title?: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
-    questions?: unknown[]; prayerFocus?: string | null; media?: { provider: string; id: string; url?: string | null } | null;
-    orderIndex?: number;
-  };
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (title !== undefined) { if (!title.trim()) return err(res, "title cannot be empty"); updates.title = title.trim(); }
-  if (description !== undefined) updates.description = description?.trim() || null;
-  if (scriptureReferences !== undefined) updates.scripture_references = scriptureReferences;
-  if (teachingMaterial !== undefined) updates.teaching_material = teachingMaterial?.trim() || null;
-  if (questions !== undefined) updates.questions = questions;
-  if (prayerFocus !== undefined) updates.prayer_focus = prayerFocus?.trim() || null;
-  if (orderIndex !== undefined) updates.order_index = orderIndex;
-  if (media !== undefined) {
-    updates.media_provider = media?.provider ?? null;
-    updates.media_id = media?.id ?? null;
-    updates.media_url = media?.url ?? null;
-  }
-
-  const { data: updated, error } = await db.from("p2p_family_study_lessons").update(updates).eq("id", lessonId).eq("study_id", studyId).select().single();
-  if (error || !updated) return err(res, error?.message ?? "Failed to update the lesson", 500);
-  return ok(res, mapLesson(updated as Record<string, unknown>));
-});
-
-router.delete("/studies/:studyId/lessons/:lessonId", async (req, res) => {
-  const userId = await verifyCaller(req);
-  if (!userId) return err(res, "Unauthorized", 401);
-  const { studyId, lessonId } = req.params;
-  const { study, authorized } = await loadStudyForManageCheck(studyId, userId);
-  if (!study) return err(res, "Study not found", 404);
-  if (!authorized) return err(res, "Only the Family Shepherd or a Co-Shepherd can remove this lesson", 403);
-
-  const { error } = await db.from("p2p_family_study_lessons").delete().eq("id", lessonId).eq("study_id", studyId);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+// Lesson create / edit / status / delete — shared with the other scope
+// (lib/customLessonRoutes.ts): drafts, publish/unpublish, archive instead of
+// deleting anything ever published, version bump on published edits.
+mountCustomLessonRoutes(router, {
+  base: "/studies", table: "p2p_family_study_lessons",
+  loadForManage: loadStudyForManageCheck, who: "the Family Shepherd or a Co-Shepherd",
 });
 
 export default router;

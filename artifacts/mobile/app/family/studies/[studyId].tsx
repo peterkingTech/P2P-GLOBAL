@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from "react";
+import CustomLessonSection from "@/components/study/CustomLessonSection";
+import type { CustomLesson, LessonApi } from "@/lib/customLessonModel";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Alert, Platform } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +11,7 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFamilyDetail } from "@/lib/familyApi";
 import {
-  getFamilyStudy, updateFamilyStudy, archiveFamilyStudy, addFamilyStudyLesson, updateFamilyStudyLesson, removeFamilyStudyLesson,
+  getFamilyStudy, updateFamilyStudy, archiveFamilyStudy, addFamilyStudyLesson, updateFamilyStudyLesson, removeFamilyStudyLesson, setFamilyStudyLessonStatus,
   type FamilyStudy, type FamilyStudyLesson, type CustomStudyStatus,
 } from "@/lib/familyStudyApi";
 
@@ -23,24 +25,7 @@ function confirmAction(title: string, message: string, onConfirm: () => void) {
   else Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: "Continue", style: "destructive", onPress: onConfirm }]);
 }
 
-interface ScriptureRef { book: string; chapter: string; startVerse: string; endVerse: string; translation: string }
 
-function lessonToFormState(lesson?: FamilyStudyLesson) {
-  const ref = (lesson?.scriptureReferences?.[0] as Partial<ScriptureRef> & { book?: string; chapter?: number; startVerse?: number; endVerse?: number; translation?: string }) ?? {};
-  return {
-    title: lesson?.title ?? "",
-    description: lesson?.description ?? "",
-    teachingMaterial: lesson?.teachingMaterial ?? "",
-    prayerFocus: lesson?.prayerFocus ?? "",
-    questions: (lesson?.questions as string[] | undefined)?.length ? (lesson!.questions as string[]) : [""],
-    mediaId: lesson?.media?.id ?? "",
-    scripture: {
-      book: ref.book ?? "", chapter: ref.chapter ? String(ref.chapter) : "",
-      startVerse: ref.startVerse ? String(ref.startVerse) : "", endVerse: ref.endVerse ? String(ref.endVerse) : "",
-      translation: ref.translation ?? "NIV",
-    } as ScriptureRef,
-  };
-}
 
 // Mirrors app/church/studies/[studyId].tsx exactly, scoped to Family
 // authorization (Shepherd/Co-Shepherd) instead of church leadership.
@@ -64,8 +49,6 @@ export default function FamilyStudyDetailScreen() {
   const [editDescription, setEditDescription] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const [lessonEditor, setLessonEditor] = useState<{ lesson: FamilyStudyLesson | null; form: ReturnType<typeof lessonToFormState> } | null>(null);
-  const [savingLesson, setSavingLesson] = useState(false);
 
   const load = useCallback(async () => {
     if (!studyId) return;
@@ -85,6 +68,15 @@ export default function FamilyStudyDetailScreen() {
       setLoading(false);
     }
   }, [studyId, familyId, profile?.id]);
+
+  // Lesson authoring goes through the shared section (components/study/
+  // CustomLessonSection.tsx); this adapter points it at this scope's API.
+  const lessonApi: LessonApi = {
+    add: (input) => addFamilyStudyLesson(studyId as string, input as any) as Promise<CustomLesson>,
+    update: (lessonId, input) => updateFamilyStudyLesson(studyId as string, lessonId, input as any) as Promise<CustomLesson>,
+    setStatus: (lessonId, status) => setFamilyStudyLessonStatus(studyId as string, lessonId, status) as Promise<CustomLesson>,
+    remove: (lessonId) => removeFamilyStudyLesson(studyId as string, lessonId),
+  };
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -130,82 +122,6 @@ export default function FamilyStudyDetailScreen() {
     }
   }
 
-  function openAddLesson() {
-    setLessonEditor({ lesson: null, form: lessonToFormState() });
-  }
-  function openEditLesson(lesson: FamilyStudyLesson) {
-    setLessonEditor({ lesson, form: lessonToFormState(lesson) });
-  }
-
-  async function handleSaveLesson() {
-    if (!study || !lessonEditor || !lessonEditor.form.title.trim()) return;
-    const { form, lesson } = lessonEditor;
-    const scriptureReferences = form.scripture.book.trim() && form.scripture.chapter.trim() && form.scripture.startVerse.trim()
-      ? [{
-          book: form.scripture.book.trim(), chapter: Number(form.scripture.chapter), startVerse: Number(form.scripture.startVerse),
-          endVerse: form.scripture.endVerse.trim() ? Number(form.scripture.endVerse) : Number(form.scripture.startVerse),
-          translation: form.scripture.translation.trim() || "NIV",
-        }]
-      : [];
-    const questions = form.questions.map((q) => q.trim()).filter(Boolean);
-    const payload = {
-      title: form.title.trim(), description: form.description.trim() || null, teachingMaterial: form.teachingMaterial.trim() || null,
-      prayerFocus: form.prayerFocus.trim() || null, scriptureReferences, questions,
-      media: form.mediaId.trim() ? { provider: "youtube", id: form.mediaId.trim(), url: null } : null,
-    };
-    setSavingLesson(true);
-    try {
-      if (lesson) {
-        const updated = await updateFamilyStudyLesson(study.id, lesson.id, payload);
-        setLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-      } else {
-        const created = await addFamilyStudyLesson(study.id, { ...payload, orderIndex: lessons.length });
-        setLessons((prev) => [...prev, created]);
-      }
-      setLessonEditor(null);
-    } catch (e: any) {
-      showAlert("Couldn't save the lesson", e.message ?? "Please try again.");
-    } finally {
-      setSavingLesson(false);
-    }
-  }
-
-  function handleRemoveLesson(lesson: FamilyStudyLesson) {
-    if (!study) return;
-    confirmAction("Remove this lesson?", lesson.title, async () => {
-      try {
-        await removeFamilyStudyLesson(study.id, lesson.id);
-        setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
-      } catch (e: any) {
-        showAlert("Couldn't remove the lesson", e.message ?? "Please try again.");
-      }
-    });
-  }
-
-  function updateLessonForm(patch: Partial<ReturnType<typeof lessonToFormState>>) {
-    setLessonEditor((prev) => (prev ? { ...prev, form: { ...prev.form, ...patch } } : prev));
-  }
-  function updateScripture(patch: Partial<ScriptureRef>) {
-    setLessonEditor((prev) => (prev ? { ...prev, form: { ...prev.form, scripture: { ...prev.form.scripture, ...patch } } } : prev));
-  }
-  function updateQuestion(index: number, value: string) {
-    setLessonEditor((prev) => {
-      if (!prev) return prev;
-      const questions = [...prev.form.questions];
-      questions[index] = value;
-      return { ...prev, form: { ...prev.form, questions } };
-    });
-  }
-  function addQuestionField() {
-    setLessonEditor((prev) => (prev ? { ...prev, form: { ...prev.form, questions: [...prev.form.questions, ""] } } : prev));
-  }
-  function removeQuestionField(index: number) {
-    setLessonEditor((prev) => {
-      if (!prev) return prev;
-      const questions = prev.form.questions.filter((_, i) => i !== index);
-      return { ...prev, form: { ...prev.form, questions: questions.length ? questions : [""] } };
-    });
-  }
 
   if (loading) {
     return <View style={[styles.container, styles.centerFill]}><ActivityIndicator color={c.accentGreen} /></View>;
@@ -251,47 +167,13 @@ export default function FamilyStudyDetailScreen() {
         )}
         {study.status === "archived" && <Text style={styles.archivedNotice}>This study is archived.</Text>}
 
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>LESSONS</Text>
-          {canManage && (
-            <TouchableOpacity style={styles.createBtn} onPress={openAddLesson}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Add Lesson</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {lessons.length === 0 ? (
-          <Text style={styles.emptyText}>No lessons yet.</Text>
-        ) : (
-          lessons.map((lesson, i) => (
-            <TouchableOpacity
-              key={lesson.id} style={styles.lessonCard}
-              onPress={() => router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: lesson.id, studyId: study.id } } as any)}
-            >
-              <Text style={styles.lessonNumber}>{i + 1}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                {!!lesson.scriptureReferences?.length && (
-                  <View style={styles.lessonMetaRow}>
-                    <FamilyIcon name="scripture" size={12} color={c.textMuted} />
-                    <Text style={styles.lessonMeta}>{(lesson.scriptureReferences[0] as any).book} {(lesson.scriptureReferences[0] as any).chapter}</Text>
-                  </View>
-                )}
-              </View>
-              {canManage && (
-                <>
-                  <TouchableOpacity onPress={() => openEditLesson(lesson)} accessibilityLabel={`Edit ${lesson.title}`} style={{ marginRight: 4 }}>
-                    <Ionicons name="create-outline" size={18} color={c.textMuted} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRemoveLesson(lesson)} accessibilityLabel={`Remove ${lesson.title}`}>
-                    <Ionicons name="trash-outline" size={18} color={c.textMuted} />
-                  </TouchableOpacity>
-                </>
-              )}
-            </TouchableOpacity>
-          ))
-        )}
+        <CustomLessonSection
+          lessons={lessons}
+          onLessonsChange={setLessons}
+          canManage={canManage}
+          api={lessonApi}
+          onOpen={(lesson) => router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: lesson.id, studyId: study.id } } as any)}
+        />
       </ScrollView>
 
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
@@ -314,62 +196,6 @@ export default function FamilyStudyDetailScreen() {
         </View>
       </Modal>
 
-      <Modal visible={!!lessonEditor} transparent animationType="slide" onRequestClose={() => setLessonEditor(null)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetBox, sheetWidth, styles.lessonSheetBox, { paddingBottom: insets.bottom + 20 }]}>
-            <ScrollView>
-              <Text style={styles.sheetTitle}>{lessonEditor?.lesson ? "Edit Lesson" : "Add Lesson"}</Text>
-
-              <Text style={styles.fieldLabel}>Lesson Title</Text>
-              <TextInput style={styles.input} value={lessonEditor?.form.title} onChangeText={(v) => updateLessonForm({ title: v })} placeholderTextColor={c.textMuted} />
-
-              <Text style={styles.fieldLabel}>Description / Introduction</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={lessonEditor?.form.description} onChangeText={(v) => updateLessonForm({ description: v })} multiline placeholderTextColor={c.textMuted} />
-
-              <Text style={styles.fieldLabel}>Scripture (optional)</Text>
-              <View style={styles.scriptureRow}>
-                <TextInput style={[styles.input, styles.scriptureBook]} placeholder="Book" placeholderTextColor={c.textMuted} value={lessonEditor?.form.scripture.book} onChangeText={(v) => updateScripture({ book: v })} />
-                <TextInput style={[styles.input, styles.scriptureSmall]} placeholder="Ch" placeholderTextColor={c.textMuted} keyboardType="number-pad" value={lessonEditor?.form.scripture.chapter} onChangeText={(v) => updateScripture({ chapter: v })} />
-              </View>
-              <View style={styles.scriptureRow}>
-                <TextInput style={[styles.input, styles.scriptureSmall]} placeholder="Start v" placeholderTextColor={c.textMuted} keyboardType="number-pad" value={lessonEditor?.form.scripture.startVerse} onChangeText={(v) => updateScripture({ startVerse: v })} />
-                <TextInput style={[styles.input, styles.scriptureSmall]} placeholder="End v" placeholderTextColor={c.textMuted} keyboardType="number-pad" value={lessonEditor?.form.scripture.endVerse} onChangeText={(v) => updateScripture({ endVerse: v })} />
-                <TextInput style={[styles.input, styles.scriptureSmall]} placeholder="NIV" placeholderTextColor={c.textMuted} value={lessonEditor?.form.scripture.translation} onChangeText={(v) => updateScripture({ translation: v })} />
-              </View>
-
-              <Text style={styles.fieldLabel}>Teaching / Study Material</Text>
-              <TextInput style={[styles.input, { minHeight: 90 }]} value={lessonEditor?.form.teachingMaterial} onChangeText={(v) => updateLessonForm({ teachingMaterial: v })} multiline placeholderTextColor={c.textMuted} />
-
-              <Text style={styles.fieldLabel}>Discussion Questions</Text>
-              {lessonEditor?.form.questions.map((q, i) => (
-                <View key={i} style={styles.questionRow}>
-                  <TextInput style={[styles.input, { flex: 1 }]} value={q} onChangeText={(v) => updateQuestion(i, v)} placeholder={`Question ${i + 1}`} placeholderTextColor={c.textMuted} />
-                  <TouchableOpacity onPress={() => removeQuestionField(i)} accessibilityLabel="Remove question"><Ionicons name="close-circle" size={20} color={c.textMuted} /></TouchableOpacity>
-                </View>
-              ))}
-              <TouchableOpacity style={styles.addQuestionBtn} onPress={addQuestionField}>
-                <Ionicons name="add" size={14} color={c.accentGreen} />
-                <Text style={styles.addQuestionText}>Add question</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.fieldLabel}>Prayer Focus (optional)</Text>
-              <TextInput style={[styles.input, { minHeight: 50 }]} value={lessonEditor?.form.prayerFocus} onChangeText={(v) => updateLessonForm({ prayerFocus: v })} multiline placeholderTextColor={c.textMuted} />
-
-              <Text style={styles.fieldLabel}>Media — YouTube video ID (optional)</Text>
-              <TextInput style={styles.input} value={lessonEditor?.form.mediaId} onChangeText={(v) => updateLessonForm({ mediaId: v })} placeholderTextColor={c.textMuted} autoCapitalize="none" />
-
-              <View style={styles.sheetRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setLessonEditor(null)} disabled={savingLesson}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveLesson} disabled={savingLesson || !lessonEditor?.form.title.trim()}>
-                  {savingLesson ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save Lesson</Text>}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

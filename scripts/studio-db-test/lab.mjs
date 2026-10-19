@@ -167,6 +167,8 @@ import churches from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churc
 import familyWorship from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyWorship.ts")))};
 import search from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/search.ts")))};
 import groupLearning from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/groupLearning.ts")))};
+import familyStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyStudies.ts")))};
+import churchStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchStudies.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -183,6 +185,8 @@ app.use("/api", churches);
 app.use("/api/family", familyWorship);
 app.use("/api/search", search);
 app.use("/api/learning", groupLearning);
+app.use("/api/family", familyStudies);
+app.use("/api", churchStudies);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

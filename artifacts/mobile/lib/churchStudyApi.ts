@@ -36,13 +36,16 @@ export interface ChurchStudyLesson {
   scriptureReferences: unknown[]; teachingMaterial: string | null;
   questions: unknown[]; prayerFocus: string | null; media: CustomStudyMedia | null;
   orderIndex: number; createdAt: string; updatedAt: string;
+  // Authoring (migration 200): per-lesson status, version, tags, links.
+  status?: "draft" | "published" | "archived"; publishedAt?: string | null; version?: number;
+  tags?: string[]; resources?: { title: string; url: string }[];
 }
 
 export function getChurchStudies(churchId: string): Promise<ChurchStudy[]> {
   return authedFetch(`/churches/${churchId}/studies`);
 }
 
-export function getChurchStudy(studyId: string): Promise<{ study: ChurchStudy; lessons: ChurchStudyLesson[] }> {
+export function getChurchStudy(studyId: string): Promise<{ study: ChurchStudy; lessons: ChurchStudyLesson[]; canManage?: boolean }> {
   return authedFetch(`/churches/studies/${studyId}`);
 }
 
@@ -66,6 +69,7 @@ export function addChurchStudyLesson(
   lesson: {
     title: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
     questions?: unknown[]; prayerFocus?: string | null; orderIndex?: number; media?: CustomStudyMedia | null;
+    tags?: string[]; resources?: { title: string; url: string }[]; status?: "published";
   }
 ): Promise<ChurchStudyLesson> {
   return authedFetch(`/churches/studies/${studyId}/lessons`, { method: "POST", body: JSON.stringify(lesson) });
@@ -77,6 +81,7 @@ export function updateChurchStudyLesson(
   updates: {
     title?: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
     questions?: unknown[]; prayerFocus?: string | null; media?: CustomStudyMedia | null; orderIndex?: number;
+    tags?: string[]; resources?: { title: string; url: string }[];
   }
 ): Promise<ChurchStudyLesson> {
   return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}`, { method: "PUT", body: JSON.stringify(updates) });
@@ -84,4 +89,9 @@ export function updateChurchStudyLesson(
 
 export function removeChurchStudyLesson(studyId: string, lessonId: string): Promise<{ removed: true }> {
   return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}`, { method: "DELETE" });
+}
+
+// Draft / published / archived for one lesson (leaders only; server-enforced).
+export function setChurchStudyLessonStatus(studyId: string, lessonId: string, status: "draft" | "published" | "archived"): Promise<ChurchStudyLesson> {
+  return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}/status`, { method: "POST", body: JSON.stringify({ status }) });
 }

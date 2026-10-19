@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
+import { passageLabel, readPassages, readQuestions } from "@/lib/customLessonModel";
 
 // Stage 1 forensic finding: this app does not actually have one "Study
 // Workspace" screen today — app/lesson/[id].tsx (P2P Curriculum, deeply
@@ -29,6 +30,9 @@ export interface CustomLessonContent {
   questions?: unknown[];
   prayerFocus?: string | null;
   media?: { provider: string; id: string; url: string | null } | null;
+  resources?: { title: string; url: string }[];
+  tags?: string[];
+  status?: "draft" | "published" | "archived";
 }
 
 function scriptureLabel(ref: any): string {
@@ -37,27 +41,41 @@ function scriptureLabel(ref: any): string {
   return `${ref.book} ${ref.chapter}:${range}${ref.translation ? ` (${ref.translation})` : ""}`;
 }
 
+// Members only ever receive published lessons; a leader opening a draft or
+// archived lesson sees it here as a clearly marked preview.
 export function CustomLessonViewer({ lesson }: { lesson: CustomLessonContent }) {
-  const scripture = lesson.scriptureReferences?.[0];
-  const questions = (lesson.questions as string[] | undefined)?.filter(Boolean) ?? [];
+  const passages = readPassages(lesson.scriptureReferences);
+  const questions = readQuestions(lesson.questions);
+  const discussion = questions.filter((q) => q.kind === "discussion");
+  const reflection = questions.filter((q) => q.kind === "reflection");
+  const links = (lesson.resources ?? []).filter((r) => /^https:\/\//i.test(r.url));
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {lesson.status && lesson.status !== "published" && (
+        <View style={styles.previewBanner} accessibilityRole="alert">
+          <Ionicons name={lesson.status === "draft" ? "eye-outline" : "archive-outline"} size={14} color="#7A4B00" />
+          <Text style={styles.previewText}>{lesson.status === "draft" ? "Draft preview — members can't see this yet" : "Archived — members can't see this"}</Text>
+        </View>
+      )}
+      <Text style={styles.ownerNote}>Custom lesson — not official P2P curriculum</Text>
       <Text style={styles.title}>{lesson.title}</Text>
       {!!lesson.description && <Text style={styles.description}>{lesson.description}</Text>}
+      {!!lesson.tags?.length && <Text style={styles.tags}>{lesson.tags.map((t) => `#${t}`).join("  ")}</Text>}
 
-      {!!scripture && (
+      {passages.map((p, i) => (
         <TouchableOpacity
-          style={styles.scriptureCard}
-          onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureLabel(scripture))}`).catch(() => {})}
+          key={`${p.book}-${p.chapter}-${p.startVerse}-${i}`}
+          style={[styles.scriptureCard, i > 0 && styles.scriptureCardMinor]}
+          onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(passageLabel(p))}`).catch(() => {})}
           accessibilityRole="link"
-          accessibilityLabel={`Open ${scriptureLabel(scripture)} on Bible.com`}
+          accessibilityLabel={`${i === 0 ? "Main passage" : "Passage"} ${passageLabel(p)}, opens Bible.com`}
         >
           <Ionicons name="book" size={16} color={colors.accentGreen} />
-          <Text style={styles.scriptureText}>{scriptureLabel(scripture)}</Text>
+          <Text style={styles.scriptureText}>{passageLabel(p)}</Text>
           <Ionicons name="open-outline" size={14} color={colors.textMuted} />
         </TouchableOpacity>
-      )}
+      ))}
 
       {!!lesson.media && lesson.media.provider === "youtube" && (
         <View style={styles.mediaWrap}>
@@ -80,13 +98,26 @@ export function CustomLessonViewer({ lesson }: { lesson: CustomLessonContent }) 
         </View>
       )}
 
-      {questions.length > 0 && (
+      {discussion.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>DISCUSSION QUESTIONS</Text>
-          {questions.map((q, i) => (
-            <View key={i} style={styles.questionRow}>
+          {discussion.map((q, i) => (
+            <View key={q.id ?? i} style={styles.questionRow}>
               <Text style={styles.questionNumber}>{i + 1}</Text>
-              <Text style={styles.questionText}>{q}</Text>
+              <Text style={styles.questionText}>{q.text}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {reflection.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>REFLECTION QUESTIONS</Text>
+          <Text style={styles.sectionNote}>For personal reflection.</Text>
+          {reflection.map((q, i) => (
+            <View key={q.id ?? i} style={styles.questionRow}>
+              <Text style={styles.questionNumber}>{i + 1}</Text>
+              <Text style={styles.questionText}>{q.text}</Text>
             </View>
           ))}
         </View>
@@ -96,6 +127,19 @@ export function CustomLessonViewer({ lesson }: { lesson: CustomLessonContent }) 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>🙏 PRAYER FOCUS</Text>
           <Text style={styles.bodyText}>{lesson.prayerFocus}</Text>
+        </View>
+      )}
+
+      {links.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>LINKS & RESOURCES</Text>
+          {links.map((r, i) => (
+            <TouchableOpacity key={`${r.url}-${i}`} style={styles.linkRow} onPress={() => Linking.openURL(r.url).catch(() => {})} accessibilityRole="link" accessibilityLabel={`${r.title}, opens in browser`}>
+              <Ionicons name="link-outline" size={16} color={colors.accentGreen} />
+              <Text style={styles.linkText} numberOfLines={2}>{r.title}</Text>
+              <Ionicons name="open-outline" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </ScrollView>
@@ -119,4 +163,12 @@ const styles = StyleSheet.create({
   questionRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   questionNumber: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold", width: 18 },
   questionText: { flex: 1, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  previewBanner: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFF4DB", borderRadius: 10, padding: 10, marginBottom: 6 },
+  previewText: { flex: 1, color: "#7A4B00", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  ownerNote: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
+  tags: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium", marginTop: 4 },
+  scriptureCardMinor: { marginTop: 8, backgroundColor: "transparent" },
+  sectionNote: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: -4, marginBottom: 8 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderBeige },
+  linkText: { flex: 1, color: colors.textDark, fontSize: 14, fontFamily: "Inter_500Medium" },
 });
