@@ -10,6 +10,9 @@ interface Props {
   onSelect: (scripture: WorshipScripture) => void;
   // Expanded (focus) view: larger, more comfortable reading text.
   largeText?: boolean;
+  // The picker button's label. Default: sharing with the Gathering (Guide).
+  // "My Bible" uses the same picker to read on your own, without sharing.
+  selectLabel?: string;
 }
 
 const DEFAULT_LANGUAGE = "en"; // Scope limit for this pass — see ScripturePanel's report note.
@@ -19,7 +22,7 @@ const MAX_VERSE_SPAN = 29;
 // picker (not a paginated Bible-app reader) sitting inline in the
 // Gathering's Scripture mode, sharing the room's existing card/typography
 // language rather than a separate reading-app aesthetic.
-export default function ScripturePanel({ currentScripture, isGuide, onSelect, largeText = false }: Props) {
+export default function ScripturePanel({ currentScripture, isGuide, onSelect, largeText = false, selectLabel = "Share with Gathering" }: Props) {
   const sheetWidth = useSheetWidth();
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [book, setBook] = useState(currentScripture?.book ?? "Psalms");
@@ -97,8 +100,8 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect, la
             <TextInput style={styles.verseInput} value={startVerse} onChangeText={setStartVerse} keyboardType="number-pad" />
             <Text style={styles.verseDash}>–</Text>
             <TextInput style={styles.verseInput} value={endVerse} onChangeText={setEndVerse} keyboardType="number-pad" />
-            <TouchableOpacity style={styles.shareBtn} onPress={share}>
-              <Text style={styles.shareBtnText}>Share with Gathering</Text>
+            <TouchableOpacity style={styles.shareBtn} onPress={share} accessibilityRole="button" accessibilityLabel={selectLabel}>
+              <Text style={styles.shareBtnText}>{selectLabel}</Text>
             </TouchableOpacity>
           </View>
 

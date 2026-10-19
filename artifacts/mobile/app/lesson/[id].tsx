@@ -38,6 +38,8 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
 import ReadableText from "@/components/ReadableText";
+import GatheringReturnBar from "@/components/family/GatheringReturnBar";
+import { useActiveGathering } from "@/lib/activeGathering";
 
 interface LessonContent {
   title: string;
@@ -472,6 +474,9 @@ export default function LessonScreen() {
   const { t } = useTranslation();
   const styles = makeStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Opened from a live Family Gathering: its call keeps running underneath.
+  // A second (1:1 "Study Together") call must not start on top of it.
+  const activeGathering = useActiveGathering();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { readingMaxWidth } = useLayout();
@@ -781,6 +786,7 @@ export default function LessonScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
         <Stack.Screen options={{ headerShown: false }} />
+        <GatheringReturnBar />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
@@ -803,6 +809,7 @@ export default function LessonScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
+      <GatheringReturnBar />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
@@ -953,7 +960,7 @@ export default function LessonScreen() {
             )
           )}
 
-          {lessonMeta && (
+          {lessonMeta && !activeGathering && (
             <TouchableOpacity
               style={styles.studyTogetherCard}
               onPress={() => setStudyPickerOpen(true)}

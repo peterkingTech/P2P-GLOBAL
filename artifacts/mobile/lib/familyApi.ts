@@ -158,6 +158,27 @@ export interface WorshipSession {
   participants?: { user_id: string; joined_at: string; camera_on: boolean; mic_on: boolean; presence_status: string }[];
   currentFocusPrayerRequestId: string | null;
   lessonId: string | null;
+  /** The family's own lesson (migration 202). At most one of lessonId / familyLessonId is set. */
+  familyLessonId?: string | null;
+  /** Resolved title of the Gathering's lesson; sent with GET and with lesson changes. */
+  lesson?: GatheringLessonRef | null;
+}
+
+export interface GatheringLessonRef { kind: "central" | "family"; id: string; title: string; studyId: string | null }
+
+/** The Gathering's lesson to follow along: content only, never anyone's answers. */
+export interface GatheringLesson {
+  kind: "central" | "family"; id: string; title: string; context: string | null; studyId: string | null;
+  description: string | null;
+  sections: { title: string | null; content: string }[];
+  scripture: { book: string; chapter: number; startVerse: number; endVerse: number; translation: string | null }[];
+  questions: { id: string; text: string; kind: "discussion" | "reflection" }[];
+  prayerFocus: string | null;
+  media: { provider: string; id: string; url: string | null } | null;
+  resources: { title: string; url: string }[];
+}
+export function getGatheringLesson(sessionId: string): Promise<{ lesson: GatheringLesson | null }> {
+  return authedFetch(`/family/worship/sessions/${sessionId}/lesson`);
 }
 
 export function formatScriptureReference(s: WorshipScripture): string {
@@ -193,7 +214,7 @@ export function updateWorshipState(sessionId: string, patch: {
   status?: string; currentMode?: WorshipMode; mediaProvider?: SharedMediaProvider | null;
   mediaType?: "video" | "audio" | null; mediaId?: string | null; mediaUrl?: string | null;
   isPlaying?: boolean; positionMs?: number; playbackRate?: number; currentScripture?: WorshipScripture | null;
-  focusPrayerRequestId?: string | null; lessonId?: string | null;
+  focusPrayerRequestId?: string | null; lessonId?: string | null; familyLessonId?: string | null;
 }): Promise<WorshipSession> {
   return authedFetch(`/family/worship/sessions/${sessionId}/state`, { method: "PUT", body: JSON.stringify(patch) });
 }

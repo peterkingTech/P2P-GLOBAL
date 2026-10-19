@@ -28,7 +28,11 @@ import ScripturePanel from "@/components/family/ScripturePanel";
 import PrayerSpacePanel from "@/components/family/PrayerSpacePanel";
 import ShareRoomPanel from "@/components/ShareRoomPanel";
 import NotesPanel from "@/components/family/NotesPanel";
-import LessonPicker from "@/components/family/LessonPicker";
+import GatheringLessonPicker, { type LessonChoice } from "@/components/family/GatheringLessonPicker";
+import GatheringLessonPanel, { type LessonScriptureRef } from "@/components/family/GatheringLessonPanel";
+import MyBibleSheet from "@/components/family/MyBibleSheet";
+import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering";
+import type { GatheringLesson, GatheringLessonRef } from "@/lib/familyApi";
 import { useVoiceSpace } from "@/hooks/useVoiceSpace";
 import { useFocusMode } from "@/hooks/useFocusMode";
 import { Ionicons } from "@expo/vector-icons";
@@ -115,7 +119,11 @@ export default function FamilyWorshipScreen() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [notes, setNotes] = useState<WorshipNote[]>([]);
   const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
-  const [attachedLesson, setAttachedLesson] = useState<{ id: string; title: string } | null>(null);
+  const [lessonRef, setLessonRef] = useState<GatheringLessonRef | null>(null);
+  // Prompt 6 resources open for everyone, never changing what the group sees.
+  const [lessonSheetOpen, setLessonSheetOpen] = useState(false);
+  const [bibleOpen, setBibleOpen] = useState(false);
+  const [bibleStart, setBibleStart] = useState<LessonScriptureRef | WorshipScripture | null>(null);
   const [mediaShelfOpen, setMediaShelfOpen] = useState(false);
   const [queue, setQueue] = useState<WorshipQueueItem[]>([]);
   const [isBehind, setIsBehind] = useState(false);
@@ -202,6 +210,7 @@ export default function FamilyWorshipScreen() {
   const leave = useCallback(async () => {
     if (leftRef.current || !params.sessionId) return;
     leftRef.current = true;
+    clearActiveGathering(params.sessionId);
     voiceSpace.leave();
     await leaveWorshipSession(params.sessionId).catch(() => {});
     if (router.canGoBack()) router.back();
@@ -502,32 +511,72 @@ export default function FamilyWorshipScreen() {
     } catch (e: any) { showAlert("Couldn't share that passage", e.message ?? "Please try again."); }
   }
 
-  // Attaches an existing curriculum lesson to this Gathering — never writes
-  // p2p_lesson_progress or implies completion, purely a "this Gathering is
-  // about this lesson" link the Session Summary and next-Gathering
-  // continuity screens read back later (see migrations/129).
-  async function selectLesson(lessonId: string, lessonTitle: string) {
+  // Links a lesson to this Gathering (Guide-only, enforced server-side): a
+  // central lesson (Core Foundation / P2P Plan) or one of the family's own
+  // published lessons. Never writes anyone's progress or implies completion —
+  // the Session Summary and continuity screens read the link back later
+  // (migrations 129, 202). Broadcast so everyone follows the same lesson.
+  async function selectLesson(choice: LessonChoice) {
     if (!session || !isHost) return;
     try {
-      const updated = await updateWorshipState(session.id, { lessonId });
+      const updated = await updateWorshipState(session.id, choice.kind === "family" ? { familyLessonId: choice.id } : { lessonId: choice.id });
       setSession(updated);
-      setAttachedLesson({ id: lessonId, title: lessonTitle });
+      setLessonRef(updated.lesson ?? { kind: choice.kind, id: choice.id, title: choice.title, studyId: null });
+      broadcastState(updated);
       setLessonPickerOpen(false);
-    } catch (e: any) { showAlert("Couldn't attach that lesson", e.message ?? "Please try again."); }
+    } catch (e: any) { showAlert("Couldn't use that lesson", e.message ?? "Please try again."); }
   }
 
-  // Resolves a display title for a lesson attached by someone else (or
-  // still set from before this client last reloaded) — a single cheap
-  // lookup, only when the id we're showing is stale, never repeated per-tick.
+  // Keeps the lesson title in step with the session row. State updates that
+  // don't touch the lesson arrive without `lesson`; only a real change of
+  // lesson (or a reconnect) asks the server for the title.
+  const currentLessonKey = session?.familyLessonId ? `family:${session.familyLessonId}` : session?.lessonId ? `central:${session.lessonId}` : null;
   useEffect(() => {
-    if (!session?.lessonId) { setAttachedLesson(null); return; }
-    if (attachedLesson?.id === session.lessonId) return;
+    if (!currentLessonKey) { setLessonRef(null); return; }
+    if (lessonRef && `${lessonRef.kind}:${lessonRef.id}` === currentLessonKey) return;
+    if (session?.lesson && `${session.lesson.kind}:${session.lesson.id}` === currentLessonKey) { setLessonRef(session.lesson); return; }
     let cancelled = false;
-    supabase.from("p2p_lessons").select("id,title").eq("id", session.lessonId).maybeSingle().then(({ data }) => {
-      if (!cancelled && data) setAttachedLesson({ id: data.id as string, title: data.title as string });
-    });
+    getWorshipSession(params.sessionId!).then((s) => { if (!cancelled) setLessonRef(s.lesson ?? null); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [session?.lessonId, attachedLesson?.id]);
+  }, [currentLessonKey, session?.lesson, lessonRef, params.sessionId]);
+
+  // Your own lesson opens ON TOP of the Gathering: this screen stays mounted,
+  // so the call, microphone and participants are untouched. The lesson
+  // screen shows a Return bar (components/family/GatheringReturnBar).
+  function openMyLesson(lesson: GatheringLesson) {
+    if (!session) return;
+    setLessonSheetOpen(false);
+    if (lesson.kind === "family" && lesson.studyId) {
+      router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: lesson.id, studyId: lesson.studyId, g: session.id } } as any);
+    } else {
+      router.push({ pathname: "/lesson/[id]", params: { id: lesson.id, g: session.id } } as any);
+    }
+  }
+  function openMyBible(start: LessonScriptureRef | WorshipScripture | null) {
+    setBibleStart(start ?? session?.currentScripture ?? null);
+    setBibleOpen(true);
+  }
+  // The lesson's own video, through the existing Shared Media path (same
+  // permission check server-side; children never control media).
+  async function playLessonMedia(youtubeId: string) {
+    if (!session || !canControl) return;
+    try {
+      const updated = await updateWorshipState(session.id, { mediaProvider: "youtube", mediaId: youtubeId, mediaType: null, mediaUrl: null, isPlaying: true, positionMs: 0 });
+      setSession(updated);
+      broadcastState(updated);
+      setLessonSheetOpen(false);
+    } catch (e: any) { showAlert("Couldn't play the video", e.message ?? "Please try again."); }
+  }
+
+  // Lets screens opened from here show "Return to Gathering" and the same mic toggle.
+  useEffect(() => {
+    if (!session?.id) return;
+    setActiveGathering({ sessionId: session.id, voiceConnected: voiceSpace.phase === "connected", micMuted: voiceSpace.micMuted, toggleMic: voiceSpace.toggleMic });
+  }, [session?.id, voiceSpace.phase, voiceSpace.micMuted, voiceSpace.toggleMic]);
+  useEffect(() => {
+    const id = params.sessionId;
+    return () => { if (id) clearActiveGathering(id); };
+  }, [params.sessionId]);
 
   async function addPrayer(content: string, visibility: "private" | "family", scriptureReference: WorshipScripture | null) {
     if (!session) return;
@@ -640,6 +689,22 @@ export default function FamilyWorshipScreen() {
 
   const modeContent = (
     <>
+      {/* Resources anyone can open without changing what the group sees. */}
+      {!focused && (
+        <View style={styles.resourceRow}>
+          {(lessonRef || isHost) && session.currentMode !== "teaching" && (
+            <TouchableOpacity style={styles.resourceBtn} onPress={() => (lessonRef ? setLessonSheetOpen(true) : setLessonPickerOpen(true))}
+              accessibilityRole="button" accessibilityLabel={lessonRef ? `Lesson: ${lessonRef.title}. Follow along` : "Choose a lesson"}>
+              <Ionicons name="school-outline" size={16} color={colors.light} />
+              <Text style={styles.resourceText} numberOfLines={1}>{lessonRef ? lessonRef.title : "Choose Lesson"}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.resourceBtn} onPress={() => openMyBible(null)} accessibilityRole="button" accessibilityLabel="My Bible. Read on your own; the group's passage doesn't change">
+            <Ionicons name="book-outline" size={16} color={colors.light} />
+            <Text style={styles.resourceText}>My Bible</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {session.currentMode === "worship" && (
         <View style={[styles.panel, focused === "media" && [styles.panelFocused, { minHeight: focusMinHeight, justifyContent: "center" }]]}>
           <View style={styles.panelLabelRow}>
@@ -697,14 +762,11 @@ export default function FamilyWorshipScreen() {
             </View>
           </View>
           <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
-          <View style={styles.lessonRow}>
-            <Text style={styles.lessonRowLabel}>Lesson: {attachedLesson?.title ?? "None selected"}</Text>
-            {isHost && (
-              <TouchableOpacity onPress={() => setLessonPickerOpen(true)} accessibilityRole="button" accessibilityLabel="Choose Lesson">
-                <Text style={styles.shelfLink}>Choose Lesson</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <GatheringLessonPanel
+            sessionId={session.id} lessonRef={lessonRef} isGuide={isHost} onChoose={() => setLessonPickerOpen(true)}
+            onOpenMine={openMyLesson} onOpenPassage={openMyBible} onPlayMedia={canControl ? playLessonMedia : null}
+            largeText={focused === "workspace"}
+          />
           <ScripturePanel currentScripture={session.currentScripture} isGuide={isHost} onSelect={selectScripture} largeText={focused === "workspace"} />
           {(session.mediaId || canControl) && <SharedMedia {...sharedMediaProps} />}
         </View>
@@ -759,7 +821,7 @@ export default function FamilyWorshipScreen() {
         <FocusBar
           title={focused === "media" ? "Media" : focused === "bible" ? "Bible" : "Study Workspace"}
           subtitle={focused === "bible" || focused === "workspace"
-            ? (session.currentScripture ? formatScriptureReference(session.currentScripture) : attachedLesson?.title ?? null)
+            ? (session.currentScripture ? formatScriptureReference(session.currentScripture) : lessonRef?.title ?? null)
             : null}
           onDone={focusMode.exit}
           mic={{ connected: voiceSpace.phase === "connected", muted: voiceSpace.micMuted, onToggle: voiceSpace.toggleMic }}
@@ -903,11 +965,28 @@ export default function FamilyWorshipScreen() {
         onDelete={deleteNote}
       />
 
-      <LessonPicker
+      <GatheringLessonPicker
         visible={lessonPickerOpen}
         onClose={() => setLessonPickerOpen(false)}
+        familyId={session.familyId}
         onSelect={selectLesson}
       />
+
+      <Modal visible={lessonSheetOpen} animationType="slide" onRequestClose={() => setLessonSheetOpen(false)}>
+        <View style={styles.screen}>
+          <FocusBar title="Lesson" subtitle="Following along together" onDone={() => setLessonSheetOpen(false)}
+            mic={{ connected: voiceSpace.phase === "connected", muted: voiceSpace.micMuted, onToggle: voiceSpace.toggleMic }}
+            topInset={insets.top} />
+          <ScrollView contentContainerStyle={styles.scroll}>
+            <GatheringLessonPanel
+              sessionId={session.id} lessonRef={lessonRef} isGuide={isHost} onChoose={() => { setLessonSheetOpen(false); setLessonPickerOpen(true); }}
+              onOpenMine={openMyLesson} onOpenPassage={(r) => { setLessonSheetOpen(false); openMyBible(r); }} onPlayMedia={canControl ? playLessonMedia : null}
+            />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <MyBibleSheet visible={bibleOpen} onClose={() => setBibleOpen(false)} start={bibleStart} />
     </View>
   );
 }
@@ -928,8 +1007,9 @@ const styles = StyleSheet.create({
   expandBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, minWidth: 44, justifyContent: "center" },
   shelfLink: { color: colors.connection, ...type.caption, fontFamily: "Inter_600SemiBold" },
   silentHint: { color: colors.textSecondary, ...type.body, marginTop: spacing.xs },
-  lessonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm },
-  lessonRowLabel: { color: colors.textSecondary, ...type.caption, flex: 1, marginRight: spacing.sm },
+  resourceRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  resourceBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, maxWidth: "100%", paddingHorizontal: 14, borderRadius: 22, backgroundColor: colors.surfaceRaised, flexShrink: 1 },
+  resourceText: { color: colors.textPrimary, fontSize: 14, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
 
   companionsLabel: { color: colors.textTertiary, ...type.label, marginBottom: spacing.sm },
   companionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

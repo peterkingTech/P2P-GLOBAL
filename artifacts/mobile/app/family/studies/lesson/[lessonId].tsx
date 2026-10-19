@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { getFamilyStudy, type FamilyStudyLesson } from "@/lib/familyStudyApi";
 import { CustomLessonViewer } from "@/components/study/CustomLessonViewer";
 import LessonWork from "@/components/study/LessonWork";
+import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -47,6 +48,8 @@ export default function FamilyCustomLessonScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12, backgroundColor: c.lightCream }]}>
       <Stack.Screen options={{ headerShown: false }} />
+      {/* Opened from a live Gathering: return to it (the call keeps running). */}
+      <GatheringReturnBar />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />

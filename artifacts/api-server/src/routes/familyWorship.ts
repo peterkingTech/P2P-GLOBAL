@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { logger } from "../lib/logger";
 import { getActiveJourney, summarizeJourney } from "../lib/groupLearning";
+import { supportsFamilyLessons, loadFamilyLessonForGathering, gatheringLessonRef, gatheringLessonView } from "../lib/gatheringLesson";
 
 const router = Router();
 
@@ -63,6 +64,7 @@ function mapSession(row: Record<string, unknown>) {
     autoAdvance: row.auto_advance ?? false,
     currentFocusPrayerRequestId: row.current_focus_prayer_request_id ?? null,
     lessonId: row.lesson_id ?? null,
+    familyLessonId: row.family_lesson_id ?? null,
   };
 }
 
@@ -236,7 +238,21 @@ router.get("/worship/sessions/:sessionId", async (req, res) => {
 
   const { data: participants } = await db
     .from("p2p_family_worship_participants").select("user_id,joined_at,camera_on,mic_on,presence_status").eq("session_id", session.id).is("left_at", null);
-  return ok(res, { ...mapSession(session as Record<string, unknown>), participants: participants ?? [] });
+  const lesson = await gatheringLessonRef(session as Record<string, unknown>);
+  return ok(res, { ...mapSession(session as Record<string, unknown>), lesson, participants: participants ?? [] });
+});
+
+// GET /family/worship/sessions/:sessionId/lesson — the Gathering's lesson to
+// follow along (any member, including a late joiner): lesson text,
+// Scripture references and questions, read from the source tables. Never
+// anyone's answers; nothing is copied into the session.
+router.get("/worship/sessions/:sessionId/lesson", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { session, isMember } = await getSessionAndCheckMembership(req.params.sessionId, userId);
+  if (!session) return err(res, "Session not found", 404);
+  if (!isMember) return err(res, "You're not a member of this Family Gathering", 403);
+  return ok(res, { lesson: await gatheringLessonView(session as Record<string, unknown>) });
 });
 
 // POST /family/worship/sessions/:sessionId/join
@@ -333,7 +349,7 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   // same category as mode/Scripture/Prayer-focus — never gated by Media
   // Permissions. This only links to the existing curriculum's lesson id;
   // it never writes p2p_lesson_progress or implies completion.
-  const bodyHasLessonChange = req.body?.lessonId !== undefined;
+  const bodyHasLessonChange = req.body?.lessonId !== undefined || req.body?.familyLessonId !== undefined;
   if (bodyHasLessonChange && session.host_id !== userId) {
     return err(res, "Only the current Guide can attach a lesson", 403);
   }
@@ -352,6 +368,7 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
     currentScripture?: { translation?: string; translationName?: string; book?: string; chapter?: number; startVerse?: number; endVerse?: number } | null;
     focusPrayerRequestId?: string | null;
     lessonId?: string | null;
+    familyLessonId?: string | null;
   };
 
   if (body.currentScripture !== undefined && body.currentScripture !== null) {
@@ -363,6 +380,17 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   // resolved here (not just FK-validated) so the friendly title can be
   // logged in the session timeline without a second round trip.
   let attachedLessonTitle: string | null = null;
+  // One lesson per Gathering: a central lesson (Core Foundation / P2P Plan)
+  // or one of this family's own published lessons (migration 202).
+  if (body.lessonId && body.familyLessonId) return err(res, "Choose one lesson");
+  if (body.familyLessonId !== undefined && !supportsFamilyLessons(session as Record<string, unknown>)) {
+    return err(res, "Family lessons can't be used in a Gathering yet", 503);
+  }
+  if (bodyHasLessonChange && body.familyLessonId) {
+    const found = await loadFamilyLessonForGathering(session.family_id as string, body.familyLessonId);
+    if (found.error !== undefined) return err(res, found.error, found.error.startsWith("Only") ? 400 : 404);
+    attachedLessonTitle = found.lesson.title as string;
+  }
   if (bodyHasLessonChange && body.lessonId) {
     const { data: lesson } = await db.from("p2p_lessons").select("id,title,status").eq("id", body.lessonId).maybeSingle();
     if (!lesson || lesson.status !== "published") return err(res, "That lesson wasn't found", 404);
@@ -397,7 +425,10 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (body.currentScripture !== undefined) update.current_scripture = body.currentScripture;
   if (body.playbackRate !== undefined) update.playback_rate = body.playbackRate;
   if (bodyHasPrayerFocusChange) update.current_focus_prayer_request_id = body.focusPrayerRequestId;
-  if (bodyHasLessonChange) update.lesson_id = body.lessonId;
+  if (bodyHasLessonChange) {
+    update.lesson_id = body.lessonId ?? null;
+    if (supportsFamilyLessons(session as Record<string, unknown>)) update.family_lesson_id = body.familyLessonId ?? null;
+  }
 
   // Any play/pause/seek/media-change re-anchors the server clock: position
   // and "now" move together, so every client recomputes from the same
@@ -421,11 +452,14 @@ router.put("/worship/sessions/:sessionId/state", async (req, res) => {
   if (body.mediaId && (body.mediaProvider !== undefined || body.mediaId !== session.media_id)) {
     await logSessionEvent(session.id as string, session.family_id as string, "media_played", { provider: body.mediaProvider ?? session.media_provider, id: body.mediaId });
   }
-  if (bodyHasLessonChange && body.lessonId) {
-    await logSessionEvent(session.id as string, session.family_id as string, "lesson_attached", { lessonId: body.lessonId, lessonTitle: attachedLessonTitle });
+  if (bodyHasLessonChange && (body.lessonId || body.familyLessonId)) {
+    await logSessionEvent(session.id as string, session.family_id as string, "lesson_attached", body.familyLessonId
+      ? { familyLessonId: body.familyLessonId, lessonTitle: attachedLessonTitle }
+      : { lessonId: body.lessonId, lessonTitle: attachedLessonTitle });
   }
 
-  return ok(res, mapSession(updated as Record<string, unknown>));
+  const mapped = mapSession(updated as Record<string, unknown>);
+  return ok(res, bodyHasLessonChange ? { ...mapped, lesson: await gatheringLessonRef(updated as Record<string, unknown>) } : mapped);
 });
 
 // POST /family/worship/sessions/:sessionId/transfer-host — { newHostId } —
@@ -653,6 +687,8 @@ async function endSessionInternal(session: Record<string, unknown>) {
     prayer_request_count: prayerRequestCount ?? 0, notes_count: notesCount ?? 0,
     guide_id: session.host_id ?? null, started_at: session.started_at ?? null, ended_at: endedAt.toISOString(),
     lesson_id: session.lesson_id ?? null,
+    // Only once migration 202 is live (the key would fail before it).
+    ...(session.family_lesson_id ? { family_lesson_id: session.family_lesson_id } : {}),
   }).select().single();
   if (historyError) {
     logger.error({ sessionId: session.id, err: historyError }, "Failed to write worship history/summary row on session end");
@@ -704,8 +740,17 @@ router.get("/worship/history", async (req, res) => {
     const { data: lessonRows } = await db.from("p2p_lessons").select("id,title").in("id", lessonIds);
     for (const l of lessonRows ?? []) titleByLessonId.set(l.id as string, l.title as string);
   }
+  // The family's own lessons (migration 202) — same single batched lookup.
+  const familyLessonIds = Array.from(new Set(rows.map((r) => r.family_lesson_id as string | null | undefined).filter((id): id is string => !!id)));
+  if (familyLessonIds.length) {
+    const { data: lessonRows } = await db.from("p2p_family_study_lessons").select("id,title").in("id", familyLessonIds);
+    for (const l of lessonRows ?? []) titleByLessonId.set(l.id as string, l.title as string);
+  }
 
-  return ok(res, rows.map((r) => ({ ...r, lesson_title: r.lesson_id ? titleByLessonId.get(r.lesson_id as string) ?? null : null })));
+  return ok(res, rows.map((r) => {
+    const id = (r.lesson_id ?? r.family_lesson_id) as string | null | undefined;
+    return { ...r, lesson_title: id ? titleByLessonId.get(id) ?? null : null };
+  }));
 });
 
 // GET /family/worship/history/:historyId — the full Session Summary. Family

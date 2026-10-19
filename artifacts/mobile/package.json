@@ -15,7 +15,7 @@
     "test:app-version": "node tests/appVersionPolicy.test.mjs",
     "test:studio-ui": "node tests/studioUi.test.mjs",
     "test:admin-shell": "node tests/adminShell.test.mjs",
-    "test:release": "npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts && npm run -s test:studio-ui && npm run -s test:admin-shell && npm run -s test:wins-moderation && npm run -s test:family-members && npm run -s test:notifications && npm run -s test:voice && npm run -s test:qr && npm run -s test:ios-sender-photos && npm run -s test:calls && npm run -s test:family-hub && npm run -s test:focus && npm run -s test:learning && npm run -s test:custom-lessons && npm run -s test:lesson-work",
+    "test:release": "npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts && npm run -s test:studio-ui && npm run -s test:admin-shell && npm run -s test:wins-moderation && npm run -s test:family-members && npm run -s test:notifications && npm run -s test:voice && npm run -s test:qr && npm run -s test:ios-sender-photos && npm run -s test:calls && npm run -s test:family-hub && npm run -s test:focus && npm run -s test:learning && npm run -s test:custom-lessons && npm run -s test:lesson-work && npm run -s test:gathering-learning",
     "test:wins-moderation": "node tests/winsModeration.test.mjs",
     "test:family-members": "node tests/familyMembers.test.mjs",
     "test:notifications": "node tests/notifications.test.mjs",
@@ -27,7 +27,8 @@
     "test:focus": "node tests/focusMode.test.mjs",
     "test:learning": "node tests/groupLearning.test.mjs",
     "test:custom-lessons": "node tests/customLessons.test.mjs",
-    "test:lesson-work": "node tests/lessonWork.test.mjs"
+    "test:lesson-work": "node tests/lessonWork.test.mjs",
+    "test:gathering-learning": "node tests/gatheringLearning.test.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
