@@ -198,6 +198,10 @@ export function pathForNotification(
   const familyId = typeof data?.familyId === "string" && /^[0-9a-f-]{36}$/i.test(data.familyId) ? data.familyId : null;
   if (notificationType === "family_join_request" && familyId) return `/family/members?familyId=${familyId}`;
   if (notificationType === "family_join_approved" && familyId) return `/family/${familyId}`;
+  // Custom lesson assignment reviewed / returned → that assignment.
+  const assignmentId = typeof data?.assignmentId === "string" && /^[0-9a-f-]{36}$/i.test(data.assignmentId) ? data.assignmentId : null;
+  const workScope = data?.scope === "family" || data?.scope === "church" ? data.scope : null;
+  if (notificationType === "assignment_reviewed" && assignmentId && workScope) return `/learning/assignment/${assignmentId}?s=${workScope}`;
   // Missed call — the thread holds the missed-call card (tap to call back);
   // history covers a call with no conversation.
   if (notificationType === "missed_call") {

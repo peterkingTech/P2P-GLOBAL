@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { getChurchStudy, type ChurchStudyLesson } from "@/lib/churchStudyApi";
 import { CustomLessonViewer } from "@/components/study/CustomLessonViewer";
+import LessonWork from "@/components/study/LessonWork";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -59,7 +60,7 @@ export default function ChurchCustomLessonScreen() {
       ) : !lesson ? (
         <View style={styles.centerFill}><Text style={styles.emptyText}>This lesson is not available.</Text></View>
       ) : (
-        <CustomLessonViewer lesson={lesson} />
+        <CustomLessonViewer lesson={lesson} footer={<LessonWork scope="church" lessonId={lesson.id} questions={lesson.questions} />} />
       )}
     </View>
   );

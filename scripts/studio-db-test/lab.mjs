@@ -32,6 +32,7 @@ export function makeTranslator(db, role, uid = null) {
         if (op === "in") { params.push(v); return `${c} = any($${params.length})`; }
         if (op === "notin") { params.push(v); return `not (${c} = any($${params.length}))`; }
         if (op === "is") return `${c} is ${v === null ? "null" : v ? "true" : "false"}`;
+        if (op === "notnull") return `${c} is not null`;
         if (op === "or") return "(" + v.map(([o, col, val]) => { params.push(val); return `${col} ${{ eq: "=", neq: "<>", ilike: "ilike", like: "like" }[o]} $${params.length}`; }).join(" or ") + ")";
         params.push(v);
         const sqlOp = { eq: "=", neq: "<>", gte: ">=", lt: "<", lte: "<=", gt: ">", ilike: "ilike", like: "like" }[op];
@@ -84,7 +85,7 @@ export function makeTranslator(db, role, uid = null) {
         eq(k, v) { q.filters.push(["eq", k, v]); return c; },
         neq(k, v) { q.filters.push(["neq", k, v]); return c; },
         in(k, v) { q.filters.push(["in", k, v]); return c; },
-        not(k, op, v) { if (op !== "in") throw new Error("translator: only not(..., 'in', ...)"); q.filters.push(["notin", k, String(v).replace(/^\(|\)$/g, "").split(",").filter(Boolean)]); return c; },
+        not(k, op, v) { if (op === "is" && v === null) { q.filters.push(["notnull", k, null]); return c; } if (op !== "in") throw new Error("translator: only not(..., 'in' | 'is', ...)"); q.filters.push(["notin", k, String(v).replace(/^\(|\)$/g, "").split(",").filter(Boolean)]); return c; },
         gte(k, v) { q.filters.push(["gte", k, v]); return c; },
         gt(k, v) { q.filters.push(["gt", k, v]); return c; },
         lt(k, v) { q.filters.push(["lt", k, v]); return c; },
@@ -169,6 +170,7 @@ import search from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/search.
 import groupLearning from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/groupLearning.ts")))};
 import familyStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyStudies.ts")))};
 import churchStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchStudies.ts")))};
+import lessonWork from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/lessonWork.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -184,6 +186,7 @@ app.use("/api", push);
 app.use("/api", churches);
 app.use("/api/family", familyWorship);
 app.use("/api/search", search);
+app.use("/api/learning/work", lessonWork);
 app.use("/api/learning", groupLearning);
 app.use("/api/family", familyStudies);
 app.use("/api", churchStudies);

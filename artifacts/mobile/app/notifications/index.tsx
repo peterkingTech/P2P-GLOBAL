@@ -128,7 +128,7 @@ export default function NotificationsScreen() {
     }
     // Family Circle join request / approval (invite links) — same
     // destination as tapping the push.
-    if (n.notificationType === "family_join_request" || n.notificationType === "family_join_approved") {
+    if (n.notificationType === "family_join_request" || n.notificationType === "family_join_approved" || n.notificationType === "assignment_reviewed") {
       const path = pathForNotification(n.notificationType, n.data);
       if (path !== "/notifications") router.push(path as any);
       return;

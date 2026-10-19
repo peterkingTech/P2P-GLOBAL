@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getFamilyStudy, type FamilyStudyLesson } from "@/lib/familyStudyApi";
 import { CustomLessonViewer } from "@/components/study/CustomLessonViewer";
+import LessonWork from "@/components/study/LessonWork";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -59,7 +60,7 @@ export default function FamilyCustomLessonScreen() {
       ) : !lesson ? (
         <View style={styles.centerFill}><Text style={{ fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" }}>This lesson is not available.</Text></View>
       ) : (
-        <CustomLessonViewer lesson={lesson} />
+        <CustomLessonViewer lesson={lesson} footer={<LessonWork scope="family" lessonId={lesson.id} questions={lesson.questions} />} />
       )}
     </View>
   );

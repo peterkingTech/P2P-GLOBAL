@@ -72,6 +72,7 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   circle_member_removed: "community",
   circle_leader_transfer: "community",
   circle_evaluation_resolved: "community", // migration 196 (p2p_process_circle_evaluation)
+  assignment_reviewed: "community", // routes/lessonWork.ts (custom lesson assignments)
 
   // Prayer coordination
   prayer_invitation_received: "prayer",

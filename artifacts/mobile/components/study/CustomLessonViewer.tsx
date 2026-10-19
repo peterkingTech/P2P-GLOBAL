@@ -43,7 +43,7 @@ function scriptureLabel(ref: any): string {
 
 // Members only ever receive published lessons; a leader opening a draft or
 // archived lesson sees it here as a clearly marked preview.
-export function CustomLessonViewer({ lesson }: { lesson: CustomLessonContent }) {
+export function CustomLessonViewer({ lesson, footer }: { lesson: CustomLessonContent; footer?: React.ReactNode }) {
   const passages = readPassages(lesson.scriptureReferences);
   const questions = readQuestions(lesson.questions);
   const discussion = questions.filter((q) => q.kind === "discussion");
@@ -142,6 +142,7 @@ export function CustomLessonViewer({ lesson }: { lesson: CustomLessonContent }) 
           ))}
         </View>
       )}
+      {footer}
     </ScrollView>
   );
 }
