@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } 
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, type } from "@/lib/togetherTheme";
 import { getGatheringLesson, type GatheringLesson, type GatheringLessonRef } from "@/lib/familyApi";
+import { getChurchCallLesson } from "@/lib/churchCallApi";
 
 export type LessonScriptureRef = GatheringLesson["scripture"][number];
 
@@ -12,7 +13,8 @@ export type LessonScriptureRef = GatheringLesson["scripture"][number];
 // the questions to discuss; it never shows anyone's answers. Personal answers
 // stay in each person's own lesson ("Open my lesson").
 interface Props {
-  sessionId: string;
+  /** Which Gathering: a Family Gathering session or a Church Gathering (church call). */
+  gathering: { kind: "family" | "church"; id: string };
   lessonRef: GatheringLessonRef | null;
   isGuide: boolean;
   onChoose: () => void;
@@ -27,7 +29,7 @@ export function scriptureLabel(r: LessonScriptureRef) {
   return `${r.book} ${r.chapter}:${r.startVerse === r.endVerse ? r.startVerse : `${r.startVerse}-${r.endVerse}`}`;
 }
 
-export default function GatheringLessonPanel({ sessionId, lessonRef, isGuide, onChoose, onOpenMine, onOpenPassage, onPlayMedia, largeText = false }: Props) {
+export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, onChoose, onOpenMine, onOpenPassage, onPlayMedia, largeText = false }: Props) {
   const [lesson, setLesson] = useState<GatheringLesson | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +40,12 @@ export default function GatheringLessonPanel({ sessionId, lessonRef, isGuide, on
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getGatheringLesson(sessionId)
+    (gathering.kind === "church" ? getChurchCallLesson(gathering.id) : getGatheringLesson(gathering.id))
       .then((r) => { if (!cancelled) setLesson(r.lesson); })
       .catch((e) => { if (!cancelled) setError(e.message ?? "Couldn't load the lesson."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [sessionId, lessonKey]);
+  }, [gathering.kind, gathering.id, lessonKey]);
 
   if (!lessonRef) {
     return (

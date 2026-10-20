@@ -12,9 +12,23 @@ import ShareRoomPanel from "@/components/ShareRoomPanel";
 import {
   getChurchCall, leaveChurchCall, endChurchCall, CHURCH_CALL_PURPOSE_LABELS,
   getChurchCallMessages, sendChurchCallMessage, setParticipantMicDisabled, setParticipantVideoDisabled, removeParticipant,
-  setChurchCallScripture, setChurchCallLesson, setChurchCallMedia,
+  setChurchCallScripture, setChurchCallLesson, setChurchCallChurchLesson, setChurchCallMedia,
+  setChurchCallPlayback, churchCallMediaSession,
   type ChurchCallDetail, type ChurchCallMessage, type ChurchCallParticipant,
 } from "@/lib/churchCallApi";
+// Learning inside the Church Gathering (Prompt 7) — the same components the
+// Family Gathering uses (Prompt 6), never a Church-only copy.
+import GatheringLessonPicker, { type LessonChoice } from "@/components/family/GatheringLessonPicker";
+import GatheringLessonPanel, { type LessonScriptureRef } from "@/components/family/GatheringLessonPanel";
+import MyBibleSheet from "@/components/family/MyBibleSheet";
+import ScripturePanel from "@/components/family/ScripturePanel";
+import FocusBar from "@/components/focus/FocusBar";
+// Synced Media — the Family Gathering's player and clock (migration 205), not a copy.
+import SharedMedia from "@/components/family/SharedMedia";
+import { youtubeProvider } from "@/lib/mediaProviders/youtube";
+import { computeWorshipPositionMs } from "@/lib/familyApi";
+import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering";
+import type { GatheringLesson, GatheringLessonRef, WorshipScripture } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -30,7 +44,10 @@ const REACTIONS = ["🙏", "❤️", "🙌", "🔥", "👏"];
 // signaling for instant UX, with the actually-enforced state persisted
 // server-side; see migration 131's own comments). No new signaling
 // mechanism, no new reaction/hand-raise system.
-type SignalType = "reaction" | "hand_raised" | "hand_lowered" | "mic_disabled" | "video_disabled" | "removed" | "chat_message";
+// context_changed: the host changed the lesson/passage/media/playback —
+// everyone reloads the call detail. call_ended: the host ended the Gathering —
+// everyone goes to its summary. (Older app versions ignore unknown types.)
+type SignalType = "reaction" | "hand_raised" | "hand_lowered" | "mic_disabled" | "video_disabled" | "removed" | "chat_message" | "context_changed" | "call_ended";
 interface Signal { type: SignalType; from: string; data?: any }
 
 // Church Calls' live screen — reuses the exact same Agora engine/token
@@ -73,13 +90,19 @@ export default function ChurchCallScreen() {
 
   const [toolsOpen, setToolsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [scriptureBook, setScriptureBook] = useState("");
-  const [scriptureChapter, setScriptureChapter] = useState("");
-  const [scriptureStartVerse, setScriptureStartVerse] = useState("");
-  const [scriptureEndVerse, setScriptureEndVerse] = useState("");
-  const [scriptureTranslation, setScriptureTranslation] = useState("NIV");
-  const [lessonIdInput, setLessonIdInput] = useState("");
   const [youtubeIdInput, setYoutubeIdInput] = useState("");
+  // Resources anyone can open without changing what the group sees.
+  const [lessonPickerOpen, setLessonPickerOpen] = useState(false);
+  const [lessonSheetOpen, setLessonSheetOpen] = useState(false);
+  const [passageOpen, setPassageOpen] = useState(false);
+  const [bibleOpen, setBibleOpen] = useState(false);
+  const [bibleStart, setBibleStart] = useState<LessonScriptureRef | WorshipScripture | null>(null);
+  // Synced Media (same behaviour as the Family Gathering's Media panel).
+  const [mediaUrlInput, setMediaUrlInput] = useState("");
+  const [isBehind, setIsBehind] = useState(false);
+  const [resyncNonce, setResyncNonce] = useState(0);
+  const [mediaHidden, setMediaHidden] = useState(false);
+  const [mediaExpanded, setMediaExpanded] = useState(false);
   const [savingTools, setSavingTools] = useState(false);
 
   const isHost = !!profile?.id && detail?.call.hostId === profile.id;
@@ -132,6 +155,7 @@ export default function ChurchCallScreen() {
   }, [profile?.id]);
 
   const handleLeave = useCallback(async () => {
+    if (params.callId) clearActiveGathering(params.callId);
     if (params.callId) { try { await leaveChurchCall(params.callId); } catch { /* best-effort */ } }
     if (router.canGoBack()) router.back();
     else router.replace("/church/calls" as any);
@@ -187,6 +211,14 @@ export default function ChurchCallScreen() {
             break;
           case "chat_message":
             setMessages((prev) => (prev.some((m) => m.id === payload.data.id) ? prev : [...prev, payload.data]));
+            break;
+          case "context_changed":
+            load();
+            break;
+          case "call_ended":
+            if (params.callId) clearActiveGathering(params.callId);
+            showAlert("Gathering ended", "The host ended this gathering.");
+            router.replace({ pathname: "/church/call-summary", params: { callId: params.callId } } as any);
             break;
         }
       }).subscribe((status, error) => {
@@ -307,58 +339,108 @@ export default function ChurchCallScreen() {
     } catch (e: any) { showAlert("Couldn't send message", e.message ?? "Please try again."); }
   }
 
-  async function handleAttachScripture() {
-    const chapter = parseInt(scriptureChapter, 10);
-    const startVerse = parseInt(scriptureStartVerse, 10);
-    const endVerse = scriptureEndVerse ? parseInt(scriptureEndVerse, 10) : undefined;
-    if (!scriptureBook.trim() || !chapter || !startVerse || !scriptureTranslation.trim()) {
-      showAlert("Missing details", "Book, chapter, start verse, and translation are required.");
-      return;
-    }
+  // Scripture — the host picks with the same Bible picker the Family
+  // Gathering uses; everyone then reads the shared passage in "Passage".
+  async function shareScripture(sc: WorshipScripture) {
     if (!params.callId) return;
     setSavingTools(true);
     try {
       const { scriptureReference } = await setChurchCallScripture(params.callId, {
-        book: scriptureBook.trim(), chapter, startVerse, endVerse: endVerse ?? startVerse, translation: scriptureTranslation.trim(),
+        book: sc.book, chapter: sc.chapter, startVerse: sc.startVerse, endVerse: sc.endVerse, translation: sc.translation,
       });
       setDetail((prev) => prev ? { ...prev, call: { ...prev.call, scriptureReference } } : prev);
-      showAlert("Scripture attached", `${scriptureReference.book} ${scriptureReference.chapter}:${scriptureReference.startVerse}`);
-    } catch (e: any) { showAlert("Couldn't attach Scripture", e.message ?? "Please try again."); }
+      sendSignal("context_changed");
+      showAlert("Passage shared", `${scriptureReference.book} ${scriptureReference.chapter}:${scriptureReference.startVerse}`);
+    } catch (e: any) { showAlert("Couldn't share Scripture", e.message ?? "Please try again."); }
     finally { setSavingTools(false); }
   }
-  async function handleAttachLesson() {
-    if (!params.callId || !lessonIdInput.trim()) return;
+  // Lesson — chosen from the church's journey, Core Foundation, P2P Plans or
+  // the church's own published lessons (host or pastor; checked server-side).
+  async function selectLesson(choice: LessonChoice) {
+    if (!params.callId) return;
     setSavingTools(true);
     try {
-      const { lesson } = await setChurchCallLesson(params.callId, lessonIdInput.trim());
-      setDetail((prev) => prev ? { ...prev, lesson, call: { ...prev.call, lessonId: lesson?.lessonId ?? null } } : prev);
-      showAlert("Lesson attached", lesson?.lessonTitle ?? "");
-    } catch (e: any) { showAlert("Couldn't attach lesson", e.message ?? "Please try again."); }
+      if (choice.kind === "church") await setChurchCallChurchLesson(params.callId, choice.id);
+      else await setChurchCallLesson(params.callId, choice.id);
+      setLessonPickerOpen(false);
+      await load();
+      sendSignal("context_changed");
+    } catch (e: any) { showAlert("Couldn't use that lesson", e.message ?? "Please try again."); }
     finally { setSavingTools(false); }
   }
-  async function handleAttachMedia() {
-    if (!params.callId || !youtubeIdInput.trim()) return;
+  // Media — a YouTube link (or ID) starts playing for everyone from 0; the
+  // host (or a pastor, server-side) plays/pauses/seeks through the same
+  // server clock the Family Gathering uses, so everyone stays together.
+  async function setMediaFromLink(input: string) {
+    const raw = input.trim();
+    if (!params.callId || !raw) return;
+    const videoId = youtubeProvider.matches(raw) ? youtubeProvider.extractId(raw) : /^[A-Za-z0-9_-]{11}$/.test(raw) ? raw : null;
+    if (!videoId) { showAlert("Couldn't recognize that link", "Paste a YouTube video link."); return; }
     setSavingTools(true);
     try {
-      const { media } = await setChurchCallMedia(params.callId, { provider: "youtube", id: youtubeIdInput.trim() });
-      setDetail((prev) => prev ? { ...prev, call: { ...prev.call, media } } : prev);
-      showAlert("Media attached", "");
-    } catch (e: any) { showAlert("Couldn't attach media", e.message ?? "Please try again."); }
+      await setChurchCallMedia(params.callId, { provider: "youtube", id: videoId });
+      setMediaUrlInput(""); setYoutubeIdInput(""); setMediaHidden(false);
+      await load();
+      sendSignal("context_changed");
+    } catch (e: any) { showAlert("Couldn't set media", e.message ?? "Please try again."); }
     finally { setSavingTools(false); }
   }
+  async function togglePlay() {
+    if (!params.callId || !detail) return;
+    try {
+      const positionMs = Math.max(0, computeWorshipPositionMs(churchCallMediaSession(detail.call)));
+      const call = await setChurchCallPlayback(params.callId, { isPlaying: !detail.call.isPlaying, positionMs });
+      setDetail((prev) => prev ? { ...prev, call: { ...prev.call, ...call } } : prev);
+      sendSignal("context_changed");
+    } catch (e: any) { showAlert("Couldn't update playback", e.message ?? "Please try again."); }
+  }
+  function handleReturnToLive() { setResyncNonce((n) => n + 1); setIsBehind(false); }
 
   async function handleEnd() {
     if (!params.callId) return;
     setEnding(true);
     try {
       await endChurchCall(params.callId);
-      if (router.canGoBack()) router.back();
-      else router.replace("/church/calls" as any);
+      // Everyone (including the host) lands on the Gathering's summary.
+      sendSignal("call_ended");
+      clearActiveGathering(params.callId);
+      router.replace({ pathname: "/church/call-summary", params: { callId: params.callId } } as any);
     } catch (e: any) {
       showAlert("Couldn't end the gathering", e.message ?? "Please try again.");
     } finally {
       setEnding(false);
     }
+  }
+
+  // Your own lesson opens ON TOP of this call: the screen stays mounted, so
+  // the call, mic and camera are untouched; the lesson screen's Return bar
+  // comes back here (components/family/GatheringReturnBar).
+  const toggleMuteRef = useRef(toggleMute);
+  toggleMuteRef.current = toggleMute;
+  useEffect(() => {
+    if (!params.callId || !params.channelName) return;
+    setActiveGathering({
+      sessionId: params.callId,
+      returnTo: { pathname: "/call/church", params: { callId: params.callId, channelName: params.channelName, ...(params.title ? { title: params.title } : {}) } },
+      voiceConnected: !!token, micMuted: muted || micDisabledByHost, toggleMic: () => toggleMuteRef.current(),
+    });
+  }, [params.callId, params.channelName, params.title, token, muted, micDisabledByHost]);
+  useEffect(() => {
+    const id = params.callId;
+    return () => { if (id) clearActiveGathering(id); };
+  }, [params.callId]);
+
+  function openMyLesson(lesson: GatheringLesson) {
+    setLessonSheetOpen(false);
+    if (lesson.kind === "church" && lesson.studyId) {
+      router.push({ pathname: "/church/studies/lesson/[lessonId]", params: { lessonId: lesson.id, studyId: lesson.studyId } } as any);
+    } else {
+      router.push({ pathname: "/lesson/[id]", params: { id: lesson.id } } as any);
+    }
+  }
+  function openMyBible(start: LessonScriptureRef | WorshipScripture | null) {
+    setBibleStart(start ?? (detail?.call.scriptureReference as WorshipScripture | null) ?? null);
+    setBibleOpen(true);
   }
 
   if (loading || !detail) {
@@ -382,6 +464,10 @@ export default function ChurchCallScreen() {
   const hostUid = detail.call.hostId ? uidFromUserId(detail.call.hostId) : null;
   const speakerTile = isTeaching ? allTiles.find((t) => (t.isSelf && iAmHost) || (!t.isSelf && t.uid === hostUid)) ?? allTiles[0] : null;
   const otherTiles = isTeaching && speakerTile ? allTiles.filter((t) => t !== speakerTile) : allTiles;
+  const lessonRef: GatheringLessonRef | null = detail.lessonRef
+    ?? (detail.lesson ? { kind: "central", id: detail.lesson.lessonId, title: detail.lesson.lessonTitle, studyId: null } : null);
+  const sharedPassage = detail.call.scriptureReference as WorshipScripture | null;
+  const mic = { connected: !!token, muted: muted || micDisabledByHost, onToggle: toggleMute };
 
   return (
     <View style={styles.screen}>
@@ -419,8 +505,52 @@ export default function ChurchCallScreen() {
               {detail.call.scriptureReference.endVerse !== detail.call.scriptureReference.startVerse ? `-${detail.call.scriptureReference.endVerse}` : ""} ({detail.call.scriptureReference.translation})
             </Text>
           )}
-          {detail.lesson && <Text style={styles.contextText} numberOfLines={1}>📚 {detail.lesson.lessonTitle}</Text>}
-          {detail.call.media && <Text style={styles.contextText} numberOfLines={1}>▶️ Media attached</Text>}
+          {lessonRef && <Text style={styles.contextText} numberOfLines={1}>📚 {lessonRef.title}</Text>}
+          {detail.call.media && <Text style={styles.contextText} numberOfLines={1}>▶️ {detail.call.isPlaying ? "Video playing" : "Video ready"}</Text>}
+        </View>
+      )}
+
+      {/* Resources anyone can open; the call keeps going underneath. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.resourceRow}>
+        {(lessonRef || isHost) && (
+          <TouchableOpacity style={styles.resourceBtn} onPress={() => (lessonRef ? setLessonSheetOpen(true) : setLessonPickerOpen(true))}
+            accessibilityRole="button" accessibilityLabel={lessonRef ? `Lesson: ${lessonRef.title}. Follow along` : "Choose a lesson"}>
+            <Ionicons name="school-outline" size={15} color="#B8860B" />
+            <Text style={styles.resourceText} numberOfLines={1}>{lessonRef ? "Lesson" : "Choose Lesson"}</Text>
+          </TouchableOpacity>
+        )}
+        {sharedPassage && (
+          <TouchableOpacity style={styles.resourceBtn} onPress={() => setPassageOpen(true)} accessibilityRole="button" accessibilityLabel="Read the shared passage">
+            <Ionicons name="book" size={15} color="#B8860B" />
+            <Text style={styles.resourceText}>Passage</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.resourceBtn} onPress={() => openMyBible(null)} accessibilityRole="button" accessibilityLabel="My Bible. Read on your own; the group's passage doesn't change">
+          <Ionicons name="book-outline" size={15} color="#B8860B" />
+          <Text style={styles.resourceText}>My Bible</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {detail.call.media && !mediaExpanded && (
+        <View style={styles.mediaPanel}>
+          <View style={styles.mediaHead}>
+            <Text style={styles.mediaLabel}>MEDIA</Text>
+            <TouchableOpacity onPress={() => setMediaHidden((h) => !h)} accessibilityRole="button" accessibilityLabel={mediaHidden ? "Show media" : "Hide media"} style={styles.mediaLink}>
+              <Text style={styles.mediaLinkText}>{mediaHidden ? "Show" : "Hide"}</Text>
+            </TouchableOpacity>
+            {!mediaHidden && (
+              <TouchableOpacity onPress={() => setMediaExpanded(true)} accessibilityRole="button" accessibilityLabel="Expand media to full screen" style={styles.mediaLink}>
+                <Ionicons name="expand-outline" size={15} color="#5B8DEF" />
+              </TouchableOpacity>
+            )}
+          </View>
+          {!mediaHidden && (
+            <SharedMedia
+              session={churchCallMediaSession(detail.call)} mediaVolume={1} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
+              isBehind={isBehind} onReturnToLive={handleReturnToLive} canControl={isHost}
+              urlInput={mediaUrlInput} onChangeUrlInput={setMediaUrlInput} onSetMedia={() => setMediaFromLink(mediaUrlInput)} onTogglePlay={togglePlay}
+            />
+          )}
         </View>
       )}
 
@@ -581,35 +711,61 @@ export default function ChurchCallScreen() {
             </View>
 
             <Text style={styles.toolsLabel}>Scripture</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput style={[styles.toolsInput, { flex: 2 }]} placeholder="Book" placeholderTextColor="rgba(255,255,255,0.4)" value={scriptureBook} onChangeText={setScriptureBook} />
-              <TextInput style={[styles.toolsInput, { flex: 1 }]} placeholder="Ch." placeholderTextColor="rgba(255,255,255,0.4)" value={scriptureChapter} onChangeText={setScriptureChapter} keyboardType="number-pad" />
-            </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput style={[styles.toolsInput, { flex: 1 }]} placeholder="Start verse" placeholderTextColor="rgba(255,255,255,0.4)" value={scriptureStartVerse} onChangeText={setScriptureStartVerse} keyboardType="number-pad" />
-              <TextInput style={[styles.toolsInput, { flex: 1 }]} placeholder="End verse" placeholderTextColor="rgba(255,255,255,0.4)" value={scriptureEndVerse} onChangeText={setScriptureEndVerse} keyboardType="number-pad" />
-              <TextInput style={[styles.toolsInput, { flex: 1 }]} placeholder="NIV" placeholderTextColor="rgba(255,255,255,0.4)" value={scriptureTranslation} onChangeText={setScriptureTranslation} />
-            </View>
-            <TouchableOpacity style={styles.toolsBtn} onPress={handleAttachScripture} disabled={savingTools}>
-              <Text style={styles.toolsBtnText}>Attach Scripture</Text>
-            </TouchableOpacity>
+            <ScripturePanel currentScripture={sharedPassage} isGuide onSelect={shareScripture} />
 
             <Text style={styles.toolsLabel}>Lesson</Text>
-            <Text style={styles.sheetEmpty}>Find the lesson's ID in Study Workspace, then paste it here.</Text>
-            <TextInput style={styles.toolsInput} placeholder="Lesson ID" placeholderTextColor="rgba(255,255,255,0.4)" value={lessonIdInput} onChangeText={setLessonIdInput} />
-            <TouchableOpacity style={styles.toolsBtn} onPress={handleAttachLesson} disabled={savingTools}>
-              <Text style={styles.toolsBtnText}>Attach Lesson</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolsLinkBtn} onPress={() => router.push("/curriculum" as any)}>
-              <Text style={styles.toolsLinkText}>Open Study Workspace →</Text>
+            <Text style={styles.sheetEmpty}>{lessonRef ? `Now: ${lessonRef.title}` : "No lesson chosen yet."}</Text>
+            <TouchableOpacity style={styles.toolsBtn} onPress={() => { setToolsOpen(false); setLessonPickerOpen(true); }} disabled={savingTools}
+              accessibilityRole="button" accessibilityLabel={lessonRef ? "Change lesson" : "Choose a lesson"}>
+              <Text style={styles.toolsBtnText}>{lessonRef ? "Change Lesson" : "Choose Lesson"}</Text>
             </TouchableOpacity>
 
             <Text style={styles.toolsLabel}>Media (YouTube)</Text>
-            <TextInput style={styles.toolsInput} placeholder="YouTube video ID" placeholderTextColor="rgba(255,255,255,0.4)" value={youtubeIdInput} onChangeText={setYoutubeIdInput} />
-            <TouchableOpacity style={styles.toolsBtn} onPress={handleAttachMedia} disabled={savingTools}>
-              <Text style={styles.toolsBtnText}>Attach Media</Text>
+            <TextInput style={styles.toolsInput} placeholder="Paste a YouTube link" placeholderTextColor="rgba(255,255,255,0.4)" value={youtubeIdInput} onChangeText={setYoutubeIdInput}
+              autoCapitalize="none" accessibilityLabel="YouTube link for Media" />
+            <TouchableOpacity style={styles.toolsBtn} onPress={() => { setToolsOpen(false); setMediaFromLink(youtubeIdInput); }} disabled={savingTools} accessibilityRole="button" accessibilityLabel="Play for everyone">
+              <Text style={styles.toolsBtnText}>Play for everyone</Text>
             </TouchableOpacity>
           </ScrollView>
+        </View>
+      </Modal>
+
+      <GatheringLessonPicker visible={lessonPickerOpen} onClose={() => setLessonPickerOpen(false)} scope="church" groupId={detail.call.churchId} onSelect={selectLesson} />
+
+      <Modal visible={lessonSheetOpen} animationType="slide" onRequestClose={() => setLessonSheetOpen(false)}>
+        <View style={styles.screen}>
+          <FocusBar title="Lesson" subtitle="Following along together" onDone={() => setLessonSheetOpen(false)} mic={mic} topInset={insets.top} />
+          <ScrollView contentContainerStyle={styles.sheetScroll}>
+            <GatheringLessonPanel
+              gathering={{ kind: "church", id: detail.call.id }} lessonRef={lessonRef} isGuide={isHost}
+              onChoose={() => { setLessonSheetOpen(false); setLessonPickerOpen(true); }}
+              onOpenMine={openMyLesson} onOpenPassage={(r) => { setLessonSheetOpen(false); openMyBible(r); }}
+            />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={passageOpen} animationType="slide" onRequestClose={() => setPassageOpen(false)}>
+        <View style={styles.screen}>
+          <FocusBar title="Passage" subtitle="Shared with everyone" onDone={() => setPassageOpen(false)} mic={mic} topInset={insets.top} />
+          <ScrollView contentContainerStyle={styles.sheetScroll}>
+            <ScripturePanel currentScripture={sharedPassage} isGuide={false} onSelect={() => {}} largeText />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <MyBibleSheet visible={bibleOpen} onClose={() => setBibleOpen(false)} start={bibleStart} />
+
+      <Modal visible={mediaExpanded && !!detail.call.media} animationType="fade" onRequestClose={() => setMediaExpanded(false)}>
+        <View style={[styles.screen, { justifyContent: "center" }]}>
+          <FocusBar title="Media" onDone={() => setMediaExpanded(false)} mic={mic} onOpenChat={() => { setMediaExpanded(false); setChatOpen(true); }} topInset={insets.top} />
+          <View style={{ flex: 1, justifyContent: "center", padding: 12 }}>
+            <SharedMedia
+              session={churchCallMediaSession(detail.call)} mediaVolume={1} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
+              isBehind={isBehind} onReturnToLive={handleReturnToLive} canControl={isHost}
+              urlInput={mediaUrlInput} onChangeUrlInput={setMediaUrlInput} onSetMedia={() => setMediaFromLink(mediaUrlInput)} onTogglePlay={togglePlay}
+            />
+          </View>
         </View>
       </Modal>
     </View>
@@ -664,6 +820,15 @@ const styles = StyleSheet.create({
   chatSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#1D9E75", alignItems: "center", justifyContent: "center" },
 
   contextBanner: { paddingHorizontal: 16, paddingBottom: 8, gap: 2 },
+  resourceRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  resourceBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.12)" },
+  resourceText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  sheetScroll: { padding: 16, paddingBottom: 40 },
+  mediaPanel: { marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.05)" },
+  mediaHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  mediaLabel: { flex: 1, color: "#B8860B", fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  mediaLink: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
+  mediaLinkText: { color: "#5B8DEF", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   contextText: { color: "#B8860B", fontSize: 11, fontFamily: "Inter_500Medium" },
 
   toolsLabel: { color: "#1D9E75", fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginTop: 10 },

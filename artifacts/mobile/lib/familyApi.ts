@@ -164,11 +164,11 @@ export interface WorshipSession {
   lesson?: GatheringLessonRef | null;
 }
 
-export interface GatheringLessonRef { kind: "central" | "family"; id: string; title: string; studyId: string | null }
+export interface GatheringLessonRef { kind: "central" | "family" | "church"; id: string; title: string; studyId: string | null }
 
 /** The Gathering's lesson to follow along: content only, never anyone's answers. */
 export interface GatheringLesson {
-  kind: "central" | "family"; id: string; title: string; context: string | null; studyId: string | null;
+  kind: "central" | "family" | "church"; id: string; title: string; context: string | null; studyId: string | null;
   description: string | null;
   sections: { title: string | null; content: string }[];
   scripture: { book: string; chapter: number; startVerse: number; endVerse: number; translation: string | null }[];

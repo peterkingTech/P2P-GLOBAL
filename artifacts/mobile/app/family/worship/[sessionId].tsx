@@ -577,7 +577,7 @@ export default function FamilyWorshipScreen() {
   // Lets screens opened from here show "Return to Gathering" and the same mic toggle.
   useEffect(() => {
     if (!session?.id) return;
-    setActiveGathering({ sessionId: session.id, voiceConnected: voiceSpace.phase === "connected", micMuted: voiceSpace.micMuted, toggleMic: voiceSpace.toggleMic });
+    setActiveGathering({ sessionId: session.id, returnTo: { pathname: "/family/worship/[sessionId]", params: { sessionId: session.id } }, voiceConnected: voiceSpace.phase === "connected", micMuted: voiceSpace.micMuted, toggleMic: voiceSpace.toggleMic });
   }, [session?.id, voiceSpace.phase, voiceSpace.micMuted, voiceSpace.toggleMic]);
   useEffect(() => {
     const id = params.sessionId;
@@ -769,7 +769,7 @@ export default function FamilyWorshipScreen() {
           </View>
           <Text style={styles.silentHint}>The Guide can present Scripture, media, and notes. Everyone can ask questions in chat.</Text>
           <GatheringLessonPanel
-            sessionId={session.id} lessonRef={lessonRef} isGuide={isHost} onChoose={() => setLessonPickerOpen(true)}
+            gathering={{ kind: "family", id: session.id }} lessonRef={lessonRef} isGuide={isHost} onChoose={() => setLessonPickerOpen(true)}
             onOpenMine={openMyLesson} onOpenPassage={openMyBible} onPlayMedia={canControl ? playLessonMedia : null}
             largeText={focused === "workspace"}
           />
@@ -974,7 +974,7 @@ export default function FamilyWorshipScreen() {
       <GatheringLessonPicker
         visible={lessonPickerOpen}
         onClose={() => setLessonPickerOpen(false)}
-        familyId={session.familyId}
+        scope="family" groupId={session.familyId}
         onSelect={selectLesson}
       />
 
@@ -985,7 +985,7 @@ export default function FamilyWorshipScreen() {
             topInset={insets.top} />
           <ScrollView contentContainerStyle={styles.scroll}>
             <GatheringLessonPanel
-              sessionId={session.id} lessonRef={lessonRef} isGuide={isHost} onChoose={() => { setLessonSheetOpen(false); setLessonPickerOpen(true); }}
+              gathering={{ kind: "family", id: session.id }} lessonRef={lessonRef} isGuide={isHost} onChoose={() => { setLessonSheetOpen(false); setLessonPickerOpen(true); }}
               onOpenMine={openMyLesson} onOpenPassage={(r) => { setLessonSheetOpen(false); openMyBible(r); }} onPlayMedia={canControl ? playLessonMedia : null}
             />
           </ScrollView>

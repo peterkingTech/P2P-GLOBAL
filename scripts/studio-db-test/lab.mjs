@@ -171,6 +171,7 @@ import groupLearning from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/
 import familyStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyStudies.ts")))};
 import churchStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchStudies.ts")))};
 import lessonWork from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/lessonWork.ts")))};
+import churchCalls from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchCalls.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
@@ -190,6 +191,7 @@ app.use("/api/learning/work", lessonWork);
 app.use("/api/learning", groupLearning);
 app.use("/api/family", familyStudies);
 app.use("/api", churchStudies);
+app.use("/api", churchCalls);
 `);
   const out = await build({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", plugins: [plugin],
     nodePaths: [path.join(apiRoot, "node_modules")], banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });

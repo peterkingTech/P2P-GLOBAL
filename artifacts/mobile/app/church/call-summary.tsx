@@ -92,7 +92,7 @@ export default function CallSummaryScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/church/calls" as any))} accessibilityRole="button" accessibilityLabel="Back"><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{summary.overview.title}</Text>
         <View style={{ width: 22 }} />
       </View>
@@ -117,12 +117,28 @@ export default function CallSummaryScreen() {
           </>
         )}
 
-        {summary.study && (
+        {(summary.lessonRef || summary.study) && (
           <>
             <Text style={styles.sectionLabel}>STUDY</Text>
             <View style={styles.card}>
-              <Text style={styles.rowText}>{summary.study.lessonTitle}</Text>
-              <Text style={styles.rowMeta}>{summary.study.moduleTitle}{summary.study.curriculumTitle ? ` · ${summary.study.curriculumTitle}` : ""}</Text>
+              <Text style={styles.rowText}>{summary.lessonRef?.title ?? summary.study?.lessonTitle}</Text>
+              <Text style={styles.rowMeta}>
+                {summary.lessonRef?.kind === "church" ? "Church lesson"
+                  : summary.study ? `${summary.study.moduleTitle}${summary.study.curriculumTitle ? ` · ${summary.study.curriculumTitle}` : ""}` : ""}
+              </Text>
+              {/* Your own answers, reflections and assignments live in the lesson — still private unless you share them. */}
+              {summary.lessonRef && (
+                <TouchableOpacity
+                  style={styles.openLessonBtn}
+                  onPress={() => router.push((summary.lessonRef!.kind === "church" && summary.lessonRef!.studyId
+                    ? { pathname: "/church/studies/lesson/[lessonId]", params: { lessonId: summary.lessonRef!.id, studyId: summary.lessonRef!.studyId } }
+                    : { pathname: "/lesson/[id]", params: { id: summary.lessonRef!.id } }) as any)}
+                  accessibilityRole="button" accessibilityLabel={`Open the lesson ${summary.lessonRef.title}`}
+                >
+                  <Ionicons name="book-outline" size={15} color={colors.accentGreen} />
+                  <Text style={styles.openLessonText}>Open lesson · reflections & assignments</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </>
         )}
@@ -130,7 +146,7 @@ export default function CallSummaryScreen() {
         {summary.media && (
           <>
             <Text style={styles.sectionLabel}>MEDIA</Text>
-            <View style={styles.card}><Text style={styles.rowText}>▶️ {summary.media.provider} media</Text></View>
+            <View style={styles.card}><Text style={styles.rowText}>▶️ {summary.media.provider === "youtube" ? "YouTube video watched together" : "Video watched together"}</Text></View>
           </>
         )}
 
@@ -185,6 +201,8 @@ export default function CallSummaryScreen() {
 }
 
 const styles = StyleSheet.create({
+  openLessonBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, marginTop: 6 },
+  openLessonText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   container: { flex: 1, backgroundColor: colors.lightCream },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 12, gap: 8 },

@@ -3,24 +3,33 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { getLearningHome, getLibrary, getCurriculumOutline, type LearningHome, type Library, type CurriculumOutline } from "@/lib/groupLearningApi";
-import { getFamilyStudies, getFamilyStudy, type FamilyStudy, type FamilyStudyLesson } from "@/lib/familyStudyApi";
+import { getLearningHome, getLibrary, getCurriculumOutline, type LearningHome, type Library, type CurriculumOutline, type GroupScope } from "@/lib/groupLearningApi";
+import { getFamilyStudies, getFamilyStudy } from "@/lib/familyStudyApi";
+import { getChurchStudies, getChurchStudy } from "@/lib/churchStudyApi";
 
-export interface LessonChoice { kind: "central" | "family"; id: string; title: string }
+// The group's own studies/lessons — same shape for Family and Church.
+interface OwnStudy { id: string; title: string; description: string | null; status: string }
+interface OwnLesson { id: string; title: string; status?: string }
+const ownStudies = (scope: GroupScope, groupId: string): Promise<OwnStudy[]> => (scope === "church" ? getChurchStudies(groupId) : getFamilyStudies(groupId));
+const ownStudy = (scope: GroupScope, studyId: string): Promise<{ lessons: OwnLesson[] }> => (scope === "church" ? getChurchStudy(studyId) : getFamilyStudy(studyId));
+
+export interface LessonChoice { kind: "central" | "family" | "church"; id: string; title: string }
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  familyId: string;
+  /** Family Gathering or Church Gathering — decides the journey and the group's own lessons. */
+  scope: GroupScope;
+  groupId: string;
   onSelect: (choice: LessonChoice) => void;
 }
 
 type Source = "journey" | "core" | "plans" | "family";
-const SOURCES: { key: Source; label: string }[] = [
+const sourcesFor = (scope: GroupScope): { key: Source; label: string }[] => [
   { key: "journey", label: "Our journey" },
   { key: "core", label: "Core Foundation" },
   { key: "plans", label: "P2P Plans" },
-  { key: "family", label: "Family lessons" },
+  { key: "family", label: scope === "church" ? "Church lessons" : "Family lessons" },
 ];
 
 // What a Gathering studies (Prompt 6): a lesson from the family's current
@@ -28,7 +37,9 @@ const SOURCES: { key: Source; label: string }[] = [
 // the same server endpoints as the Learning screens), or one of the family's
 // own published lessons. Choosing only links the lesson to the Gathering;
 // nothing is copied, completed or written to anyone's progress.
-export default function GatheringLessonPicker({ visible, onClose, familyId, onSelect }: Props) {
+export default function GatheringLessonPicker({ visible, onClose, scope, groupId, onSelect }: Props) {
+  const SOURCES = sourcesFor(scope);
+  const ownKind: LessonChoice["kind"] = scope === "church" ? "church" : "family";
   const { colors: c } = useTheme();
   const styles = makeStyles(c);
   const [source, setSource] = useState<Source>("journey");
@@ -36,23 +47,23 @@ export default function GatheringLessonPicker({ visible, onClose, familyId, onSe
   const [error, setError] = useState<string | null>(null);
   const [home, setHome] = useState<LearningHome | null>(null);
   const [library, setLibrary] = useState<Library | null>(null);
-  const [studies, setStudies] = useState<FamilyStudy[] | null>(null);
+  const [studies, setStudies] = useState<OwnStudy[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [outlines, setOutlines] = useState<Map<string, CurriculumOutline>>(new Map());
-  const [studyLessons, setStudyLessons] = useState<Map<string, FamilyStudyLesson[]>>(new Map());
+  const [studyLessons, setStudyLessons] = useState<Map<string, OwnLesson[]>>(new Map());
 
   const load = useCallback(async (s: Source) => {
     setError(null);
     try {
-      if (s === "journey" && !home) { setLoading(true); setHome(await getLearningHome("family", familyId)); }
+      if (s === "journey" && !home) { setLoading(true); setHome(await getLearningHome(scope, groupId)); }
       if ((s === "core" || s === "plans") && !library) { setLoading(true); setLibrary(await getLibrary()); }
-      if (s === "family" && !studies) { setLoading(true); setStudies((await getFamilyStudies(familyId)).filter((x) => x.status === "published")); }
+      if (s === "family" && !studies) { setLoading(true); setStudies((await ownStudies(scope, groupId)).filter((x) => x.status === "published")); }
     } catch (e: any) {
       setError(e.message ?? "Couldn't load lessons.");
     } finally {
       setLoading(false);
     }
-  }, [familyId, home, library, studies]);
+  }, [scope, groupId, home, library, studies]);
 
   useEffect(() => { if (visible) load(source); }, [visible, source, load]);
 
@@ -68,7 +79,7 @@ export default function GatheringLessonPicker({ visible, onClose, familyId, onSe
     setOpenId(id);
     if (studyLessons.has(id)) return;
     try {
-      const { lessons } = await getFamilyStudy(id);
+      const { lessons } = await ownStudy(scope, id);
       setStudyLessons((m) => new Map(m).set(id, lessons.filter((l) => (l.status ?? "published") === "published")));
     } catch (e: any) { setError(e.message ?? "Couldn't load lessons."); }
   }
@@ -111,11 +122,11 @@ export default function GatheringLessonPicker({ visible, onClose, familyId, onSe
     if (error) return <Text style={styles.emptyText}>{error}</Text>;
     if (source === "journey") {
       const j = home?.activeJourney;
-      if (!j) return <Text style={styles.emptyText}>Your family isn't on a learning journey right now. Pick from Core Foundation, P2P Plans or Family lessons.</Text>;
+      if (!j) return <Text style={styles.emptyText}>{`Your ${scope === "church" ? "church" : "family"} isn't on a learning journey right now. Pick from Core Foundation, P2P Plans or ${scope === "church" ? "Church" : "Family"} lessons.`}</Text>;
       return (
         <>
           <Text style={styles.curriculumTitle}>{j.curriculum.title}</Text>
-          {j.currentLesson && lessonRow({ kind: "central", id: j.currentLesson.id, title: j.currentLesson.title }, "Up next for your family")}
+          {j.currentLesson && lessonRow({ kind: "central", id: j.currentLesson.id, title: j.currentLesson.title }, `Up next for your ${scope === "church" ? "church" : "family"}`)}
           {j.modules.map((m) => (
             <View key={m.id} style={{ marginTop: 10 }}>
               <Text style={styles.moduleTitle}>{m.title}</Text>
@@ -136,13 +147,13 @@ export default function GatheringLessonPicker({ visible, onClose, familyId, onSe
         </View>
       ));
     }
-    if (!studies?.length) return <Text style={styles.emptyText}>Your family has no published lessons yet.</Text>;
+    if (!studies?.length) return <Text style={styles.emptyText}>{`Your ${scope === "church" ? "church" : "family"} has no published lessons yet.`}</Text>;
     return studies.map((st) => (
       <View key={st.id}>
         {groupRow(st.id, st.title, st.description)}
         {openId === st.id && (studyLessons.has(st.id)
           ? (studyLessons.get(st.id)!.length
-            ? studyLessons.get(st.id)!.map((l) => lessonRow({ kind: "family", id: l.id, title: l.title }))
+            ? studyLessons.get(st.id)!.map((l) => lessonRow({ kind: ownKind, id: l.id, title: l.title }))
             : <Text style={styles.hint}>No published lessons in this study.</Text>)
           : <ActivityIndicator color={c.primaryGreen} style={{ marginVertical: 8 }} />)}
       </View>

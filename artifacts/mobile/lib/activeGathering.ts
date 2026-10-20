@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
-// The Family Gathering this device is in right now (Prompt 6). The Gathering
+// The Gathering this device is in right now — a Family Gathering (Prompt 6)
+// or a Church Gathering (Prompt 7). The Gathering
 // screen stays mounted underneath when a participant opens their own lesson,
 // so its call keeps running; it publishes here so those screens can show a
 // "Return to Gathering" bar with the same microphone toggle. Nothing here
@@ -8,6 +9,8 @@ import { useSyncExternalStore } from "react";
 
 export interface ActiveGathering {
   sessionId: string;
+  /** The mounted Gathering screen to return to (Family Gathering or Church Gathering). */
+  returnTo: { pathname: string; params: Record<string, string> };
   voiceConnected: boolean;
   micMuted: boolean;
   toggleMic: () => void;

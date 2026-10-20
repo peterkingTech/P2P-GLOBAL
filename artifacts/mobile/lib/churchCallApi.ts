@@ -1,5 +1,6 @@
 import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import type { GatheringLesson, GatheringLessonRef, WorshipSession } from "@/lib/familyApi";
 
 // Every route on the server side (routes/churchCalls.ts) resolves identity
 // via verifyCaller() — a real Supabase JWT — never a client-supplied id.
@@ -39,6 +40,11 @@ export interface ChurchCall {
   startedAt: string | null; endedAt: string | null; createdAt: string;
   scheduledStartAt: string | null; expectedDurationMinutes: number | null; description: string | null;
   lessonId: string | null; scriptureReference: ChurchCallScripture | null; media: ChurchCallMedia | null;
+  /** The church's own lesson (migration 204). At most one of lessonId / churchLessonId is set. */
+  churchLessonId?: string | null;
+  /** Media sync (migration 205): the same playback clock as the Family Gathering. */
+  mediaSync?: boolean;
+  isPlaying?: boolean; playbackBasePositionMs?: number; playbackBaseServerTime?: string | null; playbackRate?: number;
   hostSummary: string | null; continuityNotes: string | null;
 }
 
@@ -67,6 +73,8 @@ export interface ChurchCallLessonContext {
 }
 export interface ChurchCallDetail {
   call: ChurchCall; lesson: ChurchCallLessonContext | null; participants: ChurchCallParticipant[];
+  /** The Gathering's lesson for everyone (central or church-owned). */
+  lessonRef?: GatheringLessonRef | null;
 }
 export function getChurchCall(callId: string): Promise<ChurchCallDetail> {
   return authedFetch(`/churches/calls/${callId}`);
@@ -114,8 +122,16 @@ export function addChurchCallNote(callId: string, content: string, visibility?: 
 export function setChurchCallScripture(callId: string, scripture: ChurchCallScripture): Promise<{ scriptureReference: ChurchCallScripture }> {
   return authedFetch(`/churches/calls/${callId}/scripture`, { method: "PUT", body: JSON.stringify(scripture) });
 }
-export function setChurchCallLesson(callId: string, lessonId: string | null): Promise<{ lesson: ChurchCallLessonContext | null }> {
+export function setChurchCallLesson(callId: string, lessonId: string | null): Promise<{ lesson: ChurchCallLessonContext | null; lessonRef?: GatheringLessonRef | null }> {
   return authedFetch(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ lessonId }) });
+}
+/** The church's own published lesson (migration 204); host or pastor only. */
+export function setChurchCallChurchLesson(callId: string, churchLessonId: string): Promise<{ lessonRef: GatheringLessonRef | null }> {
+  return authedFetch(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ churchLessonId }) });
+}
+/** The Gathering's lesson to follow along: content only, never anyone's answers. */
+export function getChurchCallLesson(callId: string): Promise<{ lesson: GatheringLesson | null }> {
+  return authedFetch(`/churches/calls/${callId}/lesson`);
 }
 export function setChurchCallMedia(callId: string, media: { provider: string; id: string; url?: string } | null): Promise<{ media: ChurchCallMedia | null }> {
   return authedFetch(`/churches/calls/${callId}/media`, { method: "PUT", body: JSON.stringify(media ?? {}) });
@@ -133,11 +149,30 @@ export interface ChurchCallSummary {
   participation: { participantCount: number; participants: { userId: string; name: string; photoUrl: string | null }[] };
   scripture: { reference: ChurchCallScripture | null; label: string | null };
   study: ChurchCallLessonContext | null;
+  /** The lesson studied — central or the church's own (migration 204). */
+  lessonRef?: GatheringLessonRef | null;
   media: { provider: string; id: string } | null;
   discussion: { messageCount: number; contributorCount: number };
   notes: { authorCount: number };
   hostSummary: string | null; continuityNotes: string | null;
   timeline: { type: string; data: Record<string, unknown> | null; at: string }[];
+}
+/** Play / pause / seek the call's Media for everyone (host or pastor; migration 205). */
+export function setChurchCallPlayback(callId: string, patch: { isPlaying?: boolean; positionMs?: number }): Promise<ChurchCall> {
+  return authedFetch(`/churches/calls/${callId}/playback`, { method: "PUT", body: JSON.stringify(patch) });
+}
+/**
+ * The call's media in the shape the Family Gathering's SharedMedia /
+ * SyncedMediaPlayer read (they only use the media + playback-clock fields),
+ * so a Church Gathering plays through the very same synced player.
+ */
+export function churchCallMediaSession(call: ChurchCall): WorshipSession {
+  return {
+    mediaProvider: call.media?.provider === "youtube" ? "youtube" : null,
+    mediaId: call.media?.id ?? null, mediaUrl: call.media?.url ?? null, mediaType: null,
+    isPlaying: !!call.isPlaying, playbackBasePositionMs: call.playbackBasePositionMs ?? 0,
+    playbackBaseServerTime: call.playbackBaseServerTime ?? new Date(0).toISOString(), playbackRate: call.playbackRate ?? 1,
+  } as WorshipSession;
 }
 export function getChurchCallSummary(callId: string): Promise<ChurchCallSummary> {
   return authedFetch(`/churches/calls/${callId}/summary`);

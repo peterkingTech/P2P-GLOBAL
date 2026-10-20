@@ -44,7 +44,8 @@ ok("lesson sheet keeps the mic control", /onDone=\{\(\) => setLessonSheetOpen\(f
 ok("publishes itself while mounted; clears on leave and unmount", /setActiveGathering\(\{ sessionId: session\.id/.test(gs) && /clearActiveGathering\(params\.sessionId\);\r?\n\s*voiceSpace\.leave\(\)/.test(gs)
   && /return \(\) => \{ if \(id\) clearActiveGathering\(id\); \};/.test(gs));
 const bar = src("components/family/GatheringReturnBar.tsx");
-ok("Return goes BACK to the mounted Gathering (dismissTo), not a new one", /router\.dismissTo\(\{ pathname: "\/family\/worship\/\[sessionId\]"/.test(bar) && !/router\.(push|replace)/.test(bar));
+ok("Return goes BACK to the mounted Gathering (dismissTo), not a new one", /router\.dismissTo\(gathering!\.returnTo as any\)/.test(bar) && !/router\.(push|replace)/.test(bar)
+  && /returnTo: \{ pathname: "\/family\/worship\/\[sessionId\]", params: \{ sessionId: session\.id \} \}/.test(gs));
 ok("return bar: same mic toggle, labelled", /onPress=\{gathering\.toggleMic\}/.test(bar) && /Unmute microphone/.test(bar) && /Return to the Gathering/.test(bar));
 const central = src("app/lesson/[id].tsx");
 ok("central lesson: return bar on both views", (central.match(/<GatheringReturnBar \/>/g) ?? []).length === 2);
@@ -54,7 +55,7 @@ ok("family lesson: return bar", /<GatheringReturnBar \/>/.test(src("app/family/s
 // ── Choosing a lesson ────────────────────────────────────────────────────
 const pick = src("components/family/GatheringLessonPicker.tsx");
 ok("sources: journey, Core Foundation, P2P Plans, Family lessons", /"Our journey"/.test(pick) && /"Core Foundation"/.test(pick) && /"P2P Plans"/.test(pick) && /"Family lessons"/.test(pick));
-ok("central library via the Learning endpoints (no direct table reads)", /getLibrary\(\)/.test(pick) && /getCurriculumOutline\(id\)/.test(pick) && /getLearningHome\("family", familyId\)/.test(pick) && !/supabase\.from/.test(pick));
+ok("central library via the Learning endpoints (no direct table reads)", /getLibrary\(\)/.test(pick) && /getCurriculumOutline\(id\)/.test(pick) && /getLearningHome\(scope, groupId\)/.test(pick) && !/supabase\.from/.test(pick));
 ok("family lessons: only published studies and lessons offered", /\.filter\(\(x\) => x\.status === "published"\)/.test(pick) && /\(l\.status \?\? "published"\) === "published"/.test(pick));
 ok("existing study-plan LessonPicker left as it was", /onSelect: \(lessonId: string, lessonTitle: string\) => void;/.test(src("components/family/LessonPicker.tsx")));
 ok("Guide-only + broadcast so everyone follows", /async function selectLesson\(choice: LessonChoice\) \{\r?\n\s*if \(!session \|\| !isHost\) return;/.test(gs) && /setLessonRef\(updated\.lesson[^\n]*\n\s*broadcastState\(updated\);/.test(gs));
@@ -63,13 +64,51 @@ ok("late joiner / reconnect: lesson title fetched when the session's lesson chan
 
 // ── Following along / privacy ────────────────────────────────────────────
 const panel = src("components/family/GatheringLessonPanel.tsx");
-ok("lesson content from the members-only endpoint", /getGatheringLesson\(sessionId\)/.test(panel));
+ok("lesson content from the members-only endpoint (Family or Church)", /\(gathering\.kind === "church" \? getChurchCallLesson\(gathering\.id\) : getGatheringLesson\(gathering\.id\)\)/.test(panel));
 ok("no one's answers shown; says so plainly", !/response|getReflection|submission/i.test(panel) && /stays in your own lesson unless you choose to share it/.test(panel));
 ok("lesson video only for someone who may control media (existing sync path)", /onPlayMedia=\{canControl \? playLessonMedia : null\}/.test(gs) && /mediaProvider: "youtube", mediaId: youtubeId/.test(gs));
 ok("resources row for everyone: lesson + My Bible", /accessibilityLabel="My Bible\. Read on your own; the group's passage doesn't change"/.test(gs) && /lessonRef \? setLessonSheetOpen\(true\) : setLessonPickerOpen\(true\)/.test(gs));
 const bible = src("components/family/MyBibleSheet.tsx");
 ok("My Bible: personal, never shares", /Only you see this\. The group's passage doesn't change\./.test(bible) && /onSelect=\{setPassage\}/.test(bible) && /selectLabel="Read"/.test(bible) && !/updateWorshipState/.test(bible));
 ok("ScripturePanel still shares by default for the Guide", /selectLabel = "Share with Gathering"/.test(src("components/family/ScripturePanel.tsx")));
+
+// ── Church Gathering (Prompt 7): the same pieces, no copies ─────────────
+const cc = src("app/call/church.tsx");
+ok("church call reuses the shared lesson picker/panel, My Bible, ScripturePanel, FocusBar", /from "@\/components\/family\/GatheringLessonPicker"/.test(cc) && /from "@\/components\/family\/GatheringLessonPanel"/.test(cc)
+  && /from "@\/components\/family\/MyBibleSheet"/.test(cc) && /from "@\/components\/family\/ScripturePanel"/.test(cc) && /from "@\/components\/focus\/FocusBar"/.test(cc));
+ok("church call: still one call engine (one useAgoraEngine, no voice-space)", (cc.match(/useAgoraEngine\(/g) ?? []).length === 1 && !/useVoiceSpace/.test(cc));
+ok("church picker scoped to this church; church lessons via their own call", /<GatheringLessonPicker visible=\{lessonPickerOpen\}.*scope="church" groupId=\{detail\.call\.churchId\}/.test(cc)
+  && /if \(choice\.kind === "church"\) await setChurchCallChurchLesson\(params\.callId, choice\.id\);/.test(cc));
+ok("church lesson panel reads the church endpoint", /gathering=\{\{ kind: "church", id: detail\.call\.id \}\}/.test(cc));
+ok("no more pasting lesson IDs or typing Scripture fields", !/Lesson ID|lessonIdInput|scriptureBook|placeholder="Book"/.test(cc) && /<ScripturePanel currentScripture=\{sharedPassage\} isGuide onSelect=\{shareScripture\} \/>/.test(cc));
+ok("everyone: Lesson, shared Passage (read-only) and My Bible", /accessibilityLabel="Read the shared passage"/.test(cc) && /<ScripturePanel currentScripture=\{sharedPassage\} isGuide=\{false\}/.test(cc)
+  && /accessibilityLabel="My Bible\. Read on your own; the group's passage doesn't change"/.test(cc));
+ok("host changes reach everyone live (context_changed → reload), older apps ignore it", /\| "context_changed" \| "call_ended";/.test(cc) && /case "context_changed":\r?\n\s*load\(\);/.test(cc)
+  && (cc.match(/sendSignal\("context_changed"\)/g) ?? []).length === 4); // passage, lesson, video, play/pause
+ok("own lesson opens on top; Return comes back to this call (same params)", /router\.push\(\{ pathname: "\/church\/studies\/lesson\/\[lessonId\]"/.test(cc)
+  && /returnTo: \{ pathname: "\/call\/church", params: \{ callId: params\.callId, channelName: params\.channelName/.test(cc));
+ok("mirror cleared on leave and unmount; sheets keep the call's own mic", /if \(params\.callId\) clearActiveGathering\(params\.callId\);/.test(cc) && /return \(\) => \{ if \(id\) clearActiveGathering\(id\); \};/.test(cc)
+  && /const mic = \{ connected: !!token, muted: muted \|\| micDisabledByHost, onToggle: toggleMute \};/.test(cc));
+ok("hooks run before the loading guard (no conditional hooks)", cc.indexOf("const toggleMuteRef = useRef(toggleMute);") < cc.indexOf("if (loading || !detail) {"));
+ok("church lesson screen: return bar", /<GatheringReturnBar \/>/.test(src("app/church/studies/lesson/[lessonId].tsx")));
+const ch = src("app/church/index.tsx");
+ok("church home: Learning entry for leaders and members (same unified Learning home as Family)",
+  (ch.match(/pathname: "\/learning\/\[scope\]\/\[groupId\]", params: \{ scope: "church", groupId: userChurch\.id \}/g) ?? []).length === 2);
+// Synced Media in the Church Gathering = the Family Gathering's player + clock.
+ok("church media uses the Family SharedMedia player (no second sync engine)", /import SharedMedia from "@\/components\/family\/SharedMedia";/.test(cc)
+  && (cc.match(/<SharedMedia\b/g) ?? []).length === 2 && !/createAudioPlayer|useVideoPlayer|YouTubePlayer/.test(cc));
+const cApi = src("lib/churchCallApi.ts");
+ok("adapter feeds only the media + clock fields the player reads", /export function churchCallMediaSession\(call: ChurchCall\): WorshipSession/.test(cApi)
+  && /isPlaying: !!call\.isPlaying, playbackBasePositionMs: call\.playbackBasePositionMs \?\? 0/.test(cApi));
+ok("only the host gets play/pause/link controls; position from the shared clock", /canControl=\{isHost\}/.test(cc)
+  && /computeWorshipPositionMs\(churchCallMediaSession\(detail\.call\)\)/.test(cc) && /setChurchCallPlayback\(params\.callId, \{ isPlaying: !detail\.call\.isPlaying, positionMs \}\)/.test(cc));
+ok("expanded media replaces the inline player (never two players at once)", /\{detail\.call\.media && !mediaExpanded && \(/.test(cc) && /<Modal visible=\{mediaExpanded && !!detail\.call\.media\}/.test(cc));
+ok("ending takes everyone to the summary (host + call_ended signal)", /sendSignal\("call_ended"\);/.test(cc)
+  && (cc.match(/router\.replace\(\{ pathname: "\/church\/call-summary", params: \{ callId: params\.callId \} \} as any\)/g) ?? []).length === 2);
+const sum = src("app/church/call-summary.tsx");
+ok("summary opens the lesson studied (church or central)", /pathname: "\/church\/studies\/lesson\/\[lessonId\]"/.test(sum) && /pathname: "\/lesson\/\[id\]"/.test(sum)
+  && /summary\.lessonRef\?\.title \?\? summary\.study\?\.lessonTitle/.test(sum));
+ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

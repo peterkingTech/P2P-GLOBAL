@@ -180,7 +180,7 @@ export default function ChurchHomeScreen() {
 
           <View style={{ gap: 10, marginTop: 16 }}>
             <NavRow icon="call-outline" label="Gatherings" onPress={() => router.push("/church/calls" as any)} />
-            <NavRow icon="book-outline" label="Study" onPress={() => router.push("/church/studies" as any)} />
+            <NavRow icon="school-outline" label="Learning" onPress={() => router.push({ pathname: "/learning/[scope]/[groupId]", params: { scope: "church", groupId: userChurch.id } } as any)} />
             <NavRow icon="leaf-outline" label="Church Community Dashboard" onPress={() => router.push("/church/grove" as any)} />
             <NavRow icon="people-outline" label="Members" onPress={() => router.push("/church/members" as any)} />
             {isChurchCreator && (
@@ -198,9 +198,10 @@ export default function ChurchHomeScreen() {
             <Text style={styles.attentionLink}>View Live &amp; Recent Gatherings →</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/studies" as any)}>
-            <Text style={styles.attentionTitle}>📖 Study</Text>
-            <Text style={styles.attentionLink}>P2P Curriculum & Church Studies →</Text>
+          <TouchableOpacity style={styles.attentionCard} onPress={() => router.push({ pathname: "/learning/[scope]/[groupId]", params: { scope: "church", groupId: userChurch.id } } as any)}
+            accessibilityRole="button" accessibilityLabel="Learning: our journey, P2P curriculum and church lessons">
+            <Text style={styles.attentionTitle}>📖 Learning</Text>
+            <Text style={styles.attentionLink}>Our journey, P2P Curriculum & church lessons →</Text>
           </TouchableOpacity>
 
           <Text style={styles.sectionTitle}>My Small Groups</Text>

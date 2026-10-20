@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
+import { supportsCustomLessons, loadCustomLessonForGathering, gatheringLessonRef, gatheringLessonView } from "../lib/gatheringLesson";
 
 const router = Router();
 
@@ -96,8 +97,17 @@ function mapCall(row: Record<string, unknown>) {
     description: row.description ?? null,
     // Stage 4
     lessonId: row.lesson_id ?? null,
+    // The church's own lesson (migration 204). At most one of the two is set.
+    churchLessonId: row.church_lesson_id ?? null,
     scriptureReference: row.scripture_reference ?? null,
     media: row.media_provider ? { provider: row.media_provider, id: row.media_id, url: row.media_url ?? null } : null,
+    // Media sync (migration 205) — the Family Gathering's playback clock:
+    // position = base + (now - baseServerTime) * rate while playing.
+    mediaSync: Object.prototype.hasOwnProperty.call(row, "is_playing"),
+    isPlaying: row.is_playing ?? false,
+    playbackBasePositionMs: Number(row.playback_base_position_ms ?? 0),
+    playbackBaseServerTime: row.playback_base_server_time ?? null,
+    playbackRate: Number(row.playback_rate ?? 1),
     // Stage 5
     hostSummary: row.host_summary ?? null,
     continuityNotes: row.continuity_notes ?? null,
@@ -307,10 +317,13 @@ router.get("/churches/calls/:callId", async (req, res) => {
   const profileById = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
   const lesson = call.lesson_id ? await resolveLessonContext(call.lesson_id as string) : null;
+  // Central or church-owned — the one title everyone in the Gathering sees.
+  const lessonRef = await gatheringLessonRef(call as Record<string, unknown>);
 
   return ok(res, {
     call: mapCall(call as Record<string, unknown>),
     lesson,
+    lessonRef,
     participants: (participantRows ?? []).map((p) => ({
       userId: p.user_id as string,
       name: profileById.get(p.user_id as string)?.full_name ?? "Someone",
@@ -572,24 +585,53 @@ router.put("/churches/calls/:callId/scripture", async (req, res) => {
   return ok(res, { scriptureReference: scripture });
 });
 
+// PUT /churches/calls/:callId/lesson — { lessonId } (central: Core Foundation
+// / P2P Plan) or { churchLessonId } (the church's own published lesson,
+// migration 204); null clears. Host or church pastor only (existing rule).
+// One lesson at a time; only the reference is stored.
 router.put("/churches/calls/:callId/lesson", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { callId } = req.params;
-  const { lessonId } = req.body as { lessonId?: string | null };
+  const { lessonId, churchLessonId } = req.body as { lessonId?: string | null; churchLessonId?: string | null };
   const { data: call } = await db.from("p2p_church_calls").select("*").eq("id", callId).maybeSingle();
   if (!call) return err(res, "Call not found", 404);
   if (!(await isHostOrPastor(call as Record<string, unknown>, userId))) return err(res, "Only the host or a church pastor can do that", 403);
+  if (lessonId && churchLessonId) return err(res, "Choose one lesson");
+  const hasChurchColumn = supportsCustomLessons("church", call as Record<string, unknown>);
+  if (churchLessonId !== undefined && !hasChurchColumn) return err(res, "Church lessons can't be used in a Gathering yet", 503);
+  const now = new Date().toISOString();
 
+  if (churchLessonId) {
+    const found = await loadCustomLessonForGathering("church", call.church_id as string, churchLessonId);
+    if (found.error !== undefined) return err(res, found.error, found.error.startsWith("Only") ? 400 : 404);
+    const { data: updated, error } = await db.from("p2p_church_calls").update({ church_lesson_id: churchLessonId, lesson_id: null, updated_at: now }).eq("id", callId).select().single();
+    if (error || !updated) return err(res, error?.message ?? "Failed to update", 500);
+    await logCallEvent(callId, call.church_id as string, "lesson_attached", { churchLessonId, lessonTitle: found.lesson.title });
+    return ok(res, { lesson: null, lessonRef: await gatheringLessonRef(updated as Record<string, unknown>) });
+  }
   if (lessonId) {
     const lesson = await resolveLessonContext(lessonId);
     if (!lesson) return err(res, "Lesson not found or not published", 404);
-    await db.from("p2p_church_calls").update({ lesson_id: lessonId, updated_at: new Date().toISOString() }).eq("id", callId);
+    const { data: updated } = await db.from("p2p_church_calls").update({ lesson_id: lessonId, ...(hasChurchColumn ? { church_lesson_id: null } : {}), updated_at: now }).eq("id", callId).select().single();
     await logCallEvent(callId, call.church_id as string, "lesson_attached", { lessonId, lessonTitle: lesson.lessonTitle });
-    return ok(res, { lesson });
+    return ok(res, { lesson, lessonRef: updated ? await gatheringLessonRef(updated as Record<string, unknown>) : null });
   }
-  await db.from("p2p_church_calls").update({ lesson_id: null, updated_at: new Date().toISOString() }).eq("id", callId);
-  return ok(res, { lesson: null });
+  await db.from("p2p_church_calls").update({ lesson_id: null, ...(hasChurchColumn ? { church_lesson_id: null } : {}), updated_at: now }).eq("id", callId);
+  return ok(res, { lesson: null, lessonRef: null });
+});
+
+// GET /churches/calls/:callId/lesson — the Gathering's lesson to follow along
+// (any active member of the call's church, including a late joiner — the
+// same audience as the call detail): lesson text, Scripture references and
+// questions from the source tables. Never anyone's answers.
+router.get("/churches/calls/:callId/lesson", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { data: call } = await db.from("p2p_church_calls").select("*").eq("id", req.params.callId).maybeSingle();
+  if (!call) return err(res, "Call not found", 404);
+  if (!(await isActiveChurchMember(call.church_id as string, userId))) return err(res, "You're not a member of this church", 403);
+  return ok(res, { lesson: await gatheringLessonView(call as Record<string, unknown>) });
 });
 
 const VALID_MEDIA_PROVIDERS = ["youtube"] as const;
@@ -605,12 +647,42 @@ router.put("/churches/calls/:callId/media", async (req, res) => {
   if (provider) {
     if (!(VALID_MEDIA_PROVIDERS as readonly string[]).includes(provider)) return err(res, `provider must be one of: ${VALID_MEDIA_PROVIDERS.join(", ")}`);
     if (!id) return err(res, "id is required alongside provider");
-    await db.from("p2p_church_calls").update({ media_provider: provider, media_id: id, media_url: url ?? null, updated_at: new Date().toISOString() }).eq("id", callId);
+    const now = new Date().toISOString();
+    const clock = Object.prototype.hasOwnProperty.call(call, "is_playing") ? { is_playing: true, playback_base_position_ms: 0, playback_base_server_time: now } : {};
+    await db.from("p2p_church_calls").update({ media_provider: provider, media_id: id, media_url: url ?? null, ...clock, updated_at: now }).eq("id", callId);
     await logCallEvent(callId, call.church_id as string, "media_attached", { provider, id });
     return ok(res, { media: { provider, id, url: url ?? null } });
   }
-  await db.from("p2p_church_calls").update({ media_provider: null, media_id: null, media_url: null, updated_at: new Date().toISOString() }).eq("id", callId);
+  await db.from("p2p_church_calls").update({ media_provider: null, media_id: null, media_url: null,
+    ...(Object.prototype.hasOwnProperty.call(call, "is_playing") ? { is_playing: false, playback_base_position_ms: 0 } : {}), updated_at: new Date().toISOString() }).eq("id", callId);
   return ok(res, { media: null });
+});
+
+// PUT /churches/calls/:callId/playback — { isPlaying?, positionMs? } — play,
+// pause or seek the call's Media for everyone (migration 205). Host or church
+// pastor only (the existing media rule). Every change re-anchors the server
+// clock, exactly like the Family Gathering's state route, so every client
+// recomputes the same position from the same fixed point.
+router.put("/churches/calls/:callId/playback", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  const { callId } = req.params;
+  const { isPlaying, positionMs } = req.body as { isPlaying?: boolean; positionMs?: number };
+  const { data: call } = await db.from("p2p_church_calls").select("*").eq("id", callId).maybeSingle();
+  if (!call) return err(res, "Call not found", 404);
+  if (!(await isHostOrPastor(call as Record<string, unknown>, userId))) return err(res, "Only the host or a church pastor can do that", 403);
+  if (!Object.prototype.hasOwnProperty.call(call, "is_playing")) return err(res, "Synchronized media isn't available yet", 503);
+  if (!call.media_provider) return err(res, "Attach a video first");
+  if (isPlaying !== undefined && typeof isPlaying !== "boolean") return err(res, "isPlaying must be true or false");
+  if (positionMs !== undefined && (typeof positionMs !== "number" || !Number.isFinite(positionMs) || positionMs < 0)) return err(res, "positionMs must be a non-negative number");
+  const { data: updated, error } = await db.from("p2p_church_calls").update({
+    is_playing: isPlaying ?? call.is_playing,
+    playback_base_position_ms: Math.round(positionMs ?? Number(call.playback_base_position_ms ?? 0)),
+    playback_base_server_time: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", callId).select().single();
+  if (error || !updated) return err(res, error?.message ?? "Failed to update", 500);
+  return ok(res, mapCall(updated as Record<string, unknown>));
 });
 
 // ── Stage 5 — Summary, Continuity, Journey ───────────────────────────────
@@ -687,6 +759,9 @@ router.get("/churches/calls/:callId/summary", async (req, res) => {
     },
     scripture: { reference: call.scripture_reference ?? null, label: scriptureReferenceLabel(call.scripture_reference as Record<string, unknown> | null) },
     study: lesson,
+    // The lesson studied — central (Core Foundation / P2P Plan) or the
+    // church's own (migration 204) — so the summary can open it.
+    lessonRef: await gatheringLessonRef(call as Record<string, unknown>),
     media: call.media_provider ? { provider: call.media_provider, id: call.media_id } : null,
     discussion: { messageCount: messages?.length ?? 0, contributorCount: messageAuthors.size },
     notes: { authorCount: noteAuthors.size },

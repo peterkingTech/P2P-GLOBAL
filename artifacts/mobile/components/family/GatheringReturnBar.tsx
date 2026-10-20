@@ -16,7 +16,7 @@ export default function GatheringReturnBar({ topInset = 0 }: { topInset?: number
   if (!gathering) return null;
 
   function goBack() {
-    router.dismissTo({ pathname: "/family/worship/[sessionId]", params: { sessionId: gathering!.sessionId } } as any);
+    router.dismissTo(gathering!.returnTo as any);
   }
 
   return (
