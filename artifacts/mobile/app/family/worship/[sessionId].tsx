@@ -226,6 +226,9 @@ export default function FamilyWorshipScreen() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "p2p_family_worship_sessions", filter: `id=eq.${params.sessionId}` }, (payload) => {
         const row = payload.new as Record<string, unknown>;
         if (row.status === "ended") {
+          // Both delivery paths (this one and the "state" broadcast) report
+          // the end; tell the person once.
+          if (leftRef.current) return;
           showAlert("Gathering ended", "This session has ended.");
           leave();
           return;
@@ -237,6 +240,8 @@ export default function FamilyWorshipScreen() {
           playbackBasePositionMs: Number(row.playback_base_position_ms ?? 0), playbackBaseServerTime: row.playback_base_server_time as string,
           playbackRate: Number(row.playback_rate ?? 1), isPlaying: !!row.is_playing,
           currentScripture: (row.current_scripture as WorshipSession["currentScripture"]) ?? null, hostId: row.host_id as string,
+          lessonId: (row.lesson_id as string | null) ?? null,
+          familyLessonId: (row.family_lesson_id as string | null | undefined) ?? null,
         } : prev);
       })
       .subscribe();
@@ -297,6 +302,7 @@ export default function FamilyWorshipScreen() {
       // its definition for why this exists alongside postgres_changes.
       .on("broadcast", { event: "state" }, ({ payload }: { payload: WorshipSession }) => {
         if (payload.status === "ended") {
+          if (leftRef.current) return;
           showAlert("Gathering ended", "This session has ended.");
           leave();
           return;
