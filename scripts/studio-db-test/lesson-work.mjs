@@ -153,6 +153,30 @@ try {
     && (await call("POST", `/church/assignments/${ca.id}/submissions`, U.cmember, { content: "Done" })).status === 200
     && (await call("POST", `/church/assignments/${ca.id}/submissions`, U.ann, { content: "x" })).status === 404);
   ok("church: family-scoped path can't reach a church assignment", (await call("GET", `/family/assignments/${ca.id}/submissions/mine`, U.cmember)).status === 404);
+
+  // ── Learning home: "Waiting on you" (Prompt 8) ──────────────────────────
+  const home = async (who, scope = "family", g = FA) => {
+    const res = await fetch(base.replace("/learning/work", `/learning/${scope}/${g}`), { headers: { authorization: `Bearer ${who}` } });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  let h = await home(U.ben);
+  ok("to-do: a member who hasn't submitted sees the assignment (not started), with its lesson", h.status === 200 && h.body.work.toDo.length === 1
+    && h.body.work.toDo[0].assignmentId === asg.id && h.body.work.toDo[0].state === "not_started" && h.body.work.toDo[0].lessonTitle === "Psalm 23", JSON.stringify(h.body?.work));
+  ok("to-review: members get none", h.body.work.toReview.length === 0);
+  ok("to-do: a member whose latest attempt is submitted has nothing to do", (await home(U.ann)).body.work.toDo.length === 0);
+  h = await home(U.shep);
+  ok("to-review: the Shepherd sees 1 submission waiting (latest attempt only)", h.body.work.toReview.length === 1 && h.body.work.toReview[0].waiting === 1, JSON.stringify(h.body.work));
+  const annLatest = (await call("GET", `/family/assignments/${asg.id}/submissions/mine`, U.ann)).body.attempts.at(-1);
+  await call("POST", `/family/submissions/${annLatest.id}/review`, U.shep, { status: "returned", feedback: "One more line." });
+  ok("returned work comes back to the member's to-do (state: returned)", (await home(U.ann)).body.work.toDo[0]?.state === "returned");
+  ok("…and leaves the Shepherd's review list", (await home(U.shep)).body.work.toReview.length === 0);
+  ok("no answers or feedback in the home payload", !JSON.stringify((await home(U.shep)).body.work).includes("dwell") && !JSON.stringify((await home(U.ann)).body.work).includes("One more line"));
+  ok("family: no per-member progress (no visibility rule for it)", (await home(U.shep)).body.memberProgress === null);
+  ok("another family can't read this home (403)", (await home(U.outsider)).status === 403);
+  h = await home(U.pastor, "church", CH);
+  ok("church: pastor sees the member's submission waiting; member has nothing to do", h.body.work.toReview[0]?.assignmentId === ca.id && h.body.work.toReview[0].waiting === 1
+    && (await home(U.cmember, "church", CH)).body.work.toDo.length === 0, JSON.stringify(h.body.work));
+  ok("church: no journey → no member progress", h.body.memberProgress === null);
 } finally {
   server.close();
   rmSync(tmp, { recursive: true, force: true });

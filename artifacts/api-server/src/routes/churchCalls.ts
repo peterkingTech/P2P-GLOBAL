@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { supportsCustomLessons, loadCustomLessonForGathering, gatheringLessonRef, gatheringLessonView } from "../lib/gatheringLesson";
+import { getSharedGatheringNotes, getAssignmentsCreatedDuring, getResumeLesson } from "../lib/groupProgress";
 
 const router = Router();
 
@@ -762,6 +763,9 @@ router.get("/churches/calls/:callId/summary", async (req, res) => {
     // The lesson studied — central (Core Foundation / P2P Plan) or the
     // church's own (migration 204) — so the summary can open it.
     lessonRef: await gatheringLessonRef(call as Record<string, unknown>),
+    sharedNotes: await getSharedGatheringNotes("church", callId),
+    assignmentsCreated: await getAssignmentsCreatedDuring("church", call.church_id as string, (call.started_at as string | null) ?? null, (call.ended_at as string | null) ?? null),
+    nextTime: await getResumeLesson("church", call.church_id as string),
     media: call.media_provider ? { provider: call.media_provider, id: call.media_id } : null,
     discussion: { messageCount: messages?.length ?? 0, contributorCount: messageAuthors.size },
     notes: { authorCount: noteAuthors.size },

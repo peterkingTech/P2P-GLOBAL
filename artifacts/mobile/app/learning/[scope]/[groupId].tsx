@@ -139,6 +139,36 @@ export default function LearningHomeScreen() {
           )}
         </View>
 
+        {/* Waiting on you — assignments to do (yours) and, for leaders, to review. */}
+        {(data.work?.toDo.length || data.work?.toReview.length) ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Waiting on you</Text>
+            {data.work!.toDo.map((a) => (
+              <TouchableOpacity key={`do-${a.assignmentId}`} style={styles.listRow} onPress={() => router.push({ pathname: "/learning/assignment/[assignmentId]", params: { assignmentId: a.assignmentId, s: scope } } as any)}
+                accessibilityRole="button" accessibilityLabel={`Assignment ${a.title}${a.state === "returned" ? ", returned to you" : ""}`}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.listTitle} numberOfLines={1}>{a.title}</Text>
+                  <Text style={styles.rowSub}>
+                    {a.state === "returned" ? "Returned — please revise" : "Not started"}
+                    {a.lessonTitle ? ` · ${a.lessonTitle}` : ""}{a.dueAt ? ` · due ${new Date(a.dueAt).toLocaleDateString()}` : ""}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+              </TouchableOpacity>
+            ))}
+            {data.work!.toReview.map((a) => (
+              <TouchableOpacity key={`rv-${a.assignmentId}`} style={styles.listRow} onPress={() => router.push({ pathname: "/learning/assignment/[assignmentId]", params: { assignmentId: a.assignmentId, s: scope } } as any)}
+                accessibilityRole="button" accessibilityLabel={`${a.waiting} submissions to review for ${a.title}`}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.listTitle} numberOfLines={1}>{a.title}</Text>
+                  <Text style={styles.rowSub}>{a.waiting} {a.waiting === 1 ? "submission" : "submissions"} to review{a.lessonTitle ? ` · ${a.lessonTitle}` : ""}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+
         {/* 2. P2P Library */}
         <TouchableOpacity style={styles.rowCard} onPress={openLibrary} accessibilityRole="button" accessibilityHint="Core Foundation curriculum and P2P Plans">
           <Ionicons name="library-outline" size={22} color={c.accentGreen} />
@@ -181,6 +211,20 @@ export default function LearningHomeScreen() {
               <ProgressBar styles={styles} c={c} label="Together" detail={`${j.group.covered} of ${j.group.total} lessons covered as a group`} percent={pct(j.group.covered, j.group.total)} />
               <ProgressBar styles={styles} c={c} label="You" detail={`${j.personal.completed} of ${j.personal.total} lessons completed${j.personal.submitted ? ` · ${j.personal.submitted} waiting for review` : ""}`} percent={pct(j.personal.completed, j.personal.total)} />
               <Text style={styles.cardNote}>"Together" counts lessons your group covered. "You" is your own lesson progress — nobody else's.</Text>
+              {data.memberProgress && data.memberProgress.members.length > 0 && (
+                <>
+                  <Text style={[styles.cardTitle, { marginTop: 12 }]}>Members (leaders only)</Text>
+                  {data.memberProgress.members.map((m) => (
+                    <View key={m.userId} style={styles.listRow} accessibilityLabel={`${m.name}: ${m.completed} of ${data.memberProgress!.total} lessons completed`}>
+                      <Text style={[styles.listTitle, { flex: 1 }]} numberOfLines={1}>{m.name}</Text>
+                      <Text style={styles.rowSub}>{m.completed}/{data.memberProgress!.total}{m.submitted ? ` · ${m.submitted} waiting` : ""}</Text>
+                    </View>
+                  ))}
+                  <Text style={styles.cardNote}>
+                    Lessons each member completed in this series — never their answers.{data.memberProgress.hiddenCount ? ` ${data.memberProgress.hiddenCount} member${data.memberProgress.hiddenCount === 1 ? " has" : "s have"} chosen not to share with leadership.` : ""}
+                  </Text>
+                </>
+              )}
             </>
           ) : <Text style={styles.muted}>Progress appears once a series is chosen.</Text>}
           {data.history.length > 0 && (

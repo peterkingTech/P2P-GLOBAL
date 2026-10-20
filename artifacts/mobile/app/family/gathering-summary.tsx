@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import FamilyIcon from "@/components/family/FamilyIcon";
+import GatheringFollowUp from "@/components/study/GatheringFollowUp";
 import { getFamilyDetail, getWorshipSessionSummary, updateGuideSummary, updateContinuityNotes, type WorshipSessionSummary } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
@@ -253,7 +254,17 @@ export default function GatheringSummaryScreen() {
             second copy of it; empty state when no lesson was attached. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Study</Text>
-          {summary.study ? (
+          {summary.lessonRef?.kind === "family" ? (
+            <>
+              <Text style={styles.bodyText}>{summary.lessonRef.title}</Text>
+              <Text style={styles.overviewLine}>Family lesson</Text>
+              {summary.lessonRef.studyId && (
+                <TouchableOpacity onPress={() => router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: summary.lessonRef!.id, studyId: summary.lessonRef!.studyId! } } as any)} style={{ marginTop: 6 }}>
+                  <Text style={styles.linkText}>Open Lesson →</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : summary.study ? (
             <>
               <Text style={styles.bodyText}>{summary.study.lessonTitle}</Text>
               <Text style={styles.overviewLine}>
@@ -327,6 +338,9 @@ export default function GatheringSummaryScreen() {
             <Text style={styles.bodyText}>{summary.notes.authorCount} participant{summary.notes.authorCount === 1 ? "" : "s"} took notes</Text>
           )}
         </View>
+
+        {/* Shared notes, follow-up assignments, next time (Prompt 8) */}
+        <GatheringFollowUp followUp={summary} scope="family" />
 
         {/* Participants */}
         <View style={styles.section}>

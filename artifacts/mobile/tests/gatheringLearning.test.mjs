@@ -108,6 +108,23 @@ ok("ending takes everyone to the summary (host + call_ended signal)", /sendSigna
 const sum = src("app/church/call-summary.tsx");
 ok("summary opens the lesson studied (church or central)", /pathname: "\/church\/studies\/lesson\/\[lessonId\]"/.test(sum) && /pathname: "\/lesson\/\[id\]"/.test(sum)
   && /summary\.lessonRef\?\.title \?\? summary\.study\?\.lessonTitle/.test(sum));
+// ── Prompt 8: progress + what a Gathering leaves behind ──────────────────
+const fu = src("components/study/GatheringFollowUp.tsx");
+ok("one follow-up section for both summaries (shared notes, assignments, next time)",
+  /<GatheringFollowUp followUp=\{summary\} scope="family" \/>/.test(src("app/family/gathering-summary.tsx")) && /<GatheringFollowUp followUp=\{summary\} scope="church" \/>/.test(sum));
+ok("summary says private notes/reflections stay private; shows only shared notes", /Private notes and reflections stay private\./.test(fu) && /followUp\.sharedNotes/.test(fu) && !/private/i.test(fu.replace(/\/\/.*$/gm, "").replace(/Private notes and reflections stay private\./, "")));
+ok("next time opens the central lesson by reference", /pathname: "\/lesson\/\[id\]", params: \{ id: next\.lesson!\.id \}/.test(fu));
+ok("family summary opens a family lesson studied", /pathname: "\/family\/studies\/lesson\/\[lessonId\]", params: \{ lessonId: summary\.lessonRef!\.id/.test(src("app/family/gathering-summary.tsx")));
+const lh = src("app/learning/[scope]/[groupId].tsx");
+ok("learning home: 'Waiting on you' (own to-do + leaders' review counts) opens the assignment", /Waiting on you/.test(lh) && /data\.work!\.toDo\.map/.test(lh) && /data\.work!\.toReview\.map/.test(lh)
+  && (lh.match(/pathname: "\/learning\/assignment\/\[assignmentId\]"/g) ?? []).length === 2);
+ok("learning home: member progress only when the server sends it (church leaders), counts only, says so", /data\.memberProgress && data\.memberProgress\.members\.length > 0/.test(lh)
+  && /Members \(leaders only\)/.test(lh) && /never their answers/.test(lh) && /chosen not to share with leadership/.test(lh));
+ok("family: ending opens the summary for everyone (Guide via the end result, others via history)",
+  /const ended = await endWorshipSession\(session\.id\);/.test(gs) && /finishToSummary\(ended\?\.historyId \?\? null\);/.test(gs)
+  && (gs.match(/showAlert\("Gathering ended", "This session has ended\."\);\r?\n\s*finishToSummary\(\);/g) ?? []).length === 2
+  && /router\.replace\(\{ pathname: "\/family\/gathering-summary", params: \{ historyId: hid, familyId \} \} as any\)/.test(gs)
+  && /h\.session_id === params\.sessionId/.test(gs));
 ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);

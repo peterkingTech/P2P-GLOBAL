@@ -9,7 +9,7 @@ import {
   getWorshipMessages, sendWorshipMessage, removeWorshipParticipant, canControlMedia,
   getWorshipQueue, addToWorshipQueue, removeFromWorshipQueue, reorderWorshipQueue, playNextInWorshipQueue,
   updateMediaPermission, setTrustedParticipant, getWorshipNotes, createWorshipNote, deleteWorshipNote,
-  computeWorshipPositionMs, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider, type WorshipMessage,
+  computeWorshipPositionMs, getWorshipHistory, type WorshipHistoryEntry, type WorshipSession, type WorshipMode, type FamilyMember, type FamilyPrayerRequest, type SharedMediaProvider, type WorshipMessage,
   type WorshipQueueItem, type MediaPermission, type WorshipNote, type MessageContext, type WorshipScripture,
 } from "@/lib/familyApi";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
@@ -217,6 +217,31 @@ export default function FamilyWorshipScreen() {
     else router.replace("/family" as any);
   }, [params.sessionId, router, voiceSpace.leave]);
 
+  // The Gathering ended (by the Guide/Shepherd here, or seen from another
+  // device): leave the call, then open its summary — same as Church
+  // Gatherings. Participants find the summary in the family's history (it is
+  // written as the session ends, so retry briefly); if it can't be found, go
+  // back as before.
+  const sessionRef = useRef<WorshipSession | null>(null);
+  sessionRef.current = session;
+  const finishToSummary = useCallback(async (historyId?: string | null) => {
+    if (leftRef.current || !params.sessionId) return;
+    leftRef.current = true;
+    clearActiveGathering(params.sessionId);
+    voiceSpace.leave();
+    await leaveWorshipSession(params.sessionId).catch(() => {});
+    const familyId = sessionRef.current?.familyId;
+    let hid = historyId ?? null;
+    for (let i = 0; !hid && familyId && i < 3; i++) {
+      const list = await getWorshipHistory(familyId).catch(() => [] as WorshipHistoryEntry[]);
+      hid = list.find((h) => h.session_id === params.sessionId)?.id ?? null;
+      if (!hid) await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (hid && familyId) router.replace({ pathname: "/family/gathering-summary", params: { historyId: hid, familyId } } as any);
+    else if (router.canGoBack()) router.back();
+    else router.replace("/family" as any);
+  }, [params.sessionId, router, voiceSpace.leave]);
+
   // Session row is the source of truth for state/mode/media/scripture/
   // playback anchor — every client just reconciles to it, no polling.
   useEffect(() => {
@@ -230,7 +255,7 @@ export default function FamilyWorshipScreen() {
           // the end; tell the person once.
           if (leftRef.current) return;
           showAlert("Gathering ended", "This session has ended.");
-          leave();
+          finishToSummary();
           return;
         }
         setSession((prev) => prev ? {
@@ -246,7 +271,7 @@ export default function FamilyWorshipScreen() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [params.sessionId, leave]);
+  }, [params.sessionId, leave, finishToSummary]);
 
   // Private signaling channel — Expressions (reactions), Hand Up, Together
   // Chat's live delivery, moderation, and session-state sync all ride the
@@ -304,7 +329,7 @@ export default function FamilyWorshipScreen() {
         if (payload.status === "ended") {
           if (leftRef.current) return;
           showAlert("Gathering ended", "This session has ended.");
-          leave();
+          finishToSummary();
           return;
         }
         setSession(payload);
@@ -313,7 +338,7 @@ export default function FamilyWorshipScreen() {
       signalRef.current = channel;
     })();
     return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
-  }, [params.sessionId, leave]);
+  }, [params.sessionId, leave, finishToSummary]);
 
   // Primary state-sync send path — postgres_changes on this table has been
   // observed to not deliver in production despite correct publication
@@ -656,9 +681,9 @@ export default function FamilyWorshipScreen() {
     Alert.alert("End Gathering?", "This will end the session for everyone.", [
       { text: "Cancel", style: "cancel" },
       { text: "End", style: "destructive", onPress: async () => {
-        await endWorshipSession(session.id);
+        const ended = await endWorshipSession(session.id);
         broadcastState({ ...session, status: "ended" });
-        leave();
+        finishToSummary(ended?.historyId ?? null);
       } },
     ]);
   }

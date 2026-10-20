@@ -1,3 +1,4 @@
+import type { GatheringFollowUp } from "@/lib/groupLearningApi";
 import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -228,7 +229,8 @@ export function updateWorshipPresence(sessionId: string, presenceStatus: "joined
 export function transferWorshipHost(sessionId: string, newHostId: string) {
   return authedFetch(`/family/worship/sessions/${sessionId}/transfer-host`, { method: "POST", body: JSON.stringify({ newHostId }) });
 }
-export function endWorshipSession(sessionId: string) {
+/** Ends the Gathering for everyone; returns the summary (history row) it produced. */
+export function endWorshipSession(sessionId: string): Promise<{ ended: true; historyId?: string | null }> {
   return authedFetch(`/family/worship/sessions/${sessionId}/end`, { method: "POST" });
 }
 export function updateMediaPermission(sessionId: string, patch: { mediaPermission?: MediaPermission; autoAdvance?: boolean }): Promise<WorshipSession> {
@@ -269,7 +271,9 @@ export interface WorshipHistoryEntry {
 // session facts p2p_family_worship_history/session_events already hold;
 // never a second copy of message/note/prayer-request content (see
 // familyWorship.ts's GET /worship/history/:historyId comment).
-export interface WorshipSessionSummary {
+export interface WorshipSessionSummary extends GatheringFollowUp {
+  /** The lesson studied — central or the family's own (migration 202). */
+  lessonRef?: GatheringLessonRef | null;
   id: string; familyId: string; sessionId: string;
   durationSeconds: number; startedAt: string | null; endedAt: string | null; modesVisited: string[];
   guide: { id: string; name: string; photoUrl: string | null } | null;

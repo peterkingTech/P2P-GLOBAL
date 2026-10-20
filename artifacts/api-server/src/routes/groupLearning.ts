@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getWorkStatus, getMemberJourneyProgress } from "../lib/groupProgress";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import {
   GROUP_SCOPES, type GroupScope, type JourneyRow, isUuid, scopeColumn, isGroupMember, canManageGroupLearning,
@@ -116,6 +117,12 @@ router.get("/:scope/:groupId", async (req, res) => {
     activeJourney: activeSummary,
     history,
     customLessons: ((studies ?? []) as Record<string, unknown>[]).map((x) => ({ id: x.id, title: x.title, description: x.description ?? null, status: x.status, lessonCount: counts.get(x.id as string) ?? 0 })),
+    // Assignments awaiting action: the viewer's own to-do; leaders also see
+    // how many submissions wait for review (Prompt 8).
+    work: await getWorkStatus(s.scope, s.groupId, userId, canManage),
+    // Each member's own journey completion — church leadership only, for
+    // members visible to leadership; null everywhere else (no such rule).
+    memberProgress: await getMemberJourneyProgress(s.scope, s.groupId, canManage),
   });
 });
 

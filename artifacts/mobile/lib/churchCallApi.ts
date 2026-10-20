@@ -1,6 +1,7 @@
 import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import type { GatheringLesson, GatheringLessonRef, WorshipSession } from "@/lib/familyApi";
+import type { GatheringFollowUp } from "@/lib/groupLearningApi";
 
 // Every route on the server side (routes/churchCalls.ts) resolves identity
 // via verifyCaller() — a real Supabase JWT — never a client-supplied id.
@@ -144,7 +145,7 @@ export function setChurchCallHostSummary(callId: string, summary: string): Promi
 export function setChurchCallContinuityNotes(callId: string, notes: string): Promise<{ ok: true }> {
   return authedFetch(`/churches/calls/${callId}/continuity-notes`, { method: "PUT", body: JSON.stringify({ notes }) });
 }
-export interface ChurchCallSummary {
+export interface ChurchCallSummary extends GatheringFollowUp {
   overview: { churchId: string; title: string; purpose: ChurchCallPurpose; startedAt: string | null; endedAt: string | null; durationSeconds: number | null; host: { id: string; name: string; photoUrl: string | null } | null };
   participation: { participantCount: number; participants: { userId: string; name: string; photoUrl: string | null }[] };
   scripture: { reference: ChurchCallScripture | null; label: string | null };

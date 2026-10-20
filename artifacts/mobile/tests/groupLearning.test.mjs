@@ -12,7 +12,8 @@ let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL ${n} ${d}`); } };
 
 const api = src("lib/groupLearningApi.ts");
-ok("API client: session token only (no client-supplied user id)", /Authorization: `Bearer \$\{token\}`/.test(api) && !/userId/.test(api));
+// Response types may carry a member's userId (leaders' member progress); requests never do.
+ok("API client: session token only (no client-supplied user id)", /Authorization: `Bearer \$\{token\}`/.test(api) && !/userId/.test(api.split(/\r?\n/).filter((l) => !/^export interface /.test(l)).join("\n")));
 ok("API client: every server route used", ["/learning/library", "/learning/curricula/", "/journeys`", "/pause`", "/current-lesson`", "/covered`", "/covered/${lessonId}`"].every((p) => api.includes(p)));
 
 const home = src("app/learning/[scope]/[groupId].tsx");

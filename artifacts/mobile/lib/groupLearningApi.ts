@@ -45,9 +45,25 @@ export interface JourneyHistoryItem {
   curriculum: CurriculumOutline["curriculum"]; group: { covered: number; total: number };
 }
 export interface CustomLessonSummary { id: string; title: string; description: string | null; status: "draft" | "published"; lessonCount: number }
+export interface WorkItem { assignmentId: string; title: string; lessonId: string; lessonTitle: string | null }
+/** Assignments awaiting action: the viewer's own to-do; leaders also get review counts. */
+export interface WorkStatus {
+  toDo: (WorkItem & { dueAt: string | null; state: "not_started" | "returned" })[];
+  toReview: (WorkItem & { waiting: number })[];
+}
+/** Church leadership only: each visible member's OWN completion of the active series (counts only). */
+export interface MemberProgress { total: number; hiddenCount: number; members: { userId: string; name: string; completed: number; submitted: number }[] }
 export interface LearningHome {
   scope: GroupScope; groupId: string; canManage: boolean;
   activeJourney: JourneySummary | null; history: JourneyHistoryItem[]; customLessons: CustomLessonSummary[];
+  work?: WorkStatus;
+  memberProgress?: MemberProgress | null;
+}
+/** Shared by both Gathering summaries (Family + Church). */
+export interface GatheringFollowUp {
+  sharedNotes?: { authorName: string; content: string; at: string }[];
+  assignmentsCreated?: (WorkItem & { dueAt: string | null })[];
+  nextTime?: { curriculum: { id: string; title: string }; lesson: { id: string; title: string; moduleTitle: string } | null; covered: number; total: number } | null;
 }
 
 export const getLibrary = () => authedFetch<Library>("/learning/library");

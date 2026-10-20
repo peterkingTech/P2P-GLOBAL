@@ -43,8 +43,10 @@ await db.exec(`
   create table public.p2p_lesson_sections (id uuid primary key default gen_random_uuid(), lesson_id uuid, title text, content text, section_order int);
   create table public.p2p_reflection_questions (id uuid primary key default gen_random_uuid(), lesson_id uuid, question text, display_order int);
   create table public.p2p_reflection_responses (id uuid primary key default gen_random_uuid(), user_id uuid, question_id uuid, response text);
+  create table public.p2p_sessions (id uuid primary key); create table public.p2p_discipleship_links (id uuid primary key);
+  create table public.p2p_lesson_progress (id uuid primary key default gen_random_uuid(), user_id uuid, lesson_id uuid, status text, completed boolean);
   create table public.p2p_churches (id uuid primary key, name text);
-  create table public.p2p_church_members (id uuid primary key default gen_random_uuid(), church_id uuid, user_id uuid, role text, is_active boolean default true);
+  create table public.p2p_church_members (id uuid primary key default gen_random_uuid(), church_id uuid, user_id uuid, role text, is_active boolean default true, profile_visible_to_leadership boolean default true);
   create table public.p2p_church_cohorts (id uuid primary key default gen_random_uuid(), church_id uuid, name text, leader_id uuid, status text default 'active');
   create table public.p2p_church_cohort_members (id uuid primary key default gen_random_uuid(), cohort_id uuid, user_id uuid, status text default 'active');
   create function public.p2p_is_church_member(c uuid, u uuid) returns boolean language sql stable security definer set search_path = public
@@ -52,8 +54,8 @@ await db.exec(`
   create function public.p2p_is_church_leadership(c uuid, u uuid) returns boolean language sql stable security definer set search_path = public
     as 'select exists (select 1 from p2p_church_members where church_id = c and user_id = u and is_active and role in (''senior_pastor'',''discipleship_pastor'',''small_group_leader''))';
 `);
-for (const f of ["115_family_foundation.sql", "116_family_worship_sessions.sql", "126_family_multi_membership.sql", "130_church_calls.sql", "131_church_calls_experience.sql",
-  "133_church_calls_scheduled_started_at_fix.sql", "134_custom_studies_church.sql", "135_custom_studies_family.sql", "199_group_learning_journeys.sql", "200_custom_lesson_authoring.sql"]) await db.exec(mig(f));
+for (const f of ["082_journal_reflections.sql", "115_family_foundation.sql", "116_family_worship_sessions.sql", "126_family_multi_membership.sql", "130_church_calls.sql", "131_church_calls_experience.sql",
+  "133_church_calls_scheduled_started_at_fix.sql", "134_custom_studies_church.sql", "135_custom_studies_family.sql", "199_group_learning_journeys.sql", "200_custom_lesson_authoring.sql", "201_lesson_reflections_assignments.sql"]) await db.exec(mig(f));
 
 await db.exec(`insert into auth.users values ${Object.values(U).map((u) => `('${u}')`).join(",")};`);
 await db.query(`insert into p2p_profiles (id, full_name) select x, 'User' from unnest($1::uuid[]) x`, [Object.values(U)]);
@@ -176,12 +178,37 @@ try {
     && (await playback(U.pastor, { isPlaying: true })).status === 400);
   await call("PUT", `/churches/calls/${CID}/media`, U.pastor, { provider: "youtube", id: "aaaaaaaaaaa" });
 
+  // ── Prompt 8: what the Gathering leaves behind + member progress ──
+  r = await call("POST", `/learning/church/${CH}/journeys`, U.pastor, { curriculumId: C.core });
+  ok("pastor starts the church's journey (Core Foundation)", r.status === 200, JSON.stringify(r.body));
+  ok("a member shares a note; another private one stays private",
+    (await call("POST", `/churches/calls/${CID}/notes`, U.member, { content: "Next step: pray for our city daily", visibility: "shared" })).status === 200
+    && (await call("POST", `/churches/calls/${CID}/notes`, U.member, { content: "PRIVATE NOTE about my struggle", visibility: "private" })).status === 200);
+  r = await call("POST", `/learning/work/church/lessons/${CL.pub}/assignments`, U.pastor, { title: "Memorise John 3:16", status: "published" });
+  ok("pastor gives a follow-up assignment during the Gathering", r.status === 200 && r.body.status === "published", JSON.stringify(r.body));
+  const asgId = r.body.id;
+  await call("POST", `/learning/work/church/lessons/${CL.pub}/assignments`, U.pastor, { title: "DRAFT IDEA", status: "draft" });
+  await db.query(`insert into p2p_lesson_progress (user_id, lesson_id, status, completed) values ($1,$2,'completed',true)`, [U.member, L.a]);
+  await db.query(`update p2p_church_members set profile_visible_to_leadership = false where church_id = $1 and user_id = $2`, [CH, U.late]);
+  const home = (who) => call("GET", `/learning/church/${CH}`, who);
+  let h = await home(U.pastor);
+  ok("leaders: each visible member's own completion of the series (counts only)", h.status === 200 && h.body.memberProgress?.total === 1
+    && h.body.memberProgress.members.find((m) => m.userId === U.member)?.completed === 1, JSON.stringify(h.body.memberProgress));
+  ok("leaders: a member who opted out of leadership visibility isn't listed (counted as hidden)", !h.body.memberProgress.members.some((m) => m.userId === U.late) && h.body.memberProgress.hiddenCount === 1);
+  ok("members never get other members' progress", (await home(U.member)).body.memberProgress === null && (await home(U.sgl)).body.memberProgress !== null);
+  ok("member's own to-do lists the new assignment", (await home(U.member)).body.work.toDo.some((a) => a.assignmentId === asgId));
+
   // ── Summary: the lesson studied (church-owned) is there to open ──
   r = await call("POST", `/churches/calls/${CID}/end`, U.pastor);
   ok("host ends the Gathering", r.status === 200);
   r = await call("GET", `/churches/calls/${CID}/summary`, U.member);
   ok("summary: a member sees the church lesson studied (to open), the passage and the video", r.status === 200 && r.body.lessonRef?.kind === "church" && r.body.lessonRef.id === CL.pub
     && r.body.lessonRef.studyId === SA && r.body.scripture.label === "John 3:16-17" && r.body.media?.id === "aaaaaaaaaaa", JSON.stringify(r.body).slice(0, 400));
+  ok("summary: shared notes only (private note never copied)", r.body.sharedNotes?.length === 1 && r.body.sharedNotes[0].content === "Next step: pray for our city daily"
+    && !JSON.stringify(r.body).includes("PRIVATE NOTE"), JSON.stringify(r.body.sharedNotes));
+  ok("summary: the follow-up assignment given during the Gathering (never drafts)", r.body.assignmentsCreated?.length === 1 && r.body.assignmentsCreated[0].assignmentId === asgId
+    && r.body.assignmentsCreated[0].lessonTitle === "Week 1: Love" && !JSON.stringify(r.body).includes("DRAFT IDEA"), JSON.stringify(r.body.assignmentsCreated));
+  ok("summary: next time continues the journey at its next lesson (a reference)", r.body.nextTime?.curriculum.id === C.core && r.body.nextTime.lesson?.id === L.a && r.body.nextTime.total === 1, JSON.stringify(r.body.nextTime));
   ok("summary: never anyone's answers; another church can't read it", !JSON.stringify(r.body).includes("PRIVATE ANSWER")
     && (await call("GET", `/churches/calls/${CID}/summary`, U.otherPastor)).status === 403);
   r = await setLesson(CID, U.pastor, { lessonId: null });

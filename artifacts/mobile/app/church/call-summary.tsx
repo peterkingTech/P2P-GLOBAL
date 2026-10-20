@@ -9,6 +9,7 @@ import {
   getChurchCallSummary, setChurchCallHostSummary, setChurchCallContinuityNotes,
   CHURCH_CALL_PURPOSE_LABELS, type ChurchCallSummary,
 } from "@/lib/churchCallApi";
+import GatheringFollowUp from "@/components/study/GatheringFollowUp";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -149,6 +150,9 @@ export default function CallSummaryScreen() {
             <View style={styles.card}><Text style={styles.rowText}>▶️ {summary.media.provider === "youtube" ? "YouTube video watched together" : "Video watched together"}</Text></View>
           </>
         )}
+
+        {/* Shared notes, follow-up assignments, next time (Prompt 8) */}
+        <GatheringFollowUp followUp={summary} scope="church" />
 
         <Text style={styles.sectionLabel}>DISCUSSION</Text>
         <View style={styles.card}>

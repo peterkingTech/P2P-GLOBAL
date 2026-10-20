@@ -3,6 +3,7 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { logger } from "../lib/logger";
 import { getActiveJourney, summarizeJourney } from "../lib/groupLearning";
 import { supportsFamilyLessons, loadFamilyLessonForGathering, gatheringLessonRef, gatheringLessonView } from "../lib/gatheringLesson";
+import { getSharedGatheringNotes, getAssignmentsCreatedDuring, getResumeLesson } from "../lib/groupProgress";
 
 const router = Router();
 
@@ -709,7 +710,10 @@ router.post("/worship/sessions/:sessionId/end", async (req, res) => {
   if (!userId) return err(res, "Unauthorized", 401);
   const { session } = await getSessionAndCheckMembership(req.params.sessionId, userId);
   if (!session) return err(res, "Session not found", 404);
-  if (session.status === "ended") return ok(res, { ended: true });
+  // The summary this Gathering produced — the app opens it straight away.
+  const historyIdFor = async () => ((await db.from("p2p_family_worship_history").select("id").eq("session_id", session.id as string)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle()).data?.id as string | undefined) ?? null;
+  if (session.status === "ended") return ok(res, { ended: true, historyId: await historyIdFor() });
 
   const { data: family } = await db.from("p2p_families").select("shepherd_id").eq("id", session.family_id as string).maybeSingle();
   if (session.host_id !== userId && family?.shepherd_id !== userId) {
@@ -717,7 +721,7 @@ router.post("/worship/sessions/:sessionId/end", async (req, res) => {
   }
 
   await endSessionInternal(session as Record<string, unknown>);
-  return ok(res, { ended: true });
+  return ok(res, { ended: true, historyId: await historyIdFor() });
 });
 
 // GET /family/worship/history?familyId=... — lightweight, summary-only history.
@@ -836,6 +840,13 @@ router.get("/worship/history/:historyId", async (req, res) => {
     guideSummary: history.guide_summary ?? null,
     continuityNotes: history.continuity_notes ?? null,
     study: lesson,
+    // Prompt 8: the lesson actually studied (central or the family's own),
+    // notes participants chose to share, follow-up assignments published
+    // during the Gathering, and where the journey continues next time.
+    lessonRef: await gatheringLessonRef(history as Record<string, unknown>),
+    sharedNotes: await getSharedGatheringNotes("family", sessionId),
+    assignmentsCreated: await getAssignmentsCreatedDuring("family", history.family_id as string, startedAt, endedAt),
+    nextTime: await getResumeLesson("family", history.family_id as string),
     participants: participantIds.map((id) => ({ userId: id, name: profileById.get(id)?.full_name ?? "Family member", photoUrl: profileById.get(id)?.photo_url ?? null })),
     participation: { participantCount: history.participant_count, contributorCount: contributors.size },
     scripture: { references: scriptureReferences },

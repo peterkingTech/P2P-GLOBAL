@@ -151,13 +151,33 @@ try {
   ok("lesson unpublished mid-Gathering: members no longer get its content", r.status === 200 && r.body.lesson === null);
   await db.query(`update p2p_family_study_lessons set status = 'published' where id = $1`, [FL.pub]);
 
+  // Prompt 8: the family's journey + notes taken in the Gathering.
+  r = await call("POST", `/learning/family/${FA}/journeys`, U.shep, { curriculumId: C.core });
+  ok("Shepherd starts the family's journey (Core Foundation)", r.status === 200, JSON.stringify(r.body));
+  ok("a member shares a next step; a private note stays private",
+    (await call("POST", `/family/worship/sessions/${S1}/notes`, U.teen, { content: "Next: read Psalm 23 each night", visibility: "shared" })).status === 200
+    && (await call("POST", `/family/worship/sessions/${S1}/notes`, U.teen, { content: "PRIVATE NOTE just for me", visibility: "private" })).status === 200);
+
   // End → history keeps the link; the history list shows the title.
   r = await call("POST", `/family/worship/sessions/${S1}/end`, U.shep);
   ok("Guide ends the Gathering", r.status === 200);
+  const endedHistoryId = r.body.historyId;
   const h = (await db.query(`select lesson_id, family_lesson_id from p2p_family_worship_history where session_id = $1`, [S1])).rows[0];
   ok("history snapshot keeps the family lesson reference", h?.family_lesson_id === FL.pub && h.lesson_id === null, JSON.stringify(h));
   r = await call("GET", `/family/worship/history?familyId=${FA}`, U.teen);
   ok("history list shows the family lesson's title", r.status === 200 && r.body[0]?.lesson_title === "Psalm 23", JSON.stringify(r.body?.[0]));
+  const HID = r.body[0].id;
+  ok("ending returns this Gathering's summary id (the app opens it straight away)", endedHistoryId === HID, `${endedHistoryId} vs ${HID}`);
+  r = await call("POST", `/family/worship/sessions/${S1}/end`, U.shep);
+  ok("ending again is harmless and returns the same summary", r.status === 200 && r.body.historyId === HID);
+  r = await call("GET", `/family/worship/history/${HID}`, U.late);
+  ok("summary: the family lesson studied, with its study (to open)", r.status === 200 && r.body.lessonRef?.kind === "family" && r.body.lessonRef.id === FL.pub && r.body.lessonRef.studyId === SA, JSON.stringify(r.body?.lessonRef));
+  ok("summary: the note shared — and never the private one", r.body.sharedNotes?.length === 1 && r.body.sharedNotes[0].content === "Next: read Psalm 23 each night"
+    && !JSON.stringify(r.body).includes("PRIVATE NOTE"), JSON.stringify(r.body.sharedNotes));
+  ok("summary: no assignments were given (before 201 here: empty, not an error)", Array.isArray(r.body.assignmentsCreated) && r.body.assignmentsCreated.length === 0);
+  ok("summary: next time continues the family's journey (reference only)", r.body.nextTime?.curriculum.id === C.core && r.body.nextTime.lesson?.id === L.a, JSON.stringify(r.body.nextTime));
+  ok("summary: another family can't read it (403)", (await call("GET", `/family/worship/history/${HID}`, U.other)).status === 403);
+  ok("summary: never anyone's answers", !JSON.stringify(r.body).includes("PRIVATE ANSWER"));
 
   // Progress is never touched by linking/opening.
   ok("no personal progress or answers written", (await db.query(`select count(*)::int n from p2p_reflection_responses`)).rows[0].n === 1);
