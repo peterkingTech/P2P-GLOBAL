@@ -126,6 +126,15 @@ ok("family: ending opens the summary for everyone (Guide via the end result, oth
   && /router\.replace\(\{ pathname: "\/family\/gathering-summary", params: \{ historyId: hid, familyId \} \} as any\)/.test(gs)
   && /h\.session_id === params\.sessionId/.test(gs));
 ok("children aren't shown media controls (server refuses them too)", /canControlMedia\(session, profile\?\.id\) && myFamilyRole !== "child"/.test(gs));
+// ── Prompt 10 polish ──────────────────────────────────────────────────────
+const rl = src("app/_layout.tsx");
+ok("native headers follow the app theme (no white bar above a dark screen)", /headerStyle: \{ backgroundColor: themeColors\.lightCream \}/.test(rl) && /color: themeColors\.textDark/.test(rl));
+ok("the Gathering header names the Gathering (mode badge shows the resource)", /title="Family Gathering"/.test(gs) && !/title="Study Workspace"/.test(gs));
+ok("church call summary follows the theme (no fixed light palette)", /const \{ colors \} = useTheme\(\);/.test(sum) && !/import colors from "@\/constants\/colors"/.test(sum));
+const chHome = src("app/church/index.tsx");
+ok("church overview: a failed load says so with Try again (no endless spinner)", /groveState === "failed"/.test(chHome) && /Try again/.test(chHome));
+ok("church call controls are labelled for screen readers; 44pt targets", /accessibilityLabel="Leave the gathering"/.test(cc) && /accessibilityLabel="Open chat"/.test(cc)
+  && /iconBtnSmall: \{ width: 44, height: 44/.test(cc) && /reactionBtn: \{ width: 44, height: 44/.test(cc) && !/name: "You", isSelf: true/.test(cc));
 ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);

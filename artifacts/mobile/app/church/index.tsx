@@ -43,21 +43,26 @@ export default function ChurchHomeScreen() {
     }, [loadUserChurch])
   );
 
+  // The leaders' overview: loading → numbers, or a clear "couldn't load"
+  // with Try again (never an endless spinner).
+  const [groveState, setGroveState] = useState<"loading" | "ready" | "failed">("loading");
+  const [groveNonce, setGroveNonce] = useState(0);
   useEffect(() => {
     if (!userChurch) return;
     (async () => {
       const dashboardGoals = await getLearningGoalsDashboard(userChurch.id);
       setGoalDashboard(dashboardGoals);
       if (isChurchLeader) {
-        const g = await getGroveData(userChurch.id);
-        if (g) setGrove(g);
+        setGroveState("loading");
+        const g = await getGroveData(userChurch.id).catch(() => null);
+        if (g) { setGrove(g); setGroveState("ready"); } else setGroveState("failed");
       } else {
         const [c, a] = await Promise.all([getChurchCohorts(userChurch.id), getAnnouncements(userChurch.id)]);
         setCohorts(c);
         setAnnouncements(a);
       }
     })();
-  }, [userChurch, isChurchLeader, getGroveData, getChurchCohorts, getAnnouncements, getLearningGoalsDashboard]);
+  }, [userChurch, isChurchLeader, getGroveData, getChurchCohorts, getAnnouncements, getLearningGoalsDashboard, groveNonce]);
 
   if (loading) {
     return (
@@ -161,6 +166,13 @@ export default function ChurchHomeScreen() {
               <StatRow icon="book" label="Lessons this week" value={grove.lessonsThisWeek} />
               <StatRow icon="earth" label="Nations reached" value={grove.nationsReached} />
               <StatRow icon="leaf" label="People invited" value={grove.totalGrainPlanted} />
+            </View>
+          ) : groveState === "failed" ? (
+            <View style={styles.statsCard}>
+              <Text style={styles.emptyInlineText}>Couldn't load the overview right now.</Text>
+              <TouchableOpacity onPress={() => setGroveNonce((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Try loading the overview again" style={{ minHeight: 44, justifyContent: "center" }}>
+                <Text style={styles.attentionLink}>Try again</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 12 }} />

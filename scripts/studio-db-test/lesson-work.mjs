@@ -163,6 +163,7 @@ try {
   ok("to-do: a member who hasn't submitted sees the assignment (not started), with its lesson", h.status === 200 && h.body.work.toDo.length === 1
     && h.body.work.toDo[0].assignmentId === asg.id && h.body.work.toDo[0].state === "not_started" && h.body.work.toDo[0].lessonTitle === "Psalm 23", JSON.stringify(h.body?.work));
   ok("to-review: members get none", h.body.work.toReview.length === 0);
+  ok("whoever set an assignment isn't asked to do it", !(await home(U.co)).body.work.toDo.some((a) => a.assignmentId === asg.id));
   ok("to-do: a member whose latest attempt is submitted has nothing to do", (await home(U.ann)).body.work.toDo.length === 0);
   h = await home(U.shep);
   ok("to-review: the Shepherd sees 1 submission waiting (latest attempt only)", h.body.work.toReview.length === 1 && h.body.work.toReview[0].waiting === 1, JSON.stringify(h.body.work));

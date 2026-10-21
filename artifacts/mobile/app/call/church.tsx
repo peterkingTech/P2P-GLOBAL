@@ -454,7 +454,7 @@ export default function ChurchCallScreen() {
 
   const nameByUserId = new Map(detail.participants.map((p) => [uidFromUserId(p.userId), p.name]));
   const allTiles: GridTile[] = [
-    { uid: 0, name: "You", isSelf: true, videoOn: cameraOn && !videoDisabledByHost },
+    { uid: 0, name: profile?.displayName?.split(" ")[0] || "Me", isSelf: true, videoOn: cameraOn && !videoDisabledByHost },
     ...remoteUids.map((uid) => ({ uid, name: nameByUserId.get(uid) ?? "Someone", isSelf: false, videoOn: true })),
   ];
   // Teaching mode — the host/speaker gets the large tile, everyone else a
@@ -480,12 +480,13 @@ export default function ChurchCallScreen() {
             {CHURCH_CALL_PURPOSE_LABELS[detail.call.purpose]} · {allTiles.length} participant{allTiles.length === 1 ? "" : "s"}
           </Text>
         </View>
-        <TouchableOpacity style={styles.iconBtnSmall} onPress={() => { setParticipantsOpen(true); load(); }}>
+        <TouchableOpacity style={styles.iconBtnSmall} onPress={() => { setParticipantsOpen(true); load(); }}
+          accessibilityRole="button" accessibilityLabel={`Participants${raisedHandUserIds.size ? `, ${raisedHandUserIds.size} raised hand${raisedHandUserIds.size === 1 ? "" : "s"}` : ""}`}>
           <Ionicons name="people" size={16} color="#fff" />
           {raisedHandUserIds.size > 0 && <View style={styles.badgeDot} />}
         </TouchableOpacity>
         {isHost && (
-          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setToolsOpen(true)}>
+          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setToolsOpen(true)} accessibilityRole="button" accessibilityLabel="Ministry tools: Scripture, lesson and media">
             <Ionicons name="book" size={16} color="#fff" />
           </TouchableOpacity>
         )}
@@ -577,26 +578,29 @@ export default function ChurchCallScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.reactionRow}>
         {REACTIONS.map((emoji) => (
-          <TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => sendReaction(emoji)}>
+          <TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => sendReaction(emoji)} accessibilityRole="button" accessibilityLabel={`Send reaction ${emoji}`}>
             <Text style={{ fontSize: 18 }}>{emoji}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={[styles.reactionBtn, handRaised && styles.reactionBtnActive]} onPress={toggleRaiseHand}>
+        <TouchableOpacity style={[styles.reactionBtn, handRaised && styles.reactionBtnActive]} onPress={toggleRaiseHand}
+          accessibilityRole="button" accessibilityLabel={handRaised ? "Lower your hand" : "Raise your hand"} accessibilityState={{ selected: handRaised }}>
           <Text style={{ fontSize: 16 }}>✋</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reactionBtn} onPress={() => setChatOpen(true)}>
+        <TouchableOpacity style={styles.reactionBtn} onPress={() => setChatOpen(true)} accessibilityRole="button" accessibilityLabel="Open chat">
           <Ionicons name="chatbubble-outline" size={16} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
 
       <View style={[styles.controlsRow, { paddingBottom: insets.bottom + 14 }]}>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
+        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute} accessibilityRole="button"
+          accessibilityLabel={micDisabledByHost ? "Microphone muted by the host" : muted ? "Unmute microphone" : "Mute microphone"} accessibilityState={{ selected: muted || micDisabledByHost }}>
           <Ionicons name={muted || micDisabledByHost ? "mic-off" : "mic"} size={18} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
+        <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera} accessibilityRole="button"
+          accessibilityLabel={videoDisabledByHost ? "Camera turned off by the host" : cameraOn ? "Turn camera off" : "Turn camera on"} accessibilityState={{ selected: !cameraOn || videoDisabledByHost }}>
           <Ionicons name={cameraOn && !videoDisabledByHost ? "videocam" : "videocam-off"} size={18} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleLeave}>
+        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleLeave} accessibilityRole="button" accessibilityLabel="Leave the gathering">
           <Ionicons name="call" size={18} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
         </TouchableOpacity>
       </View>
@@ -609,7 +613,7 @@ export default function ChurchCallScreen() {
 
       {isHost && (
         <View style={styles.hostBar}>
-          <TouchableOpacity style={styles.hostBtn} onPress={handleEnd} disabled={ending}>
+          <TouchableOpacity style={styles.hostBtn} onPress={handleEnd} disabled={ending} accessibilityRole="button" accessibilityLabel="End the gathering for everyone">
             {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.hostBtnText}>End Gathering for Everyone</Text>}
           </TouchableOpacity>
         </View>
@@ -621,7 +625,7 @@ export default function ChurchCallScreen() {
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Participants</Text>
-              <TouchableOpacity onPress={() => setParticipantsOpen(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setParticipantsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 360 }}>
               {detail.participants.map((p) => {
@@ -638,19 +642,19 @@ export default function ChurchCallScreen() {
                       </Text>
                     </View>
                     {handUp && isHost && (
-                      <TouchableOpacity style={styles.smallActionBtn} onPress={() => lowerHand(p.userId)}>
+                      <TouchableOpacity style={styles.smallActionBtn} onPress={() => lowerHand(p.userId)} accessibilityRole="button" accessibilityLabel={`Lower ${p.name}'s hand`}>
                         <Text style={styles.smallActionText}>Lower</Text>
                       </TouchableOpacity>
                     )}
                     {isHost && p.userId !== profile?.id && !isTileHost && (
                       <>
-                        <TouchableOpacity style={styles.smallActionBtn} onPress={() => handleMuteParticipant(p)}>
+                        <TouchableOpacity style={styles.smallActionBtn} onPress={() => handleMuteParticipant(p)} accessibilityRole="button" accessibilityLabel={`${p.micDisabledByHost ? "Unmute" : "Mute"} ${p.name}`}>
                           <Text style={styles.smallActionText}>{p.micDisabledByHost ? "Unmute" : "Mute"}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.smallActionBtn} onPress={() => handleVideoDisableParticipant(p)}>
+                        <TouchableOpacity style={styles.smallActionBtn} onPress={() => handleVideoDisableParticipant(p)} accessibilityRole="button" accessibilityLabel={`${p.videoDisabledByHost ? "Allow video for" : "Turn off video for"} ${p.name}`}>
                           <Text style={styles.smallActionText}>{p.videoDisabledByHost ? "Video On" : "Video Off"}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.smallActionBtn, styles.removeBtn]} onPress={() => handleRemoveParticipant(p)}>
+                        <TouchableOpacity style={[styles.smallActionBtn, styles.removeBtn]} onPress={() => handleRemoveParticipant(p)} accessibilityRole="button" accessibilityLabel={`Remove ${p.name} from the gathering`}>
                           <Text style={styles.smallActionText}>Remove</Text>
                         </TouchableOpacity>
                       </>
@@ -669,7 +673,7 @@ export default function ChurchCallScreen() {
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Chat</Text>
-              <TouchableOpacity onPress={() => setChatOpen(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setChatOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 300 }}>
               {messages.length === 0 ? (
@@ -690,7 +694,7 @@ export default function ChurchCallScreen() {
                 onChangeText={setChatInput}
                 onSubmitEditing={handleSendChat}
               />
-              <TouchableOpacity style={styles.chatSendBtn} onPress={handleSendChat}>
+              <TouchableOpacity style={styles.chatSendBtn} onPress={handleSendChat} accessibilityRole="button" accessibilityLabel="Send message">
                 <Ionicons name="send" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -707,7 +711,7 @@ export default function ChurchCallScreen() {
           <ScrollView contentContainerStyle={styles.sheetBox} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Ministry Tools</Text>
-              <TouchableOpacity onPress={() => setToolsOpen(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setToolsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
 
             <Text style={styles.toolsLabel}>Scripture</Text>
@@ -778,7 +782,7 @@ const styles = StyleSheet.create({
   topBarTitle: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   topBarSub: { color: "rgba(255,255,255,0.6)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#DC2626" },
-  iconBtnSmall: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
+  iconBtnSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   badgeDot: { position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: "#B8860B" },
 
   speakerWrap: { flex: 3 },
@@ -788,7 +792,7 @@ const styles = StyleSheet.create({
   floatingReaction: { fontSize: 26, marginBottom: 4 },
 
   reactionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 6 },
-  reactionBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
+  reactionBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   reactionBtnActive: { backgroundColor: "#B8860B" },
 
   controlsRow: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 16, paddingTop: 8 },
@@ -796,7 +800,7 @@ const styles = StyleSheet.create({
   endBtn: { backgroundColor: "#DC2626" },
 
   hostBar: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 10, justifyContent: "center" },
-  hostBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  hostBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingHorizontal: 14, minHeight: 44, justifyContent: "center" },
   hostBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
@@ -808,7 +812,8 @@ const styles = StyleSheet.create({
   participantRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)", flexWrap: "wrap" },
   participantName: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" },
   participantMeta: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  smallActionBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginLeft: 6 },
+  smallActionBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 8, paddingHorizontal: 10, minHeight: 44, justifyContent: "center", marginLeft: 6 },
+  closeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   removeBtn: { borderColor: "#DC2626" },
   smallActionText: { color: "#fff", fontSize: 11, fontFamily: "Inter_500Medium" },
 

@@ -46,7 +46,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppVersionGate } from "@/components/AppVersionGate";
 import { ClientBuildReporter } from "@/components/ClientBuildReporter";
 import { DataProvider, useData } from "@/contexts/DataContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { PageFrame } from "@/components/PageFrame";
 import { getStageFromPoints } from "@/constants/stages";
 import i18n, { SUPPORTED_LANGUAGES } from "@/lib/i18n";
@@ -77,6 +77,9 @@ const OWN_HEADER_ROUTES = [
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
 
 function AuthGate() {
+  // Native headers follow the app theme (light/dark) instead of the
+  // platform's default white bar above a dark screen.
+  const { colors: themeColors } = useTheme();
   const { isAuthenticated, isLoading, profile, isPasswordRecovery, accountStatus } = useAuth();
   const segments = useSegments();
   const pathname = usePathname();
@@ -190,7 +193,9 @@ function AuthGate() {
       screenOptions={{
         headerShown: true,
         headerTintColor: "#1D9E75",
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: themeColors.textDark },
+        headerStyle: { backgroundColor: themeColors.lightCream },
+        headerShadowVisible: false,
         // Safety net: a screen that sets no title shows a blank header title
         // instead of Expo Router's fallback, the route name ("plan/[id]").
         title: "",

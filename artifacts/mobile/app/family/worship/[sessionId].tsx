@@ -866,7 +866,7 @@ export default function FamilyWorshipScreen() {
       <View style={[{ paddingTop: insets.top + 10 }, focused && styles.hidden]}>
         <TogetherHeader
           onBack={leave}
-          title="Study Workspace"
+          title="Family Gathering"
           modeIcon={currentModeMeta.icon}
           modeLabel={currentModeMeta.label}
           participantCount={activeParticipants.length}

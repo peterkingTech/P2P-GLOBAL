@@ -4,7 +4,8 @@ import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-rou
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
-import colors from "@/constants/colors";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { AppColors } from "@/constants/themes";
 import {
   getChurchCallSummary, setChurchCallHostSummary, setChurchCallContinuityNotes,
   CHURCH_CALL_PURPOSE_LABELS, type ChurchCallSummary,
@@ -31,6 +32,9 @@ export default function CallSummaryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  // Follows the app theme (light/dark), like the rest of the summary.
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const params = useLocalSearchParams<{ callId: string }>();
 
   const [loading, setLoading] = useState(true);
@@ -204,7 +208,8 @@ export default function CallSummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: AppColors) {
+  return StyleSheet.create({
   openLessonBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, marginTop: 6 },
   openLessonText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   container: { flex: 1, backgroundColor: colors.lightCream },
@@ -220,3 +225,4 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
   saveBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });
+}

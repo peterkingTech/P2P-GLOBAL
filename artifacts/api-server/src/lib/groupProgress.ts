@@ -37,7 +37,7 @@ function latestByKey<T extends { assignment_id: string; user_id: string; attempt
 export async function getWorkStatus(scope: GroupScope, groupId: string, userId: string, canManage: boolean) {
   const empty = { toDo: [] as { assignmentId: string; title: string; lessonId: string; lessonTitle: string | null; dueAt: string | null; state: "not_started" | "returned" }[],
     toReview: [] as { assignmentId: string; title: string; lessonId: string; lessonTitle: string | null; waiting: number }[] };
-  const { data: asg, error } = await db.from("p2p_group_assignments").select("id,title,due_at,status,family_lesson_id,church_lesson_id")
+  const { data: asg, error } = await db.from("p2p_group_assignments").select("id,title,due_at,status,family_lesson_id,church_lesson_id,created_by")
     .eq(scopeColumn(scope), groupId).eq("status", "published");
   if (error || !asg?.length) return empty;
   const ids = asg.map((a) => a.id as string);
@@ -46,6 +46,7 @@ export async function getWorkStatus(scope: GroupScope, groupId: string, userId: 
   const { data: mine } = await db.from("p2p_group_assignment_submissions").select("assignment_id,user_id,attempt,status").eq("user_id", userId).in("assignment_id", ids);
   const myLatest = new Map(latestByKey((mine ?? []) as { assignment_id: string; user_id: string; attempt: number; status: string }[]).map((r) => [r.assignment_id, r]));
   for (const a of asg) {
+    if (a.created_by === userId) continue; // whoever set it isn't asked to do it
     const latest = myLatest.get(a.id as string);
     if (latest && latest.status !== "returned") continue;
     const lessonId = a[lessonCol(scope)] as string;
