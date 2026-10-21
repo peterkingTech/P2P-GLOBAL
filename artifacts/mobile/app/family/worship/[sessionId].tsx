@@ -602,6 +602,25 @@ export default function FamilyWorshipScreen() {
     } catch (e: any) { showAlert("Couldn't play the video", e.message ?? "Please try again."); }
   }
 
+  // Mute mode really mutes: when the Guide switches the Gathering to Mute,
+  // each device mutes its own microphone (only if it was on) and remembers
+  // that the mode did it; leaving Mute restores only what the mode muted.
+  // Anyone may still unmute on purpose during Mute (e.g. to close in
+  // prayer) and keeps that choice. Uses the same mic toggle people use.
+  const mutedByModeRef = useRef(false);
+  useEffect(() => {
+    const silent = session?.currentMode === "silent_prayer";
+    if (silent && !mutedByModeRef.current && !voiceSpace.micMuted) {
+      mutedByModeRef.current = true;
+      voiceSpace.toggleMic();
+    } else if (!silent && mutedByModeRef.current) {
+      mutedByModeRef.current = false;
+      if (voiceSpace.micMuted) voiceSpace.toggleMic();
+    }
+    // Only a change of mode acts here — never a person's own mic choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.currentMode]);
+
   // Lets screens opened from here show "Return to Gathering" and the same mic toggle.
   useEffect(() => {
     if (!session?.id) return;
@@ -767,7 +786,7 @@ export default function FamilyWorshipScreen() {
       {(session.currentMode === "prayer" || session.currentMode === "silent_prayer") && (
         <View style={styles.panel}>
           <Text style={styles.panelLabel}>{session.currentMode === "silent_prayer" ? "MUTE" : "PRAYER"}</Text>
-          {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Microphones are muted.</Text>}
+          {session.currentMode === "silent_prayer" && <Text style={styles.silentHint}>Together, quietly. Your microphone is muted — tap the mic if you need to speak.</Text>}
           <PrayerSpacePanel
             session={session}
             prayers={prayers}

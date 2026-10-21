@@ -135,6 +135,13 @@ const chHome = src("app/church/index.tsx");
 ok("church overview: a failed load says so with Try again (no endless spinner)", /groveState === "failed"/.test(chHome) && /Try again/.test(chHome));
 ok("church call controls are labelled for screen readers; 44pt targets", /accessibilityLabel="Leave the gathering"/.test(cc) && /accessibilityLabel="Open chat"/.test(cc)
   && /iconBtnSmall: \{ width: 44, height: 44/.test(cc) && /reactionBtn: \{ width: 44, height: 44/.test(cc) && !/name: "You", isSelf: true/.test(cc));
+// Mute mode really mutes (it used to only say so).
+ok("Mute mode mutes my mic only if it was on, and restores only what it muted", /const silent = session\?\.currentMode === "silent_prayer";/.test(gs)
+  && /if \(silent && !mutedByModeRef\.current && !voiceSpace\.micMuted\) \{\r?\n\s*mutedByModeRef\.current = true;\r?\n\s*voiceSpace\.toggleMic\(\);/.test(gs)
+  && /\} else if \(!silent && mutedByModeRef\.current\) \{\r?\n\s*mutedByModeRef\.current = false;\r?\n\s*if \(voiceSpace\.micMuted\) voiceSpace\.toggleMic\(\);/.test(gs)
+  && /\}, \[session\?\.currentMode\]\);/.test(gs));
+ok("Mute mode says what is true (you can unmute to speak)", /Your microphone is muted — tap the mic if you need to speak\./.test(gs) && !/Microphones are muted\./.test(gs));
+ok("the mute hook runs before the loading guard (no conditional hooks)", gs.indexOf("const mutedByModeRef = useRef(false);") < gs.indexOf("if (loading || !session) {"));
 ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);
