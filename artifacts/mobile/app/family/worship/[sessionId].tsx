@@ -143,7 +143,10 @@ export default function FamilyWorshipScreen() {
   // independently on every mutating call, so this can never be the only
   // gate (no arbitrary client-side permission escalation is possible even
   // if this value were wrong or tampered with).
-  const canControl = session ? canControlMedia(session, profile?.id) : false;
+  // Children never control Shared Media (migration 198 safeguards; the server
+  // refuses them anyway) — so they aren't shown controls that would fail.
+  const myFamilyRole = members.find((m) => m.userId === profile?.id)?.role;
+  const canControl = session ? canControlMedia(session, profile?.id) && myFamilyRole !== "child" : false;
 
   // Reconnect (spec steps 1-3 + 5): always refetches fresh from the server
   // rather than trusting whatever local state survived a background/

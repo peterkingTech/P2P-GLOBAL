@@ -125,6 +125,7 @@ ok("family: ending opens the summary for everyone (Guide via the end result, oth
   && (gs.match(/showAlert\("Gathering ended", "This session has ended\."\);\r?\n\s*finishToSummary\(\);/g) ?? []).length === 2
   && /router\.replace\(\{ pathname: "\/family\/gathering-summary", params: \{ historyId: hid, familyId \} \} as any\)/.test(gs)
   && /h\.session_id === params\.sessionId/.test(gs));
+ok("children aren't shown media controls (server refuses them too)", /canControlMedia\(session, profile\?\.id\) && myFamilyRole !== "child"/.test(gs));
 ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);
