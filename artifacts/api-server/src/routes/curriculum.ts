@@ -126,12 +126,13 @@ function mapLesson(row: Record<string, unknown>, isCompleted = false) {
   };
 }
 
-// GET /curriculum — list published curriculums
+// GET /curriculum — list published curriculums (`status`; production has no
+// `is_published` column, so the old filter failed every request).
 router.get("/curriculum", async (_req, res) => {
   const { data, error } = await supabase
     .from("p2p_curriculums")
     .select("*")
-    .eq("is_published", true)
+    .eq("status", "published")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -144,7 +145,7 @@ router.get("/curriculum", async (_req, res) => {
       title: r.title,
       description: r.description ?? null,
       imageUrl: r.image_url ?? null,
-      isPublished: r.is_published ?? false,
+      isPublished: r.status === "published",
       createdAt: r.created_at,
     }))
   );

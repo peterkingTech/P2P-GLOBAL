@@ -75,7 +75,7 @@ export async function buildWinsDb(PGlite, { with188 = false, with189 = false, ti
     alter table public.p2p_admin_activity_log enable row level security;
     create policy "admin_activity_log_select" on public.p2p_admin_activity_log for select to authenticated
       using (auth.uid() = admin_id or p2p_current_role() in ('super_admin', 'admin_supervisor'));
-    create table public.p2p_curriculums (id uuid primary key default gen_random_uuid(), title text, is_published boolean default false, created_at timestamptz default now());
+    create table public.p2p_curriculums (id uuid primary key default gen_random_uuid(), title text, status text not null default 'draft', created_at timestamptz default now());
     insert into auth.users values ${Object.values(U).map((id) => `('${id}')`).join(", ")};
     insert into p2p_profiles (id, role, full_name) values ${Object.entries(U).map(([k, id]) => `('${id}','${ROLE[k]}','Synthetic ${ROLE[k]} ${k}')`).join(", ")};
   `);

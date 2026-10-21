@@ -8,6 +8,7 @@ import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
+import { authedFetch } from "@/lib/adminFetch";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import ShareRoomPanel from "@/components/ShareRoomPanel";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -107,7 +108,7 @@ export default function BreakRoomScreen() {
     if (leftRef.current || !profile?.id || !params.roomId) return;
     leftRef.current = true;
     try {
-      await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/leave`, {
+      await authedFetch(`/calls/rooms/${params.roomId}/leave`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
@@ -119,7 +120,7 @@ export default function BreakRoomScreen() {
   const doJoin = useCallback(async () => {
     if (!profile?.id || !params.roomId || !myUid) return;
     try {
-      const res = await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/join`, {
+      const res = await authedFetch(`/calls/rooms/${params.roomId}/join`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
@@ -255,7 +256,7 @@ export default function BreakRoomScreen() {
   async function grantFloor(userId: string | null) {
     if (!isHost || !profile?.id || !params.roomId) return;
     try {
-      await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/set-speaker`, {
+      await authedFetch(`/calls/rooms/${params.roomId}/set-speaker`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostId: profile.id, speakerId: userId }),
       });
@@ -269,7 +270,7 @@ export default function BreakRoomScreen() {
       {
         text: "Remove", style: "destructive", onPress: async () => {
           if (!profile?.id || !params.roomId) return;
-          await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/remove`, {
+          await authedFetch(`/calls/rooms/${params.roomId}/remove`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ hostId: profile.id, userId: p.userId }),
           });
@@ -284,7 +285,7 @@ export default function BreakRoomScreen() {
     if (!profile?.id || !params.roomId) return;
     setFlagging(true);
     try {
-      await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}/flag`, {
+      await authedFetch(`/calls/rooms/${params.roomId}/flag`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flaggerId: profile.id, reason }),
       });
@@ -301,7 +302,7 @@ export default function BreakRoomScreen() {
     if (!isHost || !profile?.id || !params.roomId) return;
     setEnding(true);
     try {
-      await fetch(`${getApiUrl()}/calls/rooms/${params.roomId}`, {
+      await authedFetch(`/calls/rooms/${params.roomId}`, {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostId: profile.id }),
       });

@@ -37,7 +37,7 @@ export async function setupBase(db, m152) {
     create table public.p2p_scripture_references (id uuid primary key);
     create table public.p2p_mission_fields (id uuid primary key);
     create table public.p2p_mission_stories (id uuid primary key);
-    create table public.p2p_curriculums (id uuid primary key default gen_random_uuid(), title text, is_published boolean default false, created_at timestamptz default now());
+    create table public.p2p_curriculums (id uuid primary key default gen_random_uuid(), title text, status text not null default 'draft', created_at timestamptz default now());
     create table public.p2p_prayer_topics (id uuid primary key default gen_random_uuid(), title text, status text default 'draft', updated_at timestamptz default now());
     create table public.p2p_prayer_paths (id uuid primary key default gen_random_uuid(), title text, status text default 'draft', updated_at timestamptz default now());
     create table public.p2p_kingdom_wins (id uuid primary key, title text, status text default 'submitted', visibility text default 'p2p_network',

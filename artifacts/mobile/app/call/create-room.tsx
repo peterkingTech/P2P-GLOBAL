@@ -4,6 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
+import { authedFetch } from "@/lib/adminFetch";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
@@ -55,7 +56,7 @@ export default function CreateRoomScreen() {
     if (!profile?.id || !name.trim()) return;
     setLaunching(true);
     try {
-      const res = await fetch(`${getApiUrl()}/calls/rooms`, {
+      const res = await authedFetch(`/calls/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

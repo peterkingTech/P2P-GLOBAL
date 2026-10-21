@@ -30,7 +30,7 @@ const ok = (name, cond, detail = "") => { if (cond) pass++; else { fail++; conso
 const db = new PGlite();
 const cat = await setupBase(db, readFileSync(path.join(repo, "migrations/152_kingdom_stories.sql"), "utf8"));
 await db.exec(readFileSync(path.join(repo, "migrations/188_publishing_studio_foundation.sql"), "utf8"));
-await db.exec(`insert into p2p_curriculums (title, is_published) values ('Foundations', true), ('Draft plan', false);
+await db.exec(`insert into p2p_curriculums (title, status) values ('Foundations', 'published'), ('Draft plan', 'draft');
   insert into p2p_prayer_topics (title, status) values ('Peace', 'published'); insert into p2p_prayer_paths (title, status) values ('Psalm 23 path', 'draft');`);
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), "studio-routes-"));
@@ -62,7 +62,8 @@ try {
   ok("library: paginated with total (API reads with SELECT-only grants)", page0.status === 200 && page0.body.total === 2 && page0.body.items.length === 1 && page1.body.items[0].sourceId !== page0.body.items[0].sourceId, JSON.stringify(page0.body).slice(0, 200));
   ok("library: search by title", (await call("GET", "/studio/items?sourceType=kingdom_story&q=moravian", U.M)).body.items.map((i) => i.title).join() === "The Moravian Prayer Watch");
   const cur = await call("GET", "/studio/items?sourceType=curriculum", U.M);
-  ok("library: curriculum read-only from its own published flag", cur.status === 200 && cur.body.total === 2 && cur.body.editable === false && cur.body.manage.path === "/admin/curriculum" && cur.body.items.some((i) => i.nativeStatus === "published"));
+  ok("library: curriculum read-only from its own status", cur.status === 200 && cur.body.total === 2 && cur.body.editable === false && cur.body.manage.path === "/admin/curriculum" && cur.body.items.some((i) => i.nativeStatus === "published") && cur.body.items.some((i) => i.nativeStatus === "draft"));
+  ok("library: curriculum filtered by status", (await call("GET", "/studio/items?sourceType=curriculum&status=published", U.M)).body?.total === 1);
   const topics = await call("GET", "/studio/items?sourceType=prayer_topic", U.M);
   ok("library: Pray the Word read-only, honest about no admin screen", topics.status === 200 && topics.body.total === 1 && topics.body.editable === false && topics.body.manage.path === null);
   const wins = await call("GET", "/studio/items?sourceType=kingdom_win", U.S);

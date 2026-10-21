@@ -140,6 +140,26 @@ async function verifyCaller(req: import("express").Request): Promise<string | nu
   return data.user.id;
 }
 
+// Break Rooms — who is acting. A signed-in token always wins, and an id in
+// the body must match it. App builds from before this change send no token
+// and keep the old body-trusted behaviour until ROOMS_REQUIRE_AUTH=true is
+// set, once the newer build is widely installed (same staged approach as
+// CIRCLES_REQUIRE_AUTH / migration 185). Writes the error and returns null
+// when the request can't proceed.
+async function roomCaller(
+  req: import("express").Request, res: import("express").Response, claimed: string | undefined, field: string,
+): Promise<string | null> {
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    const caller = await verifyCaller(req);
+    if (!caller) { err(res, "Please sign in again.", 401); return null; }
+    if (claimed && claimed !== caller) { err(res, "Not allowed", 403); return null; }
+    return caller;
+  }
+  if (process.env.ROOMS_REQUIRE_AUTH === "true") { err(res, "Please sign in.", 401); return null; }
+  if (!claimed) { err(res, `${field} required`); return null; }
+  return claimed;
+}
+
 // POST /calls/token — mint an Agora RTC token for a channel + numeric uid.
 // No requireAuth middleware exists in this codebase (see discipleship.ts,
 // circles.ts) — every route here trusts the caller-supplied identity the
@@ -1588,11 +1608,13 @@ router.get("/calls/rooms/:roomId", async (req, res) => {
 // POST /calls/rooms — create + auto-join the host, then fires (non-blocking)
 // interest-matched notifications to users who've studied this category.
 router.post("/calls/rooms", async (req, res) => {
-  const { hostId, name, description, roomType, category, languageCode, speakingMode } = req.body as {
+  const { name, description, roomType, category, languageCode, speakingMode } = req.body as {
     hostId?: string; name?: string; description?: string; roomType?: string;
     category?: string | null; languageCode?: string | null; speakingMode?: string;
   };
-  if (!hostId || !name) return err(res, "hostId and name required");
+  const hostId = await roomCaller(req, res, (req.body as { hostId?: string }).hostId, "hostId");
+  if (!hostId) return;
+  if (!name) return err(res, "name required");
 
   const roomId = crypto.randomUUID();
   const channelName = `room_${roomId}`;
@@ -1621,8 +1643,8 @@ router.post("/calls/rooms", async (req, res) => {
 // active 24h removal block before letting a user (re)join.
 router.post("/calls/rooms/:roomId/join", async (req, res) => {
   const { roomId } = req.params;
-  const { userId } = req.body as { userId?: string };
-  if (!userId) return err(res, "userId required");
+  const userId = await roomCaller(req, res, (req.body as { userId?: string }).userId, "userId");
+  if (!userId) return;
 
   const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
   if (!room || !room.is_live) return err(res, "Room is not live", 404);
@@ -1655,8 +1677,8 @@ router.post("/calls/rooms/:roomId/join", async (req, res) => {
 // others still in it) is instead caught by the 5-minute sweep in breakRooms.ts.
 router.post("/calls/rooms/:roomId/leave", async (req, res) => {
   const { roomId } = req.params;
-  const { userId } = req.body as { userId?: string };
-  if (!userId) return err(res, "userId required");
+  const userId = await roomCaller(req, res, (req.body as { userId?: string }).userId, "userId");
+  if (!userId) return;
 
   const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
   if (!room) return err(res, "Room not found", 404);
@@ -1677,8 +1699,8 @@ router.post("/calls/rooms/:roomId/leave", async (req, res) => {
 // DELETE /calls/rooms/:roomId — host-only manual end.
 router.delete("/calls/rooms/:roomId", async (req, res) => {
   const { roomId } = req.params;
-  const { hostId } = req.body as { hostId?: string };
-  if (!hostId) return err(res, "hostId required");
+  const hostId = await roomCaller(req, res, (req.body as { hostId?: string }).hostId, "hostId");
+  if (!hostId) return;
 
   const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("host_id").eq("id", roomId).maybeSingle();
   if (!room) return err(res, "Room not found", 404);
@@ -1693,8 +1715,10 @@ router.delete("/calls/rooms/:roomId", async (req, res) => {
 // and notifies moderator/admin-role profiles.
 router.post("/calls/rooms/:roomId/flag", async (req, res) => {
   const { roomId } = req.params;
-  const { flaggerId, reason } = req.body as { flaggerId?: string; reason?: string };
-  if (!flaggerId || !reason) return err(res, "flaggerId and reason required");
+  const { reason } = req.body as { flaggerId?: string; reason?: string };
+  const flaggerId = await roomCaller(req, res, (req.body as { flaggerId?: string }).flaggerId, "flaggerId");
+  if (!flaggerId) return;
+  if (!reason) return err(res, "reason required");
 
   await supabaseWrite.from("p2p_break_room_flags").insert({ room_id: roomId, flagger_id: flaggerId, reason });
   const { count } = await supabaseWrite
@@ -1713,8 +1737,10 @@ router.post("/calls/rooms/:roomId/flag", async (req, res) => {
 // them from rejoining this specific room for 24h.
 router.post("/calls/rooms/:roomId/remove", async (req, res) => {
   const { roomId } = req.params;
-  const { hostId, userId } = req.body as { hostId?: string; userId?: string };
-  if (!hostId || !userId) return err(res, "hostId and userId required");
+  const { userId } = req.body as { hostId?: string; userId?: string };
+  const hostId = await roomCaller(req, res, (req.body as { hostId?: string }).hostId, "hostId");
+  if (!hostId) return;
+  if (!userId) return err(res, "userId required");
 
   const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("*").eq("id", roomId).maybeSingle();
   if (!room) return err(res, "Room not found", 404);
@@ -1738,8 +1764,9 @@ router.post("/calls/rooms/:roomId/remove", async (req, res) => {
 // unmutes/mutes locally based on it (Agora RTC has no cross-client mute).
 router.post("/calls/rooms/:roomId/set-speaker", async (req, res) => {
   const { roomId } = req.params;
-  const { hostId, speakerId } = req.body as { hostId?: string; speakerId?: string | null };
-  if (!hostId) return err(res, "hostId required");
+  const { speakerId } = req.body as { hostId?: string; speakerId?: string | null };
+  const hostId = await roomCaller(req, res, (req.body as { hostId?: string }).hostId, "hostId");
+  if (!hostId) return;
 
   const { data: room } = await supabaseWrite.from("p2p_break_rooms").select("host_id").eq("id", roomId).maybeSingle();
   if (!room) return err(res, "Room not found", 404);

@@ -165,14 +165,16 @@ router.get("/items", async (req, res) => {
     })) });
   }
   if (sourceType === "curriculum") {
-    if (status && !["published", "draft"].includes(status)) return fail(res, "invalid status");
-    let query = db.from("p2p_curriculums").select("id,title,is_published,created_at", { count: "exact" }).order("created_at", { ascending: false }).range(from, to);
+    // p2p_curriculums carries `status` (draft | published | archived) — there
+    // is no `is_published` column in production.
+    if (status && !["published", "draft", "archived"].includes(status)) return fail(res, "invalid status");
+    let query = db.from("p2p_curriculums").select("id,title,status,created_at", { count: "exact" }).order("created_at", { ascending: false }).range(from, to);
     if (q) query = query.ilike("title", likePattern(q));
-    if (status) query = query.eq("is_published", status === "published");
+    if (status) query = query.eq("status", status);
     const { data, error, count } = await query;
     if (error) return fail(res, "Database error.", 500);
     return res.json({ ...meta, total: count ?? 0, items: (data ?? []).map((r: any) => ({
-      sourceId: r.id, title: r.title, nativeStatus: r.is_published ? "published" : "draft", contentType: null,
+      sourceId: r.id, title: r.title, nativeStatus: r.status ?? "draft", contentType: null,
       updatedAt: r.created_at, publishedAt: null, studio: null, schedules: [],
     })) });
   }
