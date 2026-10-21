@@ -18,7 +18,7 @@ const API_BIBLE_BASE = "https://api.scripture.api.bible/v1";
 // ── Book name → USFM code ──────────────────────────────────────────────────────
 // Covers full names, common abbreviations, and numbered books
 
-const BOOK_CODES: Record<string, string> = {
+export const BOOK_CODES: Record<string, string> = {
   genesis:"GEN",gen:"GEN",gn:"GEN",
   exodus:"EXO",exo:"EXO",ex:"EXO",
   leviticus:"LEV",lev:"LEV",

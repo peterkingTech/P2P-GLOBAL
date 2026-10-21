@@ -321,7 +321,7 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     scroll: { paddingBottom: 100 },
 
-    topBarRow: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2 },
+    topBarRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2 },
     topBarMenuBtn: {
       flexDirection: "row", alignItems: "center", gap: 6,
       backgroundColor: "rgba(29,158,117,0.1)", borderWidth: 1, borderColor: "rgba(29,158,117,0.3)",
@@ -511,6 +511,17 @@ export default function LearnTab() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={styles.topBarRow}>
+          <TouchableOpacity
+            style={styles.topBarMenuBtn}
+            onPress={() => router.push("/bible" as any)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Open the Bible"
+          >
+            <Ionicons name="book" size={15} color={colors.accentGreen} />
+            <Text style={styles.topBarMenuBtnText}>Bible</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.topBarMenuBtn, schoolMenuOpen && styles.topBarMenuBtnActive]}
             onPress={() => setSchoolMenuOpen(true)}

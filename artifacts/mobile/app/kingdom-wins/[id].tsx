@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Linking, Share, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share, Platform, Alert } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import {
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import KingdomWinVideoPlayer from "@/components/KingdomWinVideoPlayer";
 import SignedPhotoView from "@/components/SignedPhotoView";
+import { openScripture } from "@/lib/openScripture";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -147,7 +148,7 @@ export default function KingdomWinDetailScreen() {
         )}
 
         {scripture && (
-          <TouchableOpacity style={styles.scriptureRow} onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scripture.referenceDisplay)}`)}>
+          <TouchableOpacity style={styles.scriptureRow} onPress={() => openScripture(scripture.referenceDisplay)}>
             <Ionicons name="book" size={14} color={c.accentGreen} />
             <Text style={styles.scriptureText}>{scripture.referenceDisplay}</Text>
             <Ionicons name="open-outline" size={13} color={c.accentGreen} />

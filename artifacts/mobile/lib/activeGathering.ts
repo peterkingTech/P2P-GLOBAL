@@ -14,6 +14,13 @@ export interface ActiveGathering {
   voiceConnected: boolean;
   micMuted: boolean;
   toggleMic: () => void;
+  /**
+   * The passage the Guide/host has shared with the group, if any, so the
+   * Bible reader can offer "Go to the group's passage". Read-only: opening
+   * it never changes what the group sees.
+   */
+  sharedPassage?: { translation: string; book: string; chapter: number; startVerse: number; endVerse: number } | null;
+  kind?: "family" | "church";
 }
 
 let current: ActiveGathering | null = null;

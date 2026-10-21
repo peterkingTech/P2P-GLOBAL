@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Linking, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Platform, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +10,7 @@ import { getMyJournal, updateJournalEntry, type JournalEntry2, type JournalStatu
 import { getScriptureReference } from "@/lib/prayerTopicsApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { openScripture } from "@/lib/openScripture";
 type Filter = "all" | "answered" | "unanswered";
 const PAGE_SIZE = 20;
 
@@ -127,7 +128,7 @@ export default function PrayerJournalScreen() {
         return;
       }
     }
-    Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(display)}`);
+    openScripture(display);
   }
 
   function handleContinuePath(entry: JournalEntry2) {

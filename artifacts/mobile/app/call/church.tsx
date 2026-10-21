@@ -431,14 +431,18 @@ export default function ChurchCallScreen() {
   // comes back here (components/family/GatheringReturnBar).
   const toggleMuteRef = useRef(toggleMute);
   toggleMuteRef.current = toggleMute;
+  // Keyed by value so a detail refresh with the same passage doesn't republish.
+  const sharedScriptureKey = detail?.call.scriptureReference ? JSON.stringify(detail.call.scriptureReference) : "";
+  const sharedScriptureRef = useMemo(() => (sharedScriptureKey ? JSON.parse(sharedScriptureKey) : null), [sharedScriptureKey]);
   useEffect(() => {
     if (!params.callId || !params.channelName) return;
     setActiveGathering({
       sessionId: params.callId,
       returnTo: { pathname: "/call/church", params: { callId: params.callId, channelName: params.channelName, ...(params.title ? { title: params.title } : {}) } },
       voiceConnected: !!token, micMuted: muted || micDisabledByHost, toggleMic: () => toggleMuteRef.current(),
+      kind: "church", sharedPassage: (sharedScriptureRef as WorshipScripture | null) ?? null,
     });
-  }, [params.callId, params.channelName, params.title, token, muted, micDisabledByHost]);
+  }, [params.callId, params.channelName, params.title, token, muted, micDisabledByHost, sharedScriptureRef]);
   useEffect(() => {
     const id = params.callId;
     return () => { if (id) clearActiveGathering(id); };

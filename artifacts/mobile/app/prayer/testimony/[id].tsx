@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Linking, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,6 +10,7 @@ import { useData } from "@/contexts/DataContext";
 import { getTestimony, type PrayerTestimony } from "@/lib/prayerTestimonyApi";
 import TestimonyVideoPlayer from "@/components/TestimonyVideoPlayer";
 import ReadableText from "@/components/ReadableText";
+import { openScripture } from "@/lib/openScripture";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -121,7 +122,7 @@ export default function TestimonyDetailScreen() {
         {scriptureRef && (
           <TouchableOpacity
             style={styles.scriptureRow}
-            onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureRef)}`)}
+            onPress={() => openScripture(scriptureRef)}
           >
             <Ionicons name="book" size={14} color={c.accentGreen} />
             <ReadableText style={styles.scriptureText}>{scriptureRef}</ReadableText>

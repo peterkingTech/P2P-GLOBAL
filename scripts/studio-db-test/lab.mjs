@@ -69,7 +69,7 @@ export function makeTranslator(db, role, uid = null) {
           const sets = keys.filter((k) => !conflict.includes(k)).map((k) => `${k} = excluded.${k}`);
           sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")}) on conflict (${conflict.join(", ")}) do ${sets.length && !q.ignoreDuplicates ? `update set ${sets.join(", ")}` : "nothing"}${q.returning ? ` returning ${q.cols}` : ""}`;
         } else if (q.op === "delete") {
-          sql = `delete from ${table}${where(params)}`;
+          sql = `delete from ${table}${where(params)}${q.returning ? ` returning ${q.cols}` : ""}`;
         }
         try {
           const rows = (await run(sql, params)).rows;

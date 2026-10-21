@@ -40,6 +40,7 @@ import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
 import ReadableText from "@/components/ReadableText";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import { useActiveGathering } from "@/lib/activeGathering";
+import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 
 interface LessonContent {
   title: string;
@@ -869,14 +870,22 @@ export default function LessonScreen() {
                       metadata: { reference: s.reference, lesson_id: id },
                     });
                   }
-                  Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(s.reference)}`).catch(() => {});
+                  // Open the passage in the P2P Bible (in context, with the
+                  // reader's own notes/highlights); bible.com only when the
+                  // reference can't be read as Book Chapter[:Verse].
+                  const target = readerTarget(s.reference);
+                  if (target) router.push(bibleRoute({ ...target, translation: translationCode }) as any);
+                  else Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(s.reference)}`).catch(() => {});
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${s.reference}. Read in the Bible`}
               >
                 <Text style={styles.verseText}>"{displayText}"</Text>
                 <ReadableText style={styles.verseRef}>
                   — {s.reference}
                   {translationCode ? ` (${translationCode})` : ""}
                 </ReadableText>
+                {readerTarget(s.reference) ? <Text style={styles.verseOpen}>Read in Bible ›</Text> : null}
               </TouchableOpacity>
             );
           })}
@@ -1067,6 +1076,7 @@ function makeStyles(c: AppColors) {
   },
   verseText: { fontSize: 16, fontStyle: "italic", color: c.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 8 },
   verseRef: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
+  verseOpen: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 6 },
   sectionHeading: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 8, marginTop: 4 },
   bodyPara: { fontSize: 15, color: c.textDark, lineHeight: 26, fontFamily: "Inter_400Regular", marginBottom: 16 },
   sentenceHighlighted: { backgroundColor: "rgba(250,204,21,0.45)" },

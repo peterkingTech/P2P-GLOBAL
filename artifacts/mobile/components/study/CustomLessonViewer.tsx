@@ -5,6 +5,7 @@ import { WebView } from "react-native-webview";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { passageLabel, readPassages, readQuestions } from "@/lib/customLessonModel";
+import { openScripture } from "@/lib/openScripture";
 
 // Stage 1 forensic finding: this app does not actually have one "Study
 // Workspace" screen today — app/lesson/[id].tsx (P2P Curriculum, deeply
@@ -15,8 +16,8 @@ import { passageLabel, readPassages, readQuestions } from "@/lib/customLessonMod
 // with no shared renderer. Forcing a Custom Lesson through app/lesson/[id]
 // tsx's CMS/submission/progress pipeline would risk that protected system;
 // instead this component reuses the genuinely reusable PIECES already
-// established elsewhere — the Scripture-reference "tap to open bible.com"
-// pattern (identical to app/lesson/[id].tsx), and the real, already-fixed
+// established elsewhere — the Scripture-reference "tap to open the Bible"
+// pattern (lib/openScripture, as in app/lesson/[id].tsx), and the real, already-fixed
 // GET /youtube-embed server page (the same Error-152 fix YouTubePlayer.
 // native.tsx depends on) — without touching either, and without the
 // synced-playback clock machinery that page's other consumer (Family
@@ -67,9 +68,9 @@ export function CustomLessonViewer({ lesson, footer }: { lesson: CustomLessonCon
         <TouchableOpacity
           key={`${p.book}-${p.chapter}-${p.startVerse}-${i}`}
           style={[styles.scriptureCard, i > 0 && styles.scriptureCardMinor]}
-          onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(passageLabel(p))}`).catch(() => {})}
-          accessibilityRole="link"
-          accessibilityLabel={`${i === 0 ? "Main passage" : "Passage"} ${passageLabel(p)}, opens Bible.com`}
+          onPress={() => openScripture(passageLabel(p), p.translation)}
+          accessibilityRole="button"
+          accessibilityLabel={`${i === 0 ? "Main passage" : "Passage"} ${passageLabel(p)}, read in the Bible`}
         >
           <Ionicons name="book" size={16} color={colors.accentGreen} />
           <Text style={styles.scriptureText}>{passageLabel(p)}</Text>

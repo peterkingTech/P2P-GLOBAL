@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getGathering, cancelGathering, type PrayerGathering, type PrayerGatheringParticipant } from "@/lib/prayerCoordinationApi";
 import { deviceTimezone, zoneShortLabel, formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 import ReadableText from "@/components/ReadableText";
+import { openScripture } from "@/lib/openScripture";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -101,9 +102,9 @@ export default function PrayerGatheringScreen() {
 
   const otherParticipant = participants.find((p) => p.userId !== profile?.id);
   const me = participants.find((p) => p.userId === profile?.id);
-  // Reuses the exact same {reference} shape and bible.com tap-through
-  // pattern already used by app/lesson/[id].tsx — no in-app Bible reader,
-  // no second Scripture representation.
+  // Reuses the exact same {reference} shape as app/lesson/[id].tsx; a tap
+  // opens it in the P2P Bible reader (lib/openScripture) — no second
+  // Scripture representation.
   const scriptureRef = (gathering.scriptureReference as { reference?: string } | null)?.reference ?? null;
   const isHost = gathering.hostId === profile?.id;
 
@@ -154,7 +155,7 @@ export default function PrayerGatheringScreen() {
         {!!scriptureRef && (
           <TouchableOpacity
             style={styles.scriptureRow}
-            onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureRef)}`).catch(() => {})}
+            onPress={() => openScripture(scriptureRef)}
           >
             <Ionicons name="book" size={16} color={c.accentGreen} />
             <ReadableText style={styles.scriptureText}>{scriptureRef}</ReadableText>

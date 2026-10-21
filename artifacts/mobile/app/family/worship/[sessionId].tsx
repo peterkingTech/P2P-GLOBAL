@@ -624,8 +624,9 @@ export default function FamilyWorshipScreen() {
   // Lets screens opened from here show "Return to Gathering" and the same mic toggle.
   useEffect(() => {
     if (!session?.id) return;
-    setActiveGathering({ sessionId: session.id, returnTo: { pathname: "/family/worship/[sessionId]", params: { sessionId: session.id } }, voiceConnected: voiceSpace.phase === "connected", micMuted: voiceSpace.micMuted, toggleMic: voiceSpace.toggleMic });
-  }, [session?.id, voiceSpace.phase, voiceSpace.micMuted, voiceSpace.toggleMic]);
+    setActiveGathering({ sessionId: session.id, returnTo: { pathname: "/family/worship/[sessionId]", params: { sessionId: session.id } }, voiceConnected: voiceSpace.phase === "connected", micMuted: voiceSpace.micMuted, toggleMic: voiceSpace.toggleMic,
+      kind: "family", sharedPassage: session.currentScripture ?? null });
+  }, [session?.id, voiceSpace.phase, voiceSpace.micMuted, voiceSpace.toggleMic, session?.currentScripture]);
   useEffect(() => {
     const id = params.sessionId;
     return () => { if (id) clearActiveGathering(id); };
