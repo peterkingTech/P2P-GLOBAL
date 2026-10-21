@@ -52,7 +52,10 @@ alter table public.p2p_group_resources enable row level security;
 revoke all on public.p2p_group_resources from anon, authenticated;
 grant all on public.p2p_group_resources to service_role;
 
--- Rollback (removes the feature's table and the EMPTY bucket; delete the
--- bucket's objects first with the storage API if any exist):
+-- Rollback (SQL part — removes the feature's table):
 --   drop table if exists public.p2p_group_resources;
---   delete from storage.buckets where id = 'group-resources';
+-- The bucket can't be removed with SQL (Supabase blocks direct deletes on
+-- storage tables): empty it and delete it with the Storage API, e.g.
+-- supabase.storage.emptyBucket('group-resources') then
+-- supabase.storage.deleteBucket('group-resources') with the service key.
+-- Leaving the empty private bucket in place is harmless.
