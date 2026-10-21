@@ -236,3 +236,41 @@ export async function relatedLessons(bookCode: string, chapter: number) {
   }).sort((a, b) => a.kind.localeCompare(b.kind) || a.curriculumTitle.localeCompare(b.curriculumTitle));
 }
 export function _resetBibleReaderCachesForTests() { tCache = null; chapterCache.clear(); refIndex = null; }
+
+// ── Exact-text highlight ranges ─────────────────────────────────────────────
+// A highlight covers (startVerse, startOffset) up to (endVerse, endOffset),
+// end EXCLUSIVE; offsets are character positions in the verse text as served
+// by getChapter(). A null startOffset means "from the verse's start" and a
+// null endOffset "to the verse's end" (whole verses — the original model).
+export interface HlRange { sv: number; so: number | null; ev: number; eo: number | null }
+const startKey = (r: HlRange) => [r.sv, r.so ?? 0] as const;
+const endKey = (r: HlRange) => [r.ev, r.eo ?? Number.POSITIVE_INFINITY] as const;
+const lt = (a: readonly [number, number], b: readonly [number, number]) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+/** Two ranges share at least one character. */
+export function rangesOverlap(a: HlRange, b: HlRange): boolean {
+  return lt(startKey(a), endKey(b)) && lt(startKey(b), endKey(a));
+}
+/**
+ * `existing` minus `cut`: the 0, 1 or 2 pieces of an older highlight that a
+ * new highlight (or an erase) doesn't cover — so its untouched words keep
+ * their colour instead of the whole highlight disappearing.
+ */
+export function subtractRange(existing: HlRange, cut: HlRange): HlRange[] {
+  if (!rangesOverlap(existing, cut)) return [existing];
+  const pieces: HlRange[] = [];
+  // Left piece: existing.start → cut.start (exclusive).
+  if (lt(startKey(existing), startKey(cut))) {
+    const left: HlRange = (cut.so ?? 0) === 0
+      ? { sv: existing.sv, so: existing.so, ev: cut.sv - 1, eo: null }
+      : { sv: existing.sv, so: existing.so, ev: cut.sv, eo: cut.so };
+    if (left.ev >= left.sv && lt(startKey(left), endKey(left))) pieces.push(left);
+  }
+  // Right piece: cut.end (exclusive) → existing.end.
+  if (lt(endKey(cut), endKey(existing))) {
+    const right: HlRange = cut.eo == null
+      ? { sv: cut.ev + 1, so: null, ev: existing.ev, eo: existing.eo }
+      : { sv: cut.ev, so: cut.eo, ev: existing.ev, eo: existing.eo };
+    if (right.ev >= right.sv && lt(startKey(right), endKey(right))) pieces.push(right);
+  }
+  return pieces;
+}

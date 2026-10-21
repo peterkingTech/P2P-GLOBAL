@@ -247,7 +247,7 @@ function makeDb(state) {
   return { from(table) {
     const q = { table, op: "select", filters: [], payload: null, single: false };
     const exec = () => {
-      const rows = state.tables[table];
+      const rows = state.tables[table] ?? [];
       if (q.op === "update") {
         const hit = rows.filter((r) => match(r, q.filters));
         hit.forEach((r) => Object.assign(r, q.payload));
@@ -366,6 +366,34 @@ try {
   expoHandler = okTickets;
   await PD.dispatchNotificationNow("c4", { skipDeviceIds: new Set(["dev-ios"]) });
   ok("immediate: VoIP-reached device skipped, other device pushed", expoCalls.length === 1 && expoCalls[0].length === 1 && expoCalls[0][0].to === tok(2));
+
+  // Own-message guard (Prompt 1): a group message notifies the OTHER
+  // members only — a row addressed to the message's own sender (whatever
+  // produced it) is never pushed, on the cron path or the immediate one.
+  seed({ notes: [
+      { id: "m-self", user_id: "author", notification_type: "new_message", created_at: nowIso(), data: { conversationId: "g1", messageId: "msg1", senderId: "author" } },
+      { id: "m-ben", user_id: "ben", notification_type: "new_message", created_at: nowIso(), data: { conversationId: "g1", messageId: "msg1", senderId: "author" } },
+      { id: "m-cy", user_id: "cy", notification_type: "new_message", created_at: nowIso(), data: { conversationId: "g1", messageId: "msg2", senderId: "author", } },
+    ],
+    tokens: [{ id: "ta", user_id: "author", token: tok(7, "author") }, { id: "tb", user_id: "ben", token: tok(8, "ben") }, { id: "tc", user_id: "cy", token: tok(9, "cy") }] });
+  expoHandler = okTickets;
+  r = await PD.dispatchPendingPushes();
+  const sentTo = expoCalls.flat().map((m) => m.to);
+  ok("own message: the author's own phone gets nothing", !sentTo.includes(tok(7, "author")), JSON.stringify(sentTo));
+  ok("own message: the other members are still notified", sentTo.includes(tok(8, "ben")) && sentTo.includes(tok(9, "cy")));
+  ok("own message: the self row is handled (never retried)", !!pushedAt("m-self"));
+  ok("own message: refusal logged without content", logs.some((l) => l.obj.verdict === "own_message" && l.obj.notificationId === "m-self"));
+  ok("each push names its intended recipient (the app hides pushes for another account)",
+    expoCalls.flat().every((m) => (m.to === tok(8, "ben") ? m.data.recipientId === "ben" : m.to === tok(9, "cy") ? m.data.recipientId === "cy" : true)));
+  seed({ notes: [{ id: "m-now", user_id: "author", notification_type: "new_message", created_at: nowIso(), data: { conversationId: "g1", senderId: "author" } }],
+    tokens: [{ id: "ta", user_id: "author", token: tok(7, "author") }] });
+  await PD.dispatchNotificationNow("m-now");
+  ok("own message (immediate path): not sent, not rolled back", expoCalls.length === 0 && !!pushedAt("m-now"));
+  ok("isOwnMessageNotification: only new_message rows whose sender is the recipient",
+    PD.isOwnMessageNotification({ user_id: "a", notification_type: "new_message", data: { senderId: "a" } }) === true
+    && PD.isOwnMessageNotification({ user_id: "a", notification_type: "new_message", data: { senderId: "b" } }) === false
+    && PD.isOwnMessageNotification({ user_id: "a", notification_type: "incoming_call", data: { callerId: "a", senderId: "a" } }) === false
+    && PD.isOwnMessageNotification({ user_id: "a", notification_type: "new_message", data: {} }) === false);
 
   // No log line anywhere contains a full push token.
   ok("pushDispatch logs never contain full tokens", !JSON.stringify(logs).includes("synthetic0001]"));

@@ -194,9 +194,48 @@ const leaks = (text) => text.includes(SECRET_KEY) || text.includes(KJV_ID) || te
     ok("unlicensed translation → 400", (await call("POST", "/me/highlights", U.ada, { ...ref(16), translationCode: "NIV", color: "gold" })).status === 400);
     const h2 = await call("POST", "/me/highlights", U.ada, { ...ref(17, 18), color: "blue" });
     const mine = await call("GET", "/me/chapter?t=KJV&book=JHN&chapter=3", U.ada);
-    ok("overlapping highlight replaces the old one (one per verse)", mine.body.available === true && mine.body.highlights.length === 1 && mine.body.highlights[0].id === h2.body.id && mine.body.highlights[0].color === "blue");
+    const byColor = Object.fromEntries(mine.body.highlights.map((h) => [h.color, h]));
+    ok("overlap: the new highlight covers exactly its verses; the older one keeps the part outside (16 gold, 17-18 blue)",
+      mine.body.available === true && mine.body.highlights.length === 2 && byColor.blue?.id === h2.body.id && byColor.blue.startVerse === 17 && byColor.blue.endVerse === 18
+      && byColor.gold?.startVerse === 16 && byColor.gold.endVerse === 16, JSON.stringify(mine.body.highlights));
     ok("highlights are per translation: none shown for BLT", (await call("GET", "/me/chapter?t=BLT&book=JHN&chapter=3", U.ada)).body.highlights.length === 0);
     ok("recolour own highlight", (await call("PUT", `/me/highlights/${h2.body.id}`, U.ada, { color: "rose" })).body.color === "rose");
+
+    // ── Exact text (word / phrase / sentence) highlights ──
+    const at = (sv, so, ev, eo, color, who = U.ada) => call("POST", "/me/highlights", who, { ...ref(sv, ev), startOffset: so, endOffset: eo, color });
+    const v3 = async () => (await call("GET", "/me/chapter?t=KJV&book=JHN&chapter=3", U.ada)).body.highlights.filter((h) => h.startVerse === 3 || h.endVerse === 3).sort((a, b) => (a.startOffset ?? 0) - (b.startOffset ?? 0));
+    const w1 = await at(3, 0, 3, 5, "green");         // one word: characters 0-5 of verse 3
+    ok("a single word saves with exact offsets", w1.status === 200 && w1.body.startOffset === null && w1.body.endOffset === 5, JSON.stringify(w1.body));
+    const w2 = await at(3, 10, 3, 18, "rose");         // a second, separate word in the same verse
+    ok("two independent highlights in one verse", w2.status === 200 && (await v3()).length === 2);
+    const ad = await at(3, 18, 3, 24, "violet");       // adjacent to the previous one
+    ok("adjacent highlights stay separate (no merge, no gap)", ad.status === 200 && (await v3()).length === 3);
+    const mid = await at(3, 2, 3, 12, "blue");         // overlaps the first two partly
+    const parts = await v3();
+    ok("overlap inside a verse: older highlights keep only their characters outside the new one",
+      mid.status === 200 && parts.some((h) => h.color === "green" && h.startOffset === null && h.endOffset === 2)
+      && parts.some((h) => h.color === "blue" && h.startOffset === 2 && h.endOffset === 12)
+      && parts.some((h) => h.color === "rose" && h.startOffset === 12 && h.endOffset === 18)
+      && parts.some((h) => h.color === "violet" && h.startOffset === 18 && h.endOffset === 24), JSON.stringify(parts.map((h) => [h.color, h.startOffset, h.endOffset])));
+    ok("the response lists what it replaced (for Undo)", Array.isArray(mid.body.replaced) && mid.body.replaced.length === 2 && Array.isArray(mid.body.pieces));
+    const er = await call("POST", "/me/highlights/erase", U.ada, { ...ref(3), startOffset: 4, endOffset: 8 });
+    const afterErase = await v3();
+    ok("erase removes highlighting from exactly the selected characters", er.status === 200
+      && afterErase.some((h) => h.color === "blue" && h.startOffset === 2 && h.endOffset === 4)
+      && afterErase.some((h) => h.color === "blue" && h.startOffset === 8 && h.endOffset === 12), JSON.stringify(afterErase.map((h) => [h.color, h.startOffset, h.endOffset])));
+    // Undo the erase: delete the pieces it created, re-create what it replaced.
+    const undo = await call("POST", "/me/highlights/restore", U.ada, { remove: er.body.pieces.map((p) => p.id), add: er.body.replaced.map((r) => ({ ...ref(r.startVerse, r.endVerse), startOffset: r.startOffset, endOffset: r.endOffset, color: r.color })) });
+    ok("undo restores the erased highlight exactly", undo.status === 200 && (await v3()).some((h) => h.color === "blue" && h.startOffset === 2 && h.endOffset === 12));
+    ok("Ben can't remove Ada's highlights through restore", (await call("POST", "/me/highlights/restore", U.ben, { remove: (await v3()).map((h) => h.id) })).status === 200 && (await v3()).length >= 4);
+    const cross = await at(3, 30, 4, 10, "gold");      // a phrase across a verse boundary
+    ok("a selection across verses saves start/end offsets in different verses", cross.status === 200 && cross.body.startVerse === 3 && cross.body.startOffset === 30 && cross.body.endVerse === 4 && cross.body.endOffset === 10);
+    ok("underline style is accepted", (await at(5, 0, 5, 5, "underline")).status === 200);
+    ok("offsets in the wrong order → 400", (await at(6, 9, 6, 3, "gold")).status === 400);
+    ok("negative / huge offsets → 400", (await at(6, -1, 6, 3, "gold")).status === 400 && (await at(6, 0, 6, 99999, "gold")).status === 400);
+    ok("still no Bible text stored (quote null) for exact-text highlights", (await db.query(`select count(*)::int n from p2p_user_highlights where book_code is not null and quote is not null`)).rows[0].n === 0);
+    // Clean the verse-3..6 highlights so the library counts below are unchanged.
+    for (const h of (await call("GET", "/me/chapter?t=KJV&book=JHN&chapter=3", U.ada)).body.highlights.filter((h) => h.startVerse >= 3 && h.startVerse <= 6))
+      await call("DELETE", `/me/highlights/${h.id}`, U.ada);
 
     // Notes
     const n1 = await call("POST", "/me/notes", U.ada, { ...ref(16), title: "Love", body: "  God gave.  " });
@@ -240,7 +279,7 @@ const leaks = (text) => text.includes(SECRET_KEY) || text.includes(KJV_ID) || te
     ok("can't delete a lesson highlight through the Bible route", (await call("DELETE", `/me/highlights/${lessonRow.id}`, U.ada)).status === 404);
     ok("can't delete a plain note through the Bible route", (await call("DELETE", `/me/notes/${plainNote.id}`, U.ada)).status === 404);
     const libH = await call("GET", "/me/library?kind=highlights", U.ada);
-    ok("library: highlights lists only Bible highlights (not the lesson one)", libH.body.items.length === 1 && libH.body.items[0].bookCode === "JHN");
+    ok("library: highlights lists only Bible highlights (not the lesson one) — the rose 17-18 and the gold piece left on 16", libH.body.items.length === 2 && libH.body.items.every((i) => i.bookCode === "JHN"), JSON.stringify(libH.body.items.map((i) => i.color)));
     const libN = await call("GET", "/me/library?kind=notes", U.ada);
     ok("library: notes lists only Bible notes (not the plain journal note)", libN.body.items.length === 1 && libN.body.items[0].id === n1.body.id);
     ok("library: saved", (await call("GET", "/me/library?kind=saved", U.ada)).body.items.length === 1);

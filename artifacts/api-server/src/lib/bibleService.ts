@@ -156,6 +156,11 @@ async function cacheVerse(
 
 // ── API.Bible fetch ────────────────────────────────────────────────────────────
 
+/** Whether live API.Bible lookups can work at all (the server has its key). */
+export function bibleServiceConfigured(): boolean {
+  return !!(process.env.API_Bible ?? process.env.API_BIBLE_KEY);
+}
+
 async function fetchFromApiBible(
   apiBibleId: string,
   verseId: string

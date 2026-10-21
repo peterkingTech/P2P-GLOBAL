@@ -12,7 +12,7 @@ import {
   Linking,
   Alert,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -41,6 +41,7 @@ import ReadableText from "@/components/ReadableText";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import { useActiveGathering } from "@/lib/activeGathering";
 import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
+import { useStudyTimeTracker } from "@/lib/studyTime";
 
 interface LessonContent {
   title: string;
@@ -482,6 +483,10 @@ export default function LessonScreen() {
   const insets = useSafeAreaInsets();
   const { readingMaxWidth } = useLayout();
   const { user, profile: authProfile } = useAuth();
+  // Daily study goal: count time while this lesson is focused and on screen.
+  const [lessonFocused, setLessonFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setLessonFocused(true); return () => setLessonFocused(false); }, []));
+  useStudyTimeTracker(user?.id, lessonFocused);
   const {
     lessons, markLessonComplete,
     getAssignmentForLesson, getQuestionSubmissionsForLesson,

@@ -1,7 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, ActivityIndicator } from "react-native";
 import { BIBLE_BOOKS, nextChapter, previousChapter } from "@/lib/bibleBooks";
-import { getBibleTranslations, getBiblePassage, formatScriptureReference, type WorshipScripture, type BibleTranslation, type BiblePassage } from "@/lib/familyApi";
+import { formatScriptureReference, type WorshipScripture } from "@/lib/familyApi";
+import { BibleApiError, bookByName, bookByCode, getChapter, getTranslations, bibleRoute } from "@/lib/bibleReaderApi";
+import { router } from "expo-router";
+
+// The Gathering's passage comes from the P2P Bible's chapter API — licensed
+// translations only, cached on the server per chapter, with honest errors
+// (not set up / busy / offline / not in this translation) instead of a blanket
+// "not found". Only the REFERENCE is shared with the group; text is fetched.
+type PanelTranslation = { translation_code: string; translation_name: string };
+type PanelPassage = { verses: { verse: number; text: string }[]; translationCode: string; translationName: string; copyright: string | null; note: string | null };
+export function passageErrorMessage(e: unknown): string {
+  if (e instanceof BibleApiError) {
+    if (e.status === 0) return "You're offline — the passage will load when you're connected.";
+    if (e.status === 503) return "The Bible isn't available on the server right now. Please try again later.";
+    if (e.status === 429) return "The Bible is busy right now — please try again in a moment.";
+    if (e.status === 404) return "That passage isn't available in this translation.";
+    if (e.status === 401) return "Please sign in again to read Scripture.";
+    return e.message;
+  }
+  return "Couldn't load that passage. Please try again.";
+}
 
 import { useSheetWidth } from "@/hooks/useLayout";
 interface Props {
@@ -13,6 +33,8 @@ interface Props {
   // The picker button's label. Default: sharing with the Gathering (Guide).
   // "My Bible" uses the same picker to read on your own, without sharing.
   selectLabel?: string;
+  /** "Read the full chapter" link (off inside a Modal such as My Bible, which has its own). */
+  showOpenInBible?: boolean;
 }
 
 const DEFAULT_LANGUAGE = "en"; // Scope limit for this pass — see ScripturePanel's report note.
@@ -22,26 +44,30 @@ const MAX_VERSE_SPAN = 29;
 // picker (not a paginated Bible-app reader) sitting inline in the
 // Gathering's Scripture mode, sharing the room's existing card/typography
 // language rather than a separate reading-app aesthetic.
-export default function ScripturePanel({ currentScripture, isGuide, onSelect, largeText = false, selectLabel = "Share with Gathering" }: Props) {
+export default function ScripturePanel({ currentScripture, isGuide, onSelect, largeText = false, selectLabel = "Share with Gathering", showOpenInBible = true }: Props) {
   const sheetWidth = useSheetWidth();
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [book, setBook] = useState(currentScripture?.book ?? "Psalms");
   const [chapter, setChapter] = useState(currentScripture?.chapter ?? 23);
   const [startVerse, setStartVerse] = useState(String(currentScripture?.startVerse ?? 1));
   const [endVerse, setEndVerse] = useState(String(currentScripture?.endVerse ?? 1));
-  const [translations, setTranslations] = useState<BibleTranslation[]>([]);
+  const [translations, setTranslations] = useState<PanelTranslation[]>([]);
   const [translationCode, setTranslationCode] = useState(currentScripture?.translation ?? "");
-  const [passage, setPassage] = useState<BiblePassage | null>(null);
+  const [passage, setPassage] = useState<PanelPassage | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const bookMeta = useMemo(() => BIBLE_BOOKS.find((b) => b.name === book), [book]);
 
   useEffect(() => {
-    getBibleTranslations(DEFAULT_LANGUAGE).then((list) => {
-      setTranslations(list);
-      if (!translationCode && list.length > 0) setTranslationCode(list[0].translation_code);
-    });
+    getTranslations().then(({ translations: list }) => {
+      const mapped = list.map((t) => ({ translation_code: t.code, translation_name: t.name, isDefault: t.isDefault, language: t.language }));
+      // English defaults first, then the rest (all licensed).
+      mapped.sort((a, b) => Number(b.language === DEFAULT_LANGUAGE) - Number(a.language === DEFAULT_LANGUAGE) || Number(b.isDefault) - Number(a.isDefault));
+      setTranslations(mapped);
+      if (!translationCode && mapped.length > 0) setTranslationCode(mapped[0].translation_code);
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -54,12 +80,31 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect, la
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getBiblePassage(currentScripture.book, currentScripture.chapter, currentScripture.startVerse, currentScripture.endVerse, currentScripture.translation)
+    const b = bookByName(currentScripture.book) ?? bookByCode(currentScripture.book);
+    if (!b) { setLoading(false); setPassage(null); setError(`"${currentScripture.book}" isn't a book of the Bible.`); return; }
+    (async () => {
+      // The shared translation may not be licensed for this app (older
+      // sessions): read it in the default licensed one and say so.
+      let t = currentScripture.translation;
+      let note: string | null = null;
+      try {
+        const { translations: list } = await getTranslations();
+        if (!list.some((x) => x.code === t)) {
+          const fallback = list.find((x) => x.isDefault && x.language === DEFAULT_LANGUAGE) ?? list[0];
+          if (fallback) { note = `${t || "That translation"} isn't available — shown in ${fallback.code}.`; t = fallback.code; }
+        }
+      } catch { /* the chapter request below reports the real problem */ }
+      const ch = await getChapter(b.code, currentScripture.chapter, t);
+      const verses = ch.verses.filter((v) => v.verse >= currentScripture.startVerse && v.verse <= currentScripture.endVerse)
+        .map((v) => ({ verse: v.verse, text: v.text.replace(/\n/g, " ") }));
+      if (!verses.length) throw new BibleApiError(`${b.name} ${currentScripture.chapter} has ${ch.verses.length} verses.`, 404);
+      return { verses, translationCode: ch.translation.code, translationName: ch.translation.name, copyright: ch.copyright, note };
+    })()
       .then((p) => { if (!cancelled) setPassage(p); })
-      .catch((e) => { if (!cancelled) setError(e.message ?? "Couldn't load that passage."); })
+      .catch((e) => { if (!cancelled) { setPassage(null); setError(passageErrorMessage(e)); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [currentScripture?.book, currentScripture?.chapter, currentScripture?.startVerse, currentScripture?.endVerse, currentScripture?.translation]);
+  }, [currentScripture?.book, currentScripture?.chapter, currentScripture?.startVerse, currentScripture?.endVerse, currentScripture?.translation, attempt]);
 
   function share() {
     const start = Math.max(1, parseInt(startVerse, 10) || 1);
@@ -127,7 +172,14 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect, la
       )}
 
       {loading && <ActivityIndicator color="#B8860B" style={{ marginTop: 12 }} />}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && (
+        <View style={{ gap: 6 }}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={() => setAttempt((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Try loading the passage again">
+            <Text style={styles.navBtnText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {passage && (
         <View style={styles.passageBox}>
@@ -138,6 +190,19 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect, la
               {v.text}
             </Text>
           ))}
+          {passage.note ? <Text style={styles.passageMeta}>{passage.note}</Text> : null}
+          <Text style={styles.passageMeta}>{passage.translationName}{passage.copyright ? ` · ${passage.copyright}` : ""}</Text>
+          {showOpenInBible && currentScripture && bookByName(currentScripture.book) ? (
+            // Opens the P2P Bible ON TOP of the Gathering (the call keeps
+            // running; the reader shows the Return bar and the group passage).
+            <TouchableOpacity onPress={() => {
+                const b = bookByName(currentScripture.book)!;
+                router.push(bibleRoute({ book: b.code, chapter: currentScripture.chapter, v: currentScripture.startVerse, ve: currentScripture.endVerse, translation: passage.translationCode }) as any);
+              }}
+              accessibilityRole="button" accessibilityLabel="Read the full chapter in the Bible">
+              <Text style={styles.navBtnText}>Read the full chapter ›</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
 
@@ -166,6 +231,7 @@ export default function ScripturePanel({ currentScripture, isGuide, onSelect, la
 }
 
 const styles = StyleSheet.create({
+  passageMeta: { color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 6 },
   pickerCard: { backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 12, gap: 10 },
   pickerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   bookBtn: { backgroundColor: "rgba(184,134,11,0.2)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },

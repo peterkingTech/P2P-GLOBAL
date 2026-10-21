@@ -45,6 +45,8 @@ import {
   acknowledgeMessages, fetchConversationMembers, fetchConversationReceipts, receiptsAvailable,
 } from "@/lib/messageReceiptsApi";
 import { deliveryAcker } from "@/lib/receiptSession";
+import { clearConversationNotifications, dismissConversationNotifications } from "@/lib/conversationNotifications";
+import { setOpenConversation } from "@/lib/push";
 
 interface Message {
   id: string;
@@ -334,7 +336,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { supabase, user, profile } = useAuth();
-  const { reportContent, pinMessage, unpinMessage, setActiveConversationId } = useData();
+  const { reportContent, pinMessage, unpinMessage, setActiveConversationId, refreshUnreadNotificationCount } = useData();
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [hiddenForMeIds, setHiddenForMeIds] = useState<Set<string>>(new Set());
@@ -658,7 +660,29 @@ export default function ChatScreen() {
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", id)
       .eq("user_id", user.id);
-  }, [id, supabase, user, fetchCallLogs, refreshReceipts]);
+    // The chat opened: clear THIS chat's message notifications (tray + the
+    // Notification Center rows) — never other chats or other types.
+    void clearConversationNotifications(id, () => { void refreshUnreadNotificationCount(); });
+  }, [id, supabase, user, fetchCallLogs, refreshReceipts, refreshUnreadNotificationCount]);
+
+  // While this chat is open and on screen, messages that arrive are read:
+  // keep last_read_at current (debounced) so unread counts and the app badge
+  // don't climb for the chat being read, and clear any tray entry for it.
+  const openReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markOpenChatRead = useCallback(() => {
+    if (!id || !user || AppState.currentState !== "active" || !focusedRef.current) return;
+    if (openReadTimerRef.current) clearTimeout(openReadTimerRef.current);
+    openReadTimerRef.current = setTimeout(() => {
+      openReadTimerRef.current = null;
+      void supabase.from("p2p_conversation_members").update({ last_read_at: new Date().toISOString() })
+        .eq("conversation_id", id).eq("user_id", user.id).then(() => {});
+      void dismissConversationNotifications(id);
+    }, 1500);
+  }, [id, user, supabase]);
+  useEffect(() => () => { if (openReadTimerRef.current) clearTimeout(openReadTimerRef.current); }, []);
+  // The realtime subscription below lives across renders: call the latest.
+  const markOpenChatReadRef = useRef(markOpenChatRead);
+  markOpenChatReadRef.current = markOpenChatRead;
 
   useEffect(() => {
     load();
@@ -669,7 +693,8 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!id) return;
     setActiveConversationId(id);
-    return () => setActiveConversationId(null);
+    setOpenConversation(id);
+    return () => { setActiveConversationId(null); setOpenConversation(null); };
   }, [id, setActiveConversationId]);
 
   useEffect(() => {
@@ -715,6 +740,7 @@ export default function ChatScreen() {
           // Message receipts — received live by this device: delivered.
           if (raw.sender_id && raw.sender_id !== user?.id && raw.message_type !== "call_summary") {
             deliveryAcker.enqueue([raw.id as string]);
+            markOpenChatReadRef.current();
           }
         }
       )

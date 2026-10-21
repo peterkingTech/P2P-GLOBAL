@@ -19,9 +19,32 @@ const LAST_TOKEN_KEY = "p2p_last_push_token";
 // An incoming call is the one exception to "still list it while open": the
 // in-app ringing screen (IncomingCallHost) already handles it, so a tray
 // entry would just be a duplicate that outlives the call.
+// The account signed in on this phone right now (set by the app shell). A
+// push addressed to a DIFFERENT account — an old token of someone who used
+// this phone before, still mapped here — is never shown. The server also
+// retires such tokens (routes/push.ts); this is the on-device safety net
+// while the app is running.
+let currentRecipientId: string | null = null;
+export function setPushRecipient(userId: string | null) { currentRecipientId = userId; }
+// The chat open on screen right now (set by app/messages/[id].tsx): its
+// messages are being read live, so no tray entry is added for them.
+let openConversationId: string | null = null;
+export function setOpenConversation(conversationId: string | null) { openConversationId = conversationId; }
+export function isForAnotherAccount(data: Record<string, unknown> | undefined, signedInUserId: string | null): boolean {
+  const to = data?.recipientId;
+  return typeof to === "string" && !!signedInUserId && to !== signedInUserId;
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
+    if (isForAnotherAccount(notification.request.content.data as Record<string, unknown> | undefined, currentRecipientId)) {
+      return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+    }
     const isForeground = AppState.currentState === "active";
+    const d = notification.request.content.data as Record<string, unknown> | undefined;
+    if (isForeground && d?.notificationType === "new_message" && openConversationId && d.conversationId === openConversationId) {
+      return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+    }
     const isIncomingCall = (notification.request.content.data as Record<string, unknown> | undefined)?.notificationType === "incoming_call";
     return {
       shouldShowBanner: !isForeground,
@@ -84,11 +107,17 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
   try {
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    // The phone's native APNs/FCM token identifies this physical phone across
+    // reinstalls and EAS projects, so the server can retire every other token
+    // still delivering here (routes/push.ts). Optional: registration works without it.
+    const nativeToken = await Notifications.getDevicePushTokenAsync()
+      .then((t) => (typeof t.data === "string" ? t.data : null)).catch(() => null);
     const res = await authedFetch("/push/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         token, platform: Platform.OS, deviceId: await getInstallId(),
+        ...(nativeToken ? { nativeToken } : {}),
         // Builds with the native call system get silent call-state pushes.
         callSystem: callSystemInstalled(),
       }),
@@ -168,6 +197,12 @@ export function pathForNotification(
   const conversationId = data?.conversationId as string | undefined;
   const contactMessageId = data?.messageId as string | undefined;
 
+  // Personal study reminder (lib/studyReminders) — only to an approved route;
+  // opening it never marks anything complete.
+  if (notificationType === "study_reminder") {
+    const route = typeof data?.route === "string" ? data.route : "";
+    return ["/bible", "/plans", "/(tabs)/learn"].includes(route) ? route : "/(tabs)/learn";
+  }
   if ((notificationType === "new_message" || notificationType === "official_message_received") && conversationId) {
     return `/messages/${conversationId}`;
   }

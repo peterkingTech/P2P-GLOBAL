@@ -14,9 +14,11 @@ interface Props {
   mic?: { connected: boolean; muted: boolean; onToggle: () => void } | null;
   onOpenChat?: (() => void) | null;
   topInset: number;
+  /** Media only: turn the player to landscape and back (the app stays portrait). */
+  rotate?: { rotated: boolean; onToggle: () => void } | null;
 }
 
-export default function FocusBar({ title, subtitle, onDone, mic, onOpenChat, topInset }: Props) {
+export default function FocusBar({ title, subtitle, onDone, mic, onOpenChat, topInset, rotate }: Props) {
   return (
     <View style={[styles.bar, { paddingTop: topInset + 6 }]} accessibilityRole="toolbar">
       <View style={{ flex: 1 }}>
@@ -36,6 +38,12 @@ export default function FocusBar({ title, subtitle, onDone, mic, onOpenChat, top
           <Ionicons name="chatbubble-ellipses-outline" size={18} color={together.textPrimary} />
         </TouchableOpacity>
       ) : null}
+      {rotate ? (
+        <TouchableOpacity style={[styles.iconBtn, rotate.rotated && styles.iconBtnOn]} onPress={rotate.onToggle} accessibilityRole="button"
+          accessibilityLabel={rotate.rotated ? "Back to portrait" : "Rotate to landscape"} accessibilityState={{ selected: rotate.rotated }}>
+          <Ionicons name="phone-landscape-outline" size={18} color={together.textPrimary} />
+        </TouchableOpacity>
+      ) : null}
       <TouchableOpacity style={styles.doneBtn} onPress={onDone} accessibilityRole="button" accessibilityLabel={`Done, close full screen ${title}`}>
         <Ionicons name="contract-outline" size={16} color="#fff" />
         <Text style={styles.doneText}>Done</Text>
@@ -50,6 +58,7 @@ const styles = StyleSheet.create({
   subtitle: { color: "rgba(255,255,255,0.65)", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   iconBtnActive: { backgroundColor: "rgba(220,38,38,0.55)" },
+  iconBtnOn: { backgroundColor: together.growth },
   doneBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: together.growth },
   doneText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

@@ -142,6 +142,11 @@ export default function FamilyDetailScreen() {
       onPress: () => router.push({ pathname: "/learning/[scope]/[groupId]", params: { scope: "family", groupId: familyId } } as any),
     },
     {
+      key: "files", icon: <Ionicons name="folder-open-outline" size={20} color={c.accentGreen} />,
+      label: "Files & Resources", detail: "PDFs, photos and documents for your family",
+      onPress: () => router.push({ pathname: "/resources/[scope]/[groupId]", params: { scope: "family", groupId: familyId, name: data.family?.name ?? "" } } as any),
+    },
+    {
       key: "prayer", icon: <FamilyIcon name="prayer" size={19} color={c.accentGreen} />,
       label: "Prayer", detail: "Your family's prayer requests",
       onPress: () => router.push({ pathname: "/family/prayer", params: { familyId } } as any),

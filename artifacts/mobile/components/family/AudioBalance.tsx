@@ -56,11 +56,12 @@ export default function AudioBalance({
               micMuted={micMuted} onToggleMic={onToggleMic} listening={listening} onToggleListening={onToggleListening}
             />
 
-            <AudioSlider label="Output" value={prefs.outputVolume} onChange={onSetOutput} accentColor={colors.light} />
-            <AudioSlider label="Media" value={prefs.mediaVolume} onChange={onSetMedia} accentColor={colors.growth} />
-            <AudioSlider label="Voice" value={prefs.roomVolume} onChange={onSetRoom} accentColor={colors.connection} disabled={!voiceConnected} />
+            <AudioSlider label="All Gathering sound (media + voices)" value={prefs.outputVolume} onChange={onSetOutput} accentColor={colors.light} />
+            <AudioSlider label="Media (the shared video or audio)" value={prefs.mediaVolume} onChange={onSetMedia} accentColor={colors.growth} />
+            <AudioSlider label="Voices (everyone speaking)" value={prefs.roomVolume} onChange={onSetRoom} accentColor={colors.connection} disabled={!voiceConnected} />
+            <Text style={styles.hint}>Only you hear these changes — nobody else's sound changes. Your phone's volume buttons set the overall loudness.</Text>
             {!voiceConnected && (
-              <Text style={styles.hint}>Join Voice above for these settings to affect anything.</Text>
+              <Text style={styles.hint}>Join Voice above for the voice settings to affect anything.</Text>
             )}
 
             {companions.length > 0 && (

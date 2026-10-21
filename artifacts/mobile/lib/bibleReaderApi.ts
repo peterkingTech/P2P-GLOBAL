@@ -97,16 +97,27 @@ export interface RelatedLesson { lessonId: string; lessonTitle: string; moduleTi
 export const getRelatedLessons = (book: string, chapter: number) => call<{ lessons: RelatedLesson[] }>(`/bible/reader/related?book=${book}&chapter=${chapter}`);
 
 // ── My study data ────────────────────────────────────────────────────────────
-export const HIGHLIGHT_COLORS = ["gold", "green", "blue", "rose", "violet"] as const;
+// "underline" is a style (no fill) — for readers who prefer it, and readable in any theme.
+export const HIGHLIGHT_COLORS = ["gold", "green", "blue", "rose", "violet", "underline"] as const;
 export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
 export interface PassageRef { translationCode: string; bookCode: string; bookName: string; chapter: number; startVerse: number; endVerse: number; reference: string }
-export interface Highlight extends PassageRef { id: string; color: HighlightColor }
+/** startOffset/endOffset: exact characters within the start/end verse (null = whole-verse edge). */
+export interface Highlight extends PassageRef { id: string; color: HighlightColor; startOffset: number | null; endOffset: number | null }
 export interface BibleNote extends PassageRef { id: string; title: string | null; body: string; updatedAt: string }
 export interface Bookmark extends PassageRef { id: string }
 export type NewRef = { translationCode: string; bookCode: string; chapter: number; startVerse: number; endVerse: number };
 export const getMyChapter = (t: string, book: string, chapter: number) =>
   call<{ available: boolean; highlights: Highlight[]; notes: BibleNote[]; bookmarks: Bookmark[] }>(`/bible/me/chapter?t=${encodeURIComponent(t)}&book=${book}&chapter=${chapter}`);
-export const addHighlight = (r: NewRef, color: HighlightColor) => call<Highlight>("/bible/me/highlights", { method: "POST", body: JSON.stringify({ ...r, color }) });
+export type Offsets = { startOffset: number | null; endOffset: number | null };
+/** Highlights EXACTLY the given text; overlapped older highlights keep their parts outside it. */
+export const addHighlight = (r: NewRef, color: HighlightColor, off?: Offsets) =>
+  call<Highlight & { replaced: Highlight[]; pieces: Highlight[] }>("/bible/me/highlights", { method: "POST", body: JSON.stringify({ ...r, ...(off ?? {}), color }) });
+/** Removes highlighting from exactly the given text (the rest stays). */
+export const eraseHighlight = (r: NewRef, off?: Offsets) =>
+  call<{ replaced: Highlight[]; pieces: Highlight[] }>("/bible/me/highlights/erase", { method: "POST", body: JSON.stringify({ ...r, ...(off ?? {}) }) });
+/** Undo: delete these (own) highlights and re-create those. */
+export const restoreHighlights = (remove: string[], add: (NewRef & Offsets & { color: HighlightColor })[]) =>
+  call<{ created: Highlight[] }>("/bible/me/highlights/restore", { method: "POST", body: JSON.stringify({ remove, add }) });
 export const recolorHighlight = (id: string, color: HighlightColor) => call<Highlight>(`/bible/me/highlights/${id}`, { method: "PUT", body: JSON.stringify({ color }) });
 export const removeHighlight = (id: string) => call<{ removed: true }>(`/bible/me/highlights/${id}`, { method: "DELETE" });
 export const addNote = (r: NewRef, title: string | null, body: string) => call<BibleNote>("/bible/me/notes", { method: "POST", body: JSON.stringify({ ...r, title, body }) });
@@ -130,5 +141,7 @@ export function highlightPalette(mode: "light" | "dark"): Record<HighlightColor,
     blue: { wash: dark ? "rgba(66,133,244,0.32)" : "rgba(147,197,253,0.55)", swatch: "#4285F4", label: "Blue" },
     rose: { wash: dark ? "rgba(236,72,153,0.30)" : "rgba(249,168,212,0.55)", swatch: "#EC4899", label: "Rose" },
     violet: { wash: dark ? "rgba(139,92,246,0.32)" : "rgba(196,181,253,0.6)", swatch: "#8B5CF6", label: "Violet" },
+    // No fill: an underline in the reading colour (see the reader's run style).
+    underline: { wash: "transparent", swatch: dark ? "#E5E7EB" : "#374151", label: "Underline" },
   };
 }

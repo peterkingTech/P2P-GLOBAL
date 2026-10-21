@@ -113,6 +113,7 @@ export default function FamilyWorshipScreen() {
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<string>>(new Set());
   const [chatOpen, setChatOpen] = useState(false);
+  const [familyConversationId, setFamilyConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<WorshipMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [pendingChatContext, setPendingChatContext] = useState<MessageContext | null>(null);
@@ -172,6 +173,7 @@ export default function FamilyWorshipScreen() {
 
       const family = await getFamilyDetail(s.familyId);
       setMembers(family.members);
+      setFamilyConversationId(family.conversationId ?? null);
       setShepherdId(family.family?.shepherdId ?? null);
       const p = await getFamilyPrayerRequests(s.familyId);
       setPrayers(p);
@@ -721,6 +723,10 @@ export default function FamilyWorshipScreen() {
   const focusMode = useFocusMode<FocusKey>(focusable);
   const focused = focusMode.focus;
   const focusMinHeight = Math.max(320, windowHeight - insets.top - insets.bottom - 84);
+  // Full-screen Media can be turned to landscape (the same player, rotated);
+  // leaving full screen always returns to portrait.
+  const [mediaRotated, setMediaRotated] = useState(false);
+  useEffect(() => { if (focused !== "media") setMediaRotated(false); }, [focused]);
 
   if (loading || !session) {
     return (
@@ -738,7 +744,7 @@ export default function FamilyWorshipScreen() {
   const sharedMediaProps = {
     session, mediaVolume: effectiveMediaVolume(togetherAudio.prefs), resyncNonce, onDriftStatus: setIsBehind, onEnded: handleMediaEnded,
     isBehind, onReturnToLive: handleReturnToLive, canControl, urlInput: mediaUrlInput, onChangeUrlInput: setMediaUrlInput,
-    onSetMedia: setMedia, onTogglePlay: togglePlay,
+    onSetMedia: setMedia, onTogglePlay: togglePlay, rotated: focused === "media" && mediaRotated,
   };
 
   const modeContent = (
@@ -878,6 +884,7 @@ export default function FamilyWorshipScreen() {
             ? (session.currentScripture ? formatScriptureReference(session.currentScripture) : lessonRef?.title ?? null)
             : null}
           onDone={focusMode.exit}
+          rotate={focused === "media" ? { rotated: mediaRotated, onToggle: () => setMediaRotated((r) => !r) } : null}
           mic={{ connected: voiceSpace.phase === "connected", muted: voiceSpace.micMuted, onToggle: voiceSpace.toggleMic }}
           onOpenChat={() => setChatOpen(true)}
           topInset={insets.top}
@@ -977,6 +984,8 @@ export default function FamilyWorshipScreen() {
       <ChatPanel
         visible={chatOpen}
         onClose={() => setChatOpen(false)}
+        // The family's permanent chat opens ON TOP of the Gathering (the call keeps running).
+        groupChat={familyConversationId ? { label: "Family chat", onOpen: () => { setChatOpen(false); router.push({ pathname: "/messages/[id]", params: { id: familyConversationId } } as any); } } : null}
         messages={messages}
         myUserId={profile?.id}
         draft={chatDraft}

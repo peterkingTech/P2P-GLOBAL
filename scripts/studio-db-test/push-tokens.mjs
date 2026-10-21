@@ -7,7 +7,7 @@
 // install + platform; signing out retires the caller's tokens on that install.
 // Synthetic data only.
 // Run: PGLITE_MODULE=.../@electric-sql/pglite/dist/index.js node scripts/studio-db-test/push-tokens.mjs
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -79,6 +79,65 @@ try {
   ok("sign-out left Ben's other phone and other users alone", (await active(`token = 'ExponentPushToken[BEN-android]'`)).length === 1 && (await active(`token = 'ExponentPushToken[CY]'`)).length === 1);
   const forged = await post("/unregister", A, { token: "ExponentPushToken[CY]" });
   ok("unregistering someone else's token is a no-op", forged.status === 200 && (await active(`token = 'ExponentPushToken[CY]'`)).length === 1);
+
+  // ── Same PHYSICAL phone across reinstalls / EAS projects (migration 208) ──
+  // Before 208 the column doesn't exist: registering with nativeToken still works.
+  const pre = await post("/register", C, { token: "ExponentPushToken[CY-pre208]", platform: "android", deviceId: "install-C", nativeToken: "fcm-native-token-of-cys-phone-0001" });
+  ok("pre-208: register with nativeToken still succeeds (column absent)", pre.status === 200 && (await active(`token = 'ExponentPushToken[CY-pre208]'`)).length === 1);
+  const m208 = readFileSync(path.join(repo, "migrations/208_push_token_native_hash.sql"), "utf8");
+  await db.exec(m208); await db.exec(m208);
+  ok("migration 208 applies twice", true);
+  // Phone P was signed in as Ben (old install, old EAS project token)...
+  await post("/register", B, { token: "ExponentPushToken[P-old-project-ben]", platform: "ios", deviceId: "install-P1", nativeToken: "apns-native-token-of-phone-P-000000" });
+  await post("/register", B, { token: "ExponentPushToken[BEN-own-iphone]", platform: "ios", deviceId: "install-B", nativeToken: "apns-native-token-of-bens-iphone-01" });
+  // ...then the app was deleted and reinstalled (new install id) and Ada signed in.
+  const pa = await post("/register", A, { token: "ExponentPushToken[P-new-project-ada]", platform: "ios", deviceId: "install-P2", nativeToken: "apns-native-token-of-phone-P-000000" });
+  ok("reinstall + new project: Ada registers on phone P", pa.status === 200);
+  ok("Ben's old token on phone P retired — Ada stops getting Ben's notifications (incl. her own group messages)", !(await active(`token = 'ExponentPushToken[P-old-project-ben]'`)).length);
+  ok("phone P has exactly one active iOS token, Ada's", JSON.stringify((await active(`native_token_hash is not null and token like '%[P-%'`)).map((r) => r.user_id)) === JSON.stringify([A]));
+  ok("Ben's own iPhone (different native token) untouched", (await active(`token = 'ExponentPushToken[BEN-own-iphone]'`)).length === 1);
+  ok("only a SHA-256 is stored, never the native token", !(await db.query(`select 1 from p2p_push_tokens where native_token_hash like '%apns%' or native_token_hash !~ '^[0-9a-f]{64}$'`)).rows.length
+    && (await db.query(`select count(*)::int n from p2p_push_tokens where native_token_hash is not null`)).rows[0].n >= 2);
+  await post("/register", A, { token: "voip-P", platform: "ios_voip", deviceId: "install-P2", nativeToken: "apns-native-token-of-phone-P-000000" });
+  ok("another platform on the same phone is not retired by it", (await active(`token = 'voip-P'`)).length === 1 && (await active(`token = 'ExponentPushToken[P-new-project-ada]'`)).length === 1);
+  const junk = await post("/register", C, { token: "ExponentPushToken[CY-junk-native]", platform: "ios", nativeToken: "short" });
+  ok("an implausible native token is ignored (no hash stored, nothing retired)", junk.status === 200 && (await db.query(`select native_token_hash from p2p_push_tokens where token = 'ExponentPushToken[CY-junk-native]'`)).rows[0].native_token_hash === null);
+
+  // ── The message trigger itself (migration 191, the live definition) ──
+  await db.exec(`
+    create table public.p2p_conversations (id uuid primary key, type text not null default 'direct');
+    create table public.p2p_conversation_members (conversation_id uuid, user_id uuid);
+    create table public.p2p_conversation_settings (conversation_id uuid, user_id uuid, is_muted boolean default false);
+    create table public.p2p_messages (id uuid primary key default gen_random_uuid(), conversation_id uuid, sender_id uuid, sent_by_admin_id uuid, message_type text default 'text', body text);
+    create table public.p2p_notifications (id uuid primary key default gen_random_uuid(), user_id uuid, title text, message text, notification_type text, data jsonb, read boolean default false, created_at timestamptz default now(), pushed_at timestamptz);
+  `);
+  const m191 = readFileSync(path.join(repo, "migrations/191_voice_message_notification_wording.sql"), "utf8");
+  const fn = m191.slice(m191.indexOf("create or replace function public.p2p_notify_on_new_message()"), m191.indexOf("$$;", m191.indexOf("create or replace function public.p2p_notify_on_new_message()")) + 3);
+  await db.exec(fn);
+  await db.exec(`create trigger p2p_messages_notify_new_message after insert on public.p2p_messages for each row execute function public.p2p_notify_on_new_message();`);
+  const G = "00000000-0000-4000-8000-0000000007d1", D = "00000000-0000-4000-8000-0000000007d2";
+  await db.query(`insert into p2p_conversations values ($1,'group'),($2,'direct')`, [G, D]);
+  for (const u of [A, B, C]) await db.query(`insert into p2p_conversation_members values ($1,$2)`, [G, u]);
+  await db.query(`insert into p2p_conversation_members values ($1,$2),($1,$3)`, [D, A, B]);
+  await db.query(`insert into p2p_conversation_settings values ($1,$2,true)`, [G, C]); // Cy muted the group
+  const notifs = async () => (await db.query(`select user_id, message, data->>'senderId' s from p2p_notifications order by created_at, user_id`)).rows;
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, body) values ($1,$2,'hello group')`, [G, A]);
+  let n = await notifs();
+  ok("group text: Ben notified, author Ada NOT, muted Cy not", n.length === 1 && n[0].user_id === B && n[0].message === "sent a message", JSON.stringify(n));
+  await db.query(`delete from p2p_notifications`);
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, message_type) values ($1,$2,'voice')`, [G, A]);
+  n = await notifs();
+  ok("group voice note: same rule (Ben only, 'sent a voice message')", n.length === 1 && n[0].user_id === B && n[0].message === "sent a voice message");
+  await db.query(`delete from p2p_notifications`);
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, body) values ($1,$2,'hi')`, [D, B]);
+  n = await notifs();
+  ok("direct message: only the other person", n.length === 1 && n[0].user_id === A);
+  await db.query(`delete from p2p_notifications`);
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, body) values ($1,null,'system')`, [G]);
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, sent_by_admin_id, body) values ($1,$2,$2,'admin')`, [G, A]);
+  await db.query(`insert into p2p_messages (conversation_id, sender_id, message_type) values ($1,$2,'call_summary')`, [G, A]);
+  ok("service/system, admin-sent and call-summary messages create no notifications", (await notifs()).length === 0);
+  ok("no notification anywhere is addressed to its own sender", !(await db.query(`select 1 from p2p_notifications where user_id::text = data->>'senderId'`)).rows.length);
   ok("no sign-in → 401", (await fetch(base + "/register", { method: "POST" })).status === 401);
 } finally {
   server.close();

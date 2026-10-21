@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
@@ -28,6 +29,11 @@ import SharedMedia from "@/components/family/SharedMedia";
 import { youtubeProvider } from "@/lib/mediaProviders/youtube";
 import { computeWorshipPositionMs } from "@/lib/familyApi";
 import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering";
+import AudioSlider from "@/components/family/AudioSlider";
+import NotesPanel from "@/components/family/NotesPanel";
+import { getChurchCallNotes, addChurchCallNote } from "@/lib/churchCallApi";
+import type { WorshipNote } from "@/lib/familyApi";
+import { loadChurchSound, saveChurchSound, voicesPlaybackLevel, DEFAULT_CHURCH_SOUND, type ChurchSound } from "@/lib/mediaRotation";
 import type { GatheringLesson, GatheringLessonRef, WorshipScripture } from "@/lib/familyApi";
 
 function showAlert(title: string, message: string) {
@@ -61,6 +67,7 @@ export default function ChurchCallScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
+  const { churchConversationId, userChurch } = useData();
   const params = useLocalSearchParams<{ callId: string; channelName: string; title?: string }>();
 
   const [detail, setDetail] = useState<ChurchCallDetail | null>(null);
@@ -108,6 +115,28 @@ export default function ChurchCallScreen() {
   const [resyncNonce, setResyncNonce] = useState(0);
   const [mediaHidden, setMediaHidden] = useState(false);
   const [mediaExpanded, setMediaExpanded] = useState(false);
+  // Full-screen media turned to landscape (the app itself stays portrait).
+  const [mediaRotated, setMediaRotated] = useState(false);
+  useEffect(() => { if (!mediaExpanded) setMediaRotated(false); }, [mediaExpanded]);
+  // This phone's own sound levels: shared media, and everyone's voices.
+  // Only this phone's speaker changes — nobody else hears a difference.
+  const [sound, setSound] = useState<ChurchSound>(DEFAULT_CHURCH_SOUND);
+  const [soundOpen, setSoundOpen] = useState(false);
+  // Notes during the Gathering (existing /churches/calls/:id/notes): shared
+  // with the call, or private to the author. The server decides who sees what.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [callNotes, setCallNotes] = useState<WorshipNote[]>([]);
+  const loadCallNotes = useCallback(async () => {
+    if (!params.callId) return;
+    try {
+      const rows = await getChurchCallNotes(params.callId);
+      setCallNotes(rows.map((n) => ({ id: n.id, sessionId: n.callId, authorId: n.authorId, authorName: n.authorName, visibility: n.visibility,
+        content: n.content, scriptureReference: null, createdAt: n.createdAt, updatedAt: n.createdAt })));
+    } catch { /* keep what's shown */ }
+  }, [params.callId]);
+  useEffect(() => { if (notesOpen) void loadCallNotes(); }, [notesOpen, loadCallNotes]);
+  useEffect(() => { void loadChurchSound().then(setSound); }, []);
+  const changeSound = (patch: Partial<ChurchSound>) => setSound((prev) => { const next = { ...prev, ...patch }; saveChurchSound(next); return next; });
   const [savingTools, setSavingTools] = useState(false);
 
   const isHost = !!profile?.id && detail?.call.hostId === profile.id;
@@ -271,6 +300,12 @@ export default function ChurchCallScreen() {
       },
     },
   });
+  // Voices slider (Sound sheet): Agora's local playback level for everyone
+  // speaking — this phone's speaker only, never anyone else's.
+  useEffect(() => {
+    const engine = engineRef.current as unknown as { adjustPlaybackSignalVolume?: (v: number) => void } | null;
+    engine?.adjustPlaybackSignalVolume?.(voicesPlaybackLevel(sound.voices));
+  }, [engineRef, token, sound.voices]);
   hostLocksRef.current = { mic: micDisabledByHost, video: videoDisabledByHost };
   function applyHostLocks() {
     const engine = engineRef.current;
@@ -565,7 +600,7 @@ export default function ChurchCallScreen() {
           </View>
           {!mediaHidden && (
             <SharedMedia
-              session={churchCallMediaSession(detail.call)} mediaVolume={1} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
+              session={churchCallMediaSession(detail.call)} mediaVolume={sound.media} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
               isBehind={isBehind} onReturnToLive={handleReturnToLive} canControl={isHost}
               urlInput={mediaUrlInput} onChangeUrlInput={setMediaUrlInput} onSetMedia={() => setMediaFromLink(mediaUrlInput)} onTogglePlay={togglePlay}
             />
@@ -606,6 +641,12 @@ export default function ChurchCallScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.reactionBtn} onPress={() => setChatOpen(true)} accessibilityRole="button" accessibilityLabel="Open chat">
           <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.reactionBtn} onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel="Open notes">
+          <Ionicons name="document-text-outline" size={16} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.reactionBtn} onPress={() => setSoundOpen(true)} accessibilityRole="button" accessibilityLabel="Sound on this phone: media and voices">
+          <Ionicons name="volume-medium-outline" size={16} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
 
@@ -685,12 +726,39 @@ export default function ChurchCallScreen() {
         </View>
       </Modal>
 
+      <NotesPanel visible={notesOpen} onClose={() => setNotesOpen(false)} notes={callNotes} myUserId={profile?.id} currentScripture={null}
+        onAdd={(content, visibility) => { if (params.callId) void addChurchCallNote(params.callId, content, visibility).then(loadCallNotes).catch(() => showAlert("Note not saved", "Please try again.")); }} />
+
+      {/* Sound — this phone only */}
+      <Modal visible={soundOpen} transparent animationType="slide" onRequestClose={() => setSoundOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheetBox}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Sound on this phone</Text>
+              <TouchableOpacity onPress={() => setSoundOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+            </View>
+            <View style={{ gap: 16, paddingVertical: 8 }}>
+              <AudioSlider label="Media (the shared video or audio)" value={sound.media} onChange={(v) => changeSound({ media: v })} accentColor="#5B8DEF" disabled={!detail.call.media} />
+              <AudioSlider label="Voices (everyone speaking)" value={sound.voices} onChange={(v) => changeSound({ voices: v })} accentColor="#34A853" />
+              <Text style={styles.sheetEmpty}>Only you hear these changes. Your phone's volume buttons set the overall loudness.{detail.call.media ? "" : " Media is available when the host shares something."}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Chat */}
       <Modal visible={chatOpen} transparent animationType="slide" onRequestClose={() => setChatOpen(false)}>
         <View style={styles.sheetOverlay}>
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Chat</Text>
+              {churchConversationId && userChurch?.id === detail.call.churchId ? (
+                // The church's PERMANENT chat opens on top of the call (the call keeps running).
+                <TouchableOpacity onPress={() => { setChatOpen(false); router.push({ pathname: "/messages/[id]", params: { id: churchConversationId } } as any); }}
+                  accessibilityRole="button" accessibilityLabel="Open the Church chat — the ongoing conversation outside this Gathering" style={{ marginLeft: "auto", marginRight: 8, minHeight: 32, justifyContent: "center" }}>
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Church chat ›</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity onPress={() => setChatOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 300 }}>
@@ -780,12 +848,14 @@ export default function ChurchCallScreen() {
 
       <Modal visible={mediaExpanded && !!detail.call.media} animationType="fade" onRequestClose={() => setMediaExpanded(false)}>
         <View style={[styles.screen, { justifyContent: "center" }]}>
-          <FocusBar title="Media" onDone={() => setMediaExpanded(false)} mic={mic} onOpenChat={() => { setMediaExpanded(false); setChatOpen(true); }} topInset={insets.top} />
+          <FocusBar title="Media" onDone={() => setMediaExpanded(false)} mic={mic} onOpenChat={() => { setMediaExpanded(false); setChatOpen(true); }} topInset={insets.top}
+            rotate={{ rotated: mediaRotated, onToggle: () => setMediaRotated((r) => !r) }} />
           <View style={{ flex: 1, justifyContent: "center", padding: 12 }}>
             <SharedMedia
-              session={churchCallMediaSession(detail.call)} mediaVolume={1} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
+              session={churchCallMediaSession(detail.call)} mediaVolume={sound.media} resyncNonce={resyncNonce} onDriftStatus={setIsBehind} onEnded={() => {}}
               isBehind={isBehind} onReturnToLive={handleReturnToLive} canControl={isHost}
               urlInput={mediaUrlInput} onChangeUrlInput={setMediaUrlInput} onSetMedia={() => setMediaFromLink(mediaUrlInput)} onTogglePlay={togglePlay}
+              rotated={mediaRotated}
             />
           </View>
         </View>

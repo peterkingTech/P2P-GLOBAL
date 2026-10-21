@@ -16,6 +16,8 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { useTranslation } from "react-i18next";
+import LockExplanationSheet from "@/components/learning/LockExplanationSheet";
+import { explainLessonLock, nextAction, progressSummary, type LockExplanation, type LockLesson } from "@/lib/lessonLocks";
 
 const HERO_HEIGHT = 230;
 
@@ -98,6 +100,20 @@ export default function ModuleDetailScreen() {
   const levelLabel = t("module.level", { n: coreModule?.level ?? 1 });
   const heroImageUri = coreModule?.imageUrl;
 
+  // Locked lessons explain themselves (lib/lessonLocks — the same rules
+  // DataContext uses to lock them; nothing here unlocks anything).
+  const [lockSheet, setLockSheet] = useState<LockExplanation | null>(null);
+  const moduleIdx = coreModule ? modules.findIndex((m) => m.id === coreModule.id) : -1;
+  const previousModule = moduleIdx > 0 ? modules[moduleIdx - 1] : null;
+  const previousModuleLessons = previousModule ? lessons.filter((l) => l.moduleId === previousModule.id) : [];
+  const explainFor = (lesson: LockLesson) => (coreModule
+    ? explainLessonLock({ lesson, module: coreModule, moduleLessons: coreLessons, previousModule, previousModuleLessons }) : null);
+  const continueNext = coreModule && !isLocked ? nextAction([coreModule], coreLessons) : null;
+  const sheetProgress = coreModule && isLocked && previousModule
+    ? { label: previousModule.title, ...progressSummary(previousModuleLessons) }
+    : coreModule ? { label: coreModule.title, ...progressSummary(coreLessons) } : null;
+  const openLessonFromSheet = (lessonId: string) => { setLockSheet(null); router.push(`/lesson/${lessonId}`); };
+
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   if (!coreModule && fallbackLoading) {
@@ -167,6 +183,24 @@ export default function ModuleDetailScreen() {
           )}
         </View>
 
+        {/* ── Continue learning: the next ELIGIBLE lesson (never a locked one) ── */}
+        {continueNext?.lessonId ? (
+          <TouchableOpacity style={styles.continueBtn} onPress={() => router.push(`/lesson/${continueNext.lessonId}`)}
+            accessibilityRole="button" accessibilityLabel={continueNext.label}>
+            <Ionicons name={continueNext.kind === "fix_revision" ? "create-outline" : "play"} size={16} color={colors.cream} />
+            <Text style={styles.continueBtnText} numberOfLines={1}>{continueNext.label}</Text>
+          </TouchableOpacity>
+        ) : continueNext?.kind === "wait_for_review" ? (
+          <Text style={styles.continueNote}>Your submitted lessons are waiting for peer review.</Text>
+        ) : null}
+        {isLocked && coreLessons[0] ? (
+          <TouchableOpacity style={styles.lockedCard} onPress={() => setLockSheet(explainFor(coreLessons[0]))}
+            accessibilityRole="button" accessibilityLabel="This module is locked. See what unlocks it">
+            <Ionicons name="lock-closed" size={16} color={colors.amber} />
+            <Text style={styles.lockedCardText}>{previousModule ? `Opens when "${previousModule.title}" is complete.` : "Opens when the previous module is complete."} See what's left ›</Text>
+          </TouchableOpacity>
+        ) : null}
+
         {/* ── Lessons list ── */}
         <View style={styles.lessonsBlock}>
           <Text style={styles.sectionTitle}>{t("module.lessons")}</Text>
@@ -180,8 +214,10 @@ export default function ModuleDetailScreen() {
                 <TouchableOpacity
                   key={lesson.id}
                   style={[styles.lessonRow, locked && styles.lessonRowLocked]}
-                  onPress={() => !locked && router.push(`/lesson/${lesson.id}`)}
-                  activeOpacity={locked ? 1 : 0.8}
+                  onPress={() => (locked ? setLockSheet(explainFor(lesson)) : router.push(`/lesson/${lesson.id}`))}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityHint={locked ? "Locked. Tap to see what unlocks it" : undefined}
                 >
                   <View style={[
                     styles.lessonBullet,
@@ -224,11 +260,21 @@ export default function ModuleDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <LockExplanationSheet visible={!!lockSheet} explanation={lockSheet} progress={sheetProgress} onClose={() => setLockSheet(null)}
+        primary={lockSheet?.next.lessonId ? { label: lockSheet.next.label, onPress: () => openLessonFromSheet(lockSheet.next.lessonId!) }
+          : lockSheet && isLocked && previousModule ? { label: `Go to "${previousModule.title}"`, onPress: () => { setLockSheet(null); router.push(`/module/${previousModule.id}` as any); } }
+          : null} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  continueBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 48, marginHorizontal: 20, marginTop: 16, borderRadius: 24, backgroundColor: colors.accentGreen, paddingHorizontal: 16 },
+  continueBtnText: { color: colors.cream, fontSize: 15, fontFamily: "Inter_700Bold", flexShrink: 1 },
+  continueNote: { marginHorizontal: 20, marginTop: 14, fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium", textAlign: "center" },
+  lockedCard: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 20, marginTop: 14, padding: 12, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: colors.card },
+  lockedCardText: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
   container: { flex: 1, backgroundColor: colors.lightCream },
   centerFill: { alignItems: "center", justifyContent: "center" },
 

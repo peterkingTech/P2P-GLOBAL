@@ -7,6 +7,7 @@ import {
   getVerseTextForTranslation,
   getTranslationByCode,
   parseVerseRef,
+  bibleServiceConfigured,
 } from "../lib/bibleService";
 
 const API_BIBLE_BASE = "https://api.scripture.api.bible/v1";
@@ -93,8 +94,18 @@ router.post("/passage", async (req, res) => {
       const result = await getVerseTextForTranslation(`${book} ${chapter}:${v}`, translationCode);
       if (result) verses.push({ verse: v, text: result.text });
     }
-    if (verses.length === 0) return err(res, "No verses found for that passage", 404);
-    return ok(res, { translationCode: translation.translation_code, translationName: translation.translation_name, book, chapter, verses });
+    // Without the API key only cached verses can be served: say so instead
+    // of claiming the passage doesn't exist (Psalm 23 was cached, so it
+    // "worked" while every uncached passage read as "not found").
+    const configured = bibleServiceConfigured();
+    if (verses.length === 0) {
+      return configured
+        ? err(res, "No verses found for that passage", 404)
+        : err(res, "The Bible service isn't set up on the server yet", 503);
+    }
+    const missing = end - startVerse + 1 - verses.length;
+    return ok(res, { translationCode: translation.translation_code, translationName: translation.translation_name, book, chapter, verses,
+      ...(missing > 0 ? { incomplete: true, missingVerses: missing, reason: configured ? "not_in_translation" : "service_not_configured" } : {}) });
   } catch (e: any) {
     return err(res, e.message ?? "Passage lookup failed", 500);
   }

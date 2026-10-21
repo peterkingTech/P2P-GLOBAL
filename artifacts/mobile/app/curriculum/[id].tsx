@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useData, Module } from "@/contexts/DataContext";
+import LockExplanationSheet from "@/components/learning/LockExplanationSheet";
+import { explainModuleLock } from "@/lib/lessonLocks";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCardPhotoWidth } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
@@ -95,6 +97,11 @@ export default function CurriculumDetailScreen() {
   const totalLessons = detail?.modules.reduce((sum, m) => sum + m.lessonCount, 0) ?? 0;
   const totalCompleted = detail?.modules.reduce((sum, m) => sum + m.completedLessons, 0) ?? 0;
   const overallPct = totalLessons > 0 ? Math.round((totalCompleted / totalLessons) * 100) : 0;
+  // A locked module explains itself from real counts (lib/lessonLocks).
+  const [lockFor, setLockFor] = useState<Module | null>(null);
+  const lockIdx = lockFor && detail ? detail.modules.findIndex((m) => m.id === lockFor.id) : -1;
+  const lockPrev = lockIdx > 0 && detail ? detail.modules[lockIdx - 1] : null;
+  const lockExplanation = lockFor ? explainModuleLock(lockFor, lockPrev) : null;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
@@ -139,15 +146,12 @@ export default function CurriculumDetailScreen() {
                 key={m.id}
                 style={[styles.moduleCard, m.isLocked && styles.moduleCardLocked]}
                 onPress={() => {
-                  if (m.isLocked) {
-                    showAlert("Locked", "Complete the previous lesson to continue.");
-                    return;
-                  }
+                  if (m.isLocked) { setLockFor(m); return; }
                   router.push(`/module/${m.id}` as any);
                 }}
                 activeOpacity={0.9}
                 accessibilityRole="button"
-                accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.isLocked ? "Locked — complete the previous lesson to continue." : `${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}`}
+                accessibilityLabel={`${m.title}. ${countsLabel}. ${stateLabel ? stateLabel + "." : ""} ${m.isLocked ? "Locked — tap to see what unlocks it." : `${m.completedLessons} of ${m.lessonCount} lessons complete. Tap to open.`}`}
               >
                 <View style={styles.moduleCardBody}>
                   <Text style={styles.moduleTitle} numberOfLines={2}>{m.title}</Text>
@@ -189,6 +193,9 @@ export default function CurriculumDetailScreen() {
           </View>
         </ScrollView>
       )}
+      <LockExplanationSheet visible={!!lockExplanation} explanation={lockExplanation} onClose={() => setLockFor(null)}
+        progress={lockPrev ? { label: lockPrev.title, completed: lockPrev.completedLessons, total: lockPrev.lessonCount } : null}
+        primary={lockPrev ? { label: `Continue "${lockPrev.title}"`, onPress: () => { setLockFor(null); router.push(`/module/${lockPrev.id}` as any); } } : null} />
     </View>
   );
 }

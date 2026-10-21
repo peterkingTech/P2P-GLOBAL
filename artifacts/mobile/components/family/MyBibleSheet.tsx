@@ -64,7 +64,7 @@ export default function MyBibleSheet({ visible, onClose, start }: Props) {
           {/* Remount when the starting passage changes so the picker starts there. */}
           <ScripturePanel
             key={passage ? `${passage.book}-${passage.chapter}-${passage.translation}` : "none"}
-            currentScripture={passage} isGuide onSelect={setPassage} selectLabel="Read" largeText
+            currentScripture={passage} isGuide onSelect={setPassage} selectLabel="Read" largeText showOpenInBible={false}
           />
         </ScrollView>
       </View>

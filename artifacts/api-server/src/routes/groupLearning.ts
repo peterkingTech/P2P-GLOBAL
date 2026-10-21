@@ -15,6 +15,30 @@ const router = Router();
 const ok = (res: import("express").Response, data: unknown) => res.json(data);
 const err = (res: import("express").Response, message: string, status = 400) => res.status(status).json({ error: message });
 
+/**
+ * Runs a `.in(column, ids)` query in batches of ids (short URLs) and pages
+ * each batch past the 1,000-row response cap. Throws if any page fails, so a
+ * failure is reported instead of silently reading as "no rows".
+ */
+export async function selectInBatches<T>(
+  ids: string[],
+  query: (chunk: string[], from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+  batchSize = 100, pageSize = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const chunk = ids.slice(i, i + batchSize);
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await query(chunk, from, from + pageSize - 1);
+      if (error) throw error;
+      const rows = (data ?? []) as T[];
+      out.push(...rows);
+      if (rows.length < pageSize) break;
+    }
+  }
+  return out;
+}
+
 // GET /learning/library — the central P2P library: Core Foundation curricula
 // and P2P Plans grouped by category (published, not hidden), with lesson counts.
 router.get("/library", async (req, res) => {
@@ -26,13 +50,23 @@ router.get("/library", async (req, res) => {
   if (error) return err(res, error.message, 500);
   const visible = ((rows ?? []) as Record<string, unknown>[]).filter((r) => r.is_visible !== false);
   const selectable = visible.filter((r) => r.type === "core" || r.type === "plan").map((r) => r.id as string);
-  const { data: mods } = selectable.length ? await db.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", selectable) : { data: [] };
-  const moduleCurriculum = new Map(((mods ?? []) as { id: string; curriculum_id: string }[]).map((m) => [m.id, m.curriculum_id]));
-  const { data: les } = moduleCurriculum.size
-    ? await db.from("p2p_lessons").select("module_id").in("module_id", [...moduleCurriculum.keys()]).eq("status", "published")
-    : { data: [] };
+  // In batches: 572 module ids in ONE request made a ~21 KB URL that failed
+  // outright in production ("fetch failed"); its error was ignored, every
+  // lesson count became 0 and the whole library rendered empty. Each batch is
+  // also paged past PostgREST's 1,000-row cap (1,787 published lessons).
+  let mods: { id: string; curriculum_id: string }[];
+  let les: { module_id: string }[];
+  try {
+    mods = await selectInBatches<{ id: string; curriculum_id: string }>(selectable, (chunk, from, to) =>
+      db.from("p2p_modules").select("id,curriculum_id").in("curriculum_id", chunk).order("id").range(from, to));
+    les = await selectInBatches<{ module_id: string }>(mods.map((m) => m.id), (chunk, from, to) =>
+      db.from("p2p_lessons").select("module_id").in("module_id", chunk).eq("status", "published").order("id").range(from, to));
+  } catch {
+    return err(res, "The library couldn't be loaded. Please try again.", 502);
+  }
+  const moduleCurriculum = new Map(mods.map((m) => [m.id, m.curriculum_id]));
   const lessonCount = new Map<string, number>();
-  for (const l of (les ?? []) as { module_id: string }[]) {
+  for (const l of les) {
     const c = moduleCurriculum.get(l.module_id);
     if (c) lessonCount.set(c, (lessonCount.get(c) ?? 0) + 1);
   }

@@ -12,7 +12,8 @@ interface Props {
   myUserId: string | undefined;
   currentScripture: WorshipScripture | null;
   onAdd: (content: string, visibility: "shared" | "private", scriptureReference: WorshipScripture | null) => void;
-  onDelete: (noteId: string) => void;
+  /** Omitted where notes can't be deleted (Church Gathering notes). */
+  onDelete?: (noteId: string) => void;
 }
 
 // Deliberately minimal — this phase prepares the shared/private/
@@ -50,8 +51,8 @@ export default function NotesPanel({ visible, onClose, notes, myUserId, currentS
                 <View key={n.id} style={styles.noteCard}>
                   <View style={styles.noteHeader}>
                     <Text style={styles.noteAuthor}>{n.authorName}{n.visibility === "private" ? " · Private" : ""}</Text>
-                    {n.authorId === myUserId && (
-                      <TouchableOpacity onPress={() => onDelete(n.id)} accessibilityRole="button" accessibilityLabel="Delete this note" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    {n.authorId === myUserId && onDelete && (
+                      <TouchableOpacity onPress={() => onDelete?.(n.id)} accessibilityRole="button" accessibilityLabel="Delete this note" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                         <Ionicons name="trash-outline" size={14} color="rgba(255,255,255,0.5)" />
                       </TouchableOpacity>
                     )}

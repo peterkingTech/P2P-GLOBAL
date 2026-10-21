@@ -98,6 +98,30 @@ try {
   ok("unknown id: 404", (await call("POST", "/me/00000000-0000-0000-0000-00000000dead/read", A)).status === 404);
   ok("signed out: 401 everywhere", (await call("GET", "/me", null)).status === 401 && (await call("GET", "/me/unread-count", null)).status === 401 && (await call("POST", `/me/${ids.call}/read`, null)).status === 401);
   ok("other user's count unaffected", await unread(C) === 1);
+  // Opening a chat (Prompt 2): only THAT chat's message notifications of
+  // the caller are marked read — several pushes, duplicates, late ones.
+  const CH1 = "00000000-0000-4000-8000-0000000c0001", CH2 = "00000000-0000-4000-8000-0000000c0002";
+  const c1a = await N(A, "new_message", "Ben", "sent a message", { conversationId: CH1, messageId: "a", senderId: B }, 3);
+  const c1b = await N(A, "new_message", "Ben", "sent a message", { conversationId: CH1, messageId: "b", senderId: B }, 2);
+  const c1dup = await N(A, "new_message", "Ben", "sent a message", { conversationId: CH1, messageId: "b", senderId: B }, 1);
+  const c2 = await N(A, "new_message", "Cy", "sent a message", { conversationId: CH2, messageId: "c", senderId: C }, 1);
+  const callSameChat = await N(A, "incoming_call", "Ben is calling", null, { conversationId: CH1, callId: "k", callerId: B }, 1);
+  const cyCh1 = await N(C, "new_message", "Ben", "sent a message", { conversationId: CH1, messageId: "a", senderId: B }, 1);
+  const isRead = async (id) => (await db.query(`select read from p2p_notifications where id = $1`, [id])).rows[0].read;
+  const before = await unread(A);
+  const cr1 = await call("POST", `/me/conversations/${CH1}/read`, A);
+  ok("open chat 1: all 3 of its message notifications marked read (incl. duplicate)", cr1.status === 200 && cr1.body.marked === 3 && await isRead(c1a) && await isRead(c1b) && await isRead(c1dup), JSON.stringify(cr1.body));
+  ok("open chat 1: chat 2's notification untouched", !(await isRead(c2)));
+  ok("open chat 1: a call notification in the same chat untouched (other type)", !(await isRead(callSameChat)));
+  ok("open chat 1: another member's notifications for that chat untouched", !(await isRead(cyCh1)));
+  ok("unread count drops by exactly 3", await unread(A) === before - 3);
+  const cr2 = await call("POST", `/me/conversations/${CH1}/read`, A);
+  ok("repeat (duplicate tap / retry): harmless, nothing more marked", cr2.status === 200 && cr2.body.marked === 0 && await unread(A) === before - 3);
+  const late = await N(A, "new_message", "Ben", "sent a message", { conversationId: CH1, messageId: "d", senderId: B }, 0);
+  ok("a late notification for the open chat is cleared on the next open", (await call("POST", `/me/conversations/${CH1}/read`, A)).body.marked === 1 && await isRead(late));
+  ok("malformed conversation id: 404", (await call("POST", "/me/conversations/nope/read", A)).status === 404);
+  ok("signed out: 401", (await call("POST", `/me/conversations/${CH1}/read`, null)).status === 401);
+  await db.query(`delete from p2p_notifications where id = $1`, [cyCh1]); // keep the read-all check below exact
   ok("read-all: only mine", (await call("POST", "/me/read-all", A)).status === 200 && await unread(A) === 0 && await unread(C) === 1);
 } finally {
   server.close();

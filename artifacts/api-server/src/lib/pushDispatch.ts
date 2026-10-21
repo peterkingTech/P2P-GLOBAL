@@ -110,6 +110,18 @@ function presentationFor(n: PendingNotification, level: PreviewLevel, senderPhot
 // which iOS hands the Notification Service Extension as userInfo["body"].
 // badge: only on new-message pushes — the recipient's unread MESSAGE count
 // (lib/messageBadge.ts). Other pushes carry none, so they never change it.
+/**
+ * A message notification addressed to the person who wrote the message.
+ * The database trigger never creates one (it excludes the sender), but the
+ * dispatcher refuses to deliver it anyway: a phone must never be told about
+ * the user's own message, whatever produced the row.
+ */
+export function isOwnMessageNotification(n: Pick<PendingNotification, "user_id" | "notification_type" | "data">): boolean {
+  if (n.notification_type !== "new_message" || !n.user_id) return false;
+  const sender = (n.data as Record<string, unknown> | null | undefined)?.senderId;
+  return typeof sender === "string" && sender === n.user_id;
+}
+
 function buildExpoMessage(n: PendingNotification, to: string, pres: PushPresentation, badge?: number) {
   const isIncomingCall = n.notification_type === "incoming_call";
   return {
@@ -120,7 +132,9 @@ function buildExpoMessage(n: PendingNotification, to: string, pres: PushPresenta
     ...(pres.image ? { richContent: { image: pres.image } } : {}),
     ...(pres.mutableContent ? { mutableContent: true } : {}),
     ...(pres.categoryId && !isIncomingCall ? { categoryId: pres.categoryId } : {}),
-    data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}), ...(pres.previewToken ? { previewToken: pres.previewToken } : {}) },
+    // recipientId: the account this push is for — the app drops a push for
+    // another account (a stale token still mapped to this phone).
+    data: { notificationId: n.id, notificationType: n.notification_type, ...(n.data ?? {}), ...(n.user_id ? { recipientId: n.user_id } : {}), ...(pres.previewToken ? { previewToken: pres.previewToken } : {}) },
     sound: "default" as const,
     // categoryId shows the Accept/Decline buttons (registered client-side in
     // lib/callNotifications.ts); ttl drops a ring push that can't be
@@ -212,6 +226,10 @@ export async function dispatchNotificationNow(
   try {
     // The recipient switched this category's phone alerts off: the claim
     // stands (handled, never retried); the in-app notification is untouched.
+    if (isOwnMessageNotification(n)) {
+      logger.warn({ notificationId, verdict: "own_message", path: "immediate" }, "pushDispatch: refused to push a message to its own sender");
+      return;
+    }
     if (n.user_id && isPushMuted(n.notification_type, (await getPushPreferences([n.user_id])).get(n.user_id))) {
       logger.info({ notificationId, notificationType: n.notification_type, verdict: "muted", path: "immediate" }, "pushDispatch: notification outcome");
       return;
@@ -301,6 +319,8 @@ export async function dispatchPendingPushes(): Promise<{
     // An incoming-call ring past its ring window announces a call that is
     // already over: not sent, recorded as "expired" (never as delivered).
     if (isStaleIncomingCall(n)) { preVerdict.set(ni, "expired"); return; }
+    // Never push someone their own message (handled; never retried).
+    if (isOwnMessageNotification(n)) { preVerdict.set(ni, "muted"); logger.warn({ notificationId: n.id, verdict: "own_message", path: "cron" }, "pushDispatch: refused to push a message to its own sender"); return; }
     if (n.user_id && deactivated.has(n.user_id) && n.notification_type !== "incoming_call") { preVerdict.set(ni, "paused"); return; }
     if (n.user_id && isPushMuted(n.notification_type, pushPrefs.get(n.user_id))) { preVerdict.set(ni, "muted"); return; }
     const tokens = n.user_id ? (tokensByUser.get(n.user_id) ?? []) : [];

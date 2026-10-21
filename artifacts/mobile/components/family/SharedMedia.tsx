@@ -1,5 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, useWindowDimensions } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { rotatedPlayerLength } from "@/lib/mediaRotation";
 import { Ionicons } from "@expo/vector-icons";
 import SyncedMediaPlayer from "./SyncedMediaPlayer";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
@@ -18,6 +20,8 @@ interface Props {
   onChangeUrlInput: (v: string) => void;
   onSetMedia: () => void;
   onTogglePlay: () => void;
+  /** Full-screen landscape: the same player turned 90° (never remounted). */
+  rotated?: boolean;
 }
 
 // The Gathering's shared content surface — the player plus its Guide
@@ -25,11 +29,16 @@ interface Props {
 // Teaching mode rather than each screen re-assembling it separately.
 export default function SharedMedia({
   session, mediaVolume, resyncNonce, onDriftStatus, onEnded, isBehind, onReturnToLive,
-  canControl, urlInput, onChangeUrlInput, onSetMedia, onTogglePlay,
+  canControl, urlInput, onChangeUrlInput, onSetMedia, onTogglePlay, rotated = false,
 }: Props) {
+  const { width, height } = useWindowDimensions();
+  const length = rotatedPlayerLength(width, height);
+  // The two wrapper Views are ALWAYS rendered (only their styles change), so
+  // rotating never remounts the player: playback, position and sync stay.
   return (
     <View>
-      <View>
+      <View style={rotated ? { height: length, alignItems: "center", justifyContent: "center" } : undefined}>
+       <View style={rotated ? { width: length, transform: [{ rotate: "90deg" }] } : undefined}>
         <SyncedMediaPlayer session={session} mediaVolume={mediaVolume} resyncNonce={resyncNonce} onDriftStatus={onDriftStatus} onEnded={onEnded} />
         {isBehind && (
           <TouchableOpacity style={styles.returnToLiveBadge} onPress={onReturnToLive} accessibilityRole="button" accessibilityLabel="Return to live playback">
@@ -37,8 +46,9 @@ export default function SharedMedia({
             <Text style={styles.returnToLiveText}>Return to Live</Text>
           </TouchableOpacity>
         )}
+       </View>
       </View>
-      {canControl && (
+      {canControl && !rotated && (
         <View style={styles.controlRow}>
           <TouchableOpacity
             style={styles.playBtn} onPress={onTogglePlay}
@@ -60,6 +70,7 @@ export default function SharedMedia({
           </TouchableOpacity>
         </View>
       )}
+      {rotated ? <StatusBar hidden /> : null}
     </View>
   );
 }

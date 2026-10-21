@@ -23,7 +23,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 // module is ever evaluated, so the call landed too late to matter.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
-import { registerForPushNotificationsAsync, pathForNotification, registerVoipTokenAsync } from "@/lib/push";
+import { registerForPushNotificationsAsync, pathForNotification, registerVoipTokenAsync, setPushRecipient } from "@/lib/push";
+import { flushPendingConversationReads } from "@/lib/conversationNotifications";
+import { syncStudyReminders } from "@/lib/studyReminders";
 import { createNotificationTapHandler } from "@/lib/notificationTap";
 import {
   callSystemActive, callSystemInstalled, configureCallSystem, flushPendingCallSystemEvents,
@@ -72,7 +74,7 @@ const OWN_HEADER_ROUTES = [
   "prayer/journal", "prayer/library/index", "prayer/my-prayer", "prayer/paths/index", "prayer/pray-the-word/index",
   "prayer/pray-with-me", "prayer/requests", "prayer/sinners-prayer",
   "prayer/testimony/feed", "prayer/testimony/record", "prayer/testimony/[id]",
-  "bible/index", "bible/search", "bible/library",
+  "bible/index", "bible/search", "bible/library", "resources/[scope]/[groupId]",
 ];
 
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
@@ -533,6 +535,17 @@ function PushNotificationHost() {
   const router = useRouter();
   const registeredForUserId = useRef<string | null>(null);
 
+  // Which account this phone is signed in as (pushes for another account aren't shown).
+  useEffect(() => { setPushRecipient(isAuthenticated ? profile?.id ?? null : null); }, [isAuthenticated, profile?.id]);
+  // Study reminders belong to the signed-in account: signing out clears them;
+  // returning to the app re-applies them (e.g. after a time-zone change).
+  useEffect(() => {
+    const uid = isAuthenticated ? profile?.id ?? null : null;
+    void syncStudyReminders(uid);
+    const sub = AppState.addEventListener("change", (st) => { if (st === "active") void syncStudyReminders(uid); });
+    return () => sub.remove();
+  }, [isAuthenticated, profile?.id]);
+
   useEffect(() => {
     if (!isAuthenticated || !profile?.id) return;
     if (registeredForUserId.current === profile.id) return;
@@ -594,7 +607,8 @@ function PushNotificationHost() {
   useEffect(() => {
     if (!isAuthenticated || !profile?.id) return;
     void tapHandler.current?.flushPending();
-    const sub = AppState.addEventListener("change", (s) => { if (s === "active") void tapHandler.current?.flushPending(); });
+    void flushPendingConversationReads();
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") { void tapHandler.current?.flushPending(); void flushPendingConversationReads(); } });
     return () => sub.remove();
   }, [isAuthenticated, profile?.id]);
 

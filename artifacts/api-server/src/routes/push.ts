@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createHash } from "node:crypto";
 import { verifyCaller, supabaseServiceRole as db } from "../lib/supabase";
 import { logger } from "../lib/logger";
 
@@ -25,10 +26,14 @@ router.post("/push/register", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
 
-  const { token, platform, deviceId, callSystem } = req.body as {
+  const { token, platform, deviceId, callSystem, nativeToken } = req.body as {
     token?: string; platform?: string; deviceId?: string;
     // This app build handles calls natively (Android Telecom / iOS CallKit).
     callSystem?: boolean;
+    // The phone's own APNs/FCM token. It identifies the PHYSICAL phone
+    // across reinstalls and EAS projects (each of which mints a different
+    // Expo token for the same phone); only its SHA-256 is stored.
+    nativeToken?: string;
   };
   if (!token?.trim()) return err(res, "token is required", 400);
   if (!platform || !PLATFORMS.includes(platform as (typeof PLATFORMS)[number])) {
@@ -41,7 +46,15 @@ router.post("/push/register", async (req, res) => {
     is_active: true, updated_at: now, last_seen_at: now,
   };
   if (typeof callSystem === "boolean") row.call_system = callSystem;
+  const nativeHash = typeof nativeToken === "string" && nativeToken.trim().length >= 16 && nativeToken.length <= 512
+    ? createHash("sha256").update(nativeToken.trim()).digest("hex") : null;
+  if (nativeHash) row.native_token_hash = nativeHash;
   let { error } = await db.from("p2p_push_tokens").upsert(row, { onConflict: "token" });
+  // Before migration 208: no native_token_hash column — register as before.
+  if (error && nativeHash && /native_token_hash/.test((error as { message?: string }).message ?? "")) {
+    delete row.native_token_hash;
+    ({ error } = await db.from("p2p_push_tokens").upsert(row, { onConflict: "token" }));
+  }
   // Before migration 172: no call_system column (42703) — register the
   // token exactly as before. An ios_voip token can't be stored yet (23514).
   if (error && (error as { code?: string }).code === "42703") {
@@ -65,6 +78,21 @@ router.post("/push/register", async (req, res) => {
       .eq("is_active", true)
       .neq("token", token.trim());
     if (retireErr) logger.warn({ err: retireErr }, "push/register: could not retire older tokens for this install");
+  }
+  // Same PHYSICAL phone, any install, any account: a reinstall makes a new
+  // install id, and a build from another EAS project a new Expo token, but
+  // the phone's native token stays the same — so the old Expo token (often
+  // still registered to whoever used this phone before) keeps delivering
+  // THEIR notifications here, including messages this user just sent them.
+  // Only the token being registered now stays active for this phone.
+  if (nativeHash && row.native_token_hash) {
+    const { error: hwErr } = await db.from("p2p_push_tokens")
+      .update({ is_active: false, updated_at: now })
+      .eq("native_token_hash", nativeHash)
+      .eq("platform", platform)
+      .eq("is_active", true)
+      .neq("token", token.trim());
+    if (hwErr) logger.warn({ err: hwErr }, "push/register: could not retire older tokens for this phone");
   }
   return ok(res, { registered: true });
 });

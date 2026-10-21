@@ -28,7 +28,8 @@ export function makeTranslator(db, role, uid = null) {
   return {
     from(table) {
       const q = { op: "select", cols: "*", filters: [], order: null, limit: null, offset: null, payload: null, single: false, maybe: false, returning: false, count: false, head: false };
-      const where = (params) => q.filters.length ? " where " + q.filters.map(([op, c, v]) => {
+      const col = (c) => (typeof c === "string" ? c.replace(/->>([A-Za-z_][A-Za-z0-9_]*)$/, "->>'$1'") : c);
+      const where = (params) => q.filters.length ? " where " + q.filters.map(([op, c0, v]) => { const c = col(c0);
         if (op === "in") { params.push(v); return `${c} = any($${params.length})`; }
         if (op === "notin") { params.push(v); return `not (${c} = any($${params.length}))`; }
         if (op === "is") return `${c} is ${v === null ? "null" : v ? "true" : "false"}`;
@@ -119,7 +120,25 @@ export function makeTranslator(db, role, uid = null) {
         return { data: (await run(`select ${fn}(${named}) as r`, keys.map((k) => args[k]))).rows[0].r, error: null };
       } catch (e) { return { data: null, error: { code: e.code, message: e.message } }; }
     },
-    storage: { from: () => ({ remove: async () => ({ data: null, error: null }) }) },
+    // In-memory object storage shared by every translator (globalThis.__labStorage):
+    // objects { "<bucket>/<path>": { size } } and a log of signed-URL calls.
+    storage: { from: (bucket) => {
+      const S = (globalThis.__labStorage ??= { objects: {}, calls: [] });
+      return {
+        remove: async (paths = []) => { for (const p of paths) delete S.objects[`${bucket}/${p}`]; S.calls.push({ op: "remove", bucket, paths }); return { data: null, error: null }; },
+        createSignedUploadUrl: async (p) => { S.calls.push({ op: "signUpload", bucket, path: p }); return { data: { signedUrl: `https://lab.storage/upload/${bucket}/${p}?token=lab`, token: "lab", path: p }, error: null }; },
+        createSignedUrl: async (p, ttl, opts) => {
+          S.calls.push({ op: "signDownload", bucket, path: p, ttl, opts });
+          return S.objects[`${bucket}/${p}`] ? { data: { signedUrl: `https://lab.storage/${bucket}/${p}?ttl=${ttl}` }, error: null } : { data: null, error: { message: "Object not found" } };
+        },
+        list: async (dir, opts = {}) => {
+          const prefix = `${bucket}/${dir}/`;
+          const rows = Object.entries(S.objects).filter(([k]) => k.startsWith(prefix) && !k.slice(prefix.length).includes("/"))
+            .map(([k, v]) => ({ name: k.slice(prefix.length), metadata: { size: v.size } })).filter((o) => !opts.search || o.name.includes(opts.search));
+          return { data: rows, error: null };
+        },
+      };
+    } },
   };
 }
 

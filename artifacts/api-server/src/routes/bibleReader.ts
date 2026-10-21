@@ -2,6 +2,7 @@ import { Router, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import {
   CANON, bookByCode, getChapter, searchBible, relatedLessons, licensedTranslations, publicTranslation, BibleError,
+  subtractRange, rangesOverlap, type HlRange,
 } from "../lib/bibleReader";
 
 // The Bible reader API (mounted at /bible). Every route needs a signed-in
@@ -16,7 +17,20 @@ const router = Router();
 const ok = (res: Response, data: unknown) => res.json(data);
 const err = (res: Response, message: string, status = 400) => res.status(status).json({ error: message });
 const isUuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-export const HIGHLIGHT_COLORS = ["gold", "green", "blue", "rose", "violet"] as const;
+// "underline" is a style (no fill) for readers who prefer it or need it.
+export const HIGHLIGHT_COLORS = ["gold", "green", "blue", "rose", "violet", "underline"] as const;
+const MAX_OFFSET = 5000;
+/** Optional exact-text offsets (characters in the verse text; end exclusive). */
+function readOffsets(body: Record<string, unknown>, sv: number, ev: number): { so: number | null; eo: number | null } | string {
+  const parse = (v: unknown) => (v == null || v === "" ? null : Number(v));
+  const so = parse(body.startOffset), eo = parse(body.endOffset);
+  for (const o of [so, eo]) if (o != null && (!Number.isInteger(o) || o < 0 || o > MAX_OFFSET)) return "Choose the words again";
+  if (sv === ev && so != null && eo != null && eo <= so) return "Choose the words again";
+  return { so: so === 0 ? null : so, eo };
+}
+const HL_COLS = "id,translation_code,book_code,chapter,start_verse,end_verse,start_offset,end_offset,color";
+const hlRange = (r: Record<string, unknown>): HlRange => ({ sv: r.start_verse as number, so: (r.start_offset as number | null) ?? null, ev: r.end_verse as number, eo: (r.end_offset as number | null) ?? null });
+const mapHl = (r: Record<string, unknown>) => ({ id: r.id, color: r.color, startOffset: (r.start_offset as number | null) ?? null, endOffset: (r.end_offset as number | null) ?? null, ...mapRef(r) });
 const NOT_READY = new Set(["42703", "42P01", "PGRST204", "PGRST205"]);
 const notReady = (e: { code?: string } | null | undefined) => !!e && NOT_READY.has(String(e.code));
 
@@ -83,7 +97,7 @@ router.get("/me/chapter", async (req, res) => {
   const b = bookByCode(String(book ?? "")); const ch = Number(chapter);
   if (!b || !Number.isInteger(ch)) return err(res, "Unknown passage");
   const [h, n, s] = await Promise.all([
-    db.from("p2p_user_highlights").select("id,translation_code,book_code,chapter,start_verse,end_verse,color").eq("user_id", userId).eq("book_code", b.code).eq("chapter", ch).eq("translation_code", String(t ?? "")),
+    db.from("p2p_user_highlights").select(HL_COLS).eq("user_id", userId).eq("book_code", b.code).eq("chapter", ch).eq("translation_code", String(t ?? "")),
     db.from("p2p_user_notes").select("id,title,body,translation_code,book_code,chapter,start_verse,end_verse,updated_at").eq("user_id", userId).eq("book_code", b.code).eq("chapter", ch),
     db.from("p2p_bible_bookmarks").select("id,translation_code,book_code,chapter,start_verse,end_verse").eq("user_id", userId).eq("book_code", b.code).eq("chapter", ch),
   ]);
@@ -91,32 +105,88 @@ router.get("/me/chapter", async (req, res) => {
   if (h.error || n.error || s.error) return err(res, "Couldn't load your notes and highlights", 500);
   return ok(res, {
     available: true,
-    highlights: (h.data ?? []).map((r) => ({ id: r.id, color: r.color, ...mapRef(r) })),
+    highlights: (h.data ?? []).map((r) => mapHl(r as Record<string, unknown>)),
     notes: (n.data ?? []).map((r) => ({ id: r.id, title: r.title ?? null, body: r.body, updatedAt: r.updated_at, ...mapRef(r) })),
     bookmarks: (s.data ?? []).map((r) => ({ id: r.id, ...mapRef(r) })),
   });
 });
 
 // ── Highlights ───────────────────────────────────────────────────────────────
+/**
+ * Applies `cut` to the caller's highlights in one chapter/translation: every
+ * overlapping highlight is replaced by the part(s) of it outside `cut`
+ * (same colour), so neighbouring highlighted words keep their colour.
+ * Returns what was removed and the pieces re-created (the app keeps them for Undo).
+ */
+async function cutHighlights(userId: string, ref: { t: string; book: { code: string; name: string }; chapter: number }, cut: HlRange) {
+  const existing = await db.from("p2p_user_highlights").select(HL_COLS).eq("user_id", userId)
+    .eq("translation_code", ref.t).eq("book_code", ref.book.code).eq("chapter", ref.chapter);
+  if (existing.error) return { error: existing.error } as const;
+  const hits = ((existing.data ?? []) as Record<string, unknown>[]).filter((r) => rangesOverlap(hlRange(r), cut));
+  const removed = hits.map((r) => mapHl(r));
+  if (hits.length) await db.from("p2p_user_highlights").delete().eq("user_id", userId).in("id", hits.map((r) => r.id as string));
+  const created: Record<string, unknown>[] = [];
+  for (const r of hits) for (const piece of subtractRange(hlRange(r), cut)) {
+    const row = await insertHighlight(userId, ref, piece, r.color as string);
+    if (row) created.push(row);
+  }
+  return { removed, created } as const;
+}
+async function insertHighlight(userId: string, ref: { t: string; book: { code: string; name: string }; chapter: number }, r: HlRange, color: string) {
+  const { data } = await db.from("p2p_user_highlights").insert({
+    user_id: userId, reference: `${refLabel(ref.book.name, ref.chapter, r.sv, r.ev)} (${ref.t})`, quote: null, color,
+    translation_code: ref.t, book_code: ref.book.code, chapter: ref.chapter, start_verse: r.sv, end_verse: r.ev,
+    start_offset: r.so, end_offset: r.eo, updated_at: new Date().toISOString(),
+  }).select(HL_COLS).single();
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
 router.post("/me/highlights", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
   const ref = await readRef(req.body ?? {});
   if (typeof ref === "string") return err(res, ref);
+  const off = readOffsets(req.body ?? {}, ref.sv, ref.ev);
+  if (typeof off === "string") return err(res, off);
   const color = String(req.body?.color ?? "");
   if (!(HIGHLIGHT_COLORS as readonly string[]).includes(color)) return err(res, "Choose a highlight colour");
-  // One highlight per verse: overlapping highlights in this chapter/translation are replaced.
-  const existing = await db.from("p2p_user_highlights").select("id,start_verse,end_verse").eq("user_id", userId)
-    .eq("translation_code", ref.t).eq("book_code", ref.book.code).eq("chapter", ref.chapter);
-  if (notReady(existing.error)) return err(res, "Highlights aren't available yet", 503);
-  if (existing.error) return err(res, "Couldn't save the highlight", 500);
-  const overlapping = (existing.data ?? []).filter((r) => (r.start_verse as number) <= ref.ev && (r.end_verse as number) >= ref.sv).map((r) => r.id as string);
-  if (overlapping.length) await db.from("p2p_user_highlights").delete().eq("user_id", userId).in("id", overlapping);
-  const { data, error } = await db.from("p2p_user_highlights").insert({
-    user_id: userId, reference: `${refLabel(ref.book.name, ref.chapter, ref.sv, ref.ev)} (${ref.t})`, quote: null, color,
-    translation_code: ref.t, book_code: ref.book.code, chapter: ref.chapter, start_verse: ref.sv, end_verse: ref.ev, updated_at: new Date().toISOString(),
-  }).select("id,translation_code,book_code,chapter,start_verse,end_verse,color").single();
-  if (error || !data) return err(res, "Couldn't save the highlight", 500);
-  return ok(res, { id: data.id, color: data.color, ...mapRef(data) });
+  // Exactly the selected text: overlapping highlights keep their parts outside it.
+  const range: HlRange = { sv: ref.sv, so: off.so, ev: ref.ev, eo: off.eo };
+  const cut = await cutHighlights(userId, ref, range);
+  if ("error" in cut) return notReady(cut.error) ? err(res, "Highlights aren't available yet", 503) : err(res, "Couldn't save the highlight", 500);
+  const row = await insertHighlight(userId, ref, range, color);
+  if (!row) return err(res, "Couldn't save the highlight", 500);
+  return ok(res, { ...mapHl(row), replaced: cut.removed, pieces: cut.created.map(mapHl) });
+});
+
+// Remove highlighting from exactly the selected text (the rest stays).
+router.post("/me/highlights/erase", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  const ref = await readRef(req.body ?? {});
+  if (typeof ref === "string") return err(res, ref);
+  const off = readOffsets(req.body ?? {}, ref.sv, ref.ev);
+  if (typeof off === "string") return err(res, off);
+  const cut = await cutHighlights(userId, ref, { sv: ref.sv, so: off.so, ev: ref.ev, eo: off.eo });
+  if ("error" in cut) return notReady(cut.error) ? err(res, "Highlights aren't available yet", 503) : err(res, "Couldn't remove the highlight", 500);
+  return ok(res, { replaced: cut.removed, pieces: cut.created.map(mapHl) });
+});
+
+// Undo: delete the given highlights (own Bible highlights only) and re-create the given ones.
+router.post("/me/highlights/restore", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  const remove = Array.isArray(req.body?.remove) ? (req.body.remove as unknown[]).filter(isUuid).slice(0, 100) : [];
+  const add = Array.isArray(req.body?.add) ? (req.body.add as Record<string, unknown>[]).slice(0, 100) : [];
+  if (remove.length) await db.from("p2p_user_highlights").delete().eq("user_id", userId).not("book_code", "is", null).in("id", remove);
+  const created: Record<string, unknown>[] = [];
+  for (const a of add) {
+    const ref = await readRef(a);
+    if (typeof ref === "string") continue;
+    const off = readOffsets(a, ref.sv, ref.ev);
+    const color = String(a.color ?? "");
+    if (typeof off === "string" || !(HIGHLIGHT_COLORS as readonly string[]).includes(color)) continue;
+    const row = await insertHighlight(userId, ref, { sv: ref.sv, so: off.so, ev: ref.ev, eo: off.eo }, color);
+    if (row) created.push(row);
+  }
+  return ok(res, { created: created.map(mapHl) });
 });
 router.put("/me/highlights/:id", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
@@ -124,11 +194,11 @@ router.put("/me/highlights/:id", async (req, res) => {
   if (!isUuid(req.params.id)) return err(res, "Not found", 404);
   if (!(HIGHLIGHT_COLORS as readonly string[]).includes(color)) return err(res, "Choose a highlight colour");
   const { data, error } = await db.from("p2p_user_highlights").update({ color, updated_at: new Date().toISOString() })
-    .eq("id", req.params.id).eq("user_id", userId).not("book_code", "is", null).select("id,translation_code,book_code,chapter,start_verse,end_verse,color").maybeSingle();
+    .eq("id", req.params.id).eq("user_id", userId).not("book_code", "is", null).select(HL_COLS).maybeSingle();
   if (notReady(error)) return err(res, "Highlights aren't available yet", 503);
   if (error) return err(res, "Couldn't update the highlight", 500);
   if (!data) return err(res, "Not found", 404);
-  return ok(res, { id: data.id, color: data.color, ...mapRef(data) });
+  return ok(res, mapHl(data as Record<string, unknown>));
 });
 router.delete("/me/highlights/:id", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
@@ -221,7 +291,7 @@ router.get("/me/library", async (req, res) => {
   const offset = Math.max(0, Math.min(10_000, Number(req.query.offset ?? 0) | 0));
   const PAGE = 30;
   const q = kind === "highlights"
-    ? db.from("p2p_user_highlights").select("id,color,translation_code,book_code,chapter,start_verse,end_verse,updated_at,created_at").eq("user_id", userId).not("book_code", "is", null).order("created_at", { ascending: false })
+    ? db.from("p2p_user_highlights").select(`${HL_COLS},updated_at,created_at`).eq("user_id", userId).not("book_code", "is", null).order("created_at", { ascending: false })
     : kind === "saved"
       ? db.from("p2p_bible_bookmarks").select("id,translation_code,book_code,chapter,start_verse,end_verse,created_at").eq("user_id", userId).order("created_at", { ascending: false })
       : kind === "notes"
@@ -232,7 +302,7 @@ router.get("/me/library", async (req, res) => {
   if (notReady(error)) return ok(res, { available: false, items: [], hasMore: false });
   if (error) return err(res, "Couldn't load your library", 500);
   const rows = (data ?? []) as Record<string, unknown>[];
-  const items = rows.slice(0, PAGE).map((r) => kind === "notes" ? mapNote(r) : kind === "highlights" ? { id: r.id, color: r.color, ...mapRef(r) } : { id: r.id, ...mapRef(r) });
+  const items = rows.slice(0, PAGE).map((r) => kind === "notes" ? mapNote(r) : kind === "highlights" ? mapHl(r) : { id: r.id, ...mapRef(r) });
   return ok(res, { available: true, items, hasMore: rows.length > PAGE });
 });
 

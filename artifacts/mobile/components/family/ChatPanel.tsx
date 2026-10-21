@@ -23,6 +23,8 @@ interface Props {
   currentScripture: WorshipScripture | null;
   currentMedia: { mediaProvider: SharedMediaProvider; mediaId: string; positionMs: number } | null;
   pendingContext: MessageContext | null;
+  /** The group's PERMANENT chat (Family / Church) — this panel is the live session's chat. */
+  groupChat?: { label: string; onOpen: () => void } | null;
   onSetPendingContext: (c: MessageContext | null) => void;
   // Desktop composition's "optional conversation panel" — docks to the
   // right edge as a tall panel instead of sliding up from the bottom.
@@ -60,7 +62,7 @@ function formatTime(iso: string) {
 // colors, not styled after any messaging app's chrome.
 export default function ChatPanel({
   visible, onClose, messages, myUserId, draft, onChangeDraft, onSend,
-  currentScripture, currentMedia, pendingContext, onSetPendingContext, dockRight,
+  currentScripture, currentMedia, pendingContext, onSetPendingContext, dockRight, groupChat,
 }: Props) {
   const sheetWidth = useSheetWidth();
   const scrollRef = useRef<ScrollView>(null);
@@ -75,6 +77,11 @@ export default function ChatPanel({
         <View style={[styles.sheet, sheetWidth, dockRight && styles.sheetDockRight]}>
           <View style={styles.header}>
             <Text style={styles.title}>CHAT</Text>
+            {groupChat ? (
+              <TouchableOpacity onPress={groupChat.onOpen} accessibilityRole="button" accessibilityLabel={`Open the ${groupChat.label} — the ongoing conversation outside this Gathering`} style={{ marginLeft: "auto", marginRight: 12, minHeight: 32, justifyContent: "center" }}>
+                <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{groupChat.label} ›</Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close Chat">
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>

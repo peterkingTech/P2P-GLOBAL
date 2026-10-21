@@ -53,7 +53,7 @@ ok("bibleRoute → /bible with string params", r.pathname === "/bible" && r.para
 ok("bibleRoute without verse/translation omits them", !("v" in B.bibleRoute({ book: "GEN", chapter: 1 }).params) && !("t" in B.bibleRoute({ book: "GEN", chapter: 1 }).params));
 ok("formatRef", B.formatRef(B.bookByCode("JHN"), 3, 16, 18) === "John 3:16–18" && B.formatRef(B.bookByCode("PSA"), 23) === "Psalms 23");
 const light = B.highlightPalette("light"), dark = B.highlightPalette("dark");
-ok("five highlight colours, each with a light and a dark wash", B.HIGHLIGHT_COLORS.length === 5 && B.HIGHLIGHT_COLORS.every((c) => light[c].wash !== dark[c].wash));
+ok("five fill colours (each with a light and a dark wash) plus an underline style", B.HIGHLIGHT_COLORS.length === 6 && B.HIGHLIGHT_COLORS.filter((c) => c !== "underline").every((c) => light[c].wash !== dark[c].wash) && light.underline.wash === "transparent" && light.underline.swatch !== dark.underline.swatch);
 ok("scripture face: platform serif, no new font dependency", B.SCRIPTURE_FONT === "Georgia");
 
 // ── lib/bibleReadingPrefs.ts against a mocked AsyncStorage ──────────────

@@ -119,6 +119,28 @@ router.post("/me/:id/read", async (req, res) => {
   return res.json({ ...mapNotification(existing as Record<string, unknown>), wasUnread: false });
 });
 
+// POST /notifications/me/conversations/:conversationId/read — opening a chat
+// marks the caller's unread MESSAGE notifications for that one chat as read
+// (several pushes for one chat, duplicates, late deliveries). Only the
+// caller's own rows of type new_message for exactly this conversation are
+// touched — never another chat, never another notification type. Idempotent.
+router.post("/me/conversations/:conversationId/read", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const conversationId = String(req.params.conversationId);
+  if (!UUID_RE.test(conversationId)) return res.status(404).json({ error: "Conversation not found" });
+  const { data, error } = await supabase
+    .from("p2p_notifications")
+    .update({ read: true })
+    .eq("user_id", userId)
+    .eq("notification_type", "new_message")
+    .eq("read", false)
+    .eq("data->>conversationId", conversationId)
+    .select("id");
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ marked: (data ?? []).length, ids: (data ?? []).map((r: { id: string }) => r.id) });
+});
+
 // POST /notifications/me/read-all — same identity/scoping model as the
 // single-notification route above; only ever touches the caller's own
 // unread rows.

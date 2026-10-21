@@ -137,6 +137,11 @@ export default function ChurchHomeScreen() {
           <NavRow icon="chatbubbles-outline" label="Church chat" onPress={() => router.push({ pathname: "/messages/[id]", params: { id: churchConversationId } } as any)} />
         </View>
       )}
+      {userChurch && (
+        <View style={{ marginTop: 14 }}>
+          <NavRow icon="folder-open-outline" label="Files & Resources" onPress={() => router.push({ pathname: "/resources/[scope]/[groupId]", params: { scope: "church", groupId: userChurch.id, name: userChurch.name ?? "" } } as any)} />
+        </View>
+      )}
 
       {goalDashboard.length > 0 && (
         <>

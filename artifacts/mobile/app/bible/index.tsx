@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Share, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -15,10 +15,17 @@ import RelatedLessonsSheet from "@/components/bible/RelatedLessonsSheet";
 import { useActiveGathering } from "@/lib/activeGathering";
 import {
   BibleApiError, HIGHLIGHT_COLORS, SCRIPTURE_FONT, addHighlight, addNote, bookByCode, bookByName, deleteNote, formatRef, getChapter,
-  getMyChapter, getTranslations, highlightPalette, removeBookmark, removeHighlight, saveBookmark, updateNote,
-  type BibleChapter, type BibleNote, type BibleTranslation, type Bookmark, type Highlight, type HighlightColor, type NewRef,
+  getMyChapter, getTranslations, highlightPalette, removeBookmark, saveBookmark, updateNote, eraseHighlight, restoreHighlights,
+  type BibleChapter, type BibleNote, type BibleTranslation, type Bookmark, type Highlight, type HighlightColor, type NewRef, type Offsets,
 } from "@/lib/bibleReaderApi";
+import {
+  nudgeRange, phraseRange, rangeText, rangeToStored, sentenceRange, storedToRange, tokenize, verseRuns, wordRange,
+  type TextRange, type Token,
+} from "@/lib/bibleRanges";
+import { withAlpha } from "@/lib/colorUtils";
 import { LINE_HEIGHT, loadPosition, savePosition, useBibleReadingPrefs } from "@/lib/bibleReadingPrefs";
+import { useStudyTimeTracker } from "@/lib/studyTime";
+import { useAuth } from "@/contexts/AuthContext";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -27,6 +34,18 @@ import { LINE_HEIGHT, loadPosition, savePosition, useBibleReadingPrefs } from "@
 // screen, so the call keeps running; the Return bar goes back to it.
 
 type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string };
+// How a tap selects text. Verse (default) and Passage select whole verses;
+// Word, Phrase and Sentence select exact words — never silently widened.
+type SelectMode = "verse" | "word" | "phrase" | "sentence" | "passage";
+const MODES: { key: SelectMode; label: string; hint: string }[] = [
+  { key: "verse", label: "Verse", hint: "Tap a verse; tap another to extend" },
+  { key: "word", label: "Word", hint: "Tap a word" },
+  { key: "phrase", label: "Phrase", hint: "Tap the first word, then the last word" },
+  { key: "sentence", label: "Sentence", hint: "Tap any word in the sentence" },
+  { key: "passage", label: "Passage", hint: "Tap the first verse, then the last verse" },
+];
+const INLINE_BUTTON_ROLE = Platform.OS === "web" ? undefined : ("button" as const);
+type UndoSpec = { remove: string[]; add: (NewRef & Offsets & { color: HighlightColor })[]; label: string };
 type MyData = { available: boolean; highlights: Highlight[]; notes: BibleNote[]; bookmarks: Bookmark[] };
 const EMPTY_MY: MyData = { available: true, highlights: [], notes: [], bookmarks: [] };
 
@@ -39,6 +58,11 @@ export default function BibleReaderScreen() {
   const palette = useMemo(() => highlightPalette(resolvedMode), [resolvedMode]);
   const { prefs, update: updatePrefs } = useBibleReadingPrefs();
   const gathering = useActiveGathering();
+  // Daily study goal: count time while this screen is focused and on screen.
+  const { profile } = useAuth();
+  const [screenFocused, setScreenFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
+  useStudyTimeTracker(profile?.id, screenFocused);
 
   const [translations, setTranslations] = useState<BibleTranslation[] | null>(null);
   const [trError, setTrError] = useState<string | null>(null);
@@ -49,7 +73,13 @@ export default function BibleReaderScreen() {
   const [error, setError] = useState<{ message: string; status: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [my, setMy] = useState<MyData>(EMPTY_MY);
-  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
+  const [mode, setSelectMode] = useState<SelectMode>("verse");
+  const [range, setRange] = useState<TextRange | null>(null);
+  const anchorRef = useRef<{ verse: number; t: Token } | number | null>(null);
+  const [undo, setUndo] = useState<UndoSpec | null>(null);
+  const [modeSheet, setModeSheet] = useState(false);
+  // Whole verses covered by the selection (notes and saved passages are per verse).
+  const sel = range ? { start: range.start.verse, end: range.end.verse } : null;
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [focus, setFocus] = useState(false);
@@ -113,14 +143,18 @@ export default function BibleReaderScreen() {
     if (!loc) return;
     const id = ++reqId.current;
     const ac = new AbortController();
-    setLoading(true); setError(null); setSel(null);
+    setLoading(true); setError(null); setRange(null); anchorRef.current = null;
     blockY.current.clear();
     getChapter(loc.book, loc.chapter, loc.t, ac.signal)
       .then((ch) => {
         if (id !== reqId.current) return;
         setData(ch);
         savePosition({ translation: loc.t, book: loc.book, chapter: loc.chapter });
-        if (loc.v) setSel({ start: loc.v, end: loc.ve ?? loc.v });
+        if (loc.v) {
+          const ve = loc.ve ?? loc.v;
+          const endLen = ch.verses.find((x) => x.verse === ve)?.text.length ?? 0;
+          setRange({ start: { verse: loc.v, offset: 0 }, end: { verse: ve, offset: endLen } });
+        }
         else scrollRef.current?.scrollTo({ y: 0, animated: false });
       })
       .catch((e) => {
@@ -192,45 +226,94 @@ export default function BibleReaderScreen() {
   };
 
   // ── Selection ─────────────────────────────────────────────────────────────
+  const verseList = useMemo(() => (data?.verses ?? []).map((v) => ({ verse: v.verse, text: v.text })), [data]);
+  const textOf = useMemo(() => new Map(verseList.map((v) => [v.verse, v.text])), [verseList]);
+  const lengthOf = useCallback((v: number) => textOf.get(v)?.length ?? 0, [textOf]);
+  const tokensOf = useMemo(() => new Map(verseList.map((v) => [v.verse, tokenize(v.text)])), [verseList]);
+  const fullVerses = (a: number, b: number): TextRange => ({ start: { verse: Math.min(a, b), offset: 0 }, end: { verse: Math.max(a, b), offset: lengthOf(Math.max(a, b)) } });
+  const textMode = mode === "word" || mode === "phrase" || mode === "sentence";
+
   const tapVerse = (v: number) => {
-    setSel((s) => {
-      if (!s) return { start: v, end: v };
-      if (s.start === v && s.end === v) return null;
-      if (v >= s.start && v <= s.end) return { start: v, end: v };
-      return { start: Math.min(s.start, v), end: Math.max(s.end, v) };
+    if (mode === "passage") {
+      const a = anchorRef.current;
+      if (typeof a === "number" && range) { setRange(fullVerses(a, v)); anchorRef.current = null; }
+      else { anchorRef.current = v; setRange(fullVerses(v, v)); }
+      return;
+    }
+    setRange((r) => {
+      if (!r) return fullVerses(v, v);
+      const s0 = r.start.verse, e0 = r.end.verse;
+      if (s0 === v && e0 === v) return null;
+      if (v >= s0 && v <= e0) return fullVerses(v, v);
+      return fullVerses(Math.min(s0, v), Math.max(e0, v));
     });
   };
+  const tapWord = (verse: number, t: Token) => {
+    if (!t.word) return;
+    if (mode === "word") { setRange(wordRange(verse, t)); return; }
+    if (mode === "sentence") { setRange(sentenceRange(verseList, { verse, offset: t.start })); return; }
+    const a = anchorRef.current;
+    if (a && typeof a === "object" && range) { setRange(phraseRange(a, { verse, t })); anchorRef.current = null; }
+    else { anchorRef.current = { verse, t }; setRange(wordRange(verse, t)); }
+  };
+  const chooseMode = (m: SelectMode) => {
+    setSelectMode(m); setModeSheet(false); anchorRef.current = null;
+    flash(MODES.find((x) => x.key === m)!.hint);
+  };
+
   const selRef: NewRef | null = loc && sel ? { translationCode: loc.t, bookCode: loc.book, chapter: loc.chapter, startVerse: sel.start, endVerse: sel.end } : null;
-  const selLabel = sel && book ? `${formatRef(book, loc!.chapter, sel.start, sel.end)} (${loc!.t})` : "";
-  const selHighlight = sel ? (() => {
-    const h = hlByVerse.get(sel.start);
-    return h && h.startVerse === sel.start && h.endVerse === sel.end ? h : null;
-  })() : null;
+  const stored = range ? rangeToStored(range, lengthOf) : null;
+  const offsets: Offsets | undefined = stored ? { startOffset: stored.startOffset, endOffset: stored.endOffset } : undefined;
+  const partial = !!stored && (stored.startOffset != null || stored.endOffset != null);
+  const selLabel = sel && book ? `${formatRef(book, loc!.chapter, sel.start, sel.end)} (${loc!.t})${partial ? " · selected words" : ""}` : "";
+  const selHighlight = stored ? my.highlights.find((h) => h.startVerse === stored.startVerse && h.endVerse === stored.endVerse
+    && (h.startOffset ?? null) === stored.startOffset && (h.endOffset ?? null) === stored.endOffset) ?? null : null;
+  const anyHighlightInSel = !!range && my.highlights.some((h) => {
+    const r = storedToRange(h, lengthOf);
+    const before = (a: { verse: number; offset: number }, b: { verse: number; offset: number }) => a.verse < b.verse || (a.verse === b.verse && a.offset < b.offset);
+    return before(r.start, range.end) && before(range.start, r.end);
+  });
   const selBookmark = sel ? my.bookmarks.find((b) => b.startVerse === sel.start && b.endVerse === sel.end) ?? null : null;
   const selNote = sel ? my.notes.find((n) => n.startVerse === sel.start && n.endVerse === sel.end) ?? null : null;
+  const toSpec = (h: Highlight) => ({ translationCode: h.translationCode, bookCode: h.bookCode, chapter: h.chapter, startVerse: h.startVerse, endVerse: h.endVerse, startOffset: h.startOffset ?? null, endOffset: h.endOffset ?? null, color: h.color });
 
   const studyUnavailable = () => flash("Highlights, notes and saved passages are coming soon.");
   const failed = (e: unknown) => flash(e instanceof BibleApiError ? e.message : "That didn't save. Please try again.");
 
+  // Highlights EXACTLY the selection; the same colour again removes it.
+  // Every change can be undone once (the server returns what it replaced).
   async function onHighlight(color: HighlightColor) {
     if (!selRef) return;
     if (!my.available) return studyUnavailable();
     setBusy(true);
     try {
-      if (selHighlight && selHighlight.color === color) { await removeHighlight(selHighlight.id); flash("Highlight removed"); }
-      else { await addHighlight(selRef, color); }
+      if (selHighlight && selHighlight.color === color) {
+        const r = await eraseHighlight(selRef, offsets);
+        setUndo({ remove: r.pieces.map((p) => p.id), add: r.replaced.map(toSpec), label: "Highlight removed" });
+      } else {
+        const r = await addHighlight(selRef, color, offsets);
+        setUndo({ remove: [r.id, ...r.pieces.map((p) => p.id)], add: r.replaced.map(toSpec), label: color === "underline" ? "Underlined" : "Highlighted" });
+      }
       await loadMine();
-      setSel(null);
+      setRange(null); anchorRef.current = null;
     } catch (e) { failed(e); } finally { setBusy(false); }
   }
-  async function onRemoveHighlightsInSelection() {
-    if (!sel) return;
-    const ids = new Set<string>();
-    for (let v = sel.start; v <= sel.end; v++) { const h = hlByVerse.get(v); if (h) ids.add(h.id); }
+  async function onErase() {
+    if (!selRef) return;
     setBusy(true);
-    try { for (const id of ids) await removeHighlight(id); await loadMine(); setSel(null); flash("Highlight removed"); }
+    try {
+      const r = await eraseHighlight(selRef, offsets);
+      setUndo({ remove: r.pieces.map((p) => p.id), add: r.replaced.map(toSpec), label: "Highlight removed" });
+      await loadMine(); setRange(null);
+    } catch (e) { failed(e); } finally { setBusy(false); }
+  }
+  async function onUndo() {
+    if (!undo) return;
+    setBusy(true);
+    try { await restoreHighlights(undo.remove, undo.add); setUndo(null); await loadMine(); flash("Undone"); }
     catch (e) { failed(e); } finally { setBusy(false); }
   }
+  useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo(null), 8000); return () => clearTimeout(t); }, [undo]);
   async function onSave() {
     if (!selRef) return;
     if (!my.available) return studyUnavailable();
@@ -242,8 +325,8 @@ export default function BibleReaderScreen() {
     } catch (e) { failed(e); } finally { setBusy(false); }
   }
   function selectedText() {
-    if (!data || !sel) return "";
-    return data.verses.filter((v) => v.verse >= sel.start && v.verse <= sel.end).map((v) => v.text.replace(/\n/g, " ")).join(" ").trim();
+    if (!data || !range) return "";
+    return rangeText(verseList, range);
   }
   // Verse text leaves the app only for translations whose licence allows it
   // (public domain); otherwise only the reference is copied/shared.
@@ -272,7 +355,7 @@ export default function BibleReaderScreen() {
     try {
       if (noteEdit.note) await updateNote(noteEdit.note.id, title, body);
       else await addNote(noteEdit.ref, title, body);
-      setNoteEdit(null); setSel(null);
+      setNoteEdit(null); setRange(null);
       flash("Note saved");
       await loadMine();
     } catch (e) { setNoteError(e instanceof BibleApiError ? e.message : "Your note didn't save. Please try again."); }
@@ -299,6 +382,18 @@ export default function BibleReaderScreen() {
     const tAllowed = translations?.some((t) => t.code === p.translation);
     return { b, p, label, here, t: tAllowed ? p.translation : undefined };
   }, [gathering?.sharedPassage, loc?.book, loc?.chapter, translations]);
+
+  // A run's look: highlight wash or underline, plus the selection wash.
+  // Inline Text styles only — nothing that can change line layout.
+  const selectionWash = withAlpha(c.accentGreen, resolvedMode === "dark" ? 0.32 : 0.2);
+  const runStyle = (run: { color: string | null; selected: boolean }) => {
+    const p = run.color ? (palette as Record<string, { wash: string; swatch: string }>)[run.color] ?? palette.gold : null;
+    return [
+      p && run.color !== "underline" ? { backgroundColor: p.wash } : null,
+      run.color === "underline" ? { textDecorationLine: "underline" as const, textDecorationColor: p?.swatch } : null,
+      run.selected ? { backgroundColor: selectionWash, textDecorationLine: "underline" as const, textDecorationStyle: "dotted" as const, textDecorationColor: c.accentGreen } : null,
+    ];
+  };
 
   const fontSize = prefs.fontSize;
   const lineHeight = Math.round(fontSize * LINE_HEIGHT[prefs.lineSpacing]);
@@ -349,14 +444,27 @@ export default function BibleReaderScreen() {
               {blk.verses.map((v) => {
                 const h = hlByVerse.get(v.verse);
                 const selected = !!sel && v.verse >= sel.start && v.verse <= sel.end;
+                const runs = verseRuns(v.verse, v.text, my.highlights, range, lengthOf);
+                const toks = textMode ? tokensOf.get(v.verse) ?? [] : [];
                 return (
-                  <Text key={v.verse} onPress={() => tapVerse(v.verse)} suppressHighlighting
-                    style={[h && { backgroundColor: palette[h.color].wash }, selected && styles.selected]}
-                    accessibilityRole="button" accessibilityState={{ selected }}
-                    accessibilityLabel={`Verse ${v.verse}${h ? `, highlighted ${palette[h.color].label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
-                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }]}>{v.verse}{" "}</Text>}
-                    {v.text}
-                    {notedVerses.has(v.verse) && <Text style={[styles.noteMark, { fontSize: Math.round(fontSize * 0.7) }]}>{" "}✎</Text>}
+                  <Text key={v.verse} onPress={textMode ? undefined : () => tapVerse(v.verse)}
+                    onLongPress={textMode ? undefined : () => chooseMode("word")} suppressHighlighting
+                    // On the web a "button" role renders an inline-BLOCK element, which
+                    // would put every verse on its own line; spans keep the text flowing
+                    // as it does on phones (where nested Text is always inline).
+                    accessibilityRole={textMode ? "text" : INLINE_BUTTON_ROLE} accessibilityState={{ selected }}
+                    accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
+                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }]}>{v.verse}{"\u00A0"}</Text>}
+                    {runs.map((run) => !textMode
+                      ? <Text key={run.start} style={runStyle(run)}>{run.text}</Text>
+                      : toks.filter((t) => t.end > run.start && t.start < run.end).map((t) => (
+                        <Text key={`${run.start}-${t.start}`} style={runStyle(run)} suppressHighlighting
+                          onPress={t.word ? () => tapWord(v.verse, t) : undefined}
+                          accessibilityRole={t.word ? INLINE_BUTTON_ROLE : undefined} accessibilityLabel={t.word ? t.text : undefined}>
+                          {v.text.slice(Math.max(t.start, run.start), Math.min(t.end, run.end))}
+                        </Text>
+                      )))}
+                    {notedVerses.has(v.verse) && <Text style={[styles.noteMark, { fontSize: Math.round(fontSize * 0.7) }]}>{"\u00A0"}✎</Text>}
                     {" "}
                   </Text>
                 );
@@ -428,10 +536,28 @@ export default function BibleReaderScreen() {
           <View style={styles.actionHead}>
             <Text style={styles.actionRef} numberOfLines={1}>{selLabel}</Text>
             {busy ? <ActivityIndicator size="small" color={c.accentGreen} /> : null}
-            <TouchableOpacity onPress={() => setSel(null)} style={styles.iconBtnSm} accessibilityRole="button" accessibilityLabel="Clear selection">
+            <TouchableOpacity onPress={() => { setRange(null); anchorRef.current = null; }} style={styles.iconBtnSm} accessibilityRole="button" accessibilityLabel="Clear selection">
               <Ionicons name="close" size={20} color={c.textMid} />
             </TouchableOpacity>
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeRow} accessibilityRole="radiogroup">
+            {MODES.map((m) => (
+              <TouchableOpacity key={m.key} style={[styles.modeChip, mode === m.key && styles.modeChipOn]} onPress={() => chooseMode(m.key)}
+                accessibilityRole="radio" accessibilityState={{ selected: mode === m.key }} accessibilityLabel={`Select by ${m.label}`}>
+                <Text style={[styles.modeText, mode === m.key && styles.modeTextOn]}>{m.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {textMode && range ? (
+            <View style={styles.nudgeRow}>
+              <Text style={styles.nudgeLabel}>Start</Text>
+              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "start", -1))} accessibilityRole="button" accessibilityLabel="Start one word earlier"><Ionicons name="chevron-back" size={16} color={c.textDark} /></TouchableOpacity>
+              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "start", 1))} accessibilityRole="button" accessibilityLabel="Start one word later"><Ionicons name="chevron-forward" size={16} color={c.textDark} /></TouchableOpacity>
+              <Text style={[styles.nudgeLabel, { marginLeft: 12 }]}>End</Text>
+              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "end", -1))} accessibilityRole="button" accessibilityLabel="End one word earlier"><Ionicons name="chevron-back" size={16} color={c.textDark} /></TouchableOpacity>
+              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "end", 1))} accessibilityRole="button" accessibilityLabel="End one word later"><Ionicons name="chevron-forward" size={16} color={c.textDark} /></TouchableOpacity>
+            </View>
+          ) : null}
           <View style={styles.swatches}>
             {HIGHLIGHT_COLORS.map((col) => {
               const active = selHighlight?.color === col;
@@ -439,14 +565,20 @@ export default function BibleReaderScreen() {
                 <TouchableOpacity key={col} onPress={() => onHighlight(col)} disabled={busy} style={[styles.swatchHit]}
                   accessibilityRole="button" accessibilityState={{ selected: active }}
                   accessibilityLabel={active ? `Remove ${palette[col].label} highlight` : `Highlight ${palette[col].label}`}>
-                  <View style={[styles.swatch, { backgroundColor: palette[col].swatch }, active && styles.swatchActive]}>
-                    {active && <Ionicons name="close" size={14} color="#fff" />}
-                  </View>
+                  {col === "underline" ? (
+                    <View style={[styles.swatch, styles.swatchClear, active && styles.swatchActive]}>
+                      <Text style={[styles.underlineGlyph, { color: palette.underline.swatch }]}>U</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.swatch, { backgroundColor: palette[col].swatch }, active && styles.swatchActive]}>
+                      {active && <Ionicons name="close" size={14} color="#fff" />}
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
-            {!selHighlight && sel && Array.from({ length: sel.end - sel.start + 1 }, (_, i) => sel.start + i).some((v) => hlByVerse.has(v)) && (
-              <TouchableOpacity onPress={onRemoveHighlightsInSelection} disabled={busy} style={styles.swatchHit} accessibilityRole="button" accessibilityLabel="Remove highlight">
+            {!selHighlight && anyHighlightInSel && (
+              <TouchableOpacity onPress={onErase} disabled={busy} style={styles.swatchHit} accessibilityRole="button" accessibilityLabel="Remove highlighting from the selected text">
                 <View style={[styles.swatch, styles.swatchClear]}><Ionicons name="remove" size={16} color={c.textMid} /></View>
               </TouchableOpacity>
             )}
@@ -462,6 +594,31 @@ export default function BibleReaderScreen() {
         </View>
       )}
 
+      {undo && !sel ? (
+        <View style={[styles.undoBar, { bottom: 24 + insets.bottom }]} accessibilityLiveRegion="polite">
+          <Text style={styles.undoText}>{undo.label}</Text>
+          <TouchableOpacity onPress={onUndo} disabled={busy} accessibilityRole="button" accessibilityLabel="Undo"><Text style={styles.undoBtn}>Undo</Text></TouchableOpacity>
+        </View>
+      ) : null}
+      {data && !sel && !undo && !focus && mode !== "verse" ? (
+        <TouchableOpacity style={[styles.modePill, { bottom: 24 + insets.bottom }]} onPress={() => setModeSheet(true)} accessibilityRole="button" accessibilityLabel={`Selecting by ${MODES.find((m) => m.key === mode)!.label}. Change`}>
+          <Ionicons name="text-outline" size={14} color={c.textDark} />
+          <Text style={styles.modePillText}>{MODES.find((m) => m.key === mode)!.label}: {MODES.find((m) => m.key === mode)!.hint.toLowerCase()}</Text>
+        </TouchableOpacity>
+      ) : null}
+      <Modal visible={modeSheet} transparent animationType="fade" onRequestClose={() => setModeSheet(false)}>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setModeSheet(false)} accessibilityLabel="Close">
+          <View style={[styles.menu, { top: insets.top + 52 }]} accessibilityRole="radiogroup">
+            {MODES.map((m) => (
+              <TouchableOpacity key={m.key} style={styles.menuItem} onPress={() => chooseMode(m.key)} accessibilityRole="radio" accessibilityState={{ selected: mode === m.key }}>
+                <Ionicons name={mode === m.key ? "radio-button-on" : "radio-button-off"} size={18} color={c.accentGreen} />
+                <View style={{ flex: 1 }}><Text style={styles.menuText}>{m.label}</Text><Text style={styles.modeHint}>{m.hint}</Text></View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {toast && (
         <View style={[styles.toast, { bottom: (sel ? 190 : 24) + insets.bottom }]} pointerEvents="none" accessibilityLiveRegion="polite">
           <Text style={styles.toastText}>{toast}</Text>
@@ -475,7 +632,8 @@ export default function BibleReaderScreen() {
             <MenuItem styles={styles} c={c} icon="library-outline" label="My notes & highlights" onPress={() => { setSheet(null); router.push("/bible/library" as any); }} />
             <MenuItem styles={styles} c={c} icon="school-outline" label="Lessons on this chapter" onPress={() => setSheet("related")} />
             <MenuItem styles={styles} c={c} icon="text-outline" label="Reading settings" onPress={() => setSheet("prefs")} />
-            <MenuItem styles={styles} c={c} icon="expand-outline" label="Focus mode" onPress={() => { setSheet(null); setSel(null); setFocus(true); }} />
+            <MenuItem styles={styles} c={c} icon="color-wand-outline" label={`Select by: ${MODES.find((m) => m.key === mode)!.label}`} onPress={() => { setSheet(null); setModeSheet(true); }} />
+            <MenuItem styles={styles} c={c} icon="expand-outline" label="Focus mode" onPress={() => { setSheet(null); setRange(null); setFocus(true); }} />
           </View>
         </TouchableOpacity>
       </Modal>
@@ -583,6 +741,21 @@ function makeStyles(c: AppColors) {
     actions: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
     action: { flex: 1, alignItems: "center", gap: 3, minHeight: 52, justifyContent: "center" },
     actionText: { fontSize: 11, color: c.textMid, fontFamily: "Inter_600SemiBold" },
+    modeRow: { gap: 6, paddingVertical: 4 },
+    modeChip: { minHeight: 32, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, justifyContent: "center" },
+    modeChipOn: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
+    modeText: { fontSize: 12, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    modeTextOn: { color: "#fff" },
+    modeHint: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    nudgeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+    nudgeLabel: { fontSize: 12, color: c.textMid, fontFamily: "Inter_600SemiBold" },
+    nudge: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
+    underlineGlyph: { fontSize: 15, fontFamily: "Inter_700Bold", textDecorationLine: "underline" },
+    undoBar: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 48, borderRadius: 24, backgroundColor: c.textDark },
+    undoText: { flex: 1, color: c.lightCream, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+    undoBtn: { color: c.accentGreen, fontSize: 15, fontFamily: "Inter_700Bold", paddingVertical: 10 },
+    modePill: { position: "absolute", alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    modePillText: { fontSize: 12, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     soon: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4 },
     toast: { position: "absolute", alignSelf: "center", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: c.textDark },
     toastText: { color: c.lightCream, fontSize: 14, fontFamily: "Inter_600SemiBold" },

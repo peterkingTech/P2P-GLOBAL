@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
@@ -34,6 +35,7 @@ const REMINDER_DAYS: { value: string; label: string }[] = [
 ];
 
 export default function KingdomSchoolSettingsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile, updateProfile, user, supabase } = useAuth();
   const { colors } = useTheme();
@@ -97,23 +99,14 @@ export default function KingdomSchoolSettingsScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Reminder Day</Text>
-        <View style={styles.card}>
-          <View style={styles.chipWrapRow}>
-            {REMINDER_DAYS.map((d) => {
-              const selected = profile?.reminderDay === d.value;
-              return (
-                <TouchableOpacity
-                  key={d.value}
-                  style={[styles.chip, selected && styles.chipActive]}
-                  onPress={() => updateProfile({ reminderDay: d.value })}
-                >
-                  <Text style={[styles.chipText, selected && styles.chipTextActive]}>{d.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+        <Text style={styles.sectionTitle}>Study reminders</Text>
+        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/study-reminders" as any)} accessibilityRole="button" accessibilityLabel="Study reminders and daily goal">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Ionicons name="alarm-outline" size={20} color={colors.accentGreen} />
+            <Text style={[styles.optionLabel, { flex: 1 }]}>Reminders and daily goal</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
-        </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
