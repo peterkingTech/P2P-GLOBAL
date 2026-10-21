@@ -528,7 +528,7 @@ function MessageBannerHost() {
 // handled twice or missed depending on app state.
 function PushNotificationHost() {
   const { isAuthenticated, profile } = useAuth();
-  const { markNotificationRead, unreadNotificationCount } = useData();
+  const { markNotificationRead, conversations } = useData();
   const router = useRouter();
   const registeredForUserId = useRef<string | null>(null);
 
@@ -597,11 +597,16 @@ function PushNotificationHost() {
     return () => sub.remove();
   }, [isAuthenticated, profile?.id]);
 
-  // App-icon badge = the server's unread notification count (native only).
+  // App-icon badge = unread chat MESSAGES only (the same per-chat counts the
+  // Messages tab shows), not muted chats — never Notification Center items
+  // (prayer, lessons, circles, system…), which piled up into a misleading
+  // number. Cleared on sign-out. Native only. The server sends the same
+  // count with each new-message push, so the icon stays right while closed.
+  const unreadMessageBadge = conversations.reduce((sum, c) => sum + (c.isMuted ? 0 : c.unreadCount), 0);
   useEffect(() => {
-    if (Platform.OS === "web" || !isAuthenticated) return;
-    void Notifications.setBadgeCountAsync(unreadNotificationCount).catch(() => {});
-  }, [unreadNotificationCount, isAuthenticated]);
+    if (Platform.OS === "web") return;
+    void Notifications.setBadgeCountAsync(isAuthenticated ? unreadMessageBadge : 0).catch(() => {});
+  }, [unreadMessageBadge, isAuthenticated]);
 
   // A push can't be withdrawn server-side, so an "Incoming call" entry can
   // outlive its call while the app was backgrounded or closed. Clear any

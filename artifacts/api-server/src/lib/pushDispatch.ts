@@ -4,6 +4,7 @@ import { getDeactivatedUserIds } from "./accountStatus";
 import { getPreviewLevels, getPushPreferences, getSenderPhotos, pushPresentation, PREVIEW_CONTENT_LEVELS, type PreviewLevel, type PushPresentation } from "./notificationPrivacy";
 import { isPushMuted } from "./notificationCategories";
 import { issuePreviewToken } from "./previewToken";
+import { unreadMessageCounts } from "./messageBadge";
 import {
   decideNotification, sendExpoMessages,
   type ExpoMessage, type ExpoSendDeps, type MessageOutcome, type NotificationVerdict,
@@ -107,10 +108,13 @@ function presentationFor(n: PendingNotification, level: PreviewLevel, senderPhot
 // pushPresentation — title/body, sender photo, iOS preview category, preview
 // token). Never contains message content. The preview token goes in data,
 // which iOS hands the Notification Service Extension as userInfo["body"].
-function buildExpoMessage(n: PendingNotification, to: string, pres: PushPresentation) {
+// badge: only on new-message pushes — the recipient's unread MESSAGE count
+// (lib/messageBadge.ts). Other pushes carry none, so they never change it.
+function buildExpoMessage(n: PendingNotification, to: string, pres: PushPresentation, badge?: number) {
   const isIncomingCall = n.notification_type === "incoming_call";
   return {
     to,
+    ...(n.notification_type === "new_message" && typeof badge === "number" ? { badge } : {}),
     title: pres.title,
     body: pres.body,
     ...(pres.image ? { richContent: { image: pres.image } } : {}),
@@ -230,7 +234,8 @@ export async function dispatchNotificationNow(
         const level = (await getPreviewLevels([n.user_id])).get(n.user_id) ?? "none";
         const photo = level === "none" ? undefined : (await getSenderPhotos([n])).get(n.id);
         const pres = presentationFor(n, level, photo);
-        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token, pres)), n.notification_type ?? "immediate");
+        const badge = n.notification_type === "new_message" ? (await unreadMessageCounts([n.user_id])).get(n.user_id) : undefined;
+        const outcomes = await sendExpo(tokens.map((t) => buildExpoMessage(n, t.token, pres, badge)), n.notification_type ?? "immediate");
         await deactivateTokens(invalidTokens(tokens.map((t) => t.token), outcomes));
         const { verdict, finished } = decideNotification(outcomes, { ageMs: 0, maxRetryAgeMs: Number.POSITIVE_INFINITY });
         logVerdict(n, verdict, outcomes, "immediate");
@@ -279,6 +284,8 @@ export async function dispatchPendingPushes(): Promise<{
   // Per-category preferences (lib/notificationCategories.ts): only the
   // phone alert is skipped; the in-app notification stays.
   const pushPrefs = await getPushPreferences(userIds);
+  // Unread-message badge for recipients of new-message pushes (one batched read).
+  const badges = await unreadMessageCounts(Array.from(new Set(pending.filter((n) => n.notification_type === "new_message" && n.user_id).map((n) => n.user_id as string))));
   const tokensByUser = new Map<string, PushToken[]>();
   for (const row of (tokenRows ?? []) as PushToken[]) {
     const list = tokensByUser.get(row.user_id) ?? [];
@@ -301,7 +308,7 @@ export async function dispatchPendingPushes(): Promise<{
     const level = (n.user_id && levels.get(n.user_id)) || "none";
     const pres = presentationFor(n, level, level === "none" ? undefined : senderPhotos.get(n.id));
     for (const t of tokens) {
-      messages.push(buildExpoMessage(n, t.token, pres));
+      messages.push(buildExpoMessage(n, t.token, pres, n.user_id ? badges.get(n.user_id) : undefined));
       messageTokens.push(t.token);
       messageOwner.push(ni);
     }

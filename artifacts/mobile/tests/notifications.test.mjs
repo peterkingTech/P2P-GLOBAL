@@ -185,7 +185,7 @@ ok("_layout: tap handler wired to the tap listener and cold start", /createNotif
 ok("_layout: marks through DataContext (the canonical route)", /markRead: \(id\) => markReadRef\.current\(id\)/.test(layout));
 ok("_layout: clears the cold-start response (native only)", /clearLastNotificationResponseAsync\(\)/.test(layout));
 ok("_layout: pending marks flushed on sign-in and foreground", /flushPending\(\)/.test(layout) && /AppState\.addEventListener\("change"/.test(layout));
-ok("_layout: badge follows the server unread count (native only)", /setBadgeCountAsync\(unreadNotificationCount\)/.test(layout));
+ok("_layout: badge = unread chat messages only (not Notification Center items), muted chats excluded, cleared on sign-out (native only)", /const unreadMessageBadge = conversations\.reduce\(\(sum, c\) => sum \+ \(c\.isMuted \? 0 : c\.unreadCount\), 0\);/.test(layout) && /setBadgeCountAsync\(isAuthenticated \? unreadMessageBadge : 0\)/.test(layout) && !/setBadgeCountAsync\(unreadNotificationCount\)/.test(layout));
 const dc = readFileSync(path.join(root, "contexts/DataContext.tsx"), "utf8");
 ok("DataContext: mark-read checks the response and counts once (wasUnread)", /if \(!res\.ok\) return "failed"/.test(dc) && /body\?\.wasUnread === true\) setUnreadNotificationCount/.test(dc));
 ok("DataContext: count from the exact server endpoint", /\/notifications\/me\/unread-count/.test(dc));
