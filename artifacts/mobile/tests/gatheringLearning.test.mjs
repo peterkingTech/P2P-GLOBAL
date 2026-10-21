@@ -142,6 +142,13 @@ ok("Mute mode mutes my mic only if it was on, and restores only what it muted", 
   && /\}, \[session\?\.currentMode\]\);/.test(gs));
 ok("Mute mode says what is true (you can unmute to speak)", /Your microphone is muted — tap the mic if you need to speak\./.test(gs) && !/Microphones are muted\./.test(gs));
 ok("the mute hook runs before the loading guard (no conditional hooks)", gs.indexOf("const mutedByModeRef = useRef(false);") < gs.indexOf("if (loading || !session) {"));
+// Church: "muted / camera off by the host" is real after a rejoin or reload too.
+ok("church: host locks are applied to the engine on join and when they load (not just shown)",
+  /onJoinChannelSuccess: \(\) => applyHostLocks\(\),/.test(cc)
+  && /if \(hostLocksRef\.current\.mic\) \{ setMuted\(true\); engine\?\.muteLocalAudioStream\(true\); \}/.test(cc)
+  && /if \(hostLocksRef\.current\.video\) \{ setCameraOn\(false\); engine\?\.enableLocalVideo\(false\); \}/.test(cc)
+  && /useEffect\(\(\) => \{ applyHostLocks\(\); \}, \[micDisabledByHost, videoDisabledByHost\]\);/.test(cc)
+  && cc.indexOf("useEffect(() => { applyHostLocks(); }") < cc.indexOf("if (loading || !detail) {"));
 ok("picker labels follow the group", /scope === "church" \? "Church lessons" : "Family lessons"/.test(pick) && /ownStudies\(scope, groupId\)/.test(pick));
 
 console.log(`${pass} passed, ${fail} failed`);

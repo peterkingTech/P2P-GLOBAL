@@ -78,6 +78,11 @@ export default function ChurchCallScreen() {
   const [videoDisabledByHost, setVideoDisabledByHost] = useState(false);
   const [ending, setEnding] = useState(false);
   const [speakingUids, setSpeakingUids] = useState<Set<number>>(new Set());
+  // Host locks (mic muted / camera off by the host) are stored server-side.
+  // A live change arrives as a signal; on (re)join or reload they come back
+  // from the call detail — apply them to the engine too, so "muted by host"
+  // is never just an icon while the microphone is still sending.
+  const hostLocksRef = useRef({ mic: false, video: false });
 
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHandUserIds, setRaisedHandUserIds] = useState<Set<string>>(new Set());
@@ -257,6 +262,7 @@ export default function ChurchCallScreen() {
       // would go stale the moment anyone joins after the initial mount,
       // showing "Someone" instead of their real name and missing them
       // from the Participants/moderation panel entirely.
+      onJoinChannelSuccess: () => applyHostLocks(),
       onUserJoined: (_c, uid) => { setRemoteUids((prev) => (prev.includes(uid) ? prev : [...prev, uid])); load(); },
       onUserOffline: (_c, uid) => { setRemoteUids((prev) => prev.filter((u) => u !== uid)); load(); },
       onAudioVolumeIndication: (_c, speakers) => {
@@ -265,6 +271,14 @@ export default function ChurchCallScreen() {
       },
     },
   });
+  hostLocksRef.current = { mic: micDisabledByHost, video: videoDisabledByHost };
+  function applyHostLocks() {
+    const engine = engineRef.current;
+    if (hostLocksRef.current.mic) { setMuted(true); engine?.muteLocalAudioStream(true); }
+    if (hostLocksRef.current.video) { setCameraOn(false); engine?.enableLocalVideo(false); }
+  }
+  useEffect(() => { applyHostLocks(); }, [micDisabledByHost, videoDisabledByHost]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   function toggleMute() {
     if (micDisabledByHost) { showAlert("Muted by host", "The host has muted your microphone for this gathering."); return; }
