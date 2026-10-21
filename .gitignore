@@ -53,3 +53,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Stray local files from 2026-10-03 (root Expo/EAS config for another project + an old code snapshot); the real app config lives in artifacts/mobile.
+/app.json
+/eas.json
+/p2p_mobile_call_bundle.zip
