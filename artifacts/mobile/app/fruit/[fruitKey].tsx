@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import ReadableText from "@/components/ReadableText";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 interface ConfirmedEncouragement {
   id: string;
@@ -137,6 +138,7 @@ export default function FruitDetailScreen() {
               <View style={styles.verseCard}>
                 <Text style={styles.verseText}>"{fruit.themeVerseText}"</Text>
                 <ReadableText style={styles.verseRef}>— {fruit.themeVerse}</ReadableText>
+                <ReadInBibleLink reference={fruit.themeVerse} />
               </View>
             )}
 

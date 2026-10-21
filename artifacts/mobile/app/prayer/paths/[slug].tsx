@@ -9,6 +9,7 @@ import { getPrayerPath, updatePathProgress, type PrayerPathDetail } from "@/lib/
 import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { savePath, saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -181,6 +182,7 @@ export default function PrayerPathFlowScreen() {
 
             <View style={styles.labelPill}><Text style={styles.labelPillText}>SCRIPTURE</Text></View>
             <Text style={styles.referenceText}>{currentStep.scripture?.referenceDisplay}</Text>
+            <ReadInBibleLink reference={currentStep.scripture?.referenceDisplay} label="Read in context" />
             {verseLoading ? <ActivityIndicator color={c.accentGreen} /> : verseText ? (
               <Text style={styles.verseText}>"{verseText}"</Text>
             ) : (

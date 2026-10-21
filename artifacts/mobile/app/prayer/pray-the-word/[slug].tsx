@@ -9,6 +9,7 @@ import { getTopic, updateTopicProgress, type PrayerTopicDetail, type ScriptureRe
 import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -172,6 +173,7 @@ export default function PrayTheWordFlowScreen() {
           <View style={styles.card}>
             <View style={styles.labelPill}><Text style={styles.labelPillText}>SCRIPTURE</Text></View>
             <Text style={styles.referenceText}>{currentScripture.referenceDisplay}</Text>
+            <ReadInBibleLink reference={currentScripture.referenceDisplay} label="Read in context" />
             {verseLoading ? (
               <ActivityIndicator color={c.accentGreen} style={{ marginTop: 16 }} />
             ) : verseText ? (

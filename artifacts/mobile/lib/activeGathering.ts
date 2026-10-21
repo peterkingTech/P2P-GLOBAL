@@ -20,7 +20,7 @@ export interface ActiveGathering {
    * it never changes what the group sees.
    */
   sharedPassage?: { translation: string; book: string; chapter: number; startVerse: number; endVerse: number } | null;
-  kind?: "family" | "church";
+  kind?: "family" | "church" | "prayer" | "call";
 }
 
 let current: ActiveGathering | null = null;

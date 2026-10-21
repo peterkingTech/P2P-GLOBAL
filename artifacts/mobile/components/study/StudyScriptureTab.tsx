@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { lookupVerseForAdmin } from "@/lib/bibleClient";
 import type { useStudySession } from "@/hooks/useStudySession";
 import ReadableText from "@/components/ReadableText";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 // Scripture supports the learning (spec: "a supporting tool inside Study
 // Together"), lesson content stays primary. Reuses the exact same lookup
@@ -47,6 +48,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
         <View style={styles.resultCard}>
           <Text style={styles.resultText}>"{result.text}"</Text>
           <ReadableText style={styles.resultRef}>— {result.reference}</ReadableText>
+          <ReadInBibleLink reference={result.reference} label="Read in context" />
           <TouchableOpacity style={styles.shareBtn} onPress={() => session.shareScripture(result.reference, result.text)}>
             <Ionicons name="people" size={14} color="#fff" />
             <Text style={styles.shareBtnText}>Share with Group</Text>
@@ -59,6 +61,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
           <Text style={styles.sharedLabel}>Shared with the group</Text>
           <Text style={styles.resultText}>"{session.sharedScripture.verse}"</Text>
           <ReadableText style={styles.resultRef}>— {session.sharedScripture.reference}</ReadableText>
+          <ReadInBibleLink reference={session.sharedScripture.reference} label="Read in context" />
         </View>
       )}
 

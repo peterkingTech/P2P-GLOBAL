@@ -37,6 +37,7 @@ import {
 import { savePrayer, getSavedPrayers } from "@/lib/prayerLibraryApi";
 import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 import ReadableText from "@/components/ReadableText";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -855,6 +856,8 @@ export default function PrayerTab() {
             </View>
             <ScrollView>
               {activePrayer?.scripture_reference ? <ReadableText style={styles.prayerModalRef}>{activePrayer.scripture_reference}</ReadableText> : null}
+              {/* Closes this sheet first: a Modal would stay on top of the reader. */}
+              <ReadInBibleLink reference={activePrayer?.scripture_reference} color={colors.upperRoomAmber} beforeOpen={() => setActivePrayer(null)} />
               <Text style={styles.prayerModalText}>{activePrayer?.prayer_text}</Text>
               <View style={styles.prayerModalActionsRow}>
                 <TouchableOpacity style={styles.prayThisBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>

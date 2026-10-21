@@ -32,6 +32,7 @@ import FruitDetailCard from "@/components/tree/FruitDetailCard";
 import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import ReadableText from "@/components/ReadableText";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -440,6 +441,7 @@ export default function LivingTreeScreen() {
             <Text style={styles.descText}>{stage.description}</Text>
             <View style={styles.verseBlock}>
               <ReadableText style={styles.verseItalic}>{stage.verse} — {stage.verseRef}</ReadableText>
+              <ReadInBibleLink reference={stage.verseRef} />
             </View>
           </View>
 

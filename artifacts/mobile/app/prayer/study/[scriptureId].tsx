@@ -9,6 +9,7 @@ import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopi
 import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
+import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -115,6 +116,7 @@ export default function ScriptureDevotionalScreen() {
           <View style={styles.card}>
             <View style={styles.labelPill}><Text style={styles.labelPillText}>{STEP_LABEL.read}</Text></View>
             <Text style={styles.referenceText}>{scripture.referenceDisplay}</Text>
+            <ReadInBibleLink reference={scripture.referenceDisplay} label="Read the whole chapter" />
             {verseText ? (
               <Text style={styles.verseText}>"{verseText}"</Text>
             ) : (

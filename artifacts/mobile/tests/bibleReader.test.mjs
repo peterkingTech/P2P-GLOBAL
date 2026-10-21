@@ -115,7 +115,16 @@ const lesson = src("app/lesson/[id].tsx");
 ok("lesson Scripture opens in the P2P Bible (bible.com only as fallback)", /readerTarget\(s\.reference\)/.test(lesson) && /router\.push\(bibleRoute\(/.test(lesson) && /Read in Bible/.test(lesson));
 for (const f of ["app/kingdom-wins/[id].tsx", "app/missions/story/[id].tsx", "app/prayer/gathering/[id].tsx", "app/prayer/journal.tsx", "app/prayer/testimony/[id].tsx", "components/study/CustomLessonViewer.tsx"])
   ok(`${f}: Scripture opens via openScripture`, /openScripture\(/.test(src(f)) && !/bible\.com/.test(src(f)));
-ok("live prayer call screen unchanged (still external link, call untouched)", /bible\.com/.test(src("app/call/prayer.tsx")) && !/openScripture/.test(src("app/call/prayer.tsx")));
+const prayerCall = src("app/call/prayer.tsx");
+ok("1:1 prayer call: Bible button opens the reader (no bible.com)", /openScripture\(scriptureRef\)/.test(prayerCall) && !/bible\.com/.test(prayerCall));
+ok("1:1 prayer call: publishes the Return bar + its passage while in the call", /kind: "prayer", sharedPassage: passage/.test(prayerCall) && /clearActiveGathering\(`prayer:\$\{/.test(prayerCall));
+ok("1:1 prayer call: join/leave/engine logic untouched (leave only from the button or a failure)", /onPress=\{\(\) => handleLeave\(\)\}/.test(prayerCall) && /if \(callState === "failed"\) void handleLeave\("failed"\)/.test(prayerCall));
+ok("Return bar names the prayer call", /Prayer call in progress/.test(src("components/family/GatheringReturnBar.tsx")));
+const link = src("components/bible/ReadInBibleLink.tsx");
+ok("ReadInBibleLink renders nothing for unreadable references and can close a Modal first", /if \(!readerTarget\(reference\)\) return null/.test(link) && /beforeOpen\?\.\(\)/.test(link));
+for (const f of ["app/prayer/study/[scriptureId].tsx", "app/prayer/pray-the-word/[slug].tsx", "app/prayer/paths/[slug].tsx", "app/fruit/[fruitKey].tsx", "app/living-tree.tsx", "components/study/StudyLessonTab.tsx", "components/study/StudyScriptureTab.tsx"])
+  ok(`${f}: Read in Bible link`, /<ReadInBibleLink reference=/.test(src(f)));
+ok("Prayer tab modal closes before opening the reader", /<ReadInBibleLink reference=\{activePrayer\?\.scripture_reference\}[^>]*beforeOpen=\{\(\) => setActivePrayer\(null\)\}/.test(src("app/(tabs)/prayer.tsx")));
 const os = src("lib/openScripture.ts");
 ok("openScripture pushes (keeps the current screen/call mounted)", /router\.push\(/.test(os) && !/router\.replace/.test(os));
 const myBible = src("components/family/MyBibleSheet.tsx");
@@ -125,5 +134,13 @@ ok("ActiveGathering carries the shared passage (optional, additive)", /sharedPas
 ok("Family Gathering publishes its current Scripture", /kind: "family", sharedPassage: session\.currentScripture/.test(src("app/family/worship/[sessionId].tsx")));
 ok("Church Gathering publishes its shared Scripture", /kind: "church", sharedPassage:/.test(src("app/call/church.tsx")));
 
+// 1:1 audio/video calls: Return bar while reading the Bible from Study Together.
+const pub = src("hooks/usePublishActiveCall.ts");
+ok("usePublishActiveCall only mirrors state (no engine/leave calls) and clears itself", !/engine|leave|endCall|muteLocalAudioStream/i.test(pub.replace(/\/\*\*[\s\S]*?\*\//, "")) && /clearActiveGathering\(sessionId\)/.test(pub) && /kind: "call"/.test(pub));
+for (const f of ["app/call/audio.tsx", "app/call/video.tsx"]) {
+  const s = src(f);
+  ok(`${f}: publishes while the call is live, using its own toggleMute`, /usePublishActiveCall\(\{\s*callKey: params\.callId \|\| params\.channelName,\s*live: callState === "connected" \|\| callState === "waiting_for_peer",\s*muted, toggleMute,\s*\}\)/.test(s));
+}
+ok("Return bar names a direct call", /"Call in progress"/.test(src("components/family/GatheringReturnBar.tsx")));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

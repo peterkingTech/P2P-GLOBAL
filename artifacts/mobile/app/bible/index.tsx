@@ -409,7 +409,7 @@ export default function BibleReaderScreen() {
         <TouchableOpacity style={styles.groupChip} onPress={() => go(groupPassage.b.code, groupPassage.p.chapter, { v: groupPassage.p.startVerse, ve: groupPassage.p.endVerse, t: groupPassage.t })}
           accessibilityRole="button" accessibilityLabel={`Go to the group's passage, ${groupPassage.label}`}>
           <Ionicons name="people" size={15} color={c.accentGreen} />
-          <Text style={styles.groupChipText} numberOfLines={1}>Group passage: {groupPassage.label}</Text>
+          <Text style={styles.groupChipText} numberOfLines={1}>{gathering?.kind === "prayer" ? "Prayer passage" : "Group passage"}: {groupPassage.label}</Text>
           <Text style={styles.groupChipGo}>Go</Text>
         </TouchableOpacity>
       )}

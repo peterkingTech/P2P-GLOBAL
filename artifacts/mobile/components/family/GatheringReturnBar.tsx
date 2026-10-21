@@ -22,7 +22,7 @@ export default function GatheringReturnBar({ topInset = 0 }: { topInset?: number
   return (
     <View style={[styles.bar, { paddingTop: topInset + 6 }]} accessibilityRole="toolbar">
       <View style={styles.live} />
-      <Text style={styles.label} numberOfLines={1}>Gathering in progress</Text>
+      <Text style={styles.label} numberOfLines={1}>{gathering.kind === "prayer" ? "Prayer call in progress" : gathering.kind === "call" ? "Call in progress" : "Gathering in progress"}</Text>
       {gathering.voiceConnected ? (
         <TouchableOpacity
           style={[styles.iconBtn, gathering.micMuted && styles.iconBtnActive]} onPress={gathering.toggleMic}
@@ -31,7 +31,7 @@ export default function GatheringReturnBar({ topInset = 0 }: { topInset?: number
           <Ionicons name={gathering.micMuted ? "mic-off" : "mic"} size={18} color={together.textPrimary} />
         </TouchableOpacity>
       ) : null}
-      <TouchableOpacity style={styles.returnBtn} onPress={goBack} accessibilityRole="button" accessibilityLabel="Return to the Gathering">
+      <TouchableOpacity style={styles.returnBtn} onPress={goBack} accessibilityRole="button" accessibilityLabel={gathering.kind === "prayer" ? "Return to the prayer call" : gathering.kind === "call" ? "Return to the call" : "Return to the Gathering"}>
         <Ionicons name="people" size={16} color="#fff" />
         <Text style={styles.returnText}>Return</Text>
       </TouchableOpacity>

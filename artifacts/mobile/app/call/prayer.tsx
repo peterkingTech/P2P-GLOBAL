@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +15,9 @@ import { getP2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
 import { getGathering, joinGathering, leaveGathering, type PrayerGathering, type PrayerGatheringParticipant } from "@/lib/prayerCoordinationApi";
+import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering";
+import { openScripture } from "@/lib/openScripture";
+import { readerTarget } from "@/lib/bibleReaderApi";
 
 function showAlert(title: string, message: string, onDismiss?: () => void) {
   if (Platform.OS === "web") {
@@ -56,9 +59,8 @@ export default function PrayerCallScreen() {
   const [gathering, setGathering] = useState<PrayerGathering | null>(null);
   const [participants, setParticipants] = useState<PrayerGatheringParticipant[]>([]);
   const [phase, setPhase] = useState<"prep" | "call">("prep");
-  // Reuses the exact same {reference} shape and bible.com tap-through
-  // pattern already used by app/lesson/[id].tsx — see the Scripture
-  // control button below.
+  // The gathering's passage ({reference}); the Bible button opens it in
+  // the P2P Bible reader ON TOP of this call (see the control row below).
   const scriptureRef = (gathering?.scriptureReference as { reference?: string } | null)?.reference ?? null;
 
   const myUid = useMemo(() => (profile?.id ? uidFromUserId(profile.id) : null), [profile?.id]);
@@ -200,6 +202,33 @@ export default function PrayerCallScreen() {
     engineRef.current?.muteLocalAudioStream(next);
   }
 
+  // Opening the Bible pushes the reader on top of this screen, which stays
+  // mounted — the call, mic and channel are untouched. Publishing here gives
+  // the reader the "Return" bar (same mic toggle) and the call's passage.
+  const toggleMuteRef = useRef(toggleMute);
+  toggleMuteRef.current = toggleMute;
+  const passage = useMemo(() => {
+    const t = readerTarget(scriptureRef);
+    return t ? { translation: "", book: t.book, chapter: t.chapter, startVerse: t.v ?? 1, endVerse: t.ve ?? t.v ?? 1 } : null;
+  }, [scriptureRef]);
+  useEffect(() => {
+    if (!gatheringId || phase !== "call" || callState === "ended" || callState === "failed") return;
+    setActiveGathering({
+      sessionId: `prayer:${gatheringId}`,
+      returnTo: { pathname: "/call/prayer", params: { gatheringId } },
+      voiceConnected: callState === "connected" || callState === "waiting_for_peer",
+      micMuted: muted, toggleMic: () => toggleMuteRef.current(),
+      kind: "prayer", sharedPassage: passage,
+    });
+  }, [gatheringId, phase, callState, muted, passage]);
+  useEffect(() => {
+    const id = gatheringId;
+    return () => { if (id) clearActiveGathering(`prayer:${id}`); };
+  }, [gatheringId]);
+  useEffect(() => {
+    if ((callState === "ended" || callState === "failed") && gatheringId) clearActiveGathering(`prayer:${gatheringId}`);
+  }, [callState, gatheringId]);
+
   const otherTiles: P2POrbitTile[] = remoteUids.map((uid) => ({ uid, isSelf: false, name: otherName, videoOn: false, muted: false }));
   const selfTile: P2POrbitTile = { uid: 0, isSelf: true, name: profile?.displayName || "You", videoOn: false, muted };
   const allTiles = [selfTile, ...otherTiles];
@@ -292,17 +321,14 @@ export default function PrayerCallScreen() {
         <P2PControlButton onPress={toggleMute} active={muted} label={muted ? "Unmute" : "Mute"} accessibilityLabel="Mute microphone" colors={p2pColors}>
           <Ionicons name={muted ? "mic-off" : "mic"} size={22} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
         </P2PControlButton>
-        {!!scriptureRef && (
-          // Reuses the exact same bible.com tap-through pattern already
-          // used by app/lesson/[id].tsx — no in-app Bible reader, no
-          // second Scripture representation, no new call functionality.
-          <P2PControlButton
-            onPress={() => Linking.openURL(`https://www.bible.com/search/bible?query=${encodeURIComponent(scriptureRef)}`).catch(() => {})}
-            label="Scripture" accessibilityLabel="Open Scripture" colors={p2pColors}
-          >
-            <Ionicons name="book" size={20} color={p2pColors.textPrimary} />
-          </P2PControlButton>
-        )}
+        {/* The P2P Bible opens ON TOP of the call (the call keeps running);
+            at the gathering's passage when there is one. */}
+        <P2PControlButton
+          onPress={() => (scriptureRef ? openScripture(scriptureRef) : router.push("/bible" as any))}
+          label="Bible" accessibilityLabel={scriptureRef ? `Open ${scriptureRef} in the Bible` : "Open the Bible"} colors={p2pColors}
+        >
+          <Ionicons name="book" size={20} color={p2pColors.textPrimary} />
+        </P2PControlButton>
         <P2PControlButton onPress={() => handleLeave()} danger label="Leave" accessibilityLabel="Leave prayer" colors={p2pColors}>
           <Ionicons name="call" size={22} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
         </P2PControlButton>

@@ -26,6 +26,7 @@ import { StudyTogetherOverlay } from "@/components/study/StudyTogetherOverlay";
 import { StudySessionSummary } from "@/components/study/StudySessionSummary";
 import { AddPeopleSheet } from "@/components/call/AddPeopleSheet";
 import { useActiveSpeaker } from "@/hooks/useActiveSpeaker";
+import { usePublishActiveCall } from "@/hooks/usePublishActiveCall";
 import { P2PRectStage } from "@/components/call/P2PRectStage";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { CallMoreSheet, type CallMoreAction } from "@/components/call/CallMoreSheet";
@@ -840,6 +841,14 @@ export default function VideoCallScreen() {
     // re-assert it, same limitation as the camera-retry fix below.
     if (!next) setMicUnavailable(false);
   }
+
+  // Lets the Bible reader (opened from Study Together, on top of this
+  // screen) show the Return bar with this same mic toggle. Mirror only.
+  usePublishActiveCall({
+    callKey: params.callId || params.channelName,
+    live: callState === "connected" || callState === "waiting_for_peer",
+    muted, toggleMute,
+  });
   function toggleCamera() {
     const next = !cameraOn;
     setCameraOn(next);
