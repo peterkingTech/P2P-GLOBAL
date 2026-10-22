@@ -58,7 +58,11 @@ create index if not exists idx_p2p_kingdom_story_topics_category on public.p2p_k
 create index if not exists idx_p2p_kingdom_story_topics_status on public.p2p_kingdom_story_topics (status);
 
 alter table public.p2p_kingdom_story_topics enable row level security;
+-- Explicit grants (never rely on default privileges); RLS below limits
+-- signed-in users to editors. The API reads with the service role.
 revoke all on public.p2p_kingdom_story_topics from anon;
+grant select, insert, update, delete on public.p2p_kingdom_story_topics to authenticated;
+grant all on public.p2p_kingdom_story_topics to service_role;
 drop policy if exists "Editors read kingdom story topics" on public.p2p_kingdom_story_topics;
 create policy "Editors read kingdom story topics" on public.p2p_kingdom_story_topics
   for select to authenticated using (public.p2p_is_kingdom_stories_editor());
@@ -98,6 +102,9 @@ create table if not exists public.p2p_kingdom_story_chapters (
 );
 
 alter table public.p2p_kingdom_story_chapters enable row level security;
+revoke all on public.p2p_kingdom_story_chapters from anon;
+grant select, insert, update, delete on public.p2p_kingdom_story_chapters to authenticated;
+grant all on public.p2p_kingdom_story_chapters to service_role;
 drop policy if exists "Kingdom story chapters visible with their story" on public.p2p_kingdom_story_chapters;
 create policy "Kingdom story chapters visible with their story" on public.p2p_kingdom_story_chapters
   for select using (
