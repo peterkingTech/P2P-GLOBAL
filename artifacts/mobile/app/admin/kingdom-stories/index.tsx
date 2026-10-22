@@ -26,6 +26,14 @@ export default function KingdomStoriesAdminListScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.catalogueLink} onPress={() => router.push("/admin/kingdom-stories/catalogue" as any)} accessibilityRole="link">
+        <Ionicons name="albums-outline" size={18} color={colors.primaryGreen} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.catalogueTitle}>Catalogue: categories & topics</Text>
+          <Text style={styles.catalogueSub}>Plan topics, track progress, start stories</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
       <View style={styles.filterBar}>
         {STATUS_FILTERS.map((f) => (
           <TouchableOpacity key={f.value} style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]} onPress={() => setStatusFilter(f.value)}>
@@ -63,6 +71,9 @@ export default function KingdomStoriesAdminListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.lightCream },
+  catalogueLink: { flexDirection: "row", alignItems: "center", gap: 10, margin: 14, marginBottom: 0, padding: 12, borderRadius: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
+  catalogueTitle: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_700Bold" },
+  catalogueSub: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
   filterBar: { flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center", padding: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
   filterChipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },

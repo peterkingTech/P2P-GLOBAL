@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { getKingdomStory, CONTENT_TYPE_LABELS, type KingdomStory } from "@/lib/kingdomStoriesApi";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
+import StoryChapters from "@/components/kingdom-stories/StoryChapters";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -72,6 +73,13 @@ export default function KingdomStoryDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        {story.status !== "published" && (
+          // Only editors can open an unpublished story: this is their reader preview.
+          <View style={styles.previewBanner}>
+            <Ionicons name="eye-outline" size={14} color={c.textDark} />
+            <Text style={styles.previewText}>Preview — readers can't see this story until it is published.</Text>
+          </View>
+        )}
         {!!story.media?.length && <View style={{ marginBottom: 14 }}><KingdomStoryMediaGallery media={story.media} /></View>}
 
         <View style={{ paddingHorizontal: 20 }}>
@@ -85,7 +93,9 @@ export default function KingdomStoryDetailScreen() {
             </View>
           )}
 
-          <Text style={styles.body}>{story.body}</Text>
+          {!!story.body && <Text style={styles.body}>{story.body}</Text>}
+
+          {!!story.chapters?.length && <StoryChapters chapters={story.chapters} />}
 
           {!!story.people && (
             <View style={styles.infoBox}>
@@ -164,10 +174,10 @@ export default function KingdomStoryDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {!!story.sources?.length && (
+          {!!story.sources?.some((s) => !s.chapterId) && (
             <View style={styles.sourcesBox}>
               <Text style={styles.sourcesLabel}>Sources & Further Reading</Text>
-              {story.sources.map((s) => (
+              {story.sources.filter((s) => !s.chapterId).map((s) => (
                 <View key={s.id} style={styles.sourceRow}>
                   <Text style={styles.sourceTitle}>{s.title}</Text>
                   {!!s.publisher && <Text style={styles.sourceMeta}>{s.publisher}</Text>}
@@ -185,6 +195,8 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     centerFill: { alignItems: "center", justifyContent: "center" },
+    previewBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 12, padding: 10, borderRadius: 10, backgroundColor: "rgba(234,179,8,0.18)" },
+    previewText: { flex: 1, fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 10 },
     headerType: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },

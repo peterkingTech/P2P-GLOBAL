@@ -10,12 +10,13 @@ import {
   addKingdomStoryMedia, updateKingdomStoryMedia, deleteKingdomStoryMedia,
   addKingdomStorySource, deleteKingdomStorySource,
   uploadKingdomStoryImage, uploadKingdomStoryVideo, getKingdomStoryMediaSignedUrl,
-  getKingdomStoryCategories, CONTENT_TYPE_LABELS,
+  getKingdomStoryCategories, editorCategoryOrder, CONTENT_TYPE_LABELS,
   type KingdomStory, type KingdomStoryCategory, type KingdomStoryContentType,
 } from "@/lib/kingdomStoriesApi";
 import { createOrFindScriptureReference, parseScriptureInput, getScriptureReference } from "@/lib/prayerTopicsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
+import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -60,7 +61,7 @@ export default function EditKingdomStoryScreen() {
     try {
       const [s, cats] = await Promise.all([getKingdomStory(id), getKingdomStoryCategories()]);
       setStory(s);
-      setCategories(cats);
+      setCategories(editorCategoryOrder(cats));
       if (s.scriptureReferenceId) getScriptureReference(s.scriptureReferenceId).then((r) => setScriptureDisplay(r.referenceDisplay)).catch(() => {});
       else setScriptureDisplay(null);
     } catch (e: any) {
@@ -239,6 +240,12 @@ export default function EditKingdomStoryScreen() {
           <Text style={styles.previewBtnText}>Preview as Peer</Text>
         </TouchableOpacity>
       </View>
+      {!!story.topicId && (
+        <TouchableOpacity onPress={() => router.push(`/admin/kingdom-stories/topics/${story.topicId}` as any)} style={styles.topicLink} accessibilityRole="link">
+          <Ionicons name="git-branch-outline" size={13} color={colors.textMid} />
+          <Text style={styles.topicLinkText}>Open this story's catalogue topic</Text>
+        </TouchableOpacity>
+      )}
 
       <Text style={styles.fieldLabel}>Title</Text>
       <TextInput style={styles.input} defaultValue={story.title} onEndEditing={(e) => saveField({ title: e.nativeEvent.text })} />
@@ -264,8 +271,10 @@ export default function EditKingdomStoryScreen() {
         ))}
       </View>
 
-      <Text style={styles.fieldLabel}>Story</Text>
+      <Text style={styles.fieldLabel}>{story.chapters?.length ? "Introduction" : "Story"}</Text>
       <TextInput style={[styles.input, styles.multiline]} defaultValue={story.body} multiline onEndEditing={(e) => saveField({ body: e.nativeEvent.text })} />
+
+      <ChaptersEditor story={story} locked={story.status === "published"} onChanged={load} onError={(title, e) => reportError(title, e)} />
 
       <Text style={styles.sectionHeading}>Optional Context</Text>
       <Text style={styles.fieldLabel}>Historical Period</Text>
@@ -325,8 +334,8 @@ export default function EditKingdomStoryScreen() {
         <VideoRecorder disabled={saving} onSubmit={handleAddVideo} />
       </View>
 
-      <Text style={styles.sectionHeading}>Sources ({story.sources?.length ?? 0})</Text>
-      {(story.sources ?? []).map((s) => (
+      <Text style={styles.sectionHeading}>Story sources ({story.sources?.filter((s) => !s.chapterId).length ?? 0})</Text>
+      {(story.sources ?? []).filter((s) => !s.chapterId).map((s) => (
         <View key={s.id} style={styles.sourceRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.sourceTitle}>{s.title}</Text>
@@ -392,6 +401,8 @@ const styles = StyleSheet.create({
   statusPill_archived: { backgroundColor: "#6b7280" },
   previewBtn: { flexDirection: "row", gap: 5, alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "rgba(29,158,117,0.1)" },
   previewBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
+  topicLink: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingVertical: 4 },
+  topicLinkText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium", textDecorationLine: "underline" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 12, marginBottom: 6 },
   fieldLabelInline: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   input: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },

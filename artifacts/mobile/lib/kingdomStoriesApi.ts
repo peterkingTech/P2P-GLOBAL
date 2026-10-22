@@ -33,6 +33,7 @@ export const CONTENT_TYPE_LABELS: Record<KingdomStoryContentType, string> = {
 
 export interface KingdomStoryCategory {
   id: string; slug: string; title: string; description: string | null; displayOrder: number; status: "draft" | "published" | "archived";
+  icon?: string | null;
 }
 export interface KingdomStoryMedia {
   id: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption: string | null;
@@ -40,7 +41,7 @@ export interface KingdomStoryMedia {
 }
 export interface KingdomStorySource {
   id: string; title: string; publisher: string | null; url: string | null; citation: string | null;
-  sourceType: string | null; displayOrder: number;
+  sourceType: string | null; displayOrder: number; chapterId?: string | null;
 }
 export interface KingdomStory {
   id: string; title: string; subtitle: string | null; categoryId: string;
@@ -61,6 +62,112 @@ export interface KingdomStory {
   isFeatured: boolean; status: KingdomStoryStatus; editorId: string | null;
   createdAt: string; updatedAt: string; publishedAt: string | null; archivedAt: string | null;
   media?: KingdomStoryMedia[]; sources?: KingdomStorySource[];
+  topicId?: string | null; chapters?: KingdomStoryChapter[];
+}
+
+// ── Catalogue (migration 210): Category → Topic → Story → Chapters ──────────
+/** Exactly this many Kingdom Lessons and Peer Reflection Questions per chapter to publish. */
+export const CHAPTER_ITEMS = 5;
+export interface KingdomStoryChapter {
+  id: string; storyId: string; chapterNumber: number; title: string; narrative: string;
+  people: string | null; places: string | null; dates: string | null; scriptureRefs: string | null;
+  evidence: { documented: string | null; testimony: string | null; tradition: string | null; disputed: string | null };
+  lessons: string[]; reflections: string[]; complete: boolean; sources: KingdomStorySource[];
+}
+export type ChapterInput = Partial<Pick<KingdomStoryChapter, "title" | "narrative" | "people" | "places" | "dates" | "scriptureRefs" | "lessons" | "reflections">> & {
+  evidence?: Partial<KingdomStoryChapter["evidence"]>;
+};
+/** A category as readers see it: published stories and planned topics counted separately. */
+export interface CatalogueCategory {
+  id: string; slug: string; title: string; description: string | null; icon: string | null; displayOrder: number;
+  publishedStories: number; plannedTopics: number;
+}
+/** Editors' category lists: active categories in their order, inactive ones after them. */
+export function editorCategoryOrder<T extends Pick<KingdomStoryCategory, "status" | "displayOrder">>(cats: T[]): T[] {
+  return [...cats].sort((a, b) => Number(a.status !== "published") - Number(b.status !== "published") || a.displayOrder - b.displayOrder);
+}
+/** Reader labels, kept separate: "3 stories" / "No stories yet", and "12 planned" (null when none). */
+export function categoryCountLabels(cat: Pick<CatalogueCategory, "publishedStories" | "plannedTopics">): { published: string; planned: string | null } {
+  const n = cat.publishedStories;
+  return {
+    published: n === 0 ? "No stories yet" : n === 1 ? "1 story" : `${n} stories`,
+    planned: cat.plannedTopics > 0 ? `${cat.plannedTopics} planned` : null,
+  };
+}
+export const TOPIC_STATUSES = ["topic", "researching", "drafting", "in_review", "ready_to_publish", "published", "archived"] as const;
+export type TopicStatus = (typeof TOPIC_STATUSES)[number];
+export const TOPIC_STATUS_LABELS: Record<TopicStatus, string> = {
+  topic: "Topic", researching: "Researching", drafting: "Drafting", in_review: "In review",
+  ready_to_publish: "Ready to publish", published: "Published", archived: "Archived",
+};
+export const TOPIC_PRIORITIES = ["P1", "P2", "P3", "P4"] as const;
+export type TopicPriority = (typeof TOPIC_PRIORITIES)[number];
+export const PRIORITY_LABELS: Record<TopicPriority, string> = {
+  P1: "P1 · Foundational", P2: "P2 · Major historical", P3: "P3 · Regional / specialised", P4: "P4 · Future expansion",
+};
+export interface KingdomStoryTopic {
+  id: string; slug: string; title: string; categoryId: string; summary: string | null; tags: string[];
+  historicalPeriod: string | null; region: string | null; keyPeople: string | null; researchNotes: string | null;
+  priority: TopicPriority; status: TopicStatus; displayOrder: number; overlapNote: string | null;
+  createdAt: string; updatedAt: string;
+  stories?: { id: string; title: string; status: KingdomStoryStatus }[];
+}
+export type TopicInput = Partial<Pick<KingdomStoryTopic, "title" | "categoryId" | "summary" | "tags" | "historicalPeriod" | "region" | "keyPeople" | "researchNotes" | "priority" | "status" | "overlapNote">>;
+export interface CatalogueOverview {
+  totals: { categories: number; activeCategories: number; topics: number; stories: number; topicsWithStory: number };
+  topicsByStatus: Partial<Record<TopicStatus, number>>;
+  topicsByPriority: Partial<Record<TopicPriority, number>>;
+  storiesByStatus: Partial<Record<KingdomStoryStatus, number>>;
+  categories: { id: string; slug: string; title: string; status: string; displayOrder: number; icon: string | null; topics: number; topicsByStatus: Partial<Record<TopicStatus, number>>; publishedStories: number; storiesInProgress: number }[];
+  storiesInProgress: { id: string; title: string; status: KingdomStoryStatus; topicId: string | null; chapters: number; complete: number }[];
+}
+
+export function getCatalogueCategories(): Promise<{ categories: CatalogueCategory[] }> {
+  return authedFetch("/kingdom-stories/catalogue/categories");
+}
+export function searchKingdomStories(q: string, page = 0): Promise<{ stories: KingdomStory[]; total: number; page: number; pageSize: number }> {
+  return authedFetch(`/kingdom-stories/feed?${new URLSearchParams({ q, page: String(page), limit: "20" })}`);
+}
+export function getCatalogueOverview(): Promise<CatalogueOverview> {
+  return authedFetch("/kingdom-stories/admin/catalogue/overview");
+}
+export function getTopics(filters: { category?: string; status?: TopicStatus; priority?: TopicPriority; q?: string; period?: string; region?: string; page?: number; limit?: number } = {}): Promise<{ topics: KingdomStoryTopic[]; total: number; page: number; pageSize: number }> {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) if (v !== undefined && v !== "") q.set(k, String(v));
+  return authedFetch(`/kingdom-stories/admin/topics?${q}`);
+}
+export function getTopic(id: string): Promise<KingdomStoryTopic> {
+  return authedFetch(`/kingdom-stories/admin/topics/${id}`);
+}
+export function createTopic(input: TopicInput & { title: string; categoryId: string }): Promise<KingdomStoryTopic> {
+  return authedFetch("/kingdom-stories/admin/topics", { method: "POST", body: JSON.stringify(input) });
+}
+export function updateTopic(id: string, input: TopicInput): Promise<KingdomStoryTopic> {
+  return authedFetch(`/kingdom-stories/admin/topics/${id}`, { method: "PUT", body: JSON.stringify(input) });
+}
+export function reorderTopics(categoryId: string, orderedIds: string[]): Promise<{ ok: true }> {
+  return authedFetch("/kingdom-stories/admin/topics/reorder", { method: "POST", body: JSON.stringify({ categoryId, orderedIds }) });
+}
+export function createStoryFromTopic(topicId: string): Promise<{ story: { id: string; title: string; status: KingdomStoryStatus } }> {
+  return authedFetch(`/kingdom-stories/admin/topics/${topicId}/story`, { method: "POST" });
+}
+export function linkStoryToTopic(topicId: string, storyId: string): Promise<{ story: { id: string } }> {
+  return authedFetch(`/kingdom-stories/admin/topics/${topicId}/link`, { method: "POST", body: JSON.stringify({ storyId }) });
+}
+export function unlinkStoryFromTopic(topicId: string, storyId: string): Promise<{ unlinked: true }> {
+  return authedFetch(`/kingdom-stories/admin/topics/${topicId}/link/${storyId}`, { method: "DELETE" });
+}
+export function addChapter(storyId: string, input: ChapterInput = {}): Promise<KingdomStoryChapter> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters`, { method: "POST", body: JSON.stringify(input) });
+}
+export function updateChapter(storyId: string, chapterId: string, input: ChapterInput): Promise<KingdomStoryChapter> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}`, { method: "PUT", body: JSON.stringify(input) });
+}
+export function reorderChapters(storyId: string, orderedIds: string[]): Promise<{ ok: true }> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/reorder`, { method: "POST", body: JSON.stringify({ orderedIds }) });
+}
+export function deleteChapter(storyId: string, chapterId: string): Promise<{ removed: true }> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}`, { method: "DELETE" });
 }
 
 export function getKingdomStoryCategories(): Promise<KingdomStoryCategory[]> {
@@ -100,7 +207,7 @@ export function updateKingdomStoryMedia(storyId: string, mediaId: string, update
 export function deleteKingdomStoryMedia(storyId: string, mediaId: string): Promise<{ removed: true }> {
   return authedFetch(`/kingdom-stories/${storyId}/media/${mediaId}`, { method: "DELETE" });
 }
-export function addKingdomStorySource(storyId: string, input: { title: string; publisher?: string; url?: string; citation?: string; sourceType?: string; displayOrder?: number }): Promise<KingdomStorySource> {
+export function addKingdomStorySource(storyId: string, input: { title: string; publisher?: string; url?: string; citation?: string; sourceType?: string; displayOrder?: number; chapterId?: string }): Promise<KingdomStorySource> {
   return authedFetch(`/kingdom-stories/${storyId}/sources`, { method: "POST", body: JSON.stringify(input) });
 }
 export function deleteKingdomStorySource(storyId: string, sourceId: string): Promise<{ removed: true }> {
