@@ -38,6 +38,8 @@ export interface KingdomStoryCategory {
 export interface KingdomStoryMedia {
   id: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption: string | null;
   displayOrder: number; isCover: boolean; durationSeconds: number | null;
+  /** The chapter this image illustrates; null/absent = story-level (cover, gallery). */
+  chapterId?: string | null;
 }
 export interface KingdomStorySource {
   id: string; title: string; publisher: string | null; url: string | null; citation: string | null;
@@ -73,9 +75,12 @@ export interface KingdomStoryChapter {
   people: string | null; places: string | null; dates: string | null; scriptureRefs: string | null;
   evidence: { documented: string | null; testimony: string | null; tradition: string | null; disputed: string | null };
   lessons: string[]; reflections: string[]; complete: boolean; sources: KingdomStorySource[];
+  /** Optional chapter Assignment (title, e.g. "Practise honesty in an agreement", and the task). */
+  assignment?: { title: string | null; text: string | null } | null;
 }
 export type ChapterInput = Partial<Pick<KingdomStoryChapter, "title" | "narrative" | "people" | "places" | "dates" | "scriptureRefs" | "lessons" | "reflections">> & {
   evidence?: Partial<KingdomStoryChapter["evidence"]>;
+  assignmentTitle?: string | null; assignment?: string | null;
 };
 /** A category as readers see it: published stories and planned topics counted separately. */
 export interface CatalogueCategory {
@@ -198,10 +203,10 @@ export function updateKingdomStory(id: string, updates: Partial<KingdomStory>): 
 export function deleteKingdomStory(id: string): Promise<{ removed: true }> {
   return authedFetch(`/kingdom-stories/${id}`, { method: "DELETE" });
 }
-export function addKingdomStoryMedia(storyId: string, input: { id?: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption?: string; displayOrder?: number; isCover?: boolean; durationSeconds?: number }): Promise<KingdomStoryMedia> {
+export function addKingdomStoryMedia(storyId: string, input: { id?: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption?: string; displayOrder?: number; isCover?: boolean; durationSeconds?: number; chapterId?: string | null }): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media`, { method: "POST", body: JSON.stringify(input) });
 }
-export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean }>): Promise<KingdomStoryMedia> {
+export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean; chapterId: string | null }>): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media/${mediaId}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function deleteKingdomStoryMedia(storyId: string, mediaId: string): Promise<{ removed: true }> {

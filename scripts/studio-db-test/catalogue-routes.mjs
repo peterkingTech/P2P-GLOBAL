@@ -20,6 +20,7 @@ const db = new PGlite();
 await setupBase(db, readFileSync(path.join(repo, "migrations/152_kingdom_stories.sql"), "utf8"));
 await db.exec(readFileSync(path.join(repo, "migrations/188_publishing_studio_foundation.sql"), "utf8"));
 await db.exec(readFileSync(path.join(repo, "migrations/210_kingdom_story_catalogue.sql"), "utf8"));
+await db.exec(readFileSync(path.join(repo, "migrations/211_kingdom_story_chapter_assignment_media.sql"), "utf8"));
 const q = async (sql, p) => (await db.query(sql, p)).rows;
 await q(`insert into auth.users (id) select id from p2p_profiles on conflict do nothing`);
 
@@ -101,6 +102,29 @@ try {
   const src = await call("POST", `/kingdom-stories/${sid}/sources`, U.A, { title: "Synthetic source", sourceType: "book", chapterId: c1.body.id });
   ok("source attached to a chapter", src.status === 200 && src.body.chapterId === c1.body.id);
   ok("source can't use another story's chapter", (await call("POST", `/kingdom-stories/${(await q(`insert into p2p_kingdom_stories (title, category_id, body) values ('Other', $1, 'b') returning id`, [bhId]))[0].id}/sources`, U.A, { title: "x", chapterId: c1.body.id })).status === 400);
+
+  // Assignment field + chapter images (migration 211).
+  const asg = await call("PUT", `/kingdom-stories/${sid}/chapters/${c1.body.id}`, U.A, { assignmentTitle: "Synthetic task title", assignment: "Synthetic task." });
+  ok("assignment saved as its own field", asg.status === 200 && asg.body.assignment?.title === "Synthetic task title" && asg.body.assignment?.text === "Synthetic task.", JSON.stringify(asg.body).slice(0, 200));
+  ok("a chapter without an assignment reports none", c2.body.assignment === null);
+  ok("assignment is optional for completeness", asg.body.complete === true);
+  const chImg = await call("POST", `/kingdom-stories/${sid}/media`, U.A, { mediaType: "image", mediaPath: `${sid}/pdf/c1.jpg`, caption: "Image: example.org", chapterId: c1.body.id });
+  ok("an image can be placed in a chapter", chImg.status === 200 && chImg.body.chapterId === c1.body.id, JSON.stringify(chImg.body).slice(0, 200));
+  const storyImg = await call("POST", `/kingdom-stories/${sid}/media`, U.A, { mediaType: "image", mediaPath: `${sid}/pdf/cover.jpg`, isCover: true });
+  ok("an image without a chapter stays story-level", storyImg.status === 200 && storyImg.body.chapterId === null);
+  ok("an image can't use another story's chapter", (await call("POST", `/kingdom-stories/${sid}/media`, U.A, { mediaType: "image", mediaPath: `${sid}/pdf/x.jpg`, chapterId: "00000000-0000-4000-8000-000000000000" })).status >= 400);
+  const movedImg = await call("PUT", `/kingdom-stories/${sid}/media/${storyImg.body.id}`, U.A, { chapterId: c2.body.id });
+  const back = await call("PUT", `/kingdom-stories/${sid}/media/${storyImg.body.id}`, U.A, { chapterId: null });
+  ok("an image can be moved into a chapter and back", movedImg.body?.chapterId === c2.body.id && back.status === 200 && back.body.chapterId === null);
+  const full = await call("GET", `/kingdom-stories/${sid}`, U.A);
+  ok("the story returns media with their chapter and chapters with their assignment",
+    full.body.media?.find((m) => m.id === chImg.body.id)?.chapterId === c1.body.id && full.body.chapters?.[0]?.assignment?.text === "Synthetic task.");
+  const c4 = await call("POST", `/kingdom-stories/${sid}/chapters`, U.A, { title: "Temporary with image" });
+  const c4img = await call("POST", `/kingdom-stories/${sid}/media`, U.A, { mediaType: "image", mediaPath: `${sid}/pdf/c4.jpg`, chapterId: c4.body.id });
+  const removedBefore = (globalThis.__labStorage?.calls ?? []).length;
+  await call("DELETE", `/kingdom-stories/${sid}/chapters/${c4.body.id}`, U.A);
+  ok("deleting a chapter removes its images (row and file)", (await q(`select count(*)::int n from p2p_kingdom_story_media where id=$1`, [c4img.body.id]))[0].n === 0
+    && (globalThis.__labStorage?.calls ?? []).slice(removedBefore).some((x) => x.op === "remove" && x.paths.includes(`${sid}/pdf/c4.jpg`)));
 
   // Fill the story and go through the Studio.
   await call("PUT", `/kingdom-stories/${sid}`, U.A, { body: "Synthetic introduction." });

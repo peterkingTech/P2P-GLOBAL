@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import type { KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
+import type { KingdomStoryChapter, KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
+import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
 
 // A story's chapters for readers (and the editor's reader preview). One
 // chapter open at a time keeps long stories readable on a phone. Each chapter:
 // people/places/dates, Scripture, the narrative, what the account rests on
-// (documented fact, testimony, tradition, disputed claims — kept apart), the
-// 5 Kingdom Lessons, the 5 Peer Reflection Questions, and its sources.
+// (documented fact, testimony, tradition, disputed claims — kept apart), its
+// image(s), then — as cards in the same style as a P2P Global lesson — the 5
+// Lessons, the 5 Reflection questions and the Assignment, and its sources.
 const EVIDENCE: { key: keyof KingdomStoryChapter["evidence"]; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
   { key: "documented", label: "Documented history", icon: "document-text-outline" },
   { key: "testimony", label: "Testimony", icon: "chatbubble-ellipses-outline" },
@@ -17,7 +19,7 @@ const EVIDENCE: { key: keyof KingdomStoryChapter["evidence"]; label: string; ico
   { key: "disputed", label: "Disputed or uncertain", icon: "help-circle-outline" },
 ];
 
-export default function StoryChapters({ chapters }: { chapters: KingdomStoryChapter[] }) {
+export default function StoryChapters({ chapters, media = [] }: { chapters: KingdomStoryChapter[]; media?: KingdomStoryMedia[] }) {
   const { colors: c } = useTheme();
   const s = makeStyles(c);
   const [open, setOpen] = useState<string | null>(chapters[0]?.id ?? null);
@@ -29,6 +31,7 @@ export default function StoryChapters({ chapters }: { chapters: KingdomStoryChap
       {chapters.map((ch) => {
         const isOpen = open === ch.id;
         const meta = [ch.dates, ch.places, ch.people].filter(Boolean) as string[];
+        const images = media.filter((m) => m.chapterId === ch.id);
         return (
           <View key={ch.id} style={s.chapter}>
             <TouchableOpacity
@@ -45,6 +48,7 @@ export default function StoryChapters({ chapters }: { chapters: KingdomStoryChap
 
             {isOpen && (
               <View style={s.chapterBody}>
+                {!!images.length && <View style={s.images}><KingdomStoryMediaGallery media={images} /></View>}
                 {meta.map((m, i) => <Text key={i} style={s.meta}>{m}</Text>)}
                 {!!ch.scriptureRefs && (
                   <View style={s.scripture}>
@@ -71,8 +75,11 @@ export default function StoryChapters({ chapters }: { chapters: KingdomStoryChap
                 )}
 
                 {!!ch.lessons.length && (
-                  <View style={s.lessonsBox}>
-                    <Text style={[s.boxLabel, { color: c.accentGreen }]}>Kingdom Lessons</Text>
+                  <View style={s.card}>
+                    <View style={s.cardHeader}>
+                      <Ionicons name="bulb" size={16} color={c.accentGreen} />
+                      <Text style={s.cardTitle}>Lessons</Text>
+                    </View>
                     {ch.lessons.map((l, i) => (
                       <View key={i} style={s.item}>
                         <Text style={[s.itemNum, { color: c.accentGreen }]}>{i + 1}</Text>
@@ -83,14 +90,28 @@ export default function StoryChapters({ chapters }: { chapters: KingdomStoryChap
                 )}
 
                 {!!ch.reflections.length && (
-                  <View style={s.reflectBox}>
-                    <Text style={s.boxLabel}>Peer Reflection Questions</Text>
+                  <View style={s.card}>
+                    <View style={s.cardHeader}>
+                      <Ionicons name="people" size={16} color={c.accentGreen} />
+                      <Text style={s.cardTitle}>Reflection</Text>
+                    </View>
                     {ch.reflections.map((r, i) => (
                       <View key={i} style={s.item}>
                         <Text style={s.itemNum}>{i + 1}</Text>
                         <Text style={s.itemText}>{r}</Text>
                       </View>
                     ))}
+                  </View>
+                )}
+
+                {!!(ch.assignment?.title || ch.assignment?.text) && (
+                  <View style={s.card}>
+                    <View style={s.cardHeader}>
+                      <Ionicons name="create" size={16} color={c.accentGreen} />
+                      <Text style={s.cardTitle}>Assignment</Text>
+                    </View>
+                    {!!ch.assignment?.title && <Text style={s.assignmentTitle}>{ch.assignment.title}</Text>}
+                    {!!ch.assignment?.text && <Text style={s.assignmentText}>{ch.assignment.text}</Text>}
                   </View>
                 )}
 
@@ -133,8 +154,13 @@ function makeStyles(c: AppColors) {
     evidenceRow: { flexDirection: "row", gap: 8 },
     evidenceLabel: { fontSize: 12, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     evidenceText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19 },
-    lessonsBox: { backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 12, padding: 12, gap: 8 },
-    reflectBox: { backgroundColor: c.lightCream, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: c.borderBeige },
+    images: { marginHorizontal: -14 },
+    // Same card as a P2P Global lesson's discussion-questions / assignment card.
+    card: { backgroundColor: c.lightCream, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 16, gap: 10 },
+    cardHeader: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 4 },
+    cardTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
+    assignmentTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    assignmentText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 22 },
     item: { flexDirection: "row", gap: 10 },
     itemNum: { width: 16, fontSize: 14, color: c.textMuted, fontFamily: "Inter_700Bold", lineHeight: 21 },
     itemText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 21 },

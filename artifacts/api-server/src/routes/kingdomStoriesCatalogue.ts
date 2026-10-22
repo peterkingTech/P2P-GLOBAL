@@ -76,6 +76,8 @@ export function mapChapter(c: Record<string, any>, sources: Array<Record<string,
     people: c.people, places: c.places, dates: c.dates, scriptureRefs: c.scripture_refs,
     evidence: { documented: c.evidence_documented, testimony: c.evidence_testimony, tradition: c.evidence_tradition, disputed: c.evidence_disputed },
     lessons: c.lessons ?? [], reflections: c.reflections ?? [],
+    // Migration 211; null until it is applied or the chapter has none.
+    assignment: c.assignment_title || c.assignment ? { title: c.assignment_title ?? null, text: c.assignment ?? null } : null,
     complete: chapterComplete(c),
     sources: sources.filter((s) => s.chapterId === c.id),
     createdAt: c.created_at, updatedAt: c.updated_at,
@@ -340,7 +342,7 @@ function chapterFields(body: Record<string, unknown>): { fields: Record<string, 
   const f: Record<string, unknown> = {};
   if (body.title !== undefined) { const v = text(body.title, 200); if (v === undefined) return { error: "title must be text" }; f.title = v ?? ""; }
   if (body.narrative !== undefined) { const v = text(body.narrative, 60000); if (v === undefined) return { error: "narrative must be text" }; f.narrative = v ?? ""; }
-  for (const [k, col, max] of [["people", "people", 2000], ["places", "places", 2000], ["dates", "dates", 1000], ["scriptureRefs", "scripture_refs", 2000]] as const) {
+  for (const [k, col, max] of [["people", "people", 2000], ["places", "places", 2000], ["dates", "dates", 1000], ["scriptureRefs", "scripture_refs", 2000], ["assignmentTitle", "assignment_title", 200], ["assignment", "assignment", 10000]] as const) {
     if (body[k] !== undefined) { const v = text(body[k], max); if (v === undefined) return { error: `${k} must be text` }; f[col] = v; }
   }
   const ev = body.evidence as Record<string, unknown> | undefined;
@@ -402,9 +404,12 @@ router.post("/:id/chapters/reorder", ...editor, async (req, res) => {
 
 router.delete("/:id/chapters/:chapterId", ...editor, async (req, res) => {
   if (!UUID_RE.test(p(req, "chapterId")) || !UUID_RE.test(p(req, "id"))) return err(res, "Chapter not found", 404);
+  // The chapter's images (migration 211) go with it: rows by cascade, files below once the row is gone.
+  const { data: chMedia } = await db.from("p2p_kingdom_story_media").select("media_path").eq("story_id", p(req, "id")).eq("chapter_id", p(req, "chapterId"));
   const { data, error } = await db.from("p2p_kingdom_story_chapters").delete().eq("id", p(req, "chapterId")).eq("story_id", p(req, "id")).select("id").maybeSingle();
   if (error) return dbFail(res, error, "Failed to remove chapter");
   if (!data) return err(res, "Chapter not found", 404);
+  if (chMedia?.length) await db.storage.from("kingdom-stories-media").remove(chMedia.map((m) => m.media_path as string));
   // Close the gap so chapters stay numbered 1, 2, 3…
   const { data: rest } = await db.from("p2p_kingdom_story_chapters").select("id").eq("story_id", p(req, "id")).order("chapter_number", { ascending: true });
   if ((rest ?? []).length) await db.rpc("p2p_kingdom_story_reorder_chapters", { p_story_id: p(req, "id"), p_chapter_ids: (rest ?? []).map((c) => c.id) });

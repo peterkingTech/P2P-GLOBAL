@@ -35,17 +35,21 @@ ok("home + category: counts via the shared labels (published and planned apart)"
 const labels = api.slice(api.indexOf("export function categoryCountLabels"), api.indexOf("export const TOPIC_STATUSES"));
 ok("count labels: 'No stories yet' / '1 story' / 'N stories' and a separate 'N planned'", labels.includes('"No stories yet"') && labels.includes('"1 story"') && labels.includes("planned`") && labels.includes("planned: cat.plannedTopics > 0"));
 ok("category page never lists topic titles", !/topics\.map|plannedTopics\.map/.test(cat) && cat.includes("being prepared"));
-ok("story: chapters rendered by the shared component", detail.includes("<StoryChapters chapters={story.chapters} />"));
+ok("story: chapters rendered by the shared component, with their images", detail.includes("<StoryChapters chapters={story.chapters} media={story.media ?? []} />"));
+ok("story: the top gallery shows only story-level images", detail.includes("(story.media ?? []).filter((m) => !m.chapterId)") && detail.includes("media={storyMedia}"));
+ok("story: no Pray button", !detail.includes(">Pray<") && !detail.includes('"/(tabs)/prayer"'));
 ok("story: chapter sources not repeated in the story source list", detail.includes("filter((s) => !s.chapterId)"));
 ok("story: editors' preview of an unpublished story is labelled", detail.includes('story.status !== "published"') && detail.includes("Preview"));
-ok("chapters: Kingdom Lessons and Peer Reflection Questions headings", chapters.includes("Kingdom Lessons") && chapters.includes("Peer Reflection Questions"));
+ok("chapters: Lessons, Reflection and Assignment cards (P2P lesson style)", [">Lessons<", ">Reflection<", ">Assignment<"].every((l) => chapters.includes(l)) && chapters.includes("ch.assignment?.text"));
+ok("chapters: each chapter shows its own images", chapters.includes("media.filter((m) => m.chapterId === ch.id)"));
 ok("chapters: four evidence kinds kept apart", ["Documented history", "Testimony", "Tradition", "Disputed or uncertain"].every((l) => chapters.includes(l)));
 ok("chapters: expandable with accessibility state", chapters.includes("accessibilityState={{ expanded: isOpen }}"));
 ok("chapters: readable body text (≥14px, generous line height)", /narrative: \{ fontSize: 15[^}]*lineHeight: 23/.test(chapters) && /itemText: \{[^}]*fontSize: 14[^}]*lineHeight: 21/.test(chapters));
 
 // Editor side.
 ok("CHAPTER_ITEMS is 5", /export const CHAPTER_ITEMS = 5;/.test(api));
-ok("chapter editor: exactly CHAPTER_ITEMS slots for lessons and questions", editor.includes("Array.from({ length: CHAPTER_ITEMS }") && editor.includes('label="Kingdom Lessons"') && editor.includes('label="Peer Reflection Questions"'));
+ok("chapter editor: exactly CHAPTER_ITEMS slots for lessons and questions", editor.includes("Array.from({ length: CHAPTER_ITEMS }") && editor.includes('label="Lessons"') && editor.includes('label="Reflection questions"'));
+ok("chapter editor: Assignment title + text, and images placed per chapter", editor.includes("save({ assignmentTitle:") && editor.includes("save({ assignment:") && editor.includes("placeImage(m.id, chapter.id)"));
 ok("chapter editor: locked while the story is live", editor.includes("editable={!locked}") && src("app/admin/kingdom-stories/[id].tsx").includes('locked={story.status === "published"}'));
 ok("chapter editor: says what is still needed", editor.includes("Still needed:"));
 // (layout widths like "47%" are styles, not figures shown to editors)

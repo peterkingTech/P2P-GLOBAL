@@ -87,7 +87,7 @@ async function loadMedia(storyId: string) {
   const { data } = await db.from("p2p_kingdom_story_media").select("*").eq("story_id", storyId).order("display_order", { ascending: true });
   return (data ?? []).map((m) => ({
     id: m.id, mediaType: m.media_type, mediaPath: m.media_path, caption: m.caption,
-    displayOrder: m.display_order, isCover: m.is_cover, durationSeconds: m.duration_seconds,
+    displayOrder: m.display_order, isCover: m.is_cover, durationSeconds: m.duration_seconds, chapterId: m.chapter_id ?? null,
   }));
 }
 async function loadSources(storyId: string) {
@@ -327,7 +327,9 @@ router.delete("/:id", async (req, res) => {
 router.post("/:id/media", async (req, res) => {
   const { data: story } = await db.from("p2p_kingdom_stories").select("id").eq("id", req.params.id).maybeSingle();
   if (!story) return err(res, "Story not found", 404);
-  const { id, mediaType, mediaPath, caption, displayOrder, isCover, durationSeconds } = req.body as Record<string, unknown>;
+  const { id, mediaType, mediaPath, caption, displayOrder, isCover, durationSeconds, chapterId } = req.body as Record<string, unknown>;
+  // Optional (migration 211): the chapter this image illustrates — must be a chapter of this story (enforced by the database too).
+  if (chapterId !== undefined && chapterId !== null && (typeof chapterId !== "string" || !UUID_RE.test(chapterId))) return err(res, "invalid chapterId");
   if (!mediaType || !MEDIA_TYPES.includes(mediaType as string)) return err(res, `mediaType must be one of: ${MEDIA_TYPES.join(", ")}`);
   if (!mediaPath || typeof mediaPath !== "string") return err(res, "mediaPath is required");
   if (!mediaPath.startsWith(`${req.params.id}/`)) return err(res, "mediaPath must belong to this story", 400);
@@ -335,22 +337,26 @@ router.post("/:id/media", async (req, res) => {
   const { data, error } = await db.from("p2p_kingdom_story_media").insert({
     ...(id ? { id } : {}), story_id: req.params.id, media_type: mediaType, media_path: mediaPath,
     caption: (caption as string)?.trim() || null, display_order: displayOrder ?? 0, is_cover: !!isCover,
-    duration_seconds: durationSeconds ?? null,
+    duration_seconds: durationSeconds ?? null, ...(chapterId ? { chapter_id: chapterId } : {}),
   }).select().single();
   if (error || !data) return storyDbError(res, error, "Failed to add media");
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds, chapterId: data.chapter_id ?? null });
 });
 
 router.put("/:id/media/:mediaId", async (req, res) => {
-  const { caption, displayOrder, isCover } = req.body as Record<string, unknown>;
+  const { caption, displayOrder, isCover, chapterId } = req.body as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
+  if (chapterId !== undefined) {
+    if (chapterId !== null && (typeof chapterId !== "string" || !UUID_RE.test(chapterId))) return err(res, "invalid chapterId");
+    updates.chapter_id = chapterId;
+  }
   if (caption !== undefined) updates.caption = (caption as string)?.trim() || null;
   if (displayOrder !== undefined) updates.display_order = displayOrder;
   if (isCover !== undefined) updates.is_cover = !!isCover;
   const { data, error } = await db.from("p2p_kingdom_story_media").update(updates).eq("id", req.params.mediaId).eq("story_id", req.params.id).select().maybeSingle();
   if (error) return storyDbError(res, error, "Failed to update media");
   if (!data) return err(res, "Media item not found", 404);
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, chapterId: data.chapter_id ?? null });
 });
 
 router.delete("/:id/media/:mediaId", async (req, res) => {

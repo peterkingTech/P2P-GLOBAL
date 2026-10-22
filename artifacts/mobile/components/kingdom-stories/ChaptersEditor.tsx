@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert } 
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import {
-  addChapter, updateChapter, deleteChapter, reorderChapters, addKingdomStorySource, deleteKingdomStorySource,
+  addChapter, updateChapter, deleteChapter, reorderChapters, addKingdomStorySource, deleteKingdomStorySource, updateKingdomStoryMedia,
   CHAPTER_ITEMS, type KingdomStory, type KingdomStoryChapter, type ChapterInput,
 } from "@/lib/kingdomStoriesApi";
 
@@ -76,6 +76,13 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
     [ids[index], ids[j]] = [ids[j], ids[index]];
     try { await reorderChapters(story.id, ids); await onChanged(); } catch (e) { onError("Couldn't reorder chapters", e); }
   }
+  const images = (story.media ?? []).filter((m) => m.mediaType === "image");
+  const chapterImages = images.filter((m) => m.chapterId === chapter.id);
+  const storyImages = images.filter((m) => !m.chapterId);
+  async function placeImage(mediaId: string, chapterId: string | null) {
+    try { await updateKingdomStoryMedia(story.id, mediaId, { chapterId }); await onChanged(); }
+    catch (e) { onError("Couldn't move image", e); }
+  }
   async function addSource() {
     if (!srcTitle.trim()) return;
     try {
@@ -100,7 +107,7 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
           {!chapter.complete && (
             <Text style={styles.todo}>
               Still needed: {[!chapter.title.trim() && "a title", !chapter.narrative.trim() && "the narrative",
-                chapter.lessons.length < CHAPTER_ITEMS && `${CHAPTER_ITEMS - chapter.lessons.length} more Kingdom Lesson${CHAPTER_ITEMS - chapter.lessons.length === 1 ? "" : "s"}`,
+                chapter.lessons.length < CHAPTER_ITEMS && `${CHAPTER_ITEMS - chapter.lessons.length} more Lesson${CHAPTER_ITEMS - chapter.lessons.length === 1 ? "" : "s"}`,
                 chapter.reflections.length < CHAPTER_ITEMS && `${CHAPTER_ITEMS - chapter.reflections.length} more Reflection Question${CHAPTER_ITEMS - chapter.reflections.length === 1 ? "" : "s"}`]
                 .filter(Boolean).join(", ")}.
             </Text>
@@ -133,8 +140,39 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
             </View>
           ))}
 
-          <ItemsEditor label="Kingdom Lessons" values={chapter.lessons} locked={locked} onSave={(lessons) => save({ lessons })} />
-          <ItemsEditor label="Peer Reflection Questions" values={chapter.reflections} locked={locked} onSave={(reflections) => save({ reflections })} />
+          <ItemsEditor label="Lessons" values={chapter.lessons} locked={locked} onSave={(lessons) => save({ lessons })} />
+          <ItemsEditor label="Reflection questions" values={chapter.reflections} locked={locked} onSave={(reflections) => save({ reflections })} />
+
+          <Text style={styles.subHeading}>Assignment</Text>
+          <Text style={styles.fieldLabel}>Assignment title (optional)</Text>
+          <TextInput style={styles.input} defaultValue={chapter.assignment?.title ?? ""} editable={!locked} placeholder="e.g. Practise honesty in an agreement" placeholderTextColor={colors.textMuted}
+            onEndEditing={(e) => save({ assignmentTitle: e.nativeEvent.text })} accessibilityLabel="Assignment title" />
+          <Text style={styles.fieldLabel}>Assignment</Text>
+          <TextInput style={[styles.input, styles.multilineSm]} defaultValue={chapter.assignment?.text ?? ""} editable={!locked} multiline placeholder="The practical task readers do after this chapter" placeholderTextColor={colors.textMuted}
+            onEndEditing={(e) => save({ assignment: e.nativeEvent.text })} accessibilityLabel="Assignment" />
+
+          <Text style={styles.subHeading}>Chapter images ({chapterImages.length})</Text>
+          {chapterImages.map((m) => (
+            <View key={m.id} style={styles.sourceRow}>
+              <Ionicons name="image-outline" size={14} color={colors.textMuted} />
+              <Text style={[styles.sourceMeta, { flex: 1 }]} numberOfLines={1}>{m.caption || m.mediaPath.split("/").pop()}</Text>
+              {!locked && (
+                <TouchableOpacity onPress={() => placeImage(m.id, null)} accessibilityLabel="Move image back to the story gallery">
+                  <Text style={styles.linkText}>Move to story</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+          {!locked && storyImages.map((m) => (
+            <View key={m.id} style={styles.sourceRow}>
+              <Ionicons name="images-outline" size={14} color={colors.textMuted} />
+              <Text style={[styles.sourceMeta, { flex: 1 }]} numberOfLines={1}>{m.caption || m.mediaPath.split("/").pop()}{m.isCover ? " · cover" : ""}</Text>
+              <TouchableOpacity onPress={() => placeImage(m.id, chapter.id)} accessibilityLabel="Place this image in the chapter">
+                <Text style={styles.linkText}>Place here</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          {!chapterImages.length && !storyImages.length && <Text style={styles.hint}>Upload images in the story's media section, then place them in a chapter here.</Text>}
 
           <Text style={styles.subHeading}>Chapter sources ({chapter.sources.length})</Text>
           {chapter.sources.map((s) => (
@@ -191,9 +229,9 @@ export default function ChaptersEditor(props: Props) {
     <View style={{ gap: 8 }}>
       <Text style={styles.heading}>Chapters ({chapters.length})</Text>
       {chapters.length > 0 ? (
-        <Text style={styles.hint}>{complete} of {chapters.length} complete. Every chapter needs a title, narrative, 5 Kingdom Lessons and 5 Peer Reflection Questions before the story can be published.</Text>
+        <Text style={styles.hint}>{complete} of {chapters.length} complete. Every chapter needs a title, narrative, 5 Lessons and 5 Reflection questions before the story can be published (the Assignment is optional).</Text>
       ) : (
-        <Text style={styles.hint}>Optional. Split a longer story into chapters, each with its own Kingdom Lessons and Peer Reflection Questions. The story text above then serves as the introduction.</Text>
+        <Text style={styles.hint}>Optional. Split a longer story into chapters, each with its own Lessons, Reflection questions and Assignment. The story text above then serves as the introduction.</Text>
       )}
       {chapters.map((ch, i) => (
         // Remount when the saved content changes so uncontrolled fields show it.
@@ -241,6 +279,7 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
   iconBtn: { borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8, padding: 8 },
   deleteText: { color: "#B91C1C", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  linkText: { color: colors.accentGreen, fontSize: 12, fontFamily: "Inter_600SemiBold" },
   addBtn: { flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "flex-start", borderWidth: 1, borderColor: colors.accentGreen, borderStyle: "dashed", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   addBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 });

@@ -58,6 +58,8 @@ export default function KingdomStoryDetailScreen() {
   if (!story) return <View style={[styles.screen, styles.centerFill]}><Stack.Screen options={{ headerShown: false }} /><Text style={styles.emptyText}>This story isn't available.</Text></View>;
 
   const dateLine = yearRange(story);
+  // Images placed in a chapter (migration 211) show inside it; the rest lead the story.
+  const storyMedia = (story.media ?? []).filter((m) => !m.chapterId);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
@@ -80,7 +82,7 @@ export default function KingdomStoryDetailScreen() {
             <Text style={styles.previewText}>Preview — readers can't see this story until it is published.</Text>
           </View>
         )}
-        {!!story.media?.length && <View style={{ marginBottom: 14 }}><KingdomStoryMediaGallery media={story.media} /></View>}
+        {!!storyMedia.length && <View style={{ marginBottom: 14 }}><KingdomStoryMediaGallery media={storyMedia} /></View>}
 
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={styles.title}>{story.title}</Text>
@@ -95,7 +97,7 @@ export default function KingdomStoryDetailScreen() {
 
           {!!story.body && <Text style={styles.body}>{story.body}</Text>}
 
-          {!!story.chapters?.length && <StoryChapters chapters={story.chapters} />}
+          {!!story.chapters?.length && <StoryChapters chapters={story.chapters} media={story.media ?? []} />}
 
           {!!story.people && (
             <View style={styles.infoBox}>
@@ -133,10 +135,6 @@ export default function KingdomStoryDetailScreen() {
           )}
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/(tabs)/prayer" as any)}>
-              <Ionicons name="hand-left-outline" size={16} color={c.textMuted} />
-              <Text style={styles.actionText}>Pray</Text>
-            </TouchableOpacity>
             {story.related?.missionField && (
               <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/missions/field/${story.related!.missionField!.slug}` as any)}>
                 <Ionicons name="flag-outline" size={16} color={c.textMuted} />
