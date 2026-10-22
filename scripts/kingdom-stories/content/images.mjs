@@ -94,4 +94,14 @@ export default {
     img("10_p11_1.jpg", 5, "shawnshashidharan.substack.com"),
     img("10_p13_1.jpg", 6, "hidabroot.org"),
   ],
+  "joshua-and-the-entry-into-canaan": [
+    img("11_p01_1.jpg", null, "bible.art", true),
+    img("11_p02_1.jpg", 1, "bible.art"),
+    img("11_p04_1.jpg", 2, "icej.org"),
+    img("11_p06_1.jpg", 3, "artofit.org"),
+    img("11_p09_1.jpg", 4, "watermarkwaves.com"),
+    img("11_p11_1.jpg", 5, "bible.art"),
+    img("11_p14_1.jpg", 6, "bible.art"),
+    img("11_p16_1.jpg", 7, "bible.art"),
+  ],
 };
