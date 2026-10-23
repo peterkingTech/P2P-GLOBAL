@@ -5,7 +5,8 @@
 // e.g. the title-page image). cover: the story's card/cover image (one each;
 // where the PDF has no title-page image, the first image is used).
 // credit: the website named under the image in the PDF, exactly as printed;
-// null where the PDF names none (no credit is invented).
+// null where the PDF names none (no credit is invented). Images added later
+// to fill gaps carry the artist and the holding collection instead.
 const img = (file, chapter, credit = null, cover = false) => ({ file, chapter, credit, cover });
 
 export default {
@@ -223,5 +224,12 @@ export default {
     img("t023_img04.jpg", 1, "bibleworld.ai"),
     img("t023_img05.jpg", 2, "bibleworld.ai"),
     img("t023_img06.jpg", 3, "wol.jw.org"),
+    // Chapters 4–8 had no image in the editor's document; public-domain / CC0
+    // artworks chosen with the editor's approval, sourced from Wikimedia Commons.
+    img("t023_ch4_blake.jpg", 4, "William Blake, Nebuchadnezzar (1795) · Minneapolis Institute of Art"),
+    img("t023_ch5_west.jpg", 5, "Benjamin West (1775) · Saint Louis Art Museum"),
+    img("t023_ch6_rubens.jpg", 6, "Peter Paul Rubens (c. 1615) · National Gallery of Art"),
+    img("t023_ch7_sabatelli.jpg", 7, "Luigi Sabatelli (1809) · Rijksmuseum"),
+    img("t023_ch8_gabriel.jpg", 8, "Engraving (1886) · commons.wikimedia.org"),
   ],
 };
