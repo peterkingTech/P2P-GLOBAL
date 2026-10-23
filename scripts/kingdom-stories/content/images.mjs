@@ -229,7 +229,7 @@ export default {
     img("t023_ch4_blake.jpg", 4, "William Blake, Nebuchadnezzar (1795) · Minneapolis Institute of Art"),
     img("t023_ch5_west.jpg", 5, "Benjamin West (1775) · Saint Louis Art Museum"),
     img("t023_ch6_rubens.jpg", 6, "Peter Paul Rubens (c. 1615) · National Gallery of Art"),
-    img("t023_ch7_sabatelli.jpg", 7, "Luigi Sabatelli (1809) · Rijksmuseum"),
-    img("t023_ch8_gabriel.jpg", 8, "Engraving (1886) · commons.wikimedia.org"),
+    img("t023_ch7_saintsever.jpg", 7, "Saint-Sever Beatus (11th century) · Bibliothèque nationale de France"),
+    img("t023_ch8_valcavado.jpg", 8, "Valcavado Beatus (970) · University of Valladolid"),
   ],
 };
