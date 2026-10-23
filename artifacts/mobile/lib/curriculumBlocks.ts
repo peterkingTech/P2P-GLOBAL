@@ -59,7 +59,7 @@ export const BLOCK_TYPE_META: Record<BlockType, BlockTypeMeta> = {
     defaultContent: () => ({ question: "" }),
   },
   assignment: {
-    type: "assignment", label: "Assignment", icon: "clipboard-outline", section: "Learning", shortcut: "A",
+    type: "assignment", label: "Comprehensive Check", icon: "clipboard-outline", section: "Learning", shortcut: "A",
     defaultContent: () => ({ title: "", instructions: "", due_after_days: 7, questions: [] }),
   },
   checkpoint: {

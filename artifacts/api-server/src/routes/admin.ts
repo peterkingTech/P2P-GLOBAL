@@ -779,7 +779,7 @@ router.post("/plans/confirm-import", requireContentAdmin, async (req, res) => {
             .insert({ lesson_id: lessonId, title: "Life Application", instructions: "", due_after_days: 7 })
             .select()
             .single();
-          if (asnErr || !assignmentRow) throw new Error(asnErr?.message ?? "Failed to create assignment");
+          if (asnErr || !assignmentRow) throw new Error(asnErr?.message ?? "Failed to create Comprehensive Check");
           createdAssignmentIds.push(assignmentRow.id as string);
           const { error: aqErr } = await supabaseWrite
             .from("p2p_assignment_questions")
@@ -1197,7 +1197,7 @@ router.post("/plans/:planId/duplicate", requireContentAdmin, async (req, res) =>
         for (const a of assignments ?? []) {
           const { data: newAssignment, error: asnErr } = await supabaseWrite
             .from("p2p_assignments").insert({ lesson_id: newLesson.id, title: a.title, instructions: a.instructions, due_after_days: a.due_after_days }).select().single();
-          if (asnErr || !newAssignment) throw new Error(asnErr?.message ?? "Failed to duplicate assignment");
+          if (asnErr || !newAssignment) throw new Error(asnErr?.message ?? "Failed to duplicate Comprehensive Check");
           const { data: aqs } = await supabaseWrite.from("p2p_assignment_questions").select("*").eq("assignment_id", a.id);
           if (aqs?.length) {
             const { error } = await supabaseWrite.from("p2p_assignment_questions").insert(aqs.map((q) => ({ assignment_id: newAssignment.id, question: q.question, display_order: q.display_order })));

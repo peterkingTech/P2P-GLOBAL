@@ -45,7 +45,7 @@ ok("reflections: device draft per user/lesson/question, cleared after saving", /
 ok("reflections: changing sharing later goes to the server (and rolls back on failure)", /await setReflectionVisibility\(latest\.id, v\)/.test(lw) && /setVisibility\(latest\.visibility\); notify\("Couldn't change who can see it"/.test(lw));
 ok("shared section: only what others chose to share; explains the scope", /Reflections members chose to share/.test(lw) && /getSharedReflections\(scope, lessonId\)/.test(lw));
 ok("assignments: state from server + local draft; leaders see draft/archived + submitted counts", /assignmentState\(a, hasDraft\)/.test(lw) && /Draft — members can't see it/.test(lw) && /submitted`/.test(lw));
-ok("new assignment: title required, due date checked, resubmission toggle, draft or publish", /Give the assignment a title\./.test(lw) && /YYYY-MM-DD/.test(lw) && /Allow resubmitting/.test(lw) && /save\("draft"\)/.test(lw) && /save\("published"\)/.test(lw));
+ok("new Comprehensive Check: title required, due date checked, resubmission toggle, draft or publish", /Give the Comprehensive Check a title\./.test(lw) && /YYYY-MM-DD/.test(lw) && /Allow resubmitting/.test(lw) && /save\("draft"\)/.test(lw) && /save\("published"\)/.test(lw));
 ok("no uploads (written answers only)", !/ImagePicker|DocumentPicker|upload/i.test(lw) && !/ImagePicker|DocumentPicker|upload/i.test(src("app/learning/assignment/[assignmentId].tsx")));
 ok("sub-components at module level (typing keeps focus)", /^function ReflectionCard\(/m.test(lw) && /^function AssignmentRow\(/m.test(lw) && /^function NewAssignmentModal\(/m.test(lw));
 

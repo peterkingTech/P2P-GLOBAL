@@ -148,7 +148,7 @@ function assignmentFields(body: Record<string, unknown>, partial: boolean): Reco
   const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
   if (!partial || has("title")) {
     const t = typeof body.title === "string" ? body.title.trim() : "";
-    if (!t) return "Give the assignment a title";
+    if (!t) return "Give the Comprehensive Check a title";
     if (t.length > LIMITS.title) return "Title is too long";
     f.title = t;
   }
@@ -209,14 +209,14 @@ router.get("/:scope/lessons/:lessonId/assignments", async (req, res) => {
 // POST /learning/work/:scope/lessons/:lessonId/assignments — leaders.
 router.post("/:scope/lessons/:lessonId/assignments", async (req, res) => {
   const a = await lessonAccess(req, res); if (!a) return;
-  if (!a.canManage) return err(res, "Only the group's leaders can create assignments", 403);
+  if (!a.canManage) return err(res, "Only the group's leaders can create Comprehensive Checks", 403);
   const f = assignmentFields((req.body ?? {}) as Record<string, unknown>, false);
   if (typeof f === "string") return err(res, f);
   const status = (req.body as { status?: string })?.status === "published" ? "published" : "draft";
   const { data, error } = await db.from("p2p_group_assignments").insert({
     ...f, status, created_by: a.userId, [lessonColumn(a.ctx.scope)]: a.ctx.lessonId, [groupColumn(a.ctx.scope)]: a.ctx.groupId,
   }).select().single();
-  if (error || !data) return err(res, error?.message ?? "Couldn't create the assignment", 500);
+  if (error || !data) return err(res, error?.message ?? "Couldn't create the Comprehensive Check", 500);
   return ok(res, mapAssignment(data as Record<string, unknown>));
 });
 
@@ -225,24 +225,24 @@ async function assignmentAccess(req: import("express").Request, res: import("exp
   if (!userId) { err(res, "Unauthorized", 401); return null; }
   const scope = scopeOf(req);
   const asg = scope ? await loadAssignment(scope, String(req.params.assignmentId)) : null;
-  if (!scope || !asg) { err(res, "Assignment not found", 404); return null; }
+  if (!scope || !asg) { err(res, "Comprehensive Check not found", 404); return null; }
   const groupId = asg[groupColumn(scope)] as string;
-  if (!(await isGroupMember(scope, groupId, userId))) { err(res, "Assignment not found", 404); return null; }
+  if (!(await isGroupMember(scope, groupId, userId))) { err(res, "Comprehensive Check not found", 404); return null; }
   const canManage = await canManageGroupLearning(scope, groupId, userId);
-  if (asg.status !== "published" && !canManage) { err(res, "Assignment not found", 404); return null; }
+  if (asg.status !== "published" && !canManage) { err(res, "Comprehensive Check not found", 404); return null; }
   return { userId, scope, asg, groupId, canManage };
 }
 
 // PUT /learning/work/:scope/assignments/:assignmentId — leaders. { …fields, status? }
 router.put("/:scope/assignments/:assignmentId", async (req, res) => {
   const a = await assignmentAccess(req, res); if (!a) return;
-  if (!a.canManage) return err(res, "Only the group's leaders can change assignments", 403);
+  if (!a.canManage) return err(res, "Only the group's leaders can change Comprehensive Checks", 403);
   const f = assignmentFields((req.body ?? {}) as Record<string, unknown>, true);
   if (typeof f === "string") return err(res, f);
   const status = (req.body as { status?: string })?.status;
   if (status !== undefined) { if (!["draft", "published", "archived"].includes(status)) return err(res, "status must be draft, published or archived"); f.status = status; }
   const { data, error } = await db.from("p2p_group_assignments").update({ ...f, updated_at: new Date().toISOString() }).eq("id", a.asg.id as string).select().single();
-  if (error || !data) return err(res, error?.message ?? "Couldn't update the assignment", 500);
+  if (error || !data) return err(res, error?.message ?? "Couldn't update the Comprehensive Check", 500);
   return ok(res, mapAssignment(data as Record<string, unknown>));
 });
 
@@ -256,13 +256,13 @@ router.get("/:scope/assignments/:assignmentId/submissions/mine", async (req, res
 // POST /learning/work/:scope/assignments/:assignmentId/submissions — { content }
 router.post("/:scope/assignments/:assignmentId/submissions", async (req, res) => {
   const a = await assignmentAccess(req, res); if (!a) return;
-  if (a.asg.status !== "published") return err(res, "This assignment isn't open", 409);
+  if (a.asg.status !== "published") return err(res, "This Comprehensive Check isn't open", 409);
   const content = (req.body as { content?: string })?.content;
   if (typeof content !== "string" || !content.trim()) return err(res, "Write your answer first");
   if (content.trim().length > LIMITS.submission) return err(res, "That answer is too long");
   const { data: latest } = await db.from("p2p_group_assignment_submissions").select("attempt,status").eq("assignment_id", a.asg.id as string).eq("user_id", a.userId)
     .order("attempt", { ascending: false }).limit(1).maybeSingle();
-  if (latest && latest.status !== "returned" && !a.asg.allow_resubmission) return err(res, "You've already submitted this assignment", 409);
+  if (latest && latest.status !== "returned" && !a.asg.allow_resubmission) return err(res, "You've already submitted this Comprehensive Check", 409);
   const attempt = ((latest?.attempt as number | undefined) ?? 0) + 1;
   const { data, error } = await db.from("p2p_group_assignment_submissions").insert({ assignment_id: a.asg.id, user_id: a.userId, attempt, content: content.trim() }).select().single();
   if (error || !data) return err(res, error?.message ?? "Couldn't submit", 500);
@@ -272,7 +272,7 @@ router.post("/:scope/assignments/:assignmentId/submissions", async (req, res) =>
 // GET /learning/work/:scope/assignments/:assignmentId/submissions — reviewers: latest attempt per member.
 router.get("/:scope/assignments/:assignmentId/submissions", async (req, res) => {
   const a = await assignmentAccess(req, res); if (!a) return;
-  if (!(await canReview(a.scope, a.asg, a.userId))) return err(res, "Only the group's leaders or the assignment's author can review submissions", 403);
+  if (!(await canReview(a.scope, a.asg, a.userId))) return err(res, "Only the group's leaders or the Comprehensive Check's author can review submissions", 403);
   const { data } = await db.from("p2p_group_assignment_submissions").select("*").eq("assignment_id", a.asg.id as string).order("attempt", { ascending: true });
   const latest = new Map<string, Record<string, unknown>>();
   const attemptsBy = new Map<string, number>();
@@ -302,7 +302,7 @@ router.post("/:scope/submissions/:submissionId/review", async (req, res) => {
   if (error || !data) return err(res, error?.message ?? "Couldn't save the review", 500);
   // Tell the writer — never the content or feedback itself in the notification.
   await db.from("p2p_notifications").insert({
-    user_id: sub.user_id, title: status === "returned" ? "Your assignment was returned" : "Your assignment was reviewed",
+    user_id: sub.user_id, title: status === "returned" ? "Your Comprehensive Check was returned" : "Your Comprehensive Check was reviewed",
     message: `${asg.title as string} — open it to see the feedback.`, notification_type: "assignment_reviewed",
     data: { assignmentId: asg.id, scope, submissionId: sub.id },
   });

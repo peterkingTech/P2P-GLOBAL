@@ -143,13 +143,13 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
           <ItemsEditor label="Lessons" values={chapter.lessons} locked={locked} onSave={(lessons) => save({ lessons })} />
           <ItemsEditor label="Reflection questions" values={chapter.reflections} locked={locked} onSave={(reflections) => save({ reflections })} />
 
-          <Text style={styles.subHeading}>Assignment</Text>
-          <Text style={styles.fieldLabel}>Assignment title (optional)</Text>
+          <Text style={styles.subHeading}>Comprehensive Check</Text>
+          <Text style={styles.fieldLabel}>Comprehensive Check title (optional)</Text>
           <TextInput style={styles.input} defaultValue={chapter.assignment?.title ?? ""} editable={!locked} placeholder="e.g. Practise honesty in an agreement" placeholderTextColor={colors.textMuted}
-            onEndEditing={(e) => save({ assignmentTitle: e.nativeEvent.text })} accessibilityLabel="Assignment title" />
-          <Text style={styles.fieldLabel}>Assignment</Text>
+            onEndEditing={(e) => save({ assignmentTitle: e.nativeEvent.text })} accessibilityLabel="Comprehensive Check title" />
+          <Text style={styles.fieldLabel}>Comprehensive Check</Text>
           <TextInput style={[styles.input, styles.multilineSm]} defaultValue={chapter.assignment?.text ?? ""} editable={!locked} multiline placeholder="The practical task readers do after this chapter" placeholderTextColor={colors.textMuted}
-            onEndEditing={(e) => save({ assignment: e.nativeEvent.text })} accessibilityLabel="Assignment" />
+            onEndEditing={(e) => save({ assignment: e.nativeEvent.text })} accessibilityLabel="Comprehensive Check" />
 
           <Text style={styles.subHeading}>Chapter images ({chapterImages.length})</Text>
           {chapterImages.map((m) => (
@@ -229,9 +229,9 @@ export default function ChaptersEditor(props: Props) {
     <View style={{ gap: 8 }}>
       <Text style={styles.heading}>Chapters ({chapters.length})</Text>
       {chapters.length > 0 ? (
-        <Text style={styles.hint}>{complete} of {chapters.length} complete. Every chapter needs a title, narrative, 5 Lessons and 5 Reflection questions before the story can be published (the Assignment is optional).</Text>
+        <Text style={styles.hint}>{complete} of {chapters.length} complete. Every chapter needs a title, narrative, 5 Lessons and 5 Reflection questions before the story can be published (the Comprehensive Check is optional).</Text>
       ) : (
-        <Text style={styles.hint}>Optional. Split a longer story into chapters, each with its own Lessons, Reflection questions and Assignment. The story text above then serves as the introduction.</Text>
+        <Text style={styles.hint}>Optional. Split a longer story into chapters, each with its own Lessons, Reflection questions and Comprehensive Check. The story text above then serves as the introduction.</Text>
       )}
       {chapters.map((ch, i) => (
         // Remount when the saved content changes so uncontrolled fields show it.

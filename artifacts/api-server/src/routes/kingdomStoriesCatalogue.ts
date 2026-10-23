@@ -73,6 +73,7 @@ function mapTopic(t: Record<string, any>, stories?: Array<Record<string, any>>) 
 export function mapChapter(c: Record<string, any>, sources: Array<Record<string, any>> = []) {
   return {
     id: c.id, storyId: c.story_id, chapterNumber: c.chapter_number, title: c.title, narrative: c.narrative,
+    lessonId: c.lesson_id ?? null, // migration 212: the chapter's lesson in the Core Curriculum learning engine
     people: c.people, places: c.places, dates: c.dates, scriptureRefs: c.scripture_refs,
     evidence: { documented: c.evidence_documented, testimony: c.evidence_testimony, tradition: c.evidence_tradition, disputed: c.evidence_disputed },
     lessons: c.lessons ?? [], reflections: c.reflections ?? [],

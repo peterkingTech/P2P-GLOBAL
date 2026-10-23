@@ -292,7 +292,7 @@ function AssignmentBlockEditor({ block, onChangeContent }: { block: LessonBlock;
           style={[textInputBase, styles.assignmentTitleInput]}
           value={c.title ?? ""}
           onChangeText={(t) => patch(block, onChangeContent, "title", t)}
-          placeholder="Assignment title"
+          placeholder="Comprehensive Check title"
           placeholderTextColor={colors.textMutedLight}
         />
       </View>

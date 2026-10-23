@@ -452,7 +452,7 @@ export default function MyDiscipleshipJourneyScreen() {
               <StatRow label="Lessons Completed" value={impactData.lessonsCompleted} s={s} />
               <StatRow label="Modules Completed" value={impactData.modulesCompleted} s={s} />
               <StatRow label="Plans Completed" value={impactData.plansCompleted} s={s} />
-              <StatRow label="Assignments Submitted" value={impactData.assignmentsSubmitted} s={s} />
+              <StatRow label="Comprehensive Checks Submitted" value={impactData.assignmentsSubmitted} s={s} />
               <StatRow label="Reflections Answered" value={impactData.reflectionsAnswered} s={s} />
               <StatRow label="Current Learning Streak" value={`${impactData.currentStreakDays} day${impactData.currentStreakDays === 1 ? "" : "s"}`} s={s} />
               <StatRow label="Total Days Active" value={impactData.totalDaysActive} s={s} />

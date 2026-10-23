@@ -35,12 +35,12 @@ export default function GatheringFollowUp({ followUp, scope }: { followUp: Follo
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.title} accessibilityRole="header">Follow-up assignments</Text>
+        <Text style={styles.title} accessibilityRole="header">Follow-up Comprehensive Checks</Text>
         {work.length === 0 ? (
-          <Text style={styles.empty}>No assignments were given during this Gathering.</Text>
+          <Text style={styles.empty}>No Comprehensive Checks were given during this Gathering.</Text>
         ) : work.map((a) => (
           <TouchableOpacity key={a.assignmentId} style={styles.row} onPress={() => router.push({ pathname: "/learning/assignment/[assignmentId]", params: { assignmentId: a.assignmentId, s: scope } } as any)}
-            accessibilityRole="button" accessibilityLabel={`Assignment ${a.title}`}>
+            accessibilityRole="button" accessibilityLabel={`Comprehensive Check ${a.title}`}>
             <View style={{ flex: 1 }}>
               <Text style={styles.body}>{a.title}</Text>
               <Text style={styles.meta}>{a.lessonTitle ?? ""}{a.dueAt ? `${a.lessonTitle ? " · " : ""}due ${new Date(a.dueAt).toLocaleDateString()}` : ""}</Text>

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabaseServiceRole as db, supabaseAsUser, verifyCaller } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import catalogueRouter, { loadChapters } from "./kingdomStoriesCatalogue";
+import { chapterLearning, storiesProgress, lockChapter } from "../lib/kingdomStoryLearning";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
 // Genuinely different authorization model from every other content route
@@ -88,6 +89,8 @@ async function loadMedia(storyId: string) {
   return (data ?? []).map((m) => ({
     id: m.id, mediaType: m.media_type, mediaPath: m.media_path, caption: m.caption,
     displayOrder: m.display_order, isCover: m.is_cover, durationSeconds: m.duration_seconds, chapterId: m.chapter_id ?? null,
+    // Migration 212: accessibility + attribution (null until an editor adds them).
+    altText: m.alt_text ?? null, sourceUrl: m.source_url ?? null, licenseNote: m.license_note ?? null, imageKind: m.image_kind ?? null,
   }));
 }
 async function loadSources(storyId: string) {
@@ -165,12 +168,17 @@ router.get("/feed", async (req, res) => {
   const { data: cats } = categoryIds.length ? await db.from("p2p_kingdom_story_categories").select("id,slug,title").in("id", categoryIds) : { data: [] };
   const catById = new Map((cats ?? []).map((c) => [c.id, { slug: c.slug, title: c.title }]));
 
+  const progress = await storiesProgress((data ?? []).map((r) => r.id as string), userId);
   const stories = await Promise.all((data ?? []).map(async (r) => {
     const { data: cover } = await db.from("p2p_kingdom_story_media").select("*").eq("story_id", r.id).eq("is_cover", true).maybeSingle();
-    return mapStory(r as Record<string, unknown>, {
-      category: catById.get(r.category_id as string) ?? null,
-      media: cover ? [{ id: cover.id, mediaType: cover.media_type, mediaPath: cover.media_path, caption: cover.caption, isCover: true }] : [],
-    });
+    return {
+      ...mapStory(r as Record<string, unknown>, {
+        category: catById.get(r.category_id as string) ?? null,
+        media: cover ? [{ id: cover.id, mediaType: cover.media_type, mediaPath: cover.media_path, caption: cover.caption, isCover: true, altText: cover.alt_text ?? null }] : [],
+      }),
+      // The reader's own progress through the book (chapters submitted or completed).
+      myProgress: progress.get(r.id as string) ?? null,
+    };
   }));
   return ok(res, { stories, total: count ?? 0, page: pageNum, pageSize });
 });
@@ -188,12 +196,58 @@ router.get("/:id", async (req, res) => {
     db.from("p2p_kingdom_story_categories").select("id,slug,title").eq("id", story.category_id).maybeSingle(),
     loadMedia(story.id as string), loadSources(story.id as string), loadRelated(story as Record<string, unknown>),
   ]);
-  const chapters = await loadChapters(story.id as string, sources);
-  return ok(res, mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }));
+  const loaded = await loadChapters(story.id as string, sources);
+  // Storybook (migration 212): each chapter's state for this reader. Editors
+  // see every chapter in full; readers get a locked chapter's title only.
+  const preview = editor && story.status !== "published";
+  const { byChapter, progress } = await chapterLearning({ id: story.id as string, status: story.status as string }, loaded, userId, preview);
+  const chapters = loaded.map((ch) => {
+    const learning = byChapter.get(ch.id)!;
+    const visible = learning.state === "locked" && !editor ? lockChapter(ch) : ch;
+    return { ...visible, learning: learning.state === "locked" && !editor ? { ...learning, reflectionQuestions: [], check: null } : learning };
+  });
+  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress });
+});
+
+// A chapter with no Comprehensive Check is finished by reading it. (Chapters
+// with a check finish through the check, like any Core Curriculum lesson.)
+router.post("/:id/chapters/:chapterId/finish", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.chapterId)) return err(res, "Chapter not found", 404);
+  const { data: story } = await db.from("p2p_kingdom_stories").select("id,status").eq("id", req.params.id).maybeSingle();
+  if (!story || story.status !== "published") return err(res, "Chapter not found", 404);
+  const { data: ch } = await db.from("p2p_kingdom_story_chapters").select("id,lesson_id").eq("id", req.params.chapterId).eq("story_id", req.params.id).maybeSingle();
+  if (!ch?.lesson_id) return err(res, "Chapter not found", 404);
+  const { data: check } = await db.from("p2p_assignments").select("id").eq("lesson_id", ch.lesson_id).maybeSingle();
+  if (check) return err(res, "This chapter finishes when you submit its Comprehensive Check.", 409);
+  const { data: open } = await db.rpc("p2p_kingdom_story_chapter_open", { p_user_id: userId, p_lesson_id: ch.lesson_id });
+  if (open !== true) return err(res, "Complete the previous chapter first.", 403);
+  // The database checks the same rule again on this write (migration 212).
+  const { error } = await db.from("p2p_lesson_progress").upsert(
+    { user_id: userId, lesson_id: ch.lesson_id, status: "completed", completed: true, progress_percent: 100, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,lesson_id" });
+  if (error) return err(res, error.code === "23514" ? "Complete the previous chapter first." : error.message, error.code === "23514" ? 403 : 500);
+  return ok(res, { finished: true });
 });
 
 // Everything below requires an authorized editor (admin_content/super_admin).
 router.use(requireAdmin, requireRole("admin_content"));
+
+// Prepare (or refresh) a draft's learning activities — reflections and
+// Comprehensive Checks become Core Curriculum rows (migration 212) — so an
+// editor can preview them. Publishing does the same automatically.
+router.post("/:id/learning/sync", async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) return err(res, "Story not found", 404);
+  const { data, error } = await db.rpc("p2p_kingdom_story_sync_learning", { p_story_id: req.params.id });
+  if (error) {
+    if (/story_not_found/.test(error.message)) return err(res, "Story not found", 404);
+    if (/studio_live_edit_blocked/.test(error.message)) return err(res, "This story is live; its activities were prepared when it was published. Unpublish it to change them.", 409);
+    if (/function .*p2p_kingdom_story_sync_learning/.test(error.message)) return err(res, "Storybook learning isn't available yet (migration 212 not applied).", 503);
+    return err(res, error.message, 500);
+  }
+  return ok(res, data);
+});
 
 router.get("/admin/list", async (req, res) => {
   const { status } = req.query as { status?: string };
@@ -328,6 +382,8 @@ router.post("/:id/media", async (req, res) => {
   const { data: story } = await db.from("p2p_kingdom_stories").select("id").eq("id", req.params.id).maybeSingle();
   if (!story) return err(res, "Story not found", 404);
   const { id, mediaType, mediaPath, caption, displayOrder, isCover, durationSeconds, chapterId } = req.body as Record<string, unknown>;
+  const attribution = mediaAttribution(req.body as Record<string, unknown>);
+  if ("error" in attribution) return err(res, attribution.error);
   // Optional (migration 211): the chapter this image illustrates — must be a chapter of this story (enforced by the database too).
   if (chapterId !== undefined && chapterId !== null && (typeof chapterId !== "string" || !UUID_RE.test(chapterId))) return err(res, "invalid chapterId");
   if (!mediaType || !MEDIA_TYPES.includes(mediaType as string)) return err(res, `mediaType must be one of: ${MEDIA_TYPES.join(", ")}`);
@@ -337,15 +393,17 @@ router.post("/:id/media", async (req, res) => {
   const { data, error } = await db.from("p2p_kingdom_story_media").insert({
     ...(id ? { id } : {}), story_id: req.params.id, media_type: mediaType, media_path: mediaPath,
     caption: (caption as string)?.trim() || null, display_order: displayOrder ?? 0, is_cover: !!isCover,
-    duration_seconds: durationSeconds ?? null, ...(chapterId ? { chapter_id: chapterId } : {}),
+    duration_seconds: durationSeconds ?? null, ...(chapterId ? { chapter_id: chapterId } : {}), ...attribution.fields,
   }).select().single();
   if (error || !data) return storyDbError(res, error, "Failed to add media");
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds, chapterId: data.chapter_id ?? null });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null });
 });
 
 router.put("/:id/media/:mediaId", async (req, res) => {
   const { caption, displayOrder, isCover, chapterId } = req.body as Record<string, unknown>;
-  const updates: Record<string, unknown> = {};
+  const attribution = mediaAttribution(req.body as Record<string, unknown>);
+  if ("error" in attribution) return err(res, attribution.error);
+  const updates: Record<string, unknown> = { ...attribution.fields };
   if (chapterId !== undefined) {
     if (chapterId !== null && (typeof chapterId !== "string" || !UUID_RE.test(chapterId))) return err(res, "invalid chapterId");
     updates.chapter_id = chapterId;
@@ -356,8 +414,26 @@ router.put("/:id/media/:mediaId", async (req, res) => {
   const { data, error } = await db.from("p2p_kingdom_story_media").update(updates).eq("id", req.params.mediaId).eq("story_id", req.params.id).select().maybeSingle();
   if (error) return storyDbError(res, error, "Failed to update media");
   if (!data) return err(res, "Media item not found", 404);
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, chapterId: data.chapter_id ?? null });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null });
 });
+
+// Optional image attribution + accessibility (migration 212). Only fields sent are changed.
+const IMAGE_KINDS = ["artistic_illustration", "historical_photograph", "artefact", "manuscript", "location_photograph", "ai_generated", "other"];
+function mediaAttribution(b: Record<string, unknown>): { fields: Record<string, unknown> } | { error: string } {
+  const fields: Record<string, unknown> = {};
+  for (const [k, col, max] of [["altText", "alt_text", 1000], ["sourceUrl", "source_url", 2000], ["licenseNote", "license_note", 1000]] as const) {
+    if (b[k] === undefined) continue;
+    if (b[k] !== null && typeof b[k] !== "string") return { error: `${k} must be text` };
+    const v = ((b[k] as string | null) ?? "").trim();
+    if (v.length > max) return { error: `${k} is too long` };
+    fields[col] = v || null;
+  }
+  if (b.imageKind !== undefined) {
+    if (b.imageKind !== null && !IMAGE_KINDS.includes(b.imageKind as string)) return { error: `imageKind must be one of: ${IMAGE_KINDS.join(", ")}` };
+    fields.image_kind = b.imageKind ?? null;
+  }
+  return { fields };
+}
 
 router.delete("/:id/media/:mediaId", async (req, res) => {
   const { data: media } = await db.from("p2p_kingdom_story_media").select("media_path").eq("id", req.params.mediaId).eq("story_id", req.params.id).maybeSingle();

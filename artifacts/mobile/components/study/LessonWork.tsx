@@ -20,7 +20,7 @@ function notify(title: string, message: string) {
 
 // Under a custom lesson: your reflections (private by default — you choose if
 // leaders or the group may read each one), reflections others chose to share
-// with you, and the lesson's assignments. Drafts stay on this device until
+// with you, and the lesson's Comprehensive Checks. Drafts (this device + the writer's other devices, migration 213) are kept until
 // submitted. Nothing here changes lesson completion or group progress.
 export default function LessonWork({ scope, lessonId, questions }: { scope: WorkScope; lessonId: string; questions: unknown[] }) {
   const { colors: c } = useTheme();
@@ -42,7 +42,7 @@ export default function LessonWork({ scope, lessonId, questions }: { scope: Work
         getAssignments(scope, lessonId),
       ]);
       setMine(m.reflections); setShared(s.reflections); setAssignments(a.assignments); setCanManage(a.canManage); setError(null);
-    } catch (e: any) { setError(e?.message ?? "Couldn't load reflections and assignments."); }
+    } catch (e: any) { setError(e?.message ?? "Couldn't load reflections and Comprehensive Checks."); }
     finally { setLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, lessonId, reflectionQs.length]);
@@ -87,14 +87,14 @@ export default function LessonWork({ scope, lessonId, questions }: { scope: Work
 
       <View style={styles.block}>
         <View style={styles.rowBetween}>
-          <Text style={styles.heading}>Assignments</Text>
+          <Text style={styles.heading}>Comprehensive Checks</Text>
           {canManage && (
-            <TouchableOpacity onPress={() => setCreating(true)} style={styles.linkBtn} accessibilityRole="button" accessibilityLabel="New assignment">
+            <TouchableOpacity onPress={() => setCreating(true)} style={styles.linkBtn} accessibilityRole="button" accessibilityLabel="New Comprehensive Check">
               <Text style={styles.link}>+ New</Text>
             </TouchableOpacity>
           )}
         </View>
-        {assignments.length === 0 ? <Text style={styles.muted}>No assignments for this lesson.</Text> : assignments.map((a) => (
+        {assignments.length === 0 ? <Text style={styles.muted}>No Comprehensive Checks for this lesson.</Text> : assignments.map((a) => (
           <AssignmentRow key={a.id} scope={scope} a={a} canManage={canManage} styles={styles} c={c} />
         ))}
       </View>
@@ -143,7 +143,7 @@ function ReflectionCard({ scope, lessonId, questionId, question, latest, onSaved
         <>
           <TextInput style={styles.input} multiline value={draft.text} onChangeText={draft.setText} textAlignVertical="top"
             placeholder="Write your reflection…" placeholderTextColor={c.textMuted} accessibilityLabel={`Your reflection: ${question}`} />
-          <Text style={styles.hint}>{draft.text.trim() ? "Draft saved on this device" : " "}</Text>
+          <Text style={styles.hint}>{draft.text.trim() ? "Draft saved — it continues on your other devices" : " "}</Text>
         </>
       )}
       <Text style={styles.label}>Who can see this?</Text>
@@ -206,7 +206,7 @@ function NewAssignmentModal({ visible, onClose, onCreate, styles, c }: {
   useEffect(() => { if (visible) { setTitle(""); setInstructions(""); setDue(""); setAllow(true); setProblem(null); } }, [visible]);
 
   async function save(status: "draft" | "published") {
-    if (!title.trim()) { setProblem("Give the assignment a title."); return; }
+    if (!title.trim()) { setProblem("Give the Comprehensive Check a title."); return; }
     let dueAt: string | null = null;
     if (due.trim()) {
       const m = due.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -216,7 +216,7 @@ function NewAssignmentModal({ visible, onClose, onCreate, styles, c }: {
     }
     setBusy(true); setProblem(null);
     try { await onCreate({ title: title.trim(), instructions: instructions.trim() || null, dueAt, allowResubmission, status }); }
-    catch (e: any) { setProblem(e?.message ?? "Couldn't create the assignment."); }
+    catch (e: any) { setProblem(e?.message ?? "Couldn't create the Comprehensive Check."); }
     finally { setBusy(false); }
   }
 
@@ -224,8 +224,8 @@ function NewAssignmentModal({ visible, onClose, onCreate, styles, c }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={styles.heading}>New assignment</Text>
-          <TextInput style={[styles.input, { minHeight: 44 }]} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={c.textMuted} maxLength={160} accessibilityLabel="Assignment title" />
+          <Text style={styles.heading}>New Comprehensive Check</Text>
+          <TextInput style={[styles.input, { minHeight: 44 }]} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={c.textMuted} maxLength={160} accessibilityLabel="Comprehensive Check title" />
           <TextInput style={styles.input} value={instructions} onChangeText={setInstructions} multiline textAlignVertical="top" placeholder="Instructions (optional)" placeholderTextColor={c.textMuted} maxLength={5000} accessibilityLabel="Instructions" />
           <TextInput style={[styles.input, { minHeight: 44 }]} value={due} onChangeText={setDue} placeholder="Due date YYYY-MM-DD (optional)" placeholderTextColor={c.textMuted} autoCapitalize="none" accessibilityLabel="Due date" />
           <View style={styles.rowBetween}>

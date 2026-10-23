@@ -40,7 +40,14 @@ export interface KingdomStoryMedia {
   displayOrder: number; isCover: boolean; durationSeconds: number | null;
   /** The chapter this image illustrates; null/absent = story-level (cover, gallery). */
   chapterId?: string | null;
+  /** Migration 212: accessibility description and attribution (optional). */
+  altText?: string | null; sourceUrl?: string | null; licenseNote?: string | null; imageKind?: KingdomImageKind | null;
 }
+export type KingdomImageKind = "artistic_illustration" | "historical_photograph" | "artefact" | "manuscript" | "location_photograph" | "ai_generated" | "other";
+export const IMAGE_KIND_LABELS: Record<KingdomImageKind, string> = {
+  artistic_illustration: "Artistic illustration", historical_photograph: "Historical photograph", artefact: "Historical artefact",
+  manuscript: "Manuscript", location_photograph: "Modern photograph of the place", ai_generated: "AI-generated illustration (not a historical record)", other: "Image",
+};
 export interface KingdomStorySource {
   id: string; title: string; publisher: string | null; url: string | null; citation: string | null;
   sourceType: string | null; displayOrder: number; chapterId?: string | null;
@@ -65,6 +72,23 @@ export interface KingdomStory {
   createdAt: string; updatedAt: string; publishedAt: string | null; archivedAt: string | null;
   media?: KingdomStoryMedia[]; sources?: KingdomStorySource[];
   topicId?: string | null; chapters?: KingdomStoryChapter[];
+  /** Storybook (migration 212): the reader's progress through this book. */
+  progress?: StoryProgress;
+  /** Story cards: chapters this reader has finished (submitted or completed). */
+  myProgress?: { totalChapters: number; doneChapters: number; started: boolean } | null;
+}
+export type ChapterState = "locked" | "available" | "in_progress" | "awaiting_review" | "completed" | "preview";
+export interface ChapterLearning {
+  lessonId: string | null;
+  state: ChapterState;
+  remaining: Array<"comprehensive_check" | "finish_reading">;
+  reflectionQuestions: Array<{ id: string; question: string }>;
+  check: { assignmentId: string; title: string; questions: Array<{ id: string; question: string }> } | null;
+  reflectionsAnswered: number;
+}
+export interface StoryProgress {
+  totalChapters: number; completedChapters: number; awaitingReviewChapters: number;
+  currentChapterId: string | null; started: boolean; finished: boolean;
 }
 
 // ── Catalogue (migration 210): Category → Topic → Story → Chapters ──────────
@@ -75,8 +99,12 @@ export interface KingdomStoryChapter {
   people: string | null; places: string | null; dates: string | null; scriptureRefs: string | null;
   evidence: { documented: string | null; testimony: string | null; tradition: string | null; disputed: string | null };
   lessons: string[]; reflections: string[]; complete: boolean; sources: KingdomStorySource[];
-  /** Optional chapter Assignment (title, e.g. "Practise honesty in an agreement", and the task). */
+  /** Optional chapter Comprehensive Check (stored as the 211 assignment field): title and task. */
   assignment?: { title: string | null; text: string | null } | null;
+  /** Migration 212: the chapter's lesson in the Core Curriculum learning engine. */
+  lessonId?: string | null;
+  /** Storybook state for the signed-in reader (absent from editor-only endpoints). */
+  learning?: ChapterLearning;
 }
 export type ChapterInput = Partial<Pick<KingdomStoryChapter, "title" | "narrative" | "people" | "places" | "dates" | "scriptureRefs" | "lessons" | "reflections">> & {
   evidence?: Partial<KingdomStoryChapter["evidence"]>;
@@ -206,7 +234,7 @@ export function deleteKingdomStory(id: string): Promise<{ removed: true }> {
 export function addKingdomStoryMedia(storyId: string, input: { id?: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption?: string; displayOrder?: number; isCover?: boolean; durationSeconds?: number; chapterId?: string | null }): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media`, { method: "POST", body: JSON.stringify(input) });
 }
-export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean; chapterId: string | null }>): Promise<KingdomStoryMedia> {
+export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean; chapterId: string | null; altText: string | null; sourceUrl: string | null; licenseNote: string | null; imageKind: KingdomImageKind | null }>): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media/${mediaId}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function deleteKingdomStoryMedia(storyId: string, mediaId: string): Promise<{ removed: true }> {
@@ -263,6 +291,14 @@ export async function uploadKingdomStoryVideo(storyId: string, localUri: string)
   } catch {
     return null;
   }
+}
+/** Finish a chapter that has no Comprehensive Check (opens the next one). */
+export function finishKingdomStoryChapter(storyId: string, chapterId: string): Promise<{ finished: true }> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}/finish`, { method: "POST" });
+}
+/** Editors: prepare a draft's reflections and Comprehensive Checks for preview (publishing does it too). */
+export function syncKingdomStoryLearning(storyId: string): Promise<{ lessons: number; reflection_questions: number; comprehensive_checks: number }> {
+  return authedFetch(`/kingdom-stories/${storyId}/learning/sync`, { method: "POST" });
 }
 export function getKingdomStoryMediaSignedUrl(mediaPath: string): Promise<string | null> {
   return supabase.storage.from("kingdom-stories-media").createSignedUrl(mediaPath, 3600)

@@ -104,7 +104,7 @@ export default function ChurchMemberProfileScreen() {
 
       <View style={styles.privacyNote}>
         <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-        <Text style={styles.privacyNoteText}>This view does not show session content, assignment answers, or private reflections. Member privacy is protected.</Text>
+        <Text style={styles.privacyNoteText}>This view does not show session content, Comprehensive Check answers, or private reflections. Member privacy is protected.</Text>
       </View>
     </ScrollView>
   );

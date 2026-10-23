@@ -19,7 +19,7 @@ type ReviewRow = Submission & { attempts: number; author: { id: string; name: st
 
 // One assignment on a custom lesson. Members: instructions, their own
 // attempts (never overwritten) with feedback, and the answer box (draft kept
-// on this device until submitted). Reviewers (the group's leaders or the
+// on this device and the writer's other devices until submitted). Reviewers (the group's leaders or the
 // assignment's author): each member's latest attempt, Mark reviewed / Return
 // with feedback. Leaders: Publish / Unpublish / Archive. The server enforces
 // every one of these rules.
@@ -45,7 +45,7 @@ export default function AssignmentScreen() {
       const mine = await getMyAttempts(scope, assignmentId);
       setAssignment(mine.assignment); setAttempts(mine.attempts); setError(null);
       try { setReview((await getSubmissionsForReview(scope, assignmentId)).submissions); } catch { setReview(null); }
-    } catch (e: any) { setError(e?.status === 404 ? "This assignment isn't available." : e?.message ?? "Couldn't load the assignment."); }
+    } catch (e: any) { setError(e?.status === 404 ? "This Comprehensive Check isn't available." : e?.message ?? "Couldn't load the Comprehensive Check."); }
     finally { setLoading(false); }
   }, [scope, assignmentId]);
   useEffect(() => { load(); }, [load]);
@@ -77,13 +77,13 @@ export default function AssignmentScreen() {
     finally { setBusy(null); }
   }
 
-  if (!scope) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Assignment" }} /><Text style={styles.muted}>This page isn't available.</Text></View>;
-  if (loading) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Assignment" }} /><ActivityIndicator color={c.primaryGreen} /></View>;
-  if (error || !assignment) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Assignment" }} /><Text style={styles.muted}>{error ?? "This assignment isn't available."}</Text></View>;
+  if (!scope) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Comprehensive Check" }} /><Text style={styles.muted}>This page isn't available.</Text></View>;
+  if (loading) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Comprehensive Check" }} /><ActivityIndicator color={c.primaryGreen} /></View>;
+  if (error || !assignment) return <View style={[styles.screen, styles.center]}><Stack.Screen options={{ title: "Comprehensive Check" }} /><Text style={styles.muted}>{error ?? "This Comprehensive Check isn't available."}</Text></View>;
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: "Assignment" }} />
+      <Stack.Screen options={{ title: "Comprehensive Check" }} />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{assignment.title}</Text>
         {assignment.dueAt ? <Text style={styles.meta}>Due {new Date(assignment.dueAt).toLocaleString()}</Text> : null}
@@ -113,7 +113,7 @@ export default function AssignmentScreen() {
               <>
                 <TextInput style={styles.input} multiline textAlignVertical="top" value={draft.text} onChangeText={draft.setText}
                   placeholder={latest ? "Write your new answer…" : "Write your answer…"} placeholderTextColor={c.textMuted} accessibilityLabel="Your answer" />
-                <Text style={styles.meta}>{draft.text.trim() ? "Draft saved on this device" : "Reviewed by your group's leaders."}</Text>
+                <Text style={styles.meta}>{draft.text.trim() ? "Draft saved — it continues on your other devices" : "Reviewed by your group's leaders."}</Text>
                 <TouchableOpacity style={[styles.primary, (!draft.text.trim() || busy === "submit") && { opacity: 0.5 }]} onPress={submit} disabled={!draft.text.trim() || busy === "submit"} accessibilityRole="button">
                   {busy === "submit" ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{latest ? "Submit again" : "Submit"}</Text>}
                 </TouchableOpacity>

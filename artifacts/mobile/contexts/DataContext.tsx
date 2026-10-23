@@ -4560,7 +4560,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .eq("lesson_id", lessonId)
         .maybeSingle();
       if (error || !data) return null;
-      return { id: data.id as string, lessonId: data.lesson_id as string, title: (data.title as string) ?? "Assignment", instructions: (data.instructions as string) ?? "" };
+      return { id: data.id as string, lessonId: data.lesson_id as string, title: (data.title as string) ?? "Comprehensive Check", instructions: (data.instructions as string) ?? "" };
     } catch { return null; }
   }, []);
 

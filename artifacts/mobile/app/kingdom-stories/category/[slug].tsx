@@ -5,6 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
+import StoryImage from "@/components/kingdom-stories/StoryImage";
+import { cardProgress } from "@/lib/storybook";
 import { getKingdomStoriesFeed, getCatalogueCategories, categoryCountLabels, type KingdomStory, type CatalogueCategory } from "@/lib/kingdomStoriesApi";
 
 // One category: its description, its PUBLISHED stories, and — as a number
@@ -32,6 +34,8 @@ export default function KingdomStoryCategoryScreen() {
       setStories(res.stories);
       setCategory(cats?.categories.find((k) => k.slug === slug) ?? null);
       setFallbackTitle(res.stories[0]?.category?.title ?? slug);
+    } catch {
+      // Offline / signed out: show the empty state rather than an unhandled error.
     } finally {
       setLoading(false);
     }
@@ -78,9 +82,14 @@ export default function KingdomStoryCategoryScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/kingdom-stories/${item.id}` as any)} activeOpacity={0.88}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              {!!item.subtitle && <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle}</Text>}
+            <TouchableOpacity style={[styles.card, { flexDirection: "row", gap: 12, alignItems: "center" }]} onPress={() => router.push(`/kingdom-stories/${item.id}` as any)} activeOpacity={0.88}
+              accessibilityRole="button" accessibilityLabel={[item.title, cardProgress(item.myProgress)].filter(Boolean).join(". ")}>
+              {item.media?.[0] ? <View style={{ width: 72, height: 72 }}><StoryImage media={item.media[0]} aspectRatio={1} rounded={10} thumb showCaption={false} /></View> : null}
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                {!!item.subtitle && <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle}</Text>}
+                {!!cardProgress(item.myProgress) && <Text style={[styles.cardSubtitle, { color: c.accentGreen }]}>{cardProgress(item.myProgress)}</Text>}
+              </View>
             </TouchableOpacity>
           )}
         />

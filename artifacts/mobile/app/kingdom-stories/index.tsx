@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
+import { cardProgress } from "@/lib/storybook";
 import {
   getKingdomStoriesFeed, getKingdomStoryCategories, getCatalogueCategories, getKingdomStoryMediaSignedUrl, searchKingdomStories,
   categoryCountLabels, CONTENT_TYPE_LABELS, type KingdomStory, type CatalogueCategory,
@@ -64,6 +65,8 @@ export default function KingdomStoriesHomeScreen() {
       setCategories(cats);
       setFeatured(featuredRes.stories[0] ?? null);
       setLatest(latestRes.stories);
+    } catch {
+      // Offline / signed out: keep what is shown (empty states) rather than an unhandled error.
     } finally {
       setLoading(false);
     }
@@ -92,6 +95,7 @@ export default function KingdomStoriesHomeScreen() {
         <Text style={styles2.cardCategory}>{item.category?.title ?? (item.contentType ? CONTENT_TYPE_LABELS[item.contentType] : "")}</Text>
         <Text style={styles2.cardTitle} numberOfLines={2}>{item.title}</Text>
         {!!item.subtitle && <Text style={styles2.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>}
+        {!!cardProgress(item.myProgress) && <Text style={[styles2.cardSubtitle, { color: c.accentGreen }]}>{cardProgress(item.myProgress)}</Text>}
       </View>
     </TouchableOpacity>
   );

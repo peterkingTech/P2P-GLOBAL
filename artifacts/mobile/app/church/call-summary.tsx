@@ -141,7 +141,7 @@ export default function CallSummaryScreen() {
                   accessibilityRole="button" accessibilityLabel={`Open the lesson ${summary.lessonRef.title}`}
                 >
                   <Ionicons name="book-outline" size={15} color={colors.accentGreen} />
-                  <Text style={styles.openLessonText}>Open lesson · reflections & assignments</Text>
+                  <Text style={styles.openLessonText}>Open lesson · reflections & Comprehensive Checks</Text>
                 </TouchableOpacity>
               )}
             </View>

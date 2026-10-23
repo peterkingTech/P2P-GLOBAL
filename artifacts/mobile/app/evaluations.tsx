@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import { useData, PendingEvaluation, MySubmission, SubmitterEvaluationContext } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import MediaPlayer from "@/components/MediaPlayer";
+import ReviewPrompts from "@/components/ReviewPrompts";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 
@@ -84,6 +85,7 @@ function CircleEvaluationCard({ evaluation, onResolved }: { evaluation: CirclePe
       <View style={styles.contentBox}>
         <Text style={styles.contentText}>{evaluation.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}</Text>
       </View>
+      <ReviewPrompts feedback={feedback} onChange={setFeedback} />
       <TextInput
         style={styles.feedbackInput}
         multiline
@@ -230,6 +232,7 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
         </View>
       )}
 
+      <ReviewPrompts feedback={feedback} onChange={setFeedback} />
       <TextInput
         style={styles.feedbackInput}
         multiline
@@ -493,7 +496,7 @@ export default function EvaluationsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={48} color={colors.borderBeige} />
             <Text style={styles.emptyTitle}>Nothing awaiting approval</Text>
-            <Text style={styles.emptySub}>Assignment responses you submit will show up here until a peer evaluator resolves them.</Text>
+            <Text style={styles.emptySub}>Comprehensive Check responses you submit will show up here until a fellow peer reviews them.</Text>
           </View>
         ) : (
           <FlatList

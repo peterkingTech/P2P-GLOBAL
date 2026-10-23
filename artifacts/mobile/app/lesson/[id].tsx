@@ -41,6 +41,7 @@ import ReadableText from "@/components/ReadableText";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import { useActiveGathering } from "@/lib/activeGathering";
 import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
+import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 
 interface LessonContent {
@@ -239,7 +240,7 @@ export function QuestionResponseCard({
           onChangeText={setText}
           accessibilityLabel={`Your answer to question ${questionIndex + 1}`}
         />
-        <Text style={qStyles.draftNote}>{text.trim() ? "Draft saved on this device" : "Your writing is saved as you type"}</Text>
+        <Text style={qStyles.draftNote}>{text.trim() ? "Draft saved — it continues on your other devices" : "Your writing is saved as you type"}</Text>
       </View>
     </Modal>
   );
@@ -303,7 +304,7 @@ export function QuestionResponseCard({
                 onChangeText={setText}
               />
               <View style={qStyles.draftRow}>
-                <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">{text.trim() ? "Draft saved on this device" : " "}</Text>
+                <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">{text.trim() ? "Draft saved — it continues on your other devices" : " "}</Text>
                 <TouchableOpacity
                   style={qStyles.expandBtn} onPress={() => setFocusWriting(true)}
                   accessibilityRole="button" accessibilityLabel="Expand writing to full screen"
@@ -483,6 +484,24 @@ export default function LessonScreen() {
   const insets = useSafeAreaInsets();
   const { readingMaxWidth } = useLayout();
   const { user, profile: authProfile } = useAuth();
+  // A Kingdom Stories chapter is a lesson of the hidden "kingdom_story"
+  // curriculum (migration 212): opened from anywhere generic (e.g. My
+  // Submissions), it is read in the storybook, not on this screen.
+  useEffect(() => {
+    if (!id) return;
+    let live = true;
+    (async () => {
+      const { data: l } = await supabase.from("p2p_lessons").select("module_id").eq("id", id).maybeSingle();
+      if (!l?.module_id || !live) return;
+      const { data: m } = await supabase.from("p2p_modules").select("curriculum_id").eq("id", l.module_id).maybeSingle();
+      if (!m?.curriculum_id || !live) return;
+      const { data: cur } = await supabase.from("p2p_curriculums").select("type").eq("id", m.curriculum_id).maybeSingle();
+      if (cur?.type !== "kingdom_story" || !live) return;
+      const { data: st } = await supabase.from("p2p_kingdom_stories").select("id").eq("module_id", l.module_id).maybeSingle();
+      if (st?.id && live) router.replace({ pathname: "/kingdom-stories/chapter", params: { id: st.id, lesson: id } } as any);
+    })().catch(() => {});
+    return () => { live = false; };
+  }, [id, router]);
   // Daily study goal: count time while this lesson is focused and on screen.
   const [lessonFocused, setLessonFocused] = useState(false);
   useFocusEffect(useCallback(() => { setLessonFocused(true); return () => setLessonFocused(false); }, []));
@@ -934,7 +953,7 @@ export default function LessonScreen() {
             <View style={styles.questionsCard}>
               <View style={styles.questionsHeader}>
                 <Ionicons name="create" size={16} color={colors.accentGreen} />
-                <Text style={styles.questionsTitle}>{assignment.title}</Text>
+                <Text style={styles.questionsTitle}>{checkTitle(assignment.title)}</Text>
               </View>
               {assignmentQuestions.map((q, idx) => (
                 <QuestionResponseCard

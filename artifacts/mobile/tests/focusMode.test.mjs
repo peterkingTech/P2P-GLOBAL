@@ -26,6 +26,8 @@ const AsyncStorage = {
   getItem: async (k) => { if (failNext) { failNext = false; throw new Error("io"); } return store.has(k) ? store.get(k) : null; },
   setItem: async (k, v) => { store.set(k, v); },
   removeItem: async (k) => { store.delete(k); },
+  multiSet: async (pairs) => { for (const [k, v] of pairs) store.set(k, v); },
+  multiRemove: async (keys) => { for (const k of keys) store.delete(k); },
 };
 const js = ts.transpileModule(src("lib/drafts.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 const mod = { exports: {} };
@@ -45,9 +47,10 @@ ok("storage failure → empty draft, never a crash", (await D.loadDraft(k)) === 
 
 const drafts = src("lib/drafts.ts");
 ok("useDraft: saved shortly after typing, immediately on background and on leaving the screen", /SAVE_DELAY_MS = 400/.test(drafts)
-  && /AppState\.addEventListener\("change", \(s\) => \{ if \(s !== "active"\) flush\(\); \}\)/.test(drafts) && /return \(\) => \{ sub\.remove\(\); flush\(\); \};/.test(drafts));
-ok("useDraft: a slow load never overwrites what was already typed", /if \(saved && !typedBeforeLoad\.current\)/.test(drafts));
-ok("drafts stay on the device (no network)", !/fetch\(|supabase|authedFetch/.test(drafts));
+  && drafts.includes('AppState.addEventListener("change", (s) => { if (s !== "active") { flush(); flushOnline(); } })') && drafts.includes("return () => { sub.remove(); flush(); flushOnline(); };"));
+ok("useDraft: a slow load never overwrites what was already typed", drafts.includes("local.text && !typedBeforeLoad.current") && drafts.includes('best.from === "online" && !typedBeforeLoad.current'));
+ok("drafts: device copy first (works offline); online copy is the writer's own and best-effort", drafts.includes("saveDraft(key, latest.current") && drafts.includes('from("p2p_answer_drafts")')
+  && !drafts.includes("fetch(") && !drafts.includes("authedFetch") && drafts.includes("catch { /* offline"));
 
 // ── Lesson answers ────────────────────────────────────────────────────────
 const lesson = src("app/lesson/[id].tsx");

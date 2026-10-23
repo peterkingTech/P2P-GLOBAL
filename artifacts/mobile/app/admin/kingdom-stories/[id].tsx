@@ -7,7 +7,7 @@ import colors from "@/constants/colors";
 import VideoRecorder from "@/components/VideoRecorder";
 import {
   getKingdomStory, updateKingdomStory, deleteKingdomStory,
-  addKingdomStoryMedia, updateKingdomStoryMedia, deleteKingdomStoryMedia,
+  addKingdomStoryMedia, updateKingdomStoryMedia, deleteKingdomStoryMedia, syncKingdomStoryLearning,
   addKingdomStorySource, deleteKingdomStorySource,
   uploadKingdomStoryImage, uploadKingdomStoryVideo, getKingdomStoryMediaSignedUrl,
   getKingdomStoryCategories, editorCategoryOrder, CONTENT_TYPE_LABELS,
@@ -17,6 +17,7 @@ import { createOrFindScriptureReference, parseScriptureInput, getScriptureRefere
 import { useAuth } from "@/contexts/AuthContext";
 import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
 import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
+import MediaDetailsEditor from "@/components/kingdom-stories/MediaDetailsEditor";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -175,6 +176,17 @@ export default function EditKingdomStoryScreen() {
     }
   }
 
+  // Storybook: turn the chapters' reflections and Comprehensive Checks into
+  // learning activities now, to preview them (publishing does this anyway).
+  async function handlePrepareActivities() {
+    if (!story) return;
+    try {
+      const r = await syncKingdomStoryLearning(story.id);
+      showAlert("Activities ready", `${r.lessons} chapters · ${r.reflection_questions} reflection questions · ${r.comprehensive_checks} Comprehensive Checks. Readers can use them once the story is published.`);
+      await load();
+    } catch (e) { reportError("Couldn't prepare the activities", e); }
+  }
+
   async function handleDeleteSource(sourceId: string) {
     if (!story) return;
     setSaving(true);
@@ -239,6 +251,12 @@ export default function EditKingdomStoryScreen() {
           <Ionicons name="eye-outline" size={14} color={colors.accentGreen} />
           <Text style={styles.previewBtnText}>Preview as Peer</Text>
         </TouchableOpacity>
+        {story.status !== "published" && !!story.chapters?.length && (
+          <TouchableOpacity onPress={handlePrepareActivities} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel="Prepare reflections and Comprehensive Checks">
+            <Ionicons name="school-outline" size={14} color={colors.accentGreen} />
+            <Text style={styles.previewBtnText}>Prepare activities</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {!!story.topicId && (
         <TouchableOpacity onPress={() => router.push(`/admin/kingdom-stories/topics/${story.topicId}` as any)} style={styles.topicLink} accessibilityRole="link">
@@ -326,6 +344,7 @@ export default function EditKingdomStoryScreen() {
           </View>
         ))}
       </View>
+      <MediaDetailsEditor story={story} locked={story.status === "published"} onChanged={load} onError={(title, e) => reportError(title, e)} />
       <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
         <TouchableOpacity style={styles.addMediaBtn} onPress={handlePickPhoto} disabled={saving}>
           <Ionicons name="image-outline" size={16} color={colors.accentGreen} />

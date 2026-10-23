@@ -35,7 +35,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     points: [
       "Go through each module at your own pace.",
       "As you learn, take time to write your personal reflections — these remain private and are saved in your My Discipleship Journal, where you can revisit them anytime.",
-      "When you complete a Comprehension Check, submit your assignment for peer review.",
+      "When you complete a Comprehensive Check, submit it for peer review by a fellow peer.",
       "Through this process, you learn from others while also helping others grow.",
     ],
     route: "/(tabs)/learn", actionLabel: "Open Kingdom School",

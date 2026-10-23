@@ -145,7 +145,7 @@ export default function LearningHomeScreen() {
             <Text style={styles.cardTitle}>Waiting on you</Text>
             {data.work!.toDo.map((a) => (
               <TouchableOpacity key={`do-${a.assignmentId}`} style={styles.listRow} onPress={() => router.push({ pathname: "/learning/assignment/[assignmentId]", params: { assignmentId: a.assignmentId, s: scope } } as any)}
-                accessibilityRole="button" accessibilityLabel={`Assignment ${a.title}${a.state === "returned" ? ", returned to you" : ""}`}>
+                accessibilityRole="button" accessibilityLabel={`Comprehensive Check ${a.title}${a.state === "returned" ? ", returned to you" : ""}`}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.listTitle} numberOfLines={1}>{a.title}</Text>
                   <Text style={styles.rowSub}>
