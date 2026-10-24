@@ -280,6 +280,20 @@ const A = load("lib/studioActions.ts");
   env.query = q({ ...page([story("x", { studio: studio({ reviewState: "in_review", submittedBy: "u-other" }) })]), state: "in_review", editable: false });
   tree = render("app/admin/studio/review.tsx");
   ok("review: viewer sees no review actions", !button(tree, "Approve") && /cannot submit, approve/.test(textOf(tree)));
+  env.stateSwap = { in_review: "draft" };
+  env.query = q({ ...page([story("d1", { title: "Draft one", nativeStatus: "review", studio: null })]), state: "draft", editable: true });
+  tree = render("app/admin/studio/review.tsx");
+  ok("review: unsubmitted story (even one marked 'review' by the old button) offers Submit for review", !!button(tree, "Submit for review") && !button(tree, "Publish now"));
+  env.stateSwap = null;
+  const reviewSrc = readFileSync(path.join(root, "app/admin/studio/review.tsx"), "utf8");
+  ok("review: title is not a link; the editor opens only from its own guarded button", !!button(tree, "Open editor") && !/accessibilityRole="link"/.test(reviewSrc)
+    && /onPress=\{guardTap\(\(\) => router\.push\(`\/admin\/kingdom-stories\/\$\{item\.sourceId\}`/.test(reviewSrc));
+  ok("review: a story acted on stays in place with its fresh state until the tab changes", /kept\.items\[id\] \?\? byId\.get\(id\)/.test(reviewSrc) && /function switchQueue[^\n]*setKept\(\{ order: \[\], items: \{\}, outcomes: \{\} \}\)/.test(reviewSrc));
+  const stepsSrc = readFileSync(path.join(root, "components/studio/StudioSteps.tsx"), "utf8");
+  ok("steps: reload the story's Studio state after every step (next step uses the new version)", /fresh = \(await getStudioItem\(item\.sourceId\)\)\.item/.test(stepsSrc) && /onDone\(outcome, fresh\)/.test(stepsSrc));
+  ok("steps: taps just after a dialog closes are ignored", /const TAP_GUARD_MS = 600;/.test(stepsSrc) && /function close\(\) \{ lastDialogClose = Date\.now\(\);/.test(stepsSrc)
+    && (stepsSrc.match(/onPress=\{guardTap\(/g) ?? []).length === 3);
+  ok("steps: Publish now offered whenever the approval allows it (not only on the Approved tab)", /editable && !publishBlock \? <Button label="Publish now"/.test(stepsSrc));
 
   // Schedule editor.
   env.params = { sourceId: "s1" };
@@ -345,6 +359,8 @@ const A = load("lib/studioActions.ts");
   ok("editor: Studio link only for Studio roles", /canOpenStudio = !!profile && STUDIO_VIEW_ROLES\.includes\(profile\.role\)/.test(editor) && /\{canOpenStudio \? \(/.test(editor));
   ok("editor: live-story edits and media/source changes report via the notice", ["Couldn't remove media", "Couldn't add source", "Couldn't remove source", "Couldn't add photo"].every((t) => editor.includes(`reportError("${t}", e)`)));
   ok("editor: Unpublish to edit offered for live stories", /handleStatusChange\("draft"\)} accessibilityRole="button" accessibilityLabel="Unpublish to edit"/.test(editor));
+  ok("editor: one review process — no old Move to Review / direct Publish, the Studio's steps instead", !editor.includes("Move to Review") && !/handleStatusChange\("(review|published)"\)/.test(editor)
+    && /<StudioSteps item=\{studioItem\}/.test(editor) && /Submit, approve and publish in the Publishing Studio/.test(editor));
   const dir = path.join(root, "app/admin/studio");
   const files = readdirSync(dir).map((f) => path.join(dir, f)).concat([path.join(root, "components/studio/StudioUI.tsx"), path.join(root, "components/studio/useStudioQuery.ts"), path.join(root, "lib/studioActions.ts"), path.join(root, "lib/studioModel.ts")]);
   const all = files.map((f) => readFileSync(f, "utf8")).join("\n");

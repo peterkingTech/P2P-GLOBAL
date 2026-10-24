@@ -15,7 +15,11 @@ import {
 } from "@/lib/kingdomStoriesApi";
 import { createOrFindScriptureReference, parseScriptureInput, getScriptureReference } from "@/lib/prayerTopicsApi";
 import { useAuth } from "@/contexts/AuthContext";
-import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
+import { STUDIO_VIEW_ROLES, REVIEW_LABELS, reviewStateOf } from "@/lib/studioModel";
+import { getStudioItem, type StudioItem } from "@/lib/studioApi";
+import type { ActionOutcome } from "@/lib/studioActions";
+import { StudioSteps } from "@/components/studio/StudioSteps";
+import { Banner, Chip, reviewTone } from "@/components/studio/StudioUI";
 import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
 import MediaDetailsEditor from "@/components/kingdom-stories/MediaDetailsEditor";
 
@@ -50,6 +54,11 @@ export default function EditKingdomStoryScreen() {
   const [studioNotice, setStudioNotice] = useState<{ message: string; where: "top" | "lifecycle" } | null>(null);
   const { profile } = useAuth();
   const canOpenStudio = !!profile && STUDIO_VIEW_ROLES.includes(profile.role);
+  // The story's Publishing Studio state: submitting, approving and publishing
+  // happen through the Studio's steps (one review process), right here.
+  const [studioItem, setStudioItem] = useState<StudioItem | null>(null);
+  const [studioEditable, setStudioEditable] = useState(false);
+  const [studioOutcome, setStudioOutcome] = useState<ActionOutcome | null>(null);
   // Shown next to where the action happened: field edits at the top,
   // Publish / Unpublish / Archive next to the lifecycle buttons.
   function reportError(title: string, e: any, where: "top" | "lifecycle" = "top") {
@@ -65,14 +74,21 @@ export default function EditKingdomStoryScreen() {
       setCategories(editorCategoryOrder(cats));
       if (s.scriptureReferenceId) getScriptureReference(s.scriptureReferenceId).then((r) => setScriptureDisplay(r.referenceDisplay)).catch(() => {});
       else setScriptureDisplay(null);
+      if (canOpenStudio) getStudioItem(id).then((r) => { setStudioItem(r.item); setStudioEditable(r.editable); }).catch(() => setStudioItem(null));
     } catch (e: any) {
       showAlert("Couldn't load story", e.message ?? "Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, canOpenStudio]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  function studioDone(outcome: ActionOutcome, fresh: StudioItem | null) {
+    setStudioOutcome(outcome);
+    if (fresh) setStudioItem(fresh);
+    if (!fresh || fresh.nativeStatus !== story?.status) load(); // e.g. just published
+  }
 
   async function saveField(updates: Partial<KingdomStory>) {
     if (!story) return;
@@ -368,9 +384,24 @@ export default function EditKingdomStoryScreen() {
       <TouchableOpacity style={styles.smallBtn} onPress={handleAddSource}><Text style={styles.smallBtnText}>Add Source</Text></TouchableOpacity>
 
       <Text style={styles.sectionHeading}>Lifecycle</Text>
+      {(story.status === "draft" || story.status === "review") && studioItem ? (
+        <View style={{ gap: 8, marginBottom: 8 }}>
+          <View style={styles.lifecycleRow}>
+            <Text style={styles.studioStateLabel}>Publishing Studio:</Text>
+            <Chip label={REVIEW_LABELS[reviewStateOf(studioItem)]} tone={reviewTone(reviewStateOf(studioItem))} />
+          </View>
+          {studioOutcome ? <Banner tone={studioOutcome.tone} text={studioOutcome.text} onDismiss={() => setStudioOutcome(null)} /> : null}
+          <View style={styles.lifecycleRow}>
+            <StudioSteps item={studioItem} editable={studioEditable} userId={profile?.id ?? null} role={profile?.role ?? null} onDone={studioDone} />
+          </View>
+        </View>
+      ) : null}
+      {(story.status === "draft" || story.status === "review") && !studioItem && canOpenStudio ? (
+        <TouchableOpacity style={[styles.lifecycleBtn, styles.publishBtn, { alignSelf: "flex-start", marginBottom: 8 }]} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Submit, approve and publish in the Publishing Studio">
+          <Text style={styles.publishBtnText}>Submit, approve and publish in the Publishing Studio</Text>
+        </TouchableOpacity>
+      ) : null}
       <View style={styles.lifecycleRow}>
-        {story.status === "draft" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("review")}><Text style={styles.lifecycleBtnText}>Move to Review</Text></TouchableOpacity>}
-        {(story.status === "draft" || story.status === "review") && <TouchableOpacity style={[styles.lifecycleBtn, styles.publishBtn]} onPress={() => handleStatusChange("published")}><Text style={styles.publishBtnText}>Publish</Text></TouchableOpacity>}
         {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")} accessibilityRole="button" accessibilityLabel="Unpublish to edit"><Text style={styles.lifecycleBtnText}>Unpublish to edit</Text></TouchableOpacity>}
         {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("archived")}><Text style={styles.lifecycleBtnText}>Archive</Text></TouchableOpacity>}
         {story.status === "archived" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")}><Text style={styles.lifecycleBtnText}>Restore to Draft</Text></TouchableOpacity>}
@@ -451,7 +482,8 @@ const styles = StyleSheet.create({
   sourceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 10, marginBottom: 6 },
   sourceTitle: { fontSize: 12, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   sourceMeta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  lifecycleRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  lifecycleRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" },
+  studioStateLabel: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   lifecycleHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
   studioNotice: { backgroundColor: "#FDF6EA", borderColor: "#EBCB95", borderWidth: 1, borderRadius: 12, padding: 12, gap: 10, marginBottom: 8 },
   studioNoticeText: { flex: 1, fontSize: 13, color: "#5C3A0B", fontFamily: "Inter_500Medium", lineHeight: 19 },
