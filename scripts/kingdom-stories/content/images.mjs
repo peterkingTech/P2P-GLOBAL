@@ -223,13 +223,14 @@ export default {
     img("t023_img03.jpg", null),
     img("t023_img04.jpg", 1, "bibleworld.ai"),
     img("t023_img05.jpg", 2, "bibleworld.ai"),
-    img("t023_img06.jpg", 3, "wol.jw.org"),
-    // Chapters 4–8 had no image in the editor's document; public-domain / CC0
-    // artworks chosen with the editor's approval, sourced from Wikimedia Commons.
-    img("t023_ch4_blake.jpg", 4, "William Blake, Nebuchadnezzar (1795) · Minneapolis Institute of Art"),
+    // Chapters 3–8: images chosen by the editor after import (chapter 3 replaces
+    // the document's image; 4–8 had none). Chapters 7 and 8 were supplied by
+    // the editor without a source, so they carry no credit.
+    img("t023_ch3_turner.jpg", 3, "J. M. W. Turner, Shadrach, Meshach and Abednego (1832) · Tate"),
+    img("t023_ch4_humbled.jpg", 4, "bible.art"),
     img("t023_ch5_west.jpg", 5, "Benjamin West (1775) · Saint Louis Art Museum"),
     img("t023_ch6_rubens.jpg", 6, "Peter Paul Rubens (c. 1615) · National Gallery of Art"),
-    img("t023_ch7_saintsever.jpg", 7, "Saint-Sever Beatus (11th century) · Bibliothèque nationale de France"),
-    img("t023_ch8_valcavado.jpg", 8, "Valcavado Beatus (970) · University of Valladolid"),
+    img("t023_ch7_beasts.jpg", 7),
+    img("t023_ch8_prayer.jpg", 8),
   ],
 };
