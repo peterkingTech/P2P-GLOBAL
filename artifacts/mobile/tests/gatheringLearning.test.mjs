@@ -69,7 +69,7 @@ ok("no one's answers shown; says so plainly", !/response|getReflection|submissio
 ok("lesson video only for someone who may control media (existing sync path)", /onPlayMedia=\{canControl \? playLessonMedia : null\}/.test(gs) && /mediaProvider: "youtube", mediaId: youtubeId/.test(gs));
 ok("resources row for everyone: lesson + My Bible", /accessibilityLabel="My Bible\. Read on your own; the group's passage doesn't change"/.test(gs) && /lessonRef \? setLessonSheetOpen\(true\) : setLessonPickerOpen\(true\)/.test(gs));
 const bible = src("components/family/MyBibleSheet.tsx");
-ok("My Bible: personal, never shares", /Only you see this\. The group's passage doesn't change\./.test(bible) && /onSelect=\{setPassage\}/.test(bible) && /selectLabel="Read"/.test(bible) && !/updateWorshipState/.test(bible));
+ok("My Bible: personal, never shares", /Only you see this\. The group's passage doesn't change\./.test(bible) && /onSelect=\{read\}/.test(bible) && /function read\(p: WorshipScripture\) \{\n    setPassage\(p\);/.test(bible) && /selectLabel="Read"/.test(bible) && !/updateWorshipState/.test(bible));
 ok("ScripturePanel still shares by default for the Guide", /selectLabel = "Share with Gathering"/.test(src("components/family/ScripturePanel.tsx")));
 
 // ── Church Gathering (Prompt 7): the same pieces, no copies ─────────────

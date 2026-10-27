@@ -7,7 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { cardProgress } from "@/lib/storybook";
-import { getKingdomStoriesFeed, getCatalogueCategories, categoryCountLabels, type KingdomStory, type CatalogueCategory } from "@/lib/kingdomStoriesApi";
+import { getKingdomStoriesFeed, getCatalogueCategories, categoryCountLabels, formatTopicNumber, type KingdomStory, type CatalogueCategory } from "@/lib/kingdomStoriesApi";
 
 // One category: its description, its PUBLISHED stories, and — as a number
 // only — how many more are planned. Planned topics are never listed or
@@ -83,9 +83,10 @@ export default function KingdomStoryCategoryScreen() {
           }
           renderItem={({ item }) => (
             <TouchableOpacity style={[styles.card, { flexDirection: "row", gap: 12, alignItems: "center" }]} onPress={() => router.push(`/kingdom-stories/${item.id}` as any)} activeOpacity={0.88}
-              accessibilityRole="button" accessibilityLabel={[item.title, cardProgress(item.myProgress)].filter(Boolean).join(". ")}>
+              accessibilityRole="button" accessibilityLabel={[formatTopicNumber(item.topicNumber), item.title, cardProgress(item.myProgress)].filter(Boolean).join(". ")}>
               {item.media?.[0] ? <View style={{ width: 72, height: 72 }}><StoryImage media={item.media[0]} aspectRatio={1} rounded={10} thumb showCaption={false} /></View> : null}
               <View style={{ flex: 1, gap: 3 }}>
+                {formatTopicNumber(item.topicNumber) ? <Text style={styles.cardNo}>{formatTopicNumber(item.topicNumber)}</Text> : null}
                 <Text style={styles.cardTitle}>{item.title}</Text>
                 {!!item.subtitle && <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle}</Text>}
                 {!!cardProgress(item.myProgress) && <Text style={[styles.cardSubtitle, { color: c.accentGreen }]}>{cardProgress(item.myProgress)}</Text>}
@@ -112,6 +113,7 @@ function makeStyles(c: AppColors) {
     emptyWrap: { alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 60, paddingHorizontal: 40 },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
     card: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, padding: 14, gap: 4 },
+    cardNo: { fontSize: 10, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 0.6, textTransform: "uppercase" },
     cardTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
     cardSubtitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
   });

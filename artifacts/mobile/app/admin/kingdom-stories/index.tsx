@@ -34,6 +34,14 @@ export default function KingdomStoriesAdminListScreen() {
         </View>
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </TouchableOpacity>
+      <TouchableOpacity style={styles.catalogueLink} onPress={() => router.push("/admin/kingdom-stories/collections" as any)} accessibilityRole="link">
+        <Ionicons name="layers-outline" size={18} color={colors.primaryGreen} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.catalogueTitle}>Homepage collections</Text>
+          <Text style={styles.catalogueSub}>Curate rows like "Start Here" for the story homepage</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
       <View style={styles.filterBar}>
         {STATUS_FILTERS.map((f) => (
           <TouchableOpacity key={f.value} style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]} onPress={() => setStatusFilter(f.value)}>

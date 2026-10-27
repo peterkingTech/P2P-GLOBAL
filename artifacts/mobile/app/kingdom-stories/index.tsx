@@ -1,77 +1,48 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, Image, TextInput } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, useWindowDimensions, RefreshControl } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
-import type { AppColors } from "@/constants/themes";
-import { cardProgress } from "@/lib/storybook";
+import { colors as T, type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import {
-  getKingdomStoriesFeed, getKingdomStoryCategories, getCatalogueCategories, getKingdomStoryMediaSignedUrl, searchKingdomStories,
-  categoryCountLabels, CONTENT_TYPE_LABELS, type KingdomStory, type CatalogueCategory,
+  getDiscoverHome, getCatalogueCategories, searchKingdomStories, saveStory, unsaveStory, formatTopicNumber, categoryCountLabels,
+  type DiscoverHome, type CatalogueCategory, type KingdomStory, type StoryCard,
 } from "@/lib/kingdomStoriesApi";
+import { CoverArt, DiscoverRow, StoryPosterCard, progressOf } from "@/components/kingdom-stories/DiscoverRow";
 
-// Kingdom Stories home — reached from Discover, not a bottom tab (per
-// product decision). "Stories of faith, mission, sacrifice, revival,
-// discipleship, and the work of God across generations." No official
-// account, no creator profile, no follower/like mechanics — the content
-// itself is the product. Categories show how many stories are PUBLISHED and,
-// separately, how many are planned; only published stories can be opened or
-// found by search.
-const thumbStyles = StyleSheet.create({
-  thumb: { width: "100%", height: "100%" },
-  thumbSmall: { width: 64, height: 64, borderRadius: 10 },
-  placeholder: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center", backgroundColor: "#1D9E75" },
-  placeholderSmall: { width: 64, height: 64, borderRadius: 10 },
-});
+// Kingdom Stories discovery — a learning library with a cinematic browse
+// (reached from Discover). Everything shown is real: an editor's Featured
+// story, the reader's own Continue Learning / Favourites / Saved / Recently
+// viewed, published editorial collections, a row per category in topic order,
+// and Recently added. No popularity or recommendations are invented. Search
+// covers published stories only; categories show published and planned
+// counts separately, as before.
 
-function StoryCoverThumb({ story, small }: { story: KingdomStory; small?: boolean }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    const cover = story.media?.[0];
-    if (cover) getKingdomStoryMediaSignedUrl(cover.mediaPath).then(setUrl);
-  }, [story.media]);
-  if (!url) return <View style={[thumbStyles.placeholder, small && thumbStyles.placeholderSmall]}><Ionicons name="book-outline" size={20} color="#fff" /></View>;
-  return <Image source={{ uri: url }} style={[thumbStyles.thumb, small && thumbStyles.thumbSmall]} resizeMode="cover" />;
-}
-
-export default function KingdomStoriesHomeScreen() {
+export default function KingdomStoriesDiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { colors: c } = useTheme();
-  const styles2 = makeStyles(c);
-
+  const { width } = useWindowDimensions();
+  const [home, setHome] = useState<DiscoverHome | null>(null);
   const [categories, setCategories] = useState<CatalogueCategory[]>([]);
-  const [countsKnown, setCountsKnown] = useState(true);
-  const [featured, setFeatured] = useState<KingdomStory | null>(null);
-  const [latest, setLatest] = useState<KingdomStory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<KingdomStory[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [heroFav, setHeroFav] = useState(false);
   const searchSeq = useRef(0);
 
   const load = useCallback(async () => {
     try {
-      const [cats, featuredRes, latestRes] = await Promise.all([
-        // Older servers have no catalogue endpoint: fall back to the plain list (no counts).
-        getCatalogueCategories().then((r) => { setCountsKnown(true); return r.categories; }).catch(async () => {
-          setCountsKnown(false);
-          return (await getKingdomStoryCategories()).map((k) => ({ id: k.id, slug: k.slug, title: k.title, description: k.description, icon: k.icon ?? null, displayOrder: k.displayOrder, publishedStories: 0, plannedTopics: 0 }));
-        }),
-        getKingdomStoriesFeed({ featured: true, limit: 1 }),
-        getKingdomStoriesFeed({ limit: 20 }),
-      ]);
-      setCategories(cats);
-      setFeatured(featuredRes.stories[0] ?? null);
-      setLatest(latestRes.stories);
-    } catch {
-      // Offline / signed out: keep what is shown (empty states) rather than an unhandled error.
-    } finally {
-      setLoading(false);
-    }
+      const [h, cats] = await Promise.all([getDiscoverHome(), getCatalogueCategories().then((r) => r.categories).catch(() => [] as CatalogueCategory[])]);
+      setHome(h); setCategories(cats); setFailed(false);
+      setHeroFav(!!h.featured?.mine?.favourite);
+    } catch { if (!home) setFailed(true); }
+    finally { setLoading(false); setRefreshing(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Search published stories (debounced; the latest query wins).
@@ -88,158 +59,181 @@ export default function KingdomStoriesHomeScreen() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const renderStory = ({ item }: { item: KingdomStory }) => (
-    <TouchableOpacity style={styles2.card} onPress={() => router.push(`/kingdom-stories/${item.id}` as any)} activeOpacity={0.88}>
-      <StoryCoverThumb story={item} small />
-      <View style={{ flex: 1, gap: 3 }}>
-        <Text style={styles2.cardCategory}>{item.category?.title ?? (item.contentType ? CONTENT_TYPE_LABELS[item.contentType] : "")}</Text>
-        <Text style={styles2.cardTitle} numberOfLines={2}>{item.title}</Text>
-        {!!item.subtitle && <Text style={styles2.cardSubtitle} numberOfLines={1}>{item.subtitle}</Text>}
-        {!!cardProgress(item.myProgress) && <Text style={[styles2.cardSubtitle, { color: c.accentGreen }]}>{cardProgress(item.myProgress)}</Text>}
-      </View>
-    </TouchableOpacity>
-  );
+  const open = (s: { id: string }) => router.push(`/kingdom-stories/${s.id}` as any);
+  const startOrContinue = (s: { id: string }) => router.push({ pathname: "/kingdom-stories/[id]", params: { id: s.id, open: "next" } } as any);
+  async function toggleHeroFavourite() {
+    const f = home?.featured;
+    if (!f) return;
+    const on = !heroFav;
+    setHeroFav(on);
+    try { await (on ? saveStory(f.id, "favourite") : unsaveStory(f.id, "favourite")); } catch { setHeroFav(!on); }
+  }
 
+  const f = home?.featured ?? null;
+  const fProg = f ? progressOf(f) : null;
+  const heroH = Math.min(520, Math.max(320, Math.round(width * (width > 900 ? 0.42 : 1.05))));
   return (
-    <View style={[styles2.screen, { paddingTop: insets.top + 12 }]}>
+    <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles2.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
-          <Ionicons name="arrow-back" size={22} color={c.textDark} />
-        </TouchableOpacity>
-        <Text style={styles2.title}>Kingdom Stories</Text>
-        <View style={{ width: 22 }} />
-      </View>
-      <Text style={styles2.subtitle}>Stories of faith, mission, sacrifice, revival, and the work of God across generations.</Text>
-      <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-        <View style={styles2.searchBox}>
-          <Ionicons name="search" size={16} color={c.textMuted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search published stories"
-            placeholderTextColor={c.textMuted}
-            style={styles2.searchInput}
-            returnKeyType="search"
-            accessibilityLabel="Search published stories"
-            autoCorrect={false}
-          />
-          {!!query && (
-            <TouchableOpacity onPress={() => setQuery("")} accessibilityLabel="Clear search" accessibilityRole="button" hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={T.textSecondary} />}>
+        {/* Hero: the Featured story (or a calm title band when none is featured) */}
+        <View style={{ height: f ? heroH : insets.top + 120 }}>
+          {f ? <CoverArt path={f.hero?.mediaPath ?? f.media?.[0]?.mediaPath} alt={f.hero?.altText ?? f.media?.[0]?.altText ?? null} /> : null}
+          <LinearGradient colors={["rgba(11,18,14,0.55)", "rgba(11,18,14,0.05)", "rgba(11,18,14,0.92)", T.background]} locations={[0, 0.3, 0.8, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
+              <Ionicons name="arrow-back" size={22} color={T.textPrimary} />
             </TouchableOpacity>
+            <Text style={styles.brand}>Kingdom Stories</Text>
+            <TouchableOpacity onPress={() => router.push("/kingdom-stories/library" as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="My library">
+              <Ionicons name="library-outline" size={22} color={T.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          {f ? (
+            <View style={styles.heroText}>
+              <Text style={styles.heroKicker}>{["Featured", formatTopicNumber(f.topicNumber), f.category?.title].filter(Boolean).join(" · ")}</Text>
+              <Text style={styles.heroTitle} accessibilityRole="header">{f.title}</Text>
+              {f.subtitle ? <Text style={styles.heroSub} numberOfLines={3}>{f.subtitle}</Text> : null}
+              <View style={styles.heroActions}>
+                <TouchableOpacity style={styles.playBtn} onPress={() => startOrContinue(f)} accessibilityRole="button"
+                  accessibilityLabel={fProg && fProg.fraction < 1 ? `Continue story. ${fProg.label}` : "Start story"}>
+                  <Ionicons name="book" size={18} color={T.onLight} />
+                  <Text style={styles.playText}>{fProg && fProg.fraction < 1 ? "Continue Story" : fProg?.fraction === 1 ? "Read Again" : "Start Story"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ghostBtn} onPress={() => open(f)} accessibilityRole="button" accessibilityLabel="View chapters">
+                  <Ionicons name="list" size={18} color={T.textPrimary} /><Text style={styles.ghostText}>View Chapters</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.roundBtn} onPress={toggleHeroFavourite} accessibilityRole="button" accessibilityState={{ selected: heroFav }}
+                  accessibilityLabel={heroFav ? "Remove from My Favourites" : "Add to My Favourites"}>
+                  <Ionicons name={heroFav ? "heart" : "heart-outline"} size={20} color={heroFav ? "#FB7185" : T.textPrimary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <Text style={[styles.heroSub, { paddingHorizontal: 16, marginTop: 8 }]}>Stories of faith, mission, sacrifice, revival, and the work of God across generations.</Text>
           )}
         </View>
-      </View>
 
-      {loading ? (
-        <View style={styles2.centerFill}><ActivityIndicator color={c.accentGreen} /></View>
-      ) : results !== null || searching ? (
-        <FlatList
-          data={results ?? []}
-          keyExtractor={(s) => s.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            searching ? <ActivityIndicator color={c.accentGreen} style={{ marginTop: 30 }} /> : (
-              <View style={styles2.emptyWrap}>
-                <Ionicons name="search-outline" size={28} color={c.textMuted} />
-                <Text style={styles2.emptyText}>No published stories match “{query.trim()}”.</Text>
-              </View>
-            )
-          }
-          renderItem={renderStory}
-        />
-      ) : (
-        <FlatList
-          data={latest}
-          keyExtractor={(s) => s.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
-          keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={
-            <View style={{ gap: 16, marginBottom: 6 }}>
-              {featured && (
-                <TouchableOpacity style={styles2.featuredCard} onPress={() => router.push(`/kingdom-stories/${featured.id}` as any)} activeOpacity={0.88}>
-                  <StoryCoverThumb story={featured} />
-                  <View style={styles2.featuredOverlay}>
-                    <Text style={styles2.featuredBadge}>FEATURED</Text>
-                    <Text style={styles2.featuredTitle} numberOfLines={2}>{featured.title}</Text>
-                    {!!featured.category && <Text style={styles2.featuredCategory}>{featured.category.title}</Text>}
-                  </View>
+        <View style={styles.searchWrap}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={16} color={T.textTertiary} />
+            <TextInput value={query} onChangeText={setQuery} placeholder="Search published stories" placeholderTextColor={T.textFaint}
+              style={styles.searchInput} returnKeyType="search" accessibilityLabel="Search published stories" autoCorrect={false} />
+            {!!query && (
+              <TouchableOpacity onPress={() => setQuery("")} accessibilityLabel="Clear search" accessibilityRole="button" hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={T.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {loading ? <ActivityIndicator color={T.growth} style={{ marginTop: 40 }} />
+          : failed ? (
+            <View style={styles.empty}>
+              <Ionicons name="cloud-offline-outline" size={30} color={T.textTertiary} />
+              <Text style={styles.emptyText}>Kingdom Stories couldn't load. Check your connection.</Text>
+              <TouchableOpacity onPress={() => { setLoading(true); load(); }} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+            </View>
+          ) : results !== null || searching ? (
+            <View style={styles.resultsGrid}>
+              {searching && !results ? <ActivityIndicator color={T.growth} style={{ marginTop: 20 }} />
+                : (results ?? []).length === 0 ? <Text style={styles.emptyText}>No published stories match “{query.trim()}”.</Text>
+                : (results ?? []).map((s) => <StoryPosterCard key={s.id} story={s as StoryCard} width={Math.min(160, (width - 52) / 3)} onPress={() => open(s)} />)}
+            </View>
+          ) : home ? (
+            <>
+              <DiscoverRow title="Continue Learning" stories={home.continueLearning} wide onOpen={startOrContinue}
+                onSeeAll={() => router.push({ pathname: "/kingdom-stories/library", params: { shelf: "in_progress" } } as any)} />
+              {!home.continueLearning.length && home.recentlyViewed.length === 0 && home.totalPublished > 0 ? (
+                <View style={styles.startHere}>
+                  <Ionicons name="sparkles-outline" size={18} color={T.light} />
+                  <Text style={styles.startHereText}>Start a story below — your progress, favourites and saved stories will appear here.</Text>
+                </View>
+              ) : null}
+              {home.collections.map((col) => (
+                <DiscoverRow key={col.id} title={col.title} subtitle={col.description} stories={col.stories}
+                  onOpen={open} onSeeAll={col.total > col.stories.length || col.total > 4 ? () => router.push(`/kingdom-stories/collection/${col.slug}` as any) : undefined} />
+              ))}
+              <DiscoverRow title="My Favourites" stories={home.favourites} onOpen={open} onSeeAll={() => router.push({ pathname: "/kingdom-stories/library", params: { shelf: "favourites" } } as any)} />
+              <DiscoverRow title="Saved for Later" stories={home.later} onOpen={open} onSeeAll={() => router.push({ pathname: "/kingdom-stories/library", params: { shelf: "later" } } as any)} />
+              {home.categoryRows.map((r) => (
+                <DiscoverRow key={r.category.id} title={r.category.title} subtitle={`${r.total} ${r.total === 1 ? "story" : "stories"}`} stories={r.stories} onOpen={open}
+                  onSeeAll={() => router.push(`/kingdom-stories/category/${r.category.slug}` as any)} />
+              ))}
+              <DiscoverRow title="Recently Added" stories={home.recentlyAdded} onOpen={open} onSeeAll={() => router.push({ pathname: "/kingdom-stories/all", params: { sort: "recent" } } as any)} />
+              <DiscoverRow title="Recently Viewed" stories={home.recentlyViewed} onOpen={open} onSeeAll={() => router.push({ pathname: "/kingdom-stories/library", params: { shelf: "recent" } } as any)} />
+
+              {home.totalPublished === 0 ? (
+                <View style={styles.empty}>
+                  <Ionicons name="book-outline" size={30} color={T.textTertiary} />
+                  <Text style={styles.emptyText}>Kingdom Stories will appear here as new stories are published.</Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.browseAll} onPress={() => router.push("/kingdom-stories/all" as any)} accessibilityRole="button" accessibilityLabel={`Browse all ${home.totalPublished} stories`}>
+                  <Ionicons name="grid-outline" size={18} color={T.textPrimary} />
+                  <Text style={styles.browseAllText}>Browse all {home.totalPublished} stories</Text>
+                  <Ionicons name="chevron-forward" size={16} color={T.textTertiary} />
                 </TouchableOpacity>
               )}
 
               {categories.length > 0 && (
-                <View style={{ gap: 10 }}>
-                  <Text style={styles2.sectionHeading}>Browse by category</Text>
-                  <View style={styles2.grid}>
+                <View style={{ marginTop: 26, paddingHorizontal: 16, gap: 10 }}>
+                  <Text style={styles.sectionTitle} accessibilityRole="header">Browse by category</Text>
+                  <View style={styles.grid}>
                     {categories.map((cat) => {
                       const counts = categoryCountLabels(cat);
                       return (
-                        <TouchableOpacity
-                          key={cat.id}
-                          style={styles2.catCard}
-                          onPress={() => router.push(`/kingdom-stories/category/${cat.slug}` as any)}
-                          activeOpacity={0.85}
-                          accessibilityRole="button"
-                          accessibilityLabel={countsKnown ? `${cat.title}. ${counts.published}${counts.planned ? `, ${counts.planned}` : ""}` : cat.title}
-                        >
-                          <Ionicons name={(cat.icon ?? "book-outline") as any} size={18} color={c.accentGreen} />
-                          <Text style={styles2.catTitle} numberOfLines={3}>{cat.title}</Text>
-                          {countsKnown && (
-                            <View style={{ gap: 1 }}>
-                              <Text style={[styles2.catCount, cat.publishedStories > 0 && { color: c.accentGreen }]}>{counts.published}</Text>
-                              {!!counts.planned && <Text style={styles2.catPlanned}>{counts.planned}</Text>}
-                            </View>
-                          )}
+                        <TouchableOpacity key={cat.id} style={styles.catCard} onPress={() => router.push(`/kingdom-stories/category/${cat.slug}` as any)} activeOpacity={0.85}
+                          accessibilityRole="button" accessibilityLabel={`${cat.title}. ${counts.published}${counts.planned ? `, ${counts.planned}` : ""}`}>
+                          <Ionicons name={(cat.icon ?? "book-outline") as any} size={18} color={T.growth} />
+                          <Text style={styles.catTitle} numberOfLines={3}>{cat.title}</Text>
+                          <Text style={[styles.catCount, cat.publishedStories > 0 && { color: T.growth }]}>{counts.published}</Text>
+                          {!!counts.planned && <Text style={styles.catPlanned}>{counts.planned}</Text>}
                         </TouchableOpacity>
                       );
                     })}
                   </View>
                 </View>
               )}
-
-              <Text style={styles2.sectionHeading}>Latest Stories</Text>
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={styles2.emptyWrap}>
-              <Ionicons name="book-outline" size={32} color={c.textMuted} />
-              <Text style={styles2.emptyText}>Kingdom Stories will appear here as new stories are published.</Text>
-            </View>
-          }
-          renderItem={renderStory}
-        />
-      )}
+            </>
+          ) : null}
+      </ScrollView>
     </View>
   );
 }
 
-function makeStyles(c: AppColors) {
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: c.lightCream },
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
-    title: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    subtitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4, marginBottom: 12, paddingHorizontal: 24, lineHeight: 17 },
-    searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, paddingHorizontal: 12, minHeight: 44 },
-    searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", paddingVertical: 10 },
-    centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
-    featuredCard: { borderRadius: 16, overflow: "hidden", height: 180, backgroundColor: c.card },
-    featuredOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 14, backgroundColor: "rgba(0,0,0,0.45)" },
-    featuredBadge: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },
-    featuredTitle: { color: "#fff", fontSize: 17, fontFamily: "Inter_700Bold", marginTop: 4 },
-    featuredCategory: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 2 },
-    grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    catCard: { flexBasis: "47%", flexGrow: 1, minHeight: 104, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, padding: 12, gap: 6, justifyContent: "space-between" },
-    catTitle: { fontSize: 13, color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 17 },
-    catCount: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_600SemiBold" },
-    catPlanned: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    sectionHeading: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
-    emptyWrap: { alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 60, paddingHorizontal: 40 },
-    emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
-    card: { flexDirection: "row", gap: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, padding: 10, alignItems: "center" },
-    cardCategory: { fontSize: 10, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.3 },
-    cardTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
-    cardSubtitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-  });
-}
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: T.background },
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
+  iconBtn: { width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, alignItems: "center", justifyContent: "center" },
+  brand: { flex: 1, textAlign: "center", color: T.textPrimary, fontSize: 15, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
+  heroText: { position: "absolute", left: 16, right: 16, bottom: 18, gap: 6, maxWidth: 720 },
+  heroKicker: { color: T.light, ...TT.label, textTransform: "uppercase" },
+  heroTitle: { color: T.textPrimary, fontSize: 30, lineHeight: 36, fontFamily: "Inter_700Bold" },
+  heroSub: { color: T.textSecondary, ...TT.body },
+  heroActions: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
+  playBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F4EFE4", borderRadius: 10, paddingHorizontal: 18, minHeight: 46 },
+  playText: { color: T.onLight, ...TT.bodyEmph, fontSize: 15 },
+  ghostBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 10, paddingHorizontal: 16, minHeight: 46 },
+  ghostText: { color: T.textPrimary, ...TT.bodyEmph },
+  roundBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" },
+  searchWrap: { paddingHorizontal: 16, marginTop: 10 },
+  searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surfaceRaised, borderRadius: 12, paddingHorizontal: 12, minHeight: MIN_TOUCH_TARGET, borderWidth: 1, borderColor: T.borderFaint },
+  searchInput: { flex: 1, color: T.textPrimary, ...TT.body, paddingVertical: 10 },
+  resultsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, marginTop: 16 },
+  startHere: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginTop: 18, padding: 12, borderRadius: 12, backgroundColor: T.lightSoft },
+  startHereText: { flex: 1, color: T.textSecondary, ...TT.caption },
+  browseAll: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginTop: 26, paddingHorizontal: 14, minHeight: 52, borderRadius: 12, backgroundColor: T.surfaceRaised },
+  browseAllText: { flex: 1, color: T.textPrimary, ...TT.bodyEmph },
+  sectionTitle: { color: T.textPrimary, ...TT.display },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  catCard: { flexBasis: "47%", flexGrow: 1, minHeight: 104, backgroundColor: T.surface, borderWidth: 1, borderColor: T.borderFaint, borderRadius: 14, padding: 12, gap: 6, justifyContent: "space-between" },
+  catTitle: { color: T.textPrimary, fontSize: 13, lineHeight: 17, fontFamily: "Inter_700Bold" },
+  catCount: { color: T.textTertiary, fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  catPlanned: { color: T.textFaint, fontSize: 11, fontFamily: "Inter_400Regular" },
+  empty: { alignItems: "center", gap: 10, paddingVertical: 50, paddingHorizontal: 40 },
+  emptyText: { color: T.textTertiary, ...TT.caption, textAlign: "center", marginTop: 8 },
+  retry: { minHeight: MIN_TOUCH_TARGET, justifyContent: "center", paddingHorizontal: 16 },
+  retryText: { color: T.growth, ...TT.bodyEmph },
+});

@@ -33,6 +33,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import MyP2PDashboard from "@/components/myp2p/MyP2PDashboard";
 import { useLayout, centeredMaxWidth, useAdaptiveTiles } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
 import LivingTree from "@/components/LivingTree";
@@ -929,6 +930,10 @@ export default function HomeTab() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* My P2P — the person's widgets (Journey, Journal, learning, Bible,
+          stories, Study Together, communities…), customizable at /my-p2p. */}
+      <MyP2PDashboard />
 
       {/* 5. Recommended for You — the existing goals-based recommendation */}
       {firstRecommendation && (

@@ -68,6 +68,10 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   study_leader_transfer: "community",
   study_participant_removed: "community",
   study_ended: "community",
+  shared_study_invite: "community", // routes/studyTogether.ts (migration 216)
+  shared_study_accepted: "community",
+  shared_study_declined: "community",
+  shared_study_started: "community",
   circle_member_added: "community",
   circle_member_removed: "community",
   circle_leader_transfer: "community",

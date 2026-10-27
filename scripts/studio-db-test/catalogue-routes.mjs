@@ -21,6 +21,8 @@ await setupBase(db, readFileSync(path.join(repo, "migrations/152_kingdom_stories
 await db.exec(readFileSync(path.join(repo, "migrations/188_publishing_studio_foundation.sql"), "utf8"));
 await db.exec(readFileSync(path.join(repo, "migrations/210_kingdom_story_catalogue.sql"), "utf8"));
 await db.exec(readFileSync(path.join(repo, "migrations/211_kingdom_story_chapter_assignment_media.sql"), "utf8"));
+// 214: deleting a chapter moves it (with its images) to the Admin Recycle Bin.
+await db.exec(readFileSync(path.join(repo, "migrations/214_admin_recycle_bin.sql"), "utf8"));
 const q = async (sql, p) => (await db.query(sql, p)).rows;
 await q(`insert into auth.users (id) select id from p2p_profiles on conflict do nothing`);
 
@@ -97,7 +99,8 @@ try {
   ok("students cannot add chapters", [401, 403].includes((await call("POST", `/kingdom-stories/${sid}/chapters`, U.P, { title: "x" })).status));
   const c3 = await call("POST", `/kingdom-stories/${sid}/chapters`, U.A, { title: "Temporary" });
   ok("reorder chapters", (await call("POST", `/kingdom-stories/${sid}/chapters/reorder`, U.A, { orderedIds: [c3.body.id, c1.body.id, c2.body.id] })).status === 200);
-  ok("delete a chapter closes the gap", (await call("DELETE", `/kingdom-stories/${sid}/chapters/${c3.body.id}`, U.A)).status === 200
+  const delC3 = await call("DELETE", `/kingdom-stories/${sid}/chapters/${c3.body.id}`, U.A);
+  ok("delete a chapter closes the gap", delC3.status === 200
     && JSON.stringify((await q(`select chapter_number n from p2p_kingdom_story_chapters where story_id=$1 order by n`, [sid])).map((r) => r.n)) === "[1,2]");
   const src = await call("POST", `/kingdom-stories/${sid}/sources`, U.A, { title: "Synthetic source", sourceType: "book", chapterId: c1.body.id });
   ok("source attached to a chapter", src.status === 200 && src.body.chapterId === c1.body.id);
@@ -123,8 +126,9 @@ try {
   const c4img = await call("POST", `/kingdom-stories/${sid}/media`, U.A, { mediaType: "image", mediaPath: `${sid}/pdf/c4.jpg`, chapterId: c4.body.id });
   const removedBefore = (globalThis.__labStorage?.calls ?? []).length;
   await call("DELETE", `/kingdom-stories/${sid}/chapters/${c4.body.id}`, U.A);
-  ok("deleting a chapter removes its images (row and file)", (await q(`select count(*)::int n from p2p_kingdom_story_media where id=$1`, [c4img.body.id]))[0].n === 0
-    && (globalThis.__labStorage?.calls ?? []).slice(removedBefore).some((x) => x.op === "remove" && x.paths.includes(`${sid}/pdf/c4.jpg`)));
+  ok("deleting a chapter moves it and its images to the Recycle Bin (row gone, file kept for restore)", (await q(`select count(*)::int n from p2p_kingdom_story_media where id=$1`, [c4img.body.id]))[0].n === 0
+    && !(globalThis.__labStorage?.calls ?? []).slice(removedBefore).some((x) => x.op === "remove")
+    && (await q(`select count(*)::int n from p2p_recycle_bin where content_type = 'kingdom_story_chapter' and content_id = $1`, [c4.body.id]))[0].n === 1);
 
   // Fill the story and go through the Studio.
   await call("PUT", `/kingdom-stories/${sid}`, U.A, { body: "Synthetic introduction." });

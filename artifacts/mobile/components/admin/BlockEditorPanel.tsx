@@ -14,6 +14,7 @@ import {
   checkPublishRequirements, estimateReadingMinutes,
 } from "@/lib/curriculumBlocks";
 import BlockRenderer from "./BlockRenderer";
+import { moveToBin } from "@/lib/recycleBinApi";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type Tab = "content" | "settings" | "preview";
@@ -109,10 +110,8 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
         );
       });
 
-      if (toDelete.length > 0) {
-        const { error } = await supabase.from("p2p_lesson_blocks").delete().in("id", toDelete);
-        if (error) throw new Error(error.message);
-      }
+      // Removed blocks go to the Admin Recycle Bin (migration 214), restorable there.
+      for (const blockId of toDelete) await moveToBin("lesson_block", blockId);
 
       if (toInsert.length > 0) {
         const { data: userData } = await supabase.auth.getUser();

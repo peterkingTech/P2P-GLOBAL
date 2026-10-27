@@ -90,19 +90,19 @@ const textIn = (n) => findAll(n, (x) => x.type === RN.Text).map((t) => [].concat
 
 const Admin = loadFile(path.join(root, "app/admin/_layout.tsx")).default;
 const src = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
-// Expected tabs per role, from the NAV_ITEMS role lists (unchanged by this fix).
+// Expected tabs per role, from the NAV_ITEMS role lists (Recycle Bin: migration 214's content roles).
 const EXPECTED = {
   // "Kingdom Wins" review: Wins moderators + the admin_content P2P Impact reviewer (migration 189).
-  super_admin: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Registrations", "Help Requests", "P2P Official Mail", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Translations", "Team"],
-  admin_content: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Kingdom Wins"],
+  super_admin: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Registrations", "Help Requests", "P2P Official Mail", "Moderation", "Kingdom Wins", "Usernames", "Verification", "Translations", "Team", "Recycle Bin"],
+  admin_content: ["Dashboard", "Content", "Kingdom Stories", "Publishing Studio", "Kingdom Wins", "Recycle Bin"],
   admin_moderation: ["Dashboard", "Publishing Studio", "Moderation", "Kingdom Wins"],
   moderator: ["Dashboard", "Publishing Studio", "Help Requests", "Moderation", "Kingdom Wins", "Usernames", "Verification"],
   admin_supervisor: ["Dashboard", "Publishing Studio", "Kingdom Wins", "Team"],
   admin_translation: ["Dashboard", "Publishing Studio", "Translations"],
   admin_marketing: ["Dashboard", "Publishing Studio", "P2P Official Mail"],
   admin_help: ["Dashboard", "Help Requests", "P2P Official Mail"],
-  peer_guide: ["Dashboard", "Content", "Help Requests", "Translations"],
-  church_leader: ["Dashboard", "Content", "Registrations", "Help Requests", "Moderation", "Usernames", "Verification", "Translations"],
+  peer_guide: ["Dashboard", "Content", "Help Requests", "Translations", "Recycle Bin"],
+  church_leader: ["Dashboard", "Content", "Registrations", "Help Requests", "Moderation", "Usernames", "Verification", "Translations", "Recycle Bin"],
   admin_finance: ["Dashboard"],
 };
 for (const [role, tabs] of Object.entries(EXPECTED)) {

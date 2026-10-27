@@ -20,6 +20,8 @@ import sessionsRouter from "./sessions";
 import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
 import adminRouter from "./admin";
+import recycleBinRouter from "./recycleBin";
+import studyTogetherRouter from "./studyTogether";
 import registrationRouter from "./registration";
 import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
@@ -63,12 +65,14 @@ router.use("/prayer", prayerLibraryRouter); // "Pray the Word" Stage 5 — Perso
 router.use("/missions", missionsRouter); // Missions — new independent content domain (fields/stories/prayer points), separate from legacy p2p_missions and the Prayer Wall
 router.use("/kingdom-wins", kingdomWinsRouter); // Kingdom Wins / Testimonies — peer-authored "look what God has done" domain, independent from the Prayer Wall and Missions
 router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P-curated EDITORIAL content (Christian history/revival/missions/etc.), admin_content/super_admin write-gated, distinct from peer-authored Kingdom Wins
+router.use("/study-together", studyTogetherRouter); // Study Together shared (async) studies (migration 216); the live in-call study stays in calls.ts
 router.use("/studio", studioRouter); // Publishing Studio — review + scheduled publishing over existing content via adapters (migration 188); every route admin + Studio-role gated
 router.use("/search", searchRouter); // P2P Global Search — bounded, parallel, multi-domain search extending the existing Discover search field; reuses each domain's own visibility rules, never bypasses RLS
 router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareable invitation links over Break Rooms/Church Calls/Family Worship; resolves safe preview info only, actual join always goes through each room's existing, unmodified join endpoint
 router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/admin/recycle-bin", recycleBinRouter); // Admin Recycle Bin (migration 214) — before /admin so its own role rules apply
 router.use("/admin", adminRouter);
 router.use("/admin/evaluations", evaluationsRouter);
 router.use("/registration", registrationRouter);

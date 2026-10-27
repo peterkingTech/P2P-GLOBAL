@@ -51,6 +51,16 @@ export default function MyDiscipleshipHubScreen() {
             <Ionicons name="arrow-forward" size={14} color={colors.primaryGreen} />
           </View>
         </TouchableOpacity>
+
+        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/study-together" as any)}>
+          <Text style={s.hubCardEmoji}>🤝</Text>
+          <Text style={s.hubCardTitle}>Study Together</Text>
+          <Text style={s.hubCardSub}>Invitations and the stories and lessons you're studying with others.</Text>
+          <View style={s.hubCardBtn}>
+            <Text style={s.hubCardBtnText}>Open Study Together</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primaryGreen} />
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

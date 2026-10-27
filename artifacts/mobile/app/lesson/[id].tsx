@@ -37,6 +37,7 @@ import { shareLesson } from "@/lib/sharing";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { StudyPartnerPicker } from "@/components/study/StudyPartnerPicker";
+import SharedStudySheet from "@/components/study/SharedStudySheet";
 import ReadableText from "@/components/ReadableText";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import { useActiveGathering } from "@/lib/activeGathering";
@@ -541,6 +542,7 @@ export default function LessonScreen() {
   // Picker only resolves WHO; the current lesson (lessonMeta below) is
   // preserved and passed through unchanged, never re-chosen.
   const [studyPickerOpen, setStudyPickerOpen] = useState(false);
+  const [sharedStudyOpen, setSharedStudyOpen] = useState(false);
   const [startingStudyWith, setStartingStudyWith] = useState<string | null>(null);
 
   const loadHighlights = useCallback(async () => {
@@ -1013,6 +1015,16 @@ export default function LessonScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Shared study at your own pace (no call needed) — same Study
+              Together, asynchronous: a peer or a group you lead. */}
+          {lessonMeta && !activeGathering && content?.title ? (
+            <TouchableOpacity style={styles.sharedStudyLink} onPress={() => setSharedStudyOpen(true)} accessibilityRole="button"
+              accessibilityLabel="Study together at your own pace" accessibilityHint="Invite a peer or start a study with a group you lead">
+              <Ionicons name="people-outline" size={16} color={colors.accentGreen} />
+              <Text style={styles.sharedStudyLinkText}>Or study it together at your own pace</Text>
+            </TouchableOpacity>
+          ) : null}
+
           {content.attribution ? (
             <View style={styles.attributionBlock}>
               <View style={styles.attributionRule} />
@@ -1027,6 +1039,10 @@ export default function LessonScreen() {
         onClose={() => setStudyPickerOpen(false)}
         onSelectPerson={handleSelectStudyPartner}
       />
+      {id && content?.title ? (
+        <SharedStudySheet visible={sharedStudyOpen} onClose={() => setSharedStudyOpen(false)} content={{ type: "lesson", id, title: content.title }}
+          onStarted={(sid) => { setSharedStudyOpen(false); router.push(`/study-together/${sid}` as any); }} />
+      ) : null}
 
       <Modal
         visible={!!pendingHighlight || !!editingHighlight}
@@ -1140,6 +1156,8 @@ function makeStyles(c: AppColors) {
   },
   studyTogetherEmoji: { fontSize: 22 },
   studyTogetherTitle: { color: c.cream, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  sharedStudyLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44, marginTop: -4 },
+  sharedStudyLinkText: { color: c.accentGreen, fontSize: 13, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
   studyTogetherSub: { color: c.cream, opacity: 0.85, fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   assignmentCard: {
     backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,

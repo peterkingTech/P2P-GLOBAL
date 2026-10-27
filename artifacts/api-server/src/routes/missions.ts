@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
+import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 
 // Missions Stage 1 — Mission Content Foundation (migration 146). Mounted
 // at /missions/*. A genuinely new, independent content domain — never
@@ -265,10 +266,10 @@ router.put("/stories/:id", requireAdmin, async (req, res) => {
 router.delete("/stories/:id", requireAdmin, async (req, res) => {
   const { data: story } = await db.from("p2p_mission_stories").select("id,media_path").eq("id", req.params.id).maybeSingle();
   if (!story) return err(res, "Mission story not found", 404);
-  if (story.media_path) await db.storage.from("mission-media").remove([story.media_path as string]);
-  const { error } = await db.from("p2p_mission_stories").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  // To the Admin Recycle Bin (migration 214); the media file is kept until purged there.
+  try { await moveToBin((req as any).adminUserId as string, "mission_story", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 // ── Admin: fields + prayer points ───────────────────────────────────────────
@@ -320,9 +321,11 @@ router.put("/admin/fields/:id", requireAdmin, async (req, res) => {
   return ok(res, mapField(data as Record<string, unknown>));
 });
 router.delete("/admin/fields/:id", requireAdmin, async (req, res) => {
-  const { error } = await db.from("p2p_mission_fields").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  const { data: field } = await db.from("p2p_mission_fields").select("id").eq("id", req.params.id).maybeSingle();
+  if (!field) return ok(res, { removed: true });
+  try { await moveToBin((req as any).adminUserId as string, "mission_field", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 router.post("/admin/prayer-points", requireAdmin, async (req, res) => {
@@ -358,9 +361,11 @@ router.put("/admin/prayer-points/:id", requireAdmin, async (req, res) => {
   return ok(res, mapPrayerPoint(data as Record<string, unknown>));
 });
 router.delete("/admin/prayer-points/:id", requireAdmin, async (req, res) => {
-  const { error } = await db.from("p2p_mission_prayer_points").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  const { data: point } = await db.from("p2p_mission_prayer_points").select("id").eq("id", req.params.id).maybeSingle();
+  if (!point) return ok(res, { removed: true });
+  try { await moveToBin((req as any).adminUserId as string, "mission_prayer_point", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 export default router;

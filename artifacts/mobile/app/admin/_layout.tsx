@@ -52,6 +52,9 @@ const NAV_ITEMS = [
   { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"] },
   { label: "Translations", path: "/admin/translations", icon: "language" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_translation"] },
   { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin", "admin_supervisor"] },
+  // Admin Recycle Bin (migration 214) — the roles whose admin screens delete content (Kingdom School,
+  // Kingdom Stories). The API lists only the types each role may restore and enforces it.
+  { label: "Recycle Bin", path: "/admin/recycle-bin", icon: "trash" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
 ];
 
 export default function AdminLayout() {

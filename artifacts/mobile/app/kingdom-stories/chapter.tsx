@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert, KeyboardAvoidingView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert, KeyboardAvoidingView, Animated, Modal } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
 import type { AppColors } from "@/constants/themes";
-import { getKingdomStory, finishKingdomStoryChapter, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
+import { getKingdomStory, finishKingdomStoryChapter, markStoryOpened, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { paragraphs, illustrationSlots, lockedMessage, STATE_LABEL } from "@/lib/storybook";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
@@ -14,6 +14,7 @@ import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips, ScriptureText } from "@/components/kingdom-stories/ScriptureLinks";
 import { useReadingScale } from "@/components/kingdom-stories/useReadingScale";
 import { useReadingPosition } from "@/components/kingdom-stories/useReadingPosition";
+import { usePageTurn } from "@/components/kingdom-stories/usePageTurn";
 // The Core Curriculum answer card: persisted drafts, text/audio/video,
 // submission and peer-review status — reused, not re-implemented.
 import { QuestionResponseCard } from "@/app/lesson/[id]";
@@ -24,6 +25,13 @@ import { QuestionResponseCard } from "@/app/lesson/[id]";
 // (private), the Comprehensive Check (reviewed by a fellow peer), what is
 // still needed, then previous / contents / next. Locked chapters never arrive
 // here with their text — the server withholds it.
+//
+// Page turns: Previous / Next / the chapter list change the chapter IN PLACE
+// (no remount, no story refetch): the story stays loaded, each chapter keeps
+// its own reading position (useReadingPosition), private drafts stay in the
+// answer cards, and a light page-turn plays unless Reduce Motion is on
+// (usePageTurn). Navigation is buttons only, so vertical scrolling and text
+// selection are never captured by a swipe. The Bible reader is separate.
 
 // What each part of the account rests on, kept apart (never blended into one claim).
 const EVIDENCE: { key: keyof KingdomStoryChapter["evidence"]; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
@@ -60,29 +68,44 @@ export default function KingdomStoryChapterScreen() {
   const [finishing, setFinishing] = useState(false);
   const position = useReadingPosition(chapterId, !!story);
 
+  // The story (all chapters and their learning states) — on focus and after
+  // finishing a chapter; NOT on every page turn.
+  const chapterRef = React.useRef(chapterId);
+  chapterRef.current = chapterId;
   const load = useCallback(async () => {
     if (!id) return;
     try {
       const st = await getKingdomStory(id);
       setStory(st);
       setError(null);
-      const ch = st.chapters?.find((x) => x.id === chapterId) ?? (lessonParam ? st.chapters?.find((x) => (x.lessonId ?? x.learning?.lessonId) === lessonParam) : undefined);
-      if (ch && ch.id !== chapterId) setChapterId(ch.id);
-      const lid = ch?.learning?.lessonId;
-      if (lid && ch?.learning?.state !== "locked" && ch?.learning?.state !== "preview") {
-        const [r, a] = await Promise.all([getQuestionSubmissionsForLesson(lid), getAssignmentQuestionSubmissionsForLesson(lid)]);
-        setReflSubs(new Map(r.map((x) => [x.questionId, x])));
-        setCheckSubs(new Map(a.map((x) => [x.questionId, x])));
-      }
+      const cur = chapterRef.current;
+      const ch = st.chapters?.find((x) => x.id === cur) ?? (lessonParam ? st.chapters?.find((x) => (x.lessonId ?? x.learning?.lessonId) === lessonParam) : undefined);
+      if (ch && ch.id !== cur) setChapterId(ch.id);
     } catch (e: any) {
       setError(e?.message ?? "Couldn't open this chapter.");
     } finally {
       setLoading(false);
     }
-  }, [id, chapterId, lessonParam, getQuestionSubmissionsForLesson, getAssignmentQuestionSubmissionsForLesson]);
-
+  }, [id, lessonParam]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  useEffect(() => { setLoading(true); }, [chapterId]);
+
+  // Per chapter: the resume point (never progress) and this reader's own answers.
+  const loadedCh = story?.chapters?.find((x) => x.id === chapterId);
+  const chLesson = loadedCh?.learning?.lessonId ?? null;
+  const chState = loadedCh?.learning?.state ?? null;
+  const loadAnswers = useCallback(async () => {
+    if (!chLesson || chState === "locked" || chState === "preview") { setReflSubs(new Map()); setCheckSubs(new Map()); return; }
+    const [r, a] = await Promise.all([getQuestionSubmissionsForLesson(chLesson), getAssignmentQuestionSubmissionsForLesson(chLesson)]);
+    setReflSubs(new Map(r.map((x) => [x.questionId, x])));
+    setCheckSubs(new Map(a.map((x) => [x.questionId, x])));
+  }, [chLesson, chState, getQuestionSubmissionsForLesson, getAssignmentQuestionSubmissionsForLesson]);
+  useEffect(() => { void loadAnswers().catch(() => {}); }, [loadAnswers]);
+  useEffect(() => {
+    if (story && loadedCh && story.status === "published" && loadedCh.learning?.state !== "locked") markStoryOpened(story.id, loadedCh.id);
+  }, [story?.id, story?.status, loadedCh?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reloadAll = useCallback(async () => { await load(); await loadAnswers().catch(() => {}); }, [load, loadAnswers]);
+  const pageTurn = usePageTurn();
+  const [chaptersOpen, setChaptersOpen] = useState(false);
 
   const chapters = useMemo(() => [...(story?.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber), [story]);
   const index = chapters.findIndex((x) => x.id === chapterId);
@@ -92,7 +115,12 @@ export default function KingdomStoryChapterScreen() {
 
   const go = (target: KingdomStoryChapter) => {
     if (target.learning?.state === "locked") return notify(`Chapter ${target.chapterNumber} is locked`, lockedMessage(chapters, target.id));
-    router.replace({ pathname: "/kingdom-stories/chapter", params: { id, chapter: target.id } } as any);
+    if (target.id === chapterId) return;
+    const forward = target.chapterNumber > (ch?.chapterNumber ?? 0);
+    pageTurn.turn(forward ? "next" : "prev");
+    setChapterId(target.id);
+    // Keep the address in step (back/refresh/share) without remounting the reader.
+    router.setParams({ chapter: target.id } as any);
   };
   const toContents = () => (router.canGoBack() ? router.back() : router.replace(`/kingdom-stories/${id}` as any));
 
@@ -133,11 +161,12 @@ export default function KingdomStoryChapterScreen() {
   async function finish() {
     if (!story || !ch || finishing) return;
     setFinishing(true);
-    try { await finishKingdomStoryChapter(story.id, ch.id); await load(); }
+    try { await finishKingdomStoryChapter(story.id, ch.id); await reloadAll(); }
     catch (e: any) { notify("Couldn't finish the chapter", e?.message ?? "Please try again."); }
     finally { setFinishing(false); }
   }
 
+  const doneCount = chapters.filter((x) => x.learning?.state === "completed").length;
   const checkSub = check?.questions[0] ? checkSubs.get(check.questions[0].id) : undefined;
   const statusText = preview ? "Preview: the reflections and Comprehensive Check open for readers once the story is published."
     : state === "completed" ? (next ? `Chapter complete. Chapter ${next.chapterNumber} is open.` : "Chapter complete — you've finished this story.")
@@ -150,10 +179,17 @@ export default function KingdomStoryChapterScreen() {
       <View style={[s.screen, { paddingTop: insets.top + 4 }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={s.header}>
-          <TouchableOpacity onPress={toContents} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Back to contents">
-            <Ionicons name="list" size={22} color={c.textDark} />
+          <TouchableOpacity onPress={toContents} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Return to the story">
+            <Ionicons name="arrow-back" size={22} color={c.textDark} />
           </TouchableOpacity>
-          <Text style={s.headerTitle} numberOfLines={1}>{story.title} · {ch.chapterNumber} of {chapters.length}</Text>
+          <TouchableOpacity style={s.headerMid} onPress={() => setChaptersOpen(true)} accessibilityRole="button"
+            accessibilityLabel={`Chapter ${ch.chapterNumber} of ${chapters.length}: ${ch.title}. Choose a chapter`}>
+            <Text style={s.headerTitle} numberOfLines={1}>{story.title} · {ch.chapterNumber} of {chapters.length}</Text>
+            <View style={s.headerChapterRow}>
+              <Text style={s.headerChapter} numberOfLines={1}>{ch.title}</Text>
+              <Ionicons name="chevron-down" size={14} color={c.textMid} />
+            </View>
+          </TouchableOpacity>
           <View style={s.sizeRow}>
             <TouchableOpacity onPress={reading.smaller} disabled={!reading.canSmaller} style={[s.iconBtn, !reading.canSmaller && { opacity: 0.35 }]} accessibilityRole="button" accessibilityLabel="Smaller text">
               <Text style={s.sizeSmall}>A</Text>
@@ -163,10 +199,16 @@ export default function KingdomStoryChapterScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        <View style={s.progressTrack} accessible accessibilityRole="progressbar"
+          accessibilityLabel={`Reading progress: ${doneCount} of ${chapters.length} chapters complete`}
+          accessibilityValue={{ min: 0, max: chapters.length, now: doneCount }}>
+          <View style={[s.progressFill, { width: `${chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0}%` as any }]} />
+        </View>
 
         <ScrollView ref={position.ref} onScroll={position.onScroll} scrollEventThrottle={100} onContentSizeChange={position.onContentSizeChange}
           contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
-          <View style={s.page}>
+          <Animated.View style={[s.page, pageTurn.pageStyle as any]}>
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.shade, pageTurn.shadeStyle]} />
             {images[0] ? <StoryImage media={images[0]} aspectRatio={4 / 3} /> : null}
 
             <Text style={s.kicker}>Chapter {ch.chapterNumber}</Text>
@@ -224,7 +266,7 @@ export default function KingdomStoryChapterScreen() {
                 </View>
                 {preview ? reflections.map((r, i) => <Text key={r.id} style={s.previewQ}>{i + 1}. {r.question}</Text>)
                   : reflections.map((r, i) => (
-                    <QuestionResponseCard key={r.id} question={r} questionIndex={i} lessonId={learning!.lessonId!} existingSub={reflSubs.get(r.id)} kind="reflection" onSubmitted={load} />
+                    <QuestionResponseCard key={r.id} question={r} questionIndex={i} lessonId={learning!.lessonId!} existingSub={reflSubs.get(r.id)} kind="reflection" onSubmitted={reloadAll} />
                   ))}
               </View>
             )}
@@ -247,7 +289,7 @@ export default function KingdomStoryChapterScreen() {
                 </View>
                 {preview || !check ? <Text style={s.previewQ}>{check?.questions[0]?.question ?? ch.assignment?.text}</Text>
                   : check.questions.map((q, i) => (
-                    <QuestionResponseCard key={q.id} question={q} questionIndex={i} lessonId={learning!.lessonId!} existingSub={checkSubs.get(q.id)} kind="assignment" assignmentId={check.assignmentId} onSubmitted={load} />
+                    <QuestionResponseCard key={q.id} question={q} questionIndex={i} lessonId={learning!.lessonId!} existingSub={checkSubs.get(q.id)} kind="assignment" assignmentId={check.assignmentId} onSubmitted={reloadAll} />
                   ))}
                 {!!checkSub && checkSub.evaluationStatus === "approved" && <Text style={s.reviewed}>Reviewed and approved by a fellow peer{checkSub.feedback ? `: “${checkSub.feedback}”` : "."}</Text>}
               </View>
@@ -279,8 +321,8 @@ export default function KingdomStoryChapterScreen() {
               <TouchableOpacity style={[s.navBtn, !prev && { opacity: 0.35 }]} disabled={!prev} onPress={() => prev && go(prev)} accessibilityRole="button" accessibilityLabel={prev ? `Previous: Chapter ${prev.chapterNumber}` : "No previous chapter"}>
                 <Ionicons name="chevron-back" size={16} color={c.textDark} /><Text style={s.navText}>Previous</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.navBtn} onPress={toContents} accessibilityRole="button" accessibilityLabel="Contents">
-                <Ionicons name="list" size={16} color={c.textDark} /><Text style={s.navText}>Contents</Text>
+              <TouchableOpacity style={s.navBtn} onPress={() => setChaptersOpen(true)} accessibilityRole="button" accessibilityLabel="Choose a chapter">
+                <Ionicons name="list" size={16} color={c.textDark} /><Text style={s.navText}>Chapters</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.navBtn, !next && { opacity: 0.35 }]} disabled={!next} onPress={() => next && go(next)} accessibilityRole="button"
                 accessibilityLabel={next ? `Next: Chapter ${next.chapterNumber}${next.learning?.state === "locked" ? ", locked" : ""}` : "No next chapter"}>
@@ -288,9 +330,44 @@ export default function KingdomStoryChapterScreen() {
                 <Ionicons name={next?.learning?.state === "locked" ? "lock-closed" : "chevron-forward"} size={16} color={c.textDark} />
               </TouchableOpacity>
             </View>
-          </View>
+            {chapters.length > 1 && chapters.length <= 30 ? (
+              <View style={s.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                {chapters.map((x) => <View key={x.id} style={[s.dot, x.learning?.state === "completed" && s.dotDone, x.id === ch.id && s.dotHere]} />)}
+              </View>
+            ) : null}
+            <TouchableOpacity onPress={toContents} style={[s.linkBtn, { alignSelf: "center" }]} accessibilityRole="button"><Text style={s.linkText}>Return to Story</Text></TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </View>
+
+      <Modal visible={chaptersOpen} transparent animationType="fade" onRequestClose={() => setChaptersOpen(false)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setChaptersOpen(false)} accessibilityLabel="Close chapters">
+          <TouchableOpacity activeOpacity={1} style={s.sheet}>
+            <View style={s.sheetHead}>
+              <Text style={s.sheetTitle} accessibilityRole="header">Chapters</Text>
+              <TouchableOpacity onPress={() => setChaptersOpen(false)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color={c.textDark} /></TouchableOpacity>
+            </View>
+            <ScrollView>
+              {chapters.map((x) => {
+                const st = x.learning?.state ?? "available";
+                const here = x.id === ch.id;
+                return (
+                  <TouchableOpacity key={x.id} style={[s.chRow, here && s.chRowHere]} onPress={() => { setChaptersOpen(false); go(x); }}
+                    accessibilityRole="button" accessibilityState={{ selected: here, disabled: st === "locked" }}
+                    accessibilityLabel={`Chapter ${x.chapterNumber}: ${x.title}. ${STATE_LABEL[st]}`}>
+                    <Text style={s.chNum}>{x.chapterNumber}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.chTitle} numberOfLines={2}>{x.title}</Text>
+                      <Text style={s.chState}>{here ? "Reading now" : STATE_LABEL[st]}</Text>
+                    </View>
+                    <Ionicons name={st === "locked" ? "lock-closed" : st === "completed" ? "checkmark-circle" : "chevron-forward"} size={18} color={st === "completed" ? c.accentGreen : c.textMuted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -306,7 +383,26 @@ function makeStyles(c: AppColors, k: number) {
     linkText: { color: c.accentGreen, fontSize: 15, fontFamily: "Inter_600SemiBold" },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, gap: 4 },
     iconBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-    headerTitle: { flex: 1, textAlign: "center", fontSize: 12, color: c.textMuted, fontFamily: "Inter_600SemiBold" },
+    headerMid: { flex: 1, alignItems: "center", minHeight: 44, justifyContent: "center" },
+    headerTitle: { textAlign: "center", fontSize: 12, color: c.textMuted, fontFamily: "Inter_600SemiBold" },
+    headerChapterRow: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" },
+    headerChapter: { flexShrink: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    progressTrack: { height: 3, backgroundColor: c.progressTrack ?? c.borderBeige, marginTop: 2 },
+    progressFill: { height: 3, backgroundColor: c.accentGreen },
+    shade: { backgroundColor: "#000", zIndex: 1 },
+    dots: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 18 },
+    dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.borderBeige },
+    dotDone: { backgroundColor: c.lightGreen ?? c.accentGreen },
+    dotHere: { backgroundColor: c.accentGreen, width: 18 },
+    overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+    sheet: { maxHeight: "75%", width: "100%", maxWidth: 640, alignSelf: "center", backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 16 },
+    sheetHead: { flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingTop: 6 },
+    sheetTitle: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
+    chRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 56 },
+    chRowHere: { backgroundColor: c.card },
+    chNum: { width: 26, fontSize: 16, color: c.accentGreen, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "center" },
+    chTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
+    chState: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
     sizeRow: { flexDirection: "row" },
     sizeSmall: { fontSize: 14, color: c.textDark, fontFamily: SCRIPTURE_FONT },
     sizeLarge: { fontSize: 20, color: c.textDark, fontFamily: SCRIPTURE_FONT },

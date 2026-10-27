@@ -1,11 +1,13 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share, Platform, Alert } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { getKingdomStory, CONTENT_TYPE_LABELS, IMAGE_KIND_LABELS, type KingdomStory, type KingdomStoryChapter, type KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
+import { getKingdomStory, saveStory, unsaveStory, markStoryOpened, formatTopicNumber, CONTENT_TYPE_LABELS, IMAGE_KIND_LABELS, type KingdomStory, type KingdomStoryChapter, type KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
+import ShareStorySheet from "@/components/kingdom-stories/ShareStorySheet";
+import SharedStudySheet from "@/components/study/SharedStudySheet";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { storyIntro, progressSummary, STATE_LABEL, lockedMessage } from "@/lib/storybook";
@@ -34,10 +36,16 @@ export default function KingdomStoryBookScreen() {
   const router = useRouter();
   const { colors: c } = useTheme();
   const s = makeStyles(c);
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // open=next: "Start / Continue Story" from discovery — open the reader at the
+  // chapter the reader is up to (once; the book stays underneath for Back).
+  const { id, open } = useLocalSearchParams<{ id: string; open?: string }>();
+  const autoOpened = useRef(false);
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState<KingdomStory | null>(null);
   const [scripture, setScripture] = useState<ScriptureReference | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [studyOpen, setStudyOpen] = useState(false);
+  const [mine, setMine] = useState<{ favourite: boolean; later: boolean }>({ favourite: false, later: false });
 
   // Reloaded whenever the book comes back into view, so finishing a chapter
   // updates the contents and progress straight away.
@@ -47,6 +55,14 @@ export default function KingdomStoryBookScreen() {
     getKingdomStory(id).then((st) => {
       if (!live) return;
       setStory(st);
+      if (st.mine) setMine(st.mine);
+      if (st.status === "published") markStoryOpened(st.id); // Recently viewed (never counts as progress)
+      if (open === "next" && !autoOpened.current) {
+        autoOpened.current = true;
+        const chs = [...(st.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber);
+        const target = (st.progress?.finished ? chs[0] : chs.find((ch) => ch.id === st.progress?.currentChapterId)) ?? chs[0];
+        if (target && target.learning?.state !== "locked") router.push({ pathname: "/kingdom-stories/chapter", params: { id: st.id, chapter: target.id } } as any);
+      }
       if (st.scriptureReferenceId) getScriptureReference(st.scriptureReferenceId).then((r) => live && setScripture(r)).catch(() => {});
     }).catch((e: any) => { if (live && !story) showAlert("Couldn't open this story", e?.message ?? "Please try again."); })
       .finally(() => live && setLoading(false));
@@ -60,7 +76,9 @@ export default function KingdomStoryBookScreen() {
   const chapters = [...(story.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber);
   const media = story.media ?? [];
   const cover = media.find((m) => m.isCover && m.mediaType === "image") ?? media.find((m) => !m.chapterId && m.mediaType === "image") ?? null;
-  const gallery = media.filter((m) => !m.chapterId && m.id !== cover?.id);
+  // Story Overview image (migration 215 role) sits with the introduction, not in the gallery.
+  const overview = media.find((m) => m.role === "overview" && m.mediaType === "image") ?? null;
+  const gallery = media.filter((m) => !m.chapterId && m.id !== cover?.id && m.id !== overview?.id);
   const intro = storyIntro(story.body);
   const prog = progressSummary(story.progress);
   const current = chapters.find((ch) => ch.id === story.progress?.currentChapterId) ?? null;
@@ -76,8 +94,14 @@ export default function KingdomStoryBookScreen() {
   const credits = media.filter((m) => m.caption || m.sourceUrl || m.licenseNote);
   const chapterNo = new Map(chapters.map((ch) => [ch.id, ch.chapterNumber]));
 
-  async function handleShare() {
-    try { await Share.share({ message: `${story!.title}${story!.subtitle ? `\n${story!.subtitle}` : ""}` }); } catch { /* cancelled */ }
+  // Share in a P2P chat or outside P2P (ShareStorySheet) — the story only, never progress.
+  function handleShare() { setShareOpen(true); }
+  // Favourite / Saved for Later: shown at once, undone if the server refuses.
+  async function toggleSave(kind: "favourite" | "later") {
+    const on = !mine[kind];
+    setMine((m) => ({ ...m, [kind]: on }));
+    try { await (on ? saveStory(story!.id, kind) : unsaveStory(story!.id, kind)); }
+    catch (e: any) { setMine((m) => ({ ...m, [kind]: !on })); showAlert("Couldn't update your library", e?.message ?? "Please try again."); }
   }
 
   return (
@@ -105,6 +129,7 @@ export default function KingdomStoryBookScreen() {
         <View style={s.page}>
           {cover ? <StoryImage media={cover} aspectRatio={1} rounded={18} /> : null}
 
+          {formatTopicNumber(story.topicNumber) ? <Text style={s.topicNo}>{formatTopicNumber(story.topicNumber)}</Text> : null}
           <Text style={s.title} accessibilityRole="header">{story.title}</Text>
           {!!story.subtitle && <Text style={s.subtitle}>{story.subtitle}</Text>}
           <Text style={s.meta}>
@@ -122,15 +147,51 @@ export default function KingdomStoryBookScreen() {
           )}
 
           {primary && (
-            <TouchableOpacity style={s.primaryBtn} onPress={() => openChapter(primary.ch)} accessibilityRole="button">
-              <Ionicons name={primary.icon} size={18} color="#fff" />
-              <Text style={s.primaryBtnText}>{primary.label}</Text>
-            </TouchableOpacity>
+            // Study Alone = your own reading; Study Together = a shared study
+            // with a peer or your group (each person keeps their own progress).
+            <View style={s.studyModes}>
+              <TouchableOpacity style={[s.primaryBtn, s.studyModeBtn]} onPress={() => openChapter(primary.ch)} accessibilityRole="button" accessibilityHint="Study alone">
+                <Ionicons name={primary.icon} size={18} color="#fff" />
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={s.studyModeLabel}>Study Alone</Text>
+                  <Text style={s.primaryBtnText} numberOfLines={1}>{primary.label}</Text>
+                </View>
+              </TouchableOpacity>
+              {!preview ? (
+                <TouchableOpacity style={[s.primaryBtn, s.studyModeBtn, s.togetherBtn]} onPress={() => setStudyOpen(true)} accessibilityRole="button" accessibilityLabel="Study Together" accessibilityHint="Invite a peer or start a study with your group">
+                  <Ionicons name="people-outline" size={18} color={c.primaryGreen ?? c.accentGreen} />
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={[s.studyModeLabel, { color: c.textMuted }]}>With others</Text>
+                    <Text style={[s.primaryBtnText, { color: c.primaryGreen ?? c.accentGreen }]}>Study Together</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+
+          {!preview && (
+            <View style={s.libraryRow}>
+              <TouchableOpacity style={[s.libraryBtn, mine.favourite && s.libraryBtnOn]} onPress={() => toggleSave("favourite")}
+                accessibilityRole="button" accessibilityState={{ selected: mine.favourite }} accessibilityLabel={mine.favourite ? "Remove from My Favourites" : "Add to My Favourites"}>
+                <Ionicons name={mine.favourite ? "heart" : "heart-outline"} size={18} color={mine.favourite ? "#E11D48" : c.textMid} />
+                <Text style={s.libraryText}>Favourite</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.libraryBtn, mine.later && s.libraryBtnOn]} onPress={() => toggleSave("later")}
+                accessibilityRole="button" accessibilityState={{ selected: mine.later }} accessibilityLabel={mine.later ? "Remove from Saved for Later" : "Save for Later"}>
+                <Ionicons name={mine.later ? "bookmark" : "bookmark-outline"} size={18} color={mine.later ? c.accentGreen : c.textMid} />
+                <Text style={s.libraryText}>{mine.later ? "Saved" : "Save for Later"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.libraryBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this story">
+                <Ionicons name="share-social-outline" size={18} color={c.textMid} />
+                <Text style={s.libraryText}>Share</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {(intro.theme || intro.scripture.length > 0 || intro.paragraphs.length > 0) && (
             <View style={s.section}>
               <Text style={s.sectionLabel}>Introduction</Text>
+              {overview ? <StoryImage media={overview} aspectRatio={4 / 3} /> : null}
               {!!intro.theme && <Text style={s.theme}>{intro.theme}</Text>}
               {intro.scripture.map((line, i) => <ScriptureChips key={i} line={line} label={i === 0 ? "Primary Scripture" : "Supporting Scripture"} />)}
               {intro.paragraphs.map((p, i) => <Text key={i} style={s.body}>{p}</Text>)}
@@ -233,6 +294,9 @@ export default function KingdomStoryBookScreen() {
           )}
         </View>
       </ScrollView>
+      <ShareStorySheet visible={shareOpen} onClose={() => setShareOpen(false)} story={story} />
+      <SharedStudySheet visible={studyOpen} onClose={() => setStudyOpen(false)} content={{ type: "kingdom_story", id: story.id, title: story.title }}
+        onStarted={(sid) => { setStudyOpen(false); router.push(`/study-together/${sid}` as any); }} />
     </View>
   );
 }
@@ -268,6 +332,11 @@ function makeStyles(c: AppColors) {
     previewBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 12, padding: 10, borderRadius: 10, backgroundColor: "rgba(234,179,8,0.18)" },
     previewText: { flex: 1, fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
     page: { paddingHorizontal: 20, maxWidth: 720, width: "100%", alignSelf: "center" },
+    topicNo: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase", textAlign: "center", marginTop: 18 },
+    libraryRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
+    libraryBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
+    libraryBtnOn: { borderColor: c.accentGreen },
+    libraryText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     title: { fontSize: 28, lineHeight: 34, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", marginTop: 18, textAlign: "center" },
     subtitle: { fontSize: 16, lineHeight: 23, color: c.textMid, fontFamily: SCRIPTURE_FONT, fontStyle: "italic", marginTop: 8, textAlign: "center" },
     meta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 10, textAlign: "center" },
@@ -277,6 +346,10 @@ function makeStyles(c: AppColors) {
     progressText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", textAlign: "center" },
     primaryBtn: { marginTop: 16, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen ?? c.accentGreen, borderRadius: 14, minHeight: 52, paddingHorizontal: 16 },
     primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
+    studyModes: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },
+    studyModeBtn: { marginTop: 0, flexGrow: 1, flexBasis: 220, justifyContent: "flex-start", paddingVertical: 8 },
+    togetherBtn: { backgroundColor: c.card, borderWidth: 1.5, borderColor: c.primaryGreen ?? c.accentGreen },
+    studyModeLabel: { fontSize: 11, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
     section: { marginTop: 28, gap: 10 },
     sectionLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.8 },
     theme: { fontSize: 17, lineHeight: 26, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontStyle: "italic" },

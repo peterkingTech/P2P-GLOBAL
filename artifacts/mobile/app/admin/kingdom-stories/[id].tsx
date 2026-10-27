@@ -22,6 +22,7 @@ import { StudioSteps } from "@/components/studio/StudioSteps";
 import { Banner, Chip, reviewTone } from "@/components/studio/StudioUI";
 import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
 import MediaDetailsEditor from "@/components/kingdom-stories/MediaDetailsEditor";
+import ImageSlots from "@/components/kingdom-stories/ImageSlots";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -226,14 +227,20 @@ export default function EditKingdomStoryScreen() {
     }
   }
 
+  // Deleting moves the story (chapters, images, sources) to the Admin Recycle
+  // Bin (migration 214); a live story must be unpublished first.
   function handleDelete() {
     if (!story) return;
-    Alert.alert("Delete this story?", "This permanently removes the story and all its media/sources. This cannot be undone.", [
+    const title = "Move this story to the Recycle Bin?";
+    const message = `"${story.title}" and its chapters, images and sources move to the Recycle Bin. Readers stop seeing it now; it can be restored from Admin → Recycle Bin.`;
+    const doDelete = async () => {
+      try { await deleteKingdomStory(story.id); router.replace("/admin/kingdom-stories" as any); }
+      catch (e: any) { showAlert("Couldn't delete", e.message ?? "Please try again."); }
+    };
+    if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) doDelete(); return; }
+    Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        try { await deleteKingdomStory(story.id); router.replace("/admin/kingdom-stories" as any); }
-        catch (e: any) { showAlert("Couldn't delete", e.message ?? "Please try again."); }
-      } },
+      { text: "Move to Recycle Bin", style: "destructive", onPress: doDelete },
     ]);
   }
 
@@ -280,6 +287,13 @@ export default function EditKingdomStoryScreen() {
           <Text style={styles.topicLinkText}>Open this story's catalogue topic</Text>
         </TouchableOpacity>
       )}
+
+      <Text style={styles.sectionHeading}>Story information</Text>
+      <Text style={styles.fieldLabel}>Topic number</Text>
+      <Text style={styles.fieldHint}>The story's stable number in its category (shown as “Topic 012”). It never changes the story's identity or readers' progress.</Text>
+      <TextInput style={[styles.input, { maxWidth: 140 }]} defaultValue={story.topicNumber ? String(story.topicNumber) : ""} keyboardType="number-pad" placeholder="e.g. 12"
+        placeholderTextColor={colors.textMuted} accessibilityLabel="Topic number"
+        onEndEditing={(e) => { const t = e.nativeEvent.text.trim(); const n = t ? Number(t) : null; if (t && (!Number.isInteger(n) || n! < 1 || n! > 9999)) { showAlert("Topic number", "Use a whole number from 1 to 9999."); return; } if (n !== (story.topicNumber ?? null)) saveField({ topicNumber: n } as any); }} />
 
       <Text style={styles.fieldLabel}>Title</Text>
       <TextInput style={styles.input} defaultValue={story.title} onEndEditing={(e) => saveField({ title: e.nativeEvent.text })} />
@@ -347,7 +361,10 @@ export default function EditKingdomStoryScreen() {
         <Text style={styles.warningText}>Scripture Stories need a Scripture reference before they can be published.</Text>
       )}
 
-      <Text style={styles.sectionHeading}>Media ({story.media?.length ?? 0})</Text>
+      <Text style={styles.sectionHeading}>Story artwork</Text>
+      <ImageSlots story={story} locked={story.status === "published"} onChanged={load} onError={(title, e) => reportError(title, e)} />
+
+      <Text style={styles.sectionHeading}>All media ({story.media?.length ?? 0})</Text>
       <View style={styles.mediaGrid}>
         {(story.media ?? []).map((m) => (
           <View key={m.id} style={styles.mediaCard}>
@@ -454,6 +471,7 @@ const styles = StyleSheet.create({
   topicLink: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingVertical: 4 },
   topicLinkText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium", textDecorationLine: "underline" },
   fieldLabel: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold", marginTop: 12, marginBottom: 6 },
+  fieldHint: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: -2, marginBottom: 6 },
   fieldLabelInline: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   input: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
   multiline: { minHeight: 140, textAlignVertical: "top" },

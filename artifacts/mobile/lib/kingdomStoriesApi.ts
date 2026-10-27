@@ -42,7 +42,10 @@ export interface KingdomStoryMedia {
   chapterId?: string | null;
   /** Migration 212: accessibility description and attribution (optional). */
   altText?: string | null; sourceUrl?: string | null; licenseNote?: string | null; imageKind?: KingdomImageKind | null;
+  /** Migration 215: where the image is used; null = cover/chapter/gallery by its other fields. */
+  role?: MediaRole | null;
 }
+export type MediaRole = "cover" | "hero" | "overview" | "chapter" | "thumbnail" | "gallery";
 export type KingdomImageKind = "artistic_illustration" | "historical_photograph" | "artefact" | "manuscript" | "location_photograph" | "ai_generated" | "other";
 export const IMAGE_KIND_LABELS: Record<KingdomImageKind, string> = {
   artistic_illustration: "Artistic illustration", historical_photograph: "Historical photograph", artefact: "Historical artefact",
@@ -76,6 +79,65 @@ export interface KingdomStory {
   progress?: StoryProgress;
   /** Story cards: chapters this reader has finished (submitted or completed). */
   myProgress?: { totalChapters: number; doneChapters: number; started: boolean } | null;
+  /** Stable display number within its category (migration 215) — never the id. */
+  topicNumber?: number | null;
+  /** The reader's own Favourite / Saved for Later (migration 215). */
+  mine?: { favourite: boolean; later: boolean };
+  /** Recently viewed shelf: when it was last opened and which chapter. */
+  lastOpenedAt?: string; lastChapterId?: string | null;
+}
+
+/** "Topic 012" — the same everywhere a story is listed. */
+export function formatTopicNumber(n: number | null | undefined): string | null {
+  return n ? `Topic ${String(n).padStart(3, "0")}` : null;
+}
+
+// ── Personal library (migration 215) ─────────────────────────────────────────
+export type LibraryShelf = "favourites" | "later" | "recent" | "in_progress" | "completed";
+export const SHELF_LABELS: Record<LibraryShelf, string> = {
+  favourites: "My Favourites", later: "Saved for Later", recent: "Recently Viewed", in_progress: "In Progress", completed: "Completed",
+};
+export function getLibraryShelf(shelf: LibraryShelf, limit = 30): Promise<{ shelf: LibraryShelf; stories: KingdomStory[]; available: boolean }> {
+  return authedFetch(`/kingdom-stories/me/library?shelf=${shelf}&limit=${limit}`);
+}
+export function saveStory(storyId: string, kind: "favourite" | "later"): Promise<{ saved: true }> {
+  return authedFetch(`/kingdom-stories/${storyId}/save`, { method: "POST", body: JSON.stringify({ kind }) });
+}
+export function unsaveStory(storyId: string, kind: "favourite" | "later"): Promise<{ saved: false }> {
+  return authedFetch(`/kingdom-stories/${storyId}/save/${kind}`, { method: "DELETE" });
+}
+/** Recently viewed + resume; never counts as progress. Best-effort (never throws). */
+export function markStoryOpened(storyId: string, chapterId?: string | null): Promise<void> {
+  return authedFetch(`/kingdom-stories/${storyId}/opened`, { method: "POST", body: JSON.stringify(chapterId ? { chapterId } : {}) }).then(() => {}, () => {});
+}
+export type FeedSort = "topic" | "title" | "recent" | "updated";
+
+// ── Discovery homepage + editorial collections (migration 215) ──────────────
+export type StoryCard = KingdomStory & { lastChapterNumber?: number | null };
+export interface DiscoverHome {
+  featured: (StoryCard & { hero: { id: string; mediaPath: string; altText: string | null } | null }) | null;
+  continueLearning: StoryCard[]; favourites: StoryCard[]; later: StoryCard[]; recentlyViewed: StoryCard[];
+  collections: { id: string; slug: string; title: string; description: string | null; stories: StoryCard[]; total: number }[];
+  categoryRows: { category: { id: string; slug: string; title: string; icon: string | null }; stories: StoryCard[]; total: number }[];
+  recentlyAdded: StoryCard[]; totalPublished: number; libraryAvailable: boolean;
+}
+export function getDiscoverHome(): Promise<DiscoverHome> { return authedFetch("/kingdom-stories/discover"); }
+export function getStoryCollection(slug: string): Promise<{ id: string; slug: string; title: string; description: string | null; stories: StoryCard[] }> {
+  return authedFetch(`/kingdom-stories/collections/${encodeURIComponent(slug)}`);
+}
+export interface StoryCollectionAdmin { id: string; slug: string; title: string; description: string | null; displayOrder: number; status: "draft" | "published" | "archived"; updatedAt: string; storyIds: string[] }
+export function getStoryCollectionsAdmin(): Promise<{ collections: StoryCollectionAdmin[] }> { return authedFetch("/kingdom-stories/admin/collections"); }
+export function createStoryCollection(input: { title: string; description?: string; displayOrder?: number }): Promise<StoryCollectionAdmin> {
+  return authedFetch("/kingdom-stories/admin/collections", { method: "POST", body: JSON.stringify(input) });
+}
+export function updateStoryCollection(id: string, input: Partial<{ title: string; description: string | null; displayOrder: number; status: "draft" | "published" | "archived" }>): Promise<StoryCollectionAdmin> {
+  return authedFetch(`/kingdom-stories/admin/collections/${id}`, { method: "PUT", body: JSON.stringify(input) });
+}
+export function setStoryCollectionStories(id: string, storyIds: string[]): Promise<{ storyIds: string[] }> {
+  return authedFetch(`/kingdom-stories/admin/collections/${id}/stories`, { method: "PUT", body: JSON.stringify({ storyIds }) });
+}
+export function deleteStoryCollection(id: string): Promise<{ removed: true }> {
+  return authedFetch(`/kingdom-stories/admin/collections/${id}`, { method: "DELETE" });
 }
 export type ChapterState = "locked" | "available" | "in_progress" | "awaiting_review" | "completed" | "preview";
 export interface ChapterLearning {
@@ -206,10 +268,11 @@ export function deleteChapter(storyId: string, chapterId: string): Promise<{ rem
 export function getKingdomStoryCategories(): Promise<KingdomStoryCategory[]> {
   return authedFetch("/kingdom-stories/categories");
 }
-export function getKingdomStoriesFeed(opts: { category?: string; featured?: boolean; page?: number; limit?: number } = {}): Promise<{ stories: KingdomStory[]; total: number; page: number; pageSize: number }> {
+export function getKingdomStoriesFeed(opts: { category?: string; featured?: boolean; page?: number; limit?: number; sort?: FeedSort } = {}): Promise<{ stories: KingdomStory[]; total: number; page: number; pageSize: number }> {
   const q = new URLSearchParams();
   if (opts.category) q.set("category", opts.category);
   if (opts.featured) q.set("featured", "true");
+  if (opts.sort && opts.sort !== "topic") q.set("sort", opts.sort);
   q.set("page", String(opts.page ?? 0));
   q.set("limit", String(opts.limit ?? 20));
   return authedFetch(`/kingdom-stories/feed?${q}`);
@@ -231,10 +294,10 @@ export function updateKingdomStory(id: string, updates: Partial<KingdomStory>): 
 export function deleteKingdomStory(id: string): Promise<{ removed: true }> {
   return authedFetch(`/kingdom-stories/${id}`, { method: "DELETE" });
 }
-export function addKingdomStoryMedia(storyId: string, input: { id?: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption?: string; displayOrder?: number; isCover?: boolean; durationSeconds?: number; chapterId?: string | null }): Promise<KingdomStoryMedia> {
+export function addKingdomStoryMedia(storyId: string, input: { id?: string; mediaType: KingdomStoryMediaType; mediaPath: string; caption?: string; displayOrder?: number; isCover?: boolean; durationSeconds?: number; chapterId?: string | null; role?: MediaRole | null }): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media`, { method: "POST", body: JSON.stringify(input) });
 }
-export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean; chapterId: string | null; altText: string | null; sourceUrl: string | null; licenseNote: string | null; imageKind: KingdomImageKind | null }>): Promise<KingdomStoryMedia> {
+export function updateKingdomStoryMedia(storyId: string, mediaId: string, updates: Partial<{ caption: string; displayOrder: number; isCover: boolean; chapterId: string | null; altText: string | null; sourceUrl: string | null; licenseNote: string | null; imageKind: KingdomImageKind | null; role: MediaRole | null }>): Promise<KingdomStoryMedia> {
   return authedFetch(`/kingdom-stories/${storyId}/media/${mediaId}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function deleteKingdomStoryMedia(storyId: string, mediaId: string): Promise<{ removed: true }> {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Share, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Modal, Share, Platform, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,9 @@ import TranslationPicker from "@/components/bible/TranslationPicker";
 import BibleNoteSheet from "@/components/bible/BibleNoteSheet";
 import ReadingPrefsSheet from "@/components/bible/ReadingPrefsSheet";
 import RelatedLessonsSheet from "@/components/bible/RelatedLessonsSheet";
+import CompareView from "@/components/bible/CompareView";
+import CompareSheet from "@/components/bible/CompareSheet";
+import { loadCompare, saveCompare, sanitizeCompare } from "@/lib/bibleCompare";
 import { useActiveGathering } from "@/lib/activeGathering";
 import {
   BibleApiError, HIGHLIGHT_COLORS, SCRIPTURE_FONT, addHighlight, addNote, bookByCode, bookByName, deleteNote, formatRef, getChapter,
@@ -33,7 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 // the P2P theme. Opening this from a Gathering pushes it ON TOP of the call
 // screen, so the call keeps running; the Return bar goes back to it.
 
-type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string };
+type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string; compare?: string };
 // How a tap selects text. Verse (default) and Passage select whole verses;
 // Word, Phrase and Sentence select exact words — never silently widened.
 type SelectMode = "verse" | "word" | "phrase" | "sentence" | "passage";
@@ -83,7 +86,11 @@ export default function BibleReaderScreen() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [focus, setFocus] = useState(false);
-  const [sheet, setSheet] = useState<null | "books" | "translations" | "prefs" | "related" | "menu">(null);
+  const [sheet, setSheet] = useState<null | "books" | "translations" | "prefs" | "related" | "menu" | "compare">(null);
+  // Bible Compare: extra licensed translations read beside this one (remembered on this device).
+  const [compareRaw, setCompareRaw] = useState<string[]>([]);
+  useEffect(() => { loadCompare().then(setCompareRaw); }, []);
+  const { width: screenWidth } = useWindowDimensions();
   const [noteEdit, setNoteEdit] = useState<{ ref: NewRef; label: string; note: BibleNote | null } | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -182,6 +189,19 @@ export default function BibleReaderScreen() {
 
   const book = bookByCode(loc?.book);
   const translation = translations?.find((t) => t.code === loc?.t);
+  const compare = useMemo(() => (loc && translations ? sanitizeCompare(loc.t, compareRaw, translations) : []), [loc?.t, compareRaw, translations]);
+  // ?compare=1 (My P2P "Compare translations" shortcut): open the chooser once the chapter is ready.
+  const compareAsked = useRef(false);
+  useEffect(() => {
+    if (params.compare === "1" && !compareAsked.current && loc && translations?.length) { compareAsked.current = true; setSheet("compare"); }
+  }, [params.compare, loc, translations]);
+  const applyCompare = (codes: string[]) => {
+    setSheet(null);
+    setCompareRaw(codes);
+    saveCompare(codes);
+    // Back to single reading: stay on the verse being looked at.
+    if (!codes.length && loc && sel) setLoc({ ...loc, v: sel.start, ve: sel.end });
+  };
 
   const go = useCallback((bookCode: string, chapter: number, extra?: { v?: number; ve?: number; t?: string }) => {
     setSheet(null);
@@ -413,6 +433,10 @@ export default function BibleReaderScreen() {
         accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`}>
         <Text style={styles.trPillText}>{loc?.t ?? "—"}</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
+        accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
+        <Ionicons name={compare.length ? "git-compare" : "git-compare-outline"} size={21} color={compare.length ? c.accentGreen : c.textDark} />
+      </TouchableOpacity>
       <TouchableOpacity style={styles.iconBtn} onPress={() => router.push({ pathname: "/bible/search", params: { t: loc?.t ?? "" } } as any)}
         accessibilityRole="button" accessibilityLabel="Search the Bible">
         <Ionicons name="search" size={21} color={c.textDark} />
@@ -423,8 +447,41 @@ export default function BibleReaderScreen() {
     </View>
   );
 
+  // Previous / next chapter and the translation credit — same in single and compare reading.
+  const footerEl = data && !focus ? (
+    <View style={styles.footer}>
+      <View style={styles.navRow}>
+        <TouchableOpacity style={[styles.navBtn, !data.previous && styles.navBtnOff]} disabled={!data.previous}
+          onPress={() => data.previous && go(data.previous.bookCode, data.previous.chapter)} accessibilityRole="button"
+          accessibilityLabel={data.previous ? `Previous chapter, ${formatRef(bookByCode(data.previous.bookCode), data.previous.chapter)}` : "No previous chapter"}>
+          <Ionicons name="chevron-back" size={18} color={c.textDark} />
+          <Text style={styles.navText} numberOfLines={1}>{data.previous ? formatRef(bookByCode(data.previous.bookCode), data.previous.chapter) : "Start"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.navBtn, styles.navBtnRight, !data.next && styles.navBtnOff]} disabled={!data.next}
+          onPress={() => data.next && go(data.next.bookCode, data.next.chapter)} accessibilityRole="button"
+          accessibilityLabel={data.next ? `Next chapter, ${formatRef(bookByCode(data.next.bookCode), data.next.chapter)}` : "No next chapter"}>
+          <Text style={styles.navText} numberOfLines={1}>{data.next ? formatRef(bookByCode(data.next.bookCode), data.next.chapter) : "End"}</Text>
+          <Ionicons name="chevron-forward" size={18} color={c.textDark} />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.copyright}>{data.translation.name}{data.copyright ? `\n${data.copyright}` : ""}</Text>
+    </View>
+  ) : null;
+
   let body: React.ReactNode;
-  if (trError) {
+  if (data && compare.length && !trError && !(error && !data) && loc) {
+    // Bible Compare: the same chapter in up to four licensed translations, verse by verse.
+    body = (
+      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
+        {error && <Text style={styles.inlineError}>{error.message}</Text>}
+        <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
+        <CompareView bookCode={loc.book} chapter={loc.chapter} primary={data} others={compare} translations={translations ?? []}
+          width={Math.min(screenWidth, 1200) - 40} fontSize={fontSize} lineHeight={lineHeight} verseNumbers={prefs.verseNumbers}
+          selected={sel} onTapVerse={tapVerse} />
+        {footerEl}
+      </ScrollView>
+    );
+  } else if (trError) {
     body = <StateMessage styles={styles} icon="cloud-offline-outline" title="The Bible couldn't load" message={trError} action="Try again" onAction={() => setTrAttempt((n) => n + 1)} c={c} />;
   } else if (translations && translations.length === 0) {
     body = <StateMessage styles={styles} icon="book-outline" title="No translations available" message="No Bible translation is licensed for P2P Global yet." c={c} />;
@@ -486,25 +543,7 @@ export default function BibleReaderScreen() {
           </View>
         )}
 
-        {!focus && (
-          <View style={styles.footer}>
-            <View style={styles.navRow}>
-              <TouchableOpacity style={[styles.navBtn, !data.previous && styles.navBtnOff]} disabled={!data.previous}
-                onPress={() => data.previous && go(data.previous.bookCode, data.previous.chapter)} accessibilityRole="button"
-                accessibilityLabel={data.previous ? `Previous chapter, ${formatRef(bookByCode(data.previous.bookCode), data.previous.chapter)}` : "No previous chapter"}>
-                <Ionicons name="chevron-back" size={18} color={c.textDark} />
-                <Text style={styles.navText} numberOfLines={1}>{data.previous ? formatRef(bookByCode(data.previous.bookCode), data.previous.chapter) : "Start"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.navBtn, styles.navBtnRight, !data.next && styles.navBtnOff]} disabled={!data.next}
-                onPress={() => data.next && go(data.next.bookCode, data.next.chapter)} accessibilityRole="button"
-                accessibilityLabel={data.next ? `Next chapter, ${formatRef(bookByCode(data.next.bookCode), data.next.chapter)}` : "No next chapter"}>
-                <Text style={styles.navText} numberOfLines={1}>{data.next ? formatRef(bookByCode(data.next.bookCode), data.next.chapter) : "End"}</Text>
-                <Ionicons name="chevron-forward" size={18} color={c.textDark} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.copyright}>{data.translation.name}{data.copyright ? `\n${data.copyright}` : ""}</Text>
-          </View>
-        )}
+        {footerEl}
       </ScrollView>
     );
   }
@@ -631,6 +670,7 @@ export default function BibleReaderScreen() {
           <View style={[styles.menu, { top: insets.top + 52 }]}>
             <MenuItem styles={styles} c={c} icon="library-outline" label="My notes & highlights" onPress={() => { setSheet(null); router.push("/bible/library" as any); }} />
             <MenuItem styles={styles} c={c} icon="school-outline" label="Lessons on this chapter" onPress={() => setSheet("related")} />
+            <MenuItem styles={styles} c={c} icon="git-compare-outline" label={compare.length ? "Compare translations (on)" : "Compare translations"} onPress={() => setSheet("compare")} />
             <MenuItem styles={styles} c={c} icon="text-outline" label="Reading settings" onPress={() => setSheet("prefs")} />
             <MenuItem styles={styles} c={c} icon="color-wand-outline" label={`Select by: ${MODES.find((m) => m.key === mode)!.label}`} onPress={() => { setSheet(null); setModeSheet(true); }} />
             <MenuItem styles={styles} c={c} icon="expand-outline" label="Focus mode" onPress={() => { setSheet(null); setRange(null); setFocus(true); }} />
@@ -644,6 +684,7 @@ export default function BibleReaderScreen() {
         error={trError} onRetry={() => setTrAttempt((n) => n + 1)}
         onSelect={(t) => { setSheet(null); if (loc && t !== loc.t) setLoc({ ...loc, t, v: sel?.start, ve: sel?.end }); }} />
       <ReadingPrefsSheet visible={sheet === "prefs"} prefs={prefs} onChange={updatePrefs} onClose={() => setSheet(null)} />
+      <CompareSheet visible={sheet === "compare"} onClose={() => setSheet(null)} translations={translations ?? []} primary={loc?.t ?? ""} selected={compare} onApply={applyCompare} />
       {book && loc && (
         <RelatedLessonsSheet visible={sheet === "related"} book={book.code} bookName={book.name} chapter={loc.chapter} onClose={() => setSheet(null)}
           onOpenLesson={(id) => { setSheet(null); router.push({ pathname: "/lesson/[id]", params: { id } } as any); }} />

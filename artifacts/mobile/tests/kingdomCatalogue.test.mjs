@@ -36,7 +36,7 @@ const labels = api.slice(api.indexOf("export function categoryCountLabels"), api
 ok("count labels: 'No stories yet' / '1 story' / 'N stories' and a separate 'N planned'", labels.includes('"No stories yet"') && labels.includes('"1 story"') && labels.includes("planned`") && labels.includes("planned: cat.plannedTopics > 0"));
 ok("category page never lists topic titles", !/topics\.map|plannedTopics\.map/.test(cat) && cat.includes("being prepared"));
 ok("story: a book — contents link each chapter to its own reading screen", detail.includes('pathname: "/kingdom-stories/chapter"') && detail.includes("Contents"));
-ok("story: the story gallery shows only story-level images", detail.includes("media.filter((m) => !m.chapterId && m.id !== cover?.id)"));
+ok("story: the story gallery shows only story-level images", detail.includes("media.filter((m) => !m.chapterId && m.id !== cover?.id && m.id !== overview?.id)")); // overview image sits with the introduction (migration 215)
 ok("story: no Pray button", !detail.includes(">Pray<") && !detail.includes('"/(tabs)/prayer"'));
 ok("story: chapter sources not repeated in the story source list", detail.includes("filter((x) => !x.chapterId)"));
 ok("story: editors' preview of an unpublished story is labelled", detail.includes('story.status !== "published"') && detail.includes("Preview"));

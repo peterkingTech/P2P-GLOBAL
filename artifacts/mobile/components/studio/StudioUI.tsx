@@ -121,19 +121,22 @@ export function Pill({ label, selected, onPress, disabled }: { label: string; se
  * Confirmation dialog for consequential actions. A Modal rather than
  * Alert.alert so it works the same on web and native, and can collect a note.
  */
-export function ConfirmDialog({ visible, title, message, confirmLabel, tone = "primary", notePrompt, noteRequired, busy, onConfirm, onCancel }: {
+export function ConfirmDialog({ visible, title, message, confirmLabel, tone = "primary", notePrompt, noteRequired, confirmText, busy, onConfirm, onCancel }: {
   visible: boolean; title: string; message: string; confirmLabel: string; tone?: "primary" | "danger";
-  notePrompt?: string; noteRequired?: boolean; busy?: boolean;
+  notePrompt?: string; noteRequired?: boolean;
+  /** When set, the note field must equal this text exactly (e.g. "PERMANENTLY DELETE"). */
+  confirmText?: string;
+  busy?: boolean;
   onConfirm: (note: string) => void; onCancel: () => void;
 }) {
   const [note, setNote] = useState("");
   useEffect(() => { if (visible) setNote(""); }, [visible]);
   // Keep showing the last content while the dialog fades out, so it never
   // flashes empty after the caller clears what it was confirming.
-  const shown = useRef({ title, message, confirmLabel, tone, notePrompt, noteRequired });
-  if (visible) shown.current = { title, message, confirmLabel, tone, notePrompt, noteRequired };
+  const shown = useRef({ title, message, confirmLabel, tone, notePrompt, noteRequired, confirmText });
+  if (visible) shown.current = { title, message, confirmLabel, tone, notePrompt, noteRequired, confirmText };
   const c = shown.current;
-  const blocked = !!c.noteRequired && !note.trim();
+  const blocked = (!!c.noteRequired && !note.trim()) || (!!c.confirmText && note.trim() !== c.confirmText);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={s.backdrop}>
@@ -142,12 +145,14 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, tone = "p
           <Text style={s.dialogText}>{c.message}</Text>
           {c.notePrompt ? (
             <>
-              <Text style={s.label} nativeID="studio-confirm-note">{c.notePrompt}{c.noteRequired ? " (required)" : ""}</Text>
+              <Text style={s.label} nativeID="studio-confirm-note">{c.notePrompt}{c.noteRequired && !c.confirmText ? " (required)" : ""}</Text>
               <TextInput
-                style={[s.input, { minHeight: 70 }]}
+                style={[s.input, { minHeight: c.confirmText ? 44 : 70 }]}
                 value={note}
                 onChangeText={setNote}
-                multiline
+                multiline={!c.confirmText}
+                autoCapitalize={c.confirmText ? "characters" : "sentences"}
+                autoCorrect={!c.confirmText}
                 maxLength={2000}
                 accessibilityLabelledBy="studio-confirm-note"
                 accessibilityLabel={c.notePrompt}
@@ -157,7 +162,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel, tone = "p
           <View style={s.dialogRow}>
             <Button label="Cancel" tone="secondary" onPress={onCancel} disabled={busy || !visible} />
             <Button label={c.confirmLabel} tone={c.tone} onPress={() => onConfirm(note.trim())} disabled={blocked || !visible} busy={busy}
-              accessibilityHint={blocked ? "Enter a note first" : undefined} />
+              accessibilityHint={blocked ? (c.confirmText ? `Type ${c.confirmText} first` : "Enter a note first") : undefined} />
           </View>
         </View>
       </View>

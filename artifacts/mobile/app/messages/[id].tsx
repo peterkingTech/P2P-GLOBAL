@@ -16,7 +16,8 @@ import {
   AppState,
   type ViewToken,
 } from "react-native";
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter, router as appRouter } from "expo-router";
+import { storyIdInMessage } from "@/lib/storyShare";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { readableSendError } from "@/lib/safeguardMessage";
@@ -307,6 +308,14 @@ function MessageBubbleRow({
                 linkStyle={styles.mentionLink}
               />
             )}
+            {/* A shared Kingdom Story opens in the app (the link itself stays plain text). */}
+            {!item.deletedAt && storyIdInMessage(item.body) ? (
+              <TouchableOpacity style={[styles.storyChip, mine && styles.storyChipMine]} onPress={() => appRouter.push(`/kingdom-stories/${storyIdInMessage(item.body)}` as any)}
+                accessibilityRole="button" accessibilityLabel="Open this Kingdom Story">
+                <Ionicons name="book-outline" size={14} color={mine ? "#fff" : "#1D9E75"} />
+                <Text style={[styles.storyChipText, mine && { color: "#fff" }]}>Open story</Text>
+              </TouchableOpacity>
+            ) : null}
             {item.is_pinned && <Ionicons name="pin" size={11} color={mine ? "rgba(255,255,255,0.8)" : colors.textMuted} style={styles.pinIcon} />}
             {mine && status && !item.deletedAt && (
               <MessageTicks status={status} timeLabel={formatCallTimestamp(item.created_at)} onPress={onPressStatus} onLight={emojiOnly} />
@@ -1678,6 +1687,9 @@ const styles = StyleSheet.create({
   },
   bubbleTextMine: { color: "#fff" },
   mentionLink: { color: "#3B82F6", fontFamily: "Inter_600SemiBold" },
+  storyChip: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 6, paddingHorizontal: 10, minHeight: 32, borderRadius: 16, borderWidth: 1, borderColor: "#1D9E75" },
+  storyChipMine: { borderColor: "rgba(255,255,255,0.7)" },
+  storyChipText: { fontSize: 13, color: "#1D9E75", fontFamily: "Inter_600SemiBold" },
   deletedText: { fontSize: 13, fontStyle: "italic", color: colors.textMuted, fontFamily: "Inter_400Regular" },
   swipeReplyIconWrap: { width: 56, alignItems: "center", justifyContent: "center" },
   replyQuote: {

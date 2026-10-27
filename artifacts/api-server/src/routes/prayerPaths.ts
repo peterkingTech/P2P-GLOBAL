@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
+import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 
 // "Pray the Word" Stage 3 — Prayer Paths (migration 143). A Prayer Path is
 // a curated, ordered sequence of EXISTING p2p_scripture_references rows
@@ -155,9 +156,12 @@ router.put("/admin/paths/:id", requireAdmin, async (req, res) => {
 });
 
 router.delete("/admin/paths/:id", requireAdmin, async (req, res) => {
-  const { error } = await db.from("p2p_prayer_paths").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  const { data: path } = await db.from("p2p_prayer_paths").select("id").eq("id", req.params.id).maybeSingle();
+  if (!path) return ok(res, { removed: true });
+  // To the Admin Recycle Bin (migration 214) with its steps and learners' progress.
+  try { await moveToBin((req as any).adminUserId as string, "prayer_path", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 router.post("/admin/paths/:id/steps", requireAdmin, async (req, res) => {
@@ -182,9 +186,11 @@ router.post("/admin/paths/:id/steps", requireAdmin, async (req, res) => {
 });
 
 router.delete("/admin/paths/:id/steps/:stepId", requireAdmin, async (req, res) => {
-  const { error } = await db.from("p2p_prayer_path_steps").delete().eq("id", req.params.stepId).eq("path_id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  const { data: step } = await db.from("p2p_prayer_path_steps").select("id").eq("id", req.params.stepId).eq("path_id", req.params.id).maybeSingle();
+  if (!step) return ok(res, { removed: true });
+  try { await moveToBin((req as any).adminUserId as string, "prayer_path_step", String(req.params.stepId)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 export default router;

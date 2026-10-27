@@ -368,7 +368,10 @@ const A = load("lib/studioActions.ts");
   ok("static: no direct writes to native content from the Studio UI", !/p2p_kingdom_(stories|wins)/.test(all));
   const layout = readFileSync(path.join(root, "app/admin/_layout.tsx"), "utf8");
   ok("nav: Publishing Studio entry filtered by Studio roles", /label: "Publishing Studio", path: "\/admin\/studio"[^\n]*roles: STUDIO_VIEW_ROLES/.test(layout));
-  ok("unchanged: ordinary users keep in-app sharing of Kingdom Stories and Wins", /Share\.share/.test(readFileSync(path.join(root, "app/kingdom-stories/[id].tsx"), "utf8")) && /Share\.share/.test(readFileSync(path.join(root, "app/kingdom-wins/[id].tsx"), "utf8")));
+  // Story sharing moved into ShareStorySheet (P2P chats + "Other apps…" via Share.share).
+  const storyPage = readFileSync(path.join(root, "app/kingdom-stories/[id].tsx"), "utf8");
+  const storySheet = readFileSync(path.join(root, "components/kingdom-stories/ShareStorySheet.tsx"), "utf8");
+  ok("unchanged: ordinary users keep in-app sharing of Kingdom Stories and Wins", /<ShareStorySheet/.test(storyPage) && /Share\.share/.test(storySheet) && /Share\.share/.test(readFileSync(path.join(root, "app/kingdom-wins/[id].tsx"), "utf8")));
 }
 
 console.log(`${pass} passed, ${fail} failed`);

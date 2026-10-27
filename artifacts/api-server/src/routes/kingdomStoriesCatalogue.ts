@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
+import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 
 // Kingdom Stories catalogue (migration 210): Category → Topic → Story → Chapters.
 // Mounted by routes/kingdomStories.ts BEFORE its own routes; every path here
@@ -405,13 +406,13 @@ router.post("/:id/chapters/reorder", ...editor, async (req, res) => {
 
 router.delete("/:id/chapters/:chapterId", ...editor, async (req, res) => {
   if (!UUID_RE.test(p(req, "chapterId")) || !UUID_RE.test(p(req, "id"))) return err(res, "Chapter not found", 404);
-  // The chapter's images (migration 211) go with it: rows by cascade, files below once the row is gone.
-  const { data: chMedia } = await db.from("p2p_kingdom_story_media").select("media_path").eq("story_id", p(req, "id")).eq("chapter_id", p(req, "chapterId"));
-  const { data, error } = await db.from("p2p_kingdom_story_chapters").delete().eq("id", p(req, "chapterId")).eq("story_id", p(req, "id")).select("id").maybeSingle();
-  if (error) return dbFail(res, error, "Failed to remove chapter");
-  if (!data) return err(res, "Chapter not found", 404);
-  if (chMedia?.length) await db.storage.from("kingdom-stories-media").remove(chMedia.map((m) => m.media_path as string));
-  // Close the gap so chapters stay numbered 1, 2, 3…
+  // The chapter, its images and sources go to the Admin Recycle Bin (migration
+  // 214); files stay in storage until it is permanently deleted there.
+  const { data: ch } = await db.from("p2p_kingdom_story_chapters").select("id").eq("id", p(req, "chapterId")).eq("story_id", p(req, "id")).maybeSingle();
+  if (!ch) return err(res, "Chapter not found", 404);
+  try { await moveToBin((req as any).adminUserId as string, "kingdom_story_chapter", p(req, "chapterId")); }
+  catch (e) { return sendRecycleError(res, e); }
+  // Close the gap so chapters stay numbered 1, 2, 3… (a restored chapter goes at the end if its number is taken).
   const { data: rest } = await db.from("p2p_kingdom_story_chapters").select("id").eq("story_id", p(req, "id")).order("chapter_number", { ascending: true });
   if ((rest ?? []).length) await db.rpc("p2p_kingdom_story_reorder_chapters", { p_story_id: p(req, "id"), p_chapter_ids: (rest ?? []).map((c) => c.id) });
   return res.json({ removed: true });

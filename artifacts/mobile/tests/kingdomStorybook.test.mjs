@@ -105,7 +105,7 @@ ok("book: cover, introduction, progress, Start/Continue Reading, contents, sourc
   ["StoryImage media={cover}", "Introduction", "progressBox", "Start Reading", "Continue Reading", "Contents", "Sources & credits"].every((x) => book.includes(x)));
 ok("book: chapter status in words (not colour/icon only) and locked reason", book.includes("STATE_LABEL[st]") && book.includes("lockedMessage(chapters, ch.id)") && book.includes("accessibilityLabel={`Chapter ${ch.chapterNumber}"));
 ok("book: progress refreshed when returning from a chapter", book.includes("useFocusEffect"));
-ok("book: chapter images stay with their chapter (not in the story gallery)", book.includes("media.filter((m) => !m.chapterId && m.id !== cover?.id)"));
+ok("book: chapter images stay with their chapter (not in the story gallery)", book.includes("media.filter((m) => !m.chapterId && m.id !== cover?.id && m.id !== overview?.id)")); // overview image sits with the introduction (migration 215)
 ok("book: no Pray button", !book.includes(">Pray<") && !book.includes('"/(tabs)/prayer"'));
 ok("chapter: illustrations inside the chapter, in order", chapter.includes("m.chapterId === ch.id") && chapter.includes("sort((a, b) => a.displayOrder - b.displayOrder)") && chapter.includes("illustrationSlots("));
 ok("chapter: 'Lessons on This Chapter', Reflection, Comprehensive Check sections", ["Lessons on This Chapter", ">Reflection<", "{COMPREHENSIVE_CHECK}"].every((x) => chapter.includes(x)));

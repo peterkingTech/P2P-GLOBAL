@@ -126,6 +126,12 @@ export default function NotificationsScreen() {
       router.push(pathForNotification("missed_call", n.data) as any);
       return;
     }
+    // Study Together shared study (migration 216) — same destination as the push.
+    if ((n.notificationType ?? "").startsWith("shared_study_")) {
+      const path = pathForNotification(n.notificationType, n.data);
+      if (path !== "/notifications") router.push(path as any);
+      return;
+    }
     // Family Circle join request / approval (invite links) — same
     // destination as tapping the push.
     if (n.notificationType === "family_join_request" || n.notificationType === "family_join_approved" || n.notificationType === "assignment_reviewed") {

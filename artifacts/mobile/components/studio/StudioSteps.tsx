@@ -19,6 +19,8 @@ const TAP_GUARD_MS = 600;
 export function guardTap(fn: () => void): () => void {
   return () => { if (Date.now() - lastDialogClose >= TAP_GUARD_MS) fn(); };
 }
+/** For screens with their own ConfirmDialog: call when it closes so guardTap covers it too. */
+export function noteDialogClosed() { lastDialogClose = Date.now(); }
 
 type Pending = { action: ReviewAction } | { publish: true };
 

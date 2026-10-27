@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
+import { previewMoveToBin, moveToBin, moveToBinMessage, type DeletePreview } from "@/lib/recycleBinApi";
 import type { Curriculum } from "@/app/admin/curriculum";
 import {
   createPlanCategory, updatePlanCategory, deletePlanCategory, reorderPlanCategories,
@@ -217,7 +218,7 @@ function CategoryFormModal({
                 <TouchableOpacity
                   style={[styles.dangerBtn, deleting && { opacity: 0.7 }]}
                   disabled={deleting}
-                  onPress={() => showConfirm("Delete category?", "This cannot be undone. Categories with plans inside them can't be deleted — move or delete the plans first.", handleDelete)}
+                  onPress={() => showConfirm("Delete category?", "It moves to the Recycle Bin (Admin → Recycle Bin), where it can be restored. Categories with plans inside them can't be deleted — move or delete the plans first.", handleDelete)}
                 >
                   {deleting ? <ActivityIndicator size="small" color="#B91C1C" /> : <><Ionicons name="trash-outline" size={15} color="#B91C1C" /><Text style={styles.dangerBtnText}>Delete Category</Text></>}
                 </TouchableOpacity>
@@ -636,13 +637,15 @@ export default function PlanCategoryManager({
       showAlert("Duplicate failed", e.message ?? "Unknown error");
     }
   }
-  function handleDeletePlan(plan: Curriculum) {
-    showConfirm("Delete plan?", `"${plan.title}" and all its modules/lessons will be permanently deleted.`, async () => {
-      const { error } = await supabase.from("p2p_curriculums").delete().eq("id", plan.id);
-      if (error) {
-        showAlert("Could not delete plan", error.code === "23503" ? "This plan still has content inside it. Delete its modules first." : error.message);
-        return;
-      }
+  // Deleting a plan moves it (modules, lessons, learners' work) to the Admin
+  // Recycle Bin (migration 214) — restorable there.
+  async function handleDeletePlan(plan: Curriculum) {
+    let preview: DeletePreview;
+    try { preview = await previewMoveToBin("curriculum", plan.id); }
+    catch (e: any) { showAlert("Could not delete plan", e?.message ?? "Please try again."); return; }
+    showConfirm("Move plan to the Recycle Bin?", moveToBinMessage(plan.title, preview), async () => {
+      try { await moveToBin("curriculum", plan.id); }
+      catch (e: any) { showAlert("Could not delete plan", e?.message ?? "Please try again."); return; }
       await reload();
     });
   }
@@ -667,7 +670,7 @@ export default function PlanCategoryManager({
       { label: "Edit", icon: "create-outline", onPress: () => setCategoryModal(cat) },
       { label: "Add Plan", icon: "add-circle-outline", onPress: () => onCreatePlanInCategory(cat.id) },
       { label: "View Plans", icon: "eye-outline", onPress: () => { if (!expanded.has(cat.id)) toggleExpand(cat.id); } },
-      { label: "Delete", icon: "trash-outline", danger: true, onPress: () => showConfirm("Delete category?", `Delete "${cat.title}"? This only works if it has no plans inside it.`, async () => {
+      { label: "Delete", icon: "trash-outline", danger: true, onPress: () => showConfirm("Delete category?", `Move "${cat.title}" to the Recycle Bin? This only works if it has no plans inside it. It can be restored from Admin → Recycle Bin.`, async () => {
         try { await deletePlanCategory(cat.id); await reload(); } catch (e: any) { showAlert("Can't delete category", e.message ?? "Unknown error"); }
       }) },
     ];

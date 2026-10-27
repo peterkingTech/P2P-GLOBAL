@@ -6,6 +6,14 @@ import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import { computeReportStats } from "../lib/adminReports";
 import { parsePlanPdf, type ParsedLesson, type ParsedPlan } from "../lib/planPdfParser";
 import { validateUsername, formatUsername } from "../lib/username";
+import { moveToBin, sendRecycleError, type RecycleType } from "../lib/recycleBin";
+
+// Kingdom School deletes move the item (and everything under it, learners'
+// work included) to the Admin Recycle Bin (migration 214) — restorable.
+async function binIt(req: import("express").Request, res: import("express").Response, type: RecycleType, id: string) {
+  try { await moveToBin((req as any).adminUserId as string, type, id); return res.status(204).send(); }
+  catch (e) { return sendRecycleError(res, e); }
+}
 
 const router = Router();
 
@@ -141,11 +149,7 @@ router.put("/curriculum/:id", requireContentAdmin, async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/curriculum/:id", requireContentAdmin, async (req, res) => {
-  const { error } = await supabase.from("p2p_curriculums").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message);
-  return res.status(204).send();
-});
+router.delete("/curriculum/:id", requireContentAdmin, (req, res) => binIt(req, res, "curriculum", String(req.params.id)));
 
 // ── Module CRUD ───────────────────────────────────────────────────────────────
 
@@ -180,11 +184,7 @@ router.put("/module/:id", requireContentAdmin, async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/module/:id", requireContentAdmin, async (req, res) => {
-  const { error } = await supabase.from("p2p_modules").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message);
-  return res.status(204).send();
-});
+router.delete("/module/:id", requireContentAdmin, (req, res) => binIt(req, res, "module", String(req.params.id)));
 
 // Reorder module — PATCH /admin/module/:id/reorder { sort_order }
 router.patch("/module/:id/reorder", requireContentAdmin, async (req, res) => {
@@ -232,11 +232,7 @@ router.put("/lesson/:id", requireContentAdmin, async (req, res) => {
   return ok(res, data);
 });
 
-router.delete("/lesson/:id", requireContentAdmin, async (req, res) => {
-  const { error } = await supabase.from("p2p_lessons").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message);
-  return res.status(204).send();
-});
+router.delete("/lesson/:id", requireContentAdmin, (req, res) => binIt(req, res, "lesson", String(req.params.id)));
 
 router.patch("/lesson/:id/reorder", requireContentAdmin, async (req, res) => {
   const { sort_order } = req.body;
@@ -966,9 +962,11 @@ router.delete("/plan-categories/:categoryId", requireContentAdmin, async (req, r
   if (count && count > 0) {
     return err(res, `This category contains ${count} plan${count === 1 ? "" : "s"}. Move or delete them before removing the category.`, 400);
   }
-  const { error } = await supabaseWrite.from("p2p_curriculums").delete().eq("id", categoryId).eq("type", "plan_category");
-  if (error) return err(res, error.message);
-  return ok(res, { deleted: true });
+  const { data: cat } = await supabaseWrite.from("p2p_curriculums").select("id").eq("id", categoryId).eq("type", "plan_category").maybeSingle();
+  if (!cat) return err(res, "Category not found", 404);
+  try { await moveToBin((req as any).adminUserId as string, "curriculum", String(categoryId)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { deleted: true, movedToRecycleBin: true });
 });
 
 // PUT /admin/plan-categories/reorder — batch display_order update

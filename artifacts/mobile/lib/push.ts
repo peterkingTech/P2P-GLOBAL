@@ -237,6 +237,10 @@ export function pathForNotification(
   const assignmentId = typeof data?.assignmentId === "string" && /^[0-9a-f-]{36}$/i.test(data.assignmentId) ? data.assignmentId : null;
   const workScope = data?.scope === "family" || data?.scope === "church" ? data.scope : null;
   if (notificationType === "assignment_reviewed" && assignmentId && workScope) return `/learning/assignment/${assignmentId}?s=${workScope}`;
+  // Study Together shared study (migration 216): invitation / accepted /
+  // declined / group study started → that study (the screen re-checks access).
+  const studyId = typeof data?.studyId === "string" && /^[0-9a-f-]{36}$/i.test(data.studyId) ? data.studyId : null;
+  if (notificationType?.startsWith("shared_study_") && studyId) return `/study-together/${studyId}`;
   // Missed call — the thread holds the missed-call card (tap to call back);
   // history covers a call with no conversation.
   if (notificationType === "missed_call") {

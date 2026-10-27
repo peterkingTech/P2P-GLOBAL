@@ -12,6 +12,7 @@ import colors from "@/constants/colors";
 import BlockEditorPanel from "@/components/admin/BlockEditorPanel";
 import PdfImportModal from "@/components/admin/PdfImportModal";
 import PlanCategoryManager from "@/components/admin/PlanCategoryManager";
+import { previewMoveToBin, moveToBin, moveToBinMessage, type DeletePreview, type RecycleType } from "@/lib/recycleBinApi";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -295,27 +296,27 @@ export default function CurriculumManagerScreen() {
     selectLesson(newLesson.id);
   }
 
-  function confirmDelete(kind: string, id: string, table: string, after?: () => void) {
+  // Deleting moves the item, with everything inside it (learners' work
+  // included), to the Admin Recycle Bin (migration 214) — restorable there.
+  async function confirmDelete(kind: string, id: string, type: RecycleType, after?: () => void) {
+    let preview: DeletePreview | null = null;
+    try { preview = await previewMoveToBin(type, id); }
+    catch (e: any) { showAdminError(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
+    if (preview.blocked) { showAdminError(`Could not delete ${kind}`, preview.blocked === "recycle_system_content" ? "This holds learners' Kingdom Stories progress and cannot be deleted." : "This can't be deleted right now."); return; }
     const doDelete = async () => {
-      const { error } = await supabase.from(table).delete().eq("id", id);
-      if (error) {
-        showAdminError(
-          `Could not delete ${kind}`,
-          error.code === "23503"
-            ? `This ${kind} still has content inside it (${error.details ?? "referenced rows"}). Delete its contents first, then delete the ${kind}.`
-            : error.message
-        );
-        return;
-      }
+      try { await moveToBin(type, id); }
+      catch (e: any) { showAdminError(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
       after?.();
       loadTree();
     };
+    const title = `Move ${kind} to the Recycle Bin?`;
+    const message = moveToBinMessage(preview.title, preview);
     if (Platform.OS === "web") {
-      if (window.confirm(`Delete ${kind}?\n\nThis cannot be undone.`)) doDelete();
+      if (window.confirm(`${title}\n\n${message}`)) doDelete();
     } else {
-      Alert.alert(`Delete ${kind}?`, "This cannot be undone.", [
+      Alert.alert(title, message, [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: doDelete },
+        { text: "Move to Recycle Bin", style: "destructive", onPress: doDelete },
       ]);
     }
   }
@@ -535,7 +536,7 @@ export default function CurriculumManagerScreen() {
         onSaved={(m) => {
           setModulesMap((p) => ({ ...p, [m.curriculum_id]: (p[m.curriculum_id] ?? []).map((x) => (x.id === m.id ? m : x)) }));
         }}
-        onDelete={() => confirmDelete("module", selectedModule.id, "p2p_modules", () => setSelectedModuleId(null))}
+        onDelete={() => confirmDelete("module", selectedModule.id, "module", () => setSelectedModuleId(null))}
       />
     </ScrollView>
   ) : selectedCurriculum ? (
@@ -544,7 +545,7 @@ export default function CurriculumManagerScreen() {
         curriculum={selectedCurriculum}
         languages={languages}
         onSaved={(c) => setCurricula((p) => p.map((x) => (x.id === c.id ? c : x)))}
-        onDelete={() => confirmDelete("curriculum", selectedCurriculum.id, "p2p_curriculums", () => setSelectedCurriculumId(null))}
+        onDelete={() => confirmDelete("curriculum", selectedCurriculum.id, "curriculum", () => setSelectedCurriculumId(null))}
       />
     </ScrollView>
   ) : (

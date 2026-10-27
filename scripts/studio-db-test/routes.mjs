@@ -121,11 +121,21 @@ try {
   ok("M3 e2e: moderator / Kingdom Win (super_admin) / unapproved publish all refused", [r1, r2, r3, r3b, r4].every((r) => r.status === 403), [r1, r2, r3, r3b, r4].map((r) => r.status).join(","));
   ok("M3 e2e: refused requests created no Studio records", (await itemCount()) === before);
 
-  // Ambiguous DST time must be resolved explicitly.
-  const amb = await call("POST", `${sp(s3)}/schedules`, U.A, { action: "archive", localTime: "2026-10-25T01:30", timezone: "Europe/London" }, { "Idempotency-Key": "key-e2e-amb-01" });
-  ok("e2e: ambiguous local time without a choice → 400", amb.status === 400 && amb.body.code === "ambiguous_local_time");
-  const ambOk = await call("POST", `${sp(s3)}/schedules`, U.A, { action: "archive", localTime: "2026-10-25T01:30", timezone: "Europe/London", fold: "later" }, { "Idempotency-Key": "key-e2e-amb-02" });
-  ok("e2e: ambiguous local time with explicit choice → stored as that instant (UTC)", ambOk.status === 201 && new Date(ambOk.body.schedule.run_at).toISOString() === "2026-10-25T01:30:00.000Z", JSON.stringify(ambOk.body).slice(0, 200));
+  // Ambiguous DST time must be resolved explicitly. Schedules must be within a
+  // year, so use the next clock-change night that is (a fixed date goes stale).
+  const nthSunday = (y, m, n) => { const d = new Date(Date.UTC(y, m, 1)); const first = 1 + ((7 - d.getUTCDay()) % 7); return first + 7 * (n - 1); };
+  const lastSunday = (y, m) => { const d = new Date(Date.UTC(y, m + 1, 0)); return d.getUTCDate() - d.getUTCDay(); };
+  const pad = (n) => String(n).padStart(2, "0");
+  const ambCandidates = [0, 1].flatMap((dy) => { const y = new Date().getUTCFullYear() + dy; return [
+    // zone, local wall time that happens twice, the UTC instant of its second (later) occurrence
+    { tz: "Europe/London", local: `${y}-10-${pad(lastSunday(y, 9))}T01:30`, laterUtc: `${y}-10-${pad(lastSunday(y, 9))}T01:30:00.000Z` },
+    { tz: "America/New_York", local: `${y}-11-${pad(nthSunday(y, 10, 1))}T01:30`, laterUtc: `${y}-11-${pad(nthSunday(y, 10, 1))}T06:30:00.000Z` },
+  ]; });
+  const ambT = ambCandidates.map((c) => ({ ...c, at: Date.parse(c.laterUtc) })).filter((c) => c.at > Date.now() + 2 * 86400e3 && c.at < Date.now() + 360 * 86400e3).sort((a, b) => a.at - b.at)[0];
+  const amb = await call("POST", `${sp(s3)}/schedules`, U.A, { action: "archive", localTime: ambT.local, timezone: ambT.tz }, { "Idempotency-Key": "key-e2e-amb-01" });
+  ok("e2e: ambiguous local time without a choice → 400", amb.status === 400 && amb.body.code === "ambiguous_local_time", `${ambT.tz} ${ambT.local} ${JSON.stringify(amb.body)}`);
+  const ambOk = await call("POST", `${sp(s3)}/schedules`, U.A, { action: "archive", localTime: ambT.local, timezone: ambT.tz, fold: "later" }, { "Idempotency-Key": "key-e2e-amb-02" });
+  ok("e2e: ambiguous local time with explicit choice → stored as that instant (UTC)", ambOk.status === 201 && new Date(ambOk.body.schedule.run_at).toISOString() === ambT.laterUtc, JSON.stringify(ambOk.body).slice(0, 200));
   await call("POST", `/studio/schedules/${ambOk.body.schedule.id}/cancel`, U.A);
 
   // Scheduling + the real scheduler.

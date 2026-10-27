@@ -208,7 +208,7 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ marginLeft: "auto" }}
-                onPress={() => confirm("Delete this chapter?", "Its text, lessons, questions and sources are removed. This cannot be undone.", async () => {
+                onPress={() => confirm("Move this chapter to the Recycle Bin?", "Its text, lessons, questions, images and sources move to the Recycle Bin; the chapters after it move up. It can be restored from Admin → Recycle Bin.", async () => {
                   try { await deleteChapter(story.id, chapter.id); await onChanged(); } catch (e) { onError("Couldn't delete chapter", e); }
                 })}
               >

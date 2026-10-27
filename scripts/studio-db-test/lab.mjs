@@ -27,7 +27,7 @@ export function makeTranslator(db, role, uid = null) {
   const SETOF = new Set(["p2p_studio_claim_due_jobs", "p2p_studio_stale_approvals"]);
   return {
     from(table) {
-      const q = { op: "select", cols: "*", filters: [], order: null, limit: null, offset: null, payload: null, single: false, maybe: false, returning: false, count: false, head: false };
+      const q = { op: "select", cols: "*", filters: [], orders: [], limit: null, offset: null, payload: null, single: false, maybe: false, returning: false, count: false, head: false };
       const col = (c) => (typeof c === "string" ? c.replace(/->>([A-Za-z_][A-Za-z0-9_]*)$/, "->>'$1'") : c);
       const where = (params) => q.filters.length ? " where " + q.filters.map(([op, c0, v]) => { const c = col(c0);
         if (op === "in") { params.push(v); return `${c} = any($${params.length})`; }
@@ -44,7 +44,7 @@ export function makeTranslator(db, role, uid = null) {
         let sql;
         if (q.op === "select") {
           const w = where(params);
-          sql = `select ${q.cols} from ${table}${w}${q.order ? ` order by ${q.order[0]} ${q.order[1] ? "asc" : "desc"}` : ""}${q.limit != null ? ` limit ${q.limit}` : ""}${q.offset ? ` offset ${q.offset}` : ""}`;
+          sql = `select ${q.cols} from ${table}${w}${q.orders.length ? ` order by ${q.orders.map(([k, asc, nf]) => `${k} ${asc ? "asc" : "desc"}${nf === undefined ? "" : nf ? " nulls first" : " nulls last"}`).join(", ")}` : ""}${q.limit != null ? ` limit ${q.limit}` : ""}${q.offset ? ` offset ${q.offset}` : ""}`;
           try {
             const rows = q.head ? [] : (await run(sql, params)).rows;
             let count = null;
@@ -60,9 +60,12 @@ export function makeTranslator(db, role, uid = null) {
           const sets = Object.entries(q.payload).map(([k, v]) => { params.push(v); return `${k} = $${params.length}`; });
           sql = `update ${table} set ${sets.join(", ")}${where(params)}${q.returning ? ` returning ${q.cols}` : ""}`;
         } else if (q.op === "insert") {
-          const keys = Object.keys(q.payload);
-          keys.forEach((k) => params.push(q.payload[k]));
-          sql = `insert into ${table} (${keys.join(", ")}) values (${keys.map((_, i) => `$${i + 1}`).join(", ")})${q.returning ? ` returning ${q.cols}` : ""}`;
+          // One row or an array of rows (PostgREST bulk insert, same keys).
+          const rowsIn = Array.isArray(q.payload) ? q.payload : [q.payload];
+          if (!rowsIn.length) return { data: [], error: null };
+          const keys = Object.keys(rowsIn[0]);
+          const tuples = rowsIn.map((row) => `(${keys.map((k) => { params.push(row[k] ?? null); return `$${params.length}`; }).join(", ")})`);
+          sql = `insert into ${table} (${keys.join(", ")}) values ${tuples.join(", ")}${q.returning ? ` returning ${q.cols}` : ""}`;
         } else if (q.op === "upsert") {
           const keys = Object.keys(q.payload);
           keys.forEach((k) => params.push(q.payload[k]));
@@ -99,7 +102,8 @@ export function makeTranslator(db, role, uid = null) {
           q.filters.push(["or", null, parts]); return c;
         },
         like(k, v) { q.filters.push(["like", k, v]); return c; },
-        order(k, o) { q.order = [k, o?.ascending !== false]; return c; },
+        // Chained .order() calls all apply, in order (PostgREST semantics), with nullsFirst.
+        order(k, o) { q.orders.push([k, o?.ascending !== false, o?.nullsFirst]); return c; },
         limit(n) { q.limit = n; return c; },
         range(a, b) { q.offset = a; q.limit = b - a + 1; return c; },
         update(p) { q.op = "update"; q.payload = p; return c; },

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
+import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 import { getTranslationByCode } from "../lib/bibleService";
 
 // "Pray the Word" Stage 1 — Scripture & Topic foundation (migration 142).
@@ -191,9 +192,12 @@ router.put("/admin/topics/:id", requireAdmin, async (req, res) => {
 });
 
 router.delete("/admin/topics/:id", requireAdmin, async (req, res) => {
-  const { error } = await db.from("p2p_prayer_topics").delete().eq("id", req.params.id);
-  if (error) return err(res, error.message, 500);
-  return ok(res, { removed: true });
+  const { data: topic } = await db.from("p2p_prayer_topics").select("id").eq("id", req.params.id).maybeSingle();
+  if (!topic) return ok(res, { removed: true });
+  // To the Admin Recycle Bin (migration 214); paths and saved items keep existing (links re-made on restore).
+  try { await moveToBin((req as any).adminUserId as string, "prayer_topic", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 // POST /prayer/admin/scriptures — find-or-create a canonical reference row.

@@ -81,7 +81,7 @@ const AsyncStorage = { __esModule: true, default: { getItem: async (k) => store.
 // ── Prompt 5: Gathering Scripture uses the licensed chapter API, honest errors ──
 {
   const sp = src("components/family/ScripturePanel.tsx");
-  ok("P5: passage loaded via the chapter API (not per-verse /bible/passage)", /await getChapter\(b\.code, currentScripture\.chapter, t\)/.test(sp) && !/getBiblePassage\(/.test(sp));
+  ok("P5: passage loaded via the chapter API (not per-verse /bible/passage)", /await cachedChapter\(b\.code, currentScripture\.chapter, t\)/.test(sp) && /p = getChapter\(bookCode, chapter, translation\);/.test(src("lib/gatheringBible.ts")) && !/getBiblePassage\(/.test(sp));
   ok("P5: errors distinguish offline / not set up / busy / not in translation", /status === 0/.test(sp) && /status === 503/.test(sp) && /status === 429/.test(sp) && /status === 404/.test(sp));
   ok("P5: retry offered; reference shared, text fetched", /Try again/.test(sp) && /onSelect\(\{ translation: translationCode, translationName, book, chapter, startVerse: start, endVerse: end \}\)/.test(sp));
   ok("P5: 'Read the full chapter' opens the reader on top (push), off inside My Bible", /router\.push\(bibleRoute\(/.test(sp) && /showOpenInBible=\{false\}/.test(src("components/family/MyBibleSheet.tsx")));

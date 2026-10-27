@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { supabaseServiceRole as db, supabaseAsUser, verifyCaller } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
+import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 import catalogueRouter, { loadChapters } from "./kingdomStoriesCatalogue";
+import libraryRouter from "./kingdomStoryLibrary";
+import discoverRouter from "./kingdomStoryDiscover";
+import { savesFor, libraryNotReady } from "../lib/kingdomStoryLibrary";
 import { chapterLearning, storiesProgress, lockChapter } from "../lib/kingdomStoryLearning";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
@@ -16,6 +20,10 @@ const router = Router();
 // Catalogue (migration 210): categories with counts, topics, chapters. First,
 // so its two-segment paths are never taken for a story id.
 router.use(catalogueRouter);
+// Personal library (migration 215): /me/library, /:id/save, /:id/opened.
+router.use(libraryRouter);
+// Discovery homepage + editorial collections (migration 215).
+router.use(discoverRouter);
 
 function ok(res: import("express").Response, data: unknown) { return res.json(data); }
 function err(res: import("express").Response, message: string, status = 400) {
@@ -75,6 +83,8 @@ function mapStory(row: Record<string, unknown>, extra?: { category?: { slug: str
     relatedCurriculumId: row.related_curriculum_id, relatedKingdomWinId: row.related_kingdom_win_id, relatedStoryId: row.related_story_id,
     related: extra?.related ?? undefined,
     isFeatured: row.is_featured, status: row.status, topicId: row.topic_id ?? null,
+    // Stable display number within the category (migration 215), never the id.
+    topicNumber: (row.topic_number as number | null | undefined) ?? null,
     // A story is never lost when its editor's account is removed — see
     // migration 152's header. No name is shown either way (this is
     // editorial content, not an author byline / creator identity).
@@ -91,6 +101,8 @@ async function loadMedia(storyId: string) {
     displayOrder: m.display_order, isCover: m.is_cover, durationSeconds: m.duration_seconds, chapterId: m.chapter_id ?? null,
     // Migration 212: accessibility + attribution (null until an editor adds them).
     altText: m.alt_text ?? null, sourceUrl: m.source_url ?? null, licenseNote: m.license_note ?? null, imageKind: m.image_kind ?? null,
+    // Migration 215: where the image is used (null = cover/chapter/gallery by its other fields).
+    role: m.role ?? null,
   }));
 }
 async function loadSources(storyId: string) {
@@ -141,7 +153,9 @@ router.get("/categories", async (req, res) => {
 router.get("/feed", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
-  const { category, featured, q, page = "0", limit = "20" } = req.query as Record<string, string>;
+  const { category, featured, q, page = "0", limit = "20", sort = "topic" } = req.query as Record<string, string>;
+  // topic (default: the approved topic order) | title | recent (recently added) | updated
+  if (!["topic", "title", "recent", "updated"].includes(sort)) return err(res, "sort must be topic, title, recent or updated");
   const pageNum = Math.max(0, parseInt(page, 10) || 0);
   const pageSize = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
   const from = pageNum * pageSize;
@@ -154,21 +168,31 @@ router.get("/feed", async (req, res) => {
     categoryId = cat.id;
   }
 
-  let query = db.from("p2p_kingdom_stories").select("*", { count: "exact" })
-    .eq("status", "published").order("published_at", { ascending: false }).range(from, to);
-  if (categoryId) query = query.eq("category_id", categoryId);
-  if (featured === "true") query = query.eq("is_featured", true);
   // Title search over published stories only (never topics).
   const term = (q ?? "").split(String.fromCharCode(92)).join(" ").replace(/[%_]/g, " ").trim().slice(0, 100);
-  if (term) query = query.ilike("title", `%${term}%`);
-  const { data, error, count } = await query;
+  const run = (order: string) => {
+    let query = db.from("p2p_kingdom_stories").select("*", { count: "exact" }).eq("status", "published");
+    query = order === "title" ? query.order("title", { ascending: true })
+      : order === "updated" ? query.order("updated_at", { ascending: false })
+      : order === "recent" ? query.order("published_at", { ascending: false })
+      : query.order("topic_number", { ascending: true, nullsFirst: false }).order("published_at", { ascending: true });
+    query = query.range(from, to);
+    if (categoryId) query = query.eq("category_id", categoryId);
+    if (featured === "true") query = query.eq("is_featured", true);
+    if (term) query = query.ilike("title", `%${term}%`);
+    return query;
+  };
+  let { data, error, count } = await run(sort);
+  // Topic numbers (migration 215) not on this database yet: the previous newest-first order.
+  if (error && sort === "topic" && libraryNotReady(error)) ({ data, error, count } = await run("recent"));
   if (error) return err(res, error.message, 500);
 
   const categoryIds = [...new Set((data ?? []).map((r) => r.category_id))];
   const { data: cats } = categoryIds.length ? await db.from("p2p_kingdom_story_categories").select("id,slug,title").in("id", categoryIds) : { data: [] };
   const catById = new Map((cats ?? []).map((c) => [c.id, { slug: c.slug, title: c.title }]));
 
-  const progress = await storiesProgress((data ?? []).map((r) => r.id as string), userId);
+  const ids = (data ?? []).map((r) => r.id as string);
+  const [progress, saves] = await Promise.all([storiesProgress(ids, userId), savesFor(userId, ids)]);
   const stories = await Promise.all((data ?? []).map(async (r) => {
     const { data: cover } = await db.from("p2p_kingdom_story_media").select("*").eq("story_id", r.id).eq("is_cover", true).maybeSingle();
     return {
@@ -178,6 +202,8 @@ router.get("/feed", async (req, res) => {
       }),
       // The reader's own progress through the book (chapters submitted or completed).
       myProgress: progress.get(r.id as string) ?? null,
+      // The reader's own Favourite / Saved for Later (migration 215).
+      mine: saves.get(r.id as string) ?? { favourite: false, later: false },
     };
   }));
   return ok(res, { stories, total: count ?? 0, page: pageNum, pageSize });
@@ -206,7 +232,8 @@ router.get("/:id", async (req, res) => {
     const visible = learning.state === "locked" && !editor ? lockChapter(ch) : ch;
     return { ...visible, learning: learning.state === "locked" && !editor ? { ...learning, reflectionQuestions: [], check: null } : learning };
   });
-  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress });
+  const mine = (await savesFor(userId, [story.id as string])).get(story.id as string) ?? { favourite: false, later: false };
+  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress, mine });
 });
 
 // A chapter with no Comprehensive Check is finished by reading it. (Chapters
@@ -297,7 +324,7 @@ router.put("/:id", async (req, res) => {
   const {
     title, subtitle, categoryId, contentType, body, historicalPeriod, startYear, endYear, location, people,
     learningSection, reflection, scriptureReferenceId, relatedMissionFieldId, relatedMissionStoryId,
-    relatedCurriculumId, relatedKingdomWinId, relatedStoryId, isFeatured, status,
+    relatedCurriculumId, relatedKingdomWinId, relatedStoryId, isFeatured, status, topicNumber,
   } = req.body as Record<string, unknown>;
 
   if (status !== undefined && !OWNER_STATUSES.includes(status as string)) return err(res, `status must be one of: ${OWNER_STATUSES.join(", ")}`);
@@ -332,6 +359,11 @@ router.put("/:id", async (req, res) => {
     updates.related_story_id = relatedStoryId;
   }
   if (isFeatured !== undefined) updates.is_featured = !!isFeatured;
+  // Stable topic number (migration 215): unique within the category, never the id.
+  if (topicNumber !== undefined) {
+    if (topicNumber !== null && (!Number.isInteger(topicNumber) || (topicNumber as number) < 1 || (topicNumber as number) > 9999)) return err(res, "topicNumber must be a whole number from 1 to 9999");
+    updates.topic_number = topicNumber;
+  }
 
   // Field edits first (as before). A status change is a separate, named call
   // (migration 188): it is attributed to this editor, audited in the same
@@ -341,6 +373,7 @@ router.put("/:id", async (req, res) => {
   let data: Record<string, unknown> | null = existing as Record<string, unknown>;
   if (Object.keys(updates).length > 1) {
     const r = await db.from("p2p_kingdom_stories").update(updates).eq("id", req.params.id).select().single();
+    if (r.error?.code === "23505" && /topic_number/.test(r.error.message ?? "")) return err(res, `Topic ${String(topicNumber).padStart(3, "0")} is already used by another story in this category.`, 409);
     if (r.error || !r.data) return storyDbError(res, r.error, "Failed to update story");
     data = r.data as Record<string, unknown>;
   }
@@ -366,15 +399,15 @@ router.put("/:id", async (req, res) => {
   return ok(res, mapStory(data as Record<string, unknown>));
 });
 
+// Deleting moves the story (chapters, images, sources) to the Admin Recycle
+// Bin (migration 214); its files stay in storage until it is permanently
+// deleted there. A live story must be unpublished first.
 router.delete("/:id", async (req, res) => {
   const { data: existing } = await db.from("p2p_kingdom_stories").select("id").eq("id", req.params.id).maybeSingle();
   if (!existing) return err(res, "Story not found", 404);
-  const media = await loadMedia(req.params.id);
-  // Row first (audited by migration 188), files only once it is gone.
-  const { error } = await db.from("p2p_kingdom_stories").delete().eq("id", req.params.id);
-  if (error) return storyDbError(res, error, "Failed to delete story");
-  if (media.length) await db.storage.from("kingdom-stories-media").remove(media.map((m: any) => m.mediaPath));
-  return ok(res, { removed: true });
+  try { await moveToBin((req as any).adminUserId as string, "kingdom_story", String(req.params.id)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 // ── Media ────────────────────────────────────────────────────────────────
@@ -390,13 +423,17 @@ router.post("/:id/media", async (req, res) => {
   if (!mediaPath || typeof mediaPath !== "string") return err(res, "mediaPath is required");
   if (!mediaPath.startsWith(`${req.params.id}/`)) return err(res, "mediaPath must belong to this story", 400);
 
+  if (attribution.fields.role === "hero") {
+    const clear = await db.from("p2p_kingdom_story_media").update({ role: null }).eq("story_id", req.params.id).eq("role", "hero");
+    if (clear.error) return storyDbError(res, clear.error, "Failed to add media");
+  }
   const { data, error } = await db.from("p2p_kingdom_story_media").insert({
     ...(id ? { id } : {}), story_id: req.params.id, media_type: mediaType, media_path: mediaPath,
     caption: (caption as string)?.trim() || null, display_order: displayOrder ?? 0, is_cover: !!isCover,
     duration_seconds: durationSeconds ?? null, ...(chapterId ? { chapter_id: chapterId } : {}), ...attribution.fields,
   }).select().single();
   if (error || !data) return storyDbError(res, error, "Failed to add media");
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, durationSeconds: data.duration_seconds, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null, role: data.role ?? null });
 });
 
 router.put("/:id/media/:mediaId", async (req, res) => {
@@ -411,14 +448,20 @@ router.put("/:id/media/:mediaId", async (req, res) => {
   if (caption !== undefined) updates.caption = (caption as string)?.trim() || null;
   if (displayOrder !== undefined) updates.display_order = displayOrder;
   if (isCover !== undefined) updates.is_cover = !!isCover;
+  if (updates.role === "hero") {
+    const clear = await db.from("p2p_kingdom_story_media").update({ role: null }).eq("story_id", req.params.id).eq("role", "hero").neq("id", req.params.mediaId);
+    if (clear.error) return storyDbError(res, clear.error, "Failed to update media");
+  }
   const { data, error } = await db.from("p2p_kingdom_story_media").update(updates).eq("id", req.params.mediaId).eq("story_id", req.params.id).select().maybeSingle();
   if (error) return storyDbError(res, error, "Failed to update media");
   if (!data) return err(res, "Media item not found", 404);
-  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null });
+  return ok(res, { id: data.id, mediaType: data.media_type, mediaPath: data.media_path, caption: data.caption, displayOrder: data.display_order, isCover: data.is_cover, chapterId: data.chapter_id ?? null, altText: data.alt_text ?? null, sourceUrl: data.source_url ?? null, licenseNote: data.license_note ?? null, imageKind: data.image_kind ?? null, role: data.role ?? null });
 });
 
 // Optional image attribution + accessibility (migration 212). Only fields sent are changed.
 const IMAGE_KINDS = ["artistic_illustration", "historical_photograph", "artefact", "manuscript", "location_photograph", "ai_generated", "other"];
+// Migration 215: where an image is used. One hero per story (setting a new one clears the old).
+const MEDIA_ROLES = ["cover", "hero", "overview", "chapter", "thumbnail", "gallery"];
 function mediaAttribution(b: Record<string, unknown>): { fields: Record<string, unknown> } | { error: string } {
   const fields: Record<string, unknown> = {};
   for (const [k, col, max] of [["altText", "alt_text", 1000], ["sourceUrl", "source_url", 2000], ["licenseNote", "license_note", 1000]] as const) {
@@ -427,6 +470,10 @@ function mediaAttribution(b: Record<string, unknown>): { fields: Record<string, 
     const v = ((b[k] as string | null) ?? "").trim();
     if (v.length > max) return { error: `${k} is too long` };
     fields[col] = v || null;
+  }
+  if (b.role !== undefined) {
+    if (b.role !== null && !MEDIA_ROLES.includes(b.role as string)) return { error: `role must be one of: ${MEDIA_ROLES.join(", ")}` };
+    fields.role = b.role ?? null;
   }
   if (b.imageKind !== undefined) {
     if (b.imageKind !== null && !IMAGE_KINDS.includes(b.imageKind as string)) return { error: `imageKind must be one of: ${IMAGE_KINDS.join(", ")}` };
@@ -438,11 +485,10 @@ function mediaAttribution(b: Record<string, unknown>): { fields: Record<string, 
 router.delete("/:id/media/:mediaId", async (req, res) => {
   const { data: media } = await db.from("p2p_kingdom_story_media").select("media_path").eq("id", req.params.mediaId).eq("story_id", req.params.id).maybeSingle();
   if (!media) return err(res, "Media item not found", 404);
-  // Row first: if it is refused (a live story's media is frozen), the file stays.
-  const { error } = await db.from("p2p_kingdom_story_media").delete().eq("id", req.params.mediaId);
-  if (error) return storyDbError(res, error, "Failed to remove media");
-  await db.storage.from("kingdom-stories-media").remove([media.media_path as string]);
-  return ok(res, { removed: true });
+  // To the Recycle Bin (a live story's media stays frozen); the file is kept until purged there.
+  try { await moveToBin((req as any).adminUserId as string, "kingdom_story_media", String(req.params.mediaId)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 // ── Sources ──────────────────────────────────────────────────────────────
@@ -464,9 +510,11 @@ router.post("/:id/sources", async (req, res) => {
 });
 
 router.delete("/:id/sources/:sourceId", async (req, res) => {
-  const { error } = await db.from("p2p_kingdom_story_sources").delete().eq("id", req.params.sourceId).eq("story_id", req.params.id);
-  if (error) return storyDbError(res, error, "Failed to remove source");
-  return ok(res, { removed: true });
+  const { data: src } = await db.from("p2p_kingdom_story_sources").select("id").eq("id", req.params.sourceId).eq("story_id", req.params.id).maybeSingle();
+  if (!src) return ok(res, { removed: true });
+  try { await moveToBin((req as any).adminUserId as string, "kingdom_story_source", String(req.params.sourceId)); }
+  catch (e) { return sendRecycleError(res, e); }
+  return ok(res, { removed: true, movedToRecycleBin: true });
 });
 
 // ── Categories management (editor) ──────────────────────────────────────

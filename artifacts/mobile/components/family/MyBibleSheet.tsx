@@ -5,7 +5,8 @@ import { colors, spacing, type } from "@/lib/togetherTheme";
 import ScripturePanel from "@/components/family/ScripturePanel";
 import { getBibleTranslations, type WorshipScripture } from "@/lib/familyApi";
 import { useRouter } from "expo-router";
-import { bibleRoute, bookByName } from "@/lib/bibleReaderApi";
+import { bibleRoute, bookByName, bookByCode } from "@/lib/bibleReaderApi";
+import { loadPosition, savePosition } from "@/lib/bibleReadingPrefs";
 
 // "My Bible" during a Gathering (Prompt 6): anyone can read any passage on
 // their own, starting from the group's passage or a lesson reference. It
@@ -32,10 +33,25 @@ export default function MyBibleSheet({ visible, onClose, start }: Props) {
       : { book: "JHN", chapter: 1 }) as any);
   }
 
+  // Reading on your own continues where you last read (the same position the
+  // full Bible reader keeps on this device); the group's passage never moves.
+  function read(p: WorshipScripture) {
+    setPassage(p);
+    const b = bookByName(p.book);
+    if (b) savePosition({ translation: p.translation, book: b.code, chapter: p.chapter });
+  }
+
   // Lesson references may have no translation; use the first available one.
   useEffect(() => {
     if (!visible) return;
-    if (!start) { setPassage(null); return; }
+    if (!start) {
+      let cancelled = false;
+      loadPosition().then((pos) => {
+        const b = pos ? bookByCode(pos.book) : undefined;
+        if (!cancelled) setPassage(pos && b ? { book: b.name, chapter: pos.chapter, startVerse: 1, endVerse: 176, translation: pos.translation } : null);
+      });
+      return () => { cancelled = true; };
+    }
     if (start.translation) { setPassage({ ...start, translation: start.translation }); return; }
     let cancelled = false;
     getBibleTranslations("en").then((list) => {
@@ -64,7 +80,7 @@ export default function MyBibleSheet({ visible, onClose, start }: Props) {
           {/* Remount when the starting passage changes so the picker starts there. */}
           <ScripturePanel
             key={passage ? `${passage.book}-${passage.chapter}-${passage.translation}` : "none"}
-            currentScripture={passage} isGuide onSelect={setPassage} selectLabel="Read" largeText showOpenInBible={false}
+            currentScripture={passage} isGuide onSelect={read} selectLabel="Read" largeText showOpenInBible={false}
           />
         </ScrollView>
       </View>
