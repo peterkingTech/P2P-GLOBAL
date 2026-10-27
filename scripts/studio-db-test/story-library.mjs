@@ -36,6 +36,23 @@ await new Function("db", `return (async () => { ${standIns} })()`)(db);
 await db.exec(read("212_kingdom_story_learning.sql"));
 await db.exec(read("214_admin_recycle_bin.sql"));
 await db.exec(read("215_kingdom_story_library.sql"));
+// 217: exact client grants. Simulate Supabase's default privileges on 215's tables first, then 217 must remove them.
+await db.exec(`grant all on public.p2p_kingdom_story_saves, public.p2p_kingdom_story_views, public.p2p_kingdom_story_collections, public.p2p_kingdom_story_collection_items to anon, authenticated`);
+await db.exec(read("217_kingdom_story_library_grants.sql"));
+await db.exec(read("217_kingdom_story_library_grants.sql")); // idempotent
+{
+  const g = (await db.query(`select
+    has_table_privilege('authenticated','public.p2p_kingdom_story_saves','select,insert,delete') saves_ok,
+    has_table_privilege('authenticated','public.p2p_kingdom_story_saves','update') or has_table_privilege('authenticated','public.p2p_kingdom_story_saves','truncate') saves_extra,
+    has_table_privilege('authenticated','public.p2p_kingdom_story_views','select') views_read,
+    has_table_privilege('authenticated','public.p2p_kingdom_story_views','insert') or has_table_privilege('authenticated','public.p2p_kingdom_story_views','truncate') views_write,
+    has_table_privilege('authenticated','public.p2p_kingdom_story_collections','select') and has_table_privilege('authenticated','public.p2p_kingdom_story_collection_items','select') cols_read,
+    has_table_privilege('authenticated','public.p2p_kingdom_story_collections','insert,update,delete,truncate') cols_write,
+    has_table_privilege('anon','public.p2p_kingdom_story_saves','select') or has_table_privilege('anon','public.p2p_kingdom_story_collections','select') anon_any,
+    has_table_privilege('service_role','public.p2p_kingdom_story_views','select,insert,update,delete') svc`)).rows[0];
+  if (!(g.saves_ok && !g.saves_extra && g.views_read && !g.views_write && g.cols_read && !g.cols_write && !g.anon_any && g.svc)) throw new Error("217 grants wrong: " + JSON.stringify(g));
+  console.log("217 grants exact:", JSON.stringify(g));
+}
 await db.query(`update p2p_kingdom_story_categories set status = 'published' where id = $1`, [catId]);
 const q = async (sql, p) => (await db.query(sql, p)).rows;
 const one = async (sql, p) => (await q(sql, p))[0];
