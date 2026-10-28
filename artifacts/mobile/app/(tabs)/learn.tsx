@@ -572,6 +572,21 @@ export default function LearnTab() {
         </Modal>
 
         <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          {/* Learning Centre: every Comprehensive Check (school, stories, family, church) in one place. */}
+          <TouchableOpacity
+            onPress={() => router.push("/learning" as any)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: colors.card }}
+            accessibilityRole="button"
+            accessibilityLabel="Learning Centre. Your Comprehensive Checks, reviews and feedback"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="school-outline" size={18} color={colors.accentGreen} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, color: colors.textDark, fontFamily: "Inter_700Bold" }}>Learning Centre</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" }}>Your Comprehensive Checks, reviews and feedback</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+          </TouchableOpacity>
           <KingdomSchoolCards
             selected={selectedSection}
             onSelect={setSelectedSection}

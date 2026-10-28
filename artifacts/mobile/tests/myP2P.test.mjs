@@ -30,11 +30,11 @@ const m = mod.exports;
 
 // 1. layout
 const d = m.DEFAULT_LAYOUT;
-ok("default: all ten widgets, discipleship first", d.order.length === 10 && d.order[0] === "journey" && d.order.includes("journal"));
+ok("default: all eleven widgets, discipleship first", d.order.length === 11 && d.order[0] === "journey" && d.order.includes("journal"));
 ok("default: journal preview hidden", d.journalPreview === false);
 const n = m.normalizeLayout({ order: ["bible", "nope", "bible", "journal"], hidden: ["journey", "journal", "updates", "zzz"], journalPreview: "yes" });
 ok("normalize: unknown + duplicate ids dropped", n.order[0] === "bible" && n.order[1] === "journal" && !n.order.includes("nope"));
-ok("normalize: missing widgets appended", n.order.length === 10);
+ok("normalize: missing widgets appended", n.order.length === 11);
 ok("normalize: required widgets can't be hidden", !n.hidden.includes("journey") && !n.hidden.includes("journal") && n.hidden.join() === "updates");
 ok("normalize: preview only on explicit true", n.journalPreview === false);
 ok("normalize: garbage → default", JSON.stringify(m.normalizeLayout("x")) === JSON.stringify({ ...d, order: [...d.order] }));

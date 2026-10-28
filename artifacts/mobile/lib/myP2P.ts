@@ -10,7 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // leaves the signed-in app.
 
 export type WidgetId =
-  | "journey" | "journal" | "continue" | "growth" | "bible"
+  | "journey" | "journal" | "continue" | "learning" | "growth" | "bible"
   | "stories" | "together" | "communities" | "prayer" | "updates";
 
 export interface WidgetInfo { id: WidgetId; title: string; description: string; required?: boolean }
@@ -20,6 +20,7 @@ export const WIDGETS: readonly WidgetInfo[] = [
   { id: "journey", title: "My Discipleship Journey", description: "Your stage, milestones and next step", required: true },
   { id: "journal", title: "My Discipleship Journal", description: "Your private reflections and entries", required: true },
   { id: "continue", title: "Continue Learning", description: "Your current lesson and story" },
+  { id: "learning", title: "My Comprehensive Checks", description: "What to do, reviews and feedback" },
   { id: "growth", title: "Daily Growth", description: "Today's study time toward your goal" },
   { id: "bible", title: "My Bible", description: "Pick up where you left off" },
   { id: "stories", title: "Kingdom Stories", description: "A story to read or continue" },
@@ -33,7 +34,7 @@ export const widgetInfo = (id: WidgetId) => WIDGETS.find((w) => w.id === id)!;
 
 export interface Layout { order: WidgetId[]; hidden: WidgetId[]; journalPreview: boolean }
 export const DEFAULT_LAYOUT: Layout = {
-  order: ["journey", "continue", "journal", "growth", "bible", "stories", "together", "communities", "prayer", "updates"],
+  order: ["journey", "continue", "learning", "journal", "growth", "bible", "stories", "together", "communities", "prayer", "updates"],
   hidden: [],
   // Journal previews stay hidden until the person chooses to show them.
   journalPreview: false,

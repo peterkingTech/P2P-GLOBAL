@@ -194,6 +194,7 @@ import groupLearning from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/
 import familyStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/familyStudies.ts")))};
 import churchStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchStudies.ts")))};
 import lessonWork from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/lessonWork.ts")))};
+import learningCentre from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/learningCentre.ts")))};
 import churchCalls from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchCalls.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
@@ -210,6 +211,7 @@ app.use("/api", push);
 app.use("/api", churches);
 app.use("/api/family", familyWorship);
 app.use("/api/search", search);
+app.use("/api/learning/centre", learningCentre);
 app.use("/api/learning/work", lessonWork);
 app.use("/api/learning", groupLearning);
 app.use("/api/family", familyStudies);

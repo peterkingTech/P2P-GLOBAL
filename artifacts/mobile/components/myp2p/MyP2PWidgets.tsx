@@ -9,6 +9,7 @@ import { useData } from "@/contexts/DataContext";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getDiscoverHome, saveStory, unsaveStory, formatTopicNumber, type DiscoverHome } from "@/lib/kingdomStoriesApi";
 import { getMyStudies, type StudyCard } from "@/lib/studyTogetherApi";
+import { getLearningOverview, STATE_LABEL, SOURCE_LABEL, type WorkItem } from "@/lib/learningCentreApi";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bibleRoute, bookByCode } from "@/lib/bibleReaderApi";
 import { studyMinutesToday } from "@/lib/studyTime";
@@ -374,11 +375,42 @@ function UpdatesWidget({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+// ── My Comprehensive Checks (Learning Centre) ─────────────────────────────
+function LearningWidget({ refreshKey }: { refreshKey: number }) {
+  const { c, s } = useS();
+  const router = useRouter();
+  const { data, loading, error } = useLoad(() => getLearningOverview(), refreshKey);
+  const open = (x: WorkItem) => router.push({ pathname: x.route.pathname, params: x.route.params } as any);
+  const reviews = data ? data.toReview.reduce((n, x) => n + (x.waiting ?? 1), 0) : 0;
+  return (
+    <Card icon="school-outline" title="My Comprehensive Checks" s={s} c={c} onTitle={() => router.push("/learning" as any)}>
+      {loading && !data ? <Loading c={c} /> : error && !data ? <Unavailable s={s} /> : (
+        <>
+          {data!.toDo.slice(0, 3).map((x) => (
+            <TouchableOpacity key={x.key} style={s.listRow} onPress={() => open(x)} accessibilityRole="button" accessibilityLabel={`${x.title}, ${SOURCE_LABEL[x.source]}. ${STATE_LABEL[x.state]}`}>
+              <Text style={[s.line, { flex: 1 }]} numberOfLines={1}>{x.context ?? x.title}</Text>
+              <Text style={s.meta}>{STATE_LABEL[x.state]}</Text>
+            </TouchableOpacity>
+          ))}
+          {!data!.toDo.length ? <Text style={s.line}>Nothing to do right now.</Text> : null}
+          {data!.awaitingReview.length ? <Text style={s.meta}>{data!.awaitingReview.length} waiting for review</Text> : null}
+          {reviews ? <Text style={s.meta}>{reviews} waiting for your review</Text> : null}
+          {data!.feedback.length ? <Text style={s.meta}>{data!.feedback.length} with feedback for you</Text> : null}
+        </>
+      )}
+      <View style={s.row}>
+        <Btn label="Open Learning Centre" primary icon="school-outline" onPress={() => router.push("/learning" as any)} s={s} c={c} />
+      </View>
+    </Card>
+  );
+}
+
 export function MyP2PWidget({ id, refreshKey, journalPreview, onToggleJournalPreview }: { id: WidgetId; refreshKey: number; journalPreview: boolean; onToggleJournalPreview: () => void }) {
   switch (id) {
     case "journey": return <JourneyWidget refreshKey={refreshKey} />;
     case "journal": return <JournalWidget refreshKey={refreshKey} showPreview={journalPreview} onTogglePreview={onToggleJournalPreview} />;
     case "continue": return <ContinueWidget refreshKey={refreshKey} />;
+    case "learning": return <LearningWidget refreshKey={refreshKey} />;
     case "growth": return <GrowthWidget refreshKey={refreshKey} />;
     case "bible": return <BibleWidget refreshKey={refreshKey} />;
     case "stories": return <StoriesWidget refreshKey={refreshKey} />;
