@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
-import { GROUP_SCOPES, type GroupScope, isUuid, isGroupMember, canManageGroupLearning } from "../lib/groupLearning";
+import { GROUP_SCOPES, type GroupScope, isUuid, isGroupMember, canManageGroupLearning, canReviewGroupAssignment } from "../lib/groupLearning";
+import { attachmentsEnabled, linkAttachments, discardLinked, ATTACHED_ONLY } from "../lib/learningAttachments";
 import { readQuestions, normalizeScripture, normalizeResources } from "../lib/customLessons";
 
 // Reflections and assignments on custom lessons (Family + Church; migration 201).
@@ -174,11 +175,7 @@ async function loadAssignment(scope: GroupScope, assignmentId: string) {
 }
 
 /** May this person review submissions: a group leader, or the assignment's creator while still a member. */
-async function canReview(scope: GroupScope, a: Record<string, unknown>, userId: string) {
-  const groupId = a[groupColumn(scope)] as string;
-  if (await canManageGroupLearning(scope, groupId, userId)) return true;
-  return a.created_by === userId && (await isGroupMember(scope, groupId, userId));
-}
+const canReview = canReviewGroupAssignment;
 
 // GET /learning/work/:scope/lessons/:lessonId/assignments
 router.get("/:scope/lessons/:lessonId/assignments", async (req, res) => {
@@ -257,15 +254,31 @@ router.get("/:scope/assignments/:assignmentId/submissions/mine", async (req, res
 router.post("/:scope/assignments/:assignmentId/submissions", async (req, res) => {
   const a = await assignmentAccess(req, res); if (!a) return;
   if (a.asg.status !== "published") return err(res, "This Comprehensive Check isn't open", 409);
-  const content = (req.body as { content?: string })?.content;
-  if (typeof content !== "string" || !content.trim()) return err(res, "Write your answer first");
-  if (content.trim().length > LIMITS.submission) return err(res, "That answer is too long");
+  const body = (req.body ?? {}) as { content?: unknown; attachmentIds?: unknown; captions?: Record<string, unknown> };
+  const attachmentIds = Array.isArray(body.attachmentIds) ? (body.attachmentIds as unknown[]).filter((x): x is string => typeof x === "string") : [];
+  if (attachmentIds.length && !attachmentsEnabled()) return err(res, "Drawings and attachments aren't switched on yet.", 503);
+  const typed = typeof body.content === "string" ? body.content.trim() : "";
+  if (!typed && !attachmentIds.length) return err(res, "Write or attach your answer first");
+  if (typed.length > LIMITS.submission) return err(res, "That answer is too long");
+  // An answer given only as a drawing / file still carries words, so reviewers
+  // on an older app version know there is something to open.
+  const content = typed || ATTACHED_ONLY;
   const { data: latest } = await db.from("p2p_group_assignment_submissions").select("attempt,status").eq("assignment_id", a.asg.id as string).eq("user_id", a.userId)
     .order("attempt", { ascending: false }).limit(1).maybeSingle();
   if (latest && latest.status !== "returned" && !a.asg.allow_resubmission) return err(res, "You've already submitted this Comprehensive Check", 409);
   const attempt = ((latest?.attempt as number | undefined) ?? 0) + 1;
-  const { data, error } = await db.from("p2p_group_assignment_submissions").insert({ assignment_id: a.asg.id, user_id: a.userId, attempt, content: content.trim() }).select().single();
-  if (error || !data) return err(res, error?.message ?? "Couldn't submit", 500);
+  // Attachments are frozen and linked to the attempt's id FIRST, then the attempt is saved;
+  // if saving fails, the copies are removed in this same request (the drafts stay).
+  const id = crypto.randomUUID();
+  if (attachmentIds.length) {
+    const linked = await linkAttachments({ ownerId: a.userId, targetKind: "group_submission", targetId: id, ids: attachmentIds, captions: body.captions });
+    if ("error" in linked) return err(res, linked.error, linked.status);
+  }
+  const { data, error } = await db.from("p2p_group_assignment_submissions").insert({ id, assignment_id: a.asg.id, user_id: a.userId, attempt, content }).select().single();
+  if (error || !data) {
+    if (attachmentIds.length) await discardLinked("group_submission", id);
+    return err(res, error?.message ?? "Couldn't submit", 500);
+  }
   return ok(res, mapSubmission(data as Record<string, unknown>));
 });
 

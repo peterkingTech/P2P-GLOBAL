@@ -34,6 +34,13 @@ export async function canManageGroupLearning(scope: GroupScope, groupId: string,
   return !!data && CHURCH_LEADERSHIP.includes(data.role as string);
 }
 
+/** May this person review a group Comprehensive Check's submissions: a group leader, or its creator while still a member. */
+export async function canReviewGroupAssignment(scope: GroupScope, a: Record<string, unknown>, userId: string): Promise<boolean> {
+  const groupId = a[scopeColumn(scope)] as string;
+  if (await canManageGroupLearning(scope, groupId, userId)) return true;
+  return a.created_by === userId && (await isGroupMember(scope, groupId, userId));
+}
+
 export interface OutlineLesson { id: string; title: string; moduleId: string; moduleTitle: string }
 export interface CurriculumOutline {
   curriculum: { id: string; title: string; subtitle: string | null; type: string; coverImage: string | null };

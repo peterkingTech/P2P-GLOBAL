@@ -25,6 +25,7 @@ import {
   SubmissionType,
   UserHighlight,
 } from "@/contexts/DataContext";
+import { AttachmentTray, AttachmentList, clearTray } from "@/components/handwriting/AttachmentTray";
 import AudioRecorder from "@/components/AudioRecorder";
 import VideoRecorder from "@/components/VideoRecorder";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -150,6 +151,11 @@ export function QuestionResponseCard({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<QuestionSubmission | null>(existingSub ?? null);
   const [error, setError] = useState<string | null>(null);
+  // Comprehensive Check answers can carry drawings / photos / PDFs (optional; never reflections).
+  const trayKey = `lesson:${lessonId}:${question.id}`;
+  const [files, setFiles] = useState<{ ids: string[]; busy: boolean; count: number }>({ ids: [], busy: false, count: 0 });
+  const [trayReset, setTrayReset] = useState(0);
+  const canSend = (!!text.trim() || (kind === "assignment" && files.ids.length > 0)) && !files.busy;
 
   // existingSub is refetched (with real evaluation status) after every submit
   // and can also change from a live realtime update — keep local state in sync
@@ -165,7 +171,7 @@ export function QuestionResponseCard({
   }, [draft.restored]);
 
   async function handleTextSubmit() {
-    if (!text.trim() || submitting) return;
+    if (!canSend || submitting) return;
     setSubmitting(true);
     setError(null);
     const err = await submitContent({
@@ -175,6 +181,7 @@ export function QuestionResponseCard({
       assignmentId: kind === "assignment" ? assignmentId : null,
       type: "text",
       text: text.trim(),
+      attachmentIds: kind === "assignment" && files.ids.length ? files.ids : undefined,
     });
     setSubmitting(false);
     if (err) { setError(err); return; }
@@ -183,6 +190,7 @@ export function QuestionResponseCard({
     setExpanded(false);
     setFocusWriting(false);
     await draft.clear();
+    if (kind === "assignment" && files.count && profile?.id) { await clearTray(profile.id, trayKey); setTrayReset((n) => n + 1); }
     onSubmitted?.();
   }
 
@@ -273,6 +281,7 @@ export function QuestionResponseCard({
               <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
             </View>
           )}
+          {kind === "assignment" ? <View style={{ marginLeft: 36 }}><AttachmentList kind="core_submission" submissionId={submitted.id} compact /></View> : null}
           {kind === "assignment" && submitted.evaluationStatus === "needs_revision" && submitted.feedback ? (
             <View style={qStyles.revisionBanner}>
               <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
@@ -314,11 +323,12 @@ export function QuestionResponseCard({
                   <Text style={qStyles.expandBtnText}>Expand</Text>
                 </TouchableOpacity>
               </View>
+              {kind === "assignment" ? <AttachmentTray key={trayReset} trayKey={trayKey} disabled={submitting} onChange={setFiles} /> : null}
               {error && <Text style={qStyles.error}>{error}</Text>}
               <TouchableOpacity
-                style={[qStyles.submitBtn, (!text.trim() || submitting) && qStyles.submitBtnDisabled]}
+                style={[qStyles.submitBtn, (!canSend || submitting) && qStyles.submitBtnDisabled]}
                 onPress={handleTextSubmit}
-                disabled={!text.trim() || submitting}
+                disabled={!canSend || submitting}
                 activeOpacity={0.85}
               >
                 {submitting ? <ActivityIndicator color={colors.cream} size="small" /> : (

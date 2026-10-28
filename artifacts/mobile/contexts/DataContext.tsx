@@ -19,6 +19,7 @@ import { receiptsAvailable } from "@/lib/messageReceiptsApi";
 import { isMissingFunction } from "@/lib/profileColumns";
 import { STAGES, getStageFromPoints } from "@/constants/stages";
 import { getApiUrl } from "@/lib/apiUrl";
+import { linkToCoreAnswer, ATTACHED_ONLY } from "@/lib/learningAttachmentsApi";
 import { authedFetch } from "@/lib/adminFetch";
 import { dismissCallNotifications } from "@/lib/callNotifications";
 import { endSystemCall } from "@/lib/callSystem";
@@ -1132,6 +1133,8 @@ export interface SubmitContentParams {
   text?: string | null;
   mediaUri?: string | null;
   durationSeconds?: number | null;
+  /** Drawings / photos / PDFs (drafts) to send with a Comprehensive Check answer (migration 218). */
+  attachmentIds?: string[];
 }
 
 export type GrowthEventType = "lesson_completed" | "module_completed" | "disciple_gained";
@@ -4761,10 +4764,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const submitContent = useCallback(async (params: SubmitContentParams): Promise<string | null> => {
     if (!profile) return "You must be signed in to submit.";
-    const { lessonId, assignmentId, questionId, assignmentQuestionId, type, text, mediaUri, durationSeconds } = params;
+    const { lessonId, assignmentId, questionId, assignmentQuestionId, type, text, mediaUri, durationSeconds, attachmentIds } = params;
     try {
       const submissionId = generateUUID();
       let mediaPath: string | null = null;
+      // Attachments are frozen onto this answer's id BEFORE it is saved, so a
+      // reviewer never sees the answer without them. Checks only (never reflections).
+      const withFiles = !!attachmentIds?.length && !!assignmentQuestionId;
+      if (withFiles) {
+        try { await linkToCoreAnswer({ submissionId, lessonId, assignmentQuestionId: assignmentQuestionId!, attachmentIds: attachmentIds! }); }
+        catch (e) { return e instanceof Error ? e.message : "Couldn't attach your work. Please try again."; }
+      }
 
       if ((type === "audio" || type === "video") && mediaUri) {
         const uploaded = await uploadSubmissionMedia(mediaUri, submissionId, profile.id);
@@ -4780,7 +4790,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         reflection_question_id: questionId ?? null,
         assignment_question_id: assignmentQuestionId ?? null,
         submission_type: type,
-        text_content: text ?? null,
+        // An answer given only as a drawing / file still carries words, so a
+        // reviewer on an older app version knows there is something to open.
+        text_content: withFiles && type === "text" && !(text ?? "").trim() ? ATTACHED_ONLY : (text ?? null),
         media_url: mediaPath,
         duration_seconds: durationSeconds ?? null,
       });

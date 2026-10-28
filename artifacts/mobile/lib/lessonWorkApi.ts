@@ -49,7 +49,9 @@ export interface AssignmentInput { title?: string; instructions?: string | null;
 export const createAssignment = (s: WorkScope, lessonId: string, input: AssignmentInput) => call<Assignment>(`${L(s, lessonId)}/assignments`, { method: "POST", body: JSON.stringify(input) });
 export const updateAssignment = (s: WorkScope, id: string, input: AssignmentInput) => call<Assignment>(`/${s}/assignments/${id}`, { method: "PUT", body: JSON.stringify(input) });
 export const getMyAttempts = (s: WorkScope, id: string) => call<{ assignment: Assignment; attempts: Submission[] }>(`/${s}/assignments/${id}/submissions/mine`);
-export const submitAssignment = (s: WorkScope, id: string, content: string) => call<Submission>(`/${s}/assignments/${id}/submissions`, { method: "POST", body: JSON.stringify({ content }) });
+/** attachmentIds: drawing / photo / PDF drafts, frozen onto this attempt by the server (migration 218). */
+export const submitAssignment = (s: WorkScope, id: string, content: string, attachmentIds?: string[]) =>
+  call<Submission>(`/${s}/assignments/${id}/submissions`, { method: "POST", body: JSON.stringify(attachmentIds?.length ? { content, attachmentIds } : { content }) });
 export const getSubmissionsForReview = (s: WorkScope, id: string) =>
   call<{ assignment: Assignment; submissions: (Submission & { attempts: number; author: { id: string; name: string; photoUrl: string | null } })[] }>(`/${s}/assignments/${id}/submissions`);
 export const reviewSubmission = (s: WorkScope, submissionId: string, status: "reviewed" | "returned", feedback: string) =>

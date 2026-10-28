@@ -53,7 +53,7 @@ ok("sub-components at module level (typing keeps focus)", /^function ReflectionC
 const as = src("app/learning/assignment/[assignmentId].tsx");
 ok("submit only when open: first time, after return, or if resubmission allowed", /const canSubmit = !!assignment && assignment\.status === "published" && \(!latest \|\| latest\.status === "returned" \|\| assignment\.allowResubmission\);/.test(as));
 ok("all attempts shown with feedback (history kept)", /attempts\.map\(\(a\) =>/.test(as) && /Feedback: \{a\.feedback\}/.test(as));
-ok("answer is a device draft until submitted", /draftKey\(profile\.id, `custom:\$\{scope\}:assignment:\$\{assignmentId\}`\)/.test(as) && /await submitAssignment\(scope, assignmentId, draft\.text\); await draft\.clear\(\);/.test(as));
+ok("answer is a device draft until submitted", /draftKey\(profile\.id, `custom:\$\{scope\}:assignment:\$\{assignmentId\}`\)/.test(as) && /await submitAssignment\(scope, assignmentId, draft\.text(, files\.ids)?\);\s*await draft\.clear\(\);/.test(as));
 ok("review section only when the server lets you review", /try \{ setReview\(\(await getSubmissionsForReview\(scope, assignmentId\)\)\.submissions\); \} catch \{ setReview\(null\); \}/.test(as) && /\{review !== null && \(/.test(as));
 ok("returning work needs feedback", /if \(status === "returned" && !fb\)/.test(as));
 

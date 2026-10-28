@@ -17,6 +17,8 @@ import * as Haptics from "expo-haptics";
 import { useData, PendingEvaluation, MySubmission, SubmitterEvaluationContext } from "@/contexts/DataContext";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import MediaPlayer from "@/components/MediaPlayer";
+import { AttachmentList } from "@/components/handwriting/AttachmentTray";
+import { isAttachedOnlyText } from "@/lib/learningAttachmentsApi";
 import ReviewPrompts from "@/components/ReviewPrompts";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
@@ -226,11 +228,14 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
         </View>
       ) : (
         <View style={styles.contentBox}>
+          {isAttachedOnlyText(evaluation.content) ? <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>Answered with a drawing or file — open it below.</Text> : (
           <Text style={styles.contentText}>
             {evaluation.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}
-          </Text>
+          </Text>)}
         </View>
       )}
+      {/* Drawings / photos / PDFs sent with this answer — only its assigned reviewer (and the writer) can open them. */}
+      <AttachmentList kind="core_submission" submissionId={evaluation.submissionId} />
 
       <ReviewPrompts feedback={feedback} onChange={setFeedback} />
       <TextInput
@@ -332,10 +337,12 @@ function MySubmissionCard({ submission }: { submission: MySubmission }) {
       ) : (
         <View style={styles.contentBox}>
           <Text style={styles.contentText} numberOfLines={3}>
-            {submission.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}
+            {isAttachedOnlyText(submission.content) ? <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>Answered with a drawing or file</Text>
+              : submission.content || <Text style={{ color: colors.textMuted, fontStyle: "italic" }}>No text content</Text>}
           </Text>
         </View>
       )}
+      <AttachmentList kind="core_submission" submissionId={submission.id} compact />
 
       <View style={[styles.statusBadge, { backgroundColor: info.bg }]}>
         <Ionicons name={info.icon as any} size={13} color={info.color} />

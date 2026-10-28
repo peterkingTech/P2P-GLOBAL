@@ -5,6 +5,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDraft, draftKey } from "@/lib/drafts";
+import { AttachmentTray, AttachmentList, clearTray } from "@/components/handwriting/AttachmentTray";
+import { isAttachedOnlyText } from "@/lib/learningAttachmentsApi";
 import {
   getMyAttempts, submitAssignment, getSubmissionsForReview, reviewSubmission, updateAssignment,
   type Assignment, type Submission, type WorkScope,
@@ -38,6 +40,11 @@ export default function AssignmentScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  // Optional drawings / photos / PDFs on this answer (migration 218).
+  const trayKey = `custom:${scope}:assignment:${assignmentId}`;
+  const [files, setFiles] = useState<{ ids: string[]; busy: boolean; count: number }>({ ids: [], busy: false, count: 0 });
+  const [trayReset, setTrayReset] = useState(0);
+  const canSend = (!!draft.text.trim() || files.ids.length > 0) && !files.busy;
 
   const load = useCallback(async () => {
     if (!scope || !assignmentId) return;
@@ -54,9 +61,14 @@ export default function AssignmentScreen() {
   const canSubmit = !!assignment && assignment.status === "published" && (!latest || latest.status === "returned" || assignment.allowResubmission);
 
   async function submit() {
-    if (!scope || !assignmentId || !draft.text.trim() || busy) return;
+    if (!scope || !assignmentId || !canSend || busy) return;
     setBusy("submit");
-    try { await submitAssignment(scope, assignmentId, draft.text); await draft.clear(); await load(); }
+    try {
+      await submitAssignment(scope, assignmentId, draft.text, files.ids);
+      await draft.clear();
+      if (files.count && profile?.id) { await clearTray(profile.id, trayKey); setTrayReset((n) => n + 1); }
+      await load();
+    }
     catch (e: any) { notify("Couldn't submit", e?.message ?? "Please try again."); }
     finally { setBusy(null); }
   }
@@ -105,7 +117,8 @@ export default function AssignmentScreen() {
             {attempts.map((a) => (
               <View key={a.id} style={styles.attempt}>
                 <Text style={styles.meta}>Attempt {a.attempt} · {STATUS_LABEL[a.status]} · {new Date(a.submittedAt).toLocaleDateString()}</Text>
-                <Text style={styles.body}>{a.content}</Text>
+                {isAttachedOnlyText(a.content) ? null : <Text style={styles.body}>{a.content}</Text>}
+                <AttachmentList kind="group_submission" submissionId={a.id} compact />
                 {a.feedback ? <Text style={styles.feedback}>Feedback: {a.feedback}</Text> : null}
               </View>
             ))}
@@ -113,8 +126,9 @@ export default function AssignmentScreen() {
               <>
                 <TextInput style={styles.input} multiline textAlignVertical="top" value={draft.text} onChangeText={draft.setText}
                   placeholder={latest ? "Write your new answer…" : "Write your answer…"} placeholderTextColor={c.textMuted} accessibilityLabel="Your answer" />
+                <AttachmentTray key={trayReset} trayKey={trayKey} disabled={busy === "submit"} onChange={setFiles} />
                 <Text style={styles.meta}>{draft.text.trim() ? "Draft saved — it continues on your other devices" : "Reviewed by your group's leaders."}</Text>
-                <TouchableOpacity style={[styles.primary, (!draft.text.trim() || busy === "submit") && { opacity: 0.5 }]} onPress={submit} disabled={!draft.text.trim() || busy === "submit"} accessibilityRole="button">
+                <TouchableOpacity style={[styles.primary, (!canSend || busy === "submit") && { opacity: 0.5 }]} onPress={submit} disabled={!canSend || busy === "submit"} accessibilityRole="button">
                   {busy === "submit" ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{latest ? "Submit again" : "Submit"}</Text>}
                 </TouchableOpacity>
               </>
@@ -130,7 +144,8 @@ export default function AssignmentScreen() {
               <View key={r.id} style={styles.attempt}>
                 <Text style={styles.author}>{r.author.name}</Text>
                 <Text style={styles.meta}>Attempt {r.attempt}{r.attempts > 1 ? ` of ${r.attempts}` : ""} · {STATUS_LABEL[r.status]}</Text>
-                <Text style={styles.body}>{r.content}</Text>
+                {isAttachedOnlyText(r.content) ? null : <Text style={styles.body}>{r.content}</Text>}
+                <AttachmentList kind="group_submission" submissionId={r.id} compact />
                 {r.feedback ? <Text style={styles.feedback}>Your feedback: {r.feedback}</Text> : null}
                 {r.status === "submitted" && (
                   <>

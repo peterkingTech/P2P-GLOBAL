@@ -26,6 +26,8 @@ app.use(
   }),
 );
 app.use(cors());
+// Drawings (up to 2 MB of strokes) are saved through the API body; every other route keeps the default limit.
+app.use("/api/learning/attachments/handwriting", express.json({ limit: "3mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

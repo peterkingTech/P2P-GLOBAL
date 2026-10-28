@@ -48,6 +48,7 @@ import familyStudyPlansRouter from "./familyStudyPlans";
 import groupLearningRouter from "./groupLearning";
 import lessonWorkRouter from "./lessonWork";
 import learningCentreRouter from "./learningCentre";
+import learningAttachmentsRouter from "./learningAttachments";
 import youtubeEmbedRouter from "./youtubeEmbed";
 
 const router: IRouter = Router();
@@ -98,6 +99,7 @@ router.use("/family", familyRouter);
 router.use("/family", familyWorshipRouter); // worship sessions live under /family/worship/* (paths differ, handled internally)
 router.use("/family", familyStudiesRouter); // Custom Studies (Family) — live under /family/:familyId/studies and /family/studies/:studyId (paths differ, handled internally)
 router.use("/family", familyStudyPlansRouter); // Custom Study Plans (Family) — ordered arrangements of EXISTING p2p_lessons, live under /family/:familyId/study-plans, /family/study-plans/:planId, and /family/:familyId/study-source (paths differ, handled internally)
+router.use("/learning/attachments", learningAttachmentsRouter); // Handwriting, photos, PDFs on Comprehensive Check answers (migration 218) — drafts owner-only, frozen copies follow their answer
 router.use("/learning/centre", learningCentreRouter); // Learning Centre — one read-only view of my Comprehensive Checks across core, stories, family, church
 router.use("/learning/work", lessonWorkRouter); // Reflections + assignments on custom lessons (migration 201) — private-by-default reflections, attempts, reviews
 router.use("/learning", groupLearningRouter); // Group Learning (Family + Church, migration 199) — central P2P library references, journeys, group progress

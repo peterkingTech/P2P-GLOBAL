@@ -130,6 +130,21 @@ export function makeTranslator(db, role, uid = null) {
       const S = (globalThis.__labStorage ??= { objects: {}, calls: [] });
       return {
         remove: async (paths = []) => { for (const p of paths) delete S.objects[`${bucket}/${p}`]; S.calls.push({ op: "remove", bucket, paths }); return { data: null, error: null }; },
+        upload: async (p, body, opts = {}) => {
+          if (S.objects[`${bucket}/${p}`] && !opts.upsert) return { data: null, error: { message: "The resource already exists" } };
+          const text = typeof body === "string" ? body : Buffer.from(body).toString("utf8");
+          S.objects[`${bucket}/${p}`] = { size: Buffer.byteLength(text), body: text, contentType: opts.contentType };
+          S.calls.push({ op: "upload", bucket, path: p }); return { data: { path: p }, error: null };
+        },
+        copy: async (from, to) => {
+          const o = S.objects[`${bucket}/${from}`];
+          if (!o) return { data: null, error: { message: "Object not found" } };
+          S.objects[`${bucket}/${to}`] = { ...o }; S.calls.push({ op: "copy", bucket, from, to }); return { data: { path: to }, error: null };
+        },
+        download: async (p) => {
+          const o = S.objects[`${bucket}/${p}`];
+          return o ? { data: new Blob([o.body ?? ""]), error: null } : { data: null, error: { message: "Object not found" } };
+        },
         createSignedUploadUrl: async (p) => { S.calls.push({ op: "signUpload", bucket, path: p }); return { data: { signedUrl: `https://lab.storage/upload/${bucket}/${p}?token=lab`, token: "lab", path: p }, error: null }; },
         createSignedUrl: async (p, ttl, opts) => {
           S.calls.push({ op: "signDownload", bucket, path: p, ttl, opts });
@@ -195,11 +210,13 @@ import familyStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/
 import churchStudies from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchStudies.ts")))};
 import lessonWork from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/lessonWork.ts")))};
 import learningCentre from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/learningCentre.ts")))};
+import learningAttachments from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/learningAttachments.ts")))};
 import churchCalls from ${JSON.stringify(posix(path.join(apiRoot, "src/routes/churchCalls.ts")))};
 export { setWinsTranslatorForTests } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/winsTranslation.ts")))};
 export { runStudioScheduler } from ${JSON.stringify(posix(path.join(apiRoot, "src/lib/studio/runtime.ts")))};
 export const app = express();
 ${extraRoutes}
+app.use("/api/learning/attachments/handwriting", express.json({ limit: "3mb" }));
 app.use(express.json());
 app.use("/api/studio", studio);
 app.use("/api/kingdom-stories", stories);
@@ -211,6 +228,7 @@ app.use("/api", push);
 app.use("/api", churches);
 app.use("/api/family", familyWorship);
 app.use("/api/search", search);
+app.use("/api/learning/attachments", learningAttachments);
 app.use("/api/learning/centre", learningCentre);
 app.use("/api/learning/work", lessonWork);
 app.use("/api/learning", groupLearning);
