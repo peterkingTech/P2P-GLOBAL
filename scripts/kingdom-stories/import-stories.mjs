@@ -89,11 +89,12 @@ export function validate(stories, images = null) {
   return errors;
 }
 
-const storagePath = (storyId, file) => `${storyId}/pdf/${file}`;
-async function upload(storyId, file) {
+// PDF extracts live under pdf/; the editor's own artwork (folder: "p2p") under p2p/.
+const storagePath = (storyId, file, folder = "pdf") => `${storyId}/${folder}/${file}`;
+async function upload(storyId, file, folder) {
   const url = envValue(apiEnv, "SUPABASE_URL"), key = envValue(apiEnv, "SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing from artifacts/api-server/.env");
-  const r = await fetch(`${url.replace(/\/$/, "")}/storage/v1/object/${BUCKET}/${storagePath(storyId, file)}`, {
+  const r = await fetch(`${url.replace(/\/$/, "")}/storage/v1/object/${BUCKET}/${storagePath(storyId, file, folder)}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, apikey: key, "Content-Type": "image/jpeg", "x-upsert": "true" },
     body: readFileSync(path.join(imagesDir, file)),
@@ -181,12 +182,12 @@ async function run() {
         const hasCover = (await c.query("select 1 from public.p2p_kingdom_story_media where story_id = $1 and is_cover", [storyId])).rows.length > 0;
         let added = 0;
         for (const [order, x] of images[s.topicSlug].entries()) {
-          const p = storagePath(storyId, x.file);
+          const p = storagePath(storyId, x.file, x.folder);
           if (have.has(p)) continue;
           await c.query(`insert into public.p2p_kingdom_story_media (story_id, media_type, media_path, caption, display_order, is_cover, chapter_id)
                          values ($1, 'image', $2, $3, $4, $5, $6)`,
             [storyId, p, x.credit ? `Image: ${x.credit}` : null, order, x.cover && !hasCover, x.chapter ? chIds[x.chapter] : null]);
-          uploads.push([storyId, x.file]);
+          uploads.push([storyId, x.file, x.folder]);
           added++;
         }
         console.log(`      images: ${added} added${added < images[s.topicSlug].length ? `, ${images[s.topicSlug].length - added} already present` : ""}`);
@@ -198,7 +199,7 @@ async function run() {
     if (apply && uploads.length && !noUpload) {
       // Files before COMMIT, so no committed row ever points at a missing file.
       // A failure rolls the rows back; already-uploaded files are reused (upsert) on the next run.
-      for (const [sid, file] of uploads) await upload(sid, file);
+      for (const [sid, file, folder] of uploads) await upload(sid, file, folder);
       console.log(`Uploaded ${uploads.length} images to ${BUCKET}.`);
     }
     await c.query(apply ? "COMMIT" : "ROLLBACK");

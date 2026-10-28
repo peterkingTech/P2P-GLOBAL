@@ -8,15 +8,26 @@
 // null where the PDF names none (no credit is invented). Images added later
 // to fill gaps carry the artist and the holding collection instead.
 const img = (file, chapter, credit = null, cover = false) => ({ file, chapter, credit, cover });
+// The editor's own artwork (stored under <story>/p2p/).
+const p2p = (file, chapter, role = null) => ({ file, chapter, credit: "P2P Global | Creative Studios", cover: role === "cover", role: role === "cover" ? null : role, folder: "p2p" });
 
 export default {
+  // Topic 001 — the editor's own artwork (P2P Global | Creative Studios, 2026-10-27),
+  // replacing the earlier PDF images (those were moved to the Admin Recycle Bin).
+  // role: cover / hero (Featured hero) / overview (with the introduction) — migration 215.
   "creation-and-the-beginning-of-humanity": [
-    img("02_p02_1.jpg", 1, null, true),
-    img("02_p05_1.jpg", 2, "hisscripture.com"),
-    img("02_p07_1.jpg", 3, "bible.art"),
-    img("02_p10_1.jpg", 4, "christianpublishinghouse.co"),
-    img("02_p12_1.jpg", 5),
-    img("02_p15_1.jpg", 6, "christianpublishinghouse.co"),
+    p2p("creation-cover.jpg", null, "cover"),
+    p2p("creation-hero.jpg", null, "hero"),
+    p2p("creation-overview.jpg", null, "overview"),
+    p2p("creation-ch1-the-deep.jpg", 1),
+    p2p("creation-ch2-land-and-seas.jpg", 2),
+    p2p("creation-ch2-fruit-trees.jpg", 2),
+    p2p("creation-ch3-sun-moon-stars.jpg", 3),
+    p2p("creation-ch4-living-creatures.jpg", 4),
+    p2p("creation-ch5-image-of-god.jpg", 5),
+    p2p("creation-ch5-humanity-in-creation.jpg", 5),
+    p2p("creation-ch6-seventh-day.jpg", 6),
+    p2p("creation-ch6-rest.jpg", 6),
   ],
   "the-fall-of-humanity": [
     img("03_p02_1.jpg", 1, "christianpublishinghouse.co", true),
