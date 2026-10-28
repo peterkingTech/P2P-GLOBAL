@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform } from "react-native";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors as T, type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import { formatTopicNumber, getKingdomStoryMediaSignedUrl, type StoryCard } from "@/lib/kingdomStoriesApi";
@@ -11,8 +10,14 @@ import { formatTopicNumber, getKingdomStoryMediaSignedUrl, type StoryCard } from
 // show only real data: cover art, topic number, title, the reader's own
 // progress and whether it's a favourite.
 
-/** A private storybook image (signed URL, cached by its storage path). */
-export function CoverArt({ path, alt, style }: { path: string | null | undefined; alt?: string | null; style?: object }) {
+/**
+ * A private storybook image (signed URL, cached by its storage path), never
+ * cropped: the whole picture — including the "P2P Global | Creative Studios"
+ * credit in its corner — shows inside the card/banner shape, over a soft
+ * blurred copy of itself. `position: "top"` pins it to the top (the hero,
+ * whose title sits over the lower part).
+ */
+export function CoverArt({ path, alt, style, position = "center" }: { path: string | null | undefined; alt?: string | null; style?: object; position?: "center" | "top" }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -22,8 +27,13 @@ export function CoverArt({ path, alt, style }: { path: string | null | undefined
   }, [path]);
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: T.sheet }, style]} accessible={!!alt} accessibilityLabel={alt ?? undefined}>
-      {url ? <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
-        : <View style={styles.coverFallback}><Ionicons name="book-outline" size={26} color={T.textFaint} /></View>}
+      {url ? (
+        <>
+          <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={28} accessible={false} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.25)" }]} />
+          <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="contain" contentPosition={position} transition={200} />
+        </>
+      ) : <View style={styles.coverFallback}><Ionicons name="book-outline" size={26} color={T.textFaint} /></View>}
     </View>
   );
 }
@@ -46,15 +56,15 @@ export function StoryPosterCard({ story, onPress, width = 132, wide = false }: {
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ width: w }}
       accessibilityRole="button" accessibilityLabel={[num, story.title, story.category?.title, prog?.label, story.mine?.favourite ? "In your favourites" : null].filter(Boolean).join(". ")}>
       <View style={[styles.poster, { aspectRatio: wide ? 16 / 9 : 2 / 3 }]}>
+        {/* The whole cover shows (credit included); nothing is laid over its lower corners. */}
         <CoverArt path={cover?.mediaPath} />
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.85)"]} style={styles.posterShade} pointerEvents="none" />
         {num ? <View style={styles.numPill}><Text style={styles.numText}>{num.replace("Topic ", "")}</Text></View> : null}
         {story.mine?.favourite ? <Ionicons name="heart" size={16} color="#FB7185" style={styles.heart} /> : null}
-        <View style={styles.posterText}>
-          <Text style={styles.posterTitle} numberOfLines={wide ? 2 : 3}>{story.title}</Text>
-          {prog ? <Text style={styles.posterMeta} numberOfLines={1}>{prog.label}</Text> : null}
-        </View>
-        {prog && prog.fraction < 1 ? <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(4, Math.round(prog.fraction * 100))}%` }]} /></View> : null}
+      </View>
+      {prog && prog.fraction < 1 ? <View style={styles.track}><View style={[styles.fill, { width: `${Math.max(4, Math.round(prog.fraction * 100))}%` }]} /></View> : null}
+      <View style={styles.posterText}>
+        <Text style={styles.posterTitle} numberOfLines={2}>{story.title}</Text>
+        {prog ? <Text style={styles.posterMeta} numberOfLines={1}>{prog.label}</Text> : null}
       </View>
     </TouchableOpacity>
   );
@@ -86,14 +96,13 @@ export function DiscoverRow({ title, subtitle, stories, onOpen, onSeeAll, wide =
 const styles = StyleSheet.create({
   coverFallback: { flex: 1, alignItems: "center", justifyContent: "center" },
   poster: { borderRadius: 12, overflow: "hidden", backgroundColor: T.sheet, borderWidth: StyleSheet.hairlineWidth, borderColor: T.borderFaint },
-  posterShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "60%" },
   numPill: { position: "absolute", top: 8, left: 8, backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   numText: { color: T.textPrimary, ...TT.micro, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
   heart: { position: "absolute", top: 8, right: 8 },
-  posterText: { position: "absolute", left: 8, right: 8, bottom: 12, gap: 2 },
+  posterText: { paddingTop: 6, paddingHorizontal: 2, gap: 2 },
   posterTitle: { color: T.textPrimary, fontSize: 13, lineHeight: 17, fontFamily: "Inter_700Bold" },
   posterMeta: { color: T.textSecondary, ...TT.micro },
-  track: { position: "absolute", left: 0, right: 0, bottom: 0, height: 4, backgroundColor: "rgba(255,255,255,0.2)" },
+  track: { marginTop: 5, height: 4, borderRadius: 2, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.2)" },
   fill: { height: 4, backgroundColor: T.growth },
   row: { marginTop: 22 },
   rowHead: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, marginBottom: 10, gap: 8 },

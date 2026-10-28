@@ -191,7 +191,7 @@ export default function KingdomStoryBookScreen() {
           {(intro.theme || intro.scripture.length > 0 || intro.paragraphs.length > 0) && (
             <View style={s.section}>
               <Text style={s.sectionLabel}>Introduction</Text>
-              {overview ? <StoryImage media={overview} aspectRatio={4 / 3} /> : null}
+              {overview ? <StoryImage media={overview} /> : null}
               {!!intro.theme && <Text style={s.theme}>{intro.theme}</Text>}
               {intro.scripture.map((line, i) => <ScriptureChips key={i} line={line} label={i === 0 ? "Primary Scripture" : "Supporting Scripture"} />)}
               {intro.paragraphs.map((p, i) => <Text key={i} style={s.body}>{p}</Text>)}
@@ -331,19 +331,19 @@ function makeStyles(c: AppColors) {
     headerType: { flex: 1, textAlign: "center", fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6 },
     previewBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 12, padding: 10, borderRadius: 10, backgroundColor: "rgba(234,179,8,0.18)" },
     previewText: { flex: 1, fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
-    page: { paddingHorizontal: 20, maxWidth: 720, width: "100%", alignSelf: "center" },
-    topicNo: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase", textAlign: "center", marginTop: 18 },
+    page: { paddingHorizontal: 16, maxWidth: 720, width: "100%", alignSelf: "center" },
+    topicNo: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase", textAlign: "left", marginTop: 18 },
     libraryRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
     libraryBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     libraryBtnOn: { borderColor: c.accentGreen },
     libraryText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    title: { fontSize: 28, lineHeight: 34, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", marginTop: 18, textAlign: "center" },
-    subtitle: { fontSize: 16, lineHeight: 23, color: c.textMid, fontFamily: SCRIPTURE_FONT, fontStyle: "italic", marginTop: 8, textAlign: "center" },
-    meta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 10, textAlign: "center" },
+    title: { fontSize: 28, lineHeight: 34, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", marginTop: 18, textAlign: "left" },
+    subtitle: { fontSize: 16, lineHeight: 23, color: c.textMid, fontFamily: SCRIPTURE_FONT, fontStyle: "italic", marginTop: 8, textAlign: "left" },
+    meta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 10, textAlign: "left" },
     progressBox: { marginTop: 16, gap: 6 },
     progressTrack: { height: 6, borderRadius: 3, backgroundColor: c.borderBeige, overflow: "hidden" },
     progressFill: { height: 6, borderRadius: 3, backgroundColor: c.accentGreen },
-    progressText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", textAlign: "center" },
+    progressText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", textAlign: "left" },
     primaryBtn: { marginTop: 16, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen ?? c.accentGreen, borderRadius: 14, minHeight: 52, paddingHorizontal: 16 },
     primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
     studyModes: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },

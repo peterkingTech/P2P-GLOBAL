@@ -116,5 +116,30 @@ ok("collections: created as draft", cols.includes("Create (as draft)"));
 ok("collections: delete goes to the bin", cols.includes("deleteStoryCollection") && cols.includes("Recycle Bin"));
 ok("collections: linked from admin index", src("app/admin/kingdom-stories/index.tsx").includes("/admin/kingdom-stories/collections"));
 
+// 4. Images are never cropped (the corner credit "P2P Global | Creative Studios" must always show).
+const storyImg = src("components/kingdom-stories/StoryImage.tsx");
+const discover = src("components/kingdom-stories/DiscoverRow.tsx");
+const sharpCover = (s) => (s.match(/contentFit="cover"(?![^>]*blurRadius)/g) ?? []).length;
+ok("images: StoryImage shows the whole picture", storyImg.includes('contentFit="contain"') && sharpCover(storyImg) === 0);
+ok("images: full-width images take the picture's own shape", storyImg.includes("setNatural(width / height)"));
+ok("images: cards + hero show the whole picture (blurred fill only behind)", discover.includes('contentFit="contain"') && sharpCover(discover) === 0);
+ok("images: nothing laid over a card's picture except top-corner badges", !discover.includes("posterShade") && /posterText: \{ paddingTop/.test(discover));
+ok("images: hero title sits below the image", /heroText: \{ paddingHorizontal: 16, paddingTop: 14/.test(src("app/kingdom-stories/index.tsx")));
+ok("images: admin slot previews uncropped", src("components/kingdom-stories/ImageSlots.tsx").includes('resizeMode="contain"'));
+
+// 5. Reading layout: left-aligned, edge-to-edge on phones, paragraph kinds.
+const chapterSrc = src("app/kingdom-stories/chapter.tsx");
+ok("reader: 16px side margins, title/kicker/meta left-aligned", /page: \{ paddingHorizontal: 16/.test(chapterSrc) && !/(kicker|title|meta): \{[^}]*textAlign: "center"/.test(chapterSrc));
+ok("story page: 16px side margins, header text left-aligned", /page: \{ paddingHorizontal: 16/.test(reader) && !/(topicNo|title|subtitle|meta|progressText): \{[^}]*textAlign: "center"/.test(reader));
+const sb = load("lib/storybook.ts");
+const k = (p) => JSON.stringify(sb.paragraphKind(p));
+ok("kinds: sub-heading", k("Final reflection questions:") === JSON.stringify({ kind: "heading", text: "Final reflection questions" }));
+ok("kinds: titled label is a heading", sb.paragraphKind("Topic review: The complete creation story").kind === "heading");
+ok("kinds: numbered item", k("2. Explain the significance.") === JSON.stringify({ kind: "numbered", number: "2", text: "Explain the significance." }));
+ok("kinds: bold label", k("Reflection: Take a moment to consider it.") === JSON.stringify({ kind: "labelled", label: "Reflection", text: "Take a moment to consider it." }));
+ok("kinds: ordinary sentences untouched", sb.paragraphKind("God made the two great lights: the greater light to govern the day and the lesser light to govern the night.").kind === "plain"
+  && sb.paragraphKind("Then God spoke.").kind === "plain");
+ok("reader: renders the kinds", chapterSrc.includes("paragraphKind(p)") && chapterSrc.includes("s.subheading") && chapterSrc.includes("s.itemRow"));
+
 console.log(`kingdomLibrary: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

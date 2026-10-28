@@ -40,12 +40,13 @@ export function ScriptureChips({ line, label = "Scripture" }: { line: string | n
 }
 
 /** A paragraph whose verified Scripture references (e.g. "Hebrews 11:31") open the P2P Bible. */
-export function ScriptureText({ text, style }: { text: string; style: StyleProp<TextStyle> }) {
+export function ScriptureText({ text, style, label, labelStyle }: { text: string; style: StyleProp<TextStyle>; label?: string; labelStyle?: StyleProp<TextStyle> }) {
   const { colors: c } = useTheme();
   const open = useOpen();
   const runs = inlineScripture(text);
   return (
     <Text style={style}>
+      {label ? <Text style={labelStyle}>{label} </Text> : null}
       {runs.map((r, i) => r.target ? (
         <Text key={i} onPress={() => open(r.target!)} style={{ color: c.accentGreen, textDecorationLine: "underline" }}
           accessibilityRole="link" accessibilityLabel={`${r.text}. Opens in the P2P Bible`}>{r.text}</Text>

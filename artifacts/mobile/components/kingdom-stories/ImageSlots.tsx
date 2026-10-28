@@ -35,7 +35,7 @@ function Preview({ path, aspect }: { path: string | null; aspect: number }) {
   useEffect(() => { let live = true; setUrl(null); if (path) getKingdomStoryMediaSignedUrl(path).then((u) => live && setUrl(u)); return () => { live = false; }; }, [path]);
   return (
     <View style={[styles.preview, { aspectRatio: aspect }]}>
-      {path ? (url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ActivityIndicator color={colors.accentGreen} />)
+      {path ? (url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityIgnoresInvertColors /> : <ActivityIndicator color={colors.accentGreen} />)
         : <View style={styles.placeholder}><Ionicons name="image-outline" size={22} color={colors.textMuted} /><Text style={styles.placeholderText}>[ Upload or Select Image ]</Text></View>}
     </View>
   );

@@ -67,6 +67,33 @@ export function paragraphs(text: string | null | undefined): string[] {
   return String(text ?? "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 }
 
+/**
+ * How a narrative paragraph should be set in the reader (the text itself is
+ * never changed): a short line ending in ":" is a sub-heading ("Final
+ * reflection questions:"); "1. …" is a numbered item (hanging indent); a
+ * paragraph opening with a known label ("Reflection: …", "Closing thought:
+ * …", "Historical note: …") shows that label in bold.
+ */
+export type ParagraphKind =
+  | { kind: "heading"; text: string }
+  | { kind: "numbered"; number: string; text: string }
+  | { kind: "labelled"; label: string; text: string }
+  | { kind: "plain"; text: string };
+const LABELS = /^(Reflection|Closing thought|Topic review|Historical note|Interpretive note|Editorial note|Note)(:)\s+([\s\S]+)$/;
+export function paragraphKind(p: string): ParagraphKind {
+  const t = p.trim();
+  if (t.length <= 90 && /:$/.test(t) && !/[.!?]\s/.test(t)) return { kind: "heading", text: t.slice(0, -1) };
+  const n = t.match(/^(\d{1,2})\.\s+([\s\S]+)$/);
+  if (n) return { kind: "numbered", number: n[1], text: n[2] };
+  const l = t.match(LABELS);
+  if (l) {
+    // "Topic review: The complete creation story" — a label with a short title reads as a heading.
+    if (l[3].length <= 60 && !/[.!?]$/.test(l[3])) return { kind: "heading", text: `${l[1]}: ${l[3]}` };
+    return { kind: "labelled", label: l[1], text: l[3] };
+  }
+  return { kind: "plain", text: t };
+}
+
 /** The story's overview lines ("Central theme: …", "Primary Scripture: …") vs. its introduction. */
 export function storyIntro(body: string): { theme: string | null; scripture: string[]; paragraphs: string[] } {
   let theme: string | null = null;

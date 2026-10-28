@@ -71,7 +71,10 @@ export default function KingdomStoriesDiscoverScreen() {
 
   const f = home?.featured ?? null;
   const fProg = f ? progressOf(f) : null;
-  const heroH = Math.min(520, Math.max(320, Math.round(width * (width > 900 ? 0.42 : 1.05))));
+  // The Featured image is shown WHOLE (its own 16:9 shape, capped on wide screens with the sides softly
+  // filled) so the corner credit — “P2P Global | Creative Studios” — is never cropped or covered;
+  // the title and buttons sit below it.
+  const heroH = Math.max(insets.top + 120, Math.min(560, Math.round(width * 9 / 16)));
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -80,7 +83,7 @@ export default function KingdomStoriesDiscoverScreen() {
         {/* Hero: the Featured story (or a calm title band when none is featured) */}
         <View style={{ height: f ? heroH : insets.top + 120 }}>
           {f ? <CoverArt path={f.hero?.mediaPath ?? f.media?.[0]?.mediaPath} alt={f.hero?.altText ?? f.media?.[0]?.altText ?? null} /> : null}
-          <LinearGradient colors={["rgba(11,18,14,0.55)", "rgba(11,18,14,0.05)", "rgba(11,18,14,0.92)", T.background]} locations={[0, 0.3, 0.8, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <LinearGradient colors={["rgba(11,18,14,0.6)", "rgba(11,18,14,0)"]} locations={[0, 0.45]} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
               <Ionicons name="arrow-back" size={22} color={T.textPrimary} />
@@ -90,7 +93,11 @@ export default function KingdomStoriesDiscoverScreen() {
               <Ionicons name="library-outline" size={22} color={T.textPrimary} />
             </TouchableOpacity>
           </View>
-          {f ? (
+          {!f ? (
+            <Text style={[styles.heroSub, { paddingHorizontal: 16, marginTop: 8 }]}>Stories of faith, mission, sacrifice, revival, and the work of God across generations.</Text>
+          ) : null}
+        </View>
+        {f ? (
             <View style={styles.heroText}>
               <Text style={styles.heroKicker}>{["Featured", formatTopicNumber(f.topicNumber), f.category?.title].filter(Boolean).join(" · ")}</Text>
               <Text style={styles.heroTitle} accessibilityRole="header">{f.title}</Text>
@@ -110,10 +117,7 @@ export default function KingdomStoriesDiscoverScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          ) : (
-            <Text style={[styles.heroSub, { paddingHorizontal: 16, marginTop: 8 }]}>Stories of faith, mission, sacrifice, revival, and the work of God across generations.</Text>
-          )}
-        </View>
+        ) : null}
 
         <View style={styles.searchWrap}>
           <View style={styles.searchBox}>
@@ -208,7 +212,7 @@ const styles = StyleSheet.create({
   topBar: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
   iconBtn: { width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, alignItems: "center", justifyContent: "center" },
   brand: { flex: 1, textAlign: "center", color: T.textPrimary, fontSize: 15, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
-  heroText: { position: "absolute", left: 16, right: 16, bottom: 18, gap: 6, maxWidth: 720 },
+  heroText: { paddingHorizontal: 16, paddingTop: 14, gap: 6, maxWidth: 760, width: "100%" },
   heroKicker: { color: T.light, ...TT.label, textTransform: "uppercase" },
   heroTitle: { color: T.textPrimary, fontSize: 30, lineHeight: 36, fontFamily: "Inter_700Bold" },
   heroSub: { color: T.textSecondary, ...TT.body },

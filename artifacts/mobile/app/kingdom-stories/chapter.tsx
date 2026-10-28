@@ -8,7 +8,7 @@ import { useData } from "@/contexts/DataContext";
 import type { AppColors } from "@/constants/themes";
 import { getKingdomStory, finishKingdomStoryChapter, markStoryOpened, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
-import { paragraphs, illustrationSlots, lockedMessage, STATE_LABEL } from "@/lib/storybook";
+import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL } from "@/lib/storybook";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips, ScriptureText } from "@/components/kingdom-stories/ScriptureLinks";
@@ -209,7 +209,7 @@ export default function KingdomStoryChapterScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
           <Animated.View style={[s.page, pageTurn.pageStyle as any]}>
             <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.shade, pageTurn.shadeStyle]} />
-            {images[0] ? <StoryImage media={images[0]} aspectRatio={4 / 3} /> : null}
+            {images[0] ? <StoryImage media={images[0]} /> : null}
 
             <Text style={s.kicker}>Chapter {ch.chapterNumber}</Text>
             <Text style={s.title} accessibilityRole="header">{ch.title}</Text>
@@ -220,12 +220,23 @@ export default function KingdomStoryChapterScreen() {
             {[ch.dates, ch.places, ch.people].filter(Boolean).map((m, i) => <Text key={i} style={s.meta}>{m}</Text>)}
 
             <View style={s.narrative}>
-              {paras.map((p, i) => (
+              {paras.map((p, i) => {
+                // Set by kind (sub-heading, numbered item, bold label, plain) — the words are never changed.
+                const pk = paragraphKind(p);
+                return (
                 <React.Fragment key={i}>
-                  <ScriptureText text={p} style={s.paragraph} />
-                  {slots.map((slot, k) => slot === i ? <View key={k} style={{ marginVertical: 8 }}><StoryImage media={images[k + 1]} aspectRatio={4 / 3} /></View> : null)}
+                  {pk.kind === "heading" ? <Text style={s.subheading} accessibilityRole="header">{pk.text}</Text>
+                    : pk.kind === "numbered" ? (
+                      <View style={s.itemRow}>
+                        <Text style={s.itemNum}>{pk.number}.</Text>
+                        <ScriptureText text={pk.text} style={[s.paragraph, { flex: 1 }]} />
+                      </View>
+                    ) : pk.kind === "labelled" ? <ScriptureText text={pk.text} label={`${pk.label}:`} labelStyle={s.label} style={s.paragraph} />
+                    : <ScriptureText text={p} style={s.paragraph} />}
+                  {slots.map((slot, k) => slot === i ? <View key={k} style={{ marginVertical: 8 }}><StoryImage media={images[k + 1]} /></View> : null)}
                 </React.Fragment>
-              ))}
+                );
+              })}
             </View>
 
             {EVIDENCE.some((e) => ch.evidence?.[e.key]) && (
@@ -406,14 +417,18 @@ function makeStyles(c: AppColors, k: number) {
     sizeRow: { flexDirection: "row" },
     sizeSmall: { fontSize: 14, color: c.textDark, fontFamily: SCRIPTURE_FONT },
     sizeLarge: { fontSize: 20, color: c.textDark, fontFamily: SCRIPTURE_FONT },
-    page: { paddingHorizontal: 22, paddingTop: 8, maxWidth: 680, width: "100%", alignSelf: "center" },
-    kicker: { marginTop: 20, fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 1, textAlign: "center" },
-    title: { marginTop: 6, fontSize: 26 * k, lineHeight: 32 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "center" },
-    statePill: { alignSelf: "center", marginTop: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    page: { paddingHorizontal: 16, paddingTop: 8, maxWidth: 680, width: "100%", alignSelf: "center" },
+    kicker: { marginTop: 20, fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 1, textAlign: "left" },
+    title: { marginTop: 6, fontSize: 26 * k, lineHeight: 32 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "left" },
+    statePill: { alignSelf: "flex-start", marginTop: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     statePillText: { fontSize: 11, color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    meta: { marginTop: 6, fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium", textAlign: "center" },
+    meta: { marginTop: 6, fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium", textAlign: "left" },
     narrative: { marginTop: 20, gap: 16 },
-    paragraph: { fontSize: 18 * k, lineHeight: 30 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT },
+    paragraph: { fontSize: 18 * k, lineHeight: 30 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, textAlign: "left" },
+    subheading: { marginTop: 10, fontSize: 19 * k, lineHeight: 26 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "left" },
+    label: { fontFamily: SCRIPTURE_FONT, fontWeight: "700", color: c.textDark },
+    itemRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
+    itemNum: { minWidth: 22, fontSize: 18 * k, lineHeight: 30 * k, color: c.accentGreen, fontFamily: SCRIPTURE_FONT, fontWeight: "700" },
     ornament: { textAlign: "center", fontSize: 22, color: c.textMuted, marginVertical: 26 },
     section: { gap: 12, marginBottom: 28 },
     sectionTitle: { fontSize: 20 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700" },
