@@ -147,8 +147,8 @@ try {
   await q(`update p2p_kingdom_stories set status = 'draft' where id = $1`, [sid]).catch(() => {});
   const live = (await q(`select status from p2p_kingdom_stories where id=$1`, [sid]))[0].status === "published";
   if (live) await call("PUT", `/kingdom-stories/${sid}`, U.A, { status: "draft" });
-  const putImg = await call("PUT", `/kingdom-stories/${sid}/media/${mid}`, U.A, { altText: "Two scouts on a roof under flax", imageKind: "artistic_illustration", licenseNote: "Used with permission" });
-  ok("image attribution saved", putImg.status === 200 && putImg.body.altText === "Two scouts on a roof under flax" && putImg.body.imageKind === "artistic_illustration", JSON.stringify(putImg.body).slice(0, 200));
+  const putImg = await call("PUT", `/kingdom-stories/${sid}/media/${mid}`, U.A, { altText: "Two scouts on a roof under flax", imageKind: "ai_generated", licenseNote: "Used with permission" });
+  ok("image attribution saved", putImg.status === 200 && putImg.body.altText === "Two scouts on a roof under flax" && putImg.body.imageKind === "ai_generated", JSON.stringify(putImg.body).slice(0, 200));
   ok("unknown image kind rejected", (await call("PUT", `/kingdom-stories/${sid}/media/${mid}`, U.A, { imageKind: "photo" })).status === 400);
   ok("students can't change image details", [401, 403].includes((await call("PUT", `/kingdom-stories/${sid}/media/${mid}`, READER, { altText: "x" })).status));
 } finally {

@@ -56,7 +56,7 @@ export default function MediaDetailsEditor({ story, locked, onChanged, onError }
             onEndEditing={(e) => save(m.id, { licenseNote: e.nativeEvent.text })} accessibilityLabel="Licence or permission" />
         </View>
       ))}
-      {open && <Text style={s.hint}>Only publish images you have the right to use. Label AI-generated or artistic images as such — never present them as historical records.</Text>}
+      {open && <Text style={s.hint}>Only publish images you have the right to use. Label AI-generated images as such — never present them as historical records.</Text>}
     </View>
   );
 }

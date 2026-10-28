@@ -46,9 +46,9 @@ export interface KingdomStoryMedia {
   role?: MediaRole | null;
 }
 export type MediaRole = "cover" | "hero" | "overview" | "chapter" | "thumbnail" | "gallery";
-export type KingdomImageKind = "artistic_illustration" | "historical_photograph" | "artefact" | "manuscript" | "location_photograph" | "ai_generated" | "other";
+export type KingdomImageKind = "historical_photograph" | "artefact" | "manuscript" | "location_photograph" | "ai_generated" | "other";
 export const IMAGE_KIND_LABELS: Record<KingdomImageKind, string> = {
-  artistic_illustration: "Artistic illustration", historical_photograph: "Historical photograph", artefact: "Historical artefact",
+  historical_photograph: "Historical photograph", artefact: "Historical artefact",
   manuscript: "Manuscript", location_photograph: "Modern photograph of the place", ai_generated: "AI-generated illustration (not a historical record)", other: "Image",
 };
 export interface KingdomStorySource {

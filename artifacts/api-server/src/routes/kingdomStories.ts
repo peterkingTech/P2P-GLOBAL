@@ -459,7 +459,8 @@ router.put("/:id/media/:mediaId", async (req, res) => {
 });
 
 // Optional image attribution + accessibility (migration 212). Only fields sent are changed.
-const IMAGE_KINDS = ["artistic_illustration", "historical_photograph", "artefact", "manuscript", "location_photograph", "ai_generated", "other"];
+// "artistic_illustration" was retired 2026-10-28 (editor: no such label on images); the DB still tolerates old values.
+const IMAGE_KINDS = ["historical_photograph", "artefact", "manuscript", "location_photograph", "ai_generated", "other"];
 // Migration 215: where an image is used. One hero per story (setting a new one clears the old).
 const MEDIA_ROLES = ["cover", "hero", "overview", "chapter", "thumbnail", "gallery"];
 function mediaAttribution(b: Record<string, unknown>): { fields: Record<string, unknown> } | { error: string } {
