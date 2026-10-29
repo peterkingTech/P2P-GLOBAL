@@ -3,6 +3,7 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin, requireRole } from "../middleware/adminAuth";
 import { storiesProgress } from "../lib/kingdomStoryLearning";
 import { heroesFor, libraryNotReady, storyCards } from "../lib/kingdomStoryLibrary";
+import { nextInJourney, recommend, sequences, type JourneyCategory, type JourneyStory } from "../lib/kingdomStoryJourney";
 import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 
 // Kingdom Stories discovery (migration 215), mounted inside /kingdom-stories
@@ -12,7 +13,15 @@ import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 //     reader's Continue Learning / Favourites / Saved for Later / Recently
 //     viewed, published editorial collections, a row per category (topic
 //     order) and Recently added. Only published stories; no invented
-//     popularity or recommendations.
+//     popularity. Newer apps also read:
+//       hero — the editor's Featured story, else the reader's next story in
+//         the biblical order, else the first story in that order (source says which);
+//       heroSlides — the swipeable hero: every editor-Featured story (newest
+//         first), then the reader's next story, then up to two they are reading
+//         (no repeats, at most 5; the first slide is always `hero`);
+//       journey — the next story in the biblical order and what follows it;
+//       recommended — stories with the reason each is suggested
+//     (lib/kingdomStoryJourney.ts). `featured` is unchanged for older apps.
 //   Editors (admin_content / super_admin): /admin/collections CRUD; deleting
 //   a collection moves it to the Admin Recycle Bin.
 
@@ -74,8 +83,25 @@ router.get("/discover", async (req, res) => {
     total: stories.filter((s) => s.category_id === c.id).length })).filter((r) => r.ids.length > 0);
   const recentlyAdded = newest.slice(0, 10).map((s) => s.id as string);
 
+  // The biblical order: categories in display order, stories by topic number.
+  const jCats: JourneyCategory[] = ((cats ?? []) as any[]).map((c) => ({ id: c.id, title: c.title, displayOrder: c.display_order ?? 0 }));
+  const jStories: JourneyStory[] = stories.map((s) => ({ id: s.id, categoryId: s.category_id, topicNumber: s.topic_number ?? null, publishedAt: s.published_at ?? null, relatedStoryId: s.related_story_id ?? null }));
+  const lastActive = new Map(views.map((v) => [v.story_id as string, v.last_opened_at as string | null]));
+  const journey = nextInJourney(jCats, jStories, progress, lastActive);
+  const firstInOrder = sequences(jCats, jStories)[0]?.ids[0] ?? null;
+  const heroId: string | null = featured?.id ?? journey?.storyId ?? firstInOrder;
+  const heroSource = featured ? "featured" : journey ? "journey" : heroId ? "first" : null;
+  const titles = new Map(stories.map((s) => [s.id as string, s.title as string]));
+  const slideIds: { id: string; source: string }[] = [];
+  const addSlide = (id: string | null | undefined, source: string) => { if (id && slideIds.length < 5 && !slideIds.some((x) => x.id === id)) slideIds.push({ id, source }); };
+  if (heroId && heroSource) addSlide(heroId, heroSource);
+  for (const st of newest.filter((x) => x.is_featured)) addSlide(st.id, "featured");
+  addSlide(journey?.storyId, "journey");
+  for (const id of continueIds.slice(0, 2)) addSlide(id, "continue");
+  const recommended = recommend(jCats, jStories, progress, journey, titles, new Set([...(heroId ? [heroId] : []), ...continueIds.slice(0, ROW)]));
+
   // One card build for every story shown; resume chapter number where known.
-  const all = [...new Set([...(featured ? [featured.id] : []), ...continueIds.slice(0, ROW), ...favouriteIds.slice(0, ROW), ...laterIds.slice(0, ROW), ...recentIds.slice(0, ROW),
+  const all = [...new Set([...(featured ? [featured.id] : []), ...slideIds.map((x) => x.id), ...(journey ? [journey.storyId, ...journey.upNext.slice(0, ROW)] : []), ...recommended.map((r) => r.storyId), ...continueIds.slice(0, ROW), ...favouriteIds.slice(0, ROW), ...laterIds.slice(0, ROW), ...recentIds.slice(0, ROW),
     ...collections.flatMap((c) => c.ids.slice(0, ROW)), ...catRows.flatMap((r) => r.ids), ...recentlyAdded])];
   const lastChapterIds = [...new Set(views.map((v) => v.last_chapter_id).filter(Boolean))] as string[];
   const { data: chNums } = lastChapterIds.length ? await db.from("p2p_kingdom_story_chapters").select("id,chapter_number").in("id", lastChapterIds) : { data: [] as any[] };
@@ -84,10 +110,18 @@ router.get("/discover", async (req, res) => {
   const cardList = await storyCards(userId, all, extra);
   const card = new Map(cardList.map((c) => [c.id as string, c]));
   const pick = (list: string[]) => list.map((id) => card.get(id)).filter(Boolean);
-  const heroes = featured ? await heroesFor([featured.id]) : new Map();
+  const heroes = await heroesFor([...new Set([featured?.id, ...slideIds.map((x) => x.id)].filter(Boolean) as string[])]);
 
   return res.json({
     featured: featured && card.get(featured.id) ? { ...card.get(featured.id), hero: heroes.get(featured.id) ?? null } : null,
+    hero: heroId && card.get(heroId) ? { ...card.get(heroId), hero: heroes.get(heroId) ?? null, source: heroSource } : null,
+    heroSlides: slideIds.filter((x) => card.has(x.id)).map((x) => ({ ...card.get(x.id), hero: heroes.get(x.id) ?? null, source: x.source })),
+    journey: journey && card.get(journey.storyId) ? {
+      story: card.get(journey.storyId), state: journey.state, position: journey.position, categoryTotal: journey.categoryTotal,
+      category: jCats.find((c) => c.id === journey.categoryId) ? { id: journey.categoryId, title: jCats.find((c) => c.id === journey.categoryId)!.title } : null,
+      upNext: pick(journey.upNext.slice(0, ROW)),
+    } : null,
+    recommended: recommended.filter((r) => card.has(r.storyId)).map((r) => ({ ...card.get(r.storyId), reason: r.reason, reasonLabel: r.label })),
     continueLearning: pick(continueIds.slice(0, ROW)),
     favourites: pick(favouriteIds.slice(0, ROW)),
     later: pick(laterIds.slice(0, ROW)),

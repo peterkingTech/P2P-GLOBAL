@@ -7,6 +7,7 @@ import libraryRouter from "./kingdomStoryLibrary";
 import discoverRouter from "./kingdomStoryDiscover";
 import { savesFor, libraryNotReady } from "../lib/kingdomStoryLibrary";
 import { chapterLearning, storiesProgress, lockChapter } from "../lib/kingdomStoryLearning";
+import { neighbours } from "../lib/kingdomStoryJourney";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
 // Genuinely different authorization model from every other content route
@@ -168,8 +169,15 @@ router.get("/feed", async (req, res) => {
     categoryId = cat.id;
   }
 
-  // Title search over published stories only (never topics).
-  const term = (q ?? "").split(String.fromCharCode(92)).join(" ").replace(/[%_]/g, " ").trim().slice(0, 100);
+  // Search over published stories only (never topics): title, subtitle,
+  // people and place, or the name of its category. Characters that would
+  // change the filter itself are dropped from the term.
+  const term = (q ?? "").split(String.fromCharCode(92)).join(" ").replace(/[%_,()*"']/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
+  let termCategoryIds: string[] = [];
+  if (term) {
+    const { data: tc } = await db.from("p2p_kingdom_story_categories").select("id").eq("status", "published").ilike("title", `%${term}%`);
+    termCategoryIds = ((tc ?? []) as { id: string }[]).map((c) => c.id);
+  }
   const run = (order: string) => {
     let query = db.from("p2p_kingdom_stories").select("*", { count: "exact" }).eq("status", "published");
     query = order === "title" ? query.order("title", { ascending: true })
@@ -179,7 +187,11 @@ router.get("/feed", async (req, res) => {
     query = query.range(from, to);
     if (categoryId) query = query.eq("category_id", categoryId);
     if (featured === "true") query = query.eq("is_featured", true);
-    if (term) query = query.ilike("title", `%${term}%`);
+    if (term) {
+      const like = `%${term}%`;
+      query = query.or([`title.ilike.${like}`, `subtitle.ilike.${like}`, `people.ilike.${like}`, `location.ilike.${like}`,
+        ...termCategoryIds.slice(0, 20).map((id) => `category_id.eq.${id}`)].join(","));
+    }
     return query;
   };
   let { data, error, count } = await run(sort);
@@ -210,6 +222,7 @@ router.get("/feed", async (req, res) => {
 });
 
 // ── Story detail ─────────────────────────────────────────────────────────
+type SequenceLink = { id: string; title: string; topicNumber: number | null };
 router.get("/:id", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
@@ -233,7 +246,17 @@ router.get("/:id", async (req, res) => {
     return { ...visible, learning: learning.state === "locked" && !editor ? { ...learning, reflectionQuestions: [], check: null } : learning };
   });
   const mine = (await savesFor(userId, [story.id as string])).get(story.id as string) ?? { favourite: false, later: false };
-  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress, mine });
+  // The published stories just before and after this one in its category's order.
+  let sequence: { previous: SequenceLink | null; next: SequenceLink | null } = { previous: null, next: null };
+  if (story.status === "published") {
+    const { data: siblings } = await db.from("p2p_kingdom_stories").select("id,title,topic_number,published_at").eq("category_id", story.category_id).eq("status", "published");
+    const list = (siblings ?? []) as any[];
+    const n = neighbours([{ id: story.category_id as string, title: "", displayOrder: 0 }],
+      list.map((x) => ({ id: x.id, categoryId: story.category_id as string, topicNumber: x.topic_number ?? null, publishedAt: x.published_at ?? null, relatedStoryId: null })), story.id as string);
+    const link = (id: string | null): SequenceLink | null => { const x = id ? list.find((r) => r.id === id) : null; return x ? { id: x.id, title: x.title, topicNumber: x.topic_number ?? null } : null; };
+    sequence = { previous: link(n.previous), next: link(n.next) };
+  }
+  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress, mine, sequence });
 });
 
 // A chapter with no Comprehensive Check is finished by reading it. (Chapters

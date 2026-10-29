@@ -676,7 +676,7 @@ export default function HomeTab() {
 
   // Same rule as the Kingdom School tab's "current module" (learn.tsx).
   const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? null;
-  const goToKingdomSchool = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/(tabs)/learn"); };
+  const goToKingdomSchool = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/kingdom-school" as any); };
   const go = (route: string) => () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as any); };
 
   const growthPoints = profile?.growthLevel ?? 0;
@@ -783,34 +783,6 @@ export default function HomeTab() {
         </View>
       </View>
 
-      {/* Church Discipleship Portal — completely free, no tiers. Only shown
-          when relevant: leaders get a prominent dashboard/register prompt,
-          regular members in a church get a light card, everyone else sees
-          nothing (church tools aren't relevant to them). */}
-      {isChurchLeader && userChurch && (
-        <GroveHomeCard
-          church={userChurch}
-          grove={homeGroveData}
-          memberCount={churchMemberCount}
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/grove" as any); }}
-        />
-      )}
-      {profile?.isMinistryLeader && !userChurch && (
-        <RegisterChurchPromptCard
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/register" as any); }}
-        />
-      )}
-      {!profile?.isMinistryLeader && userChurch && (
-        <MemberChurchCard
-          church={userChurch}
-          announcement={homeChurchAnnouncement}
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
-        />
-      )}
-
       {/* Elijah Protocol check-in, if pastoral care has flagged one */}
       {pendingElijahCheckIn && (
         <ElijahCheckInCard
@@ -903,6 +875,45 @@ export default function HomeTab() {
       {/* "How to use P2P" guide entry — hides itself once every step is done. */}
       <GetStartedCard />
 
+      {/* My Community — the families and churches this person belongs to.
+          The church card and My Family tile moved here unchanged (same
+          conditions, routes and data); Family Circle and Church keep their
+          own screens, permissions and gatherings (opened from those screens). */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeading} accessibilityRole="header">My Community</Text>
+      </View>
+      {/* Church Discipleship Portal — completely free, no tiers. Only shown
+          when relevant: leaders get a prominent dashboard/register prompt,
+          regular members in a church get a light card, everyone else sees
+          nothing (church tools aren't relevant to them). */}
+      {isChurchLeader && userChurch && (
+        <GroveHomeCard
+          church={userChurch}
+          grove={homeGroveData}
+          memberCount={churchMemberCount}
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/grove" as any); }}
+        />
+      )}
+      {profile?.isMinistryLeader && !userChurch && (
+        <RegisterChurchPromptCard
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/register" as any); }}
+        />
+      )}
+      {!profile?.isMinistryLeader && userChurch && (
+        <MemberChurchCard
+          church={userChurch}
+          announcement={homeChurchAnnouncement}
+          colors={colors}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
+        />
+      )}
+
+      <View style={styles.journeyGrid}>
+        <JourneyTile icon="home" tint="#E8873A" title={t("home.myFamily")} sub={t("home.myFamilySub")} onPress={go("/family")} styles={styles} wide />
+      </View>
+
       {/* 4. Your Journey — tiles instead of the old vertical list. No "See
           All": every journey feature is already here and no overview
           screen exists. */}
@@ -914,7 +925,6 @@ export default function HomeTab() {
         <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/connect")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} tileStyle={journeyTiles.tileStyle} />
-        <JourneyTile icon="home" tint="#E8873A" title={t("home.myFamily")} sub={t("home.myFamilySub")} onPress={go("/family")} styles={styles} wide />
       </View>
       {/* Previously only reachable from the old "More" list — kept here as
           small links so nothing disappears. Admin keeps its role gate. */}

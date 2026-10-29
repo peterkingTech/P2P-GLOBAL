@@ -215,6 +215,18 @@ try {
   ok("church: leadership role starts", (await call("POST", "/", P.L, { contentType: "lesson", contentId: S.lesson, destination: "church", groupId: CH })).status === 201);
   ok("church: plain member can't", (await call("POST", "/", P.F, { contentType: "kingdom_story", contentId: S.story, destination: "church", groupId: CH })).status === 403);
 
+  // The hub also lists published Family Circle / Church custom studies, for active members only.
+  await db.exec(`
+    create table if not exists public.p2p_family_studies (id uuid primary key default gen_random_uuid(), family_id uuid, title text, description text, status text, updated_at timestamptz default now());
+    create table if not exists public.p2p_church_studies (id uuid primary key default gen_random_uuid(), church_id uuid, title text, description text, status text, updated_at timestamptz default now());`);
+  await q(`insert into p2p_family_studies (family_id, title, status) values ($1, 'Family Psalms', 'published'), ($1, 'Family draft', 'draft')`, [FAM]);
+  await q(`insert into p2p_church_studies (church_id, title, status) values ($1, 'Church Acts', 'published'), ($1, 'Church archived', 'archived')`, [CH]);
+  const hubL = (await call("GET", "/mine", P.L)).body.groupLessons ?? [];
+  ok("hub: a member of both groups sees each group's published studies (with the group's name)", hubL.map((x) => `${x.kind}:${x.title}:${x.groupName}`).sort().join() === "church:Church Acts:The Church,family:Family Psalms:The Family", JSON.stringify(hubL));
+  ok("hub: drafts and archived studies stay on the group's own screens", !JSON.stringify(hubL).includes("draft") && !JSON.stringify(hubL).includes("archived"));
+  ok("hub: an outsider sees none", ((await call("GET", "/mine", P.N)).body.groupLessons ?? []).length === 0);
+  ok("hub: a removed family member no longer sees the family's studies", !((await call("GET", "/mine", P.K)).body.groupLessons ?? []).some((x) => x.kind === "family"));
+
   // Privacy at the database
   for (const t of ["p2p_shared_studies", "p2p_shared_study_members", "p2p_shared_study_prompts", "p2p_shared_study_responses"]) {
     ok(`rls: ${t} not readable by clients`, /permission denied/.test(await (async () => { await db.exec(`set role authenticated`); try { await q(`select * from ${t}`); return ""; } catch (e) { return e.message; } finally { await db.exec(`reset role`); } })()));

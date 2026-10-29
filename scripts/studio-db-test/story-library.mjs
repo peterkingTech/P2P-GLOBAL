@@ -179,6 +179,40 @@ try {
   ok("collections: See all page", (await call("GET", "/kingdom-stories/collections/start-here", U.P)).body.stories.length === 2);
   const delCol = await call("DELETE", `/kingdom-stories/admin/collections/${col.body.id}`, U.A);
   ok("collections: delete → Recycle Bin (items kept with it)", delCol.status === 200 && (await one(`select (counts->>'p2p_kingdom_story_collection_items')::int n from p2p_recycle_bin where content_type = 'kingdom_story_collection'`)).n === 3);
+
+  // ── Hero, biblical journey, recommendations (lib/kingdomStoryJourney.ts) ──
+  // P has finished Creation (#1; one chapter approved, one with a peer); Abraham (#3) is Featured.
+  const h = (await call("GET", "/kingdom-stories/discover", U.P)).body;
+  ok("hero: the editor's Featured story wins", h.hero?.id === S.a && h.hero.source === "featured" && h.featured?.id === S.a);
+  const slideIds = (h.heroSlides ?? []).map((x) => x.id);
+  ok("hero slides: start with the hero, no repeats, published only, at most 5", slideIds[0] === S.a && new Set(slideIds).size === slideIds.length && slideIds.length <= 5 && !slideIds.includes(S.draft));
+  ok("journey: after a finished story, the next published one in topic order", h.journey?.story.id === S.a && h.journey.state === "next" && h.journey.position === 2 && h.journey.categoryTotal === 3
+    && h.journey.upNext.map((x) => x.title).join() === "Babel", JSON.stringify(h.journey && [h.journey.story.title, h.journey.state, h.journey.position]));
+  ok("recommended: reasons given; hero and finished stories left out; drafts never", h.recommended.map((x) => `${x.title}:${x.reason}`).join() === "Babel:same_category"
+    && h.recommended[0].reasonLabel.startsWith("Continue exploring") && !JSON.stringify(h.recommended).includes("Draft story"));
+  const creationCard = h.categoryRows[0].stories.find((x) => x.id === S.b);
+  ok("cards: done vs peer-approved counted separately (finished, awaiting review)", creationCard.myProgress.doneChapters === 2 && creationCard.myProgress.completedChapters === 1);
+  // A reader with no progress, and no Featured story: the hero is the start of the biblical order.
+  await asOwner(`update p2p_kingdom_stories set is_featured = false where id = $1`, [S.a]);
+  const fresh = (await call("GET", "/kingdom-stories/discover", U.A)).body;
+  ok("hero: no Featured story → the reader's next story; never started → the first in order", fresh.hero?.id === S.b && fresh.hero.source === "journey" && fresh.journey.state === "start" && fresh.featured === null);
+  ok("journey: opening alone never starts a story", fresh.continueLearning.length === 0);
+  // An answered reflection counts as started (as on the story page), never as done.
+  const sub = await q(`insert into p2p_submissions (user_id, lesson_id, text_content) values ($1, $2, 'A thought') returning id`, [U.A, id(51)]).then(() => null, (e) => e.message);
+  if (sub) console.log("note: submission insert:", sub);
+  const started = (await call("GET", "/kingdom-stories/discover", U.A)).body;
+  ok("cards: an answer starts a story → Continue Your Stories + continue the journey", !sub && started.continueLearning.map((x) => x.id).join() === S.b
+    && started.journey.state === "continue" && started.continueLearning[0].myProgress.doneChapters === 0, sub ?? "");
+  // The story page: the published stories before and after it, in topic order.
+  const seqA = (await call("GET", `/kingdom-stories/${S.a}`, U.P)).body.sequence;
+  ok("story page: before/after in topic order", seqA?.previous?.id === S.b && seqA?.next?.id === S.c && seqA.previous.topicNumber === 1);
+  ok("story page: first story has nothing before it", (await call("GET", `/kingdom-stories/${S.b}`, U.P)).body.sequence.previous === null);
+  ok("story page: a draft stays hidden from readers", (await call("GET", `/kingdom-stories/${S.draft}`, U.P)).status === 404);
+  // Search: published only, by title or category name.
+  ok("search: by title, published only", titles(await call("GET", "/kingdom-stories/feed?q=abra", U.P)) === "Abraham" && titles(await call("GET", "/kingdom-stories/feed?q=draft", U.P)) === "");
+  const catTitle = (await one(`select title from p2p_kingdom_story_categories where id = $1`, [catId])).title;
+  ok("search: by category name", titles(await call("GET", `/kingdom-stories/feed?q=${encodeURIComponent(catTitle.slice(0, 6))}`, U.P)) === "Creation,Abraham,Babel", catTitle);
+  ok("search: filter characters can't break the query", (await call("GET", `/kingdom-stories/feed?q=${encodeURIComponent("a,b),(x")}`, U.P)).status === 200);
 } finally {
   server.close();
   rmSync(tmp, { recursive: true, force: true });

@@ -12,7 +12,9 @@ import {
 // is unchanged; this is the "study at your own pace, together" layer.
 //   GET    /destinations                 who / which groups I may study with
 //   POST   /                             start (peer invitations or a group study)
-//   GET    /mine                         invitations, active and concluded studies
+//   GET    /mine                         invitations, active and concluded studies, and the
+//                                         published Family Circle / Church custom studies of
+//                                         groups I'm an active member of (the Study Together hub)
 //   GET    /:id                          the shared study (authorized viewers only)
 //   POST   /:id/respond                  { response: "accepted" | "declined" }
 //   POST   /:id/invite                   { userIds } host of a peer study
@@ -241,6 +243,28 @@ async function myGroupIds(userId: string): Promise<Record<string, string[]>> {
   };
 }
 
+// The hub also lists the custom studies a Family Circle or Church has
+// published, for groups the caller is an ACTIVE member of (the same rule as
+// GET /family/:id/studies and /churches/:id/studies for ordinary members).
+// References only: each opens the group's own study screen. Drafts and
+// archived studies stay on those screens, for their leaders.
+async function groupCustomStudies(familyIds: string[], churchIds: string[]) {
+  const [fam, ch] = await Promise.all([
+    familyIds.length ? db.from("p2p_family_studies").select("id,family_id,title,description,updated_at").in("family_id", familyIds).eq("status", "published") : Promise.resolve({ data: [] as any[] }),
+    churchIds.length ? db.from("p2p_church_studies").select("id,church_id,title,description,updated_at").in("church_id", churchIds).eq("status", "published") : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const famRows = (fam.data ?? []) as any[], chRows = (ch.data ?? []) as any[];
+  const [fNames, cNames] = await Promise.all([
+    famRows.length ? db.from("p2p_families").select("id,name").in("id", [...new Set(famRows.map((r) => r.family_id))]) : Promise.resolve({ data: [] as any[] }),
+    chRows.length ? db.from("p2p_churches").select("id,name").in("id", [...new Set(chRows.map((r) => r.church_id))]) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const name = (rows: any[] | null, id: string) => ((rows ?? []) as any[]).find((r) => r.id === id)?.name ?? null;
+  return [
+    ...famRows.map((r) => ({ id: r.id, kind: "family" as const, title: r.title, description: r.description ?? null, groupId: r.family_id, groupName: name(fNames.data, r.family_id), updatedAt: r.updated_at })),
+    ...chRows.map((r) => ({ id: r.id, kind: "church" as const, title: r.title, description: r.description ?? null, groupId: r.church_id, groupName: name(cNames.data, r.church_id), updatedAt: r.updated_at })),
+  ].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
 router.get("/mine", async (req, res) => {
   const userId = await caller(req, res);
   if (!userId) return;
@@ -282,6 +306,7 @@ router.get("/mine", async (req, res) => {
       invitations: sorted.filter((s) => s.status === "active" && byStudy.get(s.id)?.status === "pending").map(card),
       active: sorted.filter((s) => s.status === "active" && byStudy.get(s.id)?.status !== "pending").map(card),
       concluded: sorted.filter((s) => s.status === "concluded").slice(0, 20).map(card),
+      groupLessons: await groupCustomStudies(groups.family, groups.church),
     });
   } catch (e) { return fail(res, e); }
 });

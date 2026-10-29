@@ -63,7 +63,9 @@ ok("screen: words for every state, loading / error / empty states", screen.inclu
 ok("screen: feedback shown only in the feedback section", screen.includes('section === "feedback" && x.feedback'));
 ok("screen: uses the product word Comprehensive Checks", screen.includes("COMPREHENSIVE_CHECKS"));
 const learn = src("app/(tabs)/learn.tsx");
-ok("Kingdom School links to the Learning Centre (existing cards kept)", learn.includes('router.push("/learning" as any)') && learn.includes("<KingdomSchoolCards"));
+// The Learning tab (Learning Centre landing) and the Kingdom School screen both open My Learning.
+const school = src("app/kingdom-school.tsx");
+ok("Kingdom School links to the Learning Centre (existing cards kept)", learn.includes('router.push("/learning" as any)') && school.includes('router.push("/learning" as any)') && school.includes("<KingdomSchoolCards"));
 const widgets = src("components/myp2p/MyP2PWidgets.tsx");
 ok("My P2P: Comprehensive Checks widget wired", widgets.includes("function LearningWidget") && widgets.includes('case "learning": return <LearningWidget'));
 ok("My P2P widget: read-only", !/LearningWidget[\s\S]*?(submit|\.insert\(|\.update\()[\s\S]*?export function MyP2PWidget/.test(widgets));

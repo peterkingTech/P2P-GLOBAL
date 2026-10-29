@@ -78,14 +78,17 @@ export interface KingdomStory {
   /** Storybook (migration 212): the reader's progress through this book. */
   progress?: StoryProgress;
   /** Story cards: chapters this reader has finished (submitted or completed). */
-  myProgress?: { totalChapters: number; doneChapters: number; started: boolean } | null;
+  myProgress?: { totalChapters: number; doneChapters: number; started: boolean; completedChapters?: number } | null;
   /** Stable display number within its category (migration 215) — never the id. */
   topicNumber?: number | null;
   /** The reader's own Favourite / Saved for Later (migration 215). */
   mine?: { favourite: boolean; later: boolean };
   /** Recently viewed shelf: when it was last opened and which chapter. */
   lastOpenedAt?: string; lastChapterId?: string | null;
+  /** Story page: the published stories just before and after it in its category's order. */
+  sequence?: { previous: SequenceLink | null; next: SequenceLink | null };
 }
+export interface SequenceLink { id: string; title: string; topicNumber: number | null }
 
 /** "Topic 012" — the same everywhere a story is listed. */
 export function formatTopicNumber(n: number | null | undefined): string | null {
@@ -113,13 +116,26 @@ export function markStoryOpened(storyId: string, chapterId?: string | null): Pro
 export type FeedSort = "topic" | "title" | "recent" | "updated";
 
 // ── Discovery homepage + editorial collections (migration 215) ──────────────
-export type StoryCard = KingdomStory & { lastChapterNumber?: number | null };
+export type StoryCard = KingdomStory & { lastChapterNumber?: number | null; reasonLabel?: string };
+export type HeroSource = "featured" | "journey" | "first" | "continue";
+export type RecommendationReason = "next_in_journey" | "related" | "same_category" | "other_category" | "for_journey";
+/** The reader's next story in the biblical order (API: lib/kingdomStoryJourney.ts). */
+export interface StoryJourney {
+  story: StoryCard; state: "start" | "continue" | "next"; position: number; categoryTotal: number;
+  category: { id: string; title: string } | null; upNext: StoryCard[];
+}
 export interface DiscoverHome {
   featured: (StoryCard & { hero: { id: string; mediaPath: string; altText: string | null } | null }) | null;
   continueLearning: StoryCard[]; favourites: StoryCard[]; later: StoryCard[]; recentlyViewed: StoryCard[];
   collections: { id: string; slug: string; title: string; description: string | null; stories: StoryCard[]; total: number }[];
   categoryRows: { category: { id: string; slug: string; title: string; icon: string | null }; stories: StoryCard[]; total: number }[];
   recentlyAdded: StoryCard[]; totalPublished: number; libraryAvailable: boolean;
+  /** Newer API: the editor's Featured story, else the next in the reader's journey, else the first in order. */
+  hero?: (StoryCard & { hero: { id: string; mediaPath: string; altText: string | null } | null; source: HeroSource }) | null;
+  /** Newer API: the swipeable hero — `hero` first, then other Featured stories, the next journey story, stories being read. */
+  heroSlides?: (StoryCard & { hero: { id: string; mediaPath: string; altText: string | null } | null; source: HeroSource })[];
+  journey?: StoryJourney | null;
+  recommended?: (StoryCard & { reason: RecommendationReason; reasonLabel: string })[];
 }
 export function getDiscoverHome(): Promise<DiscoverHome> { return authedFetch("/kingdom-stories/discover"); }
 export function getStoryCollection(slug: string): Promise<{ id: string; slug: string; title: string; description: string | null; stories: StoryCard[] }> {

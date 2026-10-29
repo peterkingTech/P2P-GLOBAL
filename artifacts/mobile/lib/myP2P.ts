@@ -84,8 +84,8 @@ export async function saveLayout(userId: string, l: Layout): Promise<void> {
 // marks anything complete.
 export type MilestoneKey = "firstLesson" | "firstModule" | "firstMentee" | "firstFruit";
 export const MILESTONES: { key: MilestoneKey; goal: string; route: string; action: string }[] = [
-  { key: "firstLesson", goal: "Complete your first Kingdom School lesson", route: "/(tabs)/learn", action: "Open Kingdom School" },
-  { key: "firstModule", goal: "Complete your first Kingdom School module", route: "/(tabs)/learn", action: "Continue Kingdom School" },
+  { key: "firstLesson", goal: "Complete your first Kingdom School lesson", route: "/kingdom-school", action: "Open Kingdom School" },
+  { key: "firstModule", goal: "Complete your first Kingdom School module", route: "/kingdom-school", action: "Continue Kingdom School" },
   { key: "firstMentee", goal: "Begin guiding your first disciple", route: "/connect", action: "Find someone to guide" },
   { key: "firstFruit", goal: "Receive your first Fruit of the Spirit award", route: "/my-discipleship/journey", action: "See how fruit is earned" },
 ];

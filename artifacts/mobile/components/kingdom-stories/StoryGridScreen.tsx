@@ -3,11 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, 
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors as T, type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
+import { type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
+import { useStoryStyles, type StoryPalette } from "@/lib/storyTheme";
 import type { StoryCard } from "@/lib/kingdomStoriesApi";
 import { StoryPosterCard } from "@/components/kingdom-stories/DiscoverRow";
 
-// One dark grid page for Kingdom Stories lists (library shelves, browse all,
+// One grid page (in the reader's light/dark theme) for Kingdom Stories lists (library shelves, browse all,
 // a collection): header, optional controls, loading / error / empty states.
 export default function StoryGridScreen({ title, subtitle, controls, stories, loading, error, onRetry, emptyText, onEndReached, footerLoading }: {
   title: string; subtitle?: string | null; controls?: React.ReactNode; stories: StoryCard[]; loading: boolean; error?: string | null;
@@ -15,6 +16,7 @@ export default function StoryGridScreen({ title, subtitle, controls, stories, lo
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { T, s: styles } = useStoryStyles(makeStyles);
   const { width } = useWindowDimensions();
   const cols = width >= 1100 ? 6 : width >= 800 ? 5 : width >= 560 ? 4 : 3;
   const cardW = Math.floor((Math.min(width, 1200) - 32 - (cols - 1) * 10) / cols);
@@ -57,7 +59,8 @@ export default function StoryGridScreen({ title, subtitle, controls, stories, lo
   );
 }
 
-export function PillRow<T extends string>({ options, value, onChange, label }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string }) {
+export function PillRow<V extends string>({ options, value, onChange, label }: { options: { value: V; label: string }[]; value: V; onChange: (v: V) => void; label: string }) {
+  const { s: styles } = useStoryStyles(makeStyles);
   return (
     <View style={styles.pills} accessibilityRole="tablist" accessibilityLabel={label}>
       {options.map((o) => (
@@ -70,7 +73,8 @@ export function PillRow<T extends string>({ options, value, onChange, label }: {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(T: StoryPalette) {
+  return StyleSheet.create({
   screen: { flex: 1, backgroundColor: T.background },
   header: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, marginBottom: 8 },
   iconBtn: { width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, alignItems: "center", justifyContent: "center" },
@@ -86,3 +90,4 @@ const styles = StyleSheet.create({
   retry: { minHeight: MIN_TOUCH_TARGET, justifyContent: "center", paddingHorizontal: 16 },
   retryText: { color: T.growth, ...TT.bodyEmph },
 });
+}

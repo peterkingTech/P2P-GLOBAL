@@ -106,23 +106,37 @@ export async function chapterLearning(story: { id: string; status: string }, cha
   };
 }
 
-/** Reading progress for many stories at once (story cards). */
-export async function storiesProgress(storyIds: string[], userId: string): Promise<Map<string, { totalChapters: number; doneChapters: number; started: boolean }>> {
-  const out = new Map<string, { totalChapters: number; doneChapters: number; started: boolean }>();
+/**
+ * Reading progress for many stories at once (story cards). Same rules as
+ * chapterLearning: a chapter is done when submitted or completed (completed =
+ * peer-approved, or finished where it has no check); a story is started once
+ * any chapter has progress or an answer (a reflection counts).
+ */
+export async function storiesProgress(storyIds: string[], userId: string): Promise<Map<string, { totalChapters: number; doneChapters: number; completedChapters: number; started: boolean }>> {
+  const out = new Map<string, { totalChapters: number; doneChapters: number; completedChapters: number; started: boolean }>();
   if (!storyIds.length) return out;
   const { data: chs } = await db.from("p2p_kingdom_story_chapters").select("story_id,lesson_id").in("story_id", storyIds);
   const lessonToStory = new Map<string, string>();
-  for (const id of storyIds) out.set(id, { totalChapters: 0, doneChapters: 0, started: false });
+  for (const id of storyIds) out.set(id, { totalChapters: 0, doneChapters: 0, completedChapters: 0, started: false });
   for (const c of (chs ?? []) as any[]) {
     out.get(c.story_id)!.totalChapters++;
     if (c.lesson_id) lessonToStory.set(c.lesson_id, c.story_id);
   }
   if (!lessonToStory.size) return out;
-  const { data: prog } = await db.from("p2p_lesson_progress").select("lesson_id,status,completed").eq("user_id", userId).in("lesson_id", [...lessonToStory.keys()]);
+  const lessonIds = [...lessonToStory.keys()];
+  const [{ data: prog }, { data: subs }] = await Promise.all([
+    db.from("p2p_lesson_progress").select("lesson_id,status,completed").eq("user_id", userId).in("lesson_id", lessonIds),
+    db.from("p2p_submissions").select("lesson_id").eq("user_id", userId).in("lesson_id", lessonIds),
+  ]);
   for (const p of (prog ?? []) as any[]) {
     const s = out.get(lessonToStory.get(p.lesson_id)!)!;
     s.started = true;
-    if (p.completed || p.status === "submitted" || p.status === "completed") s.doneChapters++;
+    if (p.completed || p.status === "completed") { s.doneChapters++; s.completedChapters++; }
+    else if (p.status === "submitted") s.doneChapters++;
+  }
+  for (const r of (subs ?? []) as any[]) {
+    const id = lessonToStory.get(r.lesson_id);
+    if (id) out.get(id)!.started = true;
   }
   return out;
 }

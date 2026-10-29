@@ -38,7 +38,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
       "When you complete a Comprehensive Check, submit it for peer review by a fellow peer.",
       "Through this process, you learn from others while also helping others grow.",
     ],
-    route: "/(tabs)/learn", actionLabel: "Open Kingdom School",
+    route: "/kingdom-school", actionLabel: "Open Kingdom School",
   },
   {
     id: "connect", number: 3, title: "Connect with peers", icon: "people-outline",

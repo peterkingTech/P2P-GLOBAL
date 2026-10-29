@@ -88,7 +88,7 @@ export default function KingdomStoryBookScreen() {
     router.push({ pathname: "/kingdom-stories/chapter", params: { id: story.id, chapter: ch.id } } as any);
   };
   const primary = !chapters.length ? null
-    : story.progress?.finished ? { label: "Read again", ch: chapters[0], icon: "refresh" as const }
+    : story.progress?.finished ? { label: "Review Story", ch: chapters[0], icon: "refresh" as const }
     : story.progress?.started && current ? { label: `Continue Reading · Chapter ${current.chapterNumber}`, ch: current, icon: "book" as const }
     : { label: "Start Reading", ch: chapters[0], icon: "book-outline" as const };
   const credits = media.filter((m) => m.caption || m.sourceUrl || m.licenseNote);
@@ -279,6 +279,28 @@ export default function KingdomStoryBookScreen() {
               <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
             </TouchableOpacity>
           )}
+
+          {/* Before and after this story in its category's order (published stories only). */}
+          {!preview && (story.sequence?.previous || story.sequence?.next) ? (
+            <View style={s.section}>
+              <Text style={s.sectionLabel} accessibilityRole="header">In biblical order</Text>
+              {([["previous", "Before this story", "arrow-back"], ["next", "Next in the story", "arrow-forward"]] as const).map(([key, label, icon]) => {
+                const link = story.sequence?.[key];
+                if (!link) return null;
+                return (
+                  <TouchableOpacity key={key} style={s.relatedCard} onPress={() => router.push(`/kingdom-stories/${link.id}` as any)}
+                    accessibilityRole="button" accessibilityLabel={`${label}: ${[formatTopicNumber(link.topicNumber), link.title].filter(Boolean).join(", ")}`}>
+                    <Ionicons name={icon} size={14} color={c.accentGreen} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.relatedLabel}>{[label, formatTopicNumber(link.topicNumber)].filter(Boolean).join(" · ")}</Text>
+                      <Text style={s.relatedTitle}>{link.title}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
 
           {(!!story.sources?.some((x) => !x.chapterId) || credits.length > 0) && (
             <View style={s.section}>

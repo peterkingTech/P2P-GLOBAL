@@ -9,19 +9,11 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
-import { isSmallPhone } from "@/lib/responsive";
 import {
   IPadTabCapsule, TabCapsuleContentTopContext, TabReselectContext, capsuleContentTop, createTabReselectEmitter, useIPadTabCapsuleVisible,
 } from "@/components/IPadTabCapsule";
 import "@/lib/i18n";
 
-// "Kingdom School" only actually needs shortening on narrow phones — every
-// other locale already uses a short generic word for this tab (e.g.
-// "Apprendre"/"Lernen"/"Jifunza"), so the swap only applies in English.
-function getLearnTabLabel(fullLabel: string, language: string): string {
-  if (isSmallPhone && language.startsWith("en")) return "K-School";
-  return fullLabel;
-}
 
 // No locale has a tabs.profile key yet; every locale already translates
 // home.myProfile, so that is the fallback rather than an English-only label.
@@ -49,7 +41,7 @@ function TabLabel({ label, color, baseFontSize }: { label: string; color: string
 }
 
 function NativeTabLayout() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { totalUnreadCount } = useData();
   // iPad: the native floating top bar can only show five of the six tabs, so
   // it is hidden and IPadTabCapsule draws all six in its place (same
@@ -70,7 +62,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="learn">
         <NativeTabs.Trigger.Icon sf={{ default: "book", selected: "book.fill" }} />
-        <NativeTabs.Trigger.Label>{getLearnTabLabel(t("tabs.learn"), i18n.language)}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t("tabs.learn")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="messages">
         <NativeTabs.Trigger.Icon sf={{ default: "message", selected: "message.fill" }} />
@@ -94,7 +86,7 @@ function NativeTabLayout() {
       <IPadTabCapsule
         items={[
           { name: "index", label: t("tabs.home") },
-          { name: "learn", label: getLearnTabLabel(t("tabs.learn"), i18n.language) },
+          { name: "learn", label: t("tabs.learn") },
           { name: "messages", label: t("tabs.messages"), badge: totalUnreadCount },
           { name: "prayer", label: t("tabs.prayer") },
           { name: "discover", label: t("tabs.discover") },
@@ -113,7 +105,7 @@ function ClassicTabLayout() {
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { totalUnreadCount } = useData();
   // Take the larger of the real device inset and the previous flat value —
   // preserves existing look on devices the old constants already covered,
@@ -123,7 +115,7 @@ function ClassicTabLayout() {
 
   const TAB_ITEMS = [
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
-    { name: "learn", label: getLearnTabLabel(t("tabs.learn"), i18n.language), icon: "book-outline" as const, iconActive: "book" as const },
+    { name: "learn", label: t("tabs.learn"), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
     // Wi-Fi/connectivity icon, not the prior hotspot-style "radio" icon —
     // "God is the Hotspot and we are connecting to Him." Label/route/nav

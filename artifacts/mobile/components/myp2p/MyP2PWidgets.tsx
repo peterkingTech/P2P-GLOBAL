@@ -171,7 +171,7 @@ function ContinueWidget({ refreshKey }: { refreshKey: number }) {
           <>
             <Text style={s.line}>Nothing in progress right now.</Text>
             <View style={s.row}>
-              <Btn label="Kingdom School" primary onPress={() => router.push("/(tabs)/learn" as any)} s={s} c={c} />
+              <Btn label="Kingdom School" primary onPress={() => router.push("/kingdom-school" as any)} s={s} c={c} />
               <Btn label="Kingdom Stories" onPress={() => router.push("/kingdom-stories" as any)} s={s} c={c} />
             </View>
           </>

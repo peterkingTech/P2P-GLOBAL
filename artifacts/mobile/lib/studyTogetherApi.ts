@@ -60,7 +60,38 @@ export interface SharedStudy {
 
 export const getStudyDestinations = (): Promise<{ people: StudyPerson[]; groups: LedGroup[]; maxPeople: number }> => authedFetch("/destinations");
 export const startSharedStudy = (input: { contentType: StudyContentType; contentId: string; destination: StudyDestination; groupId?: string; userIds?: string[]; prompt?: string }): Promise<{ id: string; existing?: boolean; invited?: number }> => post("", input);
-export const getMyStudies = (): Promise<{ invitations: StudyCard[]; active: StudyCard[]; concluded: StudyCard[] }> => authedFetch("/mine");
+/** A Family Circle / Church custom study the reader's group has published (opens the group's own study screen). */
+export interface GroupLessonCard { id: string; kind: "family" | "church"; title: string; description: string | null; groupId: string; groupName: string | null; updatedAt: string }
+export interface MyStudies { invitations: StudyCard[]; active: StudyCard[]; concluded: StudyCard[]; groupLessons?: GroupLessonCard[] }
+export const getMyStudies = (): Promise<MyStudies> => authedFetch("/mine");
+
+// ── The Study Together hub: one collection over the real records ─────────────
+export type HubFilter = "all" | "kingdom_story" | "lesson" | "group_lessons";
+export const HUB_FILTER_LABELS: Record<HubFilter, string> = { all: "All", kingdom_story: "Kingdom Stories", lesson: "Kingdom School", group_lessons: "Family & Church studies" };
+export interface HubItem { key: string; kind: "shared" | "group_lesson"; filter: Exclude<HubFilter, "all">; title: string; typeLabel: string; where: string; when: string; concluded: boolean; route: { pathname: string; params: Record<string, string> } }
+
+/** Every study the reader can open, newest activity first — references only, nothing copied. */
+export function hubItems(d: MyStudies): HubItem[] {
+  const shared = (x: StudyCard, concluded: boolean): HubItem => ({
+    key: `s:${x.id}`, kind: "shared", filter: x.contentType, title: x.title,
+    typeLabel: x.contentType === "kingdom_story" ? "Kingdom Story" : "Kingdom School lesson",
+    where: x.destination.type === "peer" ? (x.isHost ? "With the peers you invited" : `With ${x.host.name}`) : `${DESTINATION_LABELS[x.destination.type]}${x.destination.name ? ` · ${x.destination.name}` : ""}`,
+    when: x.lastOpenedAt ?? x.updatedAt, concluded, route: { pathname: "/study-together/[id]", params: { id: x.id } },
+  });
+  const group = (g: GroupLessonCard): HubItem => ({
+    key: `g:${g.kind}:${g.id}`, kind: "group_lesson", filter: "group_lessons", title: g.title,
+    typeLabel: g.kind === "family" ? "Family Circle study" : "Church study", where: g.groupName ?? (g.kind === "family" ? "Your Family Circle" : "Your church"),
+    when: g.updatedAt, concluded: false,
+    route: g.kind === "family" ? { pathname: "/family/studies/[studyId]", params: { studyId: g.id } } : { pathname: "/church/studies/[studyId]", params: { studyId: g.id } },
+  });
+  const t = (v: string) => new Date(v).getTime() || 0;
+  return [...d.active.map((x) => shared(x, false)), ...(d.groupLessons ?? []).map(group), ...d.concluded.map((x) => shared(x, true))]
+    .sort((a, b) => Number(a.concluded) - Number(b.concluded) || t(b.when) - t(a.when));
+}
+/** Only the filters that have something behind them (never an empty, pretend category). */
+export function hubFilters(items: HubItem[]): HubFilter[] {
+  return ["all", ...(["kingdom_story", "lesson", "group_lessons"] as const).filter((f) => items.some((i) => i.filter === f))];
+}
 export const getSharedStudy = (id: string): Promise<SharedStudy> => authedFetch(`/${id}`);
 export const respondToStudy = (id: string, response: "accepted" | "declined") => post(`/${id}/respond`, { response });
 export const inviteToStudy = (id: string, userIds: string[]) => post(`/${id}/invite`, { userIds });

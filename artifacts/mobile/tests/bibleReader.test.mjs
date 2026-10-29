@@ -110,7 +110,8 @@ ok("client sends the user's session token", /Authorization: `Bearer \$\{token\}`
 const layout = src("app/_layout.tsx");
 ok("Bible routes draw their own header", /"bible\/index", "bible\/search", "bible\/library"/.test(layout));
 ok("no new bottom tab", !/bible/i.test(src("app/(tabs)/_layout.tsx")));
-ok("Learn tab opens the Bible", /router\.push\("\/bible"/.test(src("app/(tabs)/learn.tsx")));
+// The Learning Centre header carries the Bible shortcut; Bible Study (Explore Learning) opens the reader too.
+ok("Learn tab opens the Bible", src("app/(tabs)/learn.tsx").includes('["book", "Bible", "/bible"]') && src("app/bible-study/index.tsx").includes('route: "/bible"'));
 const lesson = src("app/lesson/[id].tsx");
 ok("lesson Scripture opens in the P2P Bible (bible.com only as fallback)", /readerTarget\(s\.reference\)/.test(lesson) && /router\.push\(bibleRoute\(/.test(lesson) && /Read in Bible/.test(lesson));
 for (const f of ["app/kingdom-wins/[id].tsx", "app/missions/story/[id].tsx", "app/prayer/gathering/[id].tsx", "app/prayer/journal.tsx", "app/prayer/testimony/[id].tsx", "components/study/CustomLessonViewer.tsx"])

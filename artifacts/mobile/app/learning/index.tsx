@@ -86,7 +86,7 @@ export default function LearningCentreScreen() {
 
       {data ? (
         <View style={[s.row, { marginTop: 8 }]}>
-          <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/(tabs)/learn" as any)} accessibilityRole="button">
+          <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-school" as any)} accessibilityRole="button">
             <Text style={s.btnSecondaryText}>Kingdom School</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-stories" as any)} accessibilityRole="button">
