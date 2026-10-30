@@ -217,20 +217,28 @@ export default function BibleReaderScreen() {
   }, [my.highlights]);
   const notedVerses = useMemo(() => new Set(my.notes.map((n) => n.endVerse)), [my.notes]);
 
+  // A verse highlighted end to end in one fill colour is drawn as its own
+  // rounded colour card; partly highlighted verses stay inline in the paragraph.
   const blocks = useMemo(() => {
     if (!data) return [];
     const headingAt = new Map<number, string[]>();
     for (const h of data.headings) headingAt.set(h.beforeVerse, [...(headingAt.get(h.beforeVerse) ?? []), h.text]);
-    const out: { key: number; headings: string[]; poetry: boolean; verses: BibleChapter["verses"] }[] = [];
+    const len = new Map(data.verses.map((v) => [v.verse, v.text.length]));
+    const cardOf = (v: BibleChapter["verses"][number]) => {
+      const runs = verseRuns(v.verse, v.text, my.highlights, null, (n) => len.get(n) ?? 0);
+      return runs.length === 1 && runs[0].color && runs[0].color !== "underline" ? runs[0].color : null;
+    };
+    const out: { key: number; headings: string[]; poetry: boolean; card: string | null; verses: BibleChapter["verses"] }[] = [];
     data.verses.forEach((v, i) => {
       const last = out[out.length - 1];
       const heads = headingAt.get(v.verse) ?? [];
-      const newBlock = !last || heads.length > 0 || prefs.layout === "verses" || data.verses[i - 1]?.paragraph !== v.paragraph;
-      if (newBlock) out.push({ key: v.verse, headings: heads, poetry: v.poetry, verses: [v] });
+      const card = cardOf(v);
+      const newBlock = !last || heads.length > 0 || prefs.layout === "verses" || data.verses[i - 1]?.paragraph !== v.paragraph || !!card || !!last.card;
+      if (newBlock) out.push({ key: v.verse, headings: heads, poetry: v.poetry, card, verses: [v] });
       else last.verses.push(v);
     });
     return out;
-  }, [data, prefs.layout]);
+  }, [data, prefs.layout, my.highlights]);
 
   // Scroll to the requested verse once its block has been laid out.
   // Blocks remount per navigation so onLayout fires even for a cached chapter.
@@ -404,13 +412,13 @@ export default function BibleReaderScreen() {
     return { b, p, label, here, t: tAllowed ? p.translation : undefined };
   }, [gathering?.sharedPassage, loc?.book, loc?.chapter, translations]);
 
-  // A run's look: highlight wash or underline, plus the selection wash.
-  // Inline Text styles only — nothing that can change line layout.
+  // A run's look: solid highlight fill (dark ink on it) or underline, plus the
+  // selection wash. Inline Text styles only — nothing that can change line layout.
   const selectionWash = withAlpha(c.accentGreen, resolvedMode === "dark" ? 0.32 : 0.2);
   const runStyle = (run: { color: string | null; selected: boolean }) => {
-    const p = run.color ? (palette as Record<string, { wash: string; swatch: string }>)[run.color] ?? palette.gold : null;
+    const p = run.color ? (palette as Record<string, { wash: string; swatch: string; ink: string }>)[run.color] ?? palette.gold : null;
     return [
-      p && run.color !== "underline" ? { backgroundColor: p.wash } : null,
+      p && run.color !== "underline" ? { backgroundColor: p.wash, color: p.ink } : null,
       run.color === "underline" ? { textDecorationLine: "underline" as const, textDecorationColor: p?.swatch } : null,
       run.selected ? { backgroundColor: selectionWash, textDecorationLine: "underline" as const, textDecorationStyle: "dotted" as const, textDecorationColor: c.accentGreen } : null,
     ];
@@ -471,10 +479,13 @@ export default function BibleReaderScreen() {
       <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
-        {blocks.map((blk) => (
+        {blocks.map((blk) => {
+          const card = blk.card ? (palette as Record<string, { wash: string; ink: string }>)[blk.card] ?? palette.gold : null;
+          return (
           <View key={`${renderKey}-${blk.key}-${prefs.layout}`} onLayout={(e) => onBlockLayout(blk.verses[0].verse, blk.verses[blk.verses.length - 1].verse, e.nativeEvent.layout.y)}>
             {blk.headings.map((h, i) => <Text key={i} style={styles.heading} accessibilityRole="header">{h}</Text>)}
-            <Text style={[styles.para, { fontSize, lineHeight }, blk.poetry && styles.poetry]}>
+            <View style={card ? [styles.hlCard, { backgroundColor: card.wash }] : null}>
+            <Text style={[styles.para, { fontSize, lineHeight }, blk.poetry && styles.poetry, card && { color: card.ink, marginBottom: 0 }]}>
               {blk.verses.map((v) => {
                 const h = hlByVerse.get(v.verse);
                 const selected = !!sel && v.verse >= sel.start && v.verse <= sel.end;
@@ -488,7 +499,8 @@ export default function BibleReaderScreen() {
                     // as it does on phones (where nested Text is always inline).
                     accessibilityRole={textMode ? "text" : INLINE_BUTTON_ROLE} accessibilityState={{ selected }}
                     accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
-                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }]}>{v.verse}{"\u00A0"}</Text>}
+                    {notedVerses.has(v.verse) && <Text style={{ fontSize: Math.round(fontSize * 0.95) }}><Ionicons name="document-text" size={Math.round(fontSize * 0.95)} color={card ? card.ink : c.textMid} />{"\u00A0"}</Text>}
+                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }, card && { color: card.ink, opacity: 0.75 }]}>{v.verse}{"\u00A0"}</Text>}
                     {runs.map((run) => !textMode
                       ? <Text key={run.start} style={runStyle(run)}>{run.text}</Text>
                       : toks.filter((t) => t.end > run.start && t.start < run.end).map((t) => (
@@ -498,14 +510,15 @@ export default function BibleReaderScreen() {
                           {v.text.slice(Math.max(t.start, run.start), Math.min(t.end, run.end))}
                         </Text>
                       )))}
-                    {notedVerses.has(v.verse) && <Text style={[styles.noteMark, { fontSize: Math.round(fontSize * 0.7) }]}>{"\u00A0"}✎</Text>}
                     {" "}
                   </Text>
                 );
               })}
             </Text>
+            </View>
           </View>
-        ))}
+          );
+        })}
 
         {my.notes.length > 0 && !focus && (
           <View style={styles.notesBox}>
@@ -728,8 +741,9 @@ function makeStyles(c: AppColors) {
     heading: { fontSize: 14, color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 14, marginBottom: 6, letterSpacing: 0.2 },
     para: { color: c.textDark, fontFamily: SCRIPTURE_FONT, marginBottom: 12 },
     poetry: { paddingLeft: 14 },
+    // A whole highlighted verse: a rounded colour card that reaches slightly past the text margin.
+    hlCard: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: -12, marginBottom: 6 },
     verseNum: { color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    noteMark: { color: c.amber },
     selected: { textDecorationLine: "underline", textDecorationStyle: "dotted", textDecorationColor: c.accentGreen },
     notesBox: { marginTop: 16, padding: 14, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, gap: 10 },
     notesTitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },

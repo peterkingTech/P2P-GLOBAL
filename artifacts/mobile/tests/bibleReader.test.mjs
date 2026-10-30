@@ -53,7 +53,14 @@ ok("bibleRoute → /bible with string params", r.pathname === "/bible" && r.para
 ok("bibleRoute without verse/translation omits them", !("v" in B.bibleRoute({ book: "GEN", chapter: 1 }).params) && !("t" in B.bibleRoute({ book: "GEN", chapter: 1 }).params));
 ok("formatRef", B.formatRef(B.bookByCode("JHN"), 3, 16, 18) === "John 3:16–18" && B.formatRef(B.bookByCode("PSA"), 23) === "Psalms 23");
 const light = B.highlightPalette("light"), dark = B.highlightPalette("dark");
-ok("five fill colours (each with a light and a dark wash) plus an underline style", B.HIGHLIGHT_COLORS.length === 6 && B.HIGHLIGHT_COLORS.filter((c) => c !== "underline").every((c) => light[c].wash !== dark[c].wash) && light.underline.wash === "transparent" && light.underline.swatch !== dark.underline.swatch);
+ok("five bold solid fills (same in both themes, dark ink on top) plus an underline style", B.HIGHLIGHT_COLORS.length === 6
+  && B.HIGHLIGHT_COLORS.filter((c) => c !== "underline").every((c) => /^#[0-9A-F]{6}$/i.test(light[c].wash) && light[c].wash === dark[c].wash && light[c].ink === "#111318")
+  && light.underline.wash === "transparent" && light.underline.swatch !== dark.underline.swatch);
+ok("stored highlight keys unchanged (saved highlights keep working)", B.HIGHLIGHT_COLORS.join() === "gold,green,blue,rose,violet,underline" && light.rose.label === "Red" && light.violet.label === "Purple");
+const readerSrc = src("app/bible/index.tsx");
+ok("reader: a fully highlighted verse is its own rounded colour card", /runs\.length === 1 && runs\[0\]\.color && runs\[0\]\.color !== "underline"/.test(readerSrc)
+  && /\|\| !!card \|\| !!last\.card/.test(readerSrc) && /styles\.hlCard, \{ backgroundColor: card\.wash \}/.test(readerSrc) && /hlCard: \{ borderRadius: 10/.test(readerSrc));
+ok("reader: note icon before the verse number", readerSrc.indexOf('name="document-text"') > 0 && readerSrc.indexOf('name="document-text"') < readerSrc.indexOf("styles.verseNum, {"));
 ok("scripture face: platform serif, no new font dependency", B.SCRIPTURE_FONT === "Georgia");
 
 // ── lib/bibleReadingPrefs.ts against a mocked AsyncStorage ──────────────

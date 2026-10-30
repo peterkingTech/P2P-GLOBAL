@@ -115,19 +115,21 @@ export const getLibrary = (kind: "notes" | "highlights" | "saved", offset: numbe
   call<{ available: boolean; items: (Highlight | BibleNote | Bookmark)[]; hasMore: boolean }>(`/bible/me/library?kind=${kind}&offset=${offset}`);
 
 /**
- * Highlight colours, readable on the current P2P theme: a light wash under
- * dark text in light mode, a deeper translucent wash under light text in
- * dark mode. The swatch is the solid colour for the picker.
+ * Highlight colours: bold solid fills (a whole highlighted verse becomes a
+ * rounded colour card in the reader) with dark `ink` text on top, the same in
+ * light and dark mode. The swatch is the picker colour. Stored keys never
+ * change ("rose" shows as Red), so saved highlights keep working.
  */
-export function highlightPalette(mode: "light" | "dark"): Record<HighlightColor, { wash: string; swatch: string; label: string }> {
+export function highlightPalette(mode: "light" | "dark"): Record<HighlightColor, { wash: string; swatch: string; ink: string; label: string }> {
   const dark = mode === "dark";
+  const ink = "#111318";
   return {
-    gold: { wash: dark ? "rgba(212,160,23,0.32)" : "rgba(250,204,21,0.38)", swatch: "#D4A017", label: "Gold" },
-    green: { wash: dark ? "rgba(52,168,83,0.30)" : "rgba(134,239,172,0.55)", swatch: "#34A853", label: "Green" },
-    blue: { wash: dark ? "rgba(66,133,244,0.32)" : "rgba(147,197,253,0.55)", swatch: "#4285F4", label: "Blue" },
-    rose: { wash: dark ? "rgba(236,72,153,0.30)" : "rgba(249,168,212,0.55)", swatch: "#EC4899", label: "Rose" },
-    violet: { wash: dark ? "rgba(139,92,246,0.32)" : "rgba(196,181,253,0.6)", swatch: "#8B5CF6", label: "Violet" },
+    gold: { wash: "#FADF0B", swatch: "#FADF0B", ink, label: "Yellow" },
+    green: { wash: "#34C759", swatch: "#34C759", ink, label: "Green" },
+    blue: { wash: "#1E88F0", swatch: "#1E88F0", ink, label: "Blue" },
+    rose: { wash: "#F43838", swatch: "#F43838", ink, label: "Red" },
+    violet: { wash: "#8E3EF0", swatch: "#8E3EF0", ink, label: "Purple" },
     // No fill: an underline in the reading colour (see the reader's run style).
-    underline: { wash: "transparent", swatch: dark ? "#E5E7EB" : "#374151", label: "Underline" },
+    underline: { wash: "transparent", swatch: dark ? "#E5E7EB" : "#374151", ink: dark ? "#E5E7EB" : "#374151", label: "Underline" },
   };
 }
