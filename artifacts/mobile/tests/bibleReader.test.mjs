@@ -144,5 +144,11 @@ for (const f of ["app/call/audio.tsx", "app/call/video.tsx"]) {
   ok(`${f}: publishes while the call is live, using its own toggleMute`, /usePublishActiveCall\(\{\s*callKey: params\.callId \|\| params\.channelName,\s*live: callState === "connected" \|\| callState === "waiting_for_peer",\s*muted, toggleMute,\s*\}\)/.test(s));
 }
 ok("Return bar names a direct call", /"Call in progress"/.test(src("components/family/GatheringReturnBar.tsx")));
+
+// Study Together Scripture reads the P2P Bible (licensed translations), not the old verse lookup.
+const studyScripture = src("components/study/StudyScriptureTab.tsx");
+ok("Study Together Scripture: P2P Bible reader, not bibleClient", /from "@\/lib\/bibleReaderApi"/.test(studyScripture) && /getChapter\(target\.book, target\.chapter, t\)/.test(studyScripture)
+  && /getTranslations\(\)/.test(studyScripture) && !/bibleClient|lookupVerseForAdmin/.test(studyScripture));
+ok("Study Together Scripture: shares the passage with its translation", /session\.shareScripture\(`\$\{result\.reference\} \(\$\{result\.translation\}\)`, result\.text\)/.test(studyScripture));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

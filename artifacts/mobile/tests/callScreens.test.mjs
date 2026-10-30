@@ -44,18 +44,23 @@ ok("1:1 audio still uses the ONE shared call engine screen (no second engine)", 
 ok("pastoral/group audio screen: no full-screen photo backdrop", !/style=\{StyleSheet\.absoluteFill\}\s*\n\s*contentFit="cover"\s*\n\s*blurRadius/.test(aud) && !/backdropShade/.test(aud));
 
 const vid = src("app/call/video.tsx");
-ok("screen chosen by explicit callType", /const isAudioCall = startsAsAudio;/.test(vid) && /const startsAsAudio = params\.callType === "audio";/.test(vid));
+ok("screen chosen by explicit callType; voice layout while the audio call is still audio on both sides", /const startsAsAudio = params\.callType === "audio";/.test(vid)
+  && /const isAudioCall = startsAsAudio && mediaMode === "audio" && !remoteUids\.some\(\(uid\) => !!remoteVideoOn\[uid\]\);/.test(vid)
+  && /const callTypeForRecord: "audio" \| "video" = startsAsAudio \? "audio" : "video";/.test(vid) && /callAgainIcon=\{startsAsAudio \? "call" : "videocam"\}/.test(vid));
 ok("audio call: voice layout for 1:1 regardless of remote video", /const audioPresentation = remoteUids\.length <= 1 && \(isAudioCall \|\| \(mediaMode === "audio" && !anyRemoteVideo\)\);/.test(vid));
 ok("audio call: blurred full-screen photo only for VIDEO calls", /\{peerPhotoUrl && !isAudioCall && \(\s*\n\s*<ExpoImage[\s\S]{0,300}blurRadius=\{40\}/.test(vid));
 ok("audio call: never renders a video tile (remote or self)", /videoOn: !isAudioCall && !!remoteVideoOn\[uid\]/.test(vid) && /videoOn: !isAudioCall && cameraOn && localJoined/.test(vid));
-ok("audio call: no Audio/Video switch", /\{!isAudioCall && \(\s*\n\s*<P2PControlButton\s*\n\s*size=\{controlSize\}\s*\n\s*onPress=\{mediaMode === "video" \? switchToAudioMode : switchToVideoMode\}/.test(vid));
+ok("every 1:1 call (audio or video) has the Audio/Video switch", /\{\/\* Every 1:1 call, audio or video, can switch\. \*\/\}\s*\n\s*<P2PControlButton\s*\n\s*size=\{controlSize\}\s*\n\s*onPress=\{mediaMode === "video" \? switchToAudioMode : switchToVideoMode\}/.test(vid)
+  && /accessibilityLabel=\{mediaMode === "video" \? "Switch to audio" : "Switch to video"\}/.test(vid));
+ok("switching never leaves the call (camera on/off only; permission asked on first switch to video)", /function switchToAudioMode\(\)[\s\S]{0,300}enableLocalVideo\(false\)/.test(vid) && /async function switchToVideoMode\(\)[\s\S]{0,1200}ensureCameraReady\(\)[\s\S]{0,600}enableLocalVideo\(true\)/.test(vid)
+  && !/function switchTo(Audio|Video)Mode[\s\S]{0,1500}(leaveChannel|joinChannel)/.test(vid));
 ok("audio call: no camera / flip / smoothing / blur", /\{!isAudioCall && mediaMode === "video" && \(\s*\n\s*<P2PControlButton\s*\n\s*size=\{controlSize\}\s*\n\s*onPress=\{toggleCamera\}/.test(vid)
   && /\{!isAudioCall && mediaMode === "video" && \(\s*\n\s*<P2PControlButton size=\{controlSize\} onPress=\{flipCamera\}/.test(vid)
   && /\{!isAudioCall && cameraOn && mediaMode === "video" && \(/.test(vid) && /\.\.\.\(!isAudioCall && mediaMode === "video" && cameraOn/.test(vid));
 const strip = between(vid, "const participantStrip = (", "\n  );");
 ok("audio call: Study Together strip has no camera button or video", /\{!isAudioCall && \(\s*\n\s*<TouchableOpacity[^>\n]*style=\{styles\.studyMiniBtn\} onPress=\{toggleCamera\}>/.test(strip)
   && /remoteUid !== null && !isAudioCall \? <RtcSurfaceView/.test(strip) && /\{!isAudioCall && cameraOn && localJoined && \(/.test(strip));
-ok("audio call: 4 controls — Speaker, Mute, More, End", /controlSizeFor\(isAudioCall \? 4 :/.test(vid)
+ok("audio mode: 5 controls — Speaker, Switch to video, Mute, More, End", /controlSizeFor\(mediaMode === "video" \? 7 : 5\)/.test(vid)
   && /onPress=\{toggleSpeaker\}/.test(vid) && /onPress=\{toggleMute\} active=\{muted\}/.test(vid) && /accessibilityLabel="More call options"/.test(vid) && /danger accessibilityLabel="End call"/.test(vid));
 ok("audio call: avatar + name + elapsed time", /isAudioCall && callState === "connected" && \(\s*\n\s*<Text style=\{styles\.peerElapsed\}/.test(vid) && /<Avatar name=\{otherName\} size=\{portraitSize\} \/>/.test(vid));
 ok("audio call: no camera-unavailable banner", /\{cameraUnavailable && !isAudioCall && \(/.test(vid));

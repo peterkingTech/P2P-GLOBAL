@@ -119,15 +119,10 @@ export default function VideoCallScreen() {
   }>();
   const isInitiator = params.isInitiator === "true";
   // A 1:1 AUDIO call runs on this screen (app/call/audio.tsx routes it
-  // here): same engine and lifecycle, shown with the voice layout below
-  // (isAudioCall). The camera is never started for it.
+  // here): same engine and lifecycle. It starts with the voice layout and
+  // never touches the camera — until someone chooses video (the Audio/Video
+  // switch, see switchToVideoMode / isAudioCall below).
   const startsAsAudio = params.callType === "audio";
-  // The call's explicit type decides the screen, never whether a photo or a
-  // remote video track happens to exist: an AUDIO call always shows the
-  // voice layout (avatar, name, time, Speaker · Mute · More · End) — no
-  // full-screen photo, camera preview, video stage or video controls. A
-  // VIDEO call keeps the full video experience (incl. its own audio mode).
-  const isAudioCall = startsAsAudio;
   const callTypeForRecord: "audio" | "video" = startsAsAudio ? "audio" : "video";
   const markedInProgressRef = useRef(false);
   // CALL NAV TRACE (automatic-second-call investigation) — a fresh id per
@@ -209,7 +204,13 @@ export default function VideoCallScreen() {
   // audio-only presentation" concept that also drives which controls show.
   // It never touches the Agora channel/engine/token — see switchTo*Mode.
   const [mediaMode, setMediaMode] = useState<"video" | "audio">(startsAsAudio ? "audio" : "video");
-  const controlSize = controlSizeFor(isAudioCall ? 4 : mediaMode === "video" ? 7 : 5);
+  // The voice-only layout (avatar, name, time; no photo backdrop, camera
+  // preview or video stage) — for an AUDIO call while it is still audio on
+  // both sides. As soon as either person switches to video, the call shows
+  // like a video call (the other person can switch too, or stay on audio).
+  // Never decided by a photo; the call's record type stays its start type.
+  const isAudioCall = startsAsAudio && mediaMode === "audio" && !remoteUids.some((uid) => !!remoteVideoOn[uid]);
+  const controlSize = controlSizeFor(mediaMode === "video" ? 7 : 5);
   // WhatsApp-style call redesign — which participant is the large tile.
   // Pure UI state: P2PRectStage's tap handler below only flips this, never
   // touches Agora. false (the default) preserves this screen's original,
@@ -1060,7 +1061,7 @@ export default function VideoCallScreen() {
   if (callState === "no_answer") {
     return (
       <CallNoAnswerView colors={p2pColors} insets={insets} photoUrl={peerPhotoUrl} name={otherName} outcome={unansweredOutcome}
-        callAgainIcon={isAudioCall ? "call" : "videocam"} callingAgain={callingAgain} onCancel={navigateBack} onCallAgain={handleCallAgain}
+        callAgainIcon={startsAsAudio ? "call" : "videocam"} callingAgain={callingAgain} onCancel={navigateBack} onCallAgain={handleCallAgain}
         onRecordVoice={params.conversationId ? handleRecordVoice : undefined} />
     );
   }
@@ -1276,8 +1277,8 @@ export default function VideoCallScreen() {
           <P2PControlButton size={controlSize} onPress={toggleSpeaker} active={speakerOn} accessibilityLabel={speakerOn ? "Turn speaker off" : "Turn speaker on"} colors={p2pColors}>
             <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={20} color={speakerOn ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
-          {!isAudioCall && (
-            <P2PControlButton
+          {/* Every 1:1 call, audio or video, can switch. */}
+          <P2PControlButton
               size={controlSize}
               onPress={mediaMode === "video" ? switchToAudioMode : switchToVideoMode}
               accessibilityLabel={mediaMode === "video" ? "Switch to audio" : "Switch to video"}
@@ -1285,7 +1286,6 @@ export default function VideoCallScreen() {
             >
               <Ionicons name={mediaMode === "video" ? "call-outline" : "videocam-outline"} size={20} color={p2pColors.textPrimary} />
             </P2PControlButton>
-          )}
           <P2PControlButton size={controlSize} onPress={toggleMute} active={muted} accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} colors={p2pColors}>
             <Ionicons name={muted ? "mic-off" : "mic"} size={20} color={muted ? p2pColors.accent : p2pColors.textPrimary} />
           </P2PControlButton>
