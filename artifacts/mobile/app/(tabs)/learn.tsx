@@ -18,7 +18,7 @@ import { bookByCode } from "@/lib/bibleReaderApi";
 import { continueItems, type ContinueItem } from "@/lib/learningHome";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { AppButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG, ARTWORK_FILL } from "@/constants/artwork";
 
 // The Learning tab — the Learning Centre landing. One clean starting point:
 //   Continue Learning — the most relevant unfinished activity (real progress
@@ -175,7 +175,7 @@ function ContinueArt({ item, size, color, frame, defaultRatio }: { item: Continu
   // aren't shrunk to a sliver; the small cards' frames are already full width.
   const widen = (frame as { width?: number }).width && r > 1 ? { width: 150 } : null;
   let art: React.ReactNode = <Ionicons name={item.icon as any} size={size} color={color} />;
-  if (isBible) art = <Image source={BIBLE_COVER} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />;
+  if (isBible) art = <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />;
   else if (item.imagePath) art = <CoverArt path={item.imagePath} fit="whole" onRatio={setRatio} />;
   else if (item.imageUrl && !failed) {
     art = <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="contain" onError={() => setFailed(true)}

@@ -10,7 +10,7 @@ import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
 
 // Bible Study — the starting point for Scripture in Learning. It reuses what
 // exists and adds no Bible system of its own:
@@ -65,7 +65,7 @@ export default function BibleStudyScreen() {
         {/* The Bible cover — shown whole (it is square, so nothing is cut off); opens the Bible. */}
         <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
           <View style={s.cover}>
-            <Image source={BIBLE_COVER} style={StyleSheet.absoluteFill} resizeMode="contain" />
+            <Image source={BIBLE_COVER} style={ARTWORK_FILL} resizeMode="contain" />
           </View>
         </TouchableOpacity>
 
