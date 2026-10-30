@@ -18,6 +18,7 @@ import { bookByCode } from "@/lib/bibleReaderApi";
 import { continueItems, type ContinueItem } from "@/lib/learningHome";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { AppButton } from "@/components/ui";
+import { BIBLE_COVER } from "@/constants/artwork";
 
 // The Learning tab — the Learning Centre landing. One clean starting point:
 //   Continue Learning — the most relevant unfinished activity (real progress
@@ -114,7 +115,7 @@ export default function LearnTab() {
           <FlatList horizontal data={more} keyExtractor={(x) => x.key} showsHorizontalScrollIndicator={Platform.OS === "web"} contentContainerStyle={{ gap: 10, paddingTop: 10 }}
             renderItem={({ item }) => (
               <TouchableOpacity style={s.mini} onPress={() => go(item.route)} accessibilityRole="button" accessibilityLabel={`Continue ${item.typeLabel}: ${item.title}`}>
-                {item.imagePath || item.imageUrl
+                {item.imagePath || item.imageUrl || item.kind === "bible"
                   ? <ContinueArt item={item} size={18} color={colors.accentGreen} frame={s.miniArt} defaultRatio={16 / 9} />
                   : <Ionicons name={item.icon as any} size={18} color={colors.accentGreen} />}
                 <Text style={s.kicker} numberOfLines={1}>{item.typeLabel}</Text>
@@ -167,12 +168,15 @@ function ContinueArt({ item, size, color, frame, defaultRatio }: { item: Continu
     setRatio(null);
     if (!item.imagePath && item.imageUrl) Image.getSize(item.imageUrl, (w, h) => { if (w && h) setRatio(w / h); }, () => {});
   }, [item.imagePath, item.imageUrl]);
-  const r = Math.min(2, Math.max(0.5, ratio ?? defaultRatio));
+  // The Bible item shows the Bible cover (square artwork, shown whole).
+  const isBible = item.kind === "bible";
+  const r = isBible ? 1 : Math.min(2, Math.max(0.5, ratio ?? defaultRatio));
   // A fixed-width frame (the large card) widens for wide photos so they
   // aren't shrunk to a sliver; the small cards' frames are already full width.
   const widen = (frame as { width?: number }).width && r > 1 ? { width: 150 } : null;
   let art: React.ReactNode = <Ionicons name={item.icon as any} size={size} color={color} />;
-  if (item.imagePath) art = <CoverArt path={item.imagePath} fit="whole" onRatio={setRatio} />;
+  if (isBible) art = <Image source={BIBLE_COVER} style={StyleSheet.absoluteFill} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />;
+  else if (item.imagePath) art = <CoverArt path={item.imagePath} fit="whole" onRatio={setRatio} />;
   else if (item.imageUrl && !failed) {
     art = <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="contain" onError={() => setFailed(true)}
       accessibilityElementsHidden importantForAccessibility="no" />;
