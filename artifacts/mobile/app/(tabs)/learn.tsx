@@ -18,7 +18,7 @@ import { bookByCode } from "@/lib/bibleReaderApi";
 import { continueItems, type ContinueItem } from "@/lib/learningHome";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { AppButton } from "@/components/ui";
-import { BIBLE_COVER } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
 
 // The Learning tab — the Learning Centre landing. One clean starting point:
 //   Continue Learning — the most relevant unfinished activity (real progress
@@ -181,7 +181,7 @@ function ContinueArt({ item, size, color, frame, defaultRatio }: { item: Continu
     art = <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="contain" onError={() => setFailed(true)}
       accessibilityElementsHidden importantForAccessibility="no" />;
   }
-  return <View style={[frame, { aspectRatio: r }, widen]}>{art}</View>;
+  return <View style={[frame, { aspectRatio: r }, widen, isBible ? { backgroundColor: BIBLE_COVER_BG } : null]}>{art}</View>;
 }
 
 function makeStyles(c: AppColors) {

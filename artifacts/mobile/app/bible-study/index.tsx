@@ -10,7 +10,7 @@ import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER, BIBLE_COVER_LABEL } from "@/constants/artwork";
+import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL } from "@/constants/artwork";
 
 // Bible Study — the starting point for Scripture in Learning. It reuses what
 // exists and adds no Bible system of its own:
@@ -64,12 +64,14 @@ export default function BibleStudyScreen() {
 
         {/* The Bible cover — shown whole (it is square, so nothing is cut off); opens the Bible. */}
         <TouchableOpacity onPress={() => router.push("/bible" as any)} activeOpacity={0.92} accessibilityRole="button" accessibilityLabel={`${BIBLE_COVER_LABEL}. Open the Bible`}>
-          <Image source={BIBLE_COVER} style={s.cover} resizeMode="cover" />
+          <View style={s.cover}>
+            <Image source={BIBLE_COVER} style={StyleSheet.absoluteFill} resizeMode="contain" />
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={s.continue} onPress={() => router.push("/bible" as any)} activeOpacity={0.88} accessibilityRole="button"
           accessibilityLabel={pos ? `Continue reading ${book} ${pos.chapter}, ${pos.translation}` : "Start reading the Bible"}>
-          <Image source={BIBLE_COVER} style={s.continueArt} resizeMode="cover" accessibilityElementsHidden importantForAccessibility="no" />
+          <Image source={BIBLE_COVER} style={s.continueArt} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no" />
           <View style={{ flex: 1 }}>
             <Text style={s.continueKicker}>{pos ? "Continue Reading" : "Start Reading"}</Text>
             <Text style={s.continueTitle}>{pos ? `${book} ${pos.chapter}` : "Open the Bible"}</Text>
@@ -113,8 +115,9 @@ function makeStyles(c: AppColors) {
     back: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginLeft: -10 },
     title: { fontSize: 24, lineHeight: 30, color: c.textDark, fontFamily: "Inter_700Bold" },
     meta: { fontSize: 12, lineHeight: 17, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    cover: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 1, borderRadius: 18, marginBottom: 14, backgroundColor: "#0B1430" },
-    continueArt: { width: 52, height: 52, borderRadius: 10 },
+    // A fixed square frame (the artwork is square) with the whole picture inside.
+    cover: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 1, borderRadius: 18, overflow: "hidden", marginBottom: 14, backgroundColor: BIBLE_COVER_BG },
+    continueArt: { width: 52, height: 52, borderRadius: 10, backgroundColor: BIBLE_COVER_BG },
     continue: { flexDirection: "row", alignItems: "center", gap: 14, padding: 18, borderRadius: 18, backgroundColor: c.primaryGreen, minHeight: 88 },
     continueKicker: { fontSize: 11, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },
     continueTitle: { fontSize: 20, lineHeight: 26, color: "#fff", fontFamily: "Inter_700Bold" },
