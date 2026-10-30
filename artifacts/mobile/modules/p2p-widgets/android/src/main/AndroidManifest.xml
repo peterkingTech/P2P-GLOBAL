@@ -1,0 +1,34 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Home-screen widgets (see P2PWidgets.kt). Each reads the snapshot the
+         app wrote (SharedPreferences "p2p_widgets"); none fetches anything. -->
+    <receiver android:name=".GreetingWidget" android:exported="false" android:label="@string/p2p_widget_greeting_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_greeting_info" />
+    </receiver>
+    <receiver android:name=".SchoolWidget" android:exported="false" android:label="@string/p2p_widget_school_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_school_info" />
+    </receiver>
+    <receiver android:name=".PlansWidget" android:exported="false" android:label="@string/p2p_widget_plans_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_plans_info" />
+    </receiver>
+    <receiver android:name=".StoryWidget" android:exported="false" android:label="@string/p2p_widget_story_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_story_info" />
+    </receiver>
+    <receiver android:name=".LearningWidget" android:exported="false" android:label="@string/p2p_widget_learning_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_learning_info" />
+    </receiver>
+    <receiver android:name=".TogetherWidget" android:exported="false" android:label="@string/p2p_widget_together_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_together_info" />
+    </receiver>
+    <receiver android:name=".ReflectWidget" android:exported="false" android:label="@string/p2p_widget_reflect_name">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/p2p_widget_reflect_info" />
+    </receiver>
+  </application>
+</manifest>

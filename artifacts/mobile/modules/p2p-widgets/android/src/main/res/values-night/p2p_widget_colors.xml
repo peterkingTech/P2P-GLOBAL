@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="p2p_widget_bg">#14201B</color>
+  <color name="p2p_widget_text">#F2EFE8</color>
+  <color name="p2p_widget_muted">#B5AFA3</color>
+  <color name="p2p_widget_accent">#5FD3A6</color>
+</resources>

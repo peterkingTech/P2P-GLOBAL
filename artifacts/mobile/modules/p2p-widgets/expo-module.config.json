@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["P2PWidgetsModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.p2pwidgets.P2PWidgetsModule"]
+  }
+}

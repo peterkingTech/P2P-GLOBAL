@@ -26,6 +26,8 @@ import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync, pathForNotification, registerVoipTokenAsync, setPushRecipient } from "@/lib/push";
 import { flushPendingConversationReads } from "@/lib/conversationNotifications";
 import { syncStudyReminders } from "@/lib/studyReminders";
+import { syncDailyReminders } from "@/lib/dailyReminders";
+import WidgetSyncHost from "@/components/widgets/WidgetSyncHost";
 import { createNotificationTapHandler } from "@/lib/notificationTap";
 import {
   callSystemActive, callSystemInstalled, configureCallSystem, flushPendingCallSystemEvents,
@@ -545,6 +547,12 @@ function PushNotificationHost() {
     const sub = AppState.addEventListener("change", (st) => { if (st === "active") void syncStudyReminders(uid); });
     return () => sub.remove();
   }, [isAuthenticated, profile?.id]);
+  // Daily prayer / journal reminders follow the Prayer settings on the profile
+  // (and the Discipleship Journal reminder on this phone); signing out clears them.
+  useEffect(() => {
+    const uid = isAuthenticated ? profile?.id ?? null : null;
+    void syncDailyReminders(uid, uid ? profile : null);
+  }, [isAuthenticated, profile?.id, profile?.morningConfessionEnabled, profile?.morningConfessionTime, profile?.prayerJournalReminderEnabled]);
 
   useEffect(() => {
     if (!isAuthenticated || !profile?.id) return;
@@ -656,6 +664,8 @@ function RootLayoutNav() {
         <FamilyWorshipBannerHost />
         <CompletionMomentHost />
         <MessageBannerHost />
+        {/* Keeps the home-screen widgets current (no UI). */}
+        <WidgetSyncHost />
         <PushNotificationHost />
         <PresenceHost />
         <ClientBuildReporter />

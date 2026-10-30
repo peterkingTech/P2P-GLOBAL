@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="p2p_widget_greeting_name">P2P Greeting &amp; Scripture</string>
+  <string name="p2p_widget_greeting_desc">A greeting for the time of day and today\'s Scripture.</string>
+  <string name="p2p_widget_school_name">P2P Kingdom School</string>
+  <string name="p2p_widget_school_desc">Continue your lesson and see your Core Curriculum progress.</string>
+  <string name="p2p_widget_plans_name">P2P Learning Plans</string>
+  <string name="p2p_widget_plans_desc">Your active Learning Plan.</string>
+  <string name="p2p_widget_story_name">P2P Kingdom Stories</string>
+  <string name="p2p_widget_story_desc">Continue the Kingdom Story you are reading.</string>
+  <string name="p2p_widget_learning_name">P2P My Learning</string>
+  <string name="p2p_widget_learning_desc">Work to do, reviews and feedback on your Comprehensive Checks.</string>
+  <string name="p2p_widget_together_name">P2P Study Together</string>
+  <string name="p2p_widget_together_desc">Your shared study and next Gathering.</string>
+  <string name="p2p_widget_reflect_name">P2P Prayer &amp; Journal</string>
+  <string name="p2p_widget_reflect_desc">A moment to pray or reflect.</string>
+</resources>

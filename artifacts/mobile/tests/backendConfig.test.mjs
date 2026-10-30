@@ -100,7 +100,9 @@ const appConfig = require(path.join(root, "app.config.js"));
 const run = (vars) => withEnv(vars, () => { try { return { config: appConfig({ config: structuredClone(appJson) }) }; } catch (e) { return { error: String(e.message) }; } });
 
 let c = run({});
-ok("app.config: default → app.json unchanged", !c.error && JSON.stringify(c.config) === JSON.stringify(appJson), c.error ?? "");
+// Default build: app.json unchanged except the home-screen widgets plugin added at the end.
+const withWidgets = { ...structuredClone(appJson), plugins: [...(appJson.plugins ?? []), "./plugins/withP2PWidgets.js"] };
+ok("app.config: default → app.json unchanged (plus the widgets plugin)", !c.error && JSON.stringify(c.config) === JSON.stringify(withWidgets), c.error ?? "");
 c = run({ ...prodApi, EAS_BUILD_PROFILE: "production" });
 ok("app.config: production profile → unchanged production identity", !c.error && c.config.ios.bundleIdentifier === appJson.ios.bundleIdentifier && c.config.android.package === appJson.android.package);
 c = run({ ...stg, EAS_BUILD_PROFILE: "staging" });

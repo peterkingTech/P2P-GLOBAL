@@ -14,6 +14,10 @@ module.exports = ({ config }) => {
   if (errors.length) {
     throw new Error(`P2P build configuration rejected${profile ? ` (EAS profile "${profile}")` : ""}:\n - ${errors.join("\n - ")}`);
   }
+  // Home-screen widgets (iOS WidgetKit extension + App Group). Added here, not
+  // in app.json, so it applies to every build; the plugin derives the App
+  // Group from the final bundle id (staging gets its own).
+  config = { ...config, plugins: [...(config.plugins ?? []), "./plugins/withP2PWidgets.js"] };
   if (resolved.config.target !== "staging") return config;
 
   // Staging: a distinct app (own name, bundle id/package and URL scheme), so

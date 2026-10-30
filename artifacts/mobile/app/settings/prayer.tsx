@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { syncDailyReminders } from "@/lib/dailyReminders";
 
 // Lightweight time-of-day chips instead of a native time picker component —
 // this app has no date/time picker dependency installed yet, and adding one
@@ -29,7 +30,7 @@ export default function PrayerSettingsScreen() {
             </View>
             <Switch
               value={profile?.morningConfessionEnabled ?? false}
-              onValueChange={(v) => { updateProfile({ morningConfessionEnabled: v }); }}
+              onValueChange={(v) => { updateProfile({ morningConfessionEnabled: v }); if (v && profile) void syncDailyReminders(profile.id, { ...profile, morningConfessionEnabled: true }, true); }}
               trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
               thumbColor="#fff"
             />
@@ -60,11 +61,11 @@ export default function PrayerSettingsScreen() {
           <View style={[styles.row, styles.rowLast]}>
             <View style={{ flex: 1, marginRight: 12 }}>
               <Text style={styles.label}>Prayer journal reminder</Text>
-              <Text style={styles.desc}>A gentle nudge to write in your prayer journal</Text>
+              <Text style={styles.desc}>A gentle nudge to write in your prayer journal, every evening at 8 pm</Text>
             </View>
             <Switch
               value={profile?.prayerJournalReminderEnabled ?? false}
-              onValueChange={(v) => { updateProfile({ prayerJournalReminderEnabled: v }); }}
+              onValueChange={(v) => { updateProfile({ prayerJournalReminderEnabled: v }); if (v && profile) void syncDailyReminders(profile.id, { ...profile, prayerJournalReminderEnabled: true }, true); }}
               trackColor={{ false: colors.borderBeige, true: colors.accentGreen }}
               thumbColor="#fff"
             />

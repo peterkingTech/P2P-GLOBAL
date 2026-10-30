@@ -29,6 +29,7 @@ const CATEGORIES: Category[] = [
   { emoji: "🎯", title: "My Goals", subtitle: "View and update your discipleship goals", route: "/settings/goals" },
   { emoji: "📖", title: "Kingdom School", subtitle: "Learning preferences, Session format", route: "/settings/kingdom-school" },
   { emoji: "🙏", title: "Prayer", subtitle: "Morning confession reminder, Prayer notification", route: "/settings/prayer" },
+  { emoji: "📱", title: "Widgets & Offline", subtitle: "Home-screen widgets, privacy, journal reminder, what works offline", route: "/settings/widgets" },
   { emoji: "ℹ️", title: "About", subtitle: "App version, Terms, Privacy Policy, Contact", route: "/settings/about" },
 ];
 

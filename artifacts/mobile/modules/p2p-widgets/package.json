@@ -1,0 +1,11 @@
+{
+  "name": "p2p-widgets",
+  "version": "1.0.0",
+  "description": "Local Expo native module — home-screen widgets for P2P Global: writes the widget snapshot to shared storage (iOS App Group / Android SharedPreferences) and asks the system to redraw. The iOS WidgetKit extension itself is added by plugins/withP2PWidgets.js; the Android widgets live in this module.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "expo-modules-core": "~57.0.19"
+  }
+}
