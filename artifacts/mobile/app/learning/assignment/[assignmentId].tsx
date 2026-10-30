@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
@@ -12,11 +12,8 @@ import {
   type Assignment, type Submission, type WorkScope,
 } from "@/lib/lessonWorkApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function notify(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 const STATUS_LABEL: Record<Submission["status"], string> = { submitted: "Submitted", reviewed: "Reviewed", returned: "Returned" };
 type ReviewRow = Submission & { attempts: number; author: { id: string; name: string; photoUrl: string | null } };
 
@@ -70,23 +67,23 @@ export default function AssignmentScreen() {
       if (files.count && profile?.id) { await clearTray(profile.id, trayKey); setTrayReset((n) => n + 1); }
       await load();
     }
-    catch (e: any) { notify("Couldn't submit", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't submit", e?.message ?? "Please try again."); }
     finally { setBusy(null); }
   }
   async function doReview(row: ReviewRow, status: "reviewed" | "returned") {
     if (!scope) return;
     const fb = (feedback[row.id] ?? "").trim();
-    if (status === "returned" && !fb) { notify("Add feedback", "Say what to change when returning work."); return; }
+    if (status === "returned" && !fb) { showAlert("Add feedback", "Say what to change when returning work."); return; }
     setBusy(row.id);
     try { await reviewSubmission(scope, row.id, status, fb); setFeedback((f) => ({ ...f, [row.id]: "" })); await load(); }
-    catch (e: any) { notify("Couldn't save the review", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't save the review", e?.message ?? "Please try again."); }
     finally { setBusy(null); }
   }
   async function setStatus(status: "draft" | "published" | "archived") {
     if (!scope || !assignmentId) return;
     setBusy(status);
     try { setAssignment(await updateAssignment(scope, assignmentId, { status })); }
-    catch (e: any) { notify("Couldn't update", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't update", e?.message ?? "Please try again."); }
     finally { setBusy(null); }
   }
 

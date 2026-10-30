@@ -89,7 +89,7 @@ export default function LearningCentreScreen() {
         <View style={[s.row, { marginTop: 8 }]}>
           <AppButton label="Kingdom School" onPress={() => router.push("/kingdom-school" as any)} variant="secondary" />
           <AppButton label="Kingdom Stories" onPress={() => router.push("/kingdom-stories" as any)} variant="secondary" />
-          <AppButton label="My Journal" onPress={() => router.push("/my-discipleship/journal" as any)} variant="secondary" />
+          <AppButton label="Discipleship Journal" onPress={() => router.push("/my-discipleship/journal" as any)} variant="secondary" />
         </View>
       ) : null}
     </ScrollView>

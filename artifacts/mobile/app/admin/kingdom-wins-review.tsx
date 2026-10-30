@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Platform } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,8 @@ import {
 } from "@/lib/kingdomWinsApi";
 import { RESTRICTION_DURATIONS, formatUntil, isWinsModerator, restrictionExpiry, type RestrictionDuration } from "@/lib/winsModerationModel";
 import { AppButton, IconButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
+import { timeAgo } from "@/lib/timeFormat";
 
 type QueueStatus = "submitted" | "published" | "rejected" | "archived" | "removed";
 
@@ -34,28 +36,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   translation: "Not yet translated — please read the original",
 };
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
-function confirmThen(title: string, message: string, destructive: boolean, onConfirm: () => void) {
-  if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) onConfirm(); return; }
-  Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
-    { text: "Confirm", style: destructive ? "destructive" : "default", onPress: onConfirm },
-  ]);
-}
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return "";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export default function KingdomWinsReviewScreen() {
   const { profile } = useAuth();
@@ -88,7 +69,7 @@ export default function KingdomWinsReviewScreen() {
     }
   }
 
-  function confirmAction(entry: KingdomWin, action: "approve" | "reject" | "archive") {
+  function confirmReview(entry: KingdomWin, action: "approve" | "reject" | "archive") {
     const copy: Record<string, { title: string; body: string }> = {
       approve: entry.heldForReview
         ? { title: "Release and publish?", body: "Automated screening held this post. Publishing makes it visible to the entire authenticated P2P community." }
@@ -96,7 +77,7 @@ export default function KingdomWinsReviewScreen() {
       reject: { title: "Reject this submission?", body: "The author will be notified and can revise it." },
       archive: { title: "Archive this story?", body: "It will no longer be publicly visible, but the record is kept." },
     };
-    confirmThen(copy[action].title, copy[action].body, action === "reject", () => act(entry, action));
+    confirmAction(copy[action].title, copy[action].body, () => act(entry, action), { destructive: action === "reject" });
   }
 
   const filters = STATUS_FILTERS.filter((f) => canModerate || !f.moderatorOnly);
@@ -134,7 +115,7 @@ export default function KingdomWinsReviewScreen() {
                     </View>
                   ) : null}
                 </View>
-                <Text style={styles.timeText}>{timeAgo(item.submittedAt ?? item.createdAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.submittedAt ?? item.createdAt, "ago")}</Text>
               </View>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardMeta}>{KINGDOM_CATEGORY_LABELS[item.category]} · {item.isAnonymous ? "Anonymous" : item.authorName ?? "A peer"}</Text>
@@ -171,12 +152,12 @@ export default function KingdomWinsReviewScreen() {
                     value={noteDrafts[item.id] ?? ""} onChangeText={(t) => setNoteDrafts((prev) => ({ ...prev, [item.id]: t }))}
                   />
                   <View style={styles.actionsRow}>
-                    <AppButton label={item.heldForReview ? "Release & publish" : "Approve"} onPress={() => confirmAction(item, "approve")} disabled={acting === item.id} accessibilityLabel={item.heldForReview ? "Release and publish" : "Approve"} style={{ flex: 1 }} palette="fixedLight" />
-                    <AppButton label="Reject" onPress={() => confirmAction(item, "reject")} variant="destructive" disabled={acting === item.id} accessibilityLabel="Reject" style={{ flex: 1 }} palette="fixedLight" />
+                    <AppButton label={item.heldForReview ? "Release & publish" : "Approve"} onPress={() => confirmReview(item, "approve")} disabled={acting === item.id} accessibilityLabel={item.heldForReview ? "Release and publish" : "Approve"} style={{ flex: 1 }} palette="fixedLight" />
+                    <AppButton label="Reject" onPress={() => confirmReview(item, "reject")} variant="destructive" disabled={acting === item.id} accessibilityLabel="Reject" style={{ flex: 1 }} palette="fixedLight" />
                   </View>
                 </>
               ) : item.status === "published" && canModerate ? (
-                <AppButton label="Archive" onPress={() => confirmAction(item, "archive")} variant="secondary" disabled={acting === item.id} accessibilityLabel="Archive" style={{ flex: 1, marginTop: 8 }} palette="fixedLight" />
+                <AppButton label="Archive" onPress={() => confirmReview(item, "archive")} variant="secondary" disabled={acting === item.id} accessibilityLabel="Archive" style={{ flex: 1, marginTop: 8 }} palette="fixedLight" />
               ) : item.status !== "published" ? (
                 <View style={[styles.statusPill, item.status === "archived" ? styles.statusPillArchived : styles.statusPillRejected]}>
                   <Text style={styles.statusPillText}>{item.status.toUpperCase()}</Text>
@@ -224,13 +205,11 @@ function RestrictionPanel({ userId, onClose }: { userId: string; onClose: () => 
   function restrict() {
     if (reason.trim().length < 3) { showAlert("Reason needed", "Please give a reason (at least 3 characters)."); return; }
     const label = RESTRICTION_DURATIONS.find((d) => d.value === duration)?.label ?? "";
-    confirmThen("Restrict posting?", `This member won't be able to share new Kingdom Wins (${label.toLowerCase()}). Their existing posts stay up.`, true,
-      () => run(() => restrictWinsPosting(userId, reason.trim(), restrictionExpiry(duration))));
+    confirmAction("Restrict posting?", `This member won't be able to share new Kingdom Wins (${label.toLowerCase()}). Their existing posts stay up.`, () => run(() => restrictWinsPosting(userId, reason.trim(), restrictionExpiry(duration))), { destructive: true });
   }
   function liftAll() {
     if (reason.trim().length < 3) { showAlert("Reason needed", "Please give a reason for lifting (at least 3 characters)."); return; }
-    confirmThen("Lift restriction?", "This member will be able to share Kingdom Wins again.", false,
-      () => run(async () => { for (const r of active) await liftWinsRestriction(r.id, reason.trim()); }));
+    confirmAction("Lift restriction?", "This member will be able to share Kingdom Wins again.", () => run(async () => { for (const r of active) await liftWinsRestriction(r.id, reason.trim()); }), { destructive: false });
   }
 
   return (

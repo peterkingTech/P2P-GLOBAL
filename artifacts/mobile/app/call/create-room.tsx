@@ -1,21 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 interface RoomPreset { key: string; label: string; icon: string; roomType: string; category: string | null }
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function CreateRoomScreen() {
   const insets = useSafeAreaInsets();
@@ -57,7 +54,7 @@ export default function CreateRoomScreen() {
     if (!profile?.id || !name.trim()) return;
     setLaunching(true);
     try {
-      const res = await authedFetch(`/calls/rooms`, {
+      const res = await apiFetch(`/calls/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

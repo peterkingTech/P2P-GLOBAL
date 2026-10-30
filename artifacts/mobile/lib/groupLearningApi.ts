@@ -1,5 +1,4 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Unified group Learning for Family Circles and Churches
 // (api-server routes/groupLearning.ts, migration 199). Identity always comes
@@ -13,17 +12,7 @@ export class LearningApiError extends Error {
   constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
-async function authedFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new LearningApiError((body as { error?: string }).error ?? "Request failed", res.status);
-  return body as T;
-}
+const authedFetch = <T,>(path: string, init?: RequestInit) => apiRequest<T>(path, init, { makeError: (message, status) => new LearningApiError(message, status) });
 
 export interface LibraryItem { id: string; title: string; subtitle: string | null; type: "core" | "plan"; coverImage: string | null; lessonCount: number }
 export interface Library { core: LibraryItem[]; categories: { id: string; title: string; plans: LibraryItem[] }[] }

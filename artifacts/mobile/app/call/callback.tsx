@@ -1,13 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, Platform, Alert } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // "Call back" from the phone's own call history — Android's system call log
 // (CALL_BACK, modules/call-system CallBackActivity) or iPhone Phone → Recents

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -9,11 +9,8 @@ import {
   type CurriculumOutline, type GroupScope, type LearningHome,
 } from "@/lib/groupLearningApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // One central series (Core Foundation curriculum or P2P Plan): its modules
 // and lessons in order. Every lesson opens the existing lesson screen. When

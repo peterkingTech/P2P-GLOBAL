@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,11 +12,8 @@ import {
 } from "@/lib/prayerLibraryApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // "Pray the Word" Stage 5 — MY PRAYER LIBRARY. Every section here reads
 // from an existing source of truth (saved-item tables, the Journal, or the

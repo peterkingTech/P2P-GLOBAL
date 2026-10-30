@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMember } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { confirmAction, showAlert } from "@/lib/alerts";
 
 // Church Portal — General Overseer's Church Admin management screen.
 // "Church Admin" here means p2p_church_members.role IN (discipleship_pastor,
@@ -42,28 +43,18 @@ export default function ChurchAdminsScreen() {
 
   async function handlePromote(member: ChurchMember) {
     if (!userChurch) return;
-    Alert.alert(
-      `Make ${member.displayName ?? "this member"} a Church Admin?`,
-      "They'll be able to manage members, small groups, announcements, and learning goals for this church.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Make Church Admin",
-          onPress: async () => {
+    confirmAction(`Make ${member.displayName ?? "this member"} a Church Admin?`, "They'll be able to manage members, small groups, announcements, and learning goals for this church.", async () => {
             setBusyId(member.userId);
             const error = await updateMemberRole(userChurch.id, member.userId, "discipleship_pastor");
             setBusyId(null);
             if (error) Alert.alert("Couldn't update role", error);
             else load();
-          },
-        },
-      ]
-    );
+          }, { confirmLabel: "Make Church Admin" });
   }
 
   function handleAddAdmin() {
     if (!promotable.length) {
-      Alert.alert("No members available", "Every visible member is already a Church Admin, or no members have joined yet.");
+      showAlert("No members available", "Every visible member is already a Church Admin, or no members have joined yet.");
       return;
     }
     Alert.alert(
@@ -78,23 +69,19 @@ export default function ChurchAdminsScreen() {
 
   async function handleRemoveAdmin(member: ChurchMember) {
     if (!userChurch) return;
-    const confirmed = Platform.OS === "web"
-      ? window.confirm(`Remove ${member.displayName ?? "this admin"}'s Church Admin access? They will remain a regular member.`)
-      : await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            "Remove Church Admin access?",
-            `${member.displayName ?? "This admin"} will remain a regular member.`,
-            [
-              { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-              { text: "Remove", style: "destructive", onPress: () => resolve(true) },
-            ]
-          );
-        });
+    const confirmed = await new Promise<boolean>((resolve) => {
+      let answered = false;
+      confirmAction("Remove Church Admin access?", `${member.displayName ?? "This admin"} will remain a regular member.`,
+        () => { answered = true; resolve(true); }, { confirmLabel: "Remove", destructive: true });
+      // Web's confirm is synchronous: no answer by now means Cancel. (Native resolves
+      // only on Remove; Cancel leaves the dialog-less promise unresolved — harmless.)
+      if (Platform.OS === "web" && !answered) resolve(false);
+    });
     if (!confirmed) return;
     setBusyId(member.userId);
     const error = await updateMemberRole(userChurch.id, member.userId, "member");
     setBusyId(null);
-    if (error) Alert.alert("Couldn't remove admin access", error);
+    if (error) showAlert("Couldn't remove admin access", error);
     else load();
   }
 

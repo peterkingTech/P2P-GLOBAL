@@ -3,12 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { StudySessionSummary as Summary } from "@/hooks/useStudySession";
 import { AppButton } from "@/components/ui";
+import { formatDuration } from "@/lib/timeFormat";
 
-function formatDuration(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
 // Shown after "End Study" — a historical record, not a completion claim
 // (spec: being present does not automatically complete the lesson).
@@ -30,7 +26,7 @@ export function StudySessionSummary({
         <View style={styles.card}>
           <Text style={styles.eyebrow}>KINGDOM SCHOOL STUDY</Text>
           <Text style={styles.title}>{summary.lessonTitle || "Study Together"}</Text>
-          <Text style={styles.duration}>{formatDuration(summary.durationSeconds)}</Text>
+          <Text style={styles.duration}>{formatDuration(summary.durationSeconds, "minSec")}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statBox}>

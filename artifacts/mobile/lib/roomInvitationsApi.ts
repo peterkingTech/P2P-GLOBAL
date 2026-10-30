@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // P2P Rooms — Shareable Room Links (Stage C: authenticated in-app
 // resolution + client-side link caching). The server intentionally never
@@ -10,17 +10,6 @@ import { getApiUrl } from "@/lib/apiUrl";
 // THIS client is the only place capable of remembering a link long enough
 // for a host to "Copy Link" after navigating away and back. Regenerating
 // is the only way to recover a lost link, and it revokes the old one.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
 
 export type RoomType = "break_room" | "church_call" | "family_worship";
 export type RoomState = "scheduled" | "live" | "completed" | "unavailable";
@@ -35,13 +24,13 @@ export interface RoomInvitationPreview {
 }
 
 export function createRoomInvitation(roomType: RoomType, roomId: string, expiresAt?: string | null): Promise<RoomInvitationCreated> {
-  return authedFetch("/room-invitations", { method: "POST", body: JSON.stringify({ roomType, roomId, expiresAt: expiresAt ?? null }) });
+  return apiRequest("/room-invitations", { method: "POST", body: JSON.stringify({ roomType, roomId, expiresAt: expiresAt ?? null }) });
 }
 export function resolveRoomInvitation(token: string): Promise<RoomInvitationPreview> {
-  return authedFetch(`/room-invitations/${encodeURIComponent(token)}`);
+  return apiRequest(`/room-invitations/${encodeURIComponent(token)}`);
 }
 export function revokeRoomInvitation(invitationId: string): Promise<{ revoked: true }> {
-  return authedFetch(`/room-invitations/${invitationId}/revoke`, { method: "POST" });
+  return apiRequest(`/room-invitations/${invitationId}/revoke`, { method: "POST" });
 }
 
 export interface RoomInvitationStatus {
@@ -53,7 +42,7 @@ export interface RoomInvitationStatus {
 // can tell "nothing exists yet" apart from "something exists elsewhere,
 // generating a new one will revoke it" — see getVerifiedCachedRoomInvitation.
 export function getRoomInvitationStatus(roomType: RoomType, roomId: string): Promise<RoomInvitationStatus> {
-  return authedFetch(`/room-invitations/status?roomType=${roomType}&roomId=${encodeURIComponent(roomId)}`);
+  return apiRequest(`/room-invitations/status?roomType=${roomType}&roomId=${encodeURIComponent(roomId)}`);
 }
 
 // ── Client-side link cache ──────────────────────────────────────────────

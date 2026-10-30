@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useData, HelpRequest, HelpRequestTier, HelpRequestStatus } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { showAlert } from "@/lib/alerts";
 
 const TIER_FILTERS: Array<{ value: HelpRequestTier | "all"; label: string }> = [
   { value: "all", label: "All Tiers" },
@@ -23,15 +25,6 @@ const STATUS_FILTERS: Array<{ value: HelpRequestStatus | "all"; label: string }>
   { value: "resolved", label: "Resolved" },
 ];
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export default function HelpRequestsScreen() {
   const { getHelpRequests, updateHelpRequestStatus } = useData();
@@ -49,7 +42,7 @@ export default function HelpRequestsScreen() {
   // conversation.
   async function linkConversationToHelpRequest(reqId: string, conversationId: string) {
     try {
-      await authedFetch(`/admin/help-requests/${reqId}/link-conversation`, {
+      await apiFetch(`/admin/help-requests/${reqId}/link-conversation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId }),
@@ -66,7 +59,7 @@ export default function HelpRequestsScreen() {
   // conversation to this help request on first send.
   function handleMessageThem(req: HelpRequest) {
     if (!req.userId) {
-      Alert.alert("Account removed", "This user's account no longer exists and cannot be messaged.");
+      showAlert("Account removed", "This user's account no longer exists and cannot be messaged.");
       return;
     }
     router.push({
@@ -77,7 +70,7 @@ export default function HelpRequestsScreen() {
 
   async function handleCallThem(req: HelpRequest) {
     if (!req.userId) {
-      Alert.alert("Account removed", "This user's account no longer exists and cannot be called.");
+      showAlert("Account removed", "This user's account no longer exists and cannot be called.");
       return;
     }
     if (!user) return;
@@ -85,7 +78,7 @@ export default function HelpRequestsScreen() {
     try {
       const result = await startPeerCall({
         supabase, currentUserId: user.id, otherUserId: req.userId,
-        onAlert: (title, message) => Alert.alert(title, message),
+        onAlert: (title, message) => showAlert(title, message),
       });
       if (!result) return;
 
@@ -121,7 +114,7 @@ export default function HelpRequestsScreen() {
 
     if (next === "resolved" && req.userId) {
       try {
-        await authedFetch("/admin/activity/log", {
+        await apiFetch("/admin/activity/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ actionType: "case_resolved", targetUserId: req.userId, targetResourceId: req.id, targetResourceType: "help_request" }),
@@ -191,7 +184,7 @@ export default function HelpRequestsScreen() {
                   <Ionicons name={item.tier === "crisis" ? "alert-circle" : "hand-left"} size={12} color="#fff" />
                   <Text style={styles.tierBadgeText}>{item.tier === "crisis" ? "CRISIS" : "Struggling"}</Text>
                 </View>
-                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt, "ago")}</Text>
               </View>
               <Text style={[styles.userName, !item.userId && { color: colors.textMuted, fontStyle: "italic" }]}>
                 {item.userName || "Creator no longer available"}

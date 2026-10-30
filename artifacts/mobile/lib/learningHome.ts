@@ -37,9 +37,24 @@ export interface ContinueInputs {
 
 const TYPE = { school: "Kingdom School", story: "Kingdom Stories", together: "Study Together", bible: "Bible Study" } as const;
 
+/**
+ * The Kingdom School module to continue — the ONE rule every screen uses
+ * (Home, Learning Centre, Kingdom School, My P2P): the first unlocked module
+ * that has lessons and isn't finished. Null when everything open is done.
+ */
+export function currentModule<M extends { isLocked: boolean; lessonCount: number; completedLessons: number }>(modules: M[] | undefined | null): M | null {
+  return (modules ?? []).find((m) => !m.isLocked && m.lessonCount > 0 && m.completedLessons < m.lessonCount) ?? null;
+}
+
+/** A Kingdom Story counts as "in progress" once started and until every chapter is done. */
+export function isStoryInProgress(s: { myProgress?: { totalChapters: number; doneChapters: number; started: boolean } | null }): boolean {
+  const p = s.myProgress;
+  return !!p && p.started && p.totalChapters > 0 && p.doneChapters < p.totalChapters;
+}
+
 export function continueItems(i: ContinueInputs, max = 6): ContinueItem[] {
   const out: ContinueItem[] = [];
-  const mod = (i.modules ?? []).find((m) => !m.isLocked && m.lessonCount > 0 && m.completedLessons < m.lessonCount) ?? null;
+  const mod = currentModule(i.modules);
   const moduleItem = (m: NonNullable<typeof mod>): ContinueItem => ({
     key: `school:${m.id}`, kind: "school", typeLabel: TYPE.school, title: m.title,
     detail: `${m.completedLessons} of ${m.lessonCount} lessons`, progress: m.completedLessons / m.lessonCount, icon: "school-outline",
@@ -48,8 +63,8 @@ export function continueItems(i: ContinueInputs, max = 6): ContinueItem[] {
   });
   if (mod && mod.completedLessons > 0) out.push(moduleItem(mod));
   for (const s of i.stories ?? []) {
-    const p = s.myProgress;
-    if (!p || !p.started || !p.totalChapters || p.doneChapters >= p.totalChapters) continue;
+    if (!isStoryInProgress(s)) continue;
+    const p = s.myProgress!;
     out.push({
       key: `story:${s.id}`, kind: "story", typeLabel: TYPE.story, title: s.title,
       detail: [s.category?.title, `Chapter ${s.lastChapterNumber ?? p.doneChapters + 1} of ${p.totalChapters}`].filter(Boolean).join(" · "),

@@ -7,8 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // Settings → Account → Account status → Delete account permanently.
 // Three calm steps: a reminder that a break is available, an optional
@@ -52,18 +53,18 @@ export default function DeleteAccountScreen() {
     if (!canDelete) return;
     setSubmitting(true);
     try {
-      const res = await authedFetch("/account/deletion/request", {
+      const res = await apiFetch("/account/deletion/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: CONFIRM_WORD, reasonCode: reason }),
       });
       const body = await res.json().catch(() => ({}));
       if (res.status === 404) {
-        Alert.alert("Not available yet", "Account deletion isn't available yet. Please contact P2P Support and we'll help you.");
+        showAlert("Not available yet", "Account deletion isn't available yet. Please contact P2P Support and we'll help you.");
         return;
       }
       if (!res.ok) {
-        Alert.alert("Your account can't be deleted yet", body.error ?? "Please try again later.");
+        showAlert("Your account can't be deleted yet", body.error ?? "Please try again later.");
         return;
       }
       const when = body.deletionScheduledFor
@@ -76,7 +77,7 @@ export default function DeleteAccountScreen() {
         [{ text: "OK", onPress: () => { void signOut(); } }],
       );
     } catch {
-      Alert.alert("Couldn't request deletion", "Please check your connection and try again.");
+      showAlert("Couldn't request deletion", "Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

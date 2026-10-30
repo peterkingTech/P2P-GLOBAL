@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
@@ -8,27 +8,16 @@ import FamilyIcon from "@/components/family/FamilyIcon";
 import GatheringFollowUp from "@/components/study/GatheringFollowUp";
 import { getFamilyDetail, getWorshipSessionSummary, updateGuideSummary, updateContinuityNotes, type WorshipSessionSummary } from "@/lib/familyApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { formatDuration, formatTimeOfDay } from "@/lib/timeFormat";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
 
 function providerLabel(provider: string): string {
   if (provider === "youtube") return "YouTube";
@@ -209,7 +198,7 @@ export default function GatheringSummaryScreen() {
           <Text style={styles.sectionTitle}>Gathering Overview</Text>
           {!!familyName && <Text style={styles.overviewLine}>Family: {familyName}</Text>}
           <Text style={styles.overviewLine}>Date: {formatDateTime(summary.startedAt)}</Text>
-          <Text style={styles.overviewLine}>Duration: {formatDuration(summary.durationSeconds)}</Text>
+          <Text style={styles.overviewLine}>Duration: {formatDuration(summary.durationSeconds, "hourMin")}</Text>
           <Text style={styles.overviewLine}>Guide: {summary.guide?.name ?? "Unknown"}</Text>
           <Text style={styles.overviewLine}>
             Participants: {summary.participation.participantCount}
@@ -357,7 +346,7 @@ export default function GatheringSummaryScreen() {
           ) : (
             summary.timeline.map((e, i) => (
               <Text key={i} style={styles.bodyText}>
-                {formatTime(e.at)} — {(TIMELINE_LABEL[e.type] ?? (() => e.type))(e.data)}
+                {formatTimeOfDay(e.at)} — {(TIMELINE_LABEL[e.type] ?? (() => e.type))(e.data)}
               </Text>
             ))
           )}

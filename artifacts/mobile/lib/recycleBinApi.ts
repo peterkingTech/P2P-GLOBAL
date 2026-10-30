@@ -1,4 +1,4 @@
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 
 // P2P Admin Recycle Bin (API: /admin/recycle-bin, migration 214). Deleting
 // supported admin content moves it here with everything that depends on it;
@@ -29,7 +29,7 @@ export class RecycleApiError extends Error {
 }
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
-  try { res = await authedFetch(`/admin/recycle-bin${path}`, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } }); }
+  try { res = await apiFetch(`/admin/recycle-bin${path}`, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } }); }
   catch { throw new RecycleApiError("Can't reach the server. Check your connection and try again.", 0); }
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new RecycleApiError(body?.error ?? "Something went wrong.", res.status, body?.code);

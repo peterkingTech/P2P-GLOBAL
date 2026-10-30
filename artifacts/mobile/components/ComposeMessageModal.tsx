@@ -9,6 +9,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
   { value: "support_help", label: "Support & Help" },
   { value: "crisis_safeguarding", label: "Crisis & Safeguarding" },
@@ -172,11 +173,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                     <Text style={styles.sectionLabel}>TO</Text>
                     {selectedUser ? (
                       <View style={styles.selectedUserRow}>
-                        {selectedUser.photoUrl ? (
-                          <Image source={{ uri: selectedUser.photoUrl }} style={styles.avatar} />
-                        ) : (
-                          <View style={[styles.avatar, styles.avatarFallback]}><Ionicons name="person" size={16} color={colors.textMuted} /></View>
-                        )}
+                        <Avatar photoUrl={selectedUser.photoUrl} fallbackIcon="person" size={34} style={styles.avatar} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.selectedUserHandle}>@{selectedUser.username}</Text>
                           <Text style={styles.selectedUserName}>{selectedUser.fullName ?? "—"}</Text>
@@ -206,11 +203,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                             style={styles.resultRow}
                             onPress={() => { setSelectedUser(item); setQuery(""); setResults([]); }}
                           >
-                            {item.photoUrl ? (
-                              <Image source={{ uri: item.photoUrl }} style={styles.avatar} />
-                            ) : (
-                              <View style={[styles.avatar, styles.avatarFallback]}><Ionicons name="person" size={16} color={colors.textMuted} /></View>
-                            )}
+                            <Avatar photoUrl={item.photoUrl} fallbackIcon="person" size={34} style={styles.avatar} />
                             <View style={{ flex: 1 }}>
                               <Text style={styles.selectedUserHandle}>@{item.username}</Text>
                               <Text style={styles.selectedUserName}>{item.fullName ?? "—"}</Text>

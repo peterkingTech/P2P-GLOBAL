@@ -89,11 +89,6 @@ export default function LearnTab() {
         {/* Header — compact, so the learning content gets the space */}
         <Text style={s.title} accessibilityRole="header">Learning Centre</Text>
         <Text style={s.subtitle}>Grow in Scripture, understanding and discipleship.</Text>
-        <View style={s.shortcuts}>
-          {([["book", "Bible", "/bible"], ["document-text-outline", "Notes", "/notes"], ["bookmark-outline", "Highlights", "/highlights"]] as const).map(([icon, label, route]) => (
-            <AppButton label={`${label}`} onPress={() => router.push(route as any)} variant="secondary" size="sm" icon={icon} accessibilityLabel={`Open ${label}`} key={route} />
-          ))}
-        </View>
 
         {/* Continue Learning */}
         <Text style={s.section} accessibilityRole="header">Continue Learning</Text>
@@ -191,9 +186,6 @@ function makeStyles(c: AppColors) {
     scroll: { paddingHorizontal: 16 },
     title: { fontSize: 26, lineHeight: 32, color: c.textDark, fontFamily: "Inter_700Bold" },
     subtitle: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-    shortcuts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-    shortcut: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
-    shortcutText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     section: { fontSize: 17, lineHeight: 23, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 26, marginBottom: 10 },
     sectionRow: { flexDirection: "row", alignItems: "center", marginTop: 26, marginBottom: 10 },
     seeAll: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 44, paddingHorizontal: 4 },

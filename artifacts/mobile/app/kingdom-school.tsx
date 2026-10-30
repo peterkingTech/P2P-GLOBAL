@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Image,
   Animated,
-  Modal,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,6 +32,9 @@ import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
 import { AppButton } from "@/components/ui";
+import ContentImage from "@/components/media/ContentImage";
+import { currentModule as currentModuleOf } from "@/lib/learningHome";
+import StudyTogetherLink from "@/components/learning/StudyTogetherLink";
 
 const LOGO = require("@/assets/images/logo.png");
 const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
@@ -124,35 +126,6 @@ function foundationsIconForTitle(title: string): keyof typeof Ionicons.glyphMap 
   return "library-outline";
 }
 
-// The cover photo as its own large square block on the right of the card —
-// a real flex column next to the text column (not an overlapping full-bleed
-// background with a fade), so growing the photo can never encroach on or
-// compress the text: the two live in separate, fixed layout regions. Falls
-// back to the icon + color wash exactly as before when there is no photo
-// yet or it fails to load.
-function CategoryPhotoBlock({
-  uri, icon, colorTheme, style, fallbackStyle,
-}: { uri: string | null; icon: keyof typeof Ionicons.glyphMap; colorTheme: string; style: any; fallbackStyle: any }) {
-  const [failed, setFailed] = useState(false);
-  if (uri && !failed) {
-    return (
-      <Image
-        source={{ uri }}
-        style={style}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-    );
-  }
-  return (
-    <View style={[style, fallbackStyle, { backgroundColor: `${colorTheme}1f` }]}>
-      <Ionicons name={icon} size={30} color={colorTheme} />
-    </View>
-  );
-}
-
 // One stand-alone Foundations category, rendered as a photo card — same
 // visual language as app/curriculum.tsx's card (which remains reachable
 // directly too), reused here inline so Kingdom School -> Foundations is a
@@ -182,7 +155,7 @@ function FoundationCategoryCard({ item, colors, onPress }: { item: CurriculumCat
       {/* A dedicated block, not an overlapping background — the text
           column above is never affected no matter how large this photo is. */}
       <View style={[styles.photoWrap, { width: photoWidth }]}>
-        <CategoryPhotoBlock uri={item.coverImage} icon={icon} colorTheme={item.colorTheme} style={styles.photoBlock} fallbackStyle={styles.photoBlockFallback} />
+        <ContentImage uri={item.coverImage} fallbackIcon={icon} color={item.colorTheme} iconSize={30} style={styles.photoBlock} fallbackStyle={styles.photoBlockFallback} />
         <View style={styles.arrowBadge} accessibilityElementsHidden importantForAccessibility="no">
           {/* Deliberately NOT colors.textDark — the badge behind it is a
               fixed light rgba(255,255,255,0.85) regardless of theme (so it
@@ -317,34 +290,6 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     scroll: { paddingBottom: 100 },
 
-    topBarRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2 },
-    topBarMenuBtn: {
-      flexDirection: "row", alignItems: "center", gap: 6,
-      backgroundColor: "rgba(29,158,117,0.1)", borderWidth: 1, borderColor: "rgba(29,158,117,0.3)",
-      borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
-    },
-    topBarMenuBtnActive: { backgroundColor: "rgba(29,158,117,0.18)", borderColor: c.accentGreen },
-    topBarMenuBtnText: { fontSize: 12, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    dropdownOverlay: { flex: 1 },
-    dropdownCard: {
-      position: "absolute", right: 16, backgroundColor: c.card, borderRadius: 14,
-      borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 4, minWidth: 220,
-      shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 12, elevation: 6,
-    },
-    dropdownCaret: {
-      position: "absolute", top: -7, right: 22, width: 14, height: 14,
-      backgroundColor: c.card, borderTopWidth: 1, borderLeftWidth: 1, borderColor: c.borderBeige,
-      transform: [{ rotate: "45deg" }],
-    },
-    dropdownRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-    dropdownRowIconWrap: {
-      width: 32, height: 32, borderRadius: 9, backgroundColor: "rgba(29,158,117,0.1)",
-      alignItems: "center", justifyContent: "center",
-    },
-    dropdownRowText: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    dropdownRowSubText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
-    dropdownDivider: { height: 1, backgroundColor: c.borderBeige, marginHorizontal: 14 },
-
     sectionBlock: { paddingHorizontal: 20, paddingTop: 24 },
     sectionHeaderRow: { marginBottom: 4 },
     sectionHeaderTitle: { fontSize: 22, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -468,7 +413,7 @@ export default function KingdomSchoolScreen() {
   const hasActiveMentee = false;
   const status = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, hasActiveMentee);
 
-  const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? null;
+  const currentModule = currentModuleOf(modules);
 
   // Welcome splash — shown once per user the first time they deliberately
   // open Kingdom School (null = still checking AsyncStorage, false = show
@@ -482,8 +427,6 @@ export default function KingdomSchoolScreen() {
     setSplashSeen(true);
     if (profile?.id) AsyncStorage.setItem(`${SPLASH_SEEN_KEY_PREFIX}${profile.id}`, "true");
   }
-
-  const [schoolMenuOpen, setSchoolMenuOpen] = useState(false);
 
   // Celebrate reaching Foundation completion exactly once per user, on-device
   // (no DB column for this — see recordFoundationCompletion's own comment).
@@ -517,57 +460,8 @@ export default function KingdomSchoolScreen() {
           </TouchableOpacity>
           <Text style={{ flex: 1, fontSize: 22, lineHeight: 28, color: colors.textDark, fontFamily: "Inter_700Bold" }} accessibilityRole="header">Kingdom School</Text>
         </View>
-        <View style={styles.topBarRow}>
-          <AppButton label="Bible" onPress={() => router.push("/bible" as any)} variant="secondary" size="sm" icon="book" accessibilityLabel="Open the Bible" />
-          <TouchableOpacity accessibilityRole="button"
-            style={[styles.topBarMenuBtn, schoolMenuOpen && styles.topBarMenuBtnActive]}
-            onPress={() => setSchoolMenuOpen(true)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="bookmark" size={15} color={colors.accentGreen} />
-            <Text style={styles.topBarMenuBtnText}>Notes & Highlights</Text>
-            <Ionicons name="chevron-down" size={14} color={colors.accentGreen} />
-          </TouchableOpacity>
-        </View>
-
-        <Modal visible={schoolMenuOpen} transparent animationType="fade" onRequestClose={() => setSchoolMenuOpen(false)}>
-          <TouchableOpacity accessibilityRole="button" style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setSchoolMenuOpen(false)}>
-            <View style={[styles.dropdownCard, { top: topPad + 46 }]}>
-              <View style={styles.dropdownCaret} />
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.dropdownRow}
-                onPress={() => { setSchoolMenuOpen(false); router.push("/notes" as any); }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.dropdownRowIconWrap}>
-                  <Ionicons name="document-text-outline" size={17} color={colors.accentGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.dropdownRowText}>Notes</Text>
-                  <Text style={styles.dropdownRowSubText}>Your written notes</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
-              </TouchableOpacity>
-              <View style={styles.dropdownDivider} />
-              <TouchableOpacity accessibilityRole="button"
-                style={styles.dropdownRow}
-                onPress={() => { setSchoolMenuOpen(false); router.push("/highlights" as any); }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.dropdownRowIconWrap}>
-                  <Ionicons name="bookmark-outline" size={17} color={colors.accentGreen} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.dropdownRowText}>Highlights</Text>
-                  <Text style={styles.dropdownRowSubText}>Saved passages & quotes</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
+        {/* The Bible, Notes and Highlights live in Bible Study (Learning Centre);
+            lessons keep their own in-context Scripture actions. */}
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           {/* Comprehensive Checks for Kingdom School live in My Learning. */}
           <TouchableOpacity
@@ -584,6 +478,7 @@ export default function KingdomSchoolScreen() {
             </View>
             <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
           </TouchableOpacity>
+          <StudyTogetherLink note="Kingdom School lessons you study with others" style={{ marginBottom: 12 }} />
           <KingdomSchoolCards
             selected={selectedSection}
             onSelect={setSelectedSection}
@@ -620,7 +515,7 @@ export default function KingdomSchoolScreen() {
                 onPress={() => router.push(`/module/${currentModule.id}`)}
               >
                 {currentModule.imageUrl ? (
-                  <CategoryPhotoBlock uri={currentModule.imageUrl} icon="school-outline" colorTheme="#FFFFFF" style={styles.continuePhoto} fallbackStyle={styles.photoFallback} />
+                  <ContentImage uri={currentModule.imageUrl} fallbackIcon="school-outline" color="#FFFFFF" iconSize={30} style={styles.continuePhoto} fallbackStyle={styles.photoFallback} />
                 ) : null}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.continueLabel}>{t("learn.currentModule")}</Text>

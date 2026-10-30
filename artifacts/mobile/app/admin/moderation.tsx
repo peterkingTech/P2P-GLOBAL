@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useData, ModerationFlag, ModerationFlagStatus } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 const STATUS_FILTERS: Array<{ value: ModerationFlagStatus; label: string }> = [
   { value: "open", label: "Open" },
@@ -29,15 +31,6 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   kingdom_win: "Kingdom Win",
 };
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export default function ModerationQueueScreen() {
   const { getModerationQueue, moderateFlag } = useData();
@@ -62,7 +55,7 @@ export default function ModerationQueueScreen() {
     try {
       const err = await moderateFlag(flag.id, action, undefined);
       if (err) {
-        Alert.alert("Couldn't complete action", err);
+        showAlert("Couldn't complete action", err);
         return;
       }
       setFlags((prev) => prev.filter((f) => f.id !== flag.id));
@@ -71,29 +64,26 @@ export default function ModerationQueueScreen() {
     }
   }
 
-  function confirmAction(flag: ModerationFlag, action: "dismiss" | "warn" | "remove" | "escalate") {
+  function confirmModeration(flag: ModerationFlag, action: "dismiss" | "warn" | "remove" | "escalate") {
     const copy: Record<string, { title: string; body: string }> = {
       dismiss: { title: "Dismiss this report?", body: "No action will be taken and the post stays up." },
       warn: { title: "Warn this user?", body: "This logs a warning against their account. The post stays up." },
       remove: { title: "Remove this content?", body: "This permanently deletes the flagged post or comment." },
       escalate: { title: "Escalate to admin?", body: "This creates a case in the admin Help Requests queue for a church leader, regional admin, or super admin to review with full context." },
     };
-    Alert.alert(copy[action].title, copy[action].body, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: action === "remove" ? "destructive" : "default", onPress: () => act(flag, action) },
-    ]);
+    confirmAction(copy[action].title, copy[action].body, () => act(flag, action), { destructive: action === "remove" });
   }
 
   async function handleMessagePoster(flag: ModerationFlag) {
     if (!flag.authorId) {
-      Alert.alert("Account removed", "This user's account no longer exists.");
+      showAlert("Account removed", "This user's account no longer exists.");
       return;
     }
     setMessaging(flag.id);
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: flag.authorId });
       if (error || !data) {
-        Alert.alert("Can't message this user", "You can only message peers you already share a connection with, or help-request submitters.");
+        showAlert("Can't message this user", "You can only message peers you already share a connection with, or help-request submitters.");
         return;
       }
       router.push(`/messages/${data}` as any);
@@ -133,7 +123,7 @@ export default function ModerationQueueScreen() {
                     {CONTENT_TYPE_LABELS[item.contentType] ?? item.contentType}
                   </Text>
                 </View>
-                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt, "ago")}</Text>
               </View>
 
               {item.contentSnapshot && (
@@ -187,10 +177,10 @@ export default function ModerationQueueScreen() {
 
               {item.status === "open" ? (
                 <View style={styles.actionsRow}>
-                  <AppButton label="Dismiss" onPress={() => confirmAction(item, "dismiss")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
-                  <AppButton label="Warn" onPress={() => confirmAction(item, "warn")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
-                  <AppButton label="Remove" onPress={() => confirmAction(item, "remove")} variant="destructive" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
-                  <AppButton label="Escalate" onPress={() => confirmAction(item, "escalate")} size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Dismiss" onPress={() => confirmModeration(item, "dismiss")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Warn" onPress={() => confirmModeration(item, "warn")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Remove" onPress={() => confirmModeration(item, "remove")} variant="destructive" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Escalate" onPress={() => confirmModeration(item, "escalate")} size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
                 </View>
               ) : (
                 <View style={[styles.statusPill, styles[`statusPill_${item.status}` as const]]}>

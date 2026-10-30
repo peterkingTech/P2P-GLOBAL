@@ -36,7 +36,7 @@ const mocks = {
 function load(rel) {
   const js = ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => mocks[m] ?? {}, console, Date, Math, JSON, TextEncoder, fetch: (...x) => globalThis.fetch(...x) });
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => (m === "@/lib/apiClient" ? load("lib/apiClient.ts") : mocks[m] ?? {}), console, Date, Math, JSON, TextEncoder, fetch: (...x) => globalThis.fetch(...x) });
   return mod.exports;
 }
 

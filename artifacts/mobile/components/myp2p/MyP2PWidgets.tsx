@@ -16,6 +16,7 @@ import { studyMinutesToday } from "@/lib/studyTime";
 import { loadReminderSettings, goalProgress } from "@/lib/studyReminders";
 import { journeyMilestones, stageProgress, previewText, UPDATE_TYPES, type Timeline, type WidgetId } from "@/lib/myP2P";
 import { AppButton } from "@/components/ui";
+import { currentModule as currentModuleOf, isStoryInProgress } from "@/lib/learningHome";
 
 // The My P2P widgets. Each one reads existing data through the services the
 // rest of the app already uses, shows honest loading / empty / error states,
@@ -79,7 +80,7 @@ function JourneyWidget({ refreshKey }: { refreshKey: number }) {
   const points = profile?.growthLevel ?? 0;
   const sp = stageProgress(points, STAGES, getStageFromPoints(points));
   const m = journeyMilestones(data);
-  const currentModule = modules.find((x) => !x.isLocked && x.completedLessons < x.lessonCount) ?? null;
+  const currentModule = currentModuleOf(modules);
   const cont = () => router.push((currentModule ? `/module/${currentModule.id}` : m.next?.route ?? "/(tabs)/learn") as any);
   return (
     <Card icon="trail-sign-outline" title="My Discipleship Journey" s={s} c={c} onTitle={() => router.push("/my-discipleship/journey" as any)}>
@@ -142,8 +143,8 @@ function ContinueWidget({ refreshKey }: { refreshKey: number }) {
   const router = useRouter();
   const { modules } = useData();
   const disc = useDiscover(refreshKey);
-  const mod = modules.find((x) => !x.isLocked && x.completedLessons < x.lessonCount) ?? null;
-  const story = disc.data?.continueLearning?.[0] ?? null;
+  const mod = currentModuleOf(modules);
+  const story = disc.data?.continueLearning?.find(isStoryInProgress) ?? null;
   const sp = story?.myProgress;
   return (
     <Card icon="play-circle-outline" title="Continue Learning" s={s} c={c}>
@@ -321,6 +322,9 @@ function CommunitiesWidget() {
       ) : null}
       <TouchableOpacity style={s.listRow} onPress={() => router.push("/circles" as any)} accessibilityRole="button">
         <Ionicons name="people-circle-outline" size={18} color={c.textMid} /><Text style={[s.line, { flex: 1 }]}>My Circles</Text><Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+      </TouchableOpacity>
+      <TouchableOpacity style={s.listRow} onPress={() => router.push("/community" as any)} accessibilityRole="button">
+        <Ionicons name="grid-outline" size={18} color={c.accentGreen} /><Text style={[s.line, { flex: 1 }]}>All of My Community</Text><Ionicons name="chevron-forward" size={16} color={c.textMuted} />
       </TouchableOpacity>
     </Card>
   );

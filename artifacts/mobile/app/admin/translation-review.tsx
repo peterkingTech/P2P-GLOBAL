@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, Modal, TextInput, ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -146,7 +154,7 @@ export default function TranslationReviewScreen() {
         (d) => !(d.content_type === reviewing.content_type && d.content_id === reviewing.content_id && d.language_code === reviewing.language_code)
       ));
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      showAlert("Error", e.message);
     } finally {
       setSaving(false);
     }
@@ -322,11 +330,7 @@ export default function TranslationReviewScreen() {
 
           {/* Action buttons */}
           <View style={styles.modalActions}>
-            <AppButton label="Reject" onPress={() => Alert.alert(
-                "Reject Translation",
-                "This will mark the translation as rejected. It won't be shown to users.",
-                [{ text: "Cancel", style: "cancel" }, { text: "Reject", style: "destructive", onPress: () => updateStatus("rejected") }]
-              )} variant="destructive" icon="close-circle" disabled={saving} style={{ flex: 1 }} palette="fixedLight" />
+            <AppButton label="Reject" onPress={() => confirmAction("Reject Translation", "This will mark the translation as rejected. It won't be shown to users.", () => updateStatus("rejected"), { confirmLabel: "Reject", destructive: true })} variant="destructive" icon="close-circle" disabled={saving} style={{ flex: 1 }} palette="fixedLight" />
             <AppButton label="Approve & Publish" onPress={() => updateStatus("approved")} icon="checkmark-circle" disabled={saving} loading={saving} style={{ flex: 1 }} palette="fixedLight" />
           </View>
         </View>

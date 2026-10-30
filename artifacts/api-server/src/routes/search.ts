@@ -141,7 +141,7 @@ router.get("/", async (req, res) => {
   if (curricula.length) groups.push({
     type: "curriculum", label: "Study & Plans",
     results: rank(curricula, q, (c: any) => c.title).map((c: any) => ({
-      type: c.type === "plan" ? "plan" : "curriculum", id: c.id, title: c.title, subtitle: c.subtitle, route: `/curriculum/${c.id}`,
+      type: c.type === "plan" ? "plan" : "curriculum", id: c.id, title: c.title, subtitle: c.subtitle, route: c.type === "plan" ? `/plan/${c.id}` : `/curriculum/${c.id}`,
     })),
   });
   if (prayerTopics.length || prayerPaths.length) groups.push({

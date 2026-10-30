@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import {
@@ -7,6 +7,7 @@ import {
   CHAPTER_ITEMS, type KingdomStory, type KingdomStoryChapter, type ChapterInput,
 } from "@/lib/kingdomStoriesApi";
 import { AppButton } from "@/components/ui";
+import { confirmAction } from "@/lib/alerts";
 
 // Chapters of a Kingdom Story (editor). Saves each field when the editor
 // leaves it, like the rest of the story editor. A chapter is complete — and
@@ -21,10 +22,6 @@ type Props = {
   onError: (title: string, e: unknown) => void;
 };
 
-function confirm(title: string, message: string, onYes: () => void) {
-  if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) onYes(); return; }
-  Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: onYes }]);
-}
 
 const EVIDENCE: { key: keyof KingdomStoryChapter["evidence"]; label: string; hint: string }[] = [
   { key: "documented", label: "Documented history", hint: "What contemporary records or scholarship establish" },
@@ -209,9 +206,9 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
               </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button"
                 style={{ marginLeft: "auto" }}
-                onPress={() => confirm("Move this chapter to the Recycle Bin?", "Its text, lessons, questions, images and sources move to the Recycle Bin; the chapters after it move up. It can be restored from Admin → Recycle Bin.", async () => {
+                onPress={() => confirmAction("Move this chapter to the Recycle Bin?", "Its text, lessons, questions, images and sources move to the Recycle Bin; the chapters after it move up. It can be restored from Admin → Recycle Bin.", async () => {
                   try { await deleteChapter(story.id, chapter.id); await onChanged(); } catch (e) { onError("Couldn't delete chapter", e); }
-                })}
+                }, { confirmLabel: "Delete", destructive: true })}
               >
                 <Text style={styles.deleteText}>Delete chapter</Text>
               </TouchableOpacity>

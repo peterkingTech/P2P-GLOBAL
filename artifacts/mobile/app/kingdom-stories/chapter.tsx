@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert, KeyboardAvoidingView, Animated, Modal } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, KeyboardAvoidingView, Animated, Modal } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +19,7 @@ import { usePageTurn } from "@/components/kingdom-stories/usePageTurn";
 // submission and peer-review status — reused, not re-implemented.
 import { QuestionResponseCard } from "@/app/lesson/[id]";
 import { AppButton, IconButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // One chapter of a Kingdom Story, read like a page of an illustrated book.
 // Order: opening illustration, title, Scripture, the narrative (further
@@ -44,10 +45,6 @@ const EVIDENCE: { key: keyof KingdomStoryChapter["evidence"]; label: string; ico
 
 type Sub = Awaited<ReturnType<ReturnType<typeof useData>["getQuestionSubmissionsForLesson"]>>[number];
 
-function notify(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function KingdomStoryChapterScreen() {
   const insets = useSafeAreaInsets();
@@ -115,7 +112,7 @@ export default function KingdomStoryChapterScreen() {
   const next = index >= 0 && index < chapters.length - 1 ? chapters[index + 1] : null;
 
   const go = (target: KingdomStoryChapter) => {
-    if (target.learning?.state === "locked") return notify(`Chapter ${target.chapterNumber} is locked`, lockedMessage(chapters, target.id));
+    if (target.learning?.state === "locked") return showAlert(`Chapter ${target.chapterNumber} is locked`, lockedMessage(chapters, target.id));
     if (target.id === chapterId) return;
     const forward = target.chapterNumber > (ch?.chapterNumber ?? 0);
     pageTurn.turn(forward ? "next" : "prev");
@@ -163,7 +160,7 @@ export default function KingdomStoryChapterScreen() {
     if (!story || !ch || finishing) return;
     setFinishing(true);
     try { await finishKingdomStoryChapter(story.id, ch.id); await reloadAll(); }
-    catch (e: any) { notify("Couldn't finish the chapter", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't finish the chapter", e?.message ?? "Please try again."); }
     finally { setFinishing(false); }
   }
 

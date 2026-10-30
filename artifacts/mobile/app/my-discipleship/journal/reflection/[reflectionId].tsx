@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import { useData, JournalReflection } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // Reflection chain view — shows the FULL history (spec §15: never
 // overwrite). The original reflection and every later "Reflection Update"
@@ -14,10 +15,6 @@ import { AppButton } from "@/components/ui";
 // "Reflect Again" only ever inserts a new row via addReflectionUpdate,
 // never edits an existing one.
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function ReflectionChainScreen() {
   const insets = useSafeAreaInsets();

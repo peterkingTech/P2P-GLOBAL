@@ -43,10 +43,8 @@ export function minutesUntil(isoUtc: string): number {
   return Math.round((new Date(isoUtc).getTime() - Date.now()) / 60000);
 }
 
+import { formatDuration as formatTimeLength, secondsBetween } from "@/lib/timeFormat";
+
 export function formatDuration(startIso: string, endIso: string): string {
-  const mins = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
-  if (mins < 60) return `${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  return rem === 0 ? `${hrs}h` : `${hrs}h ${rem}m`;
+  return formatTimeLength(secondsBetween(startIso, endIso), "words");
 }

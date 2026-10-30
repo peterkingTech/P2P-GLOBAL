@@ -13,7 +13,7 @@ const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL $
 
 const api = src("lib/groupLearningApi.ts");
 // Response types may carry a member's userId (leaders' member progress); requests never do.
-ok("API client: session token only (no client-supplied user id)", /Authorization: `Bearer \$\{token\}`/.test(api) && !/userId/.test(api.split(/\r?\n/).filter((l) => !/^export interface /.test(l)).join("\n")));
+ok("API client: session token only (no client-supplied user id)", /apiRequest<T>\(path, init/.test(api) && /Authorization: `Bearer \$\{token\}`/.test(readFileSync(path.join(root, "lib/apiClient.ts"), "utf8")) &&!/userId/.test(api.split(/\r?\n/).filter((l) => !/^export interface /.test(l)).join("\n")));
 ok("API client: every server route used", ["/learning/library", "/learning/curricula/", "/journeys`", "/pause`", "/current-lesson`", "/covered`", "/covered/${lessonId}`"].every((p) => api.includes(p)));
 
 const home = src("app/learning/[scope]/[groupId].tsx");

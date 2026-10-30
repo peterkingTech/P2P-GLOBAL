@@ -23,6 +23,7 @@ import ReviewPrompts from "@/components/ReviewPrompts";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 
 interface CirclePendingEvaluation {
   submissionId: string;
@@ -114,13 +115,7 @@ function CircleEvaluationCard({ evaluation, onResolved }: { evaluation: CirclePe
 function SubmitterContextCard({ context }: { context: SubmitterEvaluationContext }) {
   return (
     <View style={styles.submitterContextCard}>
-      {context.photoUrl ? (
-        <Image source={{ uri: context.photoUrl }} style={styles.contextAvatar} />
-      ) : (
-        <View style={[styles.contextAvatar, styles.contextAvatarFallback]}>
-          <Ionicons name="person" size={18} color={colors.accentGreen} />
-        </View>
-      )}
+      <Avatar photoUrl={context.photoUrl} fallbackIcon="person" size={40} style={styles.contextAvatar} />
       <View style={{ flex: 1 }}>
         <Text style={styles.contextName}>{context.fullName}</Text>
         <View style={styles.contextMetaRow}>

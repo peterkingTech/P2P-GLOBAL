@@ -25,7 +25,7 @@ const src = (p) => readFileSync(path.join(root, p), "utf8");
 function load(rel, mocks) {
   const js = ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => mocks[m] ?? {}, console, Date, Number, fetch: (...x) => globalThis.fetch(...x) });
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => (m === "@/lib/apiClient" ? load("lib/apiClient.ts", mocks) : mocks[m] ?? {}), console, Date, Number, fetch: (...x) => globalThis.fetch(...x) });
   return mod.exports;
 }
 let lastUrl = null, lastHeaders = null, reply = { ok: true, body: { toDo: [], awaitingReview: [], feedback: [], toReview: [] } };

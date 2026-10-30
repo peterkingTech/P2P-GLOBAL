@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert, useWindowDimensions } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, useWindowDimensions } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,7 +12,7 @@ import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, 
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
 import { QualityType } from "@/lib/agoraNative";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
@@ -34,28 +34,16 @@ import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { formatClock } from "@/lib/timeFormat";
+import CallNoAnswerView, { type UnansweredOutcome } from "@/components/call/CallNoAnswerView";
 
 // Alert.alert on native is fire-and-forget — it returns immediately rather
 // than waiting for the user to dismiss it. Callers that need cleanup/
 // navigation to happen only AFTER the user has actually seen and dismissed
 // the dialog (not racing it) must pass onDismiss rather than run that logic
 // right after calling showAlert.
-function showAlert(title: string, message: string, onDismiss?: () => void) {
-  if (Platform.OS === "web") {
-    window.alert(`${title}\n\n${message}`);
-    onDismiss?.();
-  } else {
-    Alert.alert(title, message, onDismiss ? [{ text: "OK", onPress: onDismiss }] : undefined);
-  }
-}
 
-function formatClock(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
 
 const CALL_TYPE_LABEL: Partial<Record<CallType, string>> = {
   pastoral: "Pastoral check-in",
@@ -81,10 +69,6 @@ const NO_ANSWER_TIMEOUT_MS = 70000;
 
 // Caller-side outcomes where the call never connected and this screen stays
 // up as a result card (with Call again) instead of navigating away.
-type UnansweredOutcome = "no_answer" | "declined" | "busy";
-const UNANSWERED_LABEL: Record<UnansweredOutcome, string> = {
-  no_answer: "No answer", declined: "Call declined", busy: "Busy",
-};
 
 // CALL DEBUG forensic fix — two gaps the prior audit missed:
 //   1. Nothing timed out "joining_channel" itself. If Agora's joinChannel()
@@ -410,7 +394,7 @@ function AudioCallScreen() {
 
     if (params.callLogId) {
       try {
-        await authedFetch("/calls/end", {
+        await apiFetch("/calls/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -864,40 +848,9 @@ function AudioCallScreen() {
   // of any kind below.
   if (callState === "no_answer") {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 30 }]}>
-        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-        <View style={styles.center}>
-          <View style={styles.noAnswerAvatarWrap}>
-            {peerPhotoUrl ? (
-              <Image source={{ uri: peerPhotoUrl }} style={styles.noAnswerAvatarPhoto} />
-            ) : (
-              <Ionicons name="person" size={48} color={p2pColors.textMuted} />
-            )}
-          </View>
-          <Text style={styles.noAnswerName}>{otherName}</Text>
-          <Text style={styles.noAnswerStatus}>{UNANSWERED_LABEL[unansweredOutcome]}</Text>
-        </View>
-        <View style={styles.noAnswerActions}>
-          <AppButton label="Cancel" onPress={navigateBack} variant="outline" accessibilityLabel="Cancel" />
-          {!!params.conversationId && (
-            <AppButton label="Record voice message" onPress={handleRecordVoice} variant="outline" icon="mic-outline" accessibilityLabel="Record voice message" />
-          )}
-          <TouchableOpacity
-            style={[styles.noAnswerPrimaryBtn, { backgroundColor: p2pColors.accent }]}
-            onPress={handleCallAgain}
-            disabled={callingAgain}
-            accessibilityRole="button"
-            accessibilityLabel="Call again"
-          >
-            {callingAgain ? <ActivityIndicator color="#fff" size="small" /> : (
-              <>
-                <Ionicons name="call" size={16} color="#fff" />
-                <Text style={styles.noAnswerPrimaryText}>Call again</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CallNoAnswerView colors={p2pColors} insets={insets} photoUrl={peerPhotoUrl} name={otherName} outcome={unansweredOutcome}
+        callAgainIcon={"call"} callingAgain={callingAgain} onCancel={navigateBack} onCallAgain={handleCallAgain}
+        onRecordVoice={params.conversationId ? handleRecordVoice : undefined} />
     );
   }
 
@@ -1031,7 +984,7 @@ function AudioCallScreen() {
         ) : callState === "connected" ? (
           <View style={styles.statusRow}>
             <View style={styles.liveDot} />
-            <Text style={styles.timerText}>{formatClock(elapsed)}</Text>
+            <Text style={styles.timerText}>{formatClock(elapsed, { padded: true })}</Text>
           </View>
         ) : (
           <Text style={styles.statusText}>Call ended</Text>
@@ -1097,22 +1050,6 @@ function AudioCallScreen() {
 function makeStyles(p2p: P2PCallColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: p2p.bg, alignItems: "center", justifyContent: "space-between" },
-    // Stage 22 — "No answer" result screen.
-    noAnswerAvatarWrap: {
-      width: 128, height: 128, borderRadius: 64, backgroundColor: p2p.pillBg,
-      alignItems: "center", justifyContent: "center", overflow: "hidden",
-      borderWidth: 1.5, borderColor: p2p.accentBorder, marginBottom: 20,
-    },
-    noAnswerAvatarPhoto: { width: "100%", height: "100%" },
-    noAnswerName: { fontSize: 24, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
-    noAnswerStatus: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
-    noAnswerActions: { width: "100%", paddingHorizontal: 24, gap: 12 },
-    noAnswerSecondaryText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
-    noAnswerPrimaryBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      borderRadius: 14, paddingVertical: 14,
-    },
-    noAnswerPrimaryText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 20 },
     // Active 1:1 audio: dim the blurred photo backdrop so the portrait,
     // name and controls read clearly over any photo.

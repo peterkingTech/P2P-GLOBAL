@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,18 +7,14 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import {
   getMissionStory, saveMissionStory, unsaveMissionStory, getSavedMissionStories,
-  MISSION_FOCUS_LABELS, type MissionStoryDetail,
-} from "@/lib/missionsApi";
+  MISSION_FOCUS_LABELS, type MissionStoryDetail, getMissionMediaSignedUrl } from "@/lib/missionsApi";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
-import MissionVideoPlayer from "@/components/MissionVideoPlayer";
+import VideoPlayer from "@/components/media/VideoPlayer";
 import SignedPhotoView from "@/components/SignedPhotoView";
 import { openScripture } from "@/lib/openScripture";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Missions Stage 2-4 — story-first detail page. Primary actions are Pray /
 // Scripture / Watch / Save, never a like/share/follow row.
@@ -103,7 +99,7 @@ export default function MissionStoryScreen() {
         {!!story.authorName && <Text style={styles.authorText}>Shared by {story.authorName}</Text>}
 
         {story.mediaType === "video" && story.mediaPath && (
-          <View style={{ marginTop: 14 }}><MissionVideoPlayer mediaPath={story.mediaPath} durationSeconds={story.mediaDurationSeconds} /></View>
+          <View style={{ marginTop: 14 }}><VideoPlayer mediaPath={story.mediaPath} resolveUrl={getMissionMediaSignedUrl} durationSeconds={story.mediaDurationSeconds} /></View>
         )}
         {story.mediaType === "photo" && story.mediaPath && (
           <View style={{ marginTop: 14 }}><SignedPhotoView bucket="mission-media" path={story.mediaPath} /></View>
@@ -134,7 +130,7 @@ export default function MissionStoryScreen() {
         <View style={styles.actionsWrap}>
           <AppButton label="Pray" onPress={handlePray} icon="hand-left-outline" />
           <AppButton label="Pray With Me" onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { topicTitle: story.title, missionStoryId: story.id } } as any)} variant="outline" icon="people-outline" />
-          <AppButton label="Study" onPress={() => router.push("/curriculum" as any)} variant="outline" icon="school-outline" />
+          <AppButton label="Kingdom School" onPress={() => router.push("/kingdom-school" as any)} variant="outline" icon="school-outline" />
         </View>
 
         {story.relatedStories.length > 0 && (

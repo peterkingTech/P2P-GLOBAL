@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { ChurchQRCode } from "@/components/ChurchQRCode";
 import { churchRoleLabel } from "@/constants/churchRoles";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,8 +25,7 @@ export default function ChurchHomeScreen() {
     const error = await switchCurrentChurch(churchId);
     setSwitchingTo(null);
     if (error) {
-      if (Platform.OS === "web") window.alert(error);
-      else Alert.alert("Couldn't switch church", error);
+      showAlert("Couldn't switch church", error);
     }
   }
   const [loading, setLoading] = useState(true);
@@ -136,6 +136,7 @@ export default function ChurchHomeScreen() {
       {userChurch && (
         <View style={{ marginTop: 14 }}>
           <NavRow icon="folder-open-outline" label="Files & Resources" onPress={() => router.push({ pathname: "/resources/[scope]/[groupId]", params: { scope: "church", groupId: userChurch.id, name: userChurch.name ?? "" } } as any)} />
+          <NavRow icon="people-circle-outline" label="Study Together" onPress={() => router.push("/study-together" as any)} />
         </View>
       )}
 

@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, Modal, TextInput,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
-import { getApiUrl } from "@/lib/apiUrl";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { apiFetch } from "@/lib/apiClient";
+import { getApiUrl } from "@/lib/apiUrl";
+import { supabase } from "@/contexts/AuthContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -21,11 +29,6 @@ type CoverageRow = {
 type JobCounts = { pending: number; processing: number; failed: number; retrying: number };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? "";
-}
 
 function pct(n: number, total: number): number {
   if (!total) return 0;
@@ -122,24 +125,22 @@ export default function TranslationsDashboard() {
   }, [triggerModal]);
 
   async function runSingleLessonTrigger() {
-    if (!triggerLessonId.trim() || !triggerLang) return Alert.alert("Enter a lesson ID and select a language");
+    if (!triggerLessonId.trim() || !triggerLang) return showAlert("Enter a lesson ID and select a language", "");
     setTriggerRunning(true);
     setTriggerResult("Translating…");
-    const apiUrl = getApiUrl();
     try {
-      const token = await getAuthToken();
       let res: Response;
       try {
-        res = await fetch(`${apiUrl}/translations/admin/trigger`, {
+        res = await apiFetch("/translations/admin/trigger", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contentType: "lesson", contentId: triggerLessonId.trim(), lang: triggerLang, force: true }),
         });
       } catch {
         // A thrown fetch (as opposed to a non-2xx response) means the
         // request never reached any server — network-level failure, not
         // an API error. Surface the URL we tried so it's actionable.
-        throw new Error(`Could not reach the API server at ${apiUrl}. Is it running?`);
+        throw new Error(`Could not reach the API server at ${getApiUrl()}. Is it running?`);
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? `Request failed (HTTP ${res.status})`);

@@ -1,5 +1,4 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Learning Centre — one view of my Comprehensive Checks across Kingdom
 // School, Kingdom Stories, Family Circle and Church (routes/learningCentre.ts).
@@ -23,13 +22,8 @@ export interface WorkItem {
 }
 export interface LearningOverview { toDo: WorkItem[]; awaitingReview: WorkItem[]; feedback: WorkItem[]; toReview: WorkItem[] }
 
-export async function getLearningOverview(): Promise<LearningOverview> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}/learning/centre/overview`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Couldn't load your learning. Please try again.");
-  return body as LearningOverview;
+export function getLearningOverview(): Promise<LearningOverview> {
+  return apiRequest<LearningOverview>("/learning/centre/overview", {}, { fallbackError: "Couldn't load your learning. Please try again." });
 }
 
 export const SOURCE_LABEL: Record<WorkSource, string> = {

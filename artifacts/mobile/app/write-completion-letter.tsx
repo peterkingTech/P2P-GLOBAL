@@ -4,9 +4,10 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const MIN_LENGTH = 50;
 
@@ -60,9 +61,9 @@ export default function WriteCompletionLetterScreen() {
         { onConflict: "learner_id" }
       );
       if (error) throw error;
-      Alert.alert("Saved", "Your draft has been saved.");
+      showAlert("Saved", "Your draft has been saved.");
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message ?? "Something went wrong.");
+      showAlert("Couldn't save", e.message ?? "Something went wrong.");
     } finally {
       setSaving(null);
     }
@@ -89,7 +90,7 @@ export default function WriteCompletionLetterScreen() {
       );
       if (error) throw error;
 
-      authedFetch("/discipleship/notify-user", {
+      apiFetch("/discipleship/notify-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,7 +102,7 @@ export default function WriteCompletionLetterScreen() {
 
       Alert.alert("Sent", "Your letter has been sent.", [{ text: "OK", onPress: () => router.back() }]);
     } catch (e: any) {
-      Alert.alert("Couldn't send", e.message ?? "Something went wrong.");
+      showAlert("Couldn't send", e.message ?? "Something went wrong.");
     } finally {
       setSaving(null);
     }

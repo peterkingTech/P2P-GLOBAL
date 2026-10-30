@@ -1,25 +1,10 @@
 import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
 import type { ScriptureReference } from "@/lib/prayerTopicsApi";
+import { apiRequest } from "@/lib/apiClient";
 
 // Missions — client bindings for routes/missions.ts. A genuinely new,
 // independent content domain: never reads from p2p_missions (legacy,
 // still used elsewhere) or p2p_prayer_wall_posts.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
 
 export type MissionFocusTag =
   | "evangelism" | "discipleship" | "church_planting" | "bible_translation" | "youth" | "children"
@@ -57,13 +42,13 @@ export interface MissionFieldDetail extends MissionField { stories: MissionStory
 export interface MissionStoryDetail extends MissionStory { prayerPoints: MissionPrayerPoint[]; relatedStories: { id: string; title: string; summary: string | null; story_type: string }[] }
 
 export function getFocusTags(): Promise<MissionFocusTag[]> {
-  return authedFetch("/missions/focus-tags");
+  return apiRequest("/missions/focus-tags");
 }
 export function getMissionFields(focus?: MissionFocusTag): Promise<MissionField[]> {
-  return authedFetch(`/missions/fields${focus ? `?focus=${focus}` : ""}`);
+  return apiRequest(`/missions/fields${focus ? `?focus=${focus}` : ""}`);
 }
 export function getMissionField(slug: string): Promise<MissionFieldDetail> {
-  return authedFetch(`/missions/fields/${slug}`);
+  return apiRequest(`/missions/fields/${slug}`);
 }
 export function getMissionStories(opts: { fieldSlug?: string; focus?: MissionFocusTag; storyType?: MissionStoryType; page?: number; limit?: number } = {}): Promise<{ stories: MissionStory[]; total: number; page: number; pageSize: number }> {
   const q = new URLSearchParams();
@@ -72,46 +57,46 @@ export function getMissionStories(opts: { fieldSlug?: string; focus?: MissionFoc
   if (opts.storyType) q.set("storyType", opts.storyType);
   q.set("page", String(opts.page ?? 0));
   q.set("limit", String(opts.limit ?? 20));
-  return authedFetch(`/missions/stories?${q}`);
+  return apiRequest(`/missions/stories?${q}`);
 }
 export function getMissionStory(id: string): Promise<MissionStoryDetail> {
-  return authedFetch(`/missions/stories/${id}`);
+  return apiRequest(`/missions/stories/${id}`);
 }
 export function getMissionPrayerPoints(opts: { storyId?: string; fieldId?: string }): Promise<MissionPrayerPoint[]> {
   const q = new URLSearchParams();
   if (opts.storyId) q.set("storyId", opts.storyId);
   if (opts.fieldId) q.set("fieldId", opts.fieldId);
-  return authedFetch(`/missions/prayer-points?${q}`);
+  return apiRequest(`/missions/prayer-points?${q}`);
 }
 
 export function saveMissionStory(storyId: string): Promise<{ id: string; storyId: string; savedAt: string }> {
-  return authedFetch("/missions/saved-stories", { method: "POST", body: JSON.stringify({ storyId }) });
+  return apiRequest("/missions/saved-stories", { method: "POST", body: JSON.stringify({ storyId }) });
 }
 export function unsaveMissionStory(storyId: string): Promise<{ removed: true }> {
-  return authedFetch(`/missions/saved-stories/${storyId}`, { method: "DELETE" });
+  return apiRequest(`/missions/saved-stories/${storyId}`, { method: "DELETE" });
 }
 export function getSavedMissionStories(): Promise<{ id: string; savedAt: string; story: MissionStory | null }[]> {
-  return authedFetch("/missions/saved-stories");
+  return apiRequest("/missions/saved-stories");
 }
 
 export function getMyMissionStories(): Promise<MissionStory[]> {
-  return authedFetch("/missions/mine/stories");
+  return apiRequest("/missions/mine/stories");
 }
 export function createMissionStory(input: {
   id?: string; storyType: MissionStoryType; title: string; summary?: string | null; body: string;
   missionFieldId?: string | null; missionFocus?: MissionFocusTag[]; scriptureReferenceId?: string | null;
   mediaType?: "video" | "photo" | null; mediaPath?: string | null; mediaDurationSeconds?: number | null; status?: MissionStatus;
 }): Promise<MissionStory> {
-  return authedFetch("/missions/stories", { method: "POST", body: JSON.stringify(input) });
+  return apiRequest("/missions/stories", { method: "POST", body: JSON.stringify(input) });
 }
 export function updateMissionStory(id: string, updates: Partial<{
   title: string; summary: string | null; body: string; missionFieldId: string | null; missionFocus: MissionFocusTag[];
   scriptureReferenceId: string | null; status: MissionStatus;
 }>): Promise<MissionStory> {
-  return authedFetch(`/missions/stories/${id}`, { method: "PUT", body: JSON.stringify(updates) });
+  return apiRequest(`/missions/stories/${id}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function deleteMissionStory(id: string): Promise<{ removed: true }> {
-  return authedFetch(`/missions/stories/${id}`, { method: "DELETE" });
+  return apiRequest(`/missions/stories/${id}`, { method: "DELETE" });
 }
 
 // Video upload — mirrors uploadTestimonyVideo's exact shape (client

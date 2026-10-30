@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,8 +15,11 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { timeAgo } from "@/lib/timeFormat";
+import { Avatar } from "@/components/Avatar";
 
 // My Discipleship Journey — "Where am I in my discipleship?" This is the
 // screen that used to live directly at my-discipleship/index.tsx; the hub
@@ -69,18 +71,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 const SEVEN_MOUNTAINS = ["Marketplace", "Education", "Government", "Media", "Innovation", "Family", "Church"];
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return "never active";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days < 1) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
-}
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-}
 
 function StatRow({ label, value, s }: { label: string; value: number | string; s: ReturnType<typeof makeStyles> }) {
   return (
@@ -135,13 +126,7 @@ function MyPeerGuideCard({ guide, s, c }: { guide: MyPeerGuide; s: ReturnType<ty
   return (
     <View style={s.relationshipCard}>
       <View style={s.relationshipHeaderRow}>
-        {guide.peerGuidePhotoUrl ? (
-          <Image source={{ uri: guide.peerGuidePhotoUrl }} style={s.relationshipAvatar} />
-        ) : (
-          <View style={[s.relationshipAvatar, s.relationshipAvatarFallback]}>
-            <Text style={s.relationshipAvatarInitial}>{guide.peerGuideName.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
+        <Avatar photoUrl={guide.peerGuidePhotoUrl} name={guide.peerGuideName} size={44} style={s.relationshipAvatar} />
         <View style={{ flex: 1 }}>
           <Text style={s.relationshipLabel}>MY PEER GUIDE</Text>
           <Text style={s.relationshipName}>{guide.peerGuideName}</Text>
@@ -183,13 +168,7 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
           onPress={() => router.push(`/my-discipleship/disciple/${d.discipleId}` as any)}
         >
           <View style={s.relationshipHeaderRow}>
-            {d.disciplePhotoUrl ? (
-              <Image source={{ uri: d.disciplePhotoUrl }} style={s.relationshipAvatar} />
-            ) : (
-              <View style={[s.relationshipAvatar, s.relationshipAvatarFallback]}>
-                <Text style={s.relationshipAvatarInitial}>{d.discipleName.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <Avatar photoUrl={d.disciplePhotoUrl} name={d.discipleName} size={44} style={s.relationshipAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={s.relationshipLabel}>MY DISCIPLE</Text>
               <Text style={s.relationshipName}>{d.discipleName}</Text>
@@ -201,7 +180,7 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
               <Text style={s.discipleProgressText}>Kingdom School · Module {d.currentModuleNumber} of {d.totalModules}</Text>
             ) : null}
             <Text style={[s.discipleProgressText, d.isWilting && s.discipleProgressWarn]}>
-              Last active: {timeAgo(d.lastActiveAt)}{d.isWilting ? " · Check in" : ""}
+              Last active: {timeAgo(d.lastActiveAt, "days", { empty: "never active" })}{d.isWilting ? " · Check in" : ""}
             </Text>
           </View>
           <View style={s.relationshipActionsRow}>
@@ -237,15 +216,15 @@ export default function MyDiscipleshipJourneyScreen() {
     if (!profile?.id) return;
     setLoading(true);
     await Promise.all([
-      authedFetch(`/discipleship/my-peer-guide/${profile.id}`)
+      apiFetch(`/discipleship/my-peer-guide/${profile.id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => setMyPeerGuide(data?.peerGuideId ? data : null))
         .catch(() => setMyPeerGuide(null)),
-      authedFetch(`/discipleship/${profile.id}/disciples`)
+      apiFetch(`/discipleship/${profile.id}/disciples`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data) => setMyDisciples(Array.isArray(data) ? data : []))
         .catch(() => setMyDisciples([])),
-      authedFetch(`/discipleship/pending-requests/${profile.id}`)
+      apiFetch(`/discipleship/pending-requests/${profile.id}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data) => setPendingRequestCount(Array.isArray(data) ? data.length : 0))
         .catch(() => setPendingRequestCount(0)),

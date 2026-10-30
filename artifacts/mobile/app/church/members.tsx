@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMember, ChurchRole } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { churchRoleLabel, ASSIGNABLE_CHURCH_ROLES } from "@/constants/churchRoles";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 const STAGE_LABELS: Record<string, string> = {
   dormant_seed: "Seed", sprout: "Sprout", young_tree: "Young Tree",
@@ -39,7 +40,7 @@ export default function ChurchMembersScreen() {
         onPress: async () => {
           if (role === member.role) return;
           const err = await updateMemberRole(userChurch.id, member.userId, role as ChurchRole);
-          if (err) Alert.alert("Couldn't change role", err);
+          if (err) showAlert("Couldn't change role", err);
           else load(search);
         },
       })),
@@ -54,17 +55,11 @@ export default function ChurchMembersScreen() {
       ...(canChangeRoles && member.role !== "senior_pastor" ? [{ text: "Change Role", onPress: () => handleChangeRole(member) }] : []),
       {
         text: "Remove from Church", style: "destructive" as const,
-        onPress: () => Alert.alert("Remove member?", `Remove ${member.displayName} from ${userChurch.name}?`, [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Remove", style: "destructive",
-            onPress: async () => {
+        onPress: () => confirmAction("Remove member?", `Remove ${member.displayName} from ${userChurch.name}?`, async () => {
               const err = await removeChurchMember(userChurch.id, member.userId);
               if (err) Alert.alert("Couldn't remove member", err);
               else load(search);
-            },
-          },
-        ]),
+            }, { confirmLabel: "Remove", destructive: true }),
       },
       { text: "Cancel", style: "cancel" },
     ]);

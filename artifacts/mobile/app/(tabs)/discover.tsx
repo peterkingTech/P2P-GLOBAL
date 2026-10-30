@@ -15,6 +15,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { InviteCard } from "@/components/InviteCard";
 import { CircleCard } from "@/components/CircleCard";
 import { AppButton } from "@/components/ui";
+import { apiFetch } from "@/lib/apiClient";
 
 interface DiscoverCircleSummary {
   id: string;
@@ -152,11 +153,7 @@ export default function DiscoverTab() {
     setSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        const res = await fetch(`${getApiUrl()}/search?q=${encodeURIComponent(q)}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiFetch(`/search?q=${encodeURIComponent(q)}`);
         const body = await res.json();
         setSearchGroups(res.ok ? body.groups ?? [] : []);
       } catch {
@@ -226,6 +223,11 @@ export default function DiscoverTab() {
     { key: "peers", icon: "people-outline" as const, title: t("discover.discoverablePeers"), count: peerCount, sub: t("discover.discoverablePeersSub"), route: "/connect/discover" as const },
     { key: "groups", icon: "people-circle-outline" as const, title: t("discover.peerGroups"), count: groupCount, sub: t("discover.peerGroupsSub"), route: "/connect/groups" as const },
     { key: "smart-match", icon: "sparkles-outline" as const, title: t("discover.smartMatch"), count: null, sub: t("discover.smartMatchSub"), route: "/connect/smart-match" as const },
+    // Every way to find a study partner lives here (the old /connect hub redirects to this tab).
+    { key: "someone-i-know", icon: "person-circle-outline" as const, title: "Choose Someone I Know", count: null, sub: "Send a Peer Guide request to someone you trust", route: "/connect/by-username?type=peer_guide" as const },
+    { key: "invite", icon: "mail-outline" as const, title: "Invite a Peer", count: null, sub: "Send a study invitation to someone you know", route: "/connect/invite" as const },
+    { key: "username", icon: "at-outline" as const, title: "Find by Username", count: null, sub: "Already know their @username? Connect directly", route: "/connect/by-username" as const },
+    { key: "connections", icon: "checkmark-done-circle-outline" as const, title: "P2P Connections", count: null, sub: "Incoming, sent and accepted connections", route: "/connections" as const },
     { key: "wall", icon: "hand-left-outline" as const, title: t("discover.prayerWall"), count: wallCount, sub: t("discover.prayerWallSub"), route: "/(tabs)/prayer" as const },
     { key: "countries", icon: "earth-outline" as const, title: t("discover.countriesReached"), count: forestStats.countriesReached.length, sub: t("discover.countriesReachedSub"), route: "/living-tree" as const },
     // Missions left the tab bar; this card is now its entry point.

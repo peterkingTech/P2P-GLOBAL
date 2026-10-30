@@ -47,7 +47,7 @@ const mocks = {
     useLocalSearchParams: () => env.params, useFocusEffect: () => {}, usePathname: () => env.pathname, Slot: host("Slot"),
   },
   "@/contexts/AuthContext": { useAuth: () => ({ profile: env.profile }), supabase: {} },
-  "@/lib/adminFetch": { authedFetch: (p, i) => env.fetch(p, i) },
+  "@/lib/apiClient": { apiFetch: (p, i) => env.fetch(p, i) },
   "@/components/studio/useStudioQuery": { useStudioQuery: () => env.query },
   "@/contexts/ThemeContext": { useTheme: () => ({ colors: loadFile(path.join(root, "constants/themes.ts")).THEMES.light, resolvedMode: "light" }) },
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,8 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { CircleCard } from "@/components/CircleCard";
+import { showAlert } from "@/lib/alerts";
 
 interface DiscoverCircle {
   id: string;
@@ -56,15 +57,15 @@ export default function DiscoverCirclesScreen() {
     if (!profile?.id) return;
     setRequestingId(circleId);
     try {
-      const res = await authedFetch(`/circles/${circleId}/join`, {
+      const res = await apiFetch(`/circles/${circleId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
       if (!res.ok) throw new Error(String(res.status));
-      Alert.alert("Request sent", "The circle leader will review your request.");
+      showAlert("Request sent", "The circle leader will review your request.");
     } catch {
-      Alert.alert("Couldn't send request", "Please try again.");
+      showAlert("Couldn't send request", "Please try again.");
     } finally {
       setRequestingId(null);
     }

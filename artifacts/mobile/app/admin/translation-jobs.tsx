@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
-import { getApiUrl } from "@/lib/apiUrl";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { apiFetch } from "@/lib/apiClient";
+import { supabase } from "@/contexts/AuthContext";
+import { formatDate } from "@/lib/timeFormat";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -35,16 +42,6 @@ const LANG_NAMES: Record<string, string> = {
   zh: "Chinese", ar: "Arabic", he: "Hebrew", ru: "Russian",
 };
 
-async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? "";
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -85,19 +82,14 @@ export default function TranslationJobsScreen() {
   async function retryJobAction(jobId: string) {
     setRetrying(jobId);
     try {
-      const token = await getAuthToken();
-      const apiUrl = getApiUrl();
-      const res = await fetch(`${apiUrl}/translations/admin/retry/${jobId}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/translations/admin/retry/${jobId}`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "Unknown error" }));
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       await loadJobs(0, filter);
     } catch (e: any) {
-      Alert.alert("Retry failed", e.message);
+      showAlert("Retry failed", e.message);
     } finally {
       setRetrying(null);
     }
@@ -185,7 +177,7 @@ export default function TranslationJobsScreen() {
                 {item.ai_cost_usd !== null ? (
                   <Text style={styles.jobMeta}>${item.ai_cost_usd.toFixed(4)}</Text>
                 ) : null}
-                <Text style={styles.jobMeta}>{formatDate(item.created_at)}</Text>
+                <Text style={styles.jobMeta}>{formatDate(item.created_at, "dateTime", { empty: "—" })}</Text>
                 {item.triggered_by !== "admin" ? (
                   <Text style={styles.jobMeta}>by {item.triggered_by}</Text>
                 ) : null}

@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView,
-  ActivityIndicator, Alert, Platform, Modal, Image,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+  Modal,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from "react-native-draggable-flatlist";
@@ -16,6 +24,7 @@ import {
 import BlockRenderer from "./BlockRenderer";
 import { moveToBin } from "@/lib/recycleBinApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type Tab = "content" | "settings" | "preview";
@@ -29,10 +38,6 @@ interface LessonMeta {
 
 interface StatusLogRow { id: string; old_status: string | null; new_status: string; changed_at: string; }
 
-function showError(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 function tempId() { return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
 
@@ -62,8 +67,8 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
         .eq("id", lessonId).single(),
       supabase.from("p2p_lesson_blocks").select("*").eq("lesson_id", lessonId).order("order_index"),
     ]);
-    if (lErr) { showError("Could not load lesson", lErr.message); setLoading(false); return; }
-    if (bErr) { showError("Could not load blocks", bErr.message); setLoading(false); return; }
+    if (lErr) { showAlert("Could not load lesson", lErr.message); setLoading(false); return; }
+    if (bErr) { showAlert("Could not load blocks", bErr.message); setLoading(false); return; }
 
     setLesson(lessonData as LessonMeta);
     const loadedBlocks = (blockData ?? []) as LessonBlock[];
@@ -216,13 +221,13 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
     if (!block) return;
     setMenuForBlock(null);
     if (block.id.startsWith("tmp-")) {
-      showError("Save first", "This block hasn't finished saving yet — wait a second and try again.");
+      showAlert("Save first", "This block hasn't finished saving yet — wait a second and try again.");
       return;
     }
     const { data: targetBlocks } = await supabase.from("p2p_lesson_blocks").select("order_index").eq("lesson_id", targetLessonId).order("order_index", { ascending: false }).limit(1);
     const nextOrder = targetBlocks && targetBlocks.length > 0 ? targetBlocks[0].order_index + 1 : 0;
     const { error } = await supabase.from("p2p_lesson_blocks").update({ lesson_id: targetLessonId, order_index: nextOrder }).eq("id", blockId);
-    if (error) { showError("Move failed", error.message); return; }
+    if (error) { showAlert("Move failed", error.message); return; }
     setBlocks((prev) => prev.filter((b) => b.id !== blockId).map((b, i) => ({ ...b, order_index: i })));
     savedOrderRef.current = savedOrderRef.current.filter((id) => id !== blockId);
     savedBlocksRef.current.delete(blockId);
@@ -260,7 +265,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
     if (newStatus === "published") {
       const { ok, missing } = checkPublishRequirements(blocks);
       if (!ok) {
-        showError(
+        showAlert(
           "Can't publish yet",
           `This lesson is missing: ${missing.map((t) => BLOCK_TYPE_META[t].label).join(", ")}. Add at least one of each before publishing.`
         );
@@ -270,7 +275,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
     setPublishing(true);
     const { error } = await supabase.from("p2p_lessons").update({ status: newStatus }).eq("id", lessonId);
     setPublishing(false);
-    if (error) { showError("Status change failed", error.message); return; }
+    if (error) { showAlert("Status change failed", error.message); return; }
     patchLessonLocal({ status: newStatus });
     onLessonChanged?.();
     load();
@@ -278,7 +283,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
 
   async function handleCoverUpload() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { showError("Permission needed", "Allow photo access to upload a cover image."); return; }
+    if (!perm.granted) { showAlert("Permission needed", "Allow photo access to upload a cover image."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.85 });
     if (result.canceled || !result.assets.length) return;
     setCoverUploading(true);
@@ -292,7 +297,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
       const { data: urlData } = supabase.storage.from("curriculum-media").getPublicUrl(path);
       scheduleLessonSave({ cover_image_url: urlData.publicUrl });
     } catch (ex: any) {
-      showError("Upload failed", ex.message);
+      showAlert("Upload failed", ex.message);
     } finally {
       setCoverUploading(false);
     }

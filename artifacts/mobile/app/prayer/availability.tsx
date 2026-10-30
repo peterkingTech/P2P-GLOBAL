@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Platform, Alert, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Switch } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,10 +13,7 @@ import { deviceTimezone, zoneShortLabel } from "@/lib/prayerTimeDisplay";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
+import { showAlert } from "@/lib/alerts";
 
 const WEEKDAYS = [
   { key: 0, label: "Sun" }, { key: 1, label: "Mon" }, { key: 2, label: "Tue" }, { key: 3, label: "Wed" },

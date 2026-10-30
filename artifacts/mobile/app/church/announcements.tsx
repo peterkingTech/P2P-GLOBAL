@@ -8,6 +8,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
   general: "General", bible_study: "Bible Study", discipleship: "Discipleship", prayer: "Prayer",
   learning_goal: "Learning Goal", study_plan: "Study Plan", event: "Event", important: "Important",
@@ -40,7 +41,7 @@ export default function ChurchAnnouncementsScreen() {
     setPosting(true);
     const { error } = await createAnnouncement(userChurch.id, { title: title.trim(), body: body.trim() });
     setPosting(false);
-    if (error) { Alert.alert("Couldn't post announcement", error); return; }
+    if (error) { showAlert("Couldn't post announcement", error); return; }
     setTitle(""); setBody(""); setComposerOpen(false);
     load();
   }

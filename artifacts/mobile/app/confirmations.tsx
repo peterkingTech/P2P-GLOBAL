@@ -7,6 +7,8 @@ import * as Haptics from "expo-haptics";
 import { useData, PendingPeerConfirmation, PeerConfirmationType } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { Avatar } from "@/components/Avatar";
 
 const ACTION_LABEL: Record<PeerConfirmationType, string> = {
   encouragement: "left you encouraging feedback",
@@ -26,16 +28,6 @@ const ACTION_ICON: Record<PeerConfirmationType, keyof typeof Ionicons.glyphMap> 
   global: "globe",
 };
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function daysUntil(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
@@ -62,18 +54,12 @@ function ConfirmationCard({ item }: { item: PendingPeerConfirmation }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        {item.actorPhotoUrl ? (
-          <Image source={{ uri: item.actorPhotoUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Ionicons name={ACTION_ICON[item.confirmationType]} size={16} color={colors.accentGreen} />
-          </View>
-        )}
+        <Avatar photoUrl={item.actorPhotoUrl} fallbackIcon={ACTION_ICON[item.confirmationType]} size={36} style={styles.avatar} />
         <View style={{ flex: 1 }}>
           <Text style={styles.actionText}>
             <Text style={styles.actorName}>{item.actorName}</Text> {ACTION_LABEL[item.confirmationType]}
           </Text>
-          <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+          <Text style={styles.timeText}>{timeAgo(item.createdAt, "ago")}</Text>
         </View>
         {expiryDays !== null && expiryDays <= 3 && (
           <View style={styles.expiryBadge}>

@@ -1,25 +1,9 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // "Pray the Word" Stage 1/2 — client bindings for routes/prayerTopics.ts
 // (mounted at /prayer/topics, /prayer/admin/*). Scripture TEXT is never
 // returned from here — only structured references. Resolve display text
 // separately via lib/bibleApi.ts's existing /bible/* endpoints.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
 
 export interface PrayerTopic {
   id: string; slug: string; title: string; description: string | null;
@@ -43,20 +27,20 @@ export interface PrayerTopicDetail extends PrayerTopic {
 }
 
 export function getTopics(): Promise<PrayerTopic[]> {
-  return authedFetch("/prayer/topics");
+  return apiRequest("/prayer/topics");
 }
 export function getTopic(slug: string): Promise<PrayerTopicDetail> {
-  return authedFetch(`/prayer/topics/${slug}`);
+  return apiRequest(`/prayer/topics/${slug}`);
 }
 // Marks the scripture at `completedScriptureOrder` (1-based position in
 // the topic's own scripture list) as completed. The server rejects any
 // value other than exactly current+1 — this call cannot be used to skip
 // ahead, regardless of what value the client sends.
 export function updateTopicProgress(topicId: string, completedScriptureOrder: number): Promise<TopicProgress> {
-  return authedFetch(`/prayer/topics/${topicId}/progress`, { method: "PUT", body: JSON.stringify({ completedScriptureOrder }) });
+  return apiRequest(`/prayer/topics/${topicId}/progress`, { method: "PUT", body: JSON.stringify({ completedScriptureOrder }) });
 }
 export function getScriptureReference(id: string): Promise<ScriptureReference> {
-  return authedFetch(`/prayer/scriptures/${id}`);
+  return apiRequest(`/prayer/scriptures/${id}`);
 }
 
 // Admin-only get-or-create for a canonical reference row — shared across
@@ -66,7 +50,7 @@ export function getScriptureReference(id: string): Promise<ScriptureReference> {
 export function createOrFindScriptureReference(input: {
   book: string; chapter: number; startVerse: number; endVerse: number; referenceDisplay: string; translationCode?: string | null;
 }): Promise<ScriptureReference> {
-  return authedFetch("/prayer/admin/scriptures", { method: "POST", body: JSON.stringify(input) });
+  return apiRequest("/prayer/admin/scriptures", { method: "POST", body: JSON.stringify(input) });
 }
 
 // "Philippians 4:6-7" / "John 3:16" -> structured fields, or null if it

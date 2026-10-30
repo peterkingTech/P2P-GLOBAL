@@ -1,5 +1,5 @@
 import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Prayer 2.0 Stage 6 — client bindings for routes/prayerTestimonies.ts
 // (mounted at /prayer/testimonies), plus a video-upload helper that mirrors
@@ -7,21 +7,6 @@ import { getApiUrl } from "@/lib/apiUrl";
 // "prayer-testimonies" Storage bucket (migration 141) instead of
 // "submissions" so lesson-assignment media and testimony media never share
 // one bucket's path namespace.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
 
 // Same tiny RFC4122-ish v4 generator as DataContext.tsx's generateUUID —
 // duplicated rather than exported/shared since it's a 6-line pure helper
@@ -85,22 +70,22 @@ export function createTestimony(input: {
   scriptureReference?: unknown; mediaType?: "video" | null; mediaPath?: string | null;
   mediaDurationSeconds?: number | null; isAnonymous?: boolean; visibility?: TestimonyVisibility;
 }): Promise<PrayerTestimony> {
-  return authedFetch("/prayer/testimonies", { method: "POST", body: JSON.stringify(input) });
+  return apiRequest("/prayer/testimonies", { method: "POST", body: JSON.stringify(input) });
 }
 export function getMyTestimonies(): Promise<PrayerTestimony[]> {
-  return authedFetch("/prayer/testimonies/mine");
+  return apiRequest("/prayer/testimonies/mine");
 }
 export function getTestimonyFeed(type?: TestimonyType): Promise<PrayerTestimony[]> {
-  return authedFetch(`/prayer/testimonies/feed${type ? `?type=${type}` : ""}`);
+  return apiRequest(`/prayer/testimonies/feed${type ? `?type=${type}` : ""}`);
 }
 export function getTestimony(id: string): Promise<PrayerTestimony> {
-  return authedFetch(`/prayer/testimonies/${id}`);
+  return apiRequest(`/prayer/testimonies/${id}`);
 }
 export function updateTestimony(id: string, updates: Partial<{
   title: string; testimonyText: string; scriptureReference: unknown; isAnonymous: boolean; visibility: TestimonyVisibility;
 }>): Promise<PrayerTestimony> {
-  return authedFetch(`/prayer/testimonies/${id}`, { method: "PUT", body: JSON.stringify(updates) });
+  return apiRequest(`/prayer/testimonies/${id}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function deleteTestimony(id: string): Promise<{ removed: true }> {
-  return authedFetch(`/prayer/testimonies/${id}`, { method: "DELETE" });
+  return apiRequest(`/prayer/testimonies/${id}`, { method: "DELETE" });
 }

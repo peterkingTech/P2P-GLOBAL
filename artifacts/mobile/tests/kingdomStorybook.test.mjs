@@ -28,7 +28,7 @@ function load(file, mocks) {
   const js = ts.transpileModule(src(file), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, { module: mod, exports: mod.exports, Promise, console, Map, Set, JSON, Number, String, Math, Array, Object, RegExp,
-    require: (n) => { if (n in mocks) return mocks[n]; throw new Error(`unexpected require ${n} in ${file}`); } });
+    require: (n) => { if (n in mocks) return mocks[n]; if (n === "@/lib/apiClient") return load("lib/apiClient.ts", mocks); throw new Error(`unexpected require ${n} in ${file}`); } });
   return mod.exports;
 }
 const books = load("lib/bibleBooks.ts", {});

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, PublicUserProfile } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const ROLE_OPTIONS: { value: string; label: string; needsZone?: boolean; needsCountry?: boolean }[] = [
   { value: "admin_zone", label: "Zone Admin", needsZone: true },
@@ -52,11 +53,11 @@ export default function AppointAdminScreen() {
   async function handleAppoint() {
     if (!found || !role || !reason.trim()) return;
     if (selectedRole?.needsZone && !zone) {
-      Alert.alert("Zone required", "Select a zone for this role.");
+      showAlert("Zone required", "Select a zone for this role.");
       return;
     }
     if (selectedRole?.needsCountry && !country.trim()) {
-      Alert.alert("Country required", "Enter a country for this role.");
+      showAlert("Country required", "Enter a country for this role.");
       return;
     }
     setSubmitting(true);
@@ -67,7 +68,7 @@ export default function AppointAdminScreen() {
     });
     setSubmitting(false);
     if (err) {
-      Alert.alert("Couldn't appoint admin", err);
+      showAlert("Couldn't appoint admin", err);
       return;
     }
     Alert.alert(

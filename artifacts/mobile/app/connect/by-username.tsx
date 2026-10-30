@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Platform } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 interface FoundProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
@@ -18,10 +19,6 @@ interface CircleOption { id: string; name: string }
 
 type RequestType = "connect" | "peer_guide" | "circle_invite";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function ConnectByUsernameScreen() {
   const insets = useSafeAreaInsets();
@@ -75,7 +72,7 @@ export default function ConnectByUsernameScreen() {
     setSending(true);
     try {
       if (requestType === "peer_guide") {
-        const res = await authedFetch("/discipleship/request", {
+        const res = await apiFetch("/discipleship/request", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ learnerId: profile.id, peerGuideId: found.userId, message: message.trim() || undefined, source: "direct" }),
         });

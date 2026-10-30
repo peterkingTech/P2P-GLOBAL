@@ -1,16 +1,13 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getOpenPrayerRequests, commitToPray, type OpenPrayerRequest } from "@/lib/prayerCoordinationApi";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const MODE_LABEL: Record<string, string> = { pray_for_me: "Pray for me", pray_with_me: "Pray with me", both: "Pray for me or with me" };
 

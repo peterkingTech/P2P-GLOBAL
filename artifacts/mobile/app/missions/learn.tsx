@@ -44,7 +44,7 @@ export default function MissionLearnScreen() {
           </TouchableOpacity>
         ))}
 
-        <AppButton label="Explore Study & Curriculum" onPress={() => router.push("/curriculum" as any)} icon="school-outline" style={{ marginTop: 20 }} />
+        <AppButton label="Explore Kingdom School" onPress={() => router.push("/kingdom-school" as any)} icon="school-outline" style={{ marginTop: 20 }} />
         <AppButton label="Pray the Word" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="sparkles-outline" style={{ marginTop: 10 }} />
         <AppButton label="Discipleship Journey" onPress={() => router.push("/my-discipleship/journey" as any)} variant="outline" icon="leaf-outline" style={{ marginTop: 10 }} />
       </ScrollView>

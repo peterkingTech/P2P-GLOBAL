@@ -16,11 +16,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
 import ReadableText from "@/components/ReadableText";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 
 // The Integration and Onboarding Journey — 5 mandatory steps every new user
 // goes through after registration/profile-setup, before Module 1. Anchored
@@ -167,7 +168,7 @@ export default function JourneyScreen() {
     if (yes && profile?.id) {
       setNotifyingPeerGuide(true);
       try {
-        await authedFetch("/discipleship/notify-peer-guide", {
+        await apiFetch("/discipleship/notify-peer-guide", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -204,7 +205,7 @@ export default function JourneyScreen() {
     });
     await refreshProfile();
     if (peerGuide) {
-      authedFetch("/discipleship/notify-peer-guide", {
+      apiFetch("/discipleship/notify-peer-guide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -327,13 +328,7 @@ export default function JourneyScreen() {
               <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 24 }} />
             ) : peerGuide ? (
               <View style={styles.guideCard}>
-                {peerGuide.photoUrl ? (
-                  <Image source={{ uri: peerGuide.photoUrl }} style={styles.guideAvatar} />
-                ) : (
-                  <View style={[styles.guideAvatar, styles.guideAvatarPlaceholder]}>
-                    <Text style={styles.guideAvatarInitial}>{peerGuide.fullName.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
+                <Avatar photoUrl={peerGuide.photoUrl} name={peerGuide.fullName} size={72} style={styles.guideAvatar} />
                 <Text style={styles.guideName}>{peerGuide.fullName}</Text>
                 {peerGuide.country && <Text style={styles.guideCountry}>{peerGuide.country}</Text>}
                 {peerGuide.bio && <Text style={styles.guideBio}>{peerGuide.bio}</Text>}

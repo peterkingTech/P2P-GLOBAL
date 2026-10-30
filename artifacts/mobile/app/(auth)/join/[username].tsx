@@ -9,6 +9,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 
 interface InviterPreview {
   username: string;
@@ -64,13 +65,7 @@ export default function JoinScreen() {
           <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 20 }} />
         ) : inviter ? (
           <>
-            {inviter.photoUrl ? (
-              <Image source={{ uri: inviter.photoUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarInitial}>{(inviter.fullName ?? inviter.username).charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <Avatar photoUrl={inviter.photoUrl} name={inviter.fullName ?? inviter.username} size={72} style={styles.avatar} />
             <Text style={styles.title}>@{inviter.username} invited you</Text>
             {(inviter.fullName || inviter.country) && (
               <Text style={styles.subtitle}>

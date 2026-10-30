@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import SignedPhotoView from "@/components/SignedPhotoView";
-import KingdomStoryVideoPlayer from "@/components/KingdomStoryVideoPlayer";
+import VideoPlayer from "@/components/media/VideoPlayer";
 import colors from "@/constants/colors";
-import type { KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
+import { getKingdomStoryMediaSignedUrl, type KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
 
 // Ordered, swipeable image/video gallery for a Kingdom Story — the one
 // genuinely new piece of media UI this feature needed, since every other
@@ -36,7 +36,7 @@ export default function KingdomStoryMediaGallery({ media }: Props) {
           <View key={item.id} style={{ width: SCREEN_WIDTH }}>
             <View style={{ paddingHorizontal: 20 }}>
               {item.mediaType === "video" ? (
-                <KingdomStoryVideoPlayer mediaPath={item.mediaPath} />
+                <VideoPlayer mediaPath={item.mediaPath} resolveUrl={getKingdomStoryMediaSignedUrl} accessibilityLabel={item.altText ?? item.caption ?? "Story video"} />
               ) : (
                 <SignedPhotoView bucket="kingdom-stories-media" path={item.mediaPath} />
               )}

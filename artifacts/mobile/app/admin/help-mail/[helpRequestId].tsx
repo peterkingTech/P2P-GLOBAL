@@ -1,16 +1,24 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, OfficialMailThreadMessage, ComposeDepartment } from "@/contexts/DataContext";
 import { useAuth, type OfficialAccountType } from "@/contexts/AuthContext";
 import { OfficialBadge } from "@/components/OfficialBadge";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
+import { showAlert } from "@/lib/alerts";
 
 // Help-request tier -> the P2P Official identity that responds, matching
 // DEPARTMENT_TO_OFFICIAL_TYPE in officialMessages.ts (crisis_safeguarding ->
@@ -63,7 +71,7 @@ export default function HelpMailThreadScreen() {
   async function linkToHelpRequest(newConversationId: string) {
     if (!helpRequestId) return;
     try {
-      await authedFetch(`/admin/help-requests/${helpRequestId}/link-conversation`, {
+      await apiFetch(`/admin/help-requests/${helpRequestId}/link-conversation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: newConversationId }),
@@ -84,7 +92,7 @@ export default function HelpMailThreadScreen() {
     });
     setSending(false);
     if (!result.success) {
-      Alert.alert("Message not sent", result.error ?? "Please try again.");
+      showAlert("Message not sent", result.error ?? "Please try again.");
       return;
     }
     setBody("");
@@ -100,7 +108,7 @@ export default function HelpMailThreadScreen() {
     try {
       const result = await startPeerCall({
         supabase, currentUserId: user.id, otherUserId: targetUserId,
-        onAlert: (title, message) => Alert.alert(title, message),
+        onAlert: (title, message) => showAlert(title, message),
       });
       if (!result) return;
 

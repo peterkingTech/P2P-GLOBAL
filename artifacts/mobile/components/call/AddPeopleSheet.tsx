@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator, TextInput, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getInviteablePeople, sendCallInvitation, InviteablePerson } from "@/lib/callInvitations";
+import { showAlert } from "@/lib/alerts";
 
 // Study Together C2 — "Add People" during an active call. Only resolves
 // WHO to invite and sends the invitation; delivery/accept/decline all ride
@@ -12,10 +13,6 @@ const RELATIONSHIP_LABEL: Record<InviteablePerson["relationship"], string> = {
   peer_guide: "Peer Guide", disciple: "Disciple", connection: "Connection",
 };
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export function AddPeopleSheet({
   visible, onClose, callId,

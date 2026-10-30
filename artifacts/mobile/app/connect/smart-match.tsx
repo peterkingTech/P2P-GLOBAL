@@ -4,10 +4,11 @@ import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 
 // Peer Guide specific matching — replaces the old generic gift/country
 // smart-match with a real eligibility + scoring flow against
@@ -44,7 +45,7 @@ export default function SmartMatch() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const res = await authedFetch(`/discipleship/find-peer-guide/${profile.id}`);
+      const res = await apiFetch(`/discipleship/find-peer-guide/${profile.id}`);
       const data = (await res.json()) as Candidate[];
       setCandidates(Array.isArray(data) ? data : []);
     } catch {
@@ -59,7 +60,7 @@ export default function SmartMatch() {
     if (!profile?.id) return;
     setConnecting(candidate.id);
     try {
-      await authedFetch("/discipleship/request", {
+      await apiFetch("/discipleship/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ learnerId: profile.id, peerGuideId: candidate.id }),
@@ -127,13 +128,7 @@ export default function SmartMatch() {
                   {(verifiedOnly ? candidates.filter((c) => c.isVerified) : candidates).map((c) => (
                     <View key={c.id} style={styles.candidateCard}>
                       <View style={styles.candidateHeader}>
-                        {c.photoUrl ? (
-                          <Image source={{ uri: c.photoUrl }} style={styles.candidateAvatar} />
-                        ) : (
-                          <View style={[styles.candidateAvatar, styles.candidateAvatarPlaceholder]}>
-                            <Text style={styles.candidateAvatarInitial}>{c.fullName.charAt(0).toUpperCase()}</Text>
-                          </View>
-                        )}
+                        <Avatar photoUrl={c.photoUrl} name={c.fullName} size={52} style={styles.candidateAvatar} />
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: "row", alignItems: "center" }}>
                             <Text style={styles.candidateName}>{c.fullName}</Text>

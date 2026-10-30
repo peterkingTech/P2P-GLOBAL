@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, Modal, FlatList } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 const SOCIAL_PLATFORMS = [
   { value: "facebook", label: "Facebook" }, { value: "instagram", label: "Instagram" },
   { value: "youtube", label: "YouTube" }, { value: "tiktok", label: "TikTok" },
@@ -53,8 +54,8 @@ export default function ChurchSocialMediaSettingsScreen() {
     setSaving(true);
     const error = await updateSocialAccounts(userChurch.id, cleaned);
     setSaving(false);
-    if (error) { Alert.alert("Couldn't save", error); return; }
-    Alert.alert("Saved", "Social media accounts updated.");
+    if (error) { showAlert("Couldn't save", error); return; }
+    showAlert("Saved", "Social media accounts updated.");
     load();
   }
 

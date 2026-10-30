@@ -1,19 +1,16 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
-import VideoRecorder from "@/components/VideoRecorder";
 import { createTestimony, uploadTestimonyVideo, type TestimonyType, type TestimonyVisibility } from "@/lib/prayerTestimonyApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { StoryMediaField, useStoryMedia, uploadStoryMedia } from "@/components/story/StoryMedia";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Prayer 2.0 Stage 6 — two conceptually distinct testimony types share this
 // one recording screen (same fields, same media/moderation plumbing), but
@@ -43,8 +40,7 @@ export default function RecordTestimonyScreen() {
   const [scriptureRef, setScriptureRef] = useState(scripture ?? "");
   const [visibility, setVisibility] = useState<TestimonyVisibility>("p2p_network");
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [videoDuration, setVideoDuration] = useState(0);
+  const media = useStoryMedia();
   const [submitting, setSubmitting] = useState(false);
 
   const linkedToRequest = testimonyType === "answered_prayer" && !!requestId;
@@ -53,12 +49,8 @@ export default function RecordTestimonyScreen() {
     if (!profile?.id || !title.trim() || !testimonyText.trim()) return;
     setSubmitting(true);
     try {
-      let mediaFields: { id?: string; mediaType?: "video"; mediaPath?: string; mediaDurationSeconds?: number } = {};
-      if (videoUri) {
-        const uploaded = await uploadTestimonyVideo(videoUri, profile.id);
-        if (!uploaded) { showAlert("Couldn't upload your video", "Please check your connection and try again."); setSubmitting(false); return; }
-        mediaFields = { id: uploaded.testimonyId, mediaType: "video", mediaPath: uploaded.mediaPath, mediaDurationSeconds: videoDuration };
-      }
+      const mediaFields = await uploadStoryMedia(media, { userId: profile.id, uploadVideo: uploadTestimonyVideo, idOf: (u) => u.testimonyId });
+      if (!mediaFields) { setSubmitting(false); return; }
       await createTestimony({
         ...mediaFields,
         testimonyType, title: title.trim(), testimonyText: testimonyText.trim(),
@@ -118,21 +110,7 @@ export default function RecordTestimonyScreen() {
         <Text style={styles.fieldLabel}>Scripture (optional)</Text>
         <TextInput style={styles.input} value={scriptureRef} onChangeText={setScriptureRef} placeholder="e.g. Philippians 4:19" placeholderTextColor={c.textMuted} />
 
-        <Text style={styles.fieldLabel}>Video (optional)</Text>
-        {videoUri ? (
-          <View style={styles.videoChosenBox}>
-            <Ionicons name="videocam" size={16} color={c.accentGreen} />
-            <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <VideoRecorder
-            disabled={submitting}
-            onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }}
-          />
-        )}
+        <StoryMediaField media={media} disabled={submitting} allowPhoto={false} />
 
         <Text style={styles.fieldLabel}>Who can see this?</Text>
         <View style={styles.visRow}>

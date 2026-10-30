@@ -26,7 +26,7 @@ function load(file, mocks) {
   const js = ts.transpileModule(src(file), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, { module: mod, exports: mod.exports, Promise, setTimeout, clearTimeout, console, Map, Set, JSON, Number, String, Math, Array, Object,
-    require: (n) => { if (n in mocks) return mocks[n]; throw new Error(`unexpected require ${n} in ${file}`); } });
+    require: (n) => { if (n in mocks) return mocks[n]; if (n === "@/lib/apiClient") return load("lib/apiClient.ts", mocks); throw new Error(`unexpected require ${n} in ${file}`); } });
   return mod.exports;
 }
 
@@ -104,14 +104,15 @@ ok("translation picker lists only what the server returns (no hardcoded translat
 
 const api = src("lib/bibleReaderApi.ts");
 ok("client never holds an API.Bible key or calls API.Bible directly", !/api\.scripture\.api\.bible|api-key|API_BIBLE/i.test(api));
-ok("client sends the user's session token", /Authorization: `Bearer \$\{token\}`/.test(api));
+ok("client sends the user's session token (through the shared client)", /apiRequest<T>\(path, init/.test(api) && /Authorization: `Bearer \$\{token\}`/.test(src("lib/apiClient.ts")));
 
 // Navigation + connections
 const layout = src("app/_layout.tsx");
 ok("Bible routes draw their own header", /"bible\/index", "bible\/search", "bible\/library"/.test(layout));
 ok("no new bottom tab", !/bible/i.test(src("app/(tabs)/_layout.tsx")));
 // The Learning Centre header carries the Bible shortcut; Bible Study (Explore Learning) opens the reader too.
-ok("Learn tab opens the Bible", src("app/(tabs)/learn.tsx").includes('["book", "Bible", "/bible"]') && src("app/bible-study/index.tsx").includes('route: "/bible"'));
+ok("Learning opens Bible Study, which opens the Bible (one place, no repeated shortcut rows)", src("components/LearningHub.tsx").includes('route: "/bible-study"') && src("app/bible-study/index.tsx").includes('route: "/bible"')
+  && !src("app/(tabs)/learn.tsx").includes('"/notes"') && !src("app/kingdom-school.tsx").includes('"/notes"') && !src("app/kingdom-school.tsx").includes('"/bible"'));
 const lesson = src("app/lesson/[id].tsx");
 ok("lesson Scripture opens in the P2P Bible (bible.com only as fallback)", /readerTarget\(s\.reference\)/.test(lesson) && /router\.push\(bibleRoute\(/.test(lesson) && /Read in Bible/.test(lesson));
 for (const f of ["app/kingdom-wins/[id].tsx", "app/missions/story/[id].tsx", "app/prayer/gathering/[id].tsx", "app/prayer/journal.tsx", "app/prayer/testimony/[id].tsx", "components/study/CustomLessonViewer.tsx"])

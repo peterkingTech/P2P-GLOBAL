@@ -1,19 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { useStudySession, StudyProgress, OtherParticipant } from "@/hooks/useStudySession";
 import type { GroupStudyProgress } from "@/lib/groupStudy";
+import { confirmAction } from "@/lib/alerts";
 
-function showConfirm(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel" },
-      { text: confirmLabel, style: "destructive", onPress: onConfirm },
-    ]);
-  }
-}
 
 export function StudyPeopleTab({
   session, myId, myName, otherParticipants,
@@ -57,11 +48,11 @@ export function StudyPeopleTab({
   }
 
   async function handleRemove(userId: string, name: string) {
-    showConfirm(`Remove ${name}?`, `Remove ${name} from this Study Together session?`, "Remove", async () => {
+    confirmAction(`Remove ${name}?`, `Remove ${name} from this Study Together session?`, async () => {
       setRemovingId(userId);
       await session.removeParticipant(userId);
       setRemovingId(null);
-    });
+    }, { confirmLabel: "Remove", destructive: true });
   }
 
   return (

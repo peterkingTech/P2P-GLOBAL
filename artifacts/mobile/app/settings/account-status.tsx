@@ -8,9 +8,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { isValidCalendarDate, parseDMY } from "@/lib/dateOfBirth";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { formatDate } from "@/lib/timeFormat";
 
 // Settings → Account → Account status. Stage 1: shows the status and lets the
 // user take a reversible break. Everything is decided by the server
@@ -29,9 +31,6 @@ const CHOICES: { key: BreakChoice; label: string; detail: string }[] = [
   { key: "open", label: "Until I reactivate", detail: "Come back whenever you're ready" },
 ];
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
-}
 
 export default function AccountStatusScreen() {
   const insets = useSafeAreaInsets();
@@ -59,10 +58,10 @@ export default function AccountStatusScreen() {
   function confirmBreak() {
     const until = untilFor(choice);
     if (until === undefined) {
-      Alert.alert("Choose a date", "Please enter the date you'd like to return, as DD.MM.YYYY.");
+      showAlert("Choose a date", "Please enter the date you'd like to return, as DD.MM.YYYY.");
       return;
     }
-    const when = until ? `until ${formatDate(until)}` : "until you reactivate";
+    const when = until ? `until ${formatDate(until, "long")}` : "until you reactivate";
     Alert.alert(
       "Take a break?",
       `Your account will be paused ${when}.\n\nYour journey, progress, Family Circles, Peer Circles and messages all stay exactly as they are, and you'll get no notifications while you're away. You can sign in and reactivate at any time.`,
@@ -76,20 +75,20 @@ export default function AccountStatusScreen() {
   async function submit(until: string | null) {
     setSaving(true);
     try {
-      const res = await authedFetch("/account/deactivate", {
+      const res = await apiFetch("/account/deactivate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ until }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        Alert.alert("Couldn't pause your account", body.error ?? "Please try again later.");
+        showAlert("Couldn't pause your account", body.error ?? "Please try again later.");
         return;
       }
       // AuthGate moves to the "taking a break" screen once this reads it.
       await refreshAccountStatus();
     } catch {
-      Alert.alert("Couldn't pause your account", "Please check your connection and try again.");
+      showAlert("Couldn't pause your account", "Please check your connection and try again.");
     } finally {
       setSaving(false);
     }

@@ -17,6 +17,7 @@ import { StatusGlyph, TICK_COLORS_ON_LIGHT } from "@/components/MessageTicks";
 import { statusAccessibilityLabel } from "@/lib/messageReceipts";
 import { useActivityStatus } from "@/lib/presence";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
+import { timeAgo } from "@/lib/timeFormat";
 import "@/lib/i18n";
 
 type TabKey = "all" | "unread" | "favourites" | "family_church" | "peer_groups" | "circles";
@@ -30,16 +31,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "circles", label: "Circles" },
 ];
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return "";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
@@ -353,7 +344,7 @@ export default function MessagesTab() {
                   {item.isPinnedByUser && (
                     <MaterialIcons name="push-pin" size={13} color={colors.textMuted} style={styles.userPin} />
                   )}
-                  <Text style={styles.timeText}>{timeAgo(item.lastMessageAt)}</Text>
+                  <Text style={styles.timeText}>{timeAgo(item.lastMessageAt, "compact")}</Text>
                   {unread && (
                     <View style={styles.unreadBadge}>
                       <Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>

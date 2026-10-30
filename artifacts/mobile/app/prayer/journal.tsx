@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import { getScriptureReference } from "@/lib/prayerTopicsApi";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { openScripture } from "@/lib/openScripture";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 type Filter = "all" | "answered" | "unanswered";
 const PAGE_SIZE = 20;
 
@@ -21,10 +22,6 @@ const STATUS_LABELS: Record<JournalStatus, string> = {
 };
 const STATUS_OPTIONS: JournalStatus[] = ["still_praying", "trusting_god", "god_is_answering", "answered", "no_longer_needed"];
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // "Pray the Word" Stage 4 — Prayer Journal 2.0. Reads/writes now go
 // through the paginated routes/prayerJournal.ts API (never loading the

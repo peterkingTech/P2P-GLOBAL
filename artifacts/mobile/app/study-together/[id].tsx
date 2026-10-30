@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -12,6 +12,8 @@ import {
   DESTINATION_LABELS, type SharedStudy, type StudyResponse,
 } from "@/lib/studyTogetherApi";
 import { AppButton, IconButton } from "@/components/ui";
+import { confirmAction } from "@/lib/alerts";
+import { timeAgo as ago } from "@/lib/timeFormat";
 
 // One shared study: what we're studying, where the group is (the leader's
 // shared chapter), discussion questions (the chapter's own reflection
@@ -21,14 +23,6 @@ import { AppButton, IconButton } from "@/components/ui";
 // private answers, journal entries and reflections are never shown here.
 // Chat and calls are the existing P2P ones (shortcuts below).
 
-function confirm(title: string, message: string, ok: string, run: () => void) {
-  if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) run(); return; }
-  Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: ok, style: "destructive", onPress: run }]);
-}
-const ago = (iso: string) => {
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
-};
 
 export default function SharedStudyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -97,7 +91,7 @@ export default function SharedStudyScreen() {
             <Text style={s.responseMeta}>{r.mine ? "You" : r.name} · {ago(r.createdAt)}</Text>
             <Text style={s.body}>{r.body}</Text>
             {(r.mine || st.me.isLeader) ? (
-              <AppButton label="Remove" onPress={() => confirm("Remove this response?", "It will no longer be visible to the group.", "Remove", () => act(`rm:${r.id}`, () => removeStudyResponse(st.id, r.id)))} variant="tertiary" size="sm" accessibilityLabel="Remove response" style={{ alignSelf: "flex-start" }} />
+              <AppButton label="Remove" onPress={() => confirmAction("Remove this response?", "It will no longer be visible to the group.", () => act(`rm:${r.id}`, () => removeStudyResponse(st.id, r.id)), { confirmLabel: "Remove", destructive: true })} variant="tertiary" size="sm" accessibilityLabel="Remove response" style={{ alignSelf: "flex-start" }} />
             ) : null}
           </View>
         ))}
@@ -181,7 +175,7 @@ export default function SharedStudyScreen() {
           {[...sectionPrompts, ...generalPrompts].map((p) => (
             <View key={p.id}>
               {thread({ k: `p:${p.id}`, label: p.body, list: responsesFor(st.responses, { promptId: p.id }), target: { promptId: p.id } })}
-              {st.me.isLeader ? <AppButton label="Remove question" onPress={() => confirm("Remove this question?", "Its responses are removed too.", "Remove", () => act(`rp:${p.id}`, () => removeStudyPrompt(st.id, p.id)))} variant="tertiary" size="sm" style={{ alignSelf: "flex-start" }} /> : null}
+              {st.me.isLeader ? <AppButton label="Remove question" onPress={() => confirmAction("Remove this question?", "Its responses are removed too.", () => act(`rp:${p.id}`, () => removeStudyPrompt(st.id, p.id)), { confirmLabel: "Remove", destructive: true })} variant="tertiary" size="sm" style={{ alignSelf: "flex-start" }} /> : null}
             </View>
           ))}
           {thread({ k: "general", label: "General discussion", list: responsesFor(st.responses, {}), target: {} })}
@@ -223,10 +217,10 @@ export default function SharedStudyScreen() {
 
           <View style={[s.row, { marginTop: 12 }]}>
             {st.me.isLeader && active ? (
-              <AppButton label="Conclude study" onPress={() => confirm("Conclude this study?", "People keep their own progress. Responses stay readable, and you can continue the study later.", "Conclude", () => act("conclude", () => concludeStudy(st.id), "Study concluded."))} variant="secondary" />
+              <AppButton label="Conclude study" onPress={() => confirmAction("Conclude this study?", "People keep their own progress. Responses stay readable, and you can continue the study later.", () => act("conclude", () => concludeStudy(st.id), "Study concluded."), { confirmLabel: "Conclude", destructive: true })} variant="secondary" />
             ) : null}
             {!st.me.isHost ? (
-              <AppButton label="Leave study" onPress={() => confirm("Leave this study?", "You'll stop seeing it. Your own progress is unchanged.", "Leave", () => act("leave", async () => { await leaveStudy(st.id); router.replace("/study-together" as any); }))} variant="destructive" />
+              <AppButton label="Leave study" onPress={() => confirmAction("Leave this study?", "You'll stop seeing it. Your own progress is unchanged.", () => act("leave", async () => { await leaveStudy(st.id); router.replace("/study-together" as any); }), { confirmLabel: "Leave", destructive: true })} variant="destructive" />
             ) : null}
           </View>
         </>

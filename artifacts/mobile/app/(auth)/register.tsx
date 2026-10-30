@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +24,7 @@ import { validateUsername, formatUsername, generateUsernameSuggestions } from "@
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import type { SignUpLocation } from "@/contexts/AuthContext";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
@@ -155,10 +155,7 @@ export default function RegisterScreen() {
     // The account exists either way; only the location step failed, and it
     // was not marked verified. Say so, then carry on with registration.
     if (locationSaved === false) {
-      Alert.alert(
-        "Location not saved",
-        "Your account was created, but we couldn't save your location. You can verify it any time in Settings → Account."
-      );
+      showAlert("Location not saved", "Your account was created, but we couldn't save your location. You can verify it any time in Settings → Account.");
     }
 
     const inviteCode = await AsyncStorage.getItem(PENDING_INVITE_KEY);

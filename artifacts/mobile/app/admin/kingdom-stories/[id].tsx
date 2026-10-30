@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Image, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Image } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -24,11 +24,8 @@ import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
 import MediaDetailsEditor from "@/components/kingdom-stories/MediaDetailsEditor";
 import ImageSlots from "@/components/kingdom-stories/ImageSlots";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS) as KingdomStoryContentType[];
 
@@ -238,11 +235,7 @@ export default function EditKingdomStoryScreen() {
       try { await deleteKingdomStory(story.id); router.replace("/admin/kingdom-stories" as any); }
       catch (e: any) { showAlert("Couldn't delete", e.message ?? "Please try again."); }
     };
-    if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) doDelete(); return; }
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Move to Recycle Bin", style: "destructive", onPress: doDelete },
-    ]);
+    confirmAction(title, message, doDelete, { confirmLabel: "Move to Recycle Bin", destructive: true });
   }
 
   if (loading || !story) return <View style={styles.centerFill}><ActivityIndicator color={colors.accentGreen} /></View>;

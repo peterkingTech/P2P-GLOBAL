@@ -9,8 +9,6 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  Alert,
-  Platform,
   LayoutChangeEvent,
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
@@ -27,6 +25,7 @@ import { getPlanCategoryMeta } from "@/lib/planCategories";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -38,10 +37,6 @@ type CompletedPlan = Plan & { completedAt: string | null };
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-function alertLocked(message: string) {
-  if (Platform.OS === "web") window.alert(message);
-  else Alert.alert("Plan Locked", message);
-}
 
 // The 10 top-level plan category collections (p2p_curriculums rows with
 // type='plan_category', see migration 054_plan_categories.sql) — id/
@@ -97,7 +92,7 @@ function PlanListRow({
     <TouchableOpacity accessibilityRole="button"
       style={[styles.azRow, locked && styles.azRowLocked]}
       activeOpacity={0.85}
-      onPress={() => (locked ? alertLocked(unlockMessage ?? "Complete the previous plan first to access this plan.") : onPress())}
+      onPress={() => (locked ? showAlert("Plan Locked", unlockMessage ?? "Complete the previous plan first to access this plan.") : onPress())}
     >
       <View style={{ flex: 1 }}>
         <Text style={[styles.azRowTitle, locked && styles.azRowTitleLocked]} numberOfLines={1}>{title}</Text>

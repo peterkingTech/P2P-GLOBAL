@@ -1,21 +1,17 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Image, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
-import VideoRecorder from "@/components/VideoRecorder";
 import { createMissionStory, uploadMissionStoryVideo, uploadMissionStoryPhoto, type MissionStoryType } from "@/lib/missionsApi";
-import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { StoryMediaField, useStoryMedia, uploadStoryMedia } from "@/components/story/StoryMedia";
+import { scriptureReferenceIdFor, ScriptureInputError } from "@/lib/scriptureInput";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Server-side ADMIN_ROLES (middleware/adminAuth.ts) — mirrored here only
 // to decide whether to show this screen's submit action; the API's own
@@ -51,42 +47,22 @@ export default function CreateMissionStoryScreen() {
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
   const [scripture, setScripture] = useState("");
-  const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [photoAsset, setPhotoAsset] = useState<{ uri: string; mimeType?: string; fileName?: string | null } | null>(null);
+  const media = useStoryMedia();
   const [submitting, setSubmitting] = useState(false);
 
   const isAuthorized = !!profile?.role && ADMIN_ROLES.has(profile.role);
-
-  async function handlePickPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) { showAlert("Photo access needed", "Please allow photo library access to add a picture."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    setPhotoAsset({ uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName });
-  }
 
   async function handleSubmit(status: "draft" | "published") {
     if (!profile?.id || !title.trim() || !body.trim()) return;
     setSubmitting(true);
     try {
-      let mediaFields: { id?: string; mediaType?: "video" | "photo"; mediaPath?: string; mediaDurationSeconds?: number } = {};
-      if (videoUri) {
-        const uploaded = await uploadMissionStoryVideo(videoUri, profile.id);
-        if (!uploaded) { showAlert("Couldn't upload your video", "Please check your connection and try again."); setSubmitting(false); return; }
-        mediaFields = { id: uploaded.storyId, mediaType: "video", mediaPath: uploaded.mediaPath, mediaDurationSeconds: videoDuration };
-      } else if (photoAsset) {
-        const uploaded = await uploadMissionStoryPhoto(photoAsset, profile.id);
-        if (!uploaded) { showAlert("Couldn't upload your photo", "Please check your connection and try again."); setSubmitting(false); return; }
-        mediaFields = { id: uploaded.storyId, mediaType: "photo", mediaPath: uploaded.mediaPath };
-      }
-      let scriptureReferenceId: string | null = null;
-      if (scripture.trim()) {
-        const parsed = parseScriptureInput(scripture);
-        if (!parsed) { showAlert("Couldn't read that Scripture reference", "Try a format like \"Philippians 4:6-7\"."); setSubmitting(false); return; }
-        const ref = await createOrFindScriptureReference(parsed);
-        scriptureReferenceId = ref.id;
+      const mediaFields = await uploadStoryMedia(media, { userId: profile.id, uploadVideo: uploadMissionStoryVideo, uploadPhoto: uploadMissionStoryPhoto, idOf: (u) => u.storyId });
+      if (!mediaFields) { setSubmitting(false); return; }
+      let scriptureReferenceId: string | null;
+      try { scriptureReferenceId = await scriptureReferenceIdFor(scripture); }
+      catch (e) {
+        if (!(e instanceof ScriptureInputError)) throw e;
+        showAlert("Couldn't read that Scripture reference", e.message); setSubmitting(false); return;
       }
       await createMissionStory({
         ...mediaFields, storyType, title: title.trim(), summary: summary.trim() || null, body: body.trim(),
@@ -145,28 +121,7 @@ export default function CreateMissionStoryScreen() {
         <Text style={styles.fieldLabel}>Scripture reference (optional, e.g. Philippians 4:6-7)</Text>
         <TextInput style={styles.input} value={scripture} onChangeText={setScripture} placeholder="Book chapter:verse" placeholderTextColor={c.textMuted} />
 
-        <Text style={styles.fieldLabel}>Media (optional — a photo or a video, not both)</Text>
-        {photoAsset ? (
-          <View style={styles.photoPreviewBox}>
-            <Image source={{ uri: photoAsset.uri }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
-              <Ionicons name="close-circle" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        ) : videoUri ? (
-          <View style={styles.videoChosenBox}>
-            <Ionicons name="videocam" size={16} color={c.accentGreen} />
-            <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <AppButton label="Add Photo" onPress={handlePickPhoto} variant="outline" icon="image-outline" disabled={submitting} style={{ marginBottom: 10 }} />
-            <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
-          </>
-        )}
+        <StoryMediaField media={media} disabled={submitting} photoHeight={200} />
 
         <View style={styles.btnRow}>
           <AppButton label="Save Draft" onPress={() => handleSubmit("draft")} variant="outline" disabled={submitting || !title.trim() || !body.trim()} style={{ flex: 1 }} />

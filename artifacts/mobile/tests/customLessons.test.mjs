@@ -56,12 +56,13 @@ ok("delete offered only for a draft that was never published", /const neverPubli
 ok("archive asks first and says nothing written is lost", /Anything already written is kept\./.test(sec));
 ok("status badge + actions only for leaders", /\{canManage && \(\s*\n\s*<View style=\{\[styles\.badge/.test(sec) && /\{canManage && \(\s*\n\s*busyId === lesson\.id/.test(sec));
 
-for (const [file, T] of [["app/family/studies/[studyId].tsx", "FamilyStudy"], ["app/church/studies/[studyId].tsx", "ChurchStudy"]]) {
-  const sc = src(file);
-  ok(`${file}: uses the shared section; old inline editor removed`, /<CustomLessonSection/.test(sc) && !/lessonEditor/.test(sc) && !/lessonToFormState/.test(sc));
-  ok(`${file}: adapter calls this scope's API incl. status`, new RegExp(`setStatus: \\(lessonId, status\\) => set${T}LessonStatus\\(`).test(sc));
-}
-ok("church screen: management follows THIS study's church (server canManage), not the current church", /setCanManage\(manage \?\? isChurchLeader\);/.test(src("app/church/studies/[studyId].tsx")) && !/\{isChurchLeader \?/.test(src("app/church/studies/[studyId].tsx")));
+// Family and Church study pages are one shared screen (components/community/CommunityStudyScreen.tsx).
+const studyScreen = src("components/community/CommunityStudyScreen.tsx");
+for (const scope of ["family", "church"]) ok(`app/${scope}/studies/[studyId].tsx: the shared study screen, ${scope} scope`, src(`app/${scope}/studies/[studyId].tsx`).includes(`<CommunityStudyScreen scope="${scope}" />`));
+ok("study screen: uses the shared section; old inline editor removed", /<CustomLessonSection/.test(studyScreen) && !/lessonEditor/.test(studyScreen) && !/lessonToFormState/.test(studyScreen));
+ok("study screen: adapter calls this community's API incl. status", /setStatus: \(lessonId, status\) => api\.setLessonStatus\(/.test(studyScreen) && /communityStudyApi<CommunityStudyBase>\(scope\)/.test(studyScreen));
+ok("church: management follows THIS study's church (server canManage), not the current church", /if \(scope === "church"\) \{[\s\S]{0,250}setCanManage\(manage \?\? isChurchLeader\);/.test(studyScreen));
+ok("family: management follows that family's Shepherd / Co-Shepherd", /detail\.family\.shepherdId === profile\?\.id \|\| me\?\.role === "co_shepherd"/.test(studyScreen));
 
 // ── Viewer ───────────────────────────────────────────────────────────────
 const v = src("components/study/CustomLessonViewer.tsx");

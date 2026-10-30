@@ -1,10 +1,11 @@
 import React, { useRef, useState } from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert, Platform } from "react-native";
+import { Modal, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import ReadableText from "@/components/ReadableText";
+import { showAlert } from "@/lib/alerts";
 // expo-media-library has no web implementation (ExpoMediaLibraryNext is a
 // native-only module) — its top-level code throws immediately if loaded on
 // web, which previously crashed the ENTIRE app there (this file is pulled
@@ -48,7 +49,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
       if (!uri) throw new Error("Could not capture the card");
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        Alert.alert("Sharing unavailable", "Sharing isn't available on this device.");
+        showAlert("Sharing unavailable", "Sharing isn't available on this device.");
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -56,7 +57,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
         dialogTitle: "Share your Kingdom School completion",
       });
     } catch (e: any) {
-      Alert.alert("Couldn't share", e.message ?? "Something went wrong.");
+      showAlert("Couldn't share", e.message ?? "Something went wrong.");
     } finally {
       setBusy(null);
     }
@@ -64,22 +65,22 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
 
   async function handleSave() {
     if (!MediaLibrary) {
-      Alert.alert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
+      showAlert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
       return;
     }
     setBusy("save");
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Permission needed", "Allow photo access to save your completion card.");
+        showAlert("Permission needed", "Allow photo access to save your completion card.");
         return;
       }
       const uri = await captureImage();
       if (!uri) throw new Error("Could not capture the card");
       await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert("Saved", "Your completion card was saved to your photos.");
+      showAlert("Saved", "Your completion card was saved to your photos.");
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message ?? "Something went wrong.");
+      showAlert("Couldn't save", e.message ?? "Something went wrong.");
     } finally {
       setBusy(null);
     }

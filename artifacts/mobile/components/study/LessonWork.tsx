@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Modal, Switch, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Modal, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,11 +13,8 @@ import {
   VISIBILITY_OPTIONS, type WorkScope, type MyReflection, type SharedReflection, type Assignment, type ReflectionVisibility,
 } from "@/lib/lessonWorkApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function notify(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Under a custom lesson: your reflections (private by default — you choose if
 // leaders or the group may read each one), reflections others chose to share
@@ -120,14 +117,14 @@ function ReflectionCard({ scope, lessonId, questionId, question, latest, onSaved
     if (!draft.text.trim() || busy) return;
     setBusy(true);
     try { await submitReflection(scope, lessonId, questionId, draft.text, visibility); await draft.clear(); setEditing(false); await onSaved(); }
-    catch (e: any) { notify("Couldn't save your reflection", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't save your reflection", e?.message ?? "Please try again."); }
     finally { setBusy(false); }
   }
   async function changeVisibility(v: ReflectionVisibility) {
     setVisibility(v);
     if (!latest || editing) return;
     try { await setReflectionVisibility(latest.id, v); await onSaved(); }
-    catch (e: any) { setVisibility(latest.visibility); notify("Couldn't change who can see it", e?.message ?? "Please try again."); }
+    catch (e: any) { setVisibility(latest.visibility); showAlert("Couldn't change who can see it", e?.message ?? "Please try again."); }
   }
 
   return (

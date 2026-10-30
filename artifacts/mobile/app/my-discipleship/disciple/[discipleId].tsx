@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Platform, Alert, Modal,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,11 +15,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { timeAgo } from "@/lib/timeFormat";
+import { Avatar } from "@/components/Avatar";
 
 // Disciple Detail — My Discipleship Phase 1's primary workspace for an
 // active discipleship relationship. Single load of the new
@@ -41,19 +51,7 @@ interface DiscipleDetailData {
   nextStep: { message: string; action: "view_completion_letters" | "encourage" | "study_together" | "message" | "none" };
 }
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return "never active";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days < 1) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
-}
 
 function formatSince(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -89,7 +87,7 @@ export default function DiscipleDetailScreen() {
     setLoading(true);
     setError(false);
     try {
-      const res = await authedFetch(`/discipleship/${user.id}/disciple/${discipleId}`);
+      const res = await apiFetch(`/discipleship/${user.id}/disciple/${discipleId}`);
       if (!res.ok) { setError(true); setLoading(false); return; }
       const data = await res.json();
       setDetail(data);
@@ -197,13 +195,7 @@ export default function DiscipleDetailScreen() {
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           {/* ── Profile ── */}
           <View style={s.profileBlock}>
-            {detail.disciple.photoUrl ? (
-              <Image source={{ uri: detail.disciple.photoUrl }} style={s.avatar} />
-            ) : (
-              <View style={[s.avatar, s.avatarFallback]}>
-                <Text style={s.avatarInitial}>{detail.disciple.name.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <Avatar photoUrl={detail.disciple.photoUrl} name={detail.disciple.name} size={84} style={s.avatar} />
             <Text style={s.name}>{detail.disciple.name}</Text>
             <Text style={s.relationLabel}>Your Disciple{detail.disciple.country ? ` · ${detail.disciple.country}` : ""}</Text>
             <Text style={s.sinceText}>Walking with you since {formatSince(detail.relationship.since)}</Text>
@@ -255,7 +247,7 @@ export default function DiscipleDetailScreen() {
                 </>
               )}
               <Text style={[s.lastActiveText, detail.progress.isWilting && s.lastActiveWarn]}>
-                Last active: {timeAgo(detail.progress.lastActiveAt)}
+                Last active: {timeAgo(detail.progress.lastActiveAt, "days", { empty: "never active" })}
                 {detail.progress.isWilting ? ` — ${detail.disciple.name} hasn't been active in Kingdom School recently.` : ""}
               </Text>
             </View>

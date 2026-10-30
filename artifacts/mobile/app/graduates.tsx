@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { Avatar } from "@/components/Avatar";
 
 // Where a peer guide sees which of their active disciples have completed
 // the Core Curriculum and writes/sends each one a completion letter.
@@ -100,13 +101,7 @@ export default function GraduatesScreen() {
               activeOpacity={0.85}
               onPress={() => router.push({ pathname: "/write-completion-letter", params: { learnerId: g.id } } as any)}
             >
-              {g.photoUrl ? (
-                <Image source={{ uri: g.photoUrl }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarInitial}>{g.fullName.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
+              <Avatar photoUrl={g.photoUrl} name={g.fullName} size={44} style={styles.avatar} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.learnerName}>{g.fullName}</Text>
                 <Text style={styles.learnerMeta}>

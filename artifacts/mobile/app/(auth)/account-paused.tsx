@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Image, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const LOGO = require("@/assets/images/logo.png");
 
@@ -36,15 +37,15 @@ export default function AccountPausedScreen() {
     setBusy("reactivate");
     try {
       const path = scheduled ? "/account/deletion/cancel" : "/account/reactivate";
-      const res = await authedFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const res = await apiFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        Alert.alert("Couldn't reactivate", body.error ?? "Please try again later.");
+        showAlert("Couldn't reactivate", body.error ?? "Please try again later.");
         return;
       }
       await refreshAccountStatus();
     } catch {
-      Alert.alert("Couldn't reactivate", "Please check your connection and try again.");
+      showAlert("Couldn't reactivate", "Please check your connection and try again.");
     } finally {
       setBusy(null);
     }

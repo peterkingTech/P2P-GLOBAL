@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
 import { AppButton, IconButton } from "@/components/ui";
 import { CoverArt } from "@/components/kingdom-stories/DiscoverRow";
 import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
+import { showAlert } from "@/lib/alerts";
 
 // A Kingdom Story as a book: cover, introduction, the reader's progress,
 // Start/Continue Reading, a table of contents (each chapter's status in words
@@ -24,10 +25,6 @@ import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
 // their own screen (kingdom-stories/chapter). Locked chapters show their title
 // only — the server never sends a locked chapter's text to a reader.
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const STATE_ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
   locked: "lock-closed", available: "book-outline", in_progress: "create-outline",

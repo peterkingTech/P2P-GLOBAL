@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ComposeMessageModal } from "@/components/ComposeMessageModal";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { confirmAction } from "@/lib/alerts";
 
 // P2P Official Mail — the unified surface for Contact P2P Global (received
 // tickets, p2p_contact_messages) and Compose (sent official messages,
@@ -43,15 +45,6 @@ const COMPOSE_DEPARTMENT_LABELS: Record<ComposeDepartment, string> = {
   general_contact: "General Contact",
 };
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function getDepartmentLabel(role: string): string {
   if (role === "admin_marketing") return "Marketing";
@@ -145,15 +138,10 @@ export default function AdminEmailInbox() {
   }, [archiveContactMessage, load]);
 
   const handleDeleteDraft = useCallback((draft: OfficialMailDraft) => {
-    Alert.alert("Delete draft?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive", onPress: async () => {
+    confirmAction("Delete draft?", "This cannot be undone.", async () => {
           await deleteOfficialMailDraft(draft.id);
           setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-        },
-      },
-    ]);
+        }, { confirmLabel: "Delete", destructive: true });
   }, [deleteOfficialMailDraft]);
 
   return (
@@ -220,7 +208,7 @@ export default function AdminEmailInbox() {
                 <Text style={styles.senderName}>
                   {item.targetUsername ? `To @${item.targetUsername}` : "No recipient yet"}
                 </Text>
-                <Text style={styles.timeText}>{timeAgo(item.updatedAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.updatedAt, "ago")}</Text>
               </View>
               <Text style={styles.subject} numberOfLines={1}>{item.subject || "(No subject)"}</Text>
               <Text style={styles.preview} numberOfLines={1}>{item.body || "(No message)"}</Text>
@@ -245,7 +233,7 @@ export default function AdminEmailInbox() {
                 <Text style={styles.senderName}>
                   To @{item.recipientUsername ?? "unknown"}{item.recipientFullName ? ` · ${item.recipientFullName}` : ""}
                 </Text>
-                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt, "ago")}</Text>
               </View>
               <Text style={styles.subject} numberOfLines={1}>{item.subject}</Text>
               <Text style={styles.preview} numberOfLines={1}>{item.bodyPreview}</Text>
@@ -276,7 +264,7 @@ export default function AdminEmailInbox() {
                 <View style={styles.cardTopRow}>
                   <Text style={[styles.senderName, isUnread && styles.boldText]}>@{item.fromUsername ?? "unknown"}</Text>
                   <View style={styles.cardTopRowActions}>
-                    <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                    <Text style={styles.timeText}>{timeAgo(item.createdAt, "ago")}</Text>
                     <TouchableOpacity accessibilityRole="button" accessibilityLabel={item.isStarredByMe ? "Remove star" : "Star"} accessibilityState={{ selected: !!item.isStarredByMe }} onPress={() => handleToggleStar(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name={item.isStarredByMe ? "star" : "star-outline"} size={16} color={item.isStarredByMe ? colors.amber : colors.textMuted} />
                     </TouchableOpacity>

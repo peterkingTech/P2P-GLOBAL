@@ -12,6 +12,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { formatClock } from "@/lib/timeFormat";
 
 interface Props {
   storagePath: string;
@@ -85,12 +86,6 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
     setIsPlaying(true);
   }
 
-  function formatTime(ms: number) {
-    const s = Math.round(ms / 1000);
-    const m = Math.floor(s / 60).toString().padStart(2, "0");
-    const sec = (s % 60).toString().padStart(2, "0");
-    return `${m}:${sec}`;
-  }
 
   const progressPct = totalMillis > 0 ? Math.min(positionMillis / totalMillis, 1) : 0;
 
@@ -124,7 +119,7 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
         {durationSeconds != null && (
           <View style={styles.durationBadge}>
             <Ionicons name="videocam" size={11} color={colors.textMid} />
-            <Text style={styles.durationText}>{formatTime(durationSeconds * 1000)}</Text>
+            <Text style={styles.durationText}>{formatClock(Math.round(durationSeconds * 1000 / 1000), { padded: true })}</Text>
           </View>
         )}
       </View>
@@ -137,7 +132,7 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
         <Ionicons name="mic" size={14} color={colors.accentGreen} />
         <Text style={styles.audioLabel}>Audio Response</Text>
         {durationSeconds != null && (
-          <Text style={styles.audioDuration}>{formatTime(durationSeconds * 1000)}</Text>
+          <Text style={styles.audioDuration}>{formatClock(Math.round(durationSeconds * 1000 / 1000), { padded: true })}</Text>
         )}
       </View>
       <View style={styles.progressRow}>
@@ -147,7 +142,7 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progressPct * 100}%` }]} />
         </View>
-        <Text style={styles.progressTime}>{formatTime(positionMillis)}</Text>
+        <Text style={styles.progressTime}>{formatClock(Math.round(positionMillis / 1000), { padded: true })}</Text>
       </View>
     </View>
   );

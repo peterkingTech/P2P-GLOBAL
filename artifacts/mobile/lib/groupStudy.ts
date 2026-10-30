@@ -1,25 +1,11 @@
-import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "./apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Study Together C3 — Group Study Together. Same scoped real-identity
 // exception C2's callInvitations.ts introduced: these endpoints verify the
 // caller's actual Supabase session server-side, never a body-supplied id.
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify(body ?? {}),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
-  return data as T;
-}
+const post = <T,>(path: string, body?: unknown) =>
+  apiRequest<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) }, { fallbackError: "Something went wrong." });
 
 export interface GroupStudyParticipant { userId: string; name: string }
 
@@ -39,10 +25,7 @@ export interface CurrentGroupStudy {
 }
 
 export async function getCurrentGroupStudy(callId: string): Promise<CurrentGroupStudy> {
-  const res = await fetch(`${getApiUrl()}/calls/${callId}/study/current`, { headers: await authHeaders() });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Couldn't load the current study session.");
-  return data;
+  return apiRequest(`/calls/${callId}/study/current`, {}, { fallbackError: "Couldn't load the current study session." });
 }
 
 export async function startGroupStudy(callId: string, lessonId: string, moduleId: string, title: string): Promise<{ sessionId: string; leaderId: string }> {

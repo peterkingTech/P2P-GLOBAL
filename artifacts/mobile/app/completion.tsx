@@ -7,7 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import LivingTree from "@/components/LivingTree";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -249,7 +249,7 @@ function Phase2Letter({ learnerId, learnerName, onContinue }: { learnerId: strin
       try {
         const { data: link } = await supabase.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", learnerId).eq("active", true).maybeSingle();
         if (link?.mentor_id) {
-          await authedFetch("/discipleship/notify-user", {
+          await apiFetch("/discipleship/notify-user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

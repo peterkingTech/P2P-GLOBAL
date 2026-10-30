@@ -1,8 +1,7 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { accessToken, apiFetch } from "@/lib/apiClient";
 
 // Opening a chat clears THAT chat's message notifications — the tray entries
 // on this phone and the in-app Notification Center rows — and nothing else:
@@ -44,12 +43,8 @@ async function writePending(ids: string[]) {
 /** Marks this chat's unread message notifications read on the server (own rows only). */
 async function markConversationNotificationsRead(conversationId: string): Promise<boolean> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) return false;
-    const res = await fetch(`${getApiUrl()}/notifications/me/conversations/${encodeURIComponent(conversationId)}/read`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!(await accessToken())) return false;
+    const res = await apiFetch(`/notifications/me/conversations/${encodeURIComponent(conversationId)}/read`, { method: "POST" });
     return res.ok || res.status === 404; // 404 = not a valid id: nothing to retry
   } catch { return false; }
 }

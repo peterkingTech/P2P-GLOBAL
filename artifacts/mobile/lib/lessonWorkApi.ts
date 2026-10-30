@@ -1,5 +1,4 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Reflections + assignments on custom lessons (api-server routes/lessonWork.ts,
 // migration 201). Identity is the signed-in session; the server checks
@@ -9,17 +8,7 @@ export type WorkScope = "family" | "church";
 export type ReflectionVisibility = "private" | "leaders" | "group";
 export type SubmissionStatus = "submitted" | "reviewed" | "returned";
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}/learning/work${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error((body as { error?: string }).error ?? "Request failed"), { status: res.status });
-  return body as T;
-}
+const call = <T,>(path: string, init?: RequestInit) => apiRequest<T>(path, init, { base: "/learning/work" });
 
 export interface MyReflection { id: string; questionId: string; content: string; visibility: ReflectionVisibility; lessonVersion: number | null; submittedAt: string }
 export interface SharedReflection extends MyReflection { question: string; author: { id: string; name: string; photoUrl: string | null } }

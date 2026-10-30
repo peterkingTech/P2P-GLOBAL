@@ -70,10 +70,10 @@ ok("real sharing kept: Gathering room invite + family invite links/QR", /<ShareR
 const inbox = src("app/(tabs)/messages.tsx");
 ok("Messages: 'Family & Church' tab filters the two new conversation types", /\{ key: "family_church", label: "Family & Church" \}/.test(inbox)
   && /c\.conversationType === "family" \|\| c\.conversationType === "church"/.test(inbox) && /family_church: \{ title:/.test(inbox));
-ok("ConversationType includes family + church", /"circle" \| "family" \| "church";/.test(src("contexts/DataContext.tsx")));
+ok("ConversationType includes family + church (data types, re-exported by DataContext)", /"circle" \| "family" \| "church";/.test(src("contexts/data/types.ts")) && src("contexts/DataContext.tsx").includes('export * from "./data/types";'));
 const ctx = src("contexts/DataContext.tsx"), church = src("app/church/index.tsx");
 ok("church: all churches + conversation loaded from my-church", /setUserChurches\(Array\.isArray\(body\?\.churches\) \? body\.churches : \[\]\);/.test(ctx) && /setChurchConversationId\(body\?\.conversationId \?\? null\);/.test(ctx));
-ok("church: switch via PUT /churches/current, then reload", /authedFetch\("\/churches\/current", \{\s*\n\s*method: "PUT"/.test(ctx) && /await loadUserChurch\(\);\s*\n\s*return null;/.test(ctx));
+ok("church: switch via PUT /churches/current, then reload", /apiFetch\("\/churches\/current", \{\s*\n\s*method: "PUT"/.test(ctx) && /await loadUserChurch\(\);\s*\n\s*return null;/.test(ctx));
 ok("church hub: switcher only with 2+ churches; Church chat only when in it", /\{userChurches\.length > 1 && \(/.test(church) && /\{churchConversationId && \(/.test(church));
 
 // Child/teen safeguards: a refused message shows the reason, never the internal marker.

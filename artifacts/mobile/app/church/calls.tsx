@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Alert, Platform, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Modal, Switch } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,19 +12,11 @@ import {
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
+import { showAlert } from "@/lib/alerts";
+import { formatDuration, secondsBetween } from "@/lib/timeFormat";
 
 function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-}
-function formatDuration(startedAt: string, endedAt: string | null): string {
-  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const mins = Math.max(0, Math.round((end - new Date(startedAt).getTime()) / 60000));
-  const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}h ${mins % 60}m` : `${mins}m`;
 }
 
 const PURPOSES: ChurchCallPurpose[] = ["meeting", "teaching", "bible_study", "prayer", "leadership", "small_group", "fellowship", "church_gathering", "other"];
@@ -173,7 +165,7 @@ export default function ChurchCallsScreen() {
                 <View style={styles.liveDot} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle} numberOfLines={1}>{c.title}</Text>
-                  <Text style={styles.cardSub}>{CHURCH_CALL_PURPOSE_LABELS[c.purpose]} · {formatDuration(c.startedAt!, null)}</Text>
+                  <Text style={styles.cardSub}>{CHURCH_CALL_PURPOSE_LABELS[c.purpose]} · {formatDuration(secondsBetween(c.startedAt!, null), "hourMinRounded")}</Text>
                 </View>
                 <Text style={styles.joinText}>Join →</Text>
               </TouchableOpacity>
@@ -208,7 +200,7 @@ export default function ChurchCallsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle} numberOfLines={1}>{c.title}</Text>
                   <Text style={styles.cardSub}>
-                    {CHURCH_CALL_PURPOSE_LABELS[c.purpose]} · {formatWhen(c.startedAt!)} · {formatDuration(c.startedAt!, c.endedAt)}
+                    {CHURCH_CALL_PURPOSE_LABELS[c.purpose]} · {formatWhen(c.startedAt!)} · {formatDuration(secondsBetween(c.startedAt!, c.endedAt), "hourMinRounded")}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />

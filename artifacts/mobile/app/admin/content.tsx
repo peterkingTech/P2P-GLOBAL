@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { confirmAction } from "@/lib/alerts";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -93,14 +94,11 @@ function PrayerSection() {
   useEffect(() => { loadPosts(); }, [loadPosts]);
 
   const removePost = (post: PrayerPostRow) => {
-    Alert.alert("Remove Post", "Remove this post from the prayer wall?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction("Remove Post", "Remove this post from the prayer wall?", async () => {
         const { error } = await supabase.from("p2p_prayer_wall_posts").delete().eq("id", post.id);
         if (error) Alert.alert("Error", error.message);
         else setPosts(prev => prev.filter(p => p.id !== post.id));
-      }},
-    ]);
+      }, { confirmLabel: "Remove", destructive: true });
   };
 
   const filteredPosts = posts.filter(p => filter === "all" || p.post_type === filter);

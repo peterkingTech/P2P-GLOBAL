@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Image, ScrollView } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Modal, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { showAlert } from "@/lib/alerts";
 
 type Tab = "queue" | "history" | "stats";
 
@@ -56,15 +58,6 @@ const ACTION_LABELS: Record<string, { label: string; icon: keyof typeof Ionicons
   withdrawn: { label: "Withdrawn", icon: "arrow-undo-circle", color: colors.textMuted },
 };
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export default function AdminVerificationScreen() {
   const [tab, setTab] = useState<Tab>("queue");
@@ -91,7 +84,7 @@ export default function AdminVerificationScreen() {
   const loadQueue = useCallback(async () => {
     setQueueLoading(true);
     try {
-      const res = await authedFetch("/admin/verification/queue");
+      const res = await apiFetch("/admin/verification/queue");
       setQueue(res.ok ? await res.json() : []);
     } finally {
       setQueueLoading(false);
@@ -101,7 +94,7 @@ export default function AdminVerificationScreen() {
   const loadHistory = useCallback(async (q: string) => {
     setHistoryLoading(true);
     try {
-      const res = await authedFetch(`/admin/verification/history${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const res = await apiFetch(`/admin/verification/history${q ? `?q=${encodeURIComponent(q)}` : ""}`);
       setHistoryRows(res.ok ? await res.json() : []);
     } finally {
       setHistoryLoading(false);
@@ -111,7 +104,7 @@ export default function AdminVerificationScreen() {
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const res = await authedFetch("/admin/verification/stats");
+      const res = await apiFetch("/admin/verification/stats");
       setStats(res.ok ? await res.json() : null);
     } finally {
       setStatsLoading(false);
@@ -140,7 +133,7 @@ export default function AdminVerificationScreen() {
     setOutcome(null);
     setDetailLoading(true);
     try {
-      const res = await authedFetch(`/admin/verification/queue/${applicationId}`);
+      const res = await apiFetch(`/admin/verification/queue/${applicationId}`);
       if (res.ok) setDetail(await res.json());
     } finally {
       setDetailLoading(false);
@@ -157,10 +150,10 @@ export default function AdminVerificationScreen() {
     if (!detail) return;
     setActing(true);
     try {
-      const res = await authedFetch(`/admin/verification/approve/${detail.applicationId}`, {
+      const res = await apiFetch(`/admin/verification/approve/${detail.applicationId}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: notes.trim() || undefined }),
       });
-      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't approve", body.error ?? "Something went wrong"); return; }
+      if (!res.ok) { const body = await res.json(); showAlert("Couldn't approve", body.error ?? "Something went wrong"); return; }
       setOutcome({ kind: "approved", username: detail.username });
       setQueue((prev) => prev.filter((q) => q.applicationId !== detail.applicationId));
     } finally {
@@ -172,10 +165,10 @@ export default function AdminVerificationScreen() {
     if (!detail) return;
     setActing(true);
     try {
-      const res = await authedFetch(`/admin/verification/decline/${detail.applicationId}`, {
+      const res = await apiFetch(`/admin/verification/decline/${detail.applicationId}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }),
       });
-      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't decline", body.error ?? "Something went wrong"); return; }
+      if (!res.ok) { const body = await res.json(); showAlert("Couldn't decline", body.error ?? "Something went wrong"); return; }
       setOutcome({ kind: "declined", username: detail.username });
       setQueue((prev) => prev.filter((q) => q.applicationId !== detail.applicationId));
     } finally {
@@ -220,7 +213,7 @@ export default function AdminVerificationScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardUsername}>{item.username ? `@${item.username}` : "(no username)"}</Text>
                   <Text style={styles.cardSub}>{item.displayName ?? "Unnamed"}{item.country ? ` · ${item.country}` : ""}</Text>
-                  <Text style={styles.cardSub}>{item.method === "video_selfie" ? "Video selfie" : "Selfie with note"} · Submitted {timeAgo(item.submittedAt)}</Text>
+                  <Text style={styles.cardSub}>{item.method === "video_selfie" ? "Video selfie" : "Selfie with note"} · Submitted {timeAgo(item.submittedAt, "ago")}</Text>
                   <Text style={styles.cardSub}>Account age: {item.accountAgeDays ?? "?"} days · Attempt {item.attemptNumber}</Text>
                 </View>
                 <AppButton label="Review" icon="arrow-forward" iconPosition="trailing" onPress={() => openReview(item.applicationId)} variant="outline" size="sm" palette="fixedLight" />

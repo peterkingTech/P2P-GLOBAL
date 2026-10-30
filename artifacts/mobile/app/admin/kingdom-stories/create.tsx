@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import colors from "@/constants/colors";
 import {
@@ -7,11 +7,8 @@ import {
   type KingdomStoryCategory, type KingdomStoryContentType,
 } from "@/lib/kingdomStoriesApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS) as KingdomStoryContentType[];
 

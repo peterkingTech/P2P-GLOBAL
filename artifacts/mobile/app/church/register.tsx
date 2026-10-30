@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Platform, Modal, FlatList, Image } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Modal, FlatList, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 const CHURCH_TYPES = [
   { value: "local_church", label: "Local Church" },
   { value: "christian_fellowship", label: "Christian Fellowship" },
@@ -131,7 +132,7 @@ export default function RegisterChurchScreen() {
   async function handlePickLogo() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission needed", "Please allow photo library access to add a church logo.");
+      showAlert("Permission needed", "Please allow photo library access to add a church logo.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -148,7 +149,7 @@ export default function RegisterChurchScreen() {
       const { error: uploadError } = await supabase.storage
         .from("church-media")
         .upload(path, arrayBuffer, { contentType, upsert: true });
-      if (uploadError) { Alert.alert("Upload failed", uploadError.message); return; }
+      if (uploadError) { showAlert("Upload failed", uploadError.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);
       setLogoUrl(`${data.publicUrl}?t=${Date.now()}`);
     } finally {
@@ -185,7 +186,7 @@ export default function RegisterChurchScreen() {
     });
     setSubmitting(false);
     if (error || !church) {
-      Alert.alert("Couldn't register church", error ?? "Please try again.");
+      showAlert("Couldn't register church", error ?? "Please try again.");
       return;
     }
     setCreatedChurch(church);
@@ -210,7 +211,7 @@ export default function RegisterChurchScreen() {
         </View>
         <Text style={styles.helperText}>Share this link with your congregation to invite them to your church community.</Text>
 
-        <AppButton label="Copy Invite Link" onPress={async () => { await Clipboard.setStringAsync(createdChurch.inviteLink); Alert.alert("Copied", "Invite link copied to clipboard."); }} variant="outline" icon="copy-outline" style={{ marginTop: 12 }} palette="fixedLight" />
+        <AppButton label="Copy Invite Link" onPress={async () => { await Clipboard.setStringAsync(createdChurch.inviteLink); showAlert("Copied", "Invite link copied to clipboard."); }} variant="outline" icon="copy-outline" style={{ marginTop: 12 }} palette="fixedLight" />
         <AppButton label="Share Invite Link" onPress={() => shareChurchInvite({ name: createdChurch.name, inviteLink: createdChurch.inviteLink, city: createdChurch.city ?? "", country: createdChurch.country })} variant="outline" icon="share-outline" style={{ marginTop: 12 }} palette="fixedLight" />
 
         <View style={{ marginTop: 12 }}>

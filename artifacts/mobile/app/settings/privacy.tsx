@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Platform, Switch, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Platform, Switch } from "react-native";
 import { getMyActivityVisibility, setMyActivityVisibility } from "@/lib/presence";
 import { getReadReceiptsEnabled, receiptsAvailable, setReadReceiptsEnabled } from "@/lib/messageReceiptsApi";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,7 @@ import { useAuth, UserProfile } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { showAlert } from "@/lib/alerts";
 
 const TOGGLES: { key: keyof UserProfile; label: string; desc: string }[] = [
   { key: "visibleToChurchLeadership", label: "Profile visible to church leadership", desc: "Church leaders in your network can view your profile" },
@@ -42,8 +43,7 @@ export default function PrivacySettingsScreen() {
     const err = await setReadReceiptsEnabled(supabase, next);
     if (err) {
       setReadReceipts(!next);
-      if (Platform.OS === "web") window.alert("Couldn't save this setting. Please try again.");
-      else Alert.alert("Couldn't save", "Please try again.");
+      showAlert("Couldn't save", "This setting wasn't saved. Please try again.");
     }
   }
 
@@ -52,8 +52,7 @@ export default function PrivacySettingsScreen() {
     const ok = await setMyActivityVisibility(next);
     if (!ok) {
       setShowActivity(!next);
-      if (Platform.OS === "web") window.alert("Couldn't save this setting. Please try again.");
-      else Alert.alert("Couldn't save", "Please try again.");
+      showAlert("Couldn't save", "This setting wasn't saved. Please try again.");
     }
   }
 

@@ -1,31 +1,14 @@
 import type { GatheringFollowUp } from "@/lib/groupLearningApi";
-import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Every route on the server side (routes/family.ts, routes/familyWorship.ts)
 // resolves identity via verifyCaller() — a real Supabase JWT — never a
 // client-supplied id. This is the one place that attaches it, mirroring
 // the exact pattern already used by DataContext.tsx's getMyNotifications().
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    // Distinguishes "no/invalid session" (401) from every other failure so
-    // callers can show "please sign in again" instead of the raw technical
-    // string the server sends ("Unauthorized") — see FamilyApiError below.
-    throw new FamilyApiError((body as { error?: string }).error ?? "Request failed", res.status);
-  }
-  return body;
-}
+// A failed request throws FamilyApiError, which tells "no/invalid session" (401)
+// apart from other failures so callers can say "please sign in again".
+const authedFetch = (path: string, init?: RequestInit) => apiRequest(path, init, { makeError: (message, status) => new FamilyApiError(message, status) });
 
 export class FamilyApiError extends Error {
   status: number;
@@ -50,6 +33,10 @@ export interface FamilyInvitation { id: string; family_id: string; invited_by: s
 // A user may belong to several families at once — "My Family" represents
 // all of the user's family relationships, not one single identity.
 export interface FamilySummary { family: Family; myRole: FamilyRole; memberCount: number }
+/** How each family role is shown to people. */
+export const FAMILY_ROLE_LABELS: Record<string, string> = {
+  shepherd: "Family Circle Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
+};
 export interface MyFamiliesResponse {
   families: FamilySummary[]; pendingInvitations: FamilyInvitation[];
 }

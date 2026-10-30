@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,15 +7,12 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import { getTestimony, type PrayerTestimony } from "@/lib/prayerTestimonyApi";
-import TestimonyVideoPlayer from "@/components/TestimonyVideoPlayer";
+import { getTestimony, type PrayerTestimony, getTestimonySignedUrl } from "@/lib/prayerTestimonyApi";
+import VideoPlayer from "@/components/media/VideoPlayer";
 import ReadableText from "@/components/ReadableText";
 import { openScripture } from "@/lib/openScripture";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Real growth actions only — never likes/followers/viral ranking (Stage 6
 // instruction). Each row navigates to an EXISTING system; nothing here is
@@ -43,20 +40,10 @@ export default function TestimonyDetailScreen() {
 
   function handleReport() {
     if (!testimony) return;
-    Alert.alert(
-      "Report this testimony?",
-      "A moderator will review it.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Report", style: "destructive",
-          onPress: async () => {
+    confirmAction("Report this testimony?", "A moderator will review it.", async () => {
             const err = await reportContent("prayer_testimony", testimony.id, "Reported from testimony feed");
             showAlert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
-          },
-        },
-      ]
-    );
+          }, { confirmLabel: "Report", destructive: true });
   }
 
   async function handleEncourage() {
@@ -113,7 +100,7 @@ export default function TestimonyDetailScreen() {
 
         {testimony.mediaType === "video" && testimony.mediaPath && (
           <View style={{ marginTop: 14 }}>
-            <TestimonyVideoPlayer mediaPath={testimony.mediaPath} durationSeconds={testimony.mediaDurationSeconds} />
+            <VideoPlayer mediaPath={testimony.mediaPath} resolveUrl={getTestimonySignedUrl} durationSeconds={testimony.mediaDurationSeconds} horizontalPadding={64} />
           </View>
         )}
 
@@ -137,9 +124,9 @@ export default function TestimonyDetailScreen() {
             <Text style={styles.actionText}>Pray</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/curriculum" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/kingdom-school" as any)}>
             <Ionicons name="book-outline" size={18} color={c.accentGreen} />
-            <Text style={styles.actionText}>Study</Text>
+            <Text style={styles.actionText}>Study in Kingdom School</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/my-discipleship/journey" as any)}>

@@ -1,95 +1,18 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { communityStudyApi, type CommunityStudyBase, type CommunityStudyLesson } from "@/lib/communityStudyApi";
 
-// Mirrors lib/churchStudyApi.ts's authedFetch exactly, kept as its own
-// local copy per this codebase's existing convention.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
+// Family Circle custom studies — the family view of lib/communityStudyApi
+// (routes/familyStudies.ts; membership and leadership are enforced on the server).
+export type { CustomStudyStatus, CustomStudyMedia } from "@/lib/communityStudyApi";
+export interface FamilyStudy extends CommunityStudyBase { familyId: string }
+export type FamilyStudyLesson = CommunityStudyLesson;
 
-export type CustomStudyStatus = "draft" | "published" | "archived";
-
-export interface CustomStudyMedia { provider: string; id: string; url: string | null }
-
-export interface FamilyStudy {
-  id: string; familyId: string; createdBy: string | null;
-  title: string; description: string | null; status: CustomStudyStatus;
-  orderIndex: number; createdAt: string; updatedAt: string;
-}
-
-export interface FamilyStudyLesson {
-  id: string; studyId: string; title: string; description: string | null;
-  scriptureReferences: unknown[]; teachingMaterial: string | null;
-  questions: unknown[]; prayerFocus: string | null; media: CustomStudyMedia | null;
-  orderIndex: number; createdAt: string; updatedAt: string;
-  // Authoring (migration 200): per-lesson status, version, tags, links.
-  status?: "draft" | "published" | "archived"; publishedAt?: string | null; version?: number;
-  tags?: string[]; resources?: { title: string; url: string }[];
-}
-
-export function getFamilyStudies(familyId: string): Promise<FamilyStudy[]> {
-  return authedFetch(`/family/${familyId}/studies`);
-}
-
-export function getFamilyStudy(studyId: string): Promise<{ study: FamilyStudy; lessons: FamilyStudyLesson[]; canManage?: boolean }> {
-  return authedFetch(`/family/studies/${studyId}`);
-}
-
-export function createFamilyStudy(familyId: string, title: string, description?: string): Promise<FamilyStudy> {
-  return authedFetch(`/family/${familyId}/studies`, { method: "POST", body: JSON.stringify({ title, description }) });
-}
-
-export function updateFamilyStudy(
-  studyId: string,
-  updates: { title?: string; description?: string | null; status?: CustomStudyStatus; orderIndex?: number }
-): Promise<FamilyStudy> {
-  return authedFetch(`/family/studies/${studyId}`, { method: "PUT", body: JSON.stringify(updates) });
-}
-
-export function archiveFamilyStudy(studyId: string): Promise<FamilyStudy> {
-  return authedFetch(`/family/studies/${studyId}/archive`, { method: "POST" });
-}
-
-export function addFamilyStudyLesson(
-  studyId: string,
-  lesson: {
-    title: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
-    questions?: unknown[]; prayerFocus?: string | null; orderIndex?: number; media?: CustomStudyMedia | null;
-    tags?: string[]; resources?: { title: string; url: string }[]; status?: "published";
-  }
-): Promise<FamilyStudyLesson> {
-  return authedFetch(`/family/studies/${studyId}/lessons`, { method: "POST", body: JSON.stringify(lesson) });
-}
-
-export function updateFamilyStudyLesson(
-  studyId: string,
-  lessonId: string,
-  updates: {
-    title?: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
-    questions?: unknown[]; prayerFocus?: string | null; media?: CustomStudyMedia | null; orderIndex?: number;
-    tags?: string[]; resources?: { title: string; url: string }[];
-  }
-): Promise<FamilyStudyLesson> {
-  return authedFetch(`/family/studies/${studyId}/lessons/${lessonId}`, { method: "PUT", body: JSON.stringify(updates) });
-}
-
-export function removeFamilyStudyLesson(studyId: string, lessonId: string): Promise<{ removed: true }> {
-  return authedFetch(`/family/studies/${studyId}/lessons/${lessonId}`, { method: "DELETE" });
-}
-
-// Draft / published / archived for one lesson (leaders only; server-enforced).
-export function setFamilyStudyLessonStatus(studyId: string, lessonId: string, status: "draft" | "published" | "archived"): Promise<FamilyStudyLesson> {
-  return authedFetch(`/family/studies/${studyId}/lessons/${lessonId}/status`, { method: "POST", body: JSON.stringify({ status }) });
-}
+const api = communityStudyApi<FamilyStudy>("family");
+export const getFamilyStudies = api.getStudies;
+export const getFamilyStudy = api.getStudy;
+export const createFamilyStudy = api.createStudy;
+export const updateFamilyStudy = api.updateStudy;
+export const archiveFamilyStudy = api.archiveStudy;
+export const addFamilyStudyLesson = api.addLesson;
+export const updateFamilyStudyLesson = api.updateLesson;
+export const removeFamilyStudyLesson = api.removeLesson;
+export const setFamilyStudyLessonStatus = api.setLessonStatus;

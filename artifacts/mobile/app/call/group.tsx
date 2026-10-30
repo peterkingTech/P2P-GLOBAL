@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, AppState } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView, AppState } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +9,7 @@ import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,6 +17,7 @@ import { getP2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { AppButton, IconButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; country?: string | null }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -29,10 +30,6 @@ interface Question { id: string; question: string }
 type SignalType = "mute_all" | "remove_user" | "next_question" | "mark_discussed" | "hand_raised" | "hand_acknowledged" | "pass_host" | "session_ending" | "reaction";
 interface Signal { type: SignalType; from: string; data?: any }
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // P2P Calling Stage 2 — network recovery/continuity, mirrors the existing
 // audio.tsx/video.tsx reconnect-grace pattern (previously only wired for
@@ -440,7 +437,7 @@ export default function GroupCallScreen() {
   async function muteAll() {
     if (!params.circleId) return;
     try {
-      const res = await authedFetch(`/calls/circle/${params.circleId}/mute-all`, { method: "POST" });
+      const res = await apiFetch(`/calls/circle/${params.circleId}/mute-all`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as { error?: string }));
         showAlert("Couldn't mute everyone", body.error ?? "You may not have permission to do this.");
@@ -454,15 +451,12 @@ export default function GroupCallScreen() {
     showAlert("Muted everyone", "All participants except you have been muted.");
   }
   function removeParticipant(member: CircleMember) {
-    Alert.alert(`Remove ${member.name}?`, "They'll be disconnected from this session.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${member.name}?`, "They'll be disconnected from this session.", async () => {
           // Stage 23 — same server-authorized-before-broadcast pattern as
           // muteAll above.
           if (!params.circleId) return;
           try {
-            const res = await authedFetch(`/calls/circle/${params.circleId}/remove-participant`, {
+            const res = await apiFetch(`/calls/circle/${params.circleId}/remove-participant`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ targetUserId: member.userId }),
@@ -477,15 +471,10 @@ export default function GroupCallScreen() {
             return;
           }
           sendSignal("remove_user", { userId: member.userId });
-        },
-      },
-    ]);
+        }, { confirmLabel: "Remove", destructive: true });
   }
   function passHost(member: CircleMember) {
-    Alert.alert(`Make ${member.name} the host?`, "They'll control questions and session settings for the rest of this call.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Pass Host", onPress: () => { sendSignal("pass_host", { newHostId: member.userId }); setInCallHostId(member.userId); } },
-    ]);
+    confirmAction(`Make ${member.name} the host?`, "They'll control questions and session settings for the rest of this call.", () => { sendSignal("pass_host", { newHostId: member.userId }); setInCallHostId(member.userId); }, { confirmLabel: "Pass Host" });
   }
   function markDiscussed() {
     const q = questions[questionIndex];

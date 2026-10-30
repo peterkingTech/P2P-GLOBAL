@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { validateUsername, formatUsername, generateUsernameSuggestions } from "@/lib/username";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // Mandatory, unskippable username-setup step for accounts that predate the
 // @username system, or that an admin has force-flagged via Admin >
@@ -71,7 +72,7 @@ export default function UsernameSetupScreen() {
     const err = await updateUsername(formatUsername(username));
     setSaving(false);
     if (err) {
-      Alert.alert("Couldn't save username", err);
+      showAlert("Couldn't save username", err);
       return;
     }
     await refreshProfile();

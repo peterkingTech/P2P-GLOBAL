@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, Modal, FlatList } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 const TIMEFRAME_OPTIONS: { value: LearningGoalTimeframe; label: string }[] = [
   { value: "today", label: "Today" }, { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" }, { value: "custom", label: "Custom" },
@@ -57,10 +58,10 @@ export default function ChurchLearningGoalsScreen() {
 
   async function handleCreate() {
     if (!userChurch || !title.trim()) return;
-    if (level === "module" && !moduleId) { Alert.alert("Choose a module"); return; }
-    if (level === "lesson" && !lessonId) { Alert.alert("Choose a lesson"); return; }
-    if (level === "curriculum" && !curriculumId) { Alert.alert("No curriculum available yet"); return; }
-    if (timeframe === "custom" && (!customStart.trim() || !customEnd.trim())) { Alert.alert("Enter a start and end date"); return; }
+    if (level === "module" && !moduleId) { showAlert("Choose a module", ""); return; }
+    if (level === "lesson" && !lessonId) { showAlert("Choose a lesson", ""); return; }
+    if (level === "curriculum" && !curriculumId) { showAlert("No curriculum available yet", ""); return; }
+    if (timeframe === "custom" && (!customStart.trim() || !customEnd.trim())) { showAlert("Enter a start and end date", ""); return; }
 
     setSubmitting(true);
     const { goal, error } = await createLearningGoal(userChurch.id, {
@@ -74,7 +75,7 @@ export default function ChurchLearningGoalsScreen() {
       targetType, targetValue: Number(targetValue) || 0,
     });
     setSubmitting(false);
-    if (error || !goal) { Alert.alert("Couldn't create learning goal", error ?? "Please try again."); return; }
+    if (error || !goal) { showAlert("Couldn't create learning goal", error ?? "Please try again."); return; }
     setCreating(false);
     resetForm();
     load();
@@ -83,7 +84,7 @@ export default function ChurchLearningGoalsScreen() {
   async function handleArchive(goalId: string) {
     if (!userChurch) return;
     const err = await updateLearningGoal(userChurch.id, goalId, { status: "archived" });
-    if (err) Alert.alert("Couldn't archive goal", err);
+    if (err) showAlert("Couldn't archive goal", err);
     else load();
   }
 

@@ -1,4 +1,4 @@
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 
 // Publishing Studio client (api-server routes/studio.ts, migration 188).
 // Every read and write goes through /api/studio, which checks the caller's
@@ -90,7 +90,7 @@ export function errorKindForStatus(status: number): StudioErrorKind {
 }
 
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
-let fetcher: Fetcher = authedFetch;
+let fetcher: Fetcher = apiFetch;
 /** Tests only: replace the network layer. */
 export function __setStudioFetcher(f: Fetcher) { fetcher = f; }
 

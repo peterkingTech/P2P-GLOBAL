@@ -1,24 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  getMyFamilies, createFamily, respondToFamilyInvitation,
+  getMyFamilies, createFamily, respondToFamilyInvitation, FAMILY_ROLE_LABELS,
   type MyFamiliesResponse, FamilyApiError,
 } from "@/lib/familyApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
-const ROLE_LABEL: Record<string, string> = {
-  shepherd: "Family Circle Shepherd", co_shepherd: "Co-Shepherd", adult: "Adult", teen: "Teen", child: "Child",
-};
+const ROLE_LABEL = FAMILY_ROLE_LABELS;
 
 // MY FAMILIES — a user may belong to several families at once (a Member of
 // one, a Shepherd of another), so this is a list of independent family

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,18 +9,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import {
   getKingdomWin, reactToKingdomWin, unreactToKingdomWin,
-  KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomWin, type KingdomReactionType,
-} from "@/lib/kingdomWinsApi";
+  KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomWin, type KingdomReactionType, getKingdomWinMediaSignedUrl } from "@/lib/kingdomWinsApi";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
-import KingdomWinVideoPlayer from "@/components/KingdomWinVideoPlayer";
+import VideoPlayer from "@/components/media/VideoPlayer";
 import SignedPhotoView from "@/components/SignedPhotoView";
 import { openScripture } from "@/lib/openScripture";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const REACTIONS: { key: KingdomReactionType; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { key: "praying", icon: "hand-left-outline", label: "Pray" },
@@ -78,16 +74,10 @@ export default function KingdomWinDetailScreen() {
 
   function handleReport() {
     if (!entry) return;
-    Alert.alert("Report this story?", "A moderator will review it.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Report", style: "destructive",
-        onPress: async () => {
+    confirmAction("Report this story?", "A moderator will review it.", async () => {
           const errMsg = await reportContent("kingdom_win", entry.id, "Reported from Kingdom Wins");
           showAlert(errMsg ? "Couldn't send report" : "Reported", errMsg || "A moderator will review this.");
-        },
-      },
-    ]);
+        }, { confirmLabel: "Report", destructive: true });
   }
 
   if (loading) return <View style={[styles.screen, styles.centerFill]}><Stack.Screen options={{ headerShown: false }} /><ActivityIndicator color={c.accentGreen} /></View>;
@@ -118,7 +108,7 @@ export default function KingdomWinDetailScreen() {
           <Text style={styles.authorText}>{entry.isAnonymous ? "Anonymous" : entry.authorName ?? "A peer"}</Text>
         </View>
 
-        {entry.mediaType === "video" && entry.mediaPath && <View style={{ marginTop: 14 }}><KingdomWinVideoPlayer mediaPath={entry.mediaPath} /></View>}
+        {entry.mediaType === "video" && entry.mediaPath && <View style={{ marginTop: 14 }}><VideoPlayer resolveUrl={getKingdomWinMediaSignedUrl} mediaPath={entry.mediaPath} /></View>}
         {entry.mediaType === "photo" && entry.mediaPath && <View style={{ marginTop: 14 }}><SignedPhotoView bucket="kingdom-wins-media" path={entry.mediaPath} /></View>}
 
         <Text style={styles.body}>{entry.body}</Text>

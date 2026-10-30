@@ -12,7 +12,7 @@ import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { useStudySession, StudyLessonMeta, StudySessionSummary as StudySummary, OtherParticipant } from "@/hooks/useStudySession";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { resolveCallParticipants, CallParticipant } from "@/lib/callParticipants";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { startCallBackgroundSupport, stopCallBackgroundSupport } from "@/lib/callBackgroundSupport";
@@ -36,28 +36,16 @@ import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
 import { useTheme } from "@/contexts/ThemeContext";
 import { withAlpha } from "@/lib/colorUtils";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { formatClock } from "@/lib/timeFormat";
+import CallNoAnswerView, { type UnansweredOutcome } from "@/components/call/CallNoAnswerView";
 
 // Alert.alert on native is fire-and-forget — it returns immediately rather
 // than waiting for the user to dismiss it. Callers that need cleanup/
 // navigation to happen only AFTER the user has actually seen and dismissed
 // the dialog (not racing it) must pass onDismiss rather than run that logic
 // right after calling showAlert.
-function showAlert(title: string, message: string, onDismiss?: () => void) {
-  if (Platform.OS === "web") {
-    window.alert(`${title}\n\n${message}`);
-    onDismiss?.();
-  } else {
-    Alert.alert(title, message, onDismiss ? [{ text: "OK", onPress: onDismiss }] : undefined);
-  }
-}
 
-function formatClock(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
 
 // Caller side only — mirrors incoming.tsx's RING_TIMEOUT_MS (30s) on the
 // recipient's screen. Without this, "Calling…" only ever ends via Agora
@@ -83,10 +71,6 @@ const NO_ANSWER_TIMEOUT_MS = 70000;
 const MODE_SWITCH_COOLDOWN_MS = 700;
 
 // See audio.tsx's identical declaration.
-type UnansweredOutcome = "no_answer" | "declined" | "busy";
-const UNANSWERED_LABEL: Record<UnansweredOutcome, string> = {
-  no_answer: "No answer", declined: "Call declined", busy: "Busy",
-};
 
 // CALL DEBUG forensic fix — see audio.tsx's identical comment: bounds the
 // "joining_channel" step itself (both roles) and the recipient's side of
@@ -407,7 +391,7 @@ export default function VideoCallScreen() {
 
     if (params.callLogId) {
       try {
-        await authedFetch("/calls/end", {
+        await apiFetch("/calls/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1075,40 +1059,9 @@ export default function VideoCallScreen() {
   // presentation only below, no media/engine calls of any kind.
   if (callState === "no_answer") {
     return (
-      <View style={[styles.screen, { alignItems: "center", justifyContent: "space-between", paddingTop: insets.top + 40, paddingBottom: insets.bottom + 30 }]}>
-        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <View style={styles.noAnswerAvatarWrap}>
-            {peerPhotoUrl ? (
-              <Image source={{ uri: peerPhotoUrl }} style={styles.noAnswerAvatarPhoto} />
-            ) : (
-              <Ionicons name="person" size={48} color={p2pColors.textMuted} />
-            )}
-          </View>
-          <Text style={styles.noAnswerName}>{otherName}</Text>
-          <Text style={styles.noAnswerStatus}>{UNANSWERED_LABEL[unansweredOutcome]}</Text>
-        </View>
-        <View style={styles.noAnswerActions}>
-          <AppButton label="Cancel" onPress={navigateBack} variant="outline" accessibilityLabel="Cancel" />
-          {!!params.conversationId && (
-            <AppButton label="Record voice message" onPress={handleRecordVoice} variant="outline" icon="mic-outline" accessibilityLabel="Record voice message" />
-          )}
-          <TouchableOpacity
-            style={[styles.noAnswerPrimaryBtn, { backgroundColor: p2pColors.accent }]}
-            onPress={handleCallAgain}
-            disabled={callingAgain}
-            accessibilityRole="button"
-            accessibilityLabel="Call again"
-          >
-            {callingAgain ? <ActivityIndicator color="#fff" size="small" /> : (
-              <>
-                <Ionicons name={isAudioCall ? "call" : "videocam"} size={16} color="#fff" />
-                <Text style={styles.noAnswerPrimaryText}>Call again</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CallNoAnswerView colors={p2pColors} insets={insets} photoUrl={peerPhotoUrl} name={otherName} outcome={unansweredOutcome}
+        callAgainIcon={isAudioCall ? "call" : "videocam"} callingAgain={callingAgain} onCancel={navigateBack} onCallAgain={handleCallAgain}
+        onRecordVoice={params.conversationId ? handleRecordVoice : undefined} />
     );
   }
 
@@ -1216,7 +1169,7 @@ export default function VideoCallScreen() {
               </View>
               <Text style={styles.peerName} numberOfLines={1} accessibilityRole="header">{otherName}</Text>
               {isAudioCall && callState === "connected" && (
-                <Text style={styles.peerElapsed} accessibilityLabel={"Call time " + formatClock(elapsed)}>{formatClock(elapsed)}</Text>
+                <Text style={styles.peerElapsed} accessibilityLabel={"Call time " + formatClock(elapsed, { padded: true })}>{formatClock(elapsed, { padded: true })}</Text>
               )}
             </View>
           </>
@@ -1289,7 +1242,7 @@ export default function VideoCallScreen() {
       )}
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {callState === "connected" && !isAudioCall && <Text style={styles.timer}>{formatClock(elapsed)}</Text>}
+        {callState === "connected" && !isAudioCall && <Text style={styles.timer}>{formatClock(elapsed, { padded: true })}</Text>}
 
         {callState === "connected" && study.pendingGroupStudy?.active && (
           <View style={styles.autoStudyCard}>
@@ -1416,22 +1369,6 @@ export default function VideoCallScreen() {
 function makeStyles(p2p: P2PCallColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: p2p.bg },
-    // Stage 22 — "No answer" result screen.
-    noAnswerAvatarWrap: {
-      width: 128, height: 128, borderRadius: 64, backgroundColor: p2p.pillBg,
-      alignItems: "center", justifyContent: "center", overflow: "hidden",
-      borderWidth: 1.5, borderColor: p2p.accentBorder, marginBottom: 20,
-    },
-    noAnswerAvatarPhoto: { width: "100%", height: "100%" },
-    noAnswerName: { fontSize: 24, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
-    noAnswerStatus: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
-    noAnswerActions: { width: "100%", paddingHorizontal: 24, gap: 12 },
-    noAnswerSecondaryText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
-    noAnswerPrimaryBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      borderRadius: 14, paddingVertical: 14,
-    },
-    noAnswerPrimaryText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     header: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, zIndex: 2 },
     // The other person's name over the live video — shadowed so it reads on
     // any picture.

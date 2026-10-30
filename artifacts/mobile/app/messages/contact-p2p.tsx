@@ -13,6 +13,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 interface DeptInfo {
   key: ContactDepartment; label: string; icon: string; description: string; estimatedResponse: string;
 }
@@ -119,13 +120,7 @@ export default function ContactP2P() {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>FROM</Text>
           <View style={styles.fromBox}>
-            {profile?.avatarUrl ? (
-              <Image source={{ uri: profile.avatarUrl }} style={styles.fromAvatar} />
-            ) : (
-              <View style={styles.fromAvatarFallback}>
-                <Text style={styles.fromAvatarFallbackText}>{profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}</Text>
-              </View>
-            )}
+            <Avatar photoUrl={profile?.avatarUrl} name={profile?.displayName} size={40} style={styles.fromAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.fromUsername}>@{profile?.username ?? "you"}</Text>
               <Text style={styles.fromName}>{profile?.displayName}</Text>

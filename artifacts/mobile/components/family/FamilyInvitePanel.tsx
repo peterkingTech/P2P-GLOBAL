@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { Avatar } from "@/components/Avatar";
@@ -11,11 +11,8 @@ import {
   type FamilyInviteLink, type FamilyJoinRequest, type LinkRole,
 } from "@/lib/familyApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function notify(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const ROLES: LinkRole[] = ["adult", "teen", "child"];
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -49,7 +46,7 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
       setQr(familyInviteQr({ token: link.token, familyName, expiresAt: link.expiresAt }));
       await load();
     } catch (e: any) {
-      notify("Couldn't create a code", e?.message ?? "Please try again.");
+      showAlert("Couldn't create a code", e?.message ?? "Please try again.");
     } finally {
       setCreating(false);
     }
@@ -62,7 +59,7 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
       await load();
       if (action === "approve") onMembersChanged();
     } catch (e: any) {
-      notify("Couldn't update the request", e?.message ?? "Please try again.");
+      showAlert("Couldn't update the request", e?.message ?? "Please try again.");
     } finally {
       setBusyId(null);
     }
@@ -71,7 +68,7 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
   async function revoke(l: FamilyInviteLink) {
     setBusyId(l.id);
     try { await revokeFamilyInviteLink(familyId, l.id); await load(); }
-    catch (e: any) { notify("Couldn't turn off this code", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't turn off this code", e?.message ?? "Please try again."); }
     finally { setBusyId(null); }
   }
 

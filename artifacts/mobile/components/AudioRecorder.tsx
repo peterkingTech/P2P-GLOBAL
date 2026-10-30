@@ -18,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { IconButton } from "@/components/ui";
+import { formatClock } from "@/lib/timeFormat";
 
 type Phase = "idle" | "recording" | "cancelling" | "locked" | "uploading";
 
@@ -228,11 +229,6 @@ export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Pr
   const slideHintStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dragX.value }] }));
   const lockHintStyle = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.value }] }));
 
-  function formatTime(seconds: number) {
-    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  }
 
   // Forensic voice-recording audit, round 2 — the previous fix (a single
   // persistent root carrying the gesture across idle -> recording) was
@@ -274,7 +270,7 @@ export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Pr
             <View style={[styles.activeBar, phase === "cancelling" && styles.activeBarCancelling]}>
               <View style={styles.activeLeft}>
                 <View style={styles.recDot} />
-                <Text style={styles.activeTimer}>{formatTime(Math.floor(recorderState.durationMillis / 1000))}</Text>
+                <Text style={styles.activeTimer}>{formatClock(Math.floor(recorderState.durationMillis / 1000), { padded: true })}</Text>
                 <Animated.Text
                   style={[styles.slideHint, phase === "cancelling" && styles.slideHintCancelling, slideHintStyle]}
                 >
@@ -296,7 +292,7 @@ export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Pr
         <View style={styles.activeBar}>
           <View style={styles.activeLeft}>
             <View style={styles.recDot} />
-            <Text style={styles.activeTimer}>{formatTime(Math.floor(recorderState.durationMillis / 1000))}</Text>
+            <Text style={styles.activeTimer}>{formatClock(Math.floor(recorderState.durationMillis / 1000), { padded: true })}</Text>
           </View>
           <View style={styles.lockedActions}>
             <IconButton icon="trash-outline" accessibilityLabel="Delete" onPress={discardRecording} variant="tinted" size="sm" color="#C0392B" palette="fixedLight" />

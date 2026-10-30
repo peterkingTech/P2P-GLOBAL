@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, Alert, Platform, Animated } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, Animated } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,7 +8,7 @@ import { useAgora } from "@/hooks/useAgora";
 import { useAgoraEngine } from "@/hooks/useAgoraEngine";
 import { uidFromUserId } from "@/lib/agoraUid";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import ShareRoomPanel from "@/components/ShareRoomPanel";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -16,6 +16,7 @@ import { getP2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 interface RoomParticipant { userId: string; name: string; country: string | null; joinedAt: string }
 interface RoomDetail {
@@ -26,10 +27,6 @@ interface RoomDetail {
 
 const FLAG_REASONS = ["Inappropriate language", "False doctrine", "Harassment", "Spam", "Other"];
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 function SpeakingWave({ colors }: { colors: P2PCallColors }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -109,7 +106,7 @@ export default function BreakRoomScreen() {
     if (leftRef.current || !profile?.id || !params.roomId) return;
     leftRef.current = true;
     try {
-      await authedFetch(`/calls/rooms/${params.roomId}/leave`, {
+      await apiFetch(`/calls/rooms/${params.roomId}/leave`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
@@ -121,7 +118,7 @@ export default function BreakRoomScreen() {
   const doJoin = useCallback(async () => {
     if (!profile?.id || !params.roomId || !myUid) return;
     try {
-      const res = await authedFetch(`/calls/rooms/${params.roomId}/join`, {
+      const res = await apiFetch(`/calls/rooms/${params.roomId}/join`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
       });
@@ -257,7 +254,7 @@ export default function BreakRoomScreen() {
   async function grantFloor(userId: string | null) {
     if (!isHost || !profile?.id || !params.roomId) return;
     try {
-      await authedFetch(`/calls/rooms/${params.roomId}/set-speaker`, {
+      await apiFetch(`/calls/rooms/${params.roomId}/set-speaker`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostId: profile.id, speakerId: userId }),
       });
@@ -266,27 +263,22 @@ export default function BreakRoomScreen() {
   }
 
   function removeParticipant(p: RoomParticipant) {
-    Alert.alert(`Remove ${p.name}?`, "They'll be blocked from rejoining this room for 24 hours.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${p.name}?`, "They'll be blocked from rejoining this room for 24 hours.", async () => {
           if (!profile?.id || !params.roomId) return;
-          await authedFetch(`/calls/rooms/${params.roomId}/remove`, {
+          await apiFetch(`/calls/rooms/${params.roomId}/remove`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ hostId: profile.id, userId: p.userId }),
           });
           sendSignal("removed", { userId: p.userId });
           load();
-        },
-      },
-    ]);
+        }, { confirmLabel: "Remove", destructive: true });
   }
 
   async function submitFlag(reason: string) {
     if (!profile?.id || !params.roomId) return;
     setFlagging(true);
     try {
-      await authedFetch(`/calls/rooms/${params.roomId}/flag`, {
+      await apiFetch(`/calls/rooms/${params.roomId}/flag`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flaggerId: profile.id, reason }),
       });
@@ -303,7 +295,7 @@ export default function BreakRoomScreen() {
     if (!isHost || !profile?.id || !params.roomId) return;
     setEnding(true);
     try {
-      await authedFetch(`/calls/rooms/${params.roomId}`, {
+      await apiFetch(`/calls/rooms/${params.roomId}`, {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hostId: profile.id }),
       });

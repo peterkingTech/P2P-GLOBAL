@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { AppColors } from "@/constants/themes";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // New Journal reflection — the one genuinely new piece of My Discipleship
 // Journal. Free-form, prompts are suggestions only (spec explicitly says
@@ -25,10 +26,6 @@ const PROMPTS = [
   "What lesson do you find yourself returning to?",
 ];
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function NewReflectionScreen() {
   const insets = useSafeAreaInsets();

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -63,7 +63,7 @@ export default function PastoralAlertScreen() {
       });
       const { channelName } = await channelRes.json();
 
-      const startRes = await authedFetch("/calls/start", {
+      const startRes = await apiFetch("/calls/start", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channelName, callType: "pastoral", recipientId: alert.discipleId }),
       });

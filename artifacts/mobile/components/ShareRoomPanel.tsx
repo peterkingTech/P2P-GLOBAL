@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Platform } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import QRCode from "react-native-qrcode-svg";
@@ -26,10 +26,7 @@ import { shareRoomInvitation } from "@/lib/sharing";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 // P2P Rooms — Share panel (Stage D). Host-only entry point wired into the
 // three supported room screens. Every action here is explicit — nothing
@@ -108,8 +105,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
     };
     const title = "Generate a new link?";
     const message = "The current invitation link will stop working immediately. Anyone who still has the old link won't be able to use it.";
-    if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) doIt(); return; }
-    Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: "Generate New Link", style: "destructive", onPress: doIt }]);
+    confirmAction(title, message, doIt, { confirmLabel: "Generate New Link", destructive: true });
   }
 
   function handleRevoke() {
@@ -129,8 +125,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
     };
     const title = "Revoke this invitation?";
     const message = "The link will stop working immediately.";
-    if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) doIt(); return; }
-    Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: "Revoke", style: "destructive", onPress: doIt }]);
+    confirmAction(title, message, doIt, { confirmLabel: "Revoke", destructive: true });
   }
 
   async function handleCopy() {

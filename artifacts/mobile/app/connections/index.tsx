@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { Avatar } from "@/components/Avatar";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // P2P Connections management hub — the "Discover -> P2P Connect -> Accept ->
 // Communicate" lifecycle needs one place to see every stage of it, not just
@@ -90,7 +91,7 @@ export default function P2PConnectionsScreen() {
     setBusyId(id);
     const err = await respondToConnectionRequest(id, response);
     setBusyId(null);
-    if (err) { Alert.alert("Couldn't respond", err); return; }
+    if (err) { showAlert("Couldn't respond", err); return; }
     load();
   }
 
@@ -104,12 +105,12 @@ export default function P2PConnectionsScreen() {
       });
       if (!res.ok) {
         const body = await res.json();
-        Alert.alert("Couldn't cancel", body.error ?? "This request may have already been handled.");
+        showAlert("Couldn't cancel", body.error ?? "This request may have already been handled.");
       } else {
         load();
       }
     } catch {
-      Alert.alert("Couldn't cancel", "Please check your connection and try again.");
+      showAlert("Couldn't cancel", "Please check your connection and try again.");
     } finally {
       setBusyId(null);
     }
@@ -120,7 +121,7 @@ export default function P2PConnectionsScreen() {
     try {
       const { data, error } = await supabase.rpc("p2p_start_direct_conversation", { target_id: targetId });
       if (error || !data) {
-        Alert.alert("Can't message yet", "This conversation isn't available.");
+        showAlert("Can't message yet", "This conversation isn't available.");
         return;
       }
       router.push(`/messages/${data}` as any);

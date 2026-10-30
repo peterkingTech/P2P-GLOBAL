@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,11 +11,8 @@ import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 type Step = "read" | "reflect" | "respond";
 const STEP_LABEL: Record<Step, string> = { read: "READ", reflect: "REFLECT", respond: "RESPOND" };
@@ -160,7 +157,7 @@ export default function ScriptureDevotionalScreen() {
 
             <AppButton label={completed ? "Prayed & Saved" : "Pray This Scripture"} onPress={handlePrayThisScripture} variant="outline" icon={completed ? "checkmark-circle" : "hand-left-outline"} disabled={saving || completed} loading={saving} />
 
-            <AppButton label="Study More" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="book-outline" />
+            <AppButton label="Explore Pray the Word" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="book-outline" />
 
             <AppButton label="Continue Prayer" onPress={() => router.back()} style={{ marginTop: 4 }} />
           </View>

@@ -1,15 +1,12 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity, Platform, Alert } from "react-native";
+import { StyleSheet, TouchableOpacity, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // "You Are Not Alone" (a modal listing crisis-line phone numbers) has been
 // removed — those numbers were unverified placeholders

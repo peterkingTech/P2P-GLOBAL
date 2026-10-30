@@ -10,7 +10,6 @@ import {
   TextInput,
   Modal,
   Linking,
-  Alert,
 } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,6 +45,7 @@ import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 interface LessonContent {
   title: string;
@@ -771,10 +771,7 @@ export default function LessonScreen() {
     try {
       const result = await startPeerCall({
         supabase, currentUserId: user.id, otherUserId: person.id,
-        onAlert: (title, message) => {
-          if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-          else Alert.alert(title, message);
-        },
+        onAlert: showAlert,
       });
       if (!result) return;
       router.push({

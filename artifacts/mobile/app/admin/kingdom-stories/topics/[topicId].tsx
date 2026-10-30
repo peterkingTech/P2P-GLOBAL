@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import colors from "@/constants/colors";
@@ -10,15 +10,12 @@ import {
   type KingdomStoryTopic, type KingdomStoryCategory, type KingdomStory, type TopicInput,
 } from "@/lib/kingdomStoriesApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // One catalogue topic (editors): its category, tags, status and research
 // fields; its story — start one (an empty draft; nothing is generated) or
 // link an existing one — and the reader preview. Unknown facts stay empty:
 // period, region and key people are filled in from research, never guessed.
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function TopicEditorScreen() {
   const router = useRouter();

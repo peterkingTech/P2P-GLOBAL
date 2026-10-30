@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, TextInput, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, ScrollView } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -35,11 +35,8 @@ import { getChurchCallNotes, addChurchCallNote } from "@/lib/churchCallApi";
 import type { WorshipNote } from "@/lib/familyApi";
 import { loadChurchSound, saveChurchSound, voicesPlaybackLevel, DEFAULT_CHURCH_SOUND, type ChurchSound } from "@/lib/mediaRotation";
 import type { GatheringLesson, GatheringLessonRef, WorshipScripture } from "@/lib/familyApi";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const REACTIONS = ["🙏", "❤️", "🙌", "🔥", "👏"];
 
@@ -357,17 +354,14 @@ export default function ChurchCallScreen() {
     } catch (e: any) { showAlert("Couldn't update", e.message ?? "Please try again."); }
   }
   function handleRemoveParticipant(p: ChurchCallParticipant) {
-    Alert.alert(`Remove ${p.name}?`, "They'll be disconnected from this gathering.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${p.name}?`, "They'll be disconnected from this gathering.", async () => {
         if (!params.callId) return;
         try {
           await removeParticipant(params.callId, p.userId);
           sendSignal("removed", { userId: p.userId });
           setDetail((prev) => prev ? { ...prev, participants: prev.participants.filter((x) => x.userId !== p.userId) } : prev);
         } catch (e: any) { showAlert("Couldn't remove", e.message ?? "Please try again."); }
-      } },
-    ]);
+      }, { confirmLabel: "Remove", destructive: true });
   }
 
   function sendReaction(emoji: string) {

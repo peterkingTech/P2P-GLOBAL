@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getApiUrl } from "./apiUrl";
+import { apiFetch } from "@/lib/apiClient";
 
 // The peer-channel -> p2p_start_direct_conversation -> calls/start sequence
 // used to live copy-pasted in my-discipleship/disciple/[discipleId].tsx,
@@ -52,15 +53,10 @@ export async function startPeerCall(args: StartPeerCallArgs): Promise<StartPeerC
 
     // /calls/start verifies the real caller from this session's access
     // token server-side (see calls.ts's verifyCaller) — the same pattern
-    // callInvitations.ts's authHeaders() uses, not a body-supplied id.
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    const startRes = await fetch(`${apiUrl}/calls/start`, {
+    // shared client (lib/apiClient) adds, not a body-supplied id.
+    const startRes = await apiFetch("/calls/start", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ channelName, callType, recipientId: otherUserId, conversationId }),
     });
     const startData = await startRes.json();

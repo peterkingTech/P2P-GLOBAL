@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import type { OfficialAccountType } from "@/contexts/AuthContext";
+import { Avatar } from "@/components/Avatar";
 
 interface MessageBannerProps {
   senderName: string;
@@ -33,13 +34,7 @@ export function MessageBanner({
   return (
     <Animated.View style={[styles.wrap, { top: insets.top + 8, transform: [{ translateY }], opacity }]}>
       <TouchableOpacity accessibilityRole="button" style={styles.pill} onPress={onPress} activeOpacity={0.85}>
-        {senderPhotoUrl ? (
-          <Image source={{ uri: senderPhotoUrl }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="person" size={16} color="#fff" />
-          </View>
-        )}
+        <Avatar photoUrl={senderPhotoUrl} fallbackIcon="person" size={34} style={styles.avatar} />
         <View style={{ flex: 1 }}>
           <View style={styles.senderRow}>
             <Text style={styles.sender} numberOfLines={1}>{senderName}</Text>

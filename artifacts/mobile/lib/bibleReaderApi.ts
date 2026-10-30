@@ -1,7 +1,6 @@
 import { Platform } from "react-native";
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
 import { BIBLE_BOOKS } from "@/lib/bibleBooks";
+import { apiRequest } from "@/lib/apiClient";
 
 // The Bible reader's client (api-server routes/bibleReader.ts). Scripture
 // text always comes from the server (licensed API.Bible translations only);
@@ -13,23 +12,10 @@ export class BibleApiError extends Error {
   constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
-async function call<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  let res: Response;
-  try {
-    res = await fetch(`${getApiUrl()}${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-    });
-  } catch (e: any) {
-    if (e?.name === "AbortError") throw e;
-    throw new BibleApiError("You're offline — check your connection and try again.", 0);
-  }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new BibleApiError((body as { error?: string }).error ?? "Something went wrong. Please try again.", res.status);
-  return body as T;
-}
+const call = <T,>(path: string, init?: RequestInit & { signal?: AbortSignal }) => apiRequest<T>(path, init, {
+  fallbackError: "Something went wrong. Please try again.", offlineError: "You're offline — check your connection and try again.",
+  makeError: (message, status) => new BibleApiError(message, status),
+});
 
 // ── Canon (structure only: names, USFM codes, chapter counts) ───────────────
 const CODES = ["GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", "2SA", "1KI", "2KI", "1CH", "2CH", "EZR", "NEH", "EST", "JOB", "PSA", "PRO",

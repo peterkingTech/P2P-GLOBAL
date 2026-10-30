@@ -13,6 +13,7 @@ import {
 import { CoverArt, DiscoverRow, StoryPosterCard, progressOf, storyAction } from "@/components/kingdom-stories/DiscoverRow";
 import { AppButton, IconButton } from "@/components/ui";
 import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
+import StudyTogetherLink from "@/components/learning/StudyTogetherLink";
 
 // Kingdom Stories — a learning library with a cinematic browse, in the
 // reader's light/dark theme. Everything shown is real:
@@ -178,6 +179,8 @@ export default function KingdomStoriesDiscoverScreen() {
             )}
           </View>
         </View>
+
+        <StudyTogetherLink note="Kingdom Stories you read with others" style={{ marginHorizontal: 16, marginBottom: 8 }} />
 
         {loading ? <ActivityIndicator color={T.growth} style={{ marginTop: 40 }} accessibilityLabel="Loading Kingdom Stories" />
           : failed ? (

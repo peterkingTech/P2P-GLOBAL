@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,13 +7,10 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getMyKingdomWins, updateKingdomWin, deleteKingdomWin, KINGDOM_CATEGORY_LABELS, type KingdomWin } from "@/lib/kingdomWinsApi";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 const ENTRY_TYPE_LABELS: Record<KingdomWin["entryType"], string> = { kingdom_win: "Kingdom Win", testimony: "Testimony", p2p_impact: "P2P Impact" };
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function MyKingdomWinsScreen() {
   const insets = useSafeAreaInsets();
@@ -34,33 +31,17 @@ export default function MyKingdomWinsScreen() {
       // P2P Impact never self-publishes — it goes through review, and
       // needs its own explicit consent confirmation first (§33), so it
       // gets its own confirm step rather than reusing the plain publish flow.
-      if (Platform.OS === "web") {
-        if (!window.confirm("I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community.")) return;
-        try { await updateKingdomWin(entry.id, { status: "submitted", consentConfirmed: true }); load(); }
-        catch (e: any) { showAlert("Couldn't submit", e.message ?? "Please try again."); }
-        return;
-      }
-      Alert.alert(
-        "Confirm & submit for review",
-        "I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Confirm & Submit", onPress: async () => {
+      confirmAction("Confirm & submit for review", "I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community.", async () => {
             try { await updateKingdomWin(entry.id, { status: "submitted", consentConfirmed: true }); load(); }
             catch (e: any) { showAlert("Couldn't submit", e.message ?? "Please try again."); }
-          } },
-        ]
-      );
+          }, { confirmLabel: "Confirm & Submit" });
       return;
     }
     try { await updateKingdomWin(entry.id, { status: "published" }); load(); }
     catch (e: any) { showAlert("Couldn't publish", e.message ?? "Please try again."); }
   }
   function handleDelete(id: string) {
-    Alert.alert("Delete this story?", "This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { try { await deleteKingdomWin(id); load(); } catch (e: any) { showAlert("Couldn't delete", e.message ?? "Please try again."); } } },
-    ]);
+    confirmAction("Delete this story?", "This cannot be undone.", async () => { try { await deleteKingdomWin(id); load(); } catch (e: any) { showAlert("Couldn't delete", e.message ?? "Please try again."); } }, { confirmLabel: "Delete", destructive: true });
   }
 
   const drafts = entries.filter((e) => e.status === "draft");

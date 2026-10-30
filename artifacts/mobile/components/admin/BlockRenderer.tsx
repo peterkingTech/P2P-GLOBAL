@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { LessonBlock } from "@/lib/curriculumBlocks";
 import { lookupVerseForAdmin } from "@/lib/bibleClient";
 import { pickAndUploadImage, pickAndUploadAudio } from "@/lib/curriculumMedia";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 interface Props {
   block: LessonBlock;
@@ -236,7 +237,7 @@ function ScriptureBlockEditor({
     try {
       const result = await lookupVerseForAdmin(refInput.trim(), "en");
       if (!result) {
-        Alert.alert("Not found", `Could not find text for "${refInput.trim()}". You can still type it manually.`);
+        showAlert("Not found", `Could not find text for "${refInput.trim()}". You can still type it manually.`);
         onChangeContent({ ...c, reference: refInput.trim() });
         return;
       }
@@ -354,7 +355,7 @@ function ImageBlockEditor({
       const url = await pickAndUploadImage(moduleId, lessonId);
       if (url) onChangeContent({ ...c, url });
     } catch (ex: any) {
-      Alert.alert("Upload failed", ex.message);
+      showAlert("Upload failed", ex.message);
     } finally {
       setUploading(false);
     }
@@ -409,7 +410,7 @@ function AudioBlockEditor({
       const url = await pickAndUploadAudio(moduleId, lessonId);
       if (url) onChangeContent({ ...c, url });
     } catch (ex: any) {
-      Alert.alert("Upload failed", ex.message);
+      showAlert("Upload failed", ex.message);
     } finally {
       setUploading(false);
     }

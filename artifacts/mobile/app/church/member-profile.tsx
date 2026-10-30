@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMemberProfile } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const STAGE_LABELS: Record<string, string> = {
   dormant_seed: "Dormant Seed", sprout: "Sprout", young_tree: "Young Tree",
@@ -38,7 +39,7 @@ export default function ChurchMemberProfileScreen() {
     setSavingNotes(true);
     const err = await updateChurchMemberNotes(userChurch.id, userId, notes);
     setSavingNotes(false);
-    if (err) Alert.alert("Couldn't save note", err);
+    if (err) showAlert("Couldn't save note", err);
   }
 
   if (loading || !profile) {

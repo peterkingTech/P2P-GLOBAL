@@ -34,7 +34,7 @@ import { VoiceMessageBubble } from "@/components/VoiceMessageBubble";
 import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { useActivityStatus, activityLabel } from "@/lib/presence";
 import { MessageTicks } from "@/components/MessageTicks";
 import { MessageInfoSheet } from "@/components/MessageInfoSheet";
@@ -49,6 +49,7 @@ import { deliveryAcker } from "@/lib/receiptSession";
 import { clearConversationNotifications, dismissConversationNotifications } from "@/lib/conversationNotifications";
 import { setOpenConversation } from "@/lib/push";
 import { AppButton, IconButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 interface Message {
   id: string;
@@ -843,7 +844,7 @@ export default function ChatScreen() {
       // table has an INSERT policy for the anon key (see calls.ts), by
       // design: who's allowed to start a call and log it server-side, not
       // client-spoofable.
-      const startRes = await authedFetch("/calls/start", {
+      const startRes = await apiFetch("/calls/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channelName, callType, recipientId: otherUserId, conversationId: id }),
@@ -870,7 +871,7 @@ export default function ChatScreen() {
         },
       } as any);
     } catch (e: any) {
-      Alert.alert("Couldn't start call", e.message ?? "Please try again.");
+      showAlert("Couldn't start call", e.message ?? "Please try again.");
     } finally {
       setCallingType(null);
     }
@@ -900,7 +901,7 @@ export default function ChatScreen() {
   async function handleDeleteForEveryone(messageId: string) {
     const { error } = await supabase.rpc("p2p_delete_message_for_everyone", { p_message_id: messageId });
     if (error) {
-      Alert.alert("Couldn't delete message", error.message);
+      showAlert("Couldn't delete message", error.message);
       return;
     }
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, body: null, media_url: null, media_duration_seconds: null, deletedAt: new Date().toISOString() } : m)));
@@ -912,7 +913,7 @@ export default function ChatScreen() {
   async function handleDeleteForMe(messageId: string) {
     const { error } = await supabase.rpc("p2p_delete_message_for_me", { p_message_id: messageId });
     if (error) {
-      Alert.alert("Couldn't hide message", error.message);
+      showAlert("Couldn't hide message", error.message);
       return;
     }
     setHiddenForMeIds((prev) => new Set(prev).add(messageId));
@@ -941,7 +942,7 @@ export default function ChatScreen() {
         .from("p2p_message_reactions")
         .upsert({ message_id: messageId, user_id: user.id, emoji }, { onConflict: "message_id,user_id" });
       if (error) {
-        Alert.alert("Couldn't react", error.message);
+        showAlert("Couldn't react", error.message);
         load();
       }
     }
@@ -1008,7 +1009,7 @@ export default function ChatScreen() {
         text: "Unpin Message",
         onPress: async () => {
           const err = await unpinMessage(item.id);
-          if (err) Alert.alert("Couldn't unpin message", err);
+          if (err) showAlert("Couldn't unpin message", err);
           else load();
         },
       });
@@ -1029,7 +1030,7 @@ export default function ChatScreen() {
         text: "Report message",
         onPress: async () => {
           const err = await reportContent("message", item.id, "Reported from conversation");
-          Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          showAlert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
         },
       });
       options.push({
@@ -1037,7 +1038,7 @@ export default function ChatScreen() {
         style: "destructive",
         onPress: async () => {
           const err = await reportContent("profile", senderId, "Reported from conversation");
-          Alert.alert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
+          showAlert(err ? "Couldn't send report" : "Reported", err || "A moderator will review this.");
         },
       });
     }
@@ -1047,10 +1048,7 @@ export default function ChatScreen() {
         text: "🗑 Delete for Everyone",
         style: "destructive",
         onPress: () => {
-          Alert.alert("Delete for everyone?", "This will remove the message for everyone in this conversation.", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: () => handleDeleteForEveryone(item.id) },
-          ]);
+          confirmAction("Delete for everyone?", "This will remove the message for everyone in this conversation.", () => handleDeleteForEveryone(item.id), { confirmLabel: "Delete", destructive: true });
         },
       });
     }
@@ -1074,7 +1072,7 @@ export default function ChatScreen() {
           text: label,
           onPress: async () => {
             const err = await pinMessage(messageId, label === "No label" ? undefined : label);
-            if (err) Alert.alert("Couldn't pin message", err);
+            if (err) showAlert("Couldn't pin message", err);
             else load();
           },
         })),
@@ -1182,12 +1180,12 @@ export default function ChatScreen() {
       } else {
         setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, localStatus: "failed" } : m)));
       }
-      Alert.alert("Message not sent", readableSendError(error.message));
+      showAlert("Message not sent", readableSendError(error.message));
       return;
     }
     markPersisted(msg.id, data?.created_at as string | undefined);
     if (data?.flagged_self_harm) {
-      Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
+      showAlert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
     }
   }
 
@@ -1224,7 +1222,7 @@ export default function ChatScreen() {
         .from("voice-messages")
         .upload(path, arrayBuffer, { contentType: "audio/m4a", upsert: false });
       if (uploadError) {
-        Alert.alert("Voice message not sent", uploadError.message);
+        showAlert("Voice message not sent", uploadError.message);
         return;
       }
       const { data: { publicUrl } } = supabase.storage.from("voice-messages").getPublicUrl(path);
@@ -1239,15 +1237,15 @@ export default function ChatScreen() {
         .select("id, flagged_self_harm")
         .single();
       if (error) {
-        Alert.alert("Voice message not sent", readableSendError(error.message));
+        showAlert("Voice message not sent", readableSendError(error.message));
         return;
       }
       setReplyTarget(null);
       if (data?.flagged_self_harm) {
-        Alert.alert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
+        showAlert("Help is on the way", "A crisis responder from our team has been notified and will reach out to you directly.");
       }
     } catch (e: any) {
-      Alert.alert("Voice message not sent", e?.message ?? "Please try again.");
+      showAlert("Voice message not sent", e?.message ?? "Please try again.");
     }
   }
 

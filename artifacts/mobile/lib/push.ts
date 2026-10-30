@@ -3,7 +3,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform, AppState } from "react-native";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { registerNotificationCategories } from "@/lib/notificationCategories";
 import { callSystemInstalled } from "@/lib/callSystem";
 
@@ -112,7 +112,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     // still delivering here (routes/push.ts). Optional: registration works without it.
     const nativeToken = await Notifications.getDevicePushTokenAsync()
       .then((t) => (typeof t.data === "string" ? t.data : null)).catch(() => null);
-    const res = await authedFetch("/push/register", {
+    const res = await apiFetch("/push/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -153,7 +153,7 @@ export async function registerVoipTokenAsync(token: string): Promise<void> {
   if (Platform.OS !== "ios" || !token) return;
   try {
     // 409 until migration 172 is applied — the server can't store it yet.
-    await authedFetch("/push/register", {
+    await apiFetch("/push/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, platform: "ios_voip", deviceId: await getInstallId(), callSystem: true }),
@@ -171,7 +171,7 @@ export async function unregisterCurrentPushToken(): Promise<void> {
   try {
     const token = await AsyncStorage.getItem(LAST_TOKEN_KEY);
     if (!token) return;
-    await authedFetch("/push/unregister", {
+    await apiFetch("/push/unregister", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),

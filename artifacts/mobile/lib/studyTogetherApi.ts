@@ -1,5 +1,4 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Study Together — shared (asynchronous) studies (migration 216,
 // routes/studyTogether.ts). The live in-call Study Together (lib/callStart,
@@ -8,20 +7,10 @@ import { getApiUrl } from "@/lib/apiUrl";
 // Every check (who you may invite, group leadership, blocks, membership)
 // happens on the server; this file only calls it.
 
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}/study-together${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const b = body as { error?: string; studyId?: string };
-    throw Object.assign(new Error(b.error ?? "Something went wrong. Please try again."), { status: res.status, studyId: b.studyId ?? null });
-  }
-  return body;
-}
+const authedFetch = (path: string, init?: RequestInit) => apiRequest(path, init, {
+  base: "/study-together", fallbackError: "Something went wrong. Please try again.",
+  makeError: (message, status, b) => Object.assign(new Error(message), { status, studyId: (b.studyId as string | undefined) ?? null }),
+});
 const post = (path: string, body?: unknown) => authedFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) });
 
 export type StudyContentType = "kingdom_story" | "lesson";

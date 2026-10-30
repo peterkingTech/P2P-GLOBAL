@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 export default function CreateCohortScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +41,7 @@ export default function CreateCohortScreen() {
     }
     setSubmitting(false);
     if (error || !cohort) {
-      Alert.alert("Couldn't create small group", error ?? "Please try again.");
+      showAlert("Couldn't create small group", error ?? "Please try again.");
       return;
     }
     router.replace("/church/cohorts" as any);

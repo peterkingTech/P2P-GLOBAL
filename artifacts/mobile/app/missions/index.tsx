@@ -14,6 +14,7 @@ import {
 } from "@/lib/missionsApi";
 import { getKingdomWinsFeed, type KingdomWin } from "@/lib/kingdomWinsApi";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
 
 // Missions — rebuilt Discover-first landing (Stage 2). The old screen's
 // two data sources are handled deliberately:
@@ -28,16 +29,6 @@ const FOCUS_CHIPS: MissionFocusTag[] = [
   "compassion", "persecuted_church", "youth", "medical_missions", "digital_missions",
 ];
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function TestimonyCard({ item }: { item: PrayerWallPost }) {
   const { colors } = useTheme();
@@ -51,7 +42,7 @@ function TestimonyCard({ item }: { item: PrayerWallPost }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.cardName}>{item.isAnonymous ? t("missions.anonymous") : (item.userName || t("missions.aBeliever"))}</Text>
-          <Text style={s.cardMeta}>{timeAgo(item.createdAt)} · {t("missions.kingdomWinBadge")}</Text>
+          <Text style={s.cardMeta}>{timeAgo(item.createdAt, "ago")} · {t("missions.kingdomWinBadge")}</Text>
         </View>
       </View>
       <Text style={s.cardBody}>{item.body}</Text>

@@ -1,28 +1,10 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
 import type { GatheringLesson, GatheringLessonRef, WorshipSession } from "@/lib/familyApi";
 import type { GatheringFollowUp } from "@/lib/groupLearningApi";
+import { apiRequest } from "@/lib/apiClient";
 
 // Every route on the server side (routes/churchCalls.ts) resolves identity
 // via verifyCaller() — a real Supabase JWT — never a client-supplied id.
-// Exact mirror of lib/familyApi.ts's authedFetch, kept as its own local
-// copy rather than a shared import, matching this codebase's existing
-// per-feature-file convention.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
+// Requests go through the shared client (lib/apiClient).
 
 export type ChurchCallPurpose =
   "meeting" | "teaching" | "bible_study" | "prayer" | "leadership" | "small_group" | "fellowship" | "church_gathering" | "other";
@@ -50,21 +32,21 @@ export interface ChurchCall {
 }
 
 export function startChurchCall(churchId: string, title: string, purpose: ChurchCallPurpose, scope: ChurchCallScope, cohortId?: string): Promise<ChurchCall> {
-  return authedFetch(`/churches/${churchId}/calls`, { method: "POST", body: JSON.stringify({ title, purpose, scope, cohortId }) });
+  return apiRequest(`/churches/${churchId}/calls`, { method: "POST", body: JSON.stringify({ title, purpose, scope, cohortId }) });
 }
 export function scheduleChurchCall(
   churchId: string, title: string, purpose: ChurchCallPurpose, scope: ChurchCallScope,
   scheduledStartAt: string, expectedDurationMinutes?: number, description?: string, cohortId?: string
 ): Promise<ChurchCall> {
-  return authedFetch(`/churches/${churchId}/calls/schedule`, {
+  return apiRequest(`/churches/${churchId}/calls/schedule`, {
     method: "POST", body: JSON.stringify({ title, purpose, scope, cohortId, scheduledStartAt, expectedDurationMinutes, description }),
   });
 }
 export function startScheduledChurchCall(callId: string): Promise<ChurchCall> {
-  return authedFetch(`/churches/calls/${callId}/start`, { method: "POST" });
+  return apiRequest(`/churches/calls/${callId}/start`, { method: "POST" });
 }
 export function getChurchCalls(churchId: string): Promise<{ live: ChurchCall[]; upcoming: ChurchCall[]; recent: ChurchCall[] }> {
-  return authedFetch(`/churches/${churchId}/calls`);
+  return apiRequest(`/churches/${churchId}/calls`);
 }
 export interface ChurchCallParticipant {
   userId: string; name: string; photoUrl: string | null; micDisabledByHost: boolean; videoDisabledByHost: boolean;
@@ -78,72 +60,72 @@ export interface ChurchCallDetail {
   lessonRef?: GatheringLessonRef | null;
 }
 export function getChurchCall(callId: string): Promise<ChurchCallDetail> {
-  return authedFetch(`/churches/calls/${callId}`);
+  return apiRequest(`/churches/calls/${callId}`);
 }
 export function joinChurchCall(callId: string): Promise<ChurchCall> {
-  return authedFetch(`/churches/calls/${callId}/join`, { method: "POST" });
+  return apiRequest(`/churches/calls/${callId}/join`, { method: "POST" });
 }
 export function leaveChurchCall(callId: string): Promise<{ left: true }> {
-  return authedFetch(`/churches/calls/${callId}/leave`, { method: "POST" });
+  return apiRequest(`/churches/calls/${callId}/leave`, { method: "POST" });
 }
 export function endChurchCall(callId: string): Promise<ChurchCall> {
-  return authedFetch(`/churches/calls/${callId}/end`, { method: "POST" });
+  return apiRequest(`/churches/calls/${callId}/end`, { method: "POST" });
 }
 
 // ── Stage 2 — Moderation ─────────────────────────────────────────────────
 export function setParticipantMicDisabled(callId: string, userId: string, disabled: boolean): Promise<{ userId: string; micDisabledByHost: boolean }> {
-  return authedFetch(`/churches/calls/${callId}/participants/${userId}/mic`, { method: "POST", body: JSON.stringify({ disabled }) });
+  return apiRequest(`/churches/calls/${callId}/participants/${userId}/mic`, { method: "POST", body: JSON.stringify({ disabled }) });
 }
 export function setParticipantVideoDisabled(callId: string, userId: string, disabled: boolean): Promise<{ userId: string; videoDisabledByHost: boolean }> {
-  return authedFetch(`/churches/calls/${callId}/participants/${userId}/video`, { method: "POST", body: JSON.stringify({ disabled }) });
+  return apiRequest(`/churches/calls/${callId}/participants/${userId}/video`, { method: "POST", body: JSON.stringify({ disabled }) });
 }
 export function removeParticipant(callId: string, userId: string): Promise<{ removed: true }> {
-  return authedFetch(`/churches/calls/${callId}/participants/${userId}/remove`, { method: "POST" });
+  return apiRequest(`/churches/calls/${callId}/participants/${userId}/remove`, { method: "POST" });
 }
 
 // ── Stage 2 — Chat ────────────────────────────────────────────────────────
 export interface ChurchCallMessage { id: string; callId: string; userId: string; authorName: string; content: string; createdAt: string }
 export function getChurchCallMessages(callId: string): Promise<ChurchCallMessage[]> {
-  return authedFetch(`/churches/calls/${callId}/messages`);
+  return apiRequest(`/churches/calls/${callId}/messages`);
 }
 export function sendChurchCallMessage(callId: string, content: string): Promise<ChurchCallMessage> {
-  return authedFetch(`/churches/calls/${callId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  return apiRequest(`/churches/calls/${callId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
 }
 
 // ── Stage 4 — Notes ───────────────────────────────────────────────────────
 export interface ChurchCallNote { id: string; callId: string; authorId: string; authorName: string; visibility: "shared" | "private"; content: string; createdAt: string }
 export function getChurchCallNotes(callId: string): Promise<ChurchCallNote[]> {
-  return authedFetch(`/churches/calls/${callId}/notes`);
+  return apiRequest(`/churches/calls/${callId}/notes`);
 }
 export function addChurchCallNote(callId: string, content: string, visibility?: "shared" | "private"): Promise<ChurchCallNote> {
-  return authedFetch(`/churches/calls/${callId}/notes`, { method: "POST", body: JSON.stringify({ content, visibility }) });
+  return apiRequest(`/churches/calls/${callId}/notes`, { method: "POST", body: JSON.stringify({ content, visibility }) });
 }
 
 // ── Stage 4 — Scripture / Lesson / Media ─────────────────────────────────
 export function setChurchCallScripture(callId: string, scripture: ChurchCallScripture): Promise<{ scriptureReference: ChurchCallScripture }> {
-  return authedFetch(`/churches/calls/${callId}/scripture`, { method: "PUT", body: JSON.stringify(scripture) });
+  return apiRequest(`/churches/calls/${callId}/scripture`, { method: "PUT", body: JSON.stringify(scripture) });
 }
 export function setChurchCallLesson(callId: string, lessonId: string | null): Promise<{ lesson: ChurchCallLessonContext | null; lessonRef?: GatheringLessonRef | null }> {
-  return authedFetch(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ lessonId }) });
+  return apiRequest(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ lessonId }) });
 }
 /** The church's own published lesson (migration 204); host or pastor only. */
 export function setChurchCallChurchLesson(callId: string, churchLessonId: string): Promise<{ lessonRef: GatheringLessonRef | null }> {
-  return authedFetch(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ churchLessonId }) });
+  return apiRequest(`/churches/calls/${callId}/lesson`, { method: "PUT", body: JSON.stringify({ churchLessonId }) });
 }
 /** The Gathering's lesson to follow along: content only, never anyone's answers. */
 export function getChurchCallLesson(callId: string): Promise<{ lesson: GatheringLesson | null }> {
-  return authedFetch(`/churches/calls/${callId}/lesson`);
+  return apiRequest(`/churches/calls/${callId}/lesson`);
 }
 export function setChurchCallMedia(callId: string, media: { provider: string; id: string; url?: string } | null): Promise<{ media: ChurchCallMedia | null }> {
-  return authedFetch(`/churches/calls/${callId}/media`, { method: "PUT", body: JSON.stringify(media ?? {}) });
+  return apiRequest(`/churches/calls/${callId}/media`, { method: "PUT", body: JSON.stringify(media ?? {}) });
 }
 
 // ── Stage 5 — Summary, Continuity, Journey ───────────────────────────────
 export function setChurchCallHostSummary(callId: string, summary: string): Promise<{ ok: true }> {
-  return authedFetch(`/churches/calls/${callId}/host-summary`, { method: "PUT", body: JSON.stringify({ summary }) });
+  return apiRequest(`/churches/calls/${callId}/host-summary`, { method: "PUT", body: JSON.stringify({ summary }) });
 }
 export function setChurchCallContinuityNotes(callId: string, notes: string): Promise<{ ok: true }> {
-  return authedFetch(`/churches/calls/${callId}/continuity-notes`, { method: "PUT", body: JSON.stringify({ notes }) });
+  return apiRequest(`/churches/calls/${callId}/continuity-notes`, { method: "PUT", body: JSON.stringify({ notes }) });
 }
 export interface ChurchCallSummary extends GatheringFollowUp {
   overview: { churchId: string; title: string; purpose: ChurchCallPurpose; startedAt: string | null; endedAt: string | null; durationSeconds: number | null; host: { id: string; name: string; photoUrl: string | null } | null };
@@ -160,7 +142,7 @@ export interface ChurchCallSummary extends GatheringFollowUp {
 }
 /** Play / pause / seek the call's Media for everyone (host or pastor; migration 205). */
 export function setChurchCallPlayback(callId: string, patch: { isPlaying?: boolean; positionMs?: number }): Promise<ChurchCall> {
-  return authedFetch(`/churches/calls/${callId}/playback`, { method: "PUT", body: JSON.stringify(patch) });
+  return apiRequest(`/churches/calls/${callId}/playback`, { method: "PUT", body: JSON.stringify(patch) });
 }
 /**
  * The call's media in the shape the Family Gathering's SharedMedia /
@@ -176,13 +158,13 @@ export function churchCallMediaSession(call: ChurchCall): WorshipSession {
   } as WorshipSession;
 }
 export function getChurchCallSummary(callId: string): Promise<ChurchCallSummary> {
-  return authedFetch(`/churches/calls/${callId}/summary`);
+  return apiRequest(`/churches/calls/${callId}/summary`);
 }
 export function getChurchCallContinuity(churchId: string): Promise<{ previousCall: ChurchCall | null; nextScheduledCall: ChurchCall | null }> {
-  return authedFetch(`/churches/${churchId}/calls/continue`);
+  return apiRequest(`/churches/${churchId}/calls/continue`);
 }
 export function getChurchCallJourney(churchId: string): Promise<{ totalCalls: number; byPurpose: Record<string, number>; scriptureReferences: string[]; lessonsCoveredCount: number }> {
-  return authedFetch(`/churches/${churchId}/calls/journey`);
+  return apiRequest(`/churches/${churchId}/calls/journey`);
 }
 
 export const CHURCH_CALL_PURPOSE_LABELS: Record<ChurchCallPurpose, string> = {

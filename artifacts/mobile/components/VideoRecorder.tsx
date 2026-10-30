@@ -12,6 +12,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { formatClock } from "@/lib/timeFormat";
 
 type RecorderState = "idle" | "requesting" | "cameraReady" | "recording" | "reviewing" | "uploading";
 
@@ -90,11 +91,6 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
     await onSubmit(recordedUri, recordedDuration);
   }
 
-  function formatTime(seconds: number) {
-    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  }
 
   if (state === "idle" || state === "requesting") {
     return (
@@ -115,7 +111,7 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
           <View style={styles.recordingOverlay}>
             <View style={styles.recordingBadge}>
               <View style={styles.recordingDot} />
-              <Text style={styles.recordingTimer}>{formatTime(elapsedSeconds)}</Text>
+              <Text style={styles.recordingTimer}>{formatClock(elapsedSeconds, { padded: true })}</Text>
             </View>
           </View>
         )}
@@ -142,7 +138,7 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
       <View style={styles.reviewBox}>
         <View style={styles.reviewHeader}>
           <Ionicons name="videocam" size={14} color={colors.accentGreen} />
-          <Text style={styles.reviewDuration}>{formatTime(recordedDuration)} recorded</Text>
+          <Text style={styles.reviewDuration}>{formatClock(recordedDuration, { padded: true })} recorded</Text>
         </View>
         {recordedUri && (
           <VideoView

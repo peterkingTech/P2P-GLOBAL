@@ -39,11 +39,9 @@ import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 import ReadableText from "@/components/ReadableText";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { timeAgo } from "@/lib/timeFormat";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 interface LibraryPrayer {
   id: string;
@@ -74,16 +72,6 @@ function flagEmoji(code?: string | null): string {
   }
 }
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function CommentsPanel({ postId }: { postId: string }) {
   const { getComments, addComment } = useData();
@@ -182,7 +170,7 @@ function PostCard({
             )}
           </View>
           <Text style={styles.prayerMeta}>
-            {timeAgo(item.createdAt)} · {isTestimony ? t("prayer.testimony") : item.status === "answered" ? t("prayer.answered") : t("prayer.request")}
+            {timeAgo(item.createdAt, "ago")} · {isTestimony ? t("prayer.testimony") : item.status === "answered" ? t("prayer.answered") : t("prayer.request")}
           </Text>
         </View>
         {isTestimony && <Ionicons name="sparkles" size={18} color={colors.upperRoomAmber} />}
@@ -426,7 +414,7 @@ export default function PrayerTab() {
           style: "destructive",
           onPress: async () => {
             const err = await reportContent("prayer_post", post.id, "Reported from prayer wall");
-            Alert.alert(err ? t("prayer.couldntSendReport") : t("prayer.reported"), err || t("prayer.reportedMessage"));
+            showAlert(err ? t("prayer.couldntSendReport") : t("prayer.reported"), err || t("prayer.reportedMessage"));
           },
         },
       ]
@@ -475,7 +463,7 @@ export default function PrayerTab() {
   async function logPrayerAction(prayer: LibraryPrayer) {
     if (!profile?.id) return;
     await supabase.from("p2p_prayer_journal").insert({ user_id: profile.id, prayer_text: prayer.prayer_text, category: prayer.category });
-    Alert.alert("Logged", "Added to your prayer journal.");
+    showAlert("Logged", "Added to your prayer journal.");
     loadExtras();
   }
 

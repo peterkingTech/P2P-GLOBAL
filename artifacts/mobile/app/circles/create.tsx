@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const CIRCLE_TYPES: { value: string; label: string }[] = [
   { value: "open", label: "Open — anyone can request to join" },
@@ -43,7 +44,7 @@ export default function CreateCircleScreen() {
   const [saving, setSaving] = useState(false);
 
   async function handleCreate() {
-    if (!name.trim()) { Alert.alert("Name required", "Please give your circle a name."); return; }
+    if (!name.trim()) { showAlert("Name required", "Please give your circle a name."); return; }
     if (!profile?.id) return;
     setSaving(true);
     try {
@@ -70,7 +71,7 @@ export default function CreateCircleScreen() {
       if (!res.ok) throw new Error(data?.error ?? "Could not create circle");
       router.replace(`/circles/${data.id}` as any);
     } catch (e: any) {
-      Alert.alert("Couldn't create circle", e.message ?? "Something went wrong.");
+      showAlert("Couldn't create circle", e.message ?? "Something went wrong.");
     } finally {
       setSaving(false);
     }

@@ -33,7 +33,7 @@ const mocks = {
   "react-native": RN,
   "@expo/vector-icons": { Ionicons: host("Ionicons") },
   "expo-router": { useRouter: () => ({ push: (p) => env.pushes.push(p) }), useFocusEffect: () => {} },
-  "@/lib/adminFetch": { authedFetch: (p, i) => env.fetch(p, i) },
+  "@/lib/apiClient": { apiFetch: (p, i) => env.fetch(p, i) },
   "@/components/studio/useStudioQuery": { useStudioQuery: () => env.query },
   "@/contexts/ThemeContext": { useTheme: () => ({ colors: loadFile(path.join(root, "constants/themes.ts")).THEMES.light, resolvedMode: "light" }) },
 };
@@ -135,7 +135,9 @@ ok("Kingdom School: module/curriculum/plan/block deletes go to the bin with a pr
 const story = src("app/admin/kingdom-stories/[id].tsx"), chapters = src("components/kingdom-stories/ChaptersEditor.tsx");
 ok("Kingdom Stories: delete messages point to the Recycle Bin (no 'cannot be undone')",
   /Move this story to the Recycle Bin\?/.test(story) && /Move this chapter to the Recycle Bin\?/.test(chapters) && !/cannot be undone/i.test(story + chapters));
-ok("Kingdom Stories: story delete works on the web too (window.confirm)", /if \(Platform\.OS === "web"\) \{ if \(window\.confirm\(`\$\{title\}\\n\\n\$\{message\}`\)\) doDelete\(\); return; \}/.test(story));
+// The shared confirm (lib/alerts) uses window.confirm on the web.
+const alertsLib = readFileSync(path.join(root, "lib/alerts.ts"), "utf8");
+ok("Kingdom Stories: story delete works on the web too (shared confirm → window.confirm)", /confirmAction\(title, message, doDelete, \{ confirmLabel: "Move to Recycle Bin", destructive: true \}\)/.test(story) && /if \(Platform\.OS === "web"\) \{\s*if \(window\.confirm\(/.test(alertsLib));
 
 console.log(`recycle bin (app): ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

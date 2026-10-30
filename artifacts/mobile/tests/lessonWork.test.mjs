@@ -18,11 +18,11 @@ let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL ${n} ${d}`); } };
 
 const calls = [];
-const js = ts.transpileModule(src("lib/lessonWorkApi.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-const mod = { exports: {} };
-vm.runInNewContext(js, { module: mod, exports: mod.exports, JSON, Object, Error, Promise,
-  fetch: async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ({}) }; },
-  require: (n) => n === "@/contexts/AuthContext" ? { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "TOKEN" } } }) } } } : n === "@/lib/apiUrl" ? { getApiUrl: () => "https://api.test/api" } : {} });
+const compile = (rel) => ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+const fakeFetch = async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ({}) }; };
+const requireFor = (n) => n === "@/contexts/AuthContext" ? { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "TOKEN" } } }) } } } : n === "@/lib/apiUrl" ? { getApiUrl: () => "https://api.test/api" } : n === "@/lib/apiClient" ? run("lib/apiClient.ts") : {};
+function run(rel) { const m = { exports: {} }; vm.runInNewContext(compile(rel), { module: m, exports: m.exports, JSON, Object, Error, Promise, fetch: fakeFetch, require: requireFor }); return m.exports; }
+const mod = { exports: run("lib/lessonWorkApi.ts") };
 const W = mod.exports;
 
 // ── States + wording ────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ const lw = src("components/study/LessonWork.tsx");
 ok("reflections: only reflection questions; private by default", /q\.kind === "reflection" && q\.id/.test(lw) && /useState<ReflectionVisibility>\(latest\?\.visibility \?\? "private"\)/.test(lw));
 ok("reflections: 'Who can see this?' radio group with the wording", /Who can see this\?/.test(lw) && /accessibilityRole="radiogroup"/.test(lw) && /accessibilityRole="radio"/.test(lw) && /VISIBILITY_OPTIONS\.map/.test(lw));
 ok("reflections: device draft per user/lesson/question, cleared after saving", /draftKey\(profile\.id, `custom:\$\{scope\}:\$\{lessonId\}:reflection:\$\{questionId\}`\)/.test(lw) && /await draft\.clear\(\); setEditing\(false\);/.test(lw));
-ok("reflections: changing sharing later goes to the server (and rolls back on failure)", /await setReflectionVisibility\(latest\.id, v\)/.test(lw) && /setVisibility\(latest\.visibility\); notify\("Couldn't change who can see it"/.test(lw));
+ok("reflections: changing sharing later goes to the server (and rolls back on failure)", /await setReflectionVisibility\(latest\.id, v\)/.test(lw) && /setVisibility\(latest\.visibility\); showAlert\("Couldn't change who can see it"/.test(lw));
 ok("shared section: only what others chose to share; explains the scope", /Reflections members chose to share/.test(lw) && /getSharedReflections\(scope, lessonId\)/.test(lw));
 ok("assignments: state from server + local draft; leaders see draft/archived + submitted counts", /assignmentState\(a, hasDraft\)/.test(lw) && /Draft — members can't see it/.test(lw) && /submitted`/.test(lw));
 ok("new Comprehensive Check: title required, due date checked, resubmission toggle, draft or publish", /Give the Comprehensive Check a title\./.test(lw) && /YYYY-MM-DD/.test(lw) && /Allow resubmitting/.test(lw) && /save\("draft"\)/.test(lw) && /save\("published"\)/.test(lw));
@@ -58,8 +58,8 @@ ok("review section only when the server lets you review", /try \{ setReview\(\(a
 ok("returning work needs feedback", /if \(status === "returned" && !fb\)/.test(as));
 
 // ── Wiring ────────────────────────────────────────────────────────────────
-for (const [f, scope] of [["app/family/studies/lesson/[lessonId].tsx", "family"], ["app/church/studies/lesson/[lessonId].tsx", "church"]])
-  ok(`${f}: reflections/assignments under the lesson`, new RegExp(`footer=\\{<LessonWork scope="${scope}" lessonId=\\{lesson\\.id\\} questions=\\{lesson\\.questions\\} />\\}`).test(src(f)));
+ok("community lesson: reflections/assignments under the lesson, in that community's scope", /footer=\{<LessonWork scope=\{scope\} lessonId=\{lesson\.id\} questions=\{lesson\.questions\} \/>\}/.test(src("components/community/CommunityLessonScreen.tsx")));
+for (const scope of ["family", "church"]) ok(`app/${scope}/studies/lesson/[lessonId].tsx: ${scope} scope`, src(`app/${scope}/studies/lesson/[lessonId].tsx`).includes(`<CommunityLessonScreen scope="${scope}" />`));
 const push = src("lib/push.ts");
 ok("notification tap → the assignment (validated id + scope)", /notificationType === "assignment_reviewed" && assignmentId && workScope\) return `\/learning\/assignment\/\$\{assignmentId\}\?s=\$\{workScope\}`/.test(push) && /\/\^\[0-9a-f-\]\{36\}\$\/i\.test\(data\.assignmentId\)/.test(push));
 ok("Notification Center uses the same destination", /n\.notificationType === "assignment_reviewed"\) \{/.test(src("app/notifications/index.tsx")));

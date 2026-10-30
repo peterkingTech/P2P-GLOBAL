@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, Alert, Platform, Animated, AppState, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, Alert, Animated, AppState, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase, useAuth } from "@/contexts/AuthContext";
@@ -42,6 +42,7 @@ import type { FamilyIconName } from "@/components/family/FamilyIcon";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 // "Expand" on a Gathering resource panel (Bible, Media, Study Workspace).
 function ExpandButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
@@ -49,10 +50,6 @@ function ExpandButton({ label, onPress }: { label: string; onPress: () => void }
   );
 }
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Labels are the only thing standardized here — the WorshipMode key
 // values ("sharing", "silent_prayer", "teaching", ...) are the internal
@@ -410,19 +407,14 @@ export default function FamilyWorshipScreen() {
   // active, left_at-null participant row, so this isn't just cosmetic).
   function handleRemoveParticipant(userId: string, name: string) {
     if (!session || !isHost) return;
-    Alert.alert(`Remove ${name}?`, "They'll be disconnected from this Gathering.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${name}?`, "They'll be disconnected from this Gathering.", async () => {
           try {
             await removeWorshipParticipant(session.id, userId);
             signalRef.current?.send({ type: "broadcast", event: "removed", payload: { userId } });
           } catch (e: any) {
             showAlert("Couldn't remove", e.message ?? "Please try again.");
           }
-        },
-      },
-    ]);
+        }, { confirmLabel: "Remove", destructive: true });
   }
 
   async function changeMode(mode: WorshipMode) {
@@ -701,14 +693,11 @@ export default function FamilyWorshipScreen() {
 
   async function handleEnd() {
     if (!session) return;
-    Alert.alert("End Gathering?", "This will end the session for everyone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "End", style: "destructive", onPress: async () => {
+    confirmAction("End Gathering?", "This will end the session for everyone.", async () => {
         const ended = await endWorshipSession(session.id);
         broadcastState({ ...session, status: "ended" });
         finishToSummary(ended?.historyId ?? null);
-      } },
-    ]);
+      }, { confirmLabel: "End", destructive: true });
   }
 
   // Focus mode (Bible / Media / Workspace full screen). Only the current

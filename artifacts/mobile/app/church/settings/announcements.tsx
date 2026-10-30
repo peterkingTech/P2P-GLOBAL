@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, FlatList, Image, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform, Modal, FlatList, Image, Switch } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 const TYPE_OPTIONS: { value: ChurchAnnouncementType; label: string }[] = [
   { value: "general", label: "General" }, { value: "bible_study", label: "Bible Study" },
   { value: "discipleship", label: "Discipleship" }, { value: "prayer", label: "Prayer" },
@@ -65,13 +66,13 @@ export default function ChurchAnnouncementsManagementScreen() {
   async function handlePickMedia() {
     if (!userChurch) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Please allow photo library access to attach media."); return; }
+    if (!perm.granted) { showAlert("Permission needed", "Please allow photo library access to attach media."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.8, videoMaxDuration: MAX_VIDEO_SECONDS });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    if (asset.fileSize && asset.fileSize > MAX_MEDIA_BYTES) { Alert.alert("File too large", "Please choose a file under 25MB."); return; }
+    if (asset.fileSize && asset.fileSize > MAX_MEDIA_BYTES) { showAlert("File too large", "Please choose a file under 25MB."); return; }
     if (asset.type === "video" && asset.duration && asset.duration / 1000 > MAX_VIDEO_SECONDS) {
-      Alert.alert("Video too long", `Please choose a video under ${MAX_VIDEO_SECONDS} seconds.`);
+      showAlert("Video too long", `Please choose a video under ${MAX_VIDEO_SECONDS} seconds.`);
       return;
     }
     setUploadingMedia(true);
@@ -82,7 +83,7 @@ export default function ChurchAnnouncementsManagementScreen() {
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
       const { error } = await supabase.storage.from("church-media").upload(path, arrayBuffer, { contentType, upsert: true });
-      if (error) { Alert.alert("Upload failed", error.message); return; }
+      if (error) { showAlert("Upload failed", error.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);
       const url = `${data.publicUrl}?t=${Date.now()}`;
       if (isVideo) { setVideoUrl(url); setImageUrl(null); } else { setImageUrl(url); setVideoUrl(null); }
@@ -93,7 +94,7 @@ export default function ChurchAnnouncementsManagementScreen() {
 
   async function handlePost() {
     if (!userChurch || !title.trim() || !body.trim()) return;
-    if (scheduleLater && !publishAt.trim()) { Alert.alert("Choose a publish date"); return; }
+    if (scheduleLater && !publishAt.trim()) { showAlert("Choose a publish date", ""); return; }
     setPosting(true);
     const { error } = await createAnnouncement(userChurch.id, {
       title: title.trim(), body: body.trim(),
@@ -104,14 +105,14 @@ export default function ChurchAnnouncementsManagementScreen() {
       isFeatured,
     });
     setPosting(false);
-    if (error) { Alert.alert("Couldn't post announcement", error); return; }
+    if (error) { showAlert("Couldn't post announcement", error); return; }
     resetForm(); setComposerOpen(false); load();
   }
 
   async function handleArchive(item: ChurchAnnouncement) {
     if (!userChurch) return;
     const err = await updateAnnouncement(userChurch.id, item.id, { status: "archived" });
-    if (err) Alert.alert("Couldn't archive", err);
+    if (err) showAlert("Couldn't archive", err);
     else load();
   }
 

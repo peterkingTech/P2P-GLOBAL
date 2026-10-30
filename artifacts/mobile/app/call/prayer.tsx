@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,15 +19,8 @@ import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering"
 import { openScripture } from "@/lib/openScripture";
 import { readerTarget } from "@/lib/bibleReaderApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string, onDismiss?: () => void) {
-  if (Platform.OS === "web") {
-    window.alert(`${title}\n\n${message}`);
-    onDismiss?.();
-  } else {
-    Alert.alert(title, message, onDismiss ? [{ text: "OK", onPress: onDismiss }] : undefined);
-  }
-}
 
 const JOIN_CHANNEL_TIMEOUT_MS = 15000;
 const PEER_WAIT_TIMEOUT_MS = 45000;

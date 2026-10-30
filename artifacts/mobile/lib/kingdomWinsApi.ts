@@ -1,5 +1,5 @@
 import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Kingdom Wins / Testimonies — "Look what God has done." Client bindings
 // for routes/kingdomWins.ts. A genuinely independent domain: NOT the
@@ -7,21 +7,6 @@ import { getApiUrl } from "@/lib/apiUrl";
 // entry here (unlike Mission Stories, which stay admin-role-gated).
 // P2P Impact (entryType 'p2p_impact') lives in this same table/API as a
 // content classification, not a separate system — see migration 151.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
 
 export type KingdomEntryType = "kingdom_win" | "testimony" | "p2p_impact";
 export type KingdomCategory =
@@ -76,23 +61,23 @@ export function createKingdomWin(input: {
   mediaDurationSeconds?: number | null; isAnonymous?: boolean; visibility?: "p2p_network" | "private";
   status?: "draft" | "submitted" | "published"; consentConfirmed?: boolean;
 }): Promise<KingdomWin> {
-  return authedFetch("/kingdom-wins", { method: "POST", body: JSON.stringify(input) });
+  return apiRequest("/kingdom-wins", { method: "POST", body: JSON.stringify(input) });
 }
 export function updateKingdomWin(id: string, updates: Partial<{
   title: string; body: string; guidedSections: GuidedSections; lessonLearned: string | null; category: KingdomCategory;
   impactThemes: ImpactTheme[]; scriptureReferenceId: string | null; isAnonymous: boolean;
   visibility: "p2p_network" | "private"; status: KingdomStatus; consentConfirmed: boolean;
 }>): Promise<KingdomWin> {
-  return authedFetch(`/kingdom-wins/${id}`, { method: "PUT", body: JSON.stringify(updates) });
+  return apiRequest(`/kingdom-wins/${id}`, { method: "PUT", body: JSON.stringify(updates) });
 }
 export function archiveKingdomWin(id: string): Promise<KingdomWin> {
-  return authedFetch(`/kingdom-wins/${id}`, { method: "PUT", body: JSON.stringify({ status: "archived" }) });
+  return apiRequest(`/kingdom-wins/${id}`, { method: "PUT", body: JSON.stringify({ status: "archived" }) });
 }
 export function deleteKingdomWin(id: string): Promise<{ removed: true }> {
-  return authedFetch(`/kingdom-wins/${id}`, { method: "DELETE" });
+  return apiRequest(`/kingdom-wins/${id}`, { method: "DELETE" });
 }
 export function getMyKingdomWins(): Promise<KingdomWin[]> {
-  return authedFetch("/kingdom-wins/mine");
+  return apiRequest("/kingdom-wins/mine");
 }
 export function getKingdomWinsFeed(opts: { category?: KingdomCategory; entryType?: KingdomEntryType; impactTheme?: ImpactTheme; page?: number; limit?: number } = {}): Promise<{ entries: KingdomWin[]; total: number; page: number; pageSize: number }> {
   const q = new URLSearchParams();
@@ -101,42 +86,42 @@ export function getKingdomWinsFeed(opts: { category?: KingdomCategory; entryType
   if (opts.impactTheme) q.set("impactTheme", opts.impactTheme);
   q.set("page", String(opts.page ?? 0));
   q.set("limit", String(opts.limit ?? 20));
-  return authedFetch(`/kingdom-wins/feed?${q}`);
+  return apiRequest(`/kingdom-wins/feed?${q}`);
 }
 export function getKingdomWin(id: string): Promise<KingdomWin> {
-  return authedFetch(`/kingdom-wins/${id}`);
+  return apiRequest(`/kingdom-wins/${id}`);
 }
 export function reactToKingdomWin(id: string, reactionType: KingdomReactionType): Promise<{ reactionCounts: Record<string, number>; myReactions: string[] }> {
-  return authedFetch(`/kingdom-wins/${id}/react`, { method: "POST", body: JSON.stringify({ reactionType }) });
+  return apiRequest(`/kingdom-wins/${id}/react`, { method: "POST", body: JSON.stringify({ reactionType }) });
 }
 export function unreactToKingdomWin(id: string, reactionType: KingdomReactionType): Promise<{ reactionCounts: Record<string, number>; myReactions: string[] }> {
-  return authedFetch(`/kingdom-wins/${id}/react/${reactionType}`, { method: "DELETE" });
+  return apiRequest(`/kingdom-wins/${id}/react/${reactionType}`, { method: "DELETE" });
 }
 
 /** The signed-in member's own posting status (migration 189). */
 export function getMyWinsPostingStatus(): Promise<{ restricted: boolean; until: string | null }> {
-  return authedFetch("/kingdom-wins/me/posting-status");
+  return apiRequest("/kingdom-wins/me/posting-status");
 }
 
 // ── Admin moderation (review queue + posting restrictions) ──────────────────
 export function getKingdomWinsAdminQueue(status: "submitted" | "published" | "rejected" | "archived" | "removed" = "submitted"): Promise<KingdomWin[]> {
-  return authedFetch(`/kingdom-wins/admin/queue?status=${status}`);
+  return apiRequest(`/kingdom-wins/admin/queue?status=${status}`);
 }
 export function moderateKingdomWin(id: string, action: "approve" | "reject" | "archive", note?: string): Promise<KingdomWin> {
-  return authedFetch(`/kingdom-wins/${id}/moderate`, { method: "POST", body: JSON.stringify({ action, note }) });
+  return apiRequest(`/kingdom-wins/${id}/moderate`, { method: "POST", body: JSON.stringify({ action, note }) });
 }
 export interface WinsRestriction {
   id: string; userId: string; reason: string; imposedBy: string | null; imposedAt: string; expiresAt: string | null;
   liftedAt: string | null; liftedBy: string | null; liftReason: string | null; active: boolean;
 }
 export function getWinsRestrictions(userId: string): Promise<WinsRestriction[]> {
-  return authedFetch(`/kingdom-wins/admin/restrictions?userId=${encodeURIComponent(userId)}`);
+  return apiRequest(`/kingdom-wins/admin/restrictions?userId=${encodeURIComponent(userId)}`);
 }
 export function restrictWinsPosting(userId: string, reason: string, expiresAt: string | null): Promise<unknown> {
-  return authedFetch("/kingdom-wins/admin/restrictions", { method: "POST", body: JSON.stringify({ userId, reason, expiresAt }) });
+  return apiRequest("/kingdom-wins/admin/restrictions", { method: "POST", body: JSON.stringify({ userId, reason, expiresAt }) });
 }
 export function liftWinsRestriction(restrictionId: string, reason: string): Promise<unknown> {
-  return authedFetch(`/kingdom-wins/admin/restrictions/${restrictionId}/lift`, { method: "POST", body: JSON.stringify({ reason }) });
+  return apiRequest(`/kingdom-wins/admin/restrictions/${restrictionId}/lift`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
 // Media upload — identical client-generated-id shape used throughout this

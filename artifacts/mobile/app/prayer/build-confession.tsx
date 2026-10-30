@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Switch, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const TIME_PRESETS = [
   { label: "6:00 AM", hour: 6, minute: 0 },
@@ -98,10 +99,10 @@ export default function BuildConfessionScreen() {
         { onConflict: "user_id" }
       );
       if (error) throw error;
-      Alert.alert("Saved", "Your confession has been saved.");
+      showAlert("Saved", "Your confession has been saved.");
       router.back();
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message ?? "Something went wrong.");
+      showAlert("Couldn't save", e.message ?? "Something went wrong.");
     } finally {
       setSaving(false);
     }

@@ -5,8 +5,7 @@
 // category-management actions carry business logic (slug generation, lock
 // chain recalculation, safety checks) that only the server should own.
 
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 export type AdminPlanCategory = {
   id: string;
@@ -47,61 +46,51 @@ export type CategoryStats = {
   avgCompletionWeeks: number | null;
 };
 
-async function authHeaders(json = false): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? "";
-  return json
-    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-    : { Authorization: `Bearer ${token}` };
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${getApiUrl()}/admin${path}`, init);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-  return data as T;
-}
+const request = <T = unknown,>(path: string, init?: RequestInit) => apiRequest<T>(path, init, {
+  base: "/admin",
+  makeError: (message, status, b) => new Error(typeof b.error === "string" ? message : `Request failed (${status})`),
+});
 
 export async function listPlanCategories(): Promise<AdminPlanCategory[]> {
-  return request<AdminPlanCategory[]>("/plan-categories", { headers: await authHeaders() });
+  return request<AdminPlanCategory[]>("/plan-categories");
 }
 
 export async function createPlanCategory(input: { title: string; description?: string; color_theme?: string; icon?: string }): Promise<AdminPlanCategory> {
-  return request<AdminPlanCategory>("/plan-categories", { method: "POST", headers: await authHeaders(true), body: JSON.stringify(input) });
+  return request<AdminPlanCategory>("/plan-categories", { method: "POST", body: JSON.stringify(input) });
 }
 
 export async function updatePlanCategory(categoryId: string, input: Partial<{ title: string; description: string; color_theme: string; icon: string; display_order: number; status: string }>): Promise<AdminPlanCategory> {
-  return request<AdminPlanCategory>(`/plan-categories/${categoryId}`, { method: "PUT", headers: await authHeaders(true), body: JSON.stringify(input) });
+  return request<AdminPlanCategory>(`/plan-categories/${categoryId}`, { method: "PUT", body: JSON.stringify(input) });
 }
 
 export async function deletePlanCategory(categoryId: string): Promise<{ deleted: true }> {
-  return request(`/plan-categories/${categoryId}`, { method: "DELETE", headers: await authHeaders() });
+  return request(`/plan-categories/${categoryId}`, { method: "DELETE" });
 }
 
 export async function reorderPlanCategories(items: { id: string; display_order: number }[]): Promise<{ updated: number }> {
-  return request("/plan-categories/reorder", { method: "PUT", headers: await authHeaders(true), body: JSON.stringify(items) });
+  return request("/plan-categories/reorder", { method: "PUT", body: JSON.stringify(items) });
 }
 
 export async function getPlanCategoryStats(categoryId: string): Promise<CategoryStats> {
-  return request<CategoryStats>(`/plan-categories/${categoryId}/stats`, { headers: await authHeaders() });
+  return request<CategoryStats>(`/plan-categories/${categoryId}/stats`);
 }
 
 export async function listUncategorizedPlans(): Promise<AdminPlan[]> {
-  return request<AdminPlan[]>("/plans/uncategorized", { headers: await authHeaders() });
+  return request<AdminPlan[]>("/plans/uncategorized");
 }
 
 export async function movePlanToCategory(planId: string, categoryId: string): Promise<{ id: string; parentCategoryId: string; topicNumber: number }> {
-  return request(`/plans/${planId}/move-category`, { method: "PUT", headers: await authHeaders(true), body: JSON.stringify({ category_id: categoryId }) });
+  return request(`/plans/${planId}/move-category`, { method: "PUT", body: JSON.stringify({ category_id: categoryId }) });
 }
 
 export async function reorderPlan(planId: string, newTopicNumber: number): Promise<{ id: string; newTopicNumber: number }> {
-  return request(`/plans/${planId}/reorder`, { method: "PUT", headers: await authHeaders(true), body: JSON.stringify({ new_topic_number: newTopicNumber }) });
+  return request(`/plans/${planId}/reorder`, { method: "PUT", body: JSON.stringify({ new_topic_number: newTopicNumber }) });
 }
 
 export async function togglePlanLock(planId: string, isLocked: boolean): Promise<AdminPlan> {
-  return request<AdminPlan>(`/plans/${planId}/toggle-lock`, { method: "PUT", headers: await authHeaders(true), body: JSON.stringify({ is_locked: isLocked }) });
+  return request<AdminPlan>(`/plans/${planId}/toggle-lock`, { method: "PUT", body: JSON.stringify({ is_locked: isLocked }) });
 }
 
 export async function duplicatePlan(planId: string): Promise<{ id: string; title: string }> {
-  return request(`/plans/${planId}/duplicate`, { method: "POST", headers: await authHeaders() });
+  return request(`/plans/${planId}/duplicate`, { method: "POST" });
 }

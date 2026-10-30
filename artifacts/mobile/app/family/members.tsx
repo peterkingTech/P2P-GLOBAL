@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, Alert, Platform, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, RefreshControl } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
@@ -9,11 +9,8 @@ import { getFamilyDetail, inviteToFamily, removeFamilyMember, type FamilyDetailR
 import { FamilyMemberList } from "@/components/family/FamilyMemberList";
 import { FamilyInvitePanel } from "@/components/family/FamilyInvitePanel";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Scoped to one familyId (passed via route params from app/family/[familyId].tsx)
 // — a member of several families sees each family's own independent roster here.
@@ -90,15 +87,10 @@ export default function FamilyMembersScreen() {
 
   function handleRemoveMember(m: FamilyMember) {
     if (!familyId) return;
-    Alert.alert(`Remove ${m.name}?`, "They can be invited again later.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${m.name}?`, "They can be invited again later.", async () => {
           try { await removeFamilyMember(familyId, m.userId); await load(); }
           catch (e: any) { showAlert("Couldn't remove this person", e.message ?? "Please try again."); }
-        },
-      },
-    ]);
+        }, { confirmLabel: "Remove", destructive: true });
   }
 
   return (

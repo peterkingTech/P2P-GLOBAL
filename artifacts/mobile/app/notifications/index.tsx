@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -13,11 +13,8 @@ import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { NotificationRow } from "@/components/notifications/NotificationRow";
 import { NOTIFICATION_PAGE_SIZE } from "@/lib/notificationModel";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Every Study Together notification type shares this prefix — one rule
 // covers the whole lifecycle (invitation received/accepted/declined,

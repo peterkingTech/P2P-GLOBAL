@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, AdminActivityEntry, ContactDepartment, ContactDeptStats } from "@/contexts/DataContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -156,7 +156,7 @@ function ZoneOrNationalAdminDashboard({ role }: { role: "admin_zone" | "admin_na
   useEffect(() => {
     (async () => {
       try {
-        const res = await authedFetch("/admin/appointments/list");
+        const res = await apiFetch("/admin/appointments/list");
         if (res.ok) {
           const all = await res.json();
           const filtered = role === "admin_zone"
@@ -365,7 +365,7 @@ function SuperAdminDashboard() {
                     <Text style={styles.queueSub}>This week: {item.casesThisWeek} cases · Rating: {item.avgRating ?? "—"}</Text>
                   </View>
                   <TouchableOpacity accessibilityRole="button" onPress={async () => {
-                    await authedFetch(`/admin/appointments/${item.id}/suspend`, {
+                    await apiFetch(`/admin/appointments/${item.id}/suspend`, {
                       method: "PUT", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ reason: item.adminIsActive ? "Suspended from Super Admin dashboard" : "Reinstated from Super Admin dashboard" }),
                     });

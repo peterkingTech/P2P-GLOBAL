@@ -50,7 +50,7 @@ ok("return bar: same mic toggle, labelled", /onPress=\{gathering\.toggleMic\}/.t
 const central = src("app/lesson/[id].tsx");
 ok("central lesson: return bar on both views", (central.match(/<GatheringReturnBar \/>/g) ?? []).length === 2);
 ok("central lesson: no 'Study Together' (a second call) while a Gathering runs", /\{lessonMeta && !activeGathering && \(/.test(central));
-ok("family lesson: return bar", /<GatheringReturnBar \/>/.test(src("app/family/studies/lesson/[lessonId].tsx")));
+ok("family lesson: return bar (shared lesson screen)", /<GatheringReturnBar \/>/.test(src("components/community/CommunityLessonScreen.tsx")) && src("app/family/studies/lesson/[lessonId].tsx").includes('<CommunityLessonScreen scope="family" />'));
 
 // ── Choosing a lesson ────────────────────────────────────────────────────
 const pick = src("components/family/GatheringLessonPicker.tsx");
@@ -90,7 +90,7 @@ ok("own lesson opens on top; Return comes back to this call (same params)", /rou
 ok("mirror cleared on leave and unmount; sheets keep the call's own mic", /if \(params\.callId\) clearActiveGathering\(params\.callId\);/.test(cc) && /return \(\) => \{ if \(id\) clearActiveGathering\(id\); \};/.test(cc)
   && /const mic = \{ connected: !!token, muted: muted \|\| micDisabledByHost, onToggle: toggleMute \};/.test(cc));
 ok("hooks run before the loading guard (no conditional hooks)", cc.indexOf("const toggleMuteRef = useRef(toggleMute);") < cc.indexOf("if (loading || !detail) {"));
-ok("church lesson screen: return bar", /<GatheringReturnBar \/>/.test(src("app/church/studies/lesson/[lessonId].tsx")));
+ok("church lesson screen: return bar (shared lesson screen)", /<GatheringReturnBar \/>/.test(src("components/community/CommunityLessonScreen.tsx")) && src("app/church/studies/lesson/[lessonId].tsx").includes('<CommunityLessonScreen scope="church" />'));
 const ch = src("app/church/index.tsx");
 ok("church home: Learning entry for leaders and members (same unified Learning home as Family)",
   (ch.match(/pathname: "\/learning\/\[scope\]\/\[groupId\]", params: \{ scope: "church", groupId: userChurch\.id \}/g) ?? []).length === 2);

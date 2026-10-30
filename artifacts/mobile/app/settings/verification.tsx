@@ -11,6 +11,7 @@ import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const MIN_ACCOUNT_AGE_DAYS = 14;
 
@@ -26,10 +27,6 @@ const DECLINE_REASON_LABELS: Record<string, string> = {
   other: "We were unable to verify your identity with the submission provided.",
 };
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function VerificationScreen() {
   const insets = useSafeAreaInsets();

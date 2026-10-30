@@ -37,6 +37,7 @@ const mocks = {
   react: reactMock, "react-native": RN,
   "@/contexts/ThemeContext": { useTheme: () => ({ colors }) },
   "@/constants/colors": { default: colors, __esModule: true },
+  "@expo/vector-icons": { Ionicons: host("Ionicons") },
 };
 const cache = new Map();
 function resolveFile(spec, fromDir) {

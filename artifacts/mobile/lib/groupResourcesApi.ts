@@ -1,5 +1,4 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Client for Files & Resources (api-server routes/groupResources.ts). The
 // server checks membership of the exact group on every call and only ever
@@ -13,17 +12,10 @@ export interface GroupResource {
 }
 export class ResourceApiError extends Error { status: number; constructor(m: string, s: number) { super(m); this.status = s; } }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  let res: Response;
-  try {
-    res = await fetch(`${getApiUrl()}${path}`, { ...init, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) } });
-  } catch { throw new ResourceApiError("You're offline — check your connection and try again.", 0); }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ResourceApiError((body as { error?: string }).error ?? "Something went wrong.", res.status);
-  return body as T;
-}
+const call = <T,>(path: string, init?: RequestInit) => apiRequest<T>(path, init, {
+  fallbackError: "Something went wrong.", offlineError: "You're offline — check your connection and try again.",
+  makeError: (message, status) => new ResourceApiError(message, status),
+});
 
 export const listResources = (scope: GroupScope, groupId: string) =>
   call<{ available: boolean; canUpload: boolean; canManage: boolean; items: GroupResource[] }>(`/resources/${scope}/${groupId}`);

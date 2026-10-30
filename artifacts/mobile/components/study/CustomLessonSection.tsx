@@ -6,15 +6,8 @@ import type { AppColors } from "@/constants/themes";
 import CustomLessonEditor from "@/components/study/CustomLessonEditor";
 import { passageLabel, readPassages, statusLabel, type CustomLesson, type LessonApi, type LessonInput, type LessonStatus } from "@/lib/customLessonModel";
 import { AppButton, IconButton } from "@/components/ui";
+import { confirmAction, showAlert } from "@/lib/alerts";
 
-function notify(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
-function confirm(title: string, message: string, label: string, onConfirm: () => void) {
-  if (Platform.OS === "web") { if (window.confirm(`${title}\n\n${message}`)) onConfirm(); return; }
-  Alert.alert(title, message, [{ text: "Cancel", style: "cancel" }, { text: label, style: "destructive", onPress: onConfirm }]);
-}
 
 // The LESSONS section of a custom study (Family or Church — the screen passes
 // its own API adapter). Leaders: add / edit / preview / publish / unpublish /
@@ -53,17 +46,17 @@ export default function CustomLessonSection({ lessons, onLessonsChange, canManag
   async function changeStatus(lesson: CustomLesson, status: LessonStatus) {
     setBusyId(lesson.id);
     try { replace(await api.setStatus(lesson.id, status)); }
-    catch (e: any) { notify("Couldn't update the lesson", e?.message ?? "Please try again."); }
+    catch (e: any) { showAlert("Couldn't update the lesson", e?.message ?? "Please try again."); }
     finally { setBusyId(null); }
   }
 
   function remove(lesson: CustomLesson) {
-    confirm("Delete this draft?", lesson.title, "Delete", async () => {
+    confirmAction("Delete this draft?", lesson.title, async () => {
       setBusyId(lesson.id);
       try { await api.remove(lesson.id); onLessonsChange(lessons.filter((l) => l.id !== lesson.id)); }
-      catch (e: any) { notify("Couldn't delete", e?.message ?? "Please try again."); }
+      catch (e: any) { showAlert("Couldn't delete", e?.message ?? "Please try again."); }
       finally { setBusyId(null); }
-    });
+    }, { confirmLabel: "Delete", destructive: true });
   }
 
   function openActions(lesson: CustomLesson) {
@@ -75,7 +68,7 @@ export default function CustomLessonSection({ lessons, onLessonsChange, canManag
     ];
     if (status === "draft") actions.push({ text: "Publish", onPress: () => changeStatus(lesson, "published") });
     if (status === "published") actions.push({ text: "Unpublish (back to draft)", onPress: () => changeStatus(lesson, "draft") });
-    if (status !== "archived") actions.push({ text: "Archive", onPress: () => confirm("Archive this lesson?", "Members won't see it. Anything already written is kept.", "Archive", () => changeStatus(lesson, "archived")) });
+    if (status !== "archived") actions.push({ text: "Archive", onPress: () => confirmAction("Archive this lesson?", "Members won't see it. Anything already written is kept.", () => changeStatus(lesson, "archived"), { confirmLabel: "Archive", destructive: true }) });
     if (status === "archived") actions.push({ text: "Restore as draft", onPress: () => changeStatus(lesson, "draft") });
     if (neverPublished) actions.push({ text: "Delete draft", style: "destructive", onPress: () => remove(lesson) });
     if (Platform.OS === "web") {

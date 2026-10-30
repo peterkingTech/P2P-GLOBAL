@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { showAlert } from "@/lib/alerts";
 
 export default function ChurchPrivacySettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -19,7 +20,7 @@ export default function ChurchPrivacySettingsScreen() {
     setSaving(true);
     const { error } = await updateChurch(userChurch.id, { locationHidden: value });
     setSaving(false);
-    if (error) { Alert.alert("Couldn't save", error); setLocationHidden(!value); return; }
+    if (error) { showAlert("Couldn't save", error); setLocationHidden(!value); return; }
     await loadUserChurch();
   }
 

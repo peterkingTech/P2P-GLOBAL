@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -17,13 +17,10 @@ import { answerSystemCall, endSystemCall } from "@/lib/callSystem";
 import { Avatar } from "@/components/Avatar";
 import { usePeerPhoto } from "@/lib/usePeerPhoto";
 import appColors from "@/constants/colors";
+import { showAlert } from "@/lib/alerts";
 
 const LOGO = require("@/assets/images/logo.png");
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const RING_TIMEOUT_MS = 30000;
 // Device clocks can disagree with the server's created_at by a few seconds:

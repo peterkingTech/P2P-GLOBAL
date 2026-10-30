@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { useStudySession, StudyLessonMeta, StudySessionSummary as Summary } from "@/hooks/useStudySession";
 import { StudyLessonTab } from "./StudyLessonTab";
@@ -7,6 +7,7 @@ import { StudyQuestionsTab } from "./StudyQuestionsTab";
 import { StudyScriptureTab } from "./StudyScriptureTab";
 import { StudyPeopleTab } from "./StudyPeopleTab";
 import { StudyNotesTab } from "./StudyNotesTab";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 type Tab = "lesson" | "questions" | "scripture" | "notes" | "people";
 const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -17,18 +18,7 @@ const TABS: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] 
   { key: "people", label: "People", icon: "people-outline" },
 ];
 
-function showConfirm(title: string, message: string, options: { text: string; onPress: () => void; style?: "destructive" | "cancel" }[]) {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n\n${message}`)) options.find((o) => o.style !== "cancel")?.onPress();
-  } else {
-    Alert.alert(title, message, options.map((o) => ({ text: o.text, onPress: o.onPress, style: o.style })));
-  }
-}
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // The dominant learning layout Study Together switches into — lesson primary,
 // participants as a small strip (spec section 8). Doesn't know anything about
@@ -66,27 +56,17 @@ export function StudyTogetherOverlay({
   // departure, since the server only ever trusts the caller's own verified
   // identity, never who they claim to be.
   function handleLeaveStudy() {
-    showConfirm("Leave Study Together?", "You'll remain in the call, but will stop following the group's shared lesson position.", [
-      { text: "Stay", style: "cancel", onPress: () => {} },
-      {
-        text: "Leave Study", style: "destructive", onPress: async () => {
-          await session.reportParticipantDeparture(myId);
-          onReturnToCall();
-        },
-      },
-    ]);
+    confirmAction("Leave Study Together?", "You'll remain in the call, but will stop following the group's shared lesson position.", async () => {
+      await session.reportParticipantDeparture(myId);
+      onReturnToCall();
+    }, { cancelLabel: "Stay", confirmLabel: "Leave Study", destructive: true });
   }
 
   function handleEndStudy() {
-    showConfirm("End Study Session?", "Ending study does not end the call.", [
-      { text: "Continue Call", style: "cancel", onPress: () => {} },
-      {
-        text: "End Study", style: "destructive", onPress: async () => {
-          const summary = await session.endStudy();
-          onSessionEnded(summary);
-        },
-      },
-    ]);
+    confirmAction("End Study Session?", "Ending study does not end the call.", async () => {
+      const summary = await session.endStudy();
+      onSessionEnded(summary);
+    }, { cancelLabel: "Continue Call", confirmLabel: "End Study", destructive: true });
   }
 
   const moduleLessonLabel = session.lesson ? session.lesson.title : "";

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import colors from "@/constants/colors";
@@ -9,16 +9,13 @@ import {
   type KingdomStoryTopic, type KingdomStoryCategory, type TopicStatus, type TopicPriority,
 } from "@/lib/kingdomStoriesApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // Catalogue topics (editors). Filter by category, status, priority, period,
 // region; search titles. Within one category (no other filter) the topics can
 // be put in order — that order is the category's production order.
 const PAGE = 100;
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function TopicsScreen() {
   const router = useRouter();

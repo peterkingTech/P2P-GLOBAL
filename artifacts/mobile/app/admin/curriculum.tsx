@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView,
-  ActivityIndicator, Alert, Platform, useWindowDimensions, Modal, Image,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+  Modal,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +22,7 @@ import PdfImportModal from "@/components/admin/PdfImportModal";
 import PlanCategoryManager from "@/components/admin/PlanCategoryManager";
 import { previewMoveToBin, moveToBin, moveToBinMessage, type DeletePreview, type RecycleType } from "@/lib/recycleBinApi";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,10 +90,6 @@ const badgeStyles = StyleSheet.create({
   text: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.3 },
 });
 
-function showAdminError(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -209,7 +214,7 @@ export default function CurriculumManagerScreen() {
   }
 
   async function handleCreate() {
-    if (!createTitle.trim()) { showAdminError("Title required", "Please enter a title."); return; }
+    if (!createTitle.trim()) { showAlert("Title required", "Please enter a title."); return; }
     setCreateLoading(true);
 
     let error: any = null;
@@ -260,7 +265,7 @@ export default function CurriculumManagerScreen() {
     }
 
     setCreateLoading(false);
-    if (error) { showAdminError("Error", error.message); return; }
+    if (error) { showAlert("Error", error.message); return; }
 
     setCreateModal(null);
     await loadTree();
@@ -283,7 +288,7 @@ export default function CurriculumManagerScreen() {
     const { data: newLesson, error } = await supabase.from("p2p_lessons")
       .insert({ module_id: lesson.module_id, title: `${lesson.title} (Copy)`, subtitle: lesson.subtitle, status: "draft", order_index: sortOrder })
       .select().single();
-    if (error || !newLesson) { showAdminError("Duplicate failed", error?.message ?? "Unknown error"); return; }
+    if (error || !newLesson) { showAlert("Duplicate failed", error?.message ?? "Unknown error"); return; }
 
     const { data: blocks } = await supabase.from("p2p_lesson_blocks").select("*").eq("lesson_id", lesson.id).order("order_index");
     if (blocks && blocks.length > 0) {
@@ -302,24 +307,17 @@ export default function CurriculumManagerScreen() {
   async function confirmDelete(kind: string, id: string, type: RecycleType, after?: () => void) {
     let preview: DeletePreview | null = null;
     try { preview = await previewMoveToBin(type, id); }
-    catch (e: any) { showAdminError(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
-    if (preview.blocked) { showAdminError(`Could not delete ${kind}`, preview.blocked === "recycle_system_content" ? "This holds learners' Kingdom Stories progress and cannot be deleted." : "This can't be deleted right now."); return; }
+    catch (e: any) { showAlert(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
+    if (preview.blocked) { showAlert(`Could not delete ${kind}`, preview.blocked === "recycle_system_content" ? "This holds learners' Kingdom Stories progress and cannot be deleted." : "This can't be deleted right now."); return; }
     const doDelete = async () => {
       try { await moveToBin(type, id); }
-      catch (e: any) { showAdminError(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
+      catch (e: any) { showAlert(`Could not delete ${kind}`, e?.message ?? "Please try again."); return; }
       after?.();
       loadTree();
     };
     const title = `Move ${kind} to the Recycle Bin?`;
     const message = moveToBinMessage(preview.title, preview);
-    if (Platform.OS === "web") {
-      if (window.confirm(`${title}\n\n${message}`)) doDelete();
-    } else {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Move to Recycle Bin", style: "destructive", onPress: doDelete },
-      ]);
-    }
+    confirmAction(title, message, doDelete, { confirmLabel: "Move to Recycle Bin", destructive: true });
   }
 
   // ── Reorder (up/down) ────────────────────────────────────────────────────────
@@ -690,7 +688,7 @@ function CurriculumEditor({
 
   async function pickAndUploadCover() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo access to upload a cover image."); return; }
+    if (!perm.granted) { showAlert("Permission needed", "Allow photo access to upload a cover image."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.85 });
     if (result.canceled || !result.assets.length) return;
 
@@ -705,7 +703,7 @@ function CurriculumEditor({
       const { data: urlData } = supabase.storage.from("curriculum-media").getPublicUrl(path);
       setCoverImage(urlData.publicUrl);
     } catch (ex: any) {
-      Alert.alert("Upload failed", ex.message);
+      showAlert("Upload failed", ex.message);
     } finally {
       setUploadingCover(false);
     }
@@ -876,7 +874,7 @@ function ModuleEditor({
 
   async function pickAndUploadImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Allow photo access to upload a thumbnail."); return; }
+    if (!perm.granted) { showAlert("Permission needed", "Allow photo access to upload a thumbnail."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.85 });
     if (result.canceled || !result.assets.length) return;
 
@@ -891,7 +889,7 @@ function ModuleEditor({
       const { data: urlData } = supabase.storage.from("Module Title Pictures").getPublicUrl(path);
       setImageUrl(urlData.publicUrl);
     } catch (ex: any) {
-      Alert.alert("Upload failed", ex.message);
+      showAlert("Upload failed", ex.message);
     } finally {
       setUploading(false);
     }

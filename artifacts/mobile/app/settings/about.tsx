@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -10,6 +10,7 @@ import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { shareInviteLink } from "@/lib/sharing";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -17,7 +18,7 @@ const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 // than link to a fabricated URL or a blank screen, these rows say so
 // honestly when tapped.
 function notPublishedYet(what: string) {
-  Alert.alert("Coming soon", `${what} hasn't been published yet.`);
+  showAlert("Coming soon", `${what} hasn't been published yet.`);
 }
 
 export default function AboutSettingsScreen() {
@@ -30,13 +31,13 @@ export default function AboutSettingsScreen() {
 
   async function handleShareInvite() {
     if (!profile?.username) {
-      Alert.alert("Set a username first", "Add a username before inviting others.");
+      showAlert("Set a username first", "Add a username before inviting others.");
       return;
     }
     setInviting(true);
     try {
       const inviteLink = await getMyInviteLink();
-      if (!inviteLink) { Alert.alert("Couldn't get invite link", "Please try again."); return; }
+      if (!inviteLink) { showAlert("Couldn't get invite link", "Please try again."); return; }
       await shareInviteLink({ username: profile.username, inviteLink });
     } finally {
       setInviting(false);

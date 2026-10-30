@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 const DESCRIPTION_MAX = 280;
 
@@ -22,9 +23,9 @@ export default function ChurchGeneralSettingsScreen() {
     setSaving(true);
     const { error } = await updateChurch(userChurch.id, { name: name.trim(), description: description.trim() });
     setSaving(false);
-    if (error) { Alert.alert("Couldn't save", error); return; }
+    if (error) { showAlert("Couldn't save", error); return; }
     await loadUserChurch();
-    Alert.alert("Saved", "Church details updated.");
+    showAlert("Saved", "Church details updated.");
   }
 
   return (

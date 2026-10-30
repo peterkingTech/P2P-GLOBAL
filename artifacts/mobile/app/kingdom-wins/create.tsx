@@ -1,25 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch, Image, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Switch } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
-import VideoRecorder from "@/components/VideoRecorder";
 import {
   createKingdomWin, uploadKingdomWinVideo, uploadKingdomWinPhoto, getMyWinsPostingStatus,
   KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomEntryType, type KingdomCategory, type ImpactTheme,
 } from "@/lib/kingdomWinsApi";
 import { WINS_COMMUNITY_RULES, WINS_RULES_NOTE, postingStatusMessage, shareOutcome } from "@/lib/winsModerationModel";
-import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { StoryMediaField, useStoryMedia, uploadStoryMedia } from "@/components/story/StoryMedia";
+import { scriptureReferenceIdFor, ScriptureInputError } from "@/lib/scriptureInput";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 const CATEGORIES = Object.keys(KINGDOM_CATEGORY_LABELS) as KingdomCategory[];
 const IMPACT_THEMES = Object.keys(IMPACT_THEME_LABELS) as ImpactTheme[];
@@ -63,9 +59,7 @@ export default function CreateKingdomWinScreen() {
   const [impactThemes, setImpactThemes] = useState<ImpactTheme[]>([]);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [consentConfirmed, setConsentConfirmed] = useState(false);
-  const [videoUri, setVideoUri] = useState<string | null>(null);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [photoAsset, setPhotoAsset] = useState<{ uri: string; mimeType?: string; fileName?: string | null } | null>(null);
+  const media = useStoryMedia();
   const [submitting, setSubmitting] = useState(false);
   // Posting restriction (migration 189). The server enforces it either way;
   // this only explains it up front. Drafts stay available.
@@ -83,15 +77,6 @@ export default function CreateKingdomWinScreen() {
     setImpactThemes((prev) => prev.includes(theme) ? prev.filter((t) => t !== theme) : [...prev, theme]);
   }
 
-  async function handlePickPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) { showAlert("Photo access needed", "Please allow photo library access to add a picture."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    setPhotoAsset({ uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName });
-  }
-
   async function handleSubmit(status: "draft" | "published" | "submitted") {
     if (!profile?.id || !title.trim() || !hasContent) return;
     if (isImpact && status === "submitted" && !consentConfirmed) {
@@ -100,22 +85,13 @@ export default function CreateKingdomWinScreen() {
     }
     setSubmitting(true);
     try {
-      let mediaFields: { id?: string; mediaType?: "video" | "photo"; mediaPath?: string; mediaDurationSeconds?: number } = {};
-      if (videoUri) {
-        const uploaded = await uploadKingdomWinVideo(videoUri, profile.id);
-        if (!uploaded) { showAlert("Couldn't upload your video", "Please check your connection and try again."); setSubmitting(false); return; }
-        mediaFields = { id: uploaded.entryId, mediaType: "video", mediaPath: uploaded.mediaPath, mediaDurationSeconds: videoDuration };
-      } else if (photoAsset) {
-        const uploaded = await uploadKingdomWinPhoto(photoAsset, profile.id);
-        if (!uploaded) { showAlert("Couldn't upload your photo", "Please check your connection and try again."); setSubmitting(false); return; }
-        mediaFields = { id: uploaded.entryId, mediaType: "photo", mediaPath: uploaded.mediaPath };
-      }
-      let scriptureReferenceId: string | null = null;
-      if (scripture.trim()) {
-        const parsed = parseScriptureInput(scripture);
-        if (!parsed) { showAlert("Couldn't read that Scripture reference", "Try a format like \"Philippians 4:6-7\"."); setSubmitting(false); return; }
-        const ref = await createOrFindScriptureReference(parsed);
-        scriptureReferenceId = ref.id;
+      const mediaFields = await uploadStoryMedia(media, { userId: profile.id, uploadVideo: uploadKingdomWinVideo, uploadPhoto: uploadKingdomWinPhoto, idOf: (u) => u.entryId });
+      if (!mediaFields) { setSubmitting(false); return; }
+      let scriptureReferenceId: string | null;
+      try { scriptureReferenceId = await scriptureReferenceIdFor(scripture); }
+      catch (e) {
+        if (!(e instanceof ScriptureInputError)) throw e;
+        showAlert("Couldn't read that Scripture reference", e.message); setSubmitting(false); return;
       }
       const saved = await createKingdomWin({
         ...mediaFields, entryType, title: title.trim(),
@@ -216,28 +192,7 @@ export default function CreateKingdomWinScreen() {
           ))}
         </View>
 
-        <Text style={styles.fieldLabel}>Media (optional — a photo or a video, not both)</Text>
-        {photoAsset ? (
-          <View style={styles.photoPreviewBox}>
-            <Image source={{ uri: photoAsset.uri }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
-              <Ionicons name="close-circle" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        ) : videoUri ? (
-          <View style={styles.videoChosenBox}>
-            <Ionicons name="videocam" size={16} color={c.accentGreen} />
-            <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <AppButton label="Add Photo" onPress={handlePickPhoto} variant="outline" icon="image-outline" disabled={submitting} style={{ marginBottom: 10 }} />
-            <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
-          </>
-        )}
+        <StoryMediaField media={media} disabled={submitting} />
 
         <View style={styles.anonRow}>
           <View style={{ flex: 1 }}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator, Image, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator, Image, Switch } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,17 +17,11 @@ import { resolveMediaUpload } from "@/lib/mediaUpload";
 import MinistryRolePicker, { MINISTRY_ROLE_OPTIONS } from "@/components/MinistryRolePicker";
 import { MinistryRole } from "@/contexts/AuthContext";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
+import { showAlert } from "@/lib/alerts";
+import { Avatar } from "@/components/Avatar";
 
 
-function timeAgo(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
-  const years = Math.floor(months / 12);
-  return `${years} year${years === 1 ? "" : "s"} ago`;
-}
 
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -67,7 +61,7 @@ export default function AccountSettingsScreen() {
     setSavingBio(true);
     const err = await updateProfile({ bio: bio.trim() });
     setSavingBio(false);
-    if (err) Alert.alert("Couldn't save", err);
+    if (err) showAlert("Couldn't save", err);
   }
 
   async function handleSaveProfile() {
@@ -75,26 +69,26 @@ export default function AccountSettingsScreen() {
     if (dob.trim()) {
       const parsed = parseDMY(dob);
       if (!parsed || !isValidCalendarDate(parsed.year, parsed.month, parsed.day)) {
-        Alert.alert("Invalid date", "Please enter a valid date in DD.MM.YYYY format");
+        showAlert("Invalid date", "Please enter a valid date in DD.MM.YYYY format");
         return;
       }
       dateOfBirth = toISODate(parsed.year, parsed.month, parsed.day);
       if (ageFromISODate(dateOfBirth) < MIN_SIGNUP_AGE) {
-        Alert.alert("Can't save", `You must be at least ${MIN_SIGNUP_AGE} years old to use this app.`);
+        showAlert("Can't save", `You must be at least ${MIN_SIGNUP_AGE} years old to use this app.`);
         return;
       }
     }
     setSavingProfile(true);
     const err = await updateProfile({ displayName: displayName.trim(), ...(dateOfBirth ? { dateOfBirth } : {}) });
     setSavingProfile(false);
-    if (err) Alert.alert("Couldn't save", err);
-    else Alert.alert("Saved", "Your profile has been updated.");
+    if (err) showAlert("Couldn't save", err);
+    else showAlert("Saved", "Your profile has been updated.");
   }
 
   async function handlePickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert("Permission needed", "Please allow photo library access to change your profile photo.");
+      showAlert("Permission needed", "Please allow photo library access to change your profile photo.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -115,12 +109,12 @@ export default function AccountSettingsScreen() {
         .from("avatars")
         .upload(path, arrayBuffer, { contentType, upsert: true });
       if (uploadError) {
-        Alert.alert("Upload failed", uploadError.message);
+        showAlert("Upload failed", uploadError.message);
         return;
       }
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       const err = await updateProfile({ avatarUrl: `${data.publicUrl}?t=${Date.now()}` });
-      if (err) Alert.alert("Couldn't save photo", err);
+      if (err) showAlert("Couldn't save photo", err);
     } finally {
       setUploadingPhoto(false);
     }
@@ -131,23 +125,23 @@ export default function AccountSettingsScreen() {
     setSavingEmail(true);
     const { error } = await supabase.auth.updateUser({ email: email.trim() });
     setSavingEmail(false);
-    if (error) Alert.alert("Couldn't update email", error.message);
-    else Alert.alert("Check your inbox", "We sent a confirmation link to your new email address.");
+    if (error) showAlert("Couldn't update email", error.message);
+    else showAlert("Check your inbox", "We sent a confirmation link to your new email address.");
   }
 
   async function handleChangePassword() {
     if (newPassword.length < 6) {
-      Alert.alert("Too short", "Password must be at least 6 characters.");
+      showAlert("Too short", "Password must be at least 6 characters.");
       return;
     }
     setSavingPassword(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
-    if (error) Alert.alert("Couldn't change password", error.message);
+    if (error) showAlert("Couldn't change password", error.message);
     else {
       setNewPassword("");
       setShowPasswordField(false);
-      Alert.alert("Password changed", "Your password has been updated.");
+      showAlert("Password changed", "Your password has been updated.");
     }
   }
 
@@ -170,13 +164,7 @@ export default function AccountSettingsScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
           <TouchableOpacity accessibilityRole="button" onPress={handlePickPhoto} disabled={uploadingPhoto} style={styles.avatarWrap}>
-            {profile?.avatarUrl ? (
-              <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
-            ) : (
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitial}>{profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}</Text>
-              </View>
-            )}
+            <Avatar photoUrl={profile?.avatarUrl} name={profile?.displayName} size={84} style={styles.avatarImg} />
             <View style={styles.cameraBadge}>
               {uploadingPhoto ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="camera" size={14} color="#fff" />}
             </View>
@@ -353,7 +341,7 @@ export default function AccountSettingsScreen() {
                       {getFlagEmoji(profile.country)} {profile.country}{profile.city ? ` · ${profile.city}` : ""} <Text style={{ color: colors.accentGreen }}>✓ Verified</Text>
                     </Text>
                     {profile.locationVerifiedAt && (
-                      <Text style={styles.locationSub}>Verified {timeAgo(profile.locationVerifiedAt)}</Text>
+                      <Text style={styles.locationSub}>Verified {timeAgo(profile.locationVerifiedAt, "long")}</Text>
                     )}
                   </>
                 ) : (

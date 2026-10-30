@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
@@ -38,7 +38,7 @@ export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetNa
     setSending(true);
     setError(null);
     try {
-      const res = await authedFetch("/discipleship/request", {
+      const res = await apiFetch("/discipleship/request", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           learnerId: profile.id, peerGuideId: targetUserId,

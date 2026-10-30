@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { shareInviteLink } from "@/lib/sharing";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 interface InviteCardProps {
   label: string;
@@ -21,13 +22,13 @@ export function InviteCard({ label, buttonText }: InviteCardProps) {
 
   async function handlePress() {
     if (!profile?.username) {
-      Alert.alert("Set a username first", "Add a username before inviting others.");
+      showAlert("Set a username first", "Add a username before inviting others.");
       return;
     }
     setBusy(true);
     try {
       const inviteLink = await getMyInviteLink();
-      if (!inviteLink) { Alert.alert("Couldn't get invite link", "Please try again."); return; }
+      if (!inviteLink) { showAlert("Couldn't get invite link", "Please try again."); return; }
       await shareInviteLink({ username: profile.username, inviteLink });
     } finally {
       setBusy(false);

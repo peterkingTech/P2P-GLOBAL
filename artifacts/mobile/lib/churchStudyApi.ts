@@ -1,97 +1,18 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { communityStudyApi, type CommunityStudyBase, type CommunityStudyLesson } from "@/lib/communityStudyApi";
 
-// Every route on the server side (routes/churchStudies.ts) resolves
-// identity via verifyCaller() — a real Supabase JWT — never a
-// client-supplied id. Exact mirror of lib/churchCallApi.ts's authedFetch,
-// kept as its own local copy per this codebase's existing convention.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error ?? "Request failed");
-  return body;
-}
+// Church custom studies — the church view of lib/communityStudyApi (routes/
+// churchStudies.ts; membership and leadership are enforced on the server).
+export type { CustomStudyStatus, CustomStudyMedia } from "@/lib/communityStudyApi";
+export interface ChurchStudy extends CommunityStudyBase { churchId: string }
+export type ChurchStudyLesson = CommunityStudyLesson;
 
-export type CustomStudyStatus = "draft" | "published" | "archived";
-
-export interface CustomStudyMedia { provider: string; id: string; url: string | null }
-
-export interface ChurchStudy {
-  id: string; churchId: string; createdBy: string | null;
-  title: string; description: string | null; status: CustomStudyStatus;
-  orderIndex: number; createdAt: string; updatedAt: string;
-}
-
-export interface ChurchStudyLesson {
-  id: string; studyId: string; title: string; description: string | null;
-  scriptureReferences: unknown[]; teachingMaterial: string | null;
-  questions: unknown[]; prayerFocus: string | null; media: CustomStudyMedia | null;
-  orderIndex: number; createdAt: string; updatedAt: string;
-  // Authoring (migration 200): per-lesson status, version, tags, links.
-  status?: "draft" | "published" | "archived"; publishedAt?: string | null; version?: number;
-  tags?: string[]; resources?: { title: string; url: string }[];
-}
-
-export function getChurchStudies(churchId: string): Promise<ChurchStudy[]> {
-  return authedFetch(`/churches/${churchId}/studies`);
-}
-
-export function getChurchStudy(studyId: string): Promise<{ study: ChurchStudy; lessons: ChurchStudyLesson[]; canManage?: boolean }> {
-  return authedFetch(`/churches/studies/${studyId}`);
-}
-
-export function createChurchStudy(churchId: string, title: string, description?: string): Promise<ChurchStudy> {
-  return authedFetch(`/churches/${churchId}/studies`, { method: "POST", body: JSON.stringify({ title, description }) });
-}
-
-export function updateChurchStudy(
-  studyId: string,
-  updates: { title?: string; description?: string | null; status?: CustomStudyStatus; orderIndex?: number }
-): Promise<ChurchStudy> {
-  return authedFetch(`/churches/studies/${studyId}`, { method: "PUT", body: JSON.stringify(updates) });
-}
-
-export function archiveChurchStudy(studyId: string): Promise<ChurchStudy> {
-  return authedFetch(`/churches/studies/${studyId}/archive`, { method: "POST" });
-}
-
-export function addChurchStudyLesson(
-  studyId: string,
-  lesson: {
-    title: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
-    questions?: unknown[]; prayerFocus?: string | null; orderIndex?: number; media?: CustomStudyMedia | null;
-    tags?: string[]; resources?: { title: string; url: string }[]; status?: "published";
-  }
-): Promise<ChurchStudyLesson> {
-  return authedFetch(`/churches/studies/${studyId}/lessons`, { method: "POST", body: JSON.stringify(lesson) });
-}
-
-export function updateChurchStudyLesson(
-  studyId: string,
-  lessonId: string,
-  updates: {
-    title?: string; description?: string | null; scriptureReferences?: unknown[]; teachingMaterial?: string | null;
-    questions?: unknown[]; prayerFocus?: string | null; media?: CustomStudyMedia | null; orderIndex?: number;
-    tags?: string[]; resources?: { title: string; url: string }[];
-  }
-): Promise<ChurchStudyLesson> {
-  return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}`, { method: "PUT", body: JSON.stringify(updates) });
-}
-
-export function removeChurchStudyLesson(studyId: string, lessonId: string): Promise<{ removed: true }> {
-  return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}`, { method: "DELETE" });
-}
-
-// Draft / published / archived for one lesson (leaders only; server-enforced).
-export function setChurchStudyLessonStatus(studyId: string, lessonId: string, status: "draft" | "published" | "archived"): Promise<ChurchStudyLesson> {
-  return authedFetch(`/churches/studies/${studyId}/lessons/${lessonId}/status`, { method: "POST", body: JSON.stringify({ status }) });
-}
+const api = communityStudyApi<ChurchStudy>("church");
+export const getChurchStudies = api.getStudies;
+export const getChurchStudy = api.getStudy;
+export const createChurchStudy = api.createStudy;
+export const updateChurchStudy = api.updateStudy;
+export const archiveChurchStudy = api.archiveStudy;
+export const addChurchStudyLesson = api.addLesson;
+export const updateChurchStudyLesson = api.updateLesson;
+export const removeChurchStudyLesson = api.removeLesson;
+export const setChurchStudyLessonStatus = api.setLessonStatus;

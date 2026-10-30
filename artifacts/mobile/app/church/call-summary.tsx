@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,17 +12,9 @@ import {
 } from "@/lib/churchCallApi";
 import GatheringFollowUp from "@/components/study/GatheringFollowUp";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
+import { formatDuration } from "@/lib/timeFormat";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "—";
-  const mins = Math.round(seconds / 60);
-  const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}h ${mins % 60}m` : `${mins}m`;
-}
 
 // Stage 5 — Call Summary. No AI content anywhere: every field is a raw
 // count, a real logged timeline event, or the host's own manually-written
@@ -107,7 +99,7 @@ export default function CallSummaryScreen() {
         <Text style={styles.sectionLabel}>OVERVIEW</Text>
         <View style={styles.card}>
           <Text style={styles.rowText}>{CHURCH_CALL_PURPOSE_LABELS[summary.overview.purpose]}</Text>
-          <Text style={styles.rowMeta}>{summary.overview.startedAt ? new Date(summary.overview.startedAt).toLocaleString() : "—"} · {formatDuration(summary.overview.durationSeconds)}</Text>
+          <Text style={styles.rowMeta}>{summary.overview.startedAt ? new Date(summary.overview.startedAt).toLocaleString() : "—"} · {(summary.overview.durationSeconds === null ? "—" : formatDuration(summary.overview.durationSeconds, "hourMinRounded"))}</Text>
           <Text style={styles.rowMeta}>Host: {summary.overview.host?.name ?? "—"}</Text>
         </View>
 

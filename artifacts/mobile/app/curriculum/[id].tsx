@@ -8,7 +8,6 @@ import {
   Platform,
   ActivityIndicator,
   Image,
-  Alert,
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,38 +19,10 @@ import { explainModuleLock } from "@/lib/lessonLocks";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCardPhotoWidth, useFullScreenPhotoHeight } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
-
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
+import { showAlert } from "@/lib/alerts";
+import ContentImage from "@/components/media/ContentImage";
 
 type CurriculumDetailInfo = { id: string; title: string; description: string; coverImage: string | null; icon: string | null; colorTheme: string };
-
-// Same split-layout card design used for the Foundations/Curriculum category
-// cards: a fixed-width text column on the left and a dedicated, cropped
-// photo block on the right (never an image the text overlaps), so a large
-// photo can never compress the title/progress row.
-function ModuleCardImage({ uri }: { uri: string | null | undefined }) {
-  const [failed, setFailed] = useState(false);
-  if (!uri || failed) {
-    return (
-      <View style={[styles.moduleCardPhoto, styles.moduleCardImageFallback]}>
-        <Ionicons name="book-outline" size={26} color={colors.accentGreen} />
-      </View>
-    );
-  }
-  return (
-    <Image
-      source={{ uri }}
-      style={styles.moduleCardPhoto}
-      resizeMode="cover"
-      onError={() => setFailed(true)}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-    />
-  );
-}
 
 // The banner photo fills the device screen below the header.
 function CoverBanner({ curriculum, aboveHeight }: { curriculum: CurriculumDetailInfo; aboveHeight: number }) {
@@ -178,7 +149,7 @@ export default function CurriculumDetailScreen() {
                     text column above is never affected no matter how large
                     this photo is. */}
                 <View style={[styles.moduleCardPhotoWrap, { width: photoWidth }]}>
-                  <ModuleCardImage uri={m.imageUrl} />
+                  <ContentImage uri={m.imageUrl} style={styles.moduleCardPhoto} fallbackStyle={styles.moduleCardImageFallback} color={colors.accentGreen} />
                   {m.isLocked ? (
                     <View style={styles.moduleLockOverlay} accessibilityElementsHidden importantForAccessibility="no">
                       <Ionicons name="lock-closed" size={20} color="#fff" />

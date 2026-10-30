@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { STAGE_IMAGES } from "@/constants/stages";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,11 +13,8 @@ import {
   isEligible, pickEncouragement, recordVisit, recordShown, recordRemindLater, recordInviteShared,
 } from "@/lib/inviteEncouragement";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Shows at most once per eligibility window (see lib/inviteEncouragement.ts).
 // Always offers both actions: Invite a Peer, and Remind Me Later — which sets

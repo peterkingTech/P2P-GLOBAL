@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -25,8 +25,8 @@ export default function AdminChurchesScreen() {
     setLoading(true);
     try {
       const [churchesRes, statsRes] = await Promise.all([
-        authedFetch("/admin/churches"),
-        authedFetch("/admin/churches/stats"),
+        apiFetch("/admin/churches"),
+        apiFetch("/admin/churches/stats"),
       ]);
       if (churchesRes.ok) setChurches(await churchesRes.json());
       if (statsRes.ok) setStats(await statsRes.json());
@@ -38,7 +38,7 @@ export default function AdminChurchesScreen() {
   useEffect(() => { load(); }, [load]);
 
   async function handleVerify(id: string, verified: boolean) {
-    await authedFetch(`/admin/churches/${id}/verify`, {
+    await apiFetch(`/admin/churches/${id}/verify`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verified }),
     });
     load();

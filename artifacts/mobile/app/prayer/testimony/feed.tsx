@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getTestimonyFeed, type PrayerTestimony, type TestimonyType } from "@/lib/prayerTestimonyApi";
+import { timeAgo } from "@/lib/timeFormat";
 
 const TABS: { key: TestimonyType | "all"; label: string }[] = [
   { key: "all", label: "All" },
@@ -13,15 +14,6 @@ const TABS: { key: TestimonyType | "all"; label: string }[] = [
   { key: "growth", label: "Growth" },
 ];
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export default function TestimonyFeedScreen() {
   const insets = useSafeAreaInsets();
@@ -86,7 +78,7 @@ export default function TestimonyFeedScreen() {
                 <Ionicons name={item.testimonyType === "answered_prayer" ? "checkmark-circle" : "leaf"} size={16} color={c.accentGreen} />
                 <Text style={styles.cardType}>{item.testimonyType === "answered_prayer" ? "Answered Prayer" : "Growth"}</Text>
                 {item.mediaType === "video" && <Ionicons name="videocam" size={14} color={c.textMuted} />}
-                <Text style={styles.cardTime}>{timeAgo(item.createdAt)}</Text>
+                <Text style={styles.cardTime}>{timeAgo(item.createdAt, "ago")}</Text>
               </View>
               <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
               <Text style={styles.cardSnippet} numberOfLines={2}>{item.testimonyText}</Text>

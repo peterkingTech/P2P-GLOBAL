@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 function currentWeekRange(): { start: Date; end: Date; label: string } {
   const now = new Date();
@@ -35,7 +36,7 @@ export default function SubmitReportScreen() {
     });
     setSubmitting(false);
     if (err) {
-      Alert.alert("Couldn't submit report", err);
+      showAlert("Couldn't submit report", err);
       return;
     }
     Alert.alert("Report submitted", "Your report has been sent to your supervisor and the Administrative Supervisor.", [

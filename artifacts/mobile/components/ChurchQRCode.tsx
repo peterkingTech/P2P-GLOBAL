@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, Modal, Alert, StyleSheet, ActivityIndicator, Platform } from "react-native";
+import { View, Text, TouchableOpacity, Modal, StyleSheet, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
@@ -17,6 +17,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 interface ChurchQRCodeProps {
   church: { name: string; city: string | null; country: string; inviteLink: string; inviteCode: string };
 }
@@ -41,22 +42,22 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
 
   async function handleSave() {
     if (!MediaLibrary) {
-      Alert.alert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
+      showAlert("Not available", "Saving to Photos isn't supported on web. Try Share instead.");
       return;
     }
     setBusy("save");
     try {
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Permission needed", "Allow photo access to save the QR code.");
+        showAlert("Permission needed", "Allow photo access to save the QR code.");
         return;
       }
       const uri = await captureImage();
       if (!uri) throw new Error("Could not capture the QR code");
       await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert("Saved", "QR code saved to your photos.");
+      showAlert("Saved", "QR code saved to your photos.");
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message ?? "Something went wrong.");
+      showAlert("Couldn't save", e.message ?? "Something went wrong.");
     } finally {
       setBusy(null);
     }

@@ -12,6 +12,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
   help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
 };
@@ -83,7 +84,7 @@ function ForwardModal({
             <AppButton label="Cancel" onPress={onClose} variant="secondary" style={{ flex: 1 }} palette="fixedLight" />
             <AppButton label="Forward" onPress={() => {
                 if (mode === "admin" && !username.trim()) {
-                  Alert.alert("Enter a username to forward to.");
+                  showAlert("Enter a username to forward to.", "");
                   return;
                 }
                 onSubmit(mode === "department" ? { toDepartment: department, note: note.trim() || undefined } : { toUsername: username.trim(), note: note.trim() || undefined });
@@ -129,7 +130,7 @@ export default function AdminEmailMessageDetail() {
       setComposeText("");
       await load();
     } else {
-      Alert.alert("Failed to send. Please try again.");
+      showAlert("Failed to send. Please try again.", "");
     }
   }, [messageId, composeText, composeAsNote, replyToContactMessage, load]);
 
@@ -140,27 +141,22 @@ export default function AdminEmailMessageDetail() {
     setBusy(false);
     setShowForward(false);
     if (result) {
-      Alert.alert("Message forwarded.");
+      showAlert("Message forwarded.", "");
       await load();
     } else {
-      Alert.alert("Failed to forward. Please try again.");
+      showAlert("Failed to forward. Please try again.", "");
     }
   }, [messageId, forwardContactMessage, load]);
 
   const handleClose = useCallback(() => {
-    Alert.alert("Close this message?", "The sender will be asked for feedback.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Close Message", style: "destructive", onPress: async () => {
+    confirmAction("Close this message?", "The sender will be asked for feedback.", async () => {
           if (!messageId) return;
           setBusy(true);
           const result = await closeContactMessage(messageId);
           setBusy(false);
           if (result) await load();
           else Alert.alert("Failed to close. Please try again.");
-        },
-      },
-    ]);
+        }, { confirmLabel: "Close Message", destructive: true });
   }, [messageId, closeContactMessage, load]);
 
   const handlePriority = useCallback(async (priority: ContactPriority) => {
@@ -179,7 +175,7 @@ export default function AdminEmailMessageDetail() {
     setBusy(true);
     const result = await setContactMessageStatus(messageId, "unread");
     setBusy(false);
-    if (result) Alert.alert("Failed to update. Please try again.");
+    if (result) showAlert("Failed to update. Please try again.", "");
     else router.back();
   }, [messageId, setContactMessageStatus, router]);
 
@@ -196,7 +192,7 @@ export default function AdminEmailMessageDetail() {
     const next = !detail.message.isArchived;
     const result = await archiveContactMessage(messageId, next);
     setBusy(false);
-    if (result) Alert.alert("Failed to update. Please try again.");
+    if (result) showAlert("Failed to update. Please try again.", "");
     else router.back();
   }, [messageId, detail, archiveContactMessage, router]);
 

@@ -20,27 +20,9 @@ import LockExplanationSheet from "@/components/learning/LockExplanationSheet";
 import { explainLessonLock, nextAction, progressSummary, type LockExplanation, type LockLesson } from "@/lib/lessonLocks";
 import { AppButton } from "@/components/ui";
 import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
+import ContentImage from "@/components/media/ContentImage";
 
 const HERO_HEIGHT = 230;
-
-function HeroImage({ uri, isLocked }: { uri?: string; isLocked: boolean }) {
-  const [err, setErr] = useState(false);
-  if (uri && !err) {
-    return (
-      <Image
-        source={{ uri }}
-        style={[StyleSheet.absoluteFill, { opacity: isLocked ? 0.45 : 1 }]}
-        resizeMode="cover"
-        onError={() => setErr(true)}
-      />
-    );
-  }
-  return (
-    <View style={[StyleSheet.absoluteFill, styles.heroPlaceholder]}>
-      <Ionicons name="book-outline" size={52} color="rgba(157,225,203,0.25)" />
-    </View>
-  );
-}
 
 export default function ModuleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -138,7 +120,8 @@ export default function ModuleDetailScreen() {
       >
         {/* ── Hero ── */}
         <View style={[styles.hero, { height: Math.max(heroHeight, HERO_HEIGHT + topOffset) }]}>
-          <HeroImage uri={heroImageUri} isLocked={isLocked} />
+          <ContentImage uri={heroImageUri} style={[StyleSheet.absoluteFill, { opacity: isLocked ? 0.45 : 1 }]}
+            fallbackStyle={[styles.heroPlaceholder, { opacity: 1 }]} color="rgba(157,225,203,0.25)" iconSize={52} />
           <View style={styles.heroOverlay} />
 
           <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button"

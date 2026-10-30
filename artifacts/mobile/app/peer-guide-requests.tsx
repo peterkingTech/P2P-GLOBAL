@@ -4,9 +4,10 @@ import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
 
 // Where a peer guide sees and Accept/Decline's incoming "Connect" requests
 // from GET/PUT /discipleship/pending-requests|request (see discipleship.ts).
@@ -37,7 +38,7 @@ export default function PeerGuideRequestsScreen() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const res = await authedFetch(`/discipleship/pending-requests/${profile.id}`);
+      const res = await apiFetch(`/discipleship/pending-requests/${profile.id}`);
       const data = res.ok ? await res.json() : [];
       setRequests(Array.isArray(data) ? data : []);
     } catch {
@@ -53,7 +54,7 @@ export default function PeerGuideRequestsScreen() {
     if (!profile?.id) return;
     setRespondingId(requestId);
     try {
-      await authedFetch(`/discipleship/request/${requestId}/respond`, {
+      await apiFetch(`/discipleship/request/${requestId}/respond`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id, decision }),
@@ -89,13 +90,7 @@ export default function PeerGuideRequestsScreen() {
           requests.map((r) => (
             <View key={r.id} style={styles.requestCard}>
               <View style={styles.requestHeader}>
-                {r.learnerPhotoUrl ? (
-                  <Image source={{ uri: r.learnerPhotoUrl }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarInitial}>{r.learnerName.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
+                <Avatar photoUrl={r.learnerPhotoUrl} name={r.learnerName} size={44} style={styles.avatar} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.learnerName}>{r.learnerName}</Text>
                   <Text style={styles.learnerMeta}>{r.learnerCountry ?? "Location not set"}</Text>

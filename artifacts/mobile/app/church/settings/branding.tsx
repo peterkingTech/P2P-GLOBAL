@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, Image } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
+import { showAlert } from "@/lib/alerts";
 
 export default function ChurchBrandingSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -21,7 +22,7 @@ export default function ChurchBrandingSettingsScreen() {
   async function handlePick() {
     if (!userChurch) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed", "Please allow photo library access to change the church logo."); return; }
+    if (!perm.granted) { showAlert("Permission needed", "Please allow photo library access to change the church logo."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.8 });
     if (result.canceled || !result.assets?.[0]) return;
     setUploading(true);
@@ -32,13 +33,13 @@ export default function ChurchBrandingSettingsScreen() {
       const response = await fetch(asset.uri);
       const arrayBuffer = await response.arrayBuffer();
       const { error: uploadError } = await supabase.storage.from("church-media").upload(path, arrayBuffer, { contentType, upsert: true });
-      if (uploadError) { Alert.alert("Upload failed", uploadError.message); return; }
+      if (uploadError) { showAlert("Upload failed", uploadError.message); return; }
       const { data } = supabase.storage.from("church-media").getPublicUrl(path);
       const newUrl = `${data.publicUrl}?t=${Date.now()}`;
       setSaving(true);
       const { error } = await updateChurch(userChurch.id, { logoUrl: newUrl });
       setSaving(false);
-      if (error) { Alert.alert("Couldn't save logo", error); return; }
+      if (error) { showAlert("Couldn't save logo", error); return; }
       setLogoUrl(newUrl);
       await loadUserChurch();
     } finally {
@@ -51,7 +52,7 @@ export default function ChurchBrandingSettingsScreen() {
     setSaving(true);
     const { error } = await updateChurch(userChurch.id, { logoUrl: "" });
     setSaving(false);
-    if (error) { Alert.alert("Couldn't remove logo", error); return; }
+    if (error) { showAlert("Couldn't remove logo", error); return; }
     setLogoUrl(null);
     await loadUserChurch();
   }

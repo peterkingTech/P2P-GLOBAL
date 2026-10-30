@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import FamilyIcon from "@/components/family/FamilyIcon";
@@ -12,11 +12,8 @@ import {
   type FamilyDetailResponse, type ContinueStudyResponse,
 } from "@/lib/familyApi";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // One specific family's home screen — reached from MY FAMILIES
 // (app/family/index.tsx). Everything here is scoped to this familyId only;
@@ -86,19 +83,14 @@ export default function FamilyDetailScreen() {
   function handleLeaveFamily() {
     if (!data?.family || !profile?.id) return;
     const familyName = data.family.name;
-    Alert.alert(`Leave ${familyName}?`, "You can be invited back later.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave", style: "destructive", onPress: async () => {
+    confirmAction(`Leave ${familyName}?`, "You can be invited back later.", async () => {
           try {
             await removeFamilyMember(data.family.id, profile.id);
             router.replace("/family" as any);
           } catch (e: any) {
             showAlert("Couldn't leave Family Circle", e.message ?? "Please try again.");
           }
-        },
-      },
-    ]);
+        }, { confirmLabel: "Leave", destructive: true });
   }
 
   if (loading) {
@@ -146,6 +138,11 @@ export default function FamilyDetailScreen() {
       key: "files", icon: <Ionicons name="folder-open-outline" size={20} color={c.accentGreen} />,
       label: "Files & Resources", detail: "PDFs, photos and documents for your family",
       onPress: () => router.push({ pathname: "/resources/[scope]/[groupId]", params: { scope: "family", groupId: familyId, name: data.family?.name ?? "" } } as any),
+    },
+    {
+      key: "together", icon: <Ionicons name="people-circle-outline" size={20} color={c.accentGreen} />,
+      label: "Study Together", detail: "Every shared study you can open, in one place",
+      onPress: () => router.push("/study-together" as any),
     },
     {
       key: "prayer", icon: <FamilyIcon name="prayer" size={19} color={c.accentGreen} />,

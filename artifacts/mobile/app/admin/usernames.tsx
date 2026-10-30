@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { validateUsername, formatUsername } from "@/lib/username";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 type Tab = "reserved" | "search" | "flagged";
 
@@ -65,7 +66,7 @@ export default function AdminUsernamesScreen() {
   const loadReserved = useCallback(async () => {
     setReservedLoading(true);
     try {
-      const res = await authedFetch(`/admin/reserved-usernames`);
+      const res = await apiFetch(`/admin/reserved-usernames`);
       setReserved(await res.json());
     } finally {
       setReservedLoading(false);
@@ -75,7 +76,7 @@ export default function AdminUsernamesScreen() {
   const loadFlagged = useCallback(async () => {
     setFlaggedLoading(true);
     try {
-      const res = await authedFetch(`/admin/flagged-usernames`);
+      const res = await apiFetch(`/admin/flagged-usernames`);
       setFlagged(await res.json());
     } finally {
       setFlaggedLoading(false);
@@ -93,7 +94,7 @@ export default function AdminUsernamesScreen() {
     setSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const res = await authedFetch(`/admin/username-search?q=${encodeURIComponent(searchQuery.trim())}`);
+        const res = await apiFetch(`/admin/username-search?q=${encodeURIComponent(searchQuery.trim())}`);
         setSearchResults(await res.json());
       } finally {
         setSearching(false);
@@ -106,19 +107,19 @@ export default function AdminUsernamesScreen() {
     const clean = formatUsername(reserveUsername);
     const check = validateUsername(clean);
     if (!check.valid) {
-      Alert.alert("Invalid username", check.error ?? "Please enter a valid username");
+      showAlert("Invalid username", check.error ?? "Please enter a valid username");
       return;
     }
     setReserving(true);
     try {
-      const res = await authedFetch(`/admin/reserved-usernames`, {
+      const res = await apiFetch(`/admin/reserved-usernames`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: clean, reason: reserveReason.trim() || undefined }),
       });
       const body = await res.json();
       if (!res.ok) {
-        Alert.alert("Couldn't reserve", body.error ?? "Something went wrong");
+        showAlert("Couldn't reserve", body.error ?? "Something went wrong");
         return;
       }
       setReserveModalOpen(false);
@@ -131,44 +132,34 @@ export default function AdminUsernamesScreen() {
   }
 
   function confirmUnreserve(username: string) {
-    Alert.alert(`Unreserve @${username}?`, "This username will become claimable by anyone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Unreserve", style: "destructive", onPress: async () => {
+    confirmAction(`Unreserve @${username}?`, "This username will become claimable by anyone.", async () => {
           setActingId(username);
           try {
-            await authedFetch(`/admin/reserved-usernames/${encodeURIComponent(username)}`, { method: "DELETE" });
+            await apiFetch(`/admin/reserved-usernames/${encodeURIComponent(username)}`, { method: "DELETE" });
             setReserved((prev) => prev.filter((r) => r.username !== username));
           } finally {
             setActingId(null);
           }
-        },
-      },
-    ]);
+        }, { confirmLabel: "Unreserve", destructive: true });
   }
 
   function confirmForceChange(result: SearchResult) {
     if (!result.username) return;
-    Alert.alert(`Force @${result.username} to change username?`, "They'll be required to pick a new username the next time they open the app.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Force Change", style: "destructive", onPress: async () => {
+    confirmAction(`Force @${result.username} to change username?`, "They'll be required to pick a new username the next time they open the app.", async () => {
           setActingId(result.userId);
           try {
-            await authedFetch(`/admin/force-username-change/${result.userId}`, { method: "POST" });
+            await apiFetch(`/admin/force-username-change/${result.userId}`, { method: "POST" });
             Alert.alert("Done", `@${result.username} will be prompted to change their username.`);
           } finally {
             setActingId(null);
           }
-        },
-      },
-    ]);
+        }, { confirmLabel: "Force Change", destructive: true });
   }
 
   async function handleDismissFlag(userId: string) {
     setActingId(userId);
     try {
-      await authedFetch(`/admin/dismiss-username-flag/${userId}`, { method: "POST" });
+      await apiFetch(`/admin/dismiss-username-flag/${userId}`, { method: "POST" });
       setFlagged((prev) => prev.filter((f) => f.userId !== userId));
     } finally {
       setActingId(null);
@@ -178,8 +169,8 @@ export default function AdminUsernamesScreen() {
   async function handleForceChangeFromFlagged(userId: string) {
     setActingId(userId);
     try {
-      await authedFetch(`/admin/force-username-change/${userId}`, { method: "POST" });
-      Alert.alert("Confirmed", "This account remains flagged for a required username change.");
+      await apiFetch(`/admin/force-username-change/${userId}`, { method: "POST" });
+      showAlert("Confirmed", "This account remains flagged for a required username change.");
     } finally {
       setActingId(null);
     }

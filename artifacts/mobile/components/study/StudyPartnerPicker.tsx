@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { Avatar } from "@/components/Avatar";
 // "Who would you like to study with?" — the Kingdom School lesson entry
 // point's person picker (Study Together Phase 1, discoverability slice).
 // Only resolves WHO; the caller starts the call itself once a person is
@@ -38,7 +39,7 @@ export function StudyPartnerPicker({
     let cancelled = false;
     setLoading(true);
     setError(false);
-    authedFetch(`/discipleship/study-partners/${user.id}`)
+    apiFetch(`/discipleship/study-partners/${user.id}`)
       .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((data) => { if (!cancelled) setPeople(data.people ?? []); })
       .catch(() => { if (!cancelled) setError(true); })
@@ -64,7 +65,7 @@ export function StudyPartnerPicker({
           ) : people.length === 0 ? (
             <View style={{ gap: 12 }}>
               <Text style={styles.emptyText}>You don't have anyone available to study with yet.</Text>
-              <TouchableOpacity accessibilityRole="button" style={styles.connectBtn} onPress={() => { onClose(); router.push("/connect" as any); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.connectBtn} onPress={() => { onClose(); router.push("/(tabs)/discover" as any); }}>
                 <Text style={styles.connectBtnText}>Find Someone to Connect With</Text>
               </TouchableOpacity>
             </View>
@@ -72,13 +73,7 @@ export function StudyPartnerPicker({
             <ScrollView style={{ maxHeight: 420 }}>
               {people.map((p) => (
                 <TouchableOpacity accessibilityRole="button" key={p.id} style={styles.personRow} onPress={() => onSelectPerson({ id: p.id, name: p.name })}>
-                  {p.photoUrl ? (
-                    <Image source={{ uri: p.photoUrl }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, styles.avatarFallback]}>
-                      <Text style={styles.avatarInitial}>{p.name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
+                  <Avatar photoUrl={p.photoUrl} name={p.name} size={40} style={styles.avatar} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.personName}>{p.name}</Text>
                     <Text style={styles.personRelationship}>{RELATIONSHIP_LABEL[p.relationship]}</Text>

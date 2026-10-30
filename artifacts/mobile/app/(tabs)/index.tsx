@@ -42,6 +42,7 @@ import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
 import { GetStartedCard } from "@/components/GetStartedCard";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
+import { currentModule as currentModuleOf } from "@/lib/learningHome";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -674,7 +675,7 @@ export default function HomeTab() {
     dayPart === "morning" ? t("home.goodMorning") : dayPart === "afternoon" ? t("home.goodAfternoon") : t("home.goodEvening");
 
   // Same rule as the Kingdom School tab's "current module" (learn.tsx).
-  const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? null;
+  const currentModule = currentModuleOf(modules);
   const goToKingdomSchool = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/kingdom-school" as any); };
   const go = (route: string) => () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as any); };
 
@@ -910,7 +911,8 @@ export default function HomeTab() {
       )}
 
       <View style={styles.journeyGrid}>
-        <JourneyTile icon="home" tint="#E8873A" title={t("home.myFamily")} sub={t("home.myFamilySub")} onPress={go("/family")} styles={styles} wide />
+        {/* One way into everything community: families, church, gatherings and learning. */}
+        <JourneyTile icon="home" tint="#E8873A" title="My Community" sub="Your Family Circles, church, gatherings and learning" onPress={go("/community")} styles={styles} wide />
       </View>
 
       {/* 4. Your Journey — tiles instead of the old vertical list. No "See
@@ -922,7 +924,7 @@ export default function HomeTab() {
       <View style={[styles.journeyGrid, journeyTiles.containerStyle]} onLayout={journeyTiles.onLayout}>
         <JourneyTile icon="leaf" tint="#3FB37F" title={t("home.livingTree")} sub={t("home.livingTreeSub")} onPress={go("/living-tree")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} tileStyle={journeyTiles.tileStyle} />
-        <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/connect")} styles={styles} tileStyle={journeyTiles.tileStyle} />
+        <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/(tabs)/discover")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} tileStyle={journeyTiles.tileStyle} />
       </View>
       {/* Previously only reachable from the old "More" list — kept here as

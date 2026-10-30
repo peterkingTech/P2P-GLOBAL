@@ -7,12 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
-import { authedFetch } from "@/lib/adminFetch";
+import { apiFetch } from "@/lib/apiClient";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { Avatar } from "@/components/Avatar";
 import { QrShareSheet } from "@/components/qr/QrShareSheet";
 import { circleQr } from "@/lib/qrLinks";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null; isVerified: boolean }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -65,7 +66,7 @@ export default function CircleDetailScreen() {
     try {
       // Same request as app/circles/discover.tsx. Signed: the server checks
       // the request is really from this person.
-      const res = await authedFetch(`/circles/${circleId}/join`, {
+      const res = await apiFetch(`/circles/${circleId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: profile.id }),
@@ -74,7 +75,7 @@ export default function CircleDetailScreen() {
       setJoinState("sent");
     } catch {
       setJoinState("idle");
-      Alert.alert("Couldn't send request", "Please try again.");
+      showAlert("Couldn't send request", "Please try again.");
     }
   }
 
@@ -91,7 +92,7 @@ export default function CircleDetailScreen() {
       setCircle(data);
 
       if (data.leaderId === profile?.id) {
-        const jrRes = await authedFetch(`/circles/${circleId}/join-requests`);
+        const jrRes = await apiFetch(`/circles/${circleId}/join-requests`);
         setJoinRequests(jrRes.ok ? await jrRes.json() : []);
       }
       if (profile?.id) {
@@ -109,12 +110,12 @@ export default function CircleDetailScreen() {
 
   async function respondToRequest(requestId: string, action: "approve" | "decline") {
     if (!profile?.id) return;
-    const res = await authedFetch(`/circles/${circleId}/join-requests/${requestId}`, {
+    const res = await apiFetch(`/circles/${circleId}/join-requests/${requestId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, respondedBy: profile.id }),
     }).catch(() => null);
-    if (!res?.ok) Alert.alert("Couldn't update the request", "Please try again.");
+    if (!res?.ok) showAlert("Couldn't update the request", "Please try again.");
     load();
   }
 
@@ -131,7 +132,7 @@ export default function CircleDetailScreen() {
       setSessionLessonId("");
       load();
     } catch {
-      Alert.alert("Couldn't create session", "Please try again.");
+      showAlert("Couldn't create session", "Please try again.");
     } finally {
       setSavingSession(false);
     }
@@ -140,18 +141,18 @@ export default function CircleDetailScreen() {
   async function startSession() {
     if (!profile?.id || !circle) return;
     if (!circle.currentLessonId) {
-      Alert.alert("No lesson set", "This circle doesn't have a current lesson assigned yet.");
+      showAlert("No lesson set", "This circle doesn't have a current lesson assigned yet.");
       return;
     }
     setStartingSession(true);
     try {
       // Stage 25D-B — the server now derives caller identity exclusively
       // from verifyCaller(req) (a real session Bearer token), not this
-      // startedBy field. authedFetch attaches that token the same way
+      // startedBy field. apiFetch attaches that token the same way
       // every other authenticated call in this app already does; startedBy
       // is kept only because the request needs a JSON body at all, never
       // trusted by the server for authentication.
-      const res = await authedFetch(`/circles/${circleId}/start-session`, {
+      const res = await apiFetch(`/circles/${circleId}/start-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ startedBy: profile.id }),
@@ -160,7 +161,7 @@ export default function CircleDetailScreen() {
       const { channelName } = (await res.json()) as { channelName: string; sessionId: string };
       router.push({ pathname: "/call/group" as any, params: { circleId: circleId as string, channelName } });
     } catch {
-      Alert.alert("Couldn't start session", "Please try again.");
+      showAlert("Couldn't start session", "Please try again.");
     } finally {
       setStartingSession(false);
     }
@@ -183,7 +184,7 @@ export default function CircleDetailScreen() {
       });
       setPendingEvals((prev) => prev.filter((e) => e.submissionId !== evalItem.submissionId));
     } catch {
-      Alert.alert("Couldn't submit evaluation", "Please try again.");
+      showAlert("Couldn't submit evaluation", "Please try again.");
     }
   }
 
@@ -213,7 +214,7 @@ export default function CircleDetailScreen() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: addUsername.trim().replace(/^@/, ""), addedBy: profile.id }),
       });
-      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't add member", body.error ?? "Please try again."); return; }
+      if (!res.ok) { const body = await res.json(); showAlert("Couldn't add member", body.error ?? "Please try again."); return; }
       setAddMemberOpen(false);
       setAddUsername("");
       setAddPreview(null);
@@ -246,23 +247,14 @@ export default function CircleDetailScreen() {
   }
 
   function confirmRemoveMember(member: CircleMember) {
-    Alert.alert(
-      `Remove ${member.username ? `@${member.username}` : member.name}?`,
-      "They will be notified.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove", style: "destructive", onPress: async () => {
+    confirmAction(`Remove ${member.username ? `@${member.username}` : member.name}?`, "They will be notified.", async () => {
             if (!profile?.id) return;
             await fetch(`${getApiUrl()}/circles/${circleId}/members/${member.userId}`, {
               method: "DELETE", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ removedBy: profile.id }),
             });
             load();
-          },
-        },
-      ]
-    );
+          }, { confirmLabel: "Remove", destructive: true });
   }
 
   async function handleTransferLeadership() {
@@ -271,14 +263,14 @@ export default function CircleDetailScreen() {
     try {
       const clean = transferUsername.trim().replace(/^@/, "");
       const target = circle?.members.find((m) => m.username?.toLowerCase() === clean.toLowerCase());
-      if (!target) { Alert.alert("Not found", `@${clean} isn't an active member of this circle.`); return; }
+      if (!target) { showAlert("Not found", `@${clean} isn't an active member of this circle.`); return; }
       const res = await fetch(`${getApiUrl()}/circles/${circleId}/transfer-leadership`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newLeaderId: target.userId, currentLeaderId: profile.id }),
       });
-      if (!res.ok) { const body = await res.json(); Alert.alert("Couldn't transfer leadership", body.error ?? "Please try again."); return; }
+      if (!res.ok) { const body = await res.json(); showAlert("Couldn't transfer leadership", body.error ?? "Please try again."); return; }
       const body = await res.json();
-      Alert.alert("Leadership transferred", `${body.newLeaderName} is now the circle leader. You are now a member.`);
+      showAlert("Leadership transferred", `${body.newLeaderName} is now the circle leader. You are now a member.`);
       setTransferOpen(false);
       setTransferUsername("");
       load();

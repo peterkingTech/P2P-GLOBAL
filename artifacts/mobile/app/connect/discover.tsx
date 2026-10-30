@@ -14,6 +14,7 @@ import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
 import { publicLocationLabel, calledToValue, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
 import { AppButton, IconButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // P2P Connection audit — Discovery used to show a Report/Flag icon and an
 // always-available Message icon for every listed peer, regardless of any
@@ -59,9 +60,9 @@ export default function Discover() {
             [{ text: "Go to Settings", onPress: () => router.push("/settings/index" as any) }, { text: "Cancel", style: "cancel" }]
           );
         } else if (error?.message?.includes("adult and minor accounts")) {
-          Alert.alert("Can't message this person", "This conversation isn't available.");
+          showAlert("Can't message this person", "This conversation isn't available.");
         } else {
-          Alert.alert("Can't message yet", "Connect with this person first to start a conversation.");
+          showAlert("Can't message yet", "Connect with this person first to start a conversation.");
         }
         return;
       }
@@ -84,10 +85,10 @@ export default function Discover() {
         setPeers((prev) => prev.map((p) => (p.id === peer.id ? { ...p, connectionStatus: "pending_sent", connectionRequestId: row.id } : p)));
       } else {
         const body = await res.json();
-        Alert.alert("Couldn't send request", body.error ?? "Please try again.");
+        showAlert("Couldn't send request", body.error ?? "Please try again.");
       }
     } catch {
-      Alert.alert("Couldn't send request", "Please check your connection and try again.");
+      showAlert("Couldn't send request", "Please check your connection and try again.");
     } finally {
       setConnecting(null);
     }
@@ -107,10 +108,10 @@ export default function Discover() {
           : p)));
       } else {
         const body = await res.json();
-        Alert.alert("Couldn't respond", body.error ?? "This request may have already been handled.");
+        showAlert("Couldn't respond", body.error ?? "This request may have already been handled.");
       }
     } catch {
-      Alert.alert("Couldn't respond", "Please check your connection and try again.");
+      showAlert("Couldn't respond", "Please check your connection and try again.");
     } finally {
       setResponding(null);
     }

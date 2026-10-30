@@ -9,6 +9,7 @@ import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { SUPPORTED_LANGUAGES, BIBLE_STUDY_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { showAlert } from "@/lib/alerts";
 // Multilingual Expansion Stage 2 — generated directly from lib/i18n.ts's
 // SUPPORTED_LANGUAGES/LANGUAGE_DISPLAY instead of a separately hardcoded
 // list. Previously this array silently omitted hi/sw (which already had
@@ -63,7 +64,7 @@ export default function LanguageSettingsScreen() {
   async function setLanguage(kind: "app" | "content", code: string) {
     const err = await updateProfile(kind === "app" ? { appLanguage: code } : { contentLanguage: code });
     if (err) {
-      Alert.alert("Couldn't save", err);
+      showAlert("Couldn't save", err);
       return;
     }
     setLangPickerOpen(null);

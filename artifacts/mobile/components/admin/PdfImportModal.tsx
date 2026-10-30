@@ -2,11 +2,10 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Modal, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
-import { getApiUrl } from "@/lib/apiUrl";
 import { listPlanCategories, createPlanCategory, type AdminPlanCategory } from "@/lib/adminPlanCategories";
 import { AppButton } from "@/components/ui";
+import { apiRequest } from "@/lib/apiClient";
 
 // Admin PDF Plan Importer — upload one or more P2P Plan PDFs, then assign
 // each to a plan category (auto-detected from the PDF's text where
@@ -39,11 +38,6 @@ type BulkRow = {
 
 type Step = "upload" | "parsing" | "category" | "preview" | "bulk-category" | "importing" | "success" | "error";
 
-async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? "";
-}
-
 function pdfFormData(asset: DocumentPicker.DocumentPickerAsset): FormData {
   const form = new FormData();
   if (Platform.OS === "web" && asset.file) {
@@ -54,27 +48,12 @@ function pdfFormData(asset: DocumentPicker.DocumentPickerAsset): FormData {
   return form;
 }
 
-async function uploadPdf(asset: DocumentPicker.DocumentPickerAsset): Promise<ParsedPlan> {
-  const token = await getAuthToken();
-  const res = await fetch(`${getApiUrl()}/admin/plans/upload-pdf`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: pdfFormData(asset),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Failed to parse PDF");
-  return data as ParsedPlan;
+function uploadPdf(asset: DocumentPicker.DocumentPickerAsset): Promise<ParsedPlan> {
+  return apiRequest<ParsedPlan>("/admin/plans/upload-pdf", { method: "POST", body: pdfFormData(asset) }, { fallbackError: "Failed to parse PDF" });
 }
 
 async function confirmImport(plan: ParsedPlan): Promise<{ id: string }> {
-  const token = await getAuthToken();
-  const res = await fetch(`${getApiUrl()}/admin/plans/confirm-import`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(plan),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Failed to import plan");
+  const data = await apiRequest("/admin/plans/confirm-import", { method: "POST", body: JSON.stringify(plan) }, { fallbackError: "Failed to import plan" });
   return data as { id: string };
 }
 

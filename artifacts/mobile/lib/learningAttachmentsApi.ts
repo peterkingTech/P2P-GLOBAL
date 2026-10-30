@@ -1,6 +1,5 @@
-import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
 import type { DrawingDoc } from "@/lib/handwriting";
+import { apiRequest } from "@/lib/apiClient";
 
 // Drawings, photos and PDFs on Comprehensive Check answers (migration 218,
 // routes/learningAttachments.ts). Every check happens on the server: drafts
@@ -20,17 +19,7 @@ export interface AttachmentStatus { enabled: boolean; limits: { fileBytes: numbe
 export const ATTACHED_ONLY = "(Answer given as a drawing or file — open it in the latest P2P app to see it.)";
 export const isAttachedOnlyText = (t: string | null | undefined) => (t ?? "").trim() === ATTACHED_ONLY;
 
-async function token() { const { data } = await supabase.auth.getSession(); return data.session?.access_token ?? null; }
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const t = await token();
-  const res = await fetch(`${getApiUrl()}/learning/attachments${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error((body as { error?: string }).error ?? "Something went wrong. Please try again."), { status: res.status });
-  return body as T;
-}
+const call = <T,>(path: string, init?: RequestInit) => apiRequest<T>(path, init, { base: "/learning/attachments", fallbackError: "Something went wrong. Please try again." });
 const send = <T>(method: string, path: string, body?: unknown) => call<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 
 let statusCache: { at: number; value: AttachmentStatus } | null = null;

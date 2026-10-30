@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Platform } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,11 +8,9 @@ import type { CallType } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
+import { showAlert } from "@/lib/alerts";
+import { formatDuration, formatDate } from "@/lib/timeFormat";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 interface CallHistoryEntry {
   id: string; callType: CallType | "group"; status: string; durationSeconds: number;
@@ -27,7 +25,7 @@ const UNANSWERED_STATUSES = new Set(["missed", "declined", "cancelled", "busy"])
 function outcomeLabel(item: CallHistoryEntry): string {
   const incoming = item.direction === "incoming";
   switch (item.status) {
-    case "ended": return formatDuration(item.durationSeconds);
+    case "ended": return formatDuration(item.durationSeconds, "minSec");
     case "missed": return incoming ? "Missed" : "No answer";
     case "declined": return "Declined";
     case "cancelled": return "Cancelled";
@@ -43,19 +41,7 @@ const TYPE_LABEL: Record<string, string> = {
   audio: "Audio call", video: "Video call", pastoral: "Pastoral check-in", crisis: "Crisis call", group: "Group call",
 };
 
-function formatDuration(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const isToday = d.toDateString() === today.toDateString();
-  if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
-}
 
 export default function CallHistoryScreen() {
   const insets = useSafeAreaInsets();
@@ -160,7 +146,7 @@ export default function CallHistoryScreen() {
                   <Text style={styles.rowName} numberOfLines={1}>{item.otherUserName ?? "Someone"}</Text>
                   <Text style={[styles.rowMeta, missed && styles.rowDurationMissed]}>
                     {missed ? `Missed ${typeLabel.toLowerCase()}` : typeLabel}
-                    {directionLabel ? ` · ${directionLabel}` : ""} · {formatDate(item.createdAt)}
+                    {directionLabel ? ` · ${directionLabel}` : ""} · {formatDate(item.createdAt, "todayTime")}
                   </Text>
                 </View>
                 <Text style={[styles.rowDuration, missed && styles.rowDurationMissed]}>

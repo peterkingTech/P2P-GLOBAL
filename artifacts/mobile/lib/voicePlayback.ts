@@ -62,10 +62,8 @@ export function nextSpeed(r: PlaybackSpeed): PlaybackSpeed {
   return PLAYBACK_SPEEDS[(i + 1) % PLAYBACK_SPEEDS.length];
 }
 export const speedLabel = (r: number) => `${Number.isInteger(r) ? r : r.toString().replace(/0$/, "")}×`;
-export function formatClock(seconds: number): string {
-  const s = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+// The shared clock text (lib/timeFormat) — "m:ss".
+export { formatClock } from "@/lib/timeFormat";
 
 // ── Controller ──────────────────────────────────────────────────────────────
 export interface ControllerDeps {

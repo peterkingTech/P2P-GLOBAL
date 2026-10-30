@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { formatUsername, validateUsername, generateUsernameSuggestions } from "@/lib/username";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
@@ -77,10 +78,10 @@ export default function ChangeUsernameScreen() {
     const err = await updateUsername(formatUsername(username));
     setSaving(false);
     if (err) {
-      Alert.alert("Couldn't change username", err);
+      showAlert("Couldn't change username", err);
       return;
     }
-    Alert.alert("Username updated", `You're now @${formatUsername(username)}.`);
+    showAlert("Username updated", `You're now @${formatUsername(username)}.`);
     router.back();
   }
 

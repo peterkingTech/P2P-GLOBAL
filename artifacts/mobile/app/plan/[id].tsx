@@ -20,6 +20,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { sharePlan } from "@/lib/sharing";
 import { useLayout, useCardPhotoWidth, centeredMaxWidth, useFullScreenPhotoHeight } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import ContentImage from "@/components/media/ContentImage";
 
 const COVER_HEIGHT = 200;
 
@@ -29,34 +30,6 @@ const COVER_HEIGHT = 200;
 type PlanLessonDetail = { id: string; moduleId: string | null; title: string; subtitle: string | null; sortOrder: number; status: string };
 type PlanModuleDetail = { id: string; title: string; description: string | null; coverImageUrl: string | null; colorTheme: string | null; sortOrder: number; status: string; lessons: PlanLessonDetail[] };
 type PlanCategoryRef = { id: string; title: string; colorTheme: string };
-// Same split-layout card design used for the Foundations/Curriculum category
-// and module cards: a fixed-width text column on the left and a dedicated,
-// cropped photo block on the right, so the photo can never compress the
-// title/lesson-count text. Falls back to a color wash + icon (this module's
-// own colorTheme, or the plan's if the module has none) when there's no
-// cover photo yet or it fails to load.
-function ModuleHeaderPhoto({
-  uri, color, style, fallbackStyle,
-}: { uri: string | null; color: string; style: any; fallbackStyle: any }) {
-  const [failed, setFailed] = useState(false);
-  if (uri && !failed) {
-    return (
-      <Image
-        source={{ uri }}
-        style={style}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-    );
-  }
-  return (
-    <View style={[style, fallbackStyle, { backgroundColor: `${color}1A` }]}>
-      <Ionicons name="book-outline" size={22} color={color} />
-    </View>
-  );
-}
 
 type PlanDetail = {
   id: string; title: string; description: string | null; subtitle: string | null;
@@ -308,12 +281,8 @@ export default function PlanDetailScreen() {
                     </Text>
                   </View>
                   <View style={[styles.moduleHeaderPhotoWrap, { width: photoWidth }]}>
-                    <ModuleHeaderPhoto
-                      uri={m.coverImageUrl}
-                      color={m.colorTheme ?? plan.colorTheme}
-                      style={styles.moduleHeaderPhoto}
-                      fallbackStyle={styles.moduleHeaderPhotoFallback}
-                    />
+                    <ContentImage uri={m.coverImageUrl} color={m.colorTheme ?? plan.colorTheme} iconSize={22}
+                      style={styles.moduleHeaderPhoto} fallbackStyle={styles.moduleHeaderPhotoFallback} />
                   </View>
                 </View>
                 {m.lessons.map((lesson) => (

@@ -1,26 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getWorshipHistory, type WorshipHistoryEntry } from "@/lib/familyApi";
+import { showAlert } from "@/lib/alerts";
+import { formatDuration, formatDate } from "@/lib/timeFormat";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
 
 // A family-scoped list over the existing p2p_family_worship_history table —
 // this screen is the first UI caller getWorshipHistory has ever had (the
@@ -95,13 +84,13 @@ export default function FamilyGatheringHistoryScreen() {
                 style={styles.row}
                 onPress={() => router.push({ pathname: "/family/gathering-summary", params: { historyId: entry.id, familyId } } as any)}
                 accessibilityRole="button"
-                accessibilityLabel={`Gathering on ${formatDate(entry.created_at)}`}
+                accessibilityLabel={`Gathering on ${formatDate(entry.created_at, "medium")}`}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowDate}>{formatDate(entry.created_at)}</Text>
+                  <Text style={styles.rowDate}>{formatDate(entry.created_at, "medium")}</Text>
                   {!!entry.lesson_title && <Text style={styles.rowLesson}>{entry.lesson_title}</Text>}
                   <Text style={styles.rowMeta}>
-                    {formatDuration(entry.duration_seconds)} · {entry.participant_count} participant{entry.participant_count === 1 ? "" : "s"}
+                    {formatDuration(entry.duration_seconds, "hourMin")} · {entry.participant_count} participant{entry.participant_count === 1 ? "" : "s"}
                     {entry.scripture_reference ? ` · ${entry.scripture_reference}` : ""}
                   </Text>
                 </View>

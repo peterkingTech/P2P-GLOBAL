@@ -6,6 +6,7 @@ import { formatScriptureReference } from "@/lib/familyApi";
 import FamilyIcon, { type FamilyIconName } from "./FamilyIcon";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { formatTimeOfDay } from "@/lib/timeFormat";
 const CHIP_ICON = "rgba(255,255,255,0.7)";
 
 interface Props {
@@ -53,10 +54,6 @@ function ContextTag({ context, textStyle, color }: { context: MessageContext; te
   );
 }
 
-function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
 
 // Together's own chat surface — plain bubbles, P2P's existing accent
 // colors, not styled after any messaging app's chrome.
@@ -99,7 +96,7 @@ export default function ChatPanel({
                       {!mine && <Text style={styles.authorName}>{m.authorName}</Text>}
                       {m.context && <ContextTag context={m.context} textStyle={styles.contextTag} color="#B8860B" />}
                       <Text style={styles.bubbleText}>{m.content}</Text>
-                      <Text style={styles.bubbleTime}>{formatTime(m.createdAt)}</Text>
+                      <Text style={styles.bubbleTime}>{formatTimeOfDay(m.createdAt)}</Text>
                     </View>
                   </View>
                 );

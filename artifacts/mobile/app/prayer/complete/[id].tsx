@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,16 +9,13 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { getGathering, createInvitation, type PrayerGathering, type PrayerGatheringParticipant } from "@/lib/prayerCoordinationApi";
 import { formatDuration } from "@/lib/prayerTimeDisplay";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // Connects outward to EXISTING systems only — no new study/growth/mission
 // feature is created here, just navigation into what already exists.
 const NEXT_STEPS: { key: string; icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
-  { key: "study", icon: "book-outline", label: "Study Together", route: "/curriculum" },
+  { key: "study", icon: "people-outline", label: "Study Together", route: "/study-together" },
   { key: "growth", icon: "leaf-outline", label: "Set a Growth Step", route: "/my-discipleship/journey" },
   { key: "mission", icon: "earth-outline", label: "Pray for a Mission", route: "/missions" },
   { key: "testimony", icon: "sparkles-outline", label: "Share a Testimony", route: "/prayer/testimony/record" },

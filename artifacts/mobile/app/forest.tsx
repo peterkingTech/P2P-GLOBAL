@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Animated, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Animated } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import { getStageFromPoints } from "@/constants/stages";
 import { getContinent, getFlagEmoji, CONTINENT_LABELS, type Continent } from "@/lib/countryGeo";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { AppButton } from "@/components/ui";
+import { showAlert } from "@/lib/alerts";
 
 // The Generational Forest View — signature discipleship-lineage visualization.
 // "My Forest" renders self + up to 3 generations of mentees as an SVG grove
@@ -27,10 +28,6 @@ function isActiveRecently(lastActiveAt: string | null, days: number) {
   return Date.now() - new Date(lastActiveAt).getTime() <= days * 24 * 60 * 60 * 1000;
 }
 
-function showInfo(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 // ── Mini tree (SVG) ──────────────────────────────────────────────────────────
 
@@ -299,11 +296,11 @@ export default function ForestScreen() {
     // Gen-3+ minimal nodes and anyone without a username yet fall back to
     // the lightweight info alert — there's no profile page to send them to.
     const name = "displayName" in p ? p.displayName : "A disciple";
-    showInfo(name ?? "A disciple", `${getFlagEmoji(p.country)} ${p.country ?? "Unknown location"}\nGrowth level ${p.growthLevel}`);
+    showAlert(name ?? "A disciple", `${getFlagEmoji(p.country)} ${p.country ?? "Unknown location"}\nGrowth level ${p.growthLevel}`);
   }
 
   function handleStatTap(label: string, explanation: string) {
-    showInfo(label, explanation);
+    showAlert(label, explanation);
   }
 
   const totalTrees = 1 + (forestData?.stats.totalInLineage ?? 0);

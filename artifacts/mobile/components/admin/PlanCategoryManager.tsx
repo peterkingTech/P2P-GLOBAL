@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Modal, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
@@ -12,6 +12,7 @@ import {
   type CategoryStats,
 } from "@/lib/adminPlanCategories";
 import { AppButton } from "@/components/ui";
+import { confirmAction, showAlert } from "@/lib/alerts";
 
 // Full admin management surface for plan categories + the plans inside them
 // (STEP 2-9 of the Plan Category Management build). Category/lock/move/
@@ -24,21 +25,7 @@ import { AppButton } from "@/components/ui";
 const ICON_PRESETS = ["👑", "🧭", "🌱", "❤️", "✝️", "💼", "🙏", "🕊️", "🩹", "⛪", "📖", "⭐", "🔥", "💡", "🎯", "🌟", "🕯️", "📚", "🤝", "🛡️"];
 const COLOR_PRESETS = Array.from(new Set(PLAN_CATEGORIES.map((c) => c.color)));
 
-function showConfirm(title: string, message: string, onConfirm: () => void, destructive = true) {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: destructive ? "destructive" : "default", onPress: onConfirm },
-    ]);
-  }
-}
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 type ActionItem = { label: string; icon: string; onPress: () => void; danger?: boolean; disabled?: boolean };
 
@@ -206,14 +193,14 @@ function CategoryFormModal({
             {isEdit && category && (
               <View style={styles.dangerZone}>
                 <Text style={styles.dangerZoneTitle}>Danger Zone</Text>
-                <AppButton label="Archive Category" onPress={() => showConfirm("Archive category?", `"${category.title}" will be hidden from users but kept in admin.`, async () => {
+                <AppButton label="Archive Category" onPress={() => confirmAction("Archive category?", `"${category.title}" will be hidden from users but kept in admin.`, async () => {
                     try { await updatePlanCategory(category.id, { status: "archived" } as any); onSaved(); onClose(); }
                     catch (e: any) { showAlert("Error", e.message); }
-                  }, false)} variant="outline" icon="archive-outline" palette="fixedLight" />
+                  }, { destructive: false })} variant="outline" icon="archive-outline" palette="fixedLight" />
                 <TouchableOpacity accessibilityRole="button"
                   style={[styles.dangerBtn, deleting && { opacity: 0.7 }]}
                   disabled={deleting}
-                  onPress={() => showConfirm("Delete category?", "It moves to the Recycle Bin (Admin → Recycle Bin), where it can be restored. Categories with plans inside them can't be deleted — move or delete the plans first.", handleDelete)}
+                  onPress={() => confirmAction("Delete category?", "It moves to the Recycle Bin (Admin → Recycle Bin), where it can be restored. Categories with plans inside them can't be deleted — move or delete the plans first.", handleDelete, { destructive: true })}
                 >
                   {deleting ? <ActivityIndicator size="small" color="#B91C1C" /> : <><Ionicons name="trash-outline" size={15} color="#B91C1C" /><Text style={styles.dangerBtnText}>Delete Category</Text></>}
                 </TouchableOpacity>
@@ -635,11 +622,11 @@ export default function PlanCategoryManager({
     let preview: DeletePreview;
     try { preview = await previewMoveToBin("curriculum", plan.id); }
     catch (e: any) { showAlert("Could not delete plan", e?.message ?? "Please try again."); return; }
-    showConfirm("Move plan to the Recycle Bin?", moveToBinMessage(plan.title, preview), async () => {
+    confirmAction("Move plan to the Recycle Bin?", moveToBinMessage(plan.title, preview), async () => {
       try { await moveToBin("curriculum", plan.id); }
       catch (e: any) { showAlert("Could not delete plan", e?.message ?? "Please try again."); return; }
       await reload();
-    });
+    }, { destructive: true });
   }
 
   function planActionItems(plan: Curriculum): ActionItem[] {
@@ -662,9 +649,9 @@ export default function PlanCategoryManager({
       { label: "Edit", icon: "create-outline", onPress: () => setCategoryModal(cat) },
       { label: "Add Plan", icon: "add-circle-outline", onPress: () => onCreatePlanInCategory(cat.id) },
       { label: "View Plans", icon: "eye-outline", onPress: () => { if (!expanded.has(cat.id)) toggleExpand(cat.id); } },
-      { label: "Delete", icon: "trash-outline", danger: true, onPress: () => showConfirm("Delete category?", `Move "${cat.title}" to the Recycle Bin? This only works if it has no plans inside it. It can be restored from Admin → Recycle Bin.`, async () => {
+      { label: "Delete", icon: "trash-outline", danger: true, onPress: () => confirmAction("Delete category?", `Move "${cat.title}" to the Recycle Bin? This only works if it has no plans inside it. It can be restored from Admin → Recycle Bin.`, async () => {
         try { await deletePlanCategory(cat.id); await reload(); } catch (e: any) { showAlert("Can't delete category", e.message ?? "Unknown error"); }
-      }) },
+      }, { destructive: true }) },
     ];
   }
 

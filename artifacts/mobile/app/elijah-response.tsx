@@ -9,6 +9,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
+import { currentModule as currentModuleOf } from "@/lib/learningHome";
 
 // The Elijah Protocol response screen — reached from the Home screen's
 // "we noticed you've been quiet" card (see index.tsx), since this app has no
@@ -42,7 +43,7 @@ export default function ElijahResponseScreen() {
     }
 
     if (decision === "restarting") {
-      const currentModule = modules.find((m) => !m.isLocked && m.completedLessons < m.lessonCount) ?? modules[0] ?? null;
+      const currentModule = currentModuleOf(modules) ?? modules[0] ?? null;
       const currentLesson = currentModule
         ? [...lessons].filter((l) => l.moduleId === currentModule.id && !l.isCompleted).sort((a, b) => a.order - b.order)[0] ?? null
         : null;

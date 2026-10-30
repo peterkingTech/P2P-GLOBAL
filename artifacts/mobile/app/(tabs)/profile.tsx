@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Platform,
-  Alert,
   Modal,
   ActivityIndicator,
 } from "react-native";
@@ -33,6 +32,7 @@ import LivingTree, { stageLabel } from "@/components/LivingTree";
 import "@/lib/i18n";
 import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "school" },
@@ -255,7 +255,7 @@ export default function ProfileScreen() {
   function showMyQr() {
     const spec = profileQr(profile?.username);
     if (!spec) {
-      Alert.alert("Set a username first", "Your QR code links to your public @username profile.");
+      showAlert("Set a username first", "Your QR code links to your public @username profile.");
       return;
     }
     setQrSpec(spec);
@@ -263,14 +263,14 @@ export default function ProfileScreen() {
 
   async function handleShareInvite() {
     if (!profile?.username) {
-      Alert.alert("Set a username first", "Add a username before inviting others.");
+      showAlert("Set a username first", "Add a username before inviting others.");
       return;
     }
     setInvitingBusy(true);
     try {
       const inviteLink = await getMyInviteLink();
       if (!inviteLink) {
-        Alert.alert("Couldn't get invite link", "Please try again.");
+        showAlert("Couldn't get invite link", "Please try again.");
         return;
       }
       await shareInviteLink({ username: profile.username, inviteLink });
@@ -309,10 +309,7 @@ export default function ProfileScreen() {
   }
 
   async function handleSignOut() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: signOut },
-    ]);
+    confirmAction("Sign Out", "Are you sure you want to sign out?", signOut, { confirmLabel: "Sign Out", destructive: true });
   }
 
   function openReachOut() {

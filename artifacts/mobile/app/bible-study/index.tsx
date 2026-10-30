@@ -46,6 +46,7 @@ export default function BibleStudyScreen() {
     { icon: "search-outline", title: "Search Scripture", sub: "Words, phrases or a reference", route: "/bible/search" },
     { icon: "document-text-outline", title: "Notes", sub: "Your private notes", route: "/notes" },
     { icon: "bookmark-outline", title: "Highlights", sub: "Saved passages and quotes", route: "/highlights" },
+    { icon: "people-outline", title: "Study Together", sub: "Shared studies with your people", route: "/study-together" },
   ] as const;
 
   return (

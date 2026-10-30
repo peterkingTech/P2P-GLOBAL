@@ -7,14 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getKingdomWinsFeed, KINGDOM_CATEGORY_LABELS, type KingdomWin, type KingdomEntryType } from "@/lib/kingdomWinsApi";
 import { AppButton } from "@/components/ui";
+import { timeAgo } from "@/lib/timeFormat";
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / 86400000);
-  if (days < 1) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
-}
 
 // Kingdom Wins / Testimonies — "Look what God has done." Deliberately
 // calm: no likes, no follower counts, no ranking, no infinite-scroll
@@ -89,7 +83,7 @@ export default function KingdomWinsScreen() {
                   <Text style={styles.entryBadgeText}>{item.entryType === "testimony" ? "Testimony" : item.entryType === "p2p_impact" ? "P2P Impact" : "Kingdom Win"}</Text>
                 </View>
                 <Text style={styles.categoryText}>{KINGDOM_CATEGORY_LABELS[item.category]}</Text>
-                <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                <Text style={styles.timeText}>{timeAgo(item.createdAt, "days")}</Text>
               </View>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardBody} numberOfLines={3}>{item.body}</Text>

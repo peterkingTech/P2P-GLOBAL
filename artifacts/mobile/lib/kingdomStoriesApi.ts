@@ -1,26 +1,15 @@
 import { supabase } from "@/contexts/AuthContext";
-import { getApiUrl } from "@/lib/apiUrl";
+import { apiRequest } from "@/lib/apiClient";
 
 // Kingdom Stories — P2P-curated EDITORIAL content (migration 152).
 // Distinct from Kingdom Wins/P2P Impact (peer-authored testimony): only
 // admin_content/super_admin can create or publish. No author identity is
 // ever shown to peers — the content is the product, not a creator.
-async function authedFetch(path: string, init?: RequestInit) {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}) },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    // `studioRequired`: refused by the Publishing Studio approval gate or the
-    // live-story freeze (migration 188) — the story was left unchanged.
-    const b = body as { error?: string; code?: string; studioRequired?: boolean };
-    throw Object.assign(new Error(b.error ?? "Request failed"), { status: res.status, code: b.code, studioRequired: b.studioRequired === true });
-  }
-  return body;
-}
+// `studioRequired`: refused by the Publishing Studio approval gate or the
+// live-story freeze (migration 188) — the story was left unchanged.
+const authedFetch = (path: string, init?: RequestInit) => apiRequest(path, init, {
+  makeError: (message, status, b) => Object.assign(new Error(message), { status, code: b.code as string | undefined, studioRequired: b.studioRequired === true }),
+});
 
 export type KingdomStoryContentType = "historical_story" | "person" | "movement" | "event" | "place" | "present_day_story" | "documentary" | "scripture_story";
 export type KingdomStoryStatus = "draft" | "review" | "published" | "archived";

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Platform } from "react-native";
 import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +17,7 @@ import { grainLabel } from "@/lib/grain";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { showAlert, confirmAction } from "@/lib/alerts";
 type ConnectionStatus = "none" | "pending_sent" | "pending_received" | "connected";
 
 interface PublicProfile {
@@ -39,10 +40,6 @@ interface PublicProfile {
   canContact?: boolean;
 }
 
-function showAlert(title: string, message: string) {
-  if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
-  else Alert.alert(title, message);
-}
 
 export default function PublicProfileScreen() {
   const sheetWidth = useSheetWidth();
@@ -219,18 +216,13 @@ export default function PublicProfileScreen() {
   async function handleBlock() {
     if (!viewer?.id || !data) return;
     setMenuOpen(false);
-    Alert.alert(`Block @${data.username}?`, "They won't be able to see your profile or message you.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Block", style: "destructive", onPress: async () => {
+    confirmAction(`Block @${data.username}?`, "They won't be able to see your profile or message you.", async () => {
           await fetch(`${getApiUrl()}/connections/block`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ blockerId: viewer.id, blockedId: data.userId }),
           });
           setIsBlockedByMe(true);
-        },
-      },
-    ]);
+        }, { confirmLabel: "Block", destructive: true });
   }
 
   async function handleUnblock() {

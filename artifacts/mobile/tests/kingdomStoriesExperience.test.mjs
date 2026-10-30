@@ -198,10 +198,12 @@ for (const r of ["/kingdom-school", "/kingdom-stories", "/bible-study", "/study-
 const homeTab = src("app/(tabs)/index.tsx");
 const community = homeTab.indexOf("My Community</Text>");
 ok("home: My Community section exists", community > 0);
-for (const w of ["<GroveHomeCard", "<RegisterChurchPromptCard", "<MemberChurchCard", 'title={t("home.myFamily")}']) {
+for (const w of ["<GroveHomeCard", "<RegisterChurchPromptCard", "<MemberChurchCard", 'title="My Community"']) {
   ok(`home: ${w} appears once, inside My Community`, homeTab.split(w).length === 2 && homeTab.indexOf(w) > community && homeTab.indexOf(w) < homeTab.indexOf("4. Your Journey"));
 }
-ok("home: church cards keep their conditions and routes", homeTab.includes('{isChurchLeader && userChurch && (') && homeTab.includes('{!profile?.isMinistryLeader && userChurch && (') && homeTab.includes('router.push("/church/grove" as any)') && homeTab.includes('go("/family")'));
+ok("home: church cards keep their conditions and routes; the community tile opens My Community", homeTab.includes('{isChurchLeader && userChurch && (') && homeTab.includes('{!profile?.isMinistryLeader && userChurch && (') && homeTab.includes('router.push("/church/grove" as any)') && homeTab.includes('go("/community")'));
+const myCommunity = readFileSync(path.join(root, "app/community.tsx"), "utf8");
+ok("My Community: families, church, gatherings and community learning — linking to the existing screens", ["My Families", "My Church", "Community Learning", "getMyFamilies()", '"/family/[familyId]"', '"/church/calls"', '"/learning/[scope]/[groupId]"', "<StudyTogetherLink"].every((x) => myCommunity.includes(x)));
 ok("home: Messages / Prayer / Discover / Profile tabs untouched by this work", !/LearningHub|My Community/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/discover.tsx") + src("app/(tabs)/profile.tsx")));
 
 console.log(`kingdomStoriesExperience: ${pass} passed, ${fail} failed`);
