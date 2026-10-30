@@ -203,5 +203,12 @@ ok("one video player (feature players removed)", ["KingdomStoryVideoPlayer", "Ki
 const ctxSrc = read("contexts/DataContext.tsx");
 ok("DataContext: data shapes moved out, still re-exported", ctxSrc.includes('export * from "./data/learningModel";') && ctxSrc.includes('export * from "./data/types";') && !/^export interface Module \{/m.test(ctxSrc) && /^export interface Module \{/m.test(read("contexts/data/learningModel.ts")));
 
+// ── 5. No entry that just repeats a tab or another home ──────────────────────
+const disc = read("app/(tabs)/discover.tsx"), homeSrc = read("app/(tabs)/index.tsx");
+ok("Discover: no Kingdom Stories card (it lives in Learning)", !/route: "\/kingdom-stories"/.test(disc));
+ok("Discover: no Prayer Wall card (Prayer is a tab) and no unused prayer-wall request", !/route: "\/\(tabs\)\/prayer"/.test(disc) && !disc.includes("getPrayerWallPosts"));
+ok("Discover: your own church is not repeated (join / register stay)", !disc.includes(">My Church</Text>") && disc.includes('router.push("/church/join"'));
+ok("Home: no Living Tree tile (the tree card opens it) and no tile that only opens the Discover tab", (homeSrc.match(/go\("\/living-tree"\)/g) ?? []).length === 1 && !homeSrc.includes('go("/(tabs)/discover")'));
+
 console.log(`consolidation: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -922,9 +922,7 @@ export default function HomeTab() {
         <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.yourJourney")}</Text>
       </View>
       <View style={[styles.journeyGrid, journeyTiles.containerStyle]} onLayout={journeyTiles.onLayout}>
-        <JourneyTile icon="leaf" tint="#3FB37F" title={t("home.livingTree")} sub={t("home.livingTreeSub")} onPress={go("/living-tree")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} tileStyle={journeyTiles.tileStyle} />
-        <JourneyTile icon="people" tint="#1D9E75" title={t("home.peerConnect")} sub={t("home.peerConnectSub")} onPress={go("/(tabs)/discover")} styles={styles} tileStyle={journeyTiles.tileStyle} />
         <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} tileStyle={journeyTiles.tileStyle} />
       </View>
       {/* Previously only reachable from the old "More" list — kept here as

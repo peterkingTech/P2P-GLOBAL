@@ -122,7 +122,7 @@ export default function DiscoverTab() {
   useScrollToTopOnTabReselect("discover", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
-  const { getDiscoverablePeers, getGroups, getPrayerWallPosts, forestStats, missions, userChurch } = useData();
+  const { getDiscoverablePeers, getGroups, forestStats, missions, userChurch } = useData();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { contentMaxWidth } = useLayout();
@@ -130,7 +130,6 @@ export default function DiscoverTab() {
   const [loading, setLoading] = useState(true);
   const [peerCount, setPeerCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
-  const [wallCount, setWallCount] = useState(0);
   const [circles, setCircles] = useState<DiscoverCircleSummary[]>([]);
   const [liveRooms, setLiveRooms] = useState<LiveRoomSummary[]>([]);
   const [showAllRooms, setShowAllRooms] = useState(false);
@@ -178,15 +177,13 @@ export default function DiscoverTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [peers, groups, posts] = await Promise.all([
+    const [peers, groups] = await Promise.all([
       getDiscoverablePeers(),
       getGroups(),
-      getPrayerWallPosts("recent"),
       loadLiveRooms(),
     ]);
     setPeerCount(peers.length);
     setGroupCount(groups.length);
-    setWallCount(posts.length);
     try {
       const res = await fetch(`${getApiUrl()}/circles?status=forming,active`);
       const data = (await res.json()) as DiscoverCircleSummary[];
@@ -196,7 +193,7 @@ export default function DiscoverTab() {
       setCircles([]);
     }
     setLoading(false);
-  }, [getDiscoverablePeers, getGroups, getPrayerWallPosts, loadLiveRooms]);
+  }, [getDiscoverablePeers, getGroups, loadLiveRooms]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -228,11 +225,9 @@ export default function DiscoverTab() {
     { key: "invite", icon: "mail-outline" as const, title: "Invite a Peer", count: null, sub: "Send a study invitation to someone you know", route: "/connect/invite" as const },
     { key: "username", icon: "at-outline" as const, title: "Find by Username", count: null, sub: "Already know their @username? Connect directly", route: "/connect/by-username" as const },
     { key: "connections", icon: "checkmark-done-circle-outline" as const, title: "P2P Connections", count: null, sub: "Incoming, sent and accepted connections", route: "/connections" as const },
-    { key: "wall", icon: "hand-left-outline" as const, title: t("discover.prayerWall"), count: wallCount, sub: t("discover.prayerWallSub"), route: "/(tabs)/prayer" as const },
     { key: "countries", icon: "earth-outline" as const, title: t("discover.countriesReached"), count: forestStats.countriesReached.length, sub: t("discover.countriesReachedSub"), route: "/living-tree" as const },
     // Missions left the tab bar; this card is now its entry point.
     { key: "missions", icon: "flag-outline" as const, title: t("discover.missions"), count: missions.length, sub: t("discover.missionsSub"), route: "/missions" as const },
-    { key: "kingdom-stories", icon: "book-outline" as const, title: t("discover.kingdomStories"), count: null, sub: t("discover.kingdomStoriesSub"), route: "/kingdom-stories" as const },
   ];
 
   return (
@@ -381,12 +376,7 @@ export default function DiscoverTab() {
               <Text style={styles.circleCardMeta}>Has your church registered on P2P Global? Join with their invite code.</Text>
             </TouchableOpacity>
           )}
-          {userChurch && (
-            <TouchableOpacity accessibilityRole="button" style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church" as any)}>
-              <Text style={styles.circleCardName}>My Church</Text>
-              <Text style={styles.circleCardMeta}>{userChurch.name}</Text>
-            </TouchableOpacity>
-          )}
+          {/* Your own church is opened from the community overview (app/community.tsx). */}
 
           <InviteCard label="🌾 Plant a grain — invite someone to P2P Global" buttonText="Share your invite link" />
         </ScrollView>
