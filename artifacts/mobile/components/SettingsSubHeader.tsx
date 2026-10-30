@@ -21,7 +21,7 @@ export default function SettingsSubHeader({ title }: { title: string }) {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { borderBottomColor: colors.borderBeige }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.textDark }]}>{title}</Text>

@@ -13,6 +13,7 @@ import { generateTreeGeometry, placeFruits } from "@/lib/treeGeometry";
 import TreeEnvironment, { EnvironmentSetting } from "./tree/TreeEnvironment";
 import type { Season, Weather } from "@/lib/hemisphereSeason";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Fruit category -> color, reused from the existing p2p_fruits_catalog
 // taxonomy (migration 032) — never a new/invented fruit type.
@@ -365,14 +366,8 @@ export default function LivingTree({
 
       {!compact && isInteractive && (
         <View style={styles.controlsRow}>
-          <TouchableOpacity style={styles.controlBtn} onPress={toggleRoots} accessibilityRole="button" accessibilityLabel={rootsFocused ? "View canopy" : "View roots"}>
-            <Ionicons name={rootsFocused ? "leaf-outline" : "git-branch-outline"} size={16} color={colors.textDark} />
-            <Text style={styles.controlBtnText}>{rootsFocused ? "View Canopy" : "View Roots"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.controlBtn} onPress={resetView} accessibilityRole="button" accessibilityLabel="Reset view">
-            <Ionicons name="refresh-outline" size={16} color={colors.textDark} />
-            <Text style={styles.controlBtnText}>Reset View</Text>
-          </TouchableOpacity>
+          <AppButton label={rootsFocused ? "View Canopy" : "View Roots"} onPress={toggleRoots} variant="secondary" size="sm" icon={rootsFocused ? "leaf-outline" : "git-branch-outline"} accessibilityLabel={rootsFocused ? "View canopy" : "View roots"} palette="fixedLight" />
+          <AppButton label="Reset View" onPress={resetView} variant="secondary" size="sm" icon="refresh-outline" accessibilityLabel="Reset view" palette="fixedLight" />
         </View>
       )}
 
@@ -386,7 +381,7 @@ export default function LivingTree({
       )}
 
       <Modal visible={!!tooltip} transparent animationType="fade" onRequestClose={() => setTooltip(null)}>
-        <TouchableOpacity style={styles.tooltipOverlay} activeOpacity={1} onPress={() => setTooltip(null)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.tooltipOverlay} activeOpacity={1} onPress={() => setTooltip(null)}>
           <View style={styles.tooltipCard}>
             <Text style={styles.tooltipTitle}>{tooltip?.title}</Text>
             {tooltip?.lines.map((l, i) => (
@@ -410,11 +405,6 @@ const styles = StyleSheet.create({
   },
   fruitBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   controlsRow: { position: "absolute", bottom: 8, flexDirection: "row", gap: 8 },
-  controlBtn: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(255,255,255,0.85)", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6,
-  },
-  controlBtnText: { fontSize: 11, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   tooltipOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 30 },
   tooltipCard: { backgroundColor: colors.card, borderRadius: 16, padding: 20, width: "100%", maxWidth: 320, gap: 6 },
   tooltipTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },

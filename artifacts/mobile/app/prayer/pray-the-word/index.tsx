@@ -44,7 +44,7 @@ export default function PrayTheWordScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Pray the Word</Text>
@@ -58,17 +58,17 @@ export default function PrayTheWordScreen() {
       </View>
 
       <View style={styles.quickRow}>
-        <TouchableOpacity style={styles.quickCard} onPress={() => router.push("/prayer/discover" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.quickCard} onPress={() => router.push("/prayer/discover" as any)}>
           <Ionicons name="compass-outline" size={18} color={c.accentGreen} />
           <Text style={styles.quickCardText}>What are you carrying today?</Text>
         </TouchableOpacity>
       </View>
       <View style={[styles.quickRow, { marginTop: 8 }]}>
-        <TouchableOpacity style={styles.quickCardHalf} onPress={() => router.push("/prayer/library" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.quickCardHalf} onPress={() => router.push("/prayer/library" as any)}>
           <Ionicons name="bookmark-outline" size={16} color={c.accentGreen} />
           <Text style={styles.quickCardHalfText}>Saved Scriptures{savedCount > 0 ? ` (${savedCount})` : ""}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickCardHalf} onPress={() => router.push("/prayer/library" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.quickCardHalf} onPress={() => router.push("/prayer/library" as any)}>
           <Ionicons name="time-outline" size={16} color={c.accentGreen} />
           <Text style={styles.quickCardHalfText}>Recently Prayed{recentCount > 0 ? ` (${recentCount})` : ""}</Text>
         </TouchableOpacity>
@@ -87,7 +87,7 @@ export default function PrayTheWordScreen() {
           columnWrapperStyle={{ gap: 10 }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.topicCard} onPress={() => router.push(`/prayer/pray-the-word/${item.slug}` as any)} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" style={styles.topicCard} onPress={() => router.push(`/prayer/pray-the-word/${item.slug}` as any)} activeOpacity={0.85}>
               <Text style={styles.topicTitle}>{item.title}</Text>
               {!!item.description && <Text style={styles.topicDesc} numberOfLines={2}>{item.description}</Text>}
             </TouchableOpacity>

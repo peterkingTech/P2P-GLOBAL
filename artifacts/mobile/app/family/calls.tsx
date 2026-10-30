@@ -7,6 +7,7 @@ import type { AppColors } from "@/constants/themes";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { getFamilyDetail, type FamilyDetailResponse, type FamilyMember } from "@/lib/familyApi";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
+import { IconButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -117,18 +118,8 @@ export default function FamilyCallsScreen() {
                     <ActivityIndicator color={c.primaryGreen} size="small" style={{ marginRight: 8 }} />
                   ) : (
                     <>
-                      <TouchableOpacity
-                        style={styles.callBtn} onPress={() => handleCall(m, "audio")} disabled={!!callingUserId}
-                        accessibilityRole="button" accessibilityLabel={`Voice call ${m.name}`}
-                      >
-                        <Ionicons name="call" size={18} color={c.primaryGreen} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.callBtn} onPress={() => handleCall(m, "video")} disabled={!!callingUserId}
-                        accessibilityRole="button" accessibilityLabel={`Video call ${m.name}`}
-                      >
-                        <Ionicons name="videocam" size={18} color={c.primaryGreen} />
-                      </TouchableOpacity>
+                      <IconButton icon="call" accessibilityLabel={`Voice call ${m.name}`} onPress={() => handleCall(m, "audio")} variant="tinted" size="sm" color={c.primaryGreen} disabled={!!callingUserId} style={{ marginLeft: 8 }} />
+                      <IconButton icon="videocam" accessibilityLabel={`Video call ${m.name}`} onPress={() => handleCall(m, "video")} variant="tinted" size="sm" color={c.primaryGreen} disabled={!!callingUserId} style={{ marginLeft: 8 }} />
                     </>
                   )}
                 </View>
@@ -159,9 +150,5 @@ function makeStyles(c: AppColors) {
     avatarInitial: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
     memberName: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     memberRole: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 1 },
-    callBtn: {
-      width: 36, height: 36, borderRadius: 18, backgroundColor: c.lightCream,
-      alignItems: "center", justifyContent: "center", marginLeft: 8,
-    },
   });
 }

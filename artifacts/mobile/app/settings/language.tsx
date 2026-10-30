@@ -78,7 +78,7 @@ export default function LanguageSettingsScreen() {
       <SettingsSubHeader title="Language and Region" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.linkRow} onPress={() => setLangPickerOpen("app")}>
+          <TouchableOpacity accessibilityRole="button" style={styles.linkRow} onPress={() => setLangPickerOpen("app")}>
             <View>
               <Text style={styles.fieldLabel}>App Language</Text>
               <Text style={styles.rowSub}>Changes the language of the app's interface</Text>
@@ -88,7 +88,7 @@ export default function LanguageSettingsScreen() {
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, styles.linkRowLast]} onPress={() => setLangPickerOpen("content")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.linkRow, styles.linkRowLast]} onPress={() => setLangPickerOpen("content")}>
             <View>
               <Text style={styles.fieldLabel}>Content Language</Text>
               <Text style={styles.rowSub}>Changes the language curriculum is delivered in</Text>
@@ -105,7 +105,7 @@ export default function LanguageSettingsScreen() {
           {DATE_FORMATS.map((f, i) => {
             const selected = (profile?.dateFormat ?? "DD.MM.YYYY") === f.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={f.value}
                 style={[styles.formatRow, i === DATE_FORMATS.length - 1 && styles.linkRowLast]}
                 onPress={() => setDateFormat(f.value)}
@@ -126,7 +126,7 @@ export default function LanguageSettingsScreen() {
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{langPickerOpen === "app" ? "App Language" : "Content Language"}</Text>
-              <TouchableOpacity onPress={() => setLangPickerOpen(null)} style={styles.closeBtn}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLangPickerOpen(null)} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
@@ -137,7 +137,7 @@ export default function LanguageSettingsScreen() {
                 area would be unreachable with no indication more exists. */}
             <ScrollView showsVerticalScrollIndicator={false}>
               {(langPickerOpen === "app" ? LANGUAGES : BIBLE_LANGUAGES).map((l) => (
-                <TouchableOpacity key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
+                <TouchableOpacity accessibilityRole="button" key={l.code} style={styles.optionRow} onPress={() => setLanguage(langPickerOpen!, l.code)}>
                   <Text style={styles.optionLabel}>{l.label}</Text>
                   {(langPickerOpen === "app" ? profile?.appLanguage : profile?.contentLanguage) === l.code && (
                     <Ionicons name="checkmark" size={18} color={colors.accentGreen} />

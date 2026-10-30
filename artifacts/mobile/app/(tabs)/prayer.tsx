@@ -38,6 +38,7 @@ import { savePrayer, getSavedPrayers } from "@/lib/prayerLibraryApi";
 import { formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 import ReadableText from "@/components/ReadableText";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -135,7 +136,7 @@ function CommentsPanel({ postId }: { postId: string }) {
           placeholder={t("prayer.writeComment")}
           placeholderTextColor={colors.upperRoomMuted}
         />
-        <TouchableOpacity onPress={submit} disabled={posting || !text.trim()} style={styles.commentSendBtn}>
+        <TouchableOpacity accessibilityRole="button" onPress={submit} disabled={posting || !text.trim()} style={styles.commentSendBtn}>
           {posting ? (
             <ActivityIndicator size="small" color={colors.upperRoomAmber} />
           ) : (
@@ -185,7 +186,7 @@ function PostCard({
           </Text>
         </View>
         {isTestimony && <Ionicons name="sparkles" size={18} color={colors.upperRoomAmber} />}
-        <TouchableOpacity style={styles.reportBtn} onPress={() => onReport(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Report" style={styles.reportBtn} onPress={() => onReport(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="flag-outline" size={15} color={colors.upperRoomMuted} />
         </TouchableOpacity>
       </View>
@@ -202,7 +203,7 @@ function PostCard({
       <Text style={styles.prayerText}>{item.body}</Text>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.reactBtn, item.myReactions.includes("praying") && styles.reactBtnActive]}
           onPress={() => {
             if (!item.myReactions.includes("praying")) {
@@ -216,7 +217,7 @@ function PostCard({
             {t("prayer.prayingCount", { count: item.prayingCount })}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.reactBtn, item.myReactions.includes("amen") && styles.reactBtnActive]}
           onPress={() => {
             if (!item.myReactions.includes("amen")) {
@@ -230,27 +231,17 @@ function PostCard({
             {t("prayer.amenCount", { count: item.amenCount })}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reactBtn} onPress={() => setShowComments((s) => !s)}>
-          <Ionicons name="chatbubble-outline" size={14} color={colors.upperRoomMuted} />
-          <Text style={styles.reactBtnText}>{item.commentCount}</Text>
-        </TouchableOpacity>
+        <AppButton label={`${item.commentCount}`} onPress={() => setShowComments((s) => !s)} variant="secondary" size="sm" icon="chatbubble-outline" />
       </View>
 
       {!isTestimony && item.status === "open" && (
         <View style={styles.answerRow}>
-          <TouchableOpacity style={styles.answerBtn} onPress={() => onAnswer(item.id)}>
-            <Text style={styles.answerBtnText}>{t("prayer.markAnswered")}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.testifyBtn} onPress={() => onTestify(item)}>
-            <Text style={styles.testifyBtnText}>{t("prayer.shareTestimony")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("prayer.markAnswered")} onPress={() => onAnswer(item.id)} variant="secondary" size="sm" style={{ flex: 1 }} />
+          <AppButton label={t("prayer.shareTestimony")} onPress={() => onTestify(item)} variant="secondary" size="sm" style={{ flex: 1 }} />
         </View>
       )}
       {!isTestimony && item.status === "answered" && (
-        <TouchableOpacity style={styles.testifyBtnFull} onPress={() => onTestify(item)}>
-          <Ionicons name="sparkles-outline" size={14} color={colors.upperRoomAmber} />
-          <Text style={styles.testifyBtnText}>{t("prayer.shareHowGodAnswered")}</Text>
-        </TouchableOpacity>
+        <AppButton label={t("prayer.shareHowGodAnswered")} onPress={() => onTestify(item)} variant="secondary" size="sm" icon="sparkles-outline" style={{ marginTop: 10 }} />
       )}
 
       {showComments && <CommentsPanel postId={item.id} />}
@@ -503,7 +494,7 @@ export default function PrayerTab() {
 
         {/* ── "Pray the Word" — Scripture-centered prayer discovery ── */}
         <View style={styles.sectionBlock}>
-          <TouchableOpacity style={styles.ptwHero} onPress={() => router.push("/prayer/pray-the-word" as any)} activeOpacity={0.9}>
+          <TouchableOpacity accessibilityRole="button" style={styles.ptwHero} onPress={() => router.push("/prayer/pray-the-word" as any)} activeOpacity={0.9}>
             <Ionicons name="sparkles-outline" size={22} color={colors.upperRoomAmber} />
             <View style={{ flex: 1 }}>
               <Text style={styles.ptwHeroTitle}>Pray the Word</Text>
@@ -512,18 +503,18 @@ export default function PrayerTab() {
             <Ionicons name="chevron-forward" size={18} color={colors.upperRoomAmber} />
           </TouchableOpacity>
           <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-            <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/discover" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/discover" as any)}>
               <Ionicons name="compass-outline" size={20} color={colors.upperRoomAmber} />
               <Text style={styles.dashActionTitle}>What Are You Carrying?</Text>
               <Text style={styles.dashActionSub}>Find Scripture for today</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/paths" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/paths" as any)}>
               <Ionicons name="trail-sign-outline" size={20} color={colors.upperRoomAmber} />
               <Text style={styles.dashActionTitle}>Prayer Paths</Text>
               <Text style={styles.dashActionSub}>Guided Scripture journeys</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={[styles.dashActionCard, { marginTop: 10 }]} onPress={() => router.push("/prayer/library" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.dashActionCard, { marginTop: 10 }]} onPress={() => router.push("/prayer/library" as any)}>
             <Ionicons name="library-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>My Prayer Library</Text>
             <Text style={styles.dashActionSub}>Saved Scriptures, paths, and answered prayers</Text>
@@ -538,9 +529,7 @@ export default function PrayerTab() {
           ) : prayNowMatches.length === 0 ? (
             <View style={styles.dashEmptyCard}>
               <Text style={styles.dashEmptyText}>No one is available right now.</Text>
-              <TouchableOpacity style={styles.dashEmptyBtn} onPress={() => router.push("/prayer/availability" as any)}>
-                <Text style={styles.dashEmptyBtnText}>Set My Availability</Text>
-              </TouchableOpacity>
+              <AppButton label="Set My Availability" onPress={() => router.push("/prayer/availability" as any)} />
             </View>
           ) : (
             <>
@@ -552,9 +541,7 @@ export default function PrayerTab() {
                     <Text style={styles.matchName}>{m.displayName}</Text>
                     <Text style={styles.matchUntil}>🟢 Available until {formatTimeInZone(m.availableUntil, m.timezone)}</Text>
                   </View>
-                  <TouchableOpacity style={styles.requestBtn} onPress={() => { setRequestingMatch(m); setRequestMessage(""); }}>
-                    <Text style={styles.requestBtnText}>Request Prayer</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Request Prayer" onPress={() => { setRequestingMatch(m); setRequestMessage(""); }} variant="secondary" size="sm" />
                 </View>
               ))}
             </>
@@ -563,12 +550,12 @@ export default function PrayerTab() {
 
         {/* ── Prayer 2.0: Pray With Me + My Availability ── */}
         <View style={[styles.sectionBlock, { flexDirection: "row", gap: 10, marginTop: 20 }]}>
-          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/pray-with-me" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/pray-with-me" as any)}>
             <Ionicons name="megaphone-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>Pray With Me</Text>
             <Text style={styles.dashActionSub}>Ask peers to join you</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/availability" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/availability" as any)}>
             <Ionicons name="time-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>My Availability</Text>
             <Text style={styles.dashActionSub}>{availabilityCount > 0 ? `${availabilityCount} active slot${availabilityCount === 1 ? "" : "s"}` : "Not set yet"}</Text>
@@ -576,12 +563,12 @@ export default function PrayerTab() {
         </View>
 
         <View style={[styles.sectionBlock, { flexDirection: "row", gap: 10, marginTop: 10 }]}>
-          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/requests" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/requests" as any)}>
             <Ionicons name="people-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>Prayer Requests</Text>
             <Text style={styles.dashActionSub}>See who needs prayer</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/my-prayer" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/my-prayer" as any)}>
             <Ionicons name="heart-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>My Prayer</Text>
             <Text style={styles.dashActionSub}>Commitments & history</Text>
@@ -590,7 +577,7 @@ export default function PrayerTab() {
 
         {/* ── Prayer 2.0 Stage 6: Testimonies (answered prayer + growth) ── */}
         <View style={[styles.sectionBlock, { marginTop: 10 }]}>
-          <TouchableOpacity style={styles.dashActionCard} onPress={() => router.push("/prayer/testimony/feed" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashActionCard} onPress={() => router.push("/prayer/testimony/feed" as any)}>
             <Ionicons name="sparkles-outline" size={20} color={colors.upperRoomAmber} />
             <Text style={styles.dashActionTitle}>Testimonies</Text>
             <Text style={styles.dashActionSub}>Answered prayers & growth stories</Text>
@@ -602,7 +589,7 @@ export default function PrayerTab() {
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeading}>Prayer Invitations</Text>
             {pendingInvitations.map((inv) => (
-              <TouchableOpacity key={inv.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/invitation/[id]", params: { id: inv.id } } as any)}>
+              <TouchableOpacity accessibilityRole="button" key={inv.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/invitation/[id]", params: { id: inv.id } } as any)}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inviteText}>{inv.requesterName ?? "Someone"} would like to pray with you</Text>
                   <Text style={styles.inviteMeta}>{relativeDayLabel(inv.proposedStartAt)} · {formatTimeInZone(inv.proposedStartAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}</Text>
@@ -620,7 +607,7 @@ export default function PrayerTab() {
             <Text style={styles.mutedText}>Nothing scheduled yet.</Text>
           ) : (
             upcomingGatherings.map((g) => (
-              <TouchableOpacity key={g.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/gathering/[id]", params: { id: g.id } } as any)}>
+              <TouchableOpacity accessibilityRole="button" key={g.id} style={styles.inviteRow} onPress={() => router.push({ pathname: "/prayer/gathering/[id]", params: { id: g.id } } as any)}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inviteText}>{g.prayerFocus || "Prayer together"}</Text>
                   <Text style={styles.inviteMeta}>{relativeDayLabel(g.scheduledStartAt)} · {formatTimeInZone(g.scheduledStartAt, Intl.DateTimeFormat().resolvedOptions().timeZone)}</Text>
@@ -632,7 +619,7 @@ export default function PrayerTab() {
         </View>
 
         {/* ── Section 1: The Sinner's Prayer ── */}
-        <TouchableOpacity style={styles.sinnersPrayerCard} activeOpacity={0.9} onPress={() => router.push("/prayer/sinners-prayer" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.sinnersPrayerCard} activeOpacity={0.9} onPress={() => router.push("/prayer/sinners-prayer" as any)}>
           <View style={styles.sinnersPrayerIconWrap}>
             <Ionicons name="sparkles" size={22} color={colors.upperRoomAmber} />
           </View>
@@ -647,7 +634,7 @@ export default function PrayerTab() {
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionHeading}>My Prayer Journal</Text>
-            <TouchableOpacity onPress={() => router.push("/prayer/journal" as any)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/prayer/journal" as any)}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -661,10 +648,7 @@ export default function PrayerTab() {
               </View>
             ))
           )}
-          <TouchableOpacity style={styles.writeBtn} onPress={() => router.push("/prayer/journal" as any)}>
-            <Ionicons name="create-outline" size={15} color={colors.upperRoomAmber} />
-            <Text style={styles.writeBtnText}>Write a Prayer</Text>
-          </TouchableOpacity>
+          <AppButton label="Write a Prayer" onPress={() => router.push("/prayer/journal" as any)} variant="outline" icon="create-outline" style={{ marginTop: 4 }} />
         </View>
 
         {/* ── Section 3: Prayer Library ── */}
@@ -672,12 +656,12 @@ export default function PrayerTab() {
           <Text style={styles.sectionHeading}>Prayer Library</Text>
           {activeCategory ? (
             <>
-              <TouchableOpacity style={styles.backRow} onPress={() => setActiveCategory(null)}>
+              <TouchableOpacity accessibilityRole="button" style={styles.backRow} onPress={() => setActiveCategory(null)}>
                 <Ionicons name="chevron-back" size={16} color={colors.upperRoomAmber} />
                 <Text style={styles.backRowText}>Categories</Text>
               </TouchableOpacity>
               {categoryPrayers.map((p) => (
-                <TouchableOpacity key={p.id} style={styles.libraryRow} onPress={() => setActivePrayer(p)}>
+                <TouchableOpacity accessibilityRole="button" key={p.id} style={styles.libraryRow} onPress={() => setActivePrayer(p)}>
                   <Text style={styles.libraryRowTitle}>{p.title}</Text>
                   {p.scripture_reference ? <ReadableText style={styles.libraryRowRef}>{p.scripture_reference}</ReadableText> : null}
                 </TouchableOpacity>
@@ -686,7 +670,7 @@ export default function PrayerTab() {
           ) : (
             <View style={[styles.libraryGrid, libraryTiles.containerStyle]} onLayout={libraryTiles.onLayout}>
               {LIBRARY_CATEGORIES.map((c) => (
-                <TouchableOpacity key={c.key} style={[styles.libraryCard, libraryTiles.tileStyle]} onPress={() => setActiveCategory(c.key)}>
+                <TouchableOpacity accessibilityRole="button" key={c.key} style={[styles.libraryCard, libraryTiles.tileStyle]} onPress={() => setActiveCategory(c.key)}>
                   <Ionicons name={c.icon} size={22} color={colors.upperRoomAmber} />
                   <Text style={styles.libraryCardLabel}>{c.label}</Text>
                 </TouchableOpacity>
@@ -710,35 +694,32 @@ export default function PrayerTab() {
           ) : (
             <Text style={styles.mutedText}>You haven't built a personal confession yet.</Text>
           )}
-          <TouchableOpacity style={styles.writeBtn} onPress={() => router.push("/prayer/build-confession" as any)}>
-            <Ionicons name="hammer-outline" size={15} color={colors.upperRoomAmber} />
-            <Text style={styles.writeBtnText}>Build My Confession</Text>
-          </TouchableOpacity>
+          <AppButton label="Build My Confession" onPress={() => router.push("/prayer/build-confession" as any)} variant="outline" icon="hammer-outline" style={{ marginTop: 4 }} />
         </View>
 
         {/* ── Section 5: Community Prayer (existing wall, unchanged) ── */}
         <View style={styles.sectionBlock}>
           <View style={styles.communityHeaderRow}>
             <Text style={styles.sectionHeading}>Community Prayer</Text>
-            <TouchableOpacity style={styles.addBtn} onPress={openNewPost}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showForm ? "Close the form" : "New prayer request"} hitSlop={10} style={styles.addBtn} onPress={openNewPost}>
               <Ionicons name={showForm ? "close" : "add"} size={20} color={colors.upperRoomCream} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.segmentRow}>
-            <TouchableOpacity style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.segmentBtn, section === "wall" && styles.segmentBtnActive]} onPress={() => setSection("wall")}>
               <Text style={[styles.segmentText, section === "wall" && styles.segmentTextActive]}>{t("prayer.wall")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.segmentBtn, section === "private" && styles.segmentBtnActive]} onPress={() => setSection("private")}>
               <Text style={[styles.segmentText, section === "private" && styles.segmentTextActive]}>{t("prayer.private")}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.tabRow}>
-            <TouchableOpacity style={[styles.tabBtn, tab === "recent" && styles.tabBtnActive]} onPress={() => setTab("recent")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.tabBtn, tab === "recent" && styles.tabBtnActive]} onPress={() => setTab("recent")}>
               <Text style={[styles.tabBtnText, tab === "recent" && styles.tabBtnTextActive]}>{t("prayer.recent")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.tabBtn, tab === "engaged" && styles.tabBtnActive]} onPress={() => setTab("engaged")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.tabBtn, tab === "engaged" && styles.tabBtnActive]} onPress={() => setTab("engaged")}>
               <Text style={[styles.tabBtnText, tab === "engaged" && styles.tabBtnTextActive]}>{t("prayer.mostEngaged")}</Text>
             </TouchableOpacity>
           </View>
@@ -746,14 +727,14 @@ export default function PrayerTab() {
           {showForm && (
             <View style={styles.form}>
               <View style={styles.typeToggleRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.typeToggle, postType === "request" && styles.typeToggleActive]}
                   onPress={() => setPostType("request")}
                   disabled={!!answeredFromPostId}
                 >
                   <Text style={[styles.typeToggleText, postType === "request" && styles.typeToggleTextActive]}>{t("prayer.prayerRequest")}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.typeToggle, postType === "testimony" && styles.typeToggleActive]}
                   onPress={() => setPostType("testimony")}
                 >
@@ -781,14 +762,14 @@ export default function PrayerTab() {
               />
 
               <View style={styles.visibilityRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.visBtn, visibility === "global" && styles.visBtnActive]}
                   onPress={() => setVisibility("global")}
                 >
                   <Ionicons name="earth" size={14} color={visibility === "global" ? colors.upperRoomAmber : colors.upperRoomMuted} />
                   <Text style={[styles.visBtnText, visibility === "global" && styles.visBtnTextActive]}>{t("prayer.global")}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.visBtn, visibility === "peer_group" && styles.visBtnActive]}
                   onPress={() => setVisibility("peer_group")}
                 >
@@ -810,15 +791,7 @@ export default function PrayerTab() {
                 />
               </View>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={submitting}>
-                {submitting ? (
-                  <ActivityIndicator color="#100B06" size="small" />
-                ) : (
-                  <Text style={styles.submitBtnText}>
-                    {postType === "testimony" ? t("prayer.shareTestimony") : t("prayer.submitRequest")}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              <AppButton label={postType === "testimony" ? t("prayer.shareTestimony") : t("prayer.submitRequest")} onPress={handleSubmit} disabled={submitting} loading={submitting} style={{ marginTop: 12 }} />
             </View>
           )}
 
@@ -850,7 +823,7 @@ export default function PrayerTab() {
           <View style={[styles.prayerModalBox, sheetWidth]}>
             <View style={styles.prayerModalHeader}>
               <Text style={styles.prayerModalTitle}>{activePrayer?.title}</Text>
-              <TouchableOpacity onPress={() => setActivePrayer(null)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setActivePrayer(null)}>
                 <Ionicons name="close" size={22} color={colors.upperRoomCream} />
               </TouchableOpacity>
             </View>
@@ -860,12 +833,8 @@ export default function PrayerTab() {
               <ReadInBibleLink reference={activePrayer?.scripture_reference} color={colors.upperRoomAmber} beforeOpen={() => setActivePrayer(null)} />
               <Text style={styles.prayerModalText}>{activePrayer?.prayer_text}</Text>
               <View style={styles.prayerModalActionsRow}>
-                <TouchableOpacity style={styles.prayThisBtn} onPress={() => activePrayer && logPrayerAction(activePrayer)}>
-                  <Text style={styles.prayThisBtnText}>Pray This</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveMineBtn} onPress={() => activePrayer && handleSaveLibraryPrayer(activePrayer.id)} disabled={!!activePrayer && savedPrayerIds.has(activePrayer.id)}>
-                  <Text style={styles.saveMineBtnText}>{activePrayer && savedPrayerIds.has(activePrayer.id) ? "Saved" : "Save to My Prayers"}</Text>
-                </TouchableOpacity>
+                <AppButton label="Pray This" onPress={() => activePrayer && logPrayerAction(activePrayer)} style={{ flex: 1 }} />
+                <AppButton label={activePrayer && savedPrayerIds.has(activePrayer.id) ? "Saved" : "Save to My Prayers"} onPress={() => activePrayer && handleSaveLibraryPrayer(activePrayer.id)} variant="outline" disabled={!!activePrayer && savedPrayerIds.has(activePrayer.id)} style={{ flex: 1 }} />
               </View>
             </ScrollView>
           </View>
@@ -878,7 +847,7 @@ export default function PrayerTab() {
           <View style={[styles.prayerModalBox, sheetWidth, { maxHeight: undefined }]}>
             <View style={styles.prayerModalHeader}>
               <Text style={styles.prayerModalTitle}>Request Prayer</Text>
-              <TouchableOpacity onPress={() => setRequestingMatch(null)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setRequestingMatch(null)}>
                 <Ionicons name="close" size={22} color={colors.upperRoomCream} />
               </TouchableOpacity>
             </View>
@@ -895,9 +864,7 @@ export default function PrayerTab() {
                   placeholderTextColor={colors.upperRoomMuted}
                   multiline
                 />
-                <TouchableOpacity style={styles.submitBtn} onPress={handleSendPrayerRequest} disabled={sendingRequest}>
-                  {sendingRequest ? <ActivityIndicator color="#100B06" size="small" /> : <Text style={styles.submitBtnText}>Send Invitation</Text>}
-                </TouchableOpacity>
+                <AppButton label="Send Invitation" onPress={handleSendPrayerRequest} disabled={sendingRequest} loading={sendingRequest} style={{ marginTop: 12 }} />
               </>
             )}
           </View>
@@ -943,8 +910,6 @@ function makeStyles(c: AppColors) {
     borderRadius: 14, padding: 20,
   },
   dashEmptyText: { fontSize: 13, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
-  dashEmptyBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
-  dashEmptyBtnText: { color: "#100B06", fontSize: 12, fontFamily: "Inter_700Bold" },
   matchCard: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.upperRoomCard, borderWidth: 1,
     borderColor: c.upperRoomBorder, borderRadius: 14, padding: 12, marginTop: 8,
@@ -953,8 +918,6 @@ function makeStyles(c: AppColors) {
   matchAvatarText: { fontSize: 14, color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
   matchName: { fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
   matchUntil: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
-  requestBtn: { backgroundColor: "rgba(224,164,65,0.15)", borderWidth: 1, borderColor: "rgba(224,164,65,0.4)", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  requestBtnText: { fontSize: 11, color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
   dashActionCard: {
     flex: 1, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder,
     borderRadius: 14, padding: 14, gap: 6, alignItems: "flex-start",
@@ -976,8 +939,6 @@ function makeStyles(c: AppColors) {
 
   journalPreviewRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 12, marginBottom: 8 },
   journalPreviewText: { flex: 1, fontSize: 13, color: c.upperRoomCream, fontFamily: "Inter_400Regular" },
-  writeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,164,65,0.35)", borderRadius: 12, paddingVertical: 11, marginTop: 4 },
-  writeBtnText: { fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
 
   libraryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   libraryCard: { width: "47%", backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 14, padding: 16, gap: 8, alignItems: "flex-start" },
@@ -1057,12 +1018,6 @@ function makeStyles(c: AppColors) {
     backgroundColor: "rgba(224,164,65,0.08)", borderWidth: 1, borderColor: "rgba(224,164,65,0.25)",
   },
   anonLabel: { fontSize: 12, color: c.upperRoomCream, fontFamily: "Inter_500Medium", flex: 1 },
-  submitBtn: {
-    backgroundColor: c.upperRoomAmber,
-    borderRadius: 10, height: 44,
-    alignItems: "center", justifyContent: "center", marginTop: 12,
-  },
-  submitBtnText: { color: "#100B06", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   loading: { alignItems: "center", justifyContent: "center", paddingVertical: 40 },
   empty: { alignItems: "center", paddingTop: 30, paddingBottom: 20, gap: 12 },
   emptyText: { color: c.upperRoomMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
@@ -1101,21 +1056,6 @@ function makeStyles(c: AppColors) {
   reactBtnText: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_500Medium" },
   reactBtnTextActive: { color: c.upperRoomAmber },
   answerRow: { flexDirection: "row", gap: 8, marginTop: 10 },
-  answerBtn: {
-    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder,
-  },
-  answerBtnText: { fontSize: 12, fontWeight: "600", color: c.upperRoomCream, fontFamily: "Inter_600SemiBold" },
-  testifyBtn: {
-    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center",
-    backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
-  },
-  testifyBtnFull: {
-    flexDirection: "row", gap: 6, justifyContent: "center",
-    marginTop: 10, paddingVertical: 8, borderRadius: 8, alignItems: "center",
-    backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
-  },
-  testifyBtnText: { fontSize: 12, fontWeight: "600", color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
   commentsPanel: { marginTop: 12, borderTopWidth: 1, borderTopColor: c.upperRoomBorder, paddingTop: 10, gap: 8 },
   commentEmpty: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_400Regular" },
   commentRow: { gap: 2 },
@@ -1136,9 +1076,5 @@ function makeStyles(c: AppColors) {
   prayerModalRef: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold", marginBottom: 10 },
   prayerModalText: { fontSize: 15, color: c.upperRoomCream, fontFamily: "Inter_400Regular", lineHeight: 24 },
   prayerModalActionsRow: { flexDirection: "row", gap: 10, marginTop: 20 },
-  prayThisBtn: { flex: 1, backgroundColor: c.upperRoomAmber, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-  prayThisBtnText: { fontSize: 14, fontWeight: "700", color: "#100B06", fontFamily: "Inter_700Bold" },
-  saveMineBtn: { flex: 1, borderWidth: 1, borderColor: "rgba(224,164,65,0.4)", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-  saveMineBtnText: { fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
   });
 }

@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useData, ModerationFlag, ModerationFlagStatus } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const STATUS_FILTERS: Array<{ value: ModerationFlagStatus; label: string }> = [
   { value: "open", label: "Open" },
@@ -105,7 +106,7 @@ export default function ModerationQueueScreen() {
     <View style={styles.container}>
       <View style={styles.filterBar}>
         {STATUS_FILTERS.map((f) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={f.value}
             style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]}
             onPress={() => setStatusFilter(f.value)}
@@ -157,7 +158,7 @@ export default function ModerationQueueScreen() {
                           `${item.poster.warnedCount} warned · ${item.poster.removedCount} removed · ${item.poster.escalatedCount} escalated`}
                     </Text>
                   </View>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={styles.msgIconBtn}
                     onPress={() => handleMessagePoster(item)}
                     disabled={messaging === item.id || !item.authorId}
@@ -186,34 +187,10 @@ export default function ModerationQueueScreen() {
 
               {item.status === "open" ? (
                 <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionDismiss]}
-                    onPress={() => confirmAction(item, "dismiss")}
-                    disabled={acting === item.id}
-                  >
-                    <Text style={styles.actionBtnText}>Dismiss</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionWarn]}
-                    onPress={() => confirmAction(item, "warn")}
-                    disabled={acting === item.id}
-                  >
-                    <Text style={styles.actionBtnText}>Warn</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionRemove]}
-                    onPress={() => confirmAction(item, "remove")}
-                    disabled={acting === item.id}
-                  >
-                    <Text style={styles.actionBtnText}>Remove</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionEscalate]}
-                    onPress={() => confirmAction(item, "escalate")}
-                    disabled={acting === item.id}
-                  >
-                    <Text style={styles.actionBtnText}>Escalate</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Dismiss" onPress={() => confirmAction(item, "dismiss")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Warn" onPress={() => confirmAction(item, "warn")} variant="secondary" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Remove" onPress={() => confirmAction(item, "remove")} variant="destructive" size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Escalate" onPress={() => confirmAction(item, "escalate")} size="sm" disabled={acting === item.id} style={{ flex: 1, minWidth: 70 }} palette="fixedLight" />
                 </View>
               ) : (
                 <View style={[styles.statusPill, styles[`statusPill_${item.status}` as const]]}>

@@ -96,7 +96,7 @@ export default function TestimonyDetailScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerType}>{testimony.testimonyType === "answered_prayer" ? "Answered Prayer" : "Growth Testimony"}</Text>
@@ -120,7 +120,7 @@ export default function TestimonyDetailScreen() {
         <Text style={styles.body}>{testimony.testimonyText}</Text>
 
         {scriptureRef && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.scriptureRow}
             onPress={() => openScripture(scriptureRef)}
           >
@@ -132,29 +132,29 @@ export default function TestimonyDetailScreen() {
 
         <View style={styles.actionsWrap}>
           <Text style={styles.actionsTitle}>What would you like to do?</Text>
-          <TouchableOpacity style={styles.actionRow} onPress={() => router.push("/prayer/pray-with-me" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/prayer/pray-with-me" as any)}>
             <Ionicons name="hand-left-outline" size={18} color={c.accentGreen} />
             <Text style={styles.actionText}>Pray</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={() => router.push("/curriculum" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/curriculum" as any)}>
             <Ionicons name="book-outline" size={18} color={c.accentGreen} />
             <Text style={styles.actionText}>Study</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={() => router.push("/my-discipleship/journey" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/my-discipleship/journey" as any)}>
             <Ionicons name="leaf-outline" size={18} color={c.accentGreen} />
             <Text style={styles.actionText}>Set a Growth Step</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
           {canEncourage && (
-            <TouchableOpacity style={styles.actionRow} onPress={handleEncourage} disabled={messaging}>
+            <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={handleEncourage} disabled={messaging}>
               {messaging ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Ionicons name="heart-outline" size={18} color={c.accentGreen} />}
               <Text style={styles.actionText}>Encourage {testimony.authorName ?? "them"}</Text>
               <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.actionRow} onPress={() => router.push("/connect/discover" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionRow} onPress={() => router.push("/connect/discover" as any)}>
             <Ionicons name="people-outline" size={18} color={c.accentGreen} />
             <Text style={styles.actionText}>Find a Peer</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />

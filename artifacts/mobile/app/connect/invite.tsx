@@ -11,6 +11,7 @@ import { shareInviteLink } from "@/lib/sharing";
 import { recordInviteShared } from "@/lib/inviteEncouragement";
 import { grainLabel } from "@/lib/grain";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -88,22 +89,8 @@ export default function InvitePeer() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.btn} onPress={() => { void handleShare(); }} disabled={!!busy}>
-          {busy === "share" ? <ActivityIndicator color="#fff" /> : (
-            <>
-              <Ionicons name="share-outline" size={18} color="#fff" />
-              <Text style={styles.btnText}>Invite a Peer</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnOutline} onPress={() => { void handleCopy(); }} disabled={!!busy}>
-          {busy === "copy" ? <ActivityIndicator color={colors.primaryGreen} /> : (
-            <>
-              <Ionicons name={copied ? "checkmark" : "copy-outline"} size={18} color={colors.primaryGreen} />
-              <Text style={styles.btnOutlineText}>{copied ? "Link copied" : "Copy my invite link"}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Invite a Peer" onPress={() => { void handleShare(); }} size="lg" icon="share-outline" disabled={!!busy} loading={busy === "share"} style={{ width: "100%", marginBottom: 12 }} palette="fixedLight" />
+        <AppButton label={copied ? "Link copied" : "Copy my invite link"} onPress={() => { void handleCopy(); }} variant="outline" size="lg" icon={copied ? "checkmark" : "copy-outline"} disabled={!!busy} loading={busy === "copy"} style={{ width: "100%" }} palette="fixedLight" />
 
         {!!grain && <Text style={styles.grain}>{grain}</Text>}
       </ScrollView>
@@ -123,15 +110,5 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 8 },
   cardBody: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 21 },
-  btn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.primaryGreen, borderRadius: 12, paddingVertical: 14, width: "100%", marginBottom: 12, minHeight: 50,
-  },
-  btnText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
-  btnOutline: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", minHeight: 50,
-    borderRadius: 12, paddingVertical: 14, width: "100%", borderWidth: 1.5, borderColor: colors.primaryGreen,
-  },
-  btnOutlineText: { color: colors.primaryGreen, fontWeight: "700", fontFamily: "Inter_700Bold" },
   grain: { marginTop: 16, fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
 });

@@ -10,6 +10,7 @@ import {
   createFamilyInviteLink, getFamilyJoinRequests, listFamilyInviteLinks, respondToFamilyJoinRequest, revokeFamilyInviteLink,
   type FamilyInviteLink, type FamilyJoinRequest, type LinkRole,
 } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 function notify(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -86,9 +87,7 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
           </TouchableOpacity>
         ))}
       </View>
-      <TouchableOpacity style={styles.primaryBtn} onPress={createCode} disabled={creating} accessibilityRole="button" accessibilityLabel="Create invite QR code">
-        {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Create QR code</Text>}
-      </TouchableOpacity>
+      <AppButton label="Create QR code" onPress={createCode} disabled={creating} loading={creating} accessibilityLabel="Create invite QR code" />
 
       {requests.length ? (
         <View style={styles.section}>
@@ -102,12 +101,8 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
               </View>
               {busyId === r.id ? <ActivityIndicator color={c.accentGreen} /> : (
                 <>
-                  <TouchableOpacity style={styles.outlineBtn} onPress={() => answer(r, "decline")} accessibilityRole="button" accessibilityLabel={`Decline ${r.name}`}>
-                    <Text style={styles.outlineText}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.smallBtn} onPress={() => answer(r, "approve")} accessibilityRole="button" accessibilityLabel={`Approve ${r.name}`}>
-                    <Text style={styles.primaryBtnText}>Approve</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Decline" onPress={() => answer(r, "decline")} variant="outline" accessibilityLabel={`Decline ${r.name}`} />
+                  <AppButton label="Approve" onPress={() => answer(r, "approve")} accessibilityLabel={`Approve ${r.name}`} />
                 </>
               )}
             </View>
@@ -125,9 +120,7 @@ export function FamilyInvitePanel({ familyId, familyName, onMembersChanged }: { 
                 <Text style={styles.rowSub}>Expires {shortDate(l.expiresAt)} · used {l.useCount} of {l.maxUses}</Text>
               </View>
               {busyId === l.id ? <ActivityIndicator color={c.accentGreen} /> : (
-                <TouchableOpacity style={styles.outlineBtn} onPress={() => revoke(l)} accessibilityRole="button" accessibilityLabel={`Turn off ${FAMILY_ROLE_LABEL[l.role]} code`}>
-                  <Text style={styles.outlineText}>Turn off</Text>
-                </TouchableOpacity>
+                <AppButton label="Turn off" onPress={() => revoke(l)} variant="outline" accessibilityLabel={`Turn off ${FAMILY_ROLE_LABEL[l.role]} code`} />
               )}
             </View>
           ))}
@@ -152,14 +145,10 @@ const makeStyles = (c: AppColors) =>
     roleChipOn: { borderColor: c.accentGreen, backgroundColor: "rgba(29,158,117,0.12)" },
     roleText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
     roleTextOn: { color: c.accentGreen, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    primaryBtn: { minHeight: 44, borderRadius: 12, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
-    primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
     section: { marginTop: 6, gap: 8 },
     sectionTitle: { fontSize: 12, fontWeight: "700", color: c.textMid, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
     row: { flexDirection: "row", alignItems: "center", gap: 10 },
     rowName: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     rowSub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    outlineBtn: { minHeight: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center" },
     outlineText: { fontSize: 12, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    smallBtn: { minHeight: 44, paddingHorizontal: 12, borderRadius: 10, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
   });

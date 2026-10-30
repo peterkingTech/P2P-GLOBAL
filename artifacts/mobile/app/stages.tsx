@@ -35,7 +35,7 @@ export default function StagesScreen() {
     >
       <Stack.Screen options={{ headerShown: false }} />
       {/* Back */}
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityRole="button" style={styles.back} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={20} color={colors.primaryGreen} />
         <Text style={styles.backLabel}>Living Tree</Text>
       </TouchableOpacity>

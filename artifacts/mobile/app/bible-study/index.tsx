@@ -9,6 +9,7 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Bible Study — the starting point for Scripture in Learning. It reuses what
 // exists and adds no Bible system of its own:
@@ -52,9 +53,7 @@ export default function BibleStudyScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} style={s.back} accessibilityRole="button" accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-          </TouchableOpacity>
+          <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
           <View style={{ flex: 1 }}>
             <Text style={s.title} accessibilityRole="header">Bible Study</Text>
             <Text style={s.meta}>Read, search and explore Scripture.</Text>
@@ -86,14 +85,11 @@ export default function BibleStudyScreen() {
         <Text style={[s.meta, { marginBottom: 10 }]}>Passages chosen by P2P editors for each topic. Open any passage to read it in context.</Text>
         {topics === null && !topicsFailed ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel="Loading topics" />
           : topicsFailed ? (
-            <TouchableOpacity onPress={load} style={s.retry} accessibilityRole="button"><Text style={s.retryText}>Topics couldn't load. Try again</Text></TouchableOpacity>
+            <AppButton label="Topics couldn't load. Try again" onPress={load} variant="tertiary" />
           ) : topics && topics.length ? (
             <View style={s.chips}>
               {topics.map((t) => (
-                <TouchableOpacity key={t.id} style={s.chip} onPress={() => router.push({ pathname: "/bible-study/topic/[slug]", params: { slug: t.slug } } as any)}
-                  accessibilityRole="button" accessibilityLabel={`Topic: ${t.title}`}>
-                  <Text style={s.chipText}>{t.title}</Text>
-                </TouchableOpacity>
+                <AppButton label={`${t.title}`} onPress={() => router.push({ pathname: "/bible-study/topic/[slug]", params: { slug: t.slug } } as any)} variant="secondary" accessibilityLabel={`Topic: ${t.title}`} key={t.id} />
               ))}
             </View>
           ) : <Text style={s.meta}>No topics are published yet.</Text>}

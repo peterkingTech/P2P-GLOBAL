@@ -74,7 +74,7 @@ export default function LessonPicker({ visible, onClose, onSelect }: Props) {
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Choose a Lesson</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
+          <TouchableOpacity hitSlop={10} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
             <Ionicons name="close" size={24} color={c.textDark} />
           </TouchableOpacity>
         </View>

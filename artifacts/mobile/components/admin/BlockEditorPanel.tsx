@@ -15,6 +15,7 @@ import {
 } from "@/lib/curriculumBlocks";
 import BlockRenderer from "./BlockRenderer";
 import { moveToBin } from "@/lib/recycleBinApi";
+import { AppButton } from "@/components/ui";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type Tab = "content" | "settings" | "preview";
@@ -319,7 +320,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
   return (
     <View style={styles.container}>
       {/* Header */}
-      <TouchableOpacity style={styles.coverWrap} onPress={handleCoverUpload} disabled={coverUploading}>
+      <TouchableOpacity accessibilityRole="button" style={styles.coverWrap} onPress={handleCoverUpload} disabled={coverUploading}>
         {lesson.cover_image_url ? (
           <Image source={{ uri: lesson.cover_image_url }} style={styles.coverImage} resizeMode="cover" />
         ) : (
@@ -358,7 +359,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
       {/* Tabs */}
       <View style={styles.tabsRow}>
         {(["content", "settings", "preview"] as Tab[]).map((t) => (
-          <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
+          <TouchableOpacity accessibilityRole="button" key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
             <Text style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
           </TouchableOpacity>
         ))}
@@ -394,7 +395,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
                       onChangeContent={(content) => updateBlockContent(item.id, content)}
                     />
                   </View>
-                  <TouchableOpacity style={styles.blockMenuBtn} onPress={() => setMenuForBlock(item.id)}>
+                  <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" hitSlop={10} style={styles.blockMenuBtn} onPress={() => setMenuForBlock(item.id)}>
                     <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
                   </TouchableOpacity>
                 </View>
@@ -404,7 +405,7 @@ export default function BlockEditorPanel({ lessonId, onLessonChanged }: { lesson
 
           <QuickToolbar onAdd={(type) => addBlock(type)} />
 
-          <TouchableOpacity style={styles.fab} onPress={() => setPickerOpen(true)}>
+          <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" hitSlop={10} style={styles.fab} onPress={() => setPickerOpen(true)}>
             <Ionicons name="add" size={26} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -471,10 +472,7 @@ function QuickToolbar({ onAdd }: { onAdd: (t: BlockType) => void }) {
         {QUICK_TOOLBAR_TYPES.map((t) => {
           const meta = BLOCK_TYPE_META[t];
           return (
-            <TouchableOpacity key={t} style={styles.quickToolbarBtn} onPress={() => onAdd(t)}>
-              <Ionicons name={meta.icon as any} size={16} color={colors.primaryGreen} />
-              <Text style={styles.quickToolbarBtnText}>{meta.label}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${meta.label}`} onPress={() => onAdd(t)} variant="outline" size="sm" icon={meta.icon as any} key={t} palette="fixedLight" />
           );
         })}
       </ScrollView>
@@ -485,7 +483,7 @@ function QuickToolbar({ onAdd }: { onAdd: (t: BlockType) => void }) {
 function BlockPickerModal({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (t: BlockType) => void }) {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity accessibilityRole="button" style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
         <View style={styles.pickerCard} onStartShouldSetResponder={() => true}>
           <Text style={styles.pickerTitle}>Add a block</Text>
           <ScrollView style={{ maxHeight: 420 }}>
@@ -493,7 +491,7 @@ function BlockPickerModal({ visible, onClose, onPick }: { visible: boolean; onCl
               <View key={section} style={{ marginBottom: 10 }}>
                 <Text style={styles.pickerSectionLabel}>{section}</Text>
                 {Object.values(BLOCK_TYPE_META).filter((m) => m.section === section).map((m) => (
-                  <TouchableOpacity key={m.type} style={styles.pickerRow} onPress={() => onPick(m.type)}>
+                  <TouchableOpacity accessibilityRole="button" key={m.type} style={styles.pickerRow} onPress={() => onPick(m.type)}>
                     <Ionicons name={m.icon as any} size={18} color={colors.primaryGreen} />
                     <Text style={styles.pickerRowLabel}>{m.label}</Text>
                     {m.shortcut && Platform.OS === "web" && <Text style={styles.pickerShortcut}>{m.shortcut}</Text>}
@@ -529,23 +527,23 @@ function BlockMenuModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity accessibilityRole="button" style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
         <View style={styles.menuCard} onStartShouldSetResponder={() => true}>
           {mode === "main" && (
             <>
-              <TouchableOpacity style={styles.menuRow} onPress={onDuplicate}>
+              <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={onDuplicate}>
                 <Ionicons name="copy-outline" size={18} color={colors.textDark} />
                 <Text style={styles.menuRowText}>Duplicate</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuRow} onPress={() => setMode("convert")}>
+              <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={() => setMode("convert")}>
                 <Ionicons name="swap-horizontal-outline" size={18} color={colors.textDark} />
                 <Text style={styles.menuRowText}>Convert type</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuRow} onPress={() => setMode("move")}>
+              <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={() => setMode("move")}>
                 <Ionicons name="arrow-redo-outline" size={18} color={colors.textDark} />
                 <Text style={styles.menuRowText}>Move to different lesson</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuRow} onPress={onDelete}>
+              <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={onDelete}>
                 <Ionicons name="trash-outline" size={18} color={"#B91C1C"} />
                 <Text style={[styles.menuRowText, { color: "#B91C1C" }]}>Delete</Text>
               </TouchableOpacity>
@@ -554,7 +552,7 @@ function BlockMenuModal({
           {mode === "convert" && (
             <ScrollView style={{ maxHeight: 360 }}>
               {Object.values(BLOCK_TYPE_META).map((m) => (
-                <TouchableOpacity key={m.type} style={styles.menuRow} onPress={() => onConvert(m.type)}>
+                <TouchableOpacity accessibilityRole="button" key={m.type} style={styles.menuRow} onPress={() => onConvert(m.type)}>
                   <Ionicons name={m.icon as any} size={18} color={colors.primaryGreen} />
                   <Text style={styles.menuRowText}>{m.label}</Text>
                 </TouchableOpacity>
@@ -565,7 +563,7 @@ function BlockMenuModal({
             <ScrollView style={{ maxHeight: 360 }}>
               {siblingLessons.length === 0 && <Text style={styles.emptyStateText}>No other lessons in this module.</Text>}
               {siblingLessons.map((l) => (
-                <TouchableOpacity key={l.id} style={styles.menuRow} onPress={() => onMove(l.id)}>
+                <TouchableOpacity accessibilityRole="button" key={l.id} style={styles.menuRow} onPress={() => onMove(l.id)}>
                   <Ionicons name="document-outline" size={18} color={colors.primaryGreen} />
                   <Text style={styles.menuRowText}>{l.title}</Text>
                 </TouchableOpacity>
@@ -622,7 +620,7 @@ function SettingsTab({
         <Text style={styles.settingsLabel}>Status</Text>
         <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
           {(["draft", "review", "published", "archived"] as LessonStatus[]).map((s) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={s}
               disabled={publishing}
               style={[styles.statusOption, lesson.status === s && { backgroundColor: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }]}
@@ -667,9 +665,7 @@ function PreviewTab({
         </View>
       ))}
       {lesson.status !== "published" && (
-        <TouchableOpacity style={styles.publishBtn} onPress={onPublish} disabled={publishing}>
-          {publishing ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>Publish</Text>}
-        </TouchableOpacity>
+        <AppButton label="Publish" onPress={onPublish} disabled={publishing} loading={publishing} style={{ marginTop: 8 }} palette="fixedLight" />
       )}
     </ScrollView>
   );
@@ -702,8 +698,6 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 48, gap: 8 },
   emptyStateText: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.textMutedLight, textAlign: "center" },
   quickToolbar: { borderTopWidth: 1, borderTopColor: colors.borderBeige, paddingVertical: 8, backgroundColor: colors.lightCream },
-  quickToolbarBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  quickToolbarBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.textDark },
   fab: { position: "absolute", right: 20, bottom: 76, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primaryGreen, alignItems: "center", justifyContent: "center", elevation: 4, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center", padding: 20 },
   pickerCard: { width: "100%", maxWidth: 420, backgroundColor: "#fff", borderRadius: 16, padding: 16 },
@@ -726,6 +720,4 @@ const styles = StyleSheet.create({
   previewCover: { width: "100%", height: 160, borderRadius: 10 },
   previewTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: colors.textDark },
   previewSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.textMuted },
-  publishBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 8 },
-  publishBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

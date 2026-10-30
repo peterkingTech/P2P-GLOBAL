@@ -10,6 +10,7 @@ import colors from "@/constants/colors";
 import { getStageFromPoints } from "@/constants/stages";
 import { getContinent, getFlagEmoji, CONTINENT_LABELS, type Continent } from "@/lib/countryGeo";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { AppButton } from "@/components/ui";
 
 // The Generational Forest View — signature discipleship-lineage visualization.
 // "My Forest" renders self + up to 3 generations of mentees as an SVG grove
@@ -71,7 +72,7 @@ function AncestryStrip({ data, onTapPerson }: { data: GenerationalForestData; on
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ancestryRow}>
       {data.ancestry.map((a) => (
         <React.Fragment key={a.userId}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.ancestryNode}
             onPress={() => onTapPerson(a)}
           >
@@ -108,9 +109,7 @@ function ForestCanvas({ data, revealProgress, onTapPerson }: {
           <MiniTree cx={cx} cy={GROUND_Y} scale={2.1} color={stageColorFor(data.self.growthLevel)} wilted={false} />
         </Svg>
         <Text style={styles.canvasEmptyText}>Your forest begins with one person</Text>
-        <TouchableOpacity style={styles.findGuideBtn} onPress={() => onTapPerson(data.self)}>
-          <Text style={styles.findGuideBtnText}>View My Tree</Text>
-        </TouchableOpacity>
+        <AppButton label="View My Tree" onPress={() => onTapPerson(data.self)} style={{ marginTop: 12 }} palette="fixedLight" />
       </View>
     );
   }
@@ -217,7 +216,7 @@ function ForestCanvas({ data, revealProgress, onTapPerson }: {
 
 function StatChip({ icon, value, label, onPress }: { icon: string; value: number; label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.statChip} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.statChip} onPress={onPress}>
       <Text style={styles.statChipIcon}>{icon}</Text>
       <Text style={styles.statChipValue}>{value}</Text>
       <Text style={styles.statChipLabel}>{label}</Text>
@@ -314,7 +313,7 @@ export default function ForestScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={22} color={colors.primaryGreen} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Generational Forest</Text>
@@ -322,10 +321,10 @@ export default function ForestScreen() {
       </View>
 
       <View style={styles.segmentRow}>
-        <TouchableOpacity style={[styles.segmentBtn, tab === "mine" && styles.segmentBtnActive]} onPress={() => setTab("mine")}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.segmentBtn, tab === "mine" && styles.segmentBtnActive]} onPress={() => setTab("mine")}>
           <Text style={[styles.segmentText, tab === "mine" && styles.segmentTextActive]}>My Forest</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.segmentBtn, tab === "global" && styles.segmentBtnActive]} onPress={() => setTab("global")}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.segmentBtn, tab === "global" && styles.segmentBtnActive]} onPress={() => setTab("global")}>
           <Text style={[styles.segmentText, tab === "global" && styles.segmentTextActive]}>Global</Text>
         </TouchableOpacity>
       </View>
@@ -417,8 +416,6 @@ const styles = StyleSheet.create({
   canvasScrollOuter: { marginTop: 12 },
   canvasScrollContent: { alignItems: "center" },
   canvasEmptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
-  findGuideBtn: { marginTop: 12, backgroundColor: colors.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9 },
-  findGuideBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   treeLabelWrap: { position: "absolute", width: 60, alignItems: "center" },
   treeUsername: { fontSize: 9, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   flagOverlay: { fontSize: 14, textAlign: "center" },

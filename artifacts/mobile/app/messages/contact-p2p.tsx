@@ -12,6 +12,7 @@ import { useData, ContactDepartment } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 interface DeptInfo {
   key: ContactDepartment; label: string; icon: string; description: string; estimatedResponse: string;
 }
@@ -46,12 +47,8 @@ function SentConfirmation({ department, referenceNumber }: { department: DeptInf
         <Text style={styles.referenceHint}>Keep this for your records</Text>
       </View>
       <Text style={styles.replyNote}>We will reply via your P2P Global messages inbox.</Text>
-      <TouchableOpacity style={styles.viewMessagesButton} onPress={() => router.push("/messages/my-contact-messages" as any)}>
-        <Text style={styles.viewMessagesText}>View My Sent Messages</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/(tabs)/messages" as any)}>
-        <Text style={styles.backText}>Back to Messages</Text>
-      </TouchableOpacity>
+      <AppButton label="View My Sent Messages" onPress={() => router.push("/messages/my-contact-messages" as any)} size="lg" style={{ width: "100%", marginTop: 10 }} palette="fixedLight" />
+      <AppButton label="Back to Messages" onPress={() => router.replace("/(tabs)/messages" as any)} variant="tertiary" palette="fixedLight" />
     </View>
   );
 }
@@ -111,7 +108,7 @@ export default function ContactP2P() {
           segment "messages/contact-p2p" as visible UI text. */}
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Contact P2P Global</Text>
@@ -139,7 +136,7 @@ export default function ContactP2P() {
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>TO</Text>
-          <TouchableOpacity style={styles.departmentPicker} onPress={() => setShowDepartmentPicker(true)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.departmentPicker} onPress={() => setShowDepartmentPicker(true)}>
             {selectedDept ? (
               <View style={styles.selectedDept}>
                 <Text style={{ fontSize: 18 }}>{selectedDept.icon}</Text>
@@ -156,7 +153,7 @@ export default function ContactP2P() {
             <View style={[styles.pickerCard, sheetWidth]}>
               <Text style={styles.pickerTitle}>Select Department</Text>
               {DEPARTMENTS.map((dept) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={dept.key}
                   style={styles.deptOption}
                   onPress={() => { setDepartment(dept.key); setShowDepartmentPicker(false); }}
@@ -170,9 +167,7 @@ export default function ContactP2P() {
                   {department === dept.key && <Ionicons name="checkmark" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowDepartmentPicker(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setShowDepartmentPicker(false)} variant="tertiary" style={{ marginTop: 6 }} palette="fixedLight" />
             </View>
           </View>
         </Modal>
@@ -207,20 +202,7 @@ export default function ContactP2P() {
 
         {sendError && <Text style={styles.errorText}>{sendError}</Text>}
 
-        <TouchableOpacity
-          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!canSend}
-        >
-          {sending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="send" size={16} color="#fff" />
-              <Text style={styles.sendButtonText}>Send Message</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Send Message" onPress={handleSend} size="lg" icon="send" disabled={!canSend} loading={sending} palette="fixedLight" />
 
         {body.length > 0 && body.trim().length < 20 && (
           <Text style={styles.validationHint}>Message must be at least 20 characters</Text>
@@ -265,7 +247,6 @@ const styles = StyleSheet.create({
   deptOptionLabel: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   deptOptionDesc: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular" },
   deptOptionEta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  cancelButton: { alignItems: "center", paddingVertical: 14, marginTop: 6 },
   cancelText: { fontSize: 14, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   subjectInput: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
@@ -277,12 +258,6 @@ const styles = StyleSheet.create({
   },
   charCount: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "right" },
   errorText: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium" },
-  sendButton: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 52,
-  },
-  sendButtonDisabled: { opacity: 0.5 },
-  sendButtonText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   validationHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: -8 },
 
   confirmationContainer: { flex: 1, backgroundColor: colors.lightCream, alignItems: "center", justifyContent: "center", padding: 28, gap: 14 },
@@ -297,11 +272,6 @@ const styles = StyleSheet.create({
   referenceNumber: { fontSize: 18, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   referenceHint: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   replyNote: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", textAlign: "center" },
-  viewMessagesButton: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center",
-    width: "100%", marginTop: 10,
-  },
   viewMessagesText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  backButton: { alignItems: "center", paddingVertical: 10 },
   backText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
 });

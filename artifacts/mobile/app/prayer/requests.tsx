@@ -57,11 +57,11 @@ export default function PrayerRequestsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Prayer Requests</Text>
-        <TouchableOpacity onPress={() => router.push("/prayer/pray-with-me" as any)} accessibilityLabel="Share a request">
+        <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => router.push("/prayer/pray-with-me" as any)} accessibilityLabel="Share a request">
           <Ionicons name="add-circle" size={26} color={c.accentGreen} />
         </TouchableOpacity>
       </View>
@@ -78,7 +78,7 @@ export default function PrayerRequestsScreen() {
               <Text style={styles.cardTitle}>{r.title}</Text>
               <Text style={styles.cardPoint}>{r.prayerPoint}</Text>
               <Text style={styles.cardMode}>{MODE_LABEL[r.prayerMode]}</Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.commitBtn, committed.has(r.id) && styles.commitBtnDone]}
                 onPress={() => handleCommit(r)}
                 disabled={committing === r.id || committed.has(r.id)}

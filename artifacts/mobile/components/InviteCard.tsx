@@ -5,6 +5,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { shareInviteLink } from "@/lib/sharing";
+import { AppButton } from "@/components/ui";
 
 interface InviteCardProps {
   label: string;
@@ -36,9 +37,7 @@ export function InviteCard({ label, buttonText }: InviteCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity style={styles.btn} onPress={handlePress} disabled={busy} activeOpacity={0.85}>
-        {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnText}>{buttonText}</Text>}
-      </TouchableOpacity>
+      <AppButton label={`${buttonText}`} onPress={handlePress} disabled={busy} loading={busy} />
     </View>
   );
 }
@@ -50,7 +49,5 @@ function makeStyles(c: AppColors) {
       padding: 16, marginBottom: 16,
     },
     label: { fontSize: 14, fontWeight: "600", color: c.textDark, marginBottom: 12, fontFamily: "Inter_600SemiBold" },
-    btn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 44, alignItems: "center", justifyContent: "center" },
-    btnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

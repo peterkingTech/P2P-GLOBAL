@@ -7,6 +7,7 @@ import { type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import { useStoryStyles, type StoryPalette } from "@/lib/storyTheme";
 import type { StoryCard } from "@/lib/kingdomStoriesApi";
 import { StoryPosterCard } from "@/components/kingdom-stories/DiscoverRow";
+import { AppButton } from "@/components/ui";
 
 // One grid page (in the reader's light/dark theme) for Kingdom Stories lists (library shelves, browse all,
 // a collection): header, optional controls, loading / error / empty states.
@@ -24,7 +25,7 @@ export default function StoryGridScreen({ title, subtitle, controls, stories, lo
     <View style={[styles.screen, { paddingTop: insets.top + 6 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/kingdom-stories" as any))} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
+        <TouchableOpacity hitSlop={10} onPress={() => (router.canGoBack() ? router.back() : router.replace("/kingdom-stories" as any))} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
           <Ionicons name="arrow-back" size={22} color={T.textPrimary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -38,7 +39,7 @@ export default function StoryGridScreen({ title, subtitle, controls, stories, lo
           <View style={styles.empty}>
             <Ionicons name="cloud-offline-outline" size={28} color={T.textTertiary} />
             <Text style={styles.emptyText}>{error}</Text>
-            {onRetry ? <TouchableOpacity onPress={onRetry} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity> : null}
+            {onRetry ? <AppButton label="Try again" onPress={onRetry} variant="tertiary" /> : null}
           </View>
         ) : (
           <FlatList

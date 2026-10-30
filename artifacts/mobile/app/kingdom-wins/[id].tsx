@@ -15,6 +15,7 @@ import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopi
 import KingdomWinVideoPlayer from "@/components/KingdomWinVideoPlayer";
 import SignedPhotoView from "@/components/SignedPhotoView";
 import { openScripture } from "@/lib/openScripture";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -98,7 +99,7 @@ export default function KingdomWinDetailScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerType}>{entry.entryType === "testimony" ? "Testimony" : entry.entryType === "p2p_impact" ? "P2P Impact" : "Kingdom Win"}</Text>
@@ -148,7 +149,7 @@ export default function KingdomWinDetailScreen() {
         )}
 
         {scripture && (
-          <TouchableOpacity style={styles.scriptureRow} onPress={() => openScripture(scripture.referenceDisplay)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.scriptureRow} onPress={() => openScripture(scripture.referenceDisplay)}>
             <Ionicons name="book" size={14} color={c.accentGreen} />
             <Text style={styles.scriptureText}>{scripture.referenceDisplay}</Text>
             <Ionicons name="open-outline" size={13} color={c.accentGreen} />
@@ -160,7 +161,7 @@ export default function KingdomWinDetailScreen() {
             const active = entry.myReactions?.includes(r.key);
             const count = entry.reactionCounts?.[r.key] ?? 0;
             return (
-              <TouchableOpacity key={r.key} style={[styles.reactionBtn, active && styles.reactionBtnActive]} onPress={() => handleReact(r.key)} disabled={reacting === r.key}>
+              <TouchableOpacity accessibilityRole="button" key={r.key} style={[styles.reactionBtn, active && styles.reactionBtnActive]} onPress={() => handleReact(r.key)} disabled={reacting === r.key}>
                 {reacting === r.key ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
                   <>
                     <Ionicons name={r.icon} size={16} color={active ? c.accentGreen : c.textMuted} />
@@ -170,10 +171,7 @@ export default function KingdomWinDetailScreen() {
               </TouchableOpacity>
             );
           })}
-          <TouchableOpacity style={styles.reactionBtn} onPress={handleShare}>
-            <Ionicons name="share-outline" size={16} color={c.textMuted} />
-            <Text style={styles.reactionText}>Share</Text>
-          </TouchableOpacity>
+          <AppButton label="Share" onPress={handleShare} variant="outline" size="sm" icon="share-outline" />
         </View>
 
         {entry.prayer2RequestId && (

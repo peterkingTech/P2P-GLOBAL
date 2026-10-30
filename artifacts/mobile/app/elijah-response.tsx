@@ -8,6 +8,7 @@ import { useData } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import colors from "@/constants/colors";
 import ReadableText from "@/components/ReadableText";
+import { AppButton } from "@/components/ui";
 
 // The Elijah Protocol response screen — reached from the Home screen's
 // "we noticed you've been quiet" card (see index.tsx), since this app has no
@@ -71,9 +72,7 @@ export default function ElijahResponseScreen() {
               ? "That's okay. We won't send you any more check-ins for 30 days. Come back whenever you're ready."
               : "Your peer guide has been asked to reach out to you personally. You are not alone in this."}
           </Text>
-          <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace("/(tabs)")}>
-            <Text style={styles.doneBtnText}>Return Home</Text>
-          </TouchableOpacity>
+          <AppButton label="Return Home" onPress={() => router.replace("/(tabs)")} size="lg" palette="fixedLight" />
         </View>
       </View>
     );
@@ -90,38 +89,11 @@ export default function ElijahResponseScreen() {
         </Text>
 
         <View style={{ gap: 12, marginTop: 32 }}>
-          <TouchableOpacity
-            style={[styles.responseBtn, styles.softGreenBtn]}
-            onPress={() => respond("taking_break")}
-            disabled={!!submitting}
-            activeOpacity={0.85}
-          >
-            {submitting === "taking_break" ? <ActivityIndicator color={colors.primaryGreen} /> : (
-              <Text style={styles.softGreenBtnText}>I need a break — I am okay</Text>
-            )}
-          </TouchableOpacity>
+          <AppButton label="I need a break — I am okay" onPress={() => respond("taking_break")} variant="secondary" size="lg" disabled={!!submitting} loading={submitting === "taking_break"} palette="fixedLight" />
 
-          <TouchableOpacity
-            style={[styles.responseBtn, styles.amberBtn]}
-            onPress={() => respond("needs_support")}
-            disabled={!!submitting}
-            activeOpacity={0.85}
-          >
-            {submitting === "needs_support" ? <ActivityIndicator color="#fff" /> : (
-              <Text style={styles.amberBtnText}>I need someone to talk to</Text>
-            )}
-          </TouchableOpacity>
+          <AppButton label="I need someone to talk to" onPress={() => respond("needs_support")} size="lg" disabled={!!submitting} loading={submitting === "needs_support"} palette="fixedLight" />
 
-          <TouchableOpacity
-            style={[styles.responseBtn, styles.primaryGreenBtn]}
-            onPress={() => respond("restarting")}
-            disabled={!!submitting}
-            activeOpacity={0.85}
-          >
-            {submitting === "restarting" ? <ActivityIndicator color="#fff" /> : (
-              <Text style={styles.primaryGreenBtnText}>I am ready to restart</Text>
-            )}
-          </TouchableOpacity>
+          <AppButton label="I am ready to restart" onPress={() => respond("restarting")} size="lg" disabled={!!submitting} loading={submitting === "restarting"} palette="fixedLight" />
         </View>
       </ScrollView>
     </View>
@@ -137,14 +109,6 @@ const styles = StyleSheet.create({
   },
   paragraph: { fontSize: 16, color: colors.textDark, fontFamily: "Inter_400Regular", lineHeight: 26, textAlign: "center" },
 
-  responseBtn: { height: 54, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  softGreenBtn: { backgroundColor: "rgba(29,158,117,0.1)", borderWidth: 1.5, borderColor: "rgba(29,158,117,0.3)" },
-  softGreenBtnText: { color: colors.primaryGreen, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  amberBtn: { backgroundColor: colors.amber },
-  amberBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  primaryGreenBtn: { backgroundColor: colors.primaryGreen },
-  primaryGreenBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
   confirmWrap: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   iconRing: {
     width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(29,158,117,0.1)",
@@ -152,6 +116,4 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center", marginBottom: 12 },
   confirmText: { fontSize: 14, color: colors.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22, marginBottom: 28 },
-  doneBtn: { backgroundColor: colors.primaryGreen, borderRadius: 14, height: 52, paddingHorizontal: 32, alignItems: "center", justifyContent: "center" },
-  doneBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

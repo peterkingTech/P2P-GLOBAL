@@ -7,6 +7,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { AppButton } from "@/components/ui";
 
 const RATING_OPTIONS = [
   { value: 1, emoji: "😞", label: "Poor" },
@@ -53,9 +54,7 @@ export default function AdminInteractionFeedbackScreen() {
         <Ionicons name="checkmark-circle" size={48} color={colors.accentGreen} />
         <Text style={styles.thankYouTitle}>Thank you for your feedback.</Text>
         <Text style={styles.thankYouSub}>It helps us serve you better.</Text>
-        <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-          <Text style={styles.doneBtnText}>Done</Text>
-        </TouchableOpacity>
+        <AppButton label="Done" onPress={() => router.back()} style={{ marginTop: 10 }} />
       </View>
     );
   }
@@ -70,7 +69,7 @@ export default function AdminInteractionFeedbackScreen() {
         <Text style={styles.sectionLabel}>How did you feel?</Text>
         <View style={styles.ratingRow}>
           {RATING_OPTIONS.map((opt) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={opt.value}
               style={[styles.ratingChip, rating === opt.value && styles.ratingChipActive]}
               onPress={() => setRating(opt.value)}
@@ -99,12 +98,8 @@ export default function AdminInteractionFeedbackScreen() {
           numberOfLines={4}
         />
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting || rating === null}>
-          {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>Submit Feedback</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.skipBtn} onPress={() => router.back()}>
-          <Text style={styles.skipBtnText}>Skip for now</Text>
-        </TouchableOpacity>
+        <AppButton label="Submit Feedback" onPress={handleSubmit} size="lg" disabled={submitting || rating === null} loading={submitting} style={{ marginTop: 20 }} />
+        <AppButton label="Skip for now" onPress={() => router.back()} variant="tertiary" style={{ marginTop: 14 }} />
       </View>
     </View>
   );
@@ -113,7 +108,7 @@ export default function AdminInteractionFeedbackScreen() {
 function CheckRow({ label, checked, onToggle, colors, destructive }: { label: string; checked: boolean; onToggle: () => void; colors: AppColors; destructive?: boolean }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.checkRow} onPress={onToggle}>
+    <TouchableOpacity accessibilityRole="button" style={styles.checkRow} onPress={onToggle}>
       <Ionicons
         name={checked ? "checkbox" : "square-outline"}
         size={20}
@@ -146,13 +141,7 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       padding: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", minHeight: 100, textAlignVertical: "top",
     },
-    submitBtn: { backgroundColor: c.accentGreen, borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 20 },
-    submitBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
-    skipBtn: { alignItems: "center", marginTop: 14 },
-    skipBtnText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
     thankYouTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     thankYouSub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    doneBtn: { backgroundColor: c.accentGreen, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 10 },
-    doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

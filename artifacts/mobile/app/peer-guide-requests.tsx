@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Where a peer guide sees and Accept/Decline's incoming "Connect" requests
 // from GET/PUT /discipleship/pending-requests|request (see discipleship.ts).
@@ -69,7 +70,7 @@ export default function PeerGuideRequestsScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Peer Guide Requests</Text>
@@ -113,20 +114,8 @@ export default function PeerGuideRequestsScreen() {
               )}
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.declineBtn}
-                  onPress={() => respond(r.id, "decline")}
-                  disabled={respondingId === r.id}
-                >
-                  <Text style={styles.declineBtnText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.acceptBtn}
-                  onPress={() => respond(r.id, "accept")}
-                  disabled={respondingId === r.id}
-                >
-                  {respondingId === r.id ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
-                </TouchableOpacity>
+                <AppButton label="Decline" onPress={() => respond(r.id, "decline")} variant="outline" disabled={respondingId === r.id} style={{ flex: 1 }} palette="fixedLight" />
+                <AppButton label="Accept" onPress={() => respond(r.id, "accept")} disabled={respondingId === r.id} loading={respondingId === r.id} style={{ flex: 1 }} palette="fixedLight" />
               </View>
             </View>
           ))
@@ -158,13 +147,4 @@ const styles = StyleSheet.create({
   messagePreviewText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", fontStyle: "italic", lineHeight: 19 },
 
   actionsRow: { flexDirection: "row", gap: 10 },
-  declineBtn: {
-    flex: 1, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center",
-    borderWidth: 1.5, borderColor: colors.borderBeige,
-  },
-  declineBtnText: { fontSize: 14, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
-  acceptBtn: {
-    flex: 1, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryGreen,
-  },
-  acceptBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 });

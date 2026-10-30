@@ -16,6 +16,7 @@ import { shareChurchInvite } from "@/lib/sharing";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 interface ChurchQRCodeProps {
   church: { name: string; city: string | null; country: string; inviteLink: string; inviteCode: string };
 }
@@ -76,17 +77,14 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
 
   return (
     <>
-      <TouchableOpacity style={styles.trigger} onPress={() => setVisible(true)}>
-        <Ionicons name="grid-outline" size={18} color={colors.accentGreen} />
-        <Text style={styles.triggerText}>Show QR Code</Text>
-      </TouchableOpacity>
+      <AppButton label="Show QR Code" onPress={() => setVisible(true)} variant="outline" icon="grid-outline" palette="fixedLight" />
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, sheetWidth]}>
             <View style={styles.header}>
               <Text style={styles.title}>Church Invite QR</Text>
-              <TouchableOpacity onPress={() => setVisible(false)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -121,22 +119,8 @@ export function ChurchQRCode({ church }: ChurchQRCodeProps) {
             </Text>
 
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.actionBtnOutline} onPress={handleSave} disabled={busy !== null}>
-                {busy === "save" ? <ActivityIndicator color={colors.accentGreen} size="small" /> : (
-                  <>
-                    <Ionicons name="download-outline" size={16} color={colors.accentGreen} />
-                    <Text style={styles.actionBtnOutlineText}>Save to Photos</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={handleShare} disabled={busy !== null}>
-                {busy === "share" ? <ActivityIndicator color="#fff" size="small" /> : (
-                  <>
-                    <Ionicons name="share-outline" size={16} color="#fff" />
-                    <Text style={styles.actionBtnText}>Share</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Save to Photos" onPress={handleSave} variant="outline" icon="download-outline" disabled={busy !== null} loading={busy === "save"} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Share" onPress={handleShare} icon="share-outline" disabled={busy !== null} loading={busy === "share"} style={{ flex: 1 }} palette="fixedLight" />
             </View>
 
             <Text style={styles.printTip}>💡 Save and print this QR code to display in your church</Text>
@@ -171,15 +155,5 @@ const styles = StyleSheet.create({
   verse: { fontSize: 10, color: colors.textMuted, fontStyle: "italic", marginTop: 2, fontFamily: "Inter_400Regular" },
   instructions: { fontSize: 12, color: colors.textMuted, textAlign: "center", marginTop: 16, lineHeight: 17, fontFamily: "Inter_400Regular" },
   actions: { flexDirection: "row", gap: 10, marginTop: 16, width: "100%" },
-  actionBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, borderRadius: 12, height: 46,
-  },
-  actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
-  actionBtnOutline: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 12, height: 46,
-  },
-  actionBtnOutlineText: { color: colors.accentGreen, fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   printTip: { fontSize: 11, color: colors.textMuted, textAlign: "center", marginTop: 14, marginBottom: 4, fontFamily: "Inter_400Regular" },
 });

@@ -7,6 +7,7 @@ import type { AppColors } from "@/constants/themes";
 import { BIBLE_BOOKS } from "@/lib/bibleBooks";
 import { getBibleTranslations, type BibleTranslation } from "@/lib/familyApi";
 import { formToInput, lessonToForm, newPassage, type CustomLesson, type LessonForm, type LessonInput } from "@/lib/customLessonModel";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Full-screen authoring form for one custom lesson (Family or Church — the
 // screen passes onSave). Only the title is required; everything else is
@@ -51,7 +52,7 @@ export default function CustomLessonEditor({ visible, lesson, onCancel, onSave }
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={[styles.screen, { paddingTop: insets.top + 6 }]}>
           <View style={styles.bar}>
-            <TouchableOpacity onPress={onCancel} style={styles.barBtn} accessibilityRole="button" accessibilityLabel="Cancel"><Text style={styles.barCancel}>Cancel</Text></TouchableOpacity>
+            <AppButton label="Cancel" onPress={onCancel} variant="tertiary" accessibilityLabel="Cancel" style={{ minWidth: 72 }} />
             <Text style={styles.barTitle}>{lesson ? "Edit lesson" : "New lesson"}</Text>
             <View style={styles.barBtn} />
           </View>
@@ -70,10 +71,7 @@ export default function CustomLessonEditor({ visible, lesson, onCancel, onSave }
               {form.passages.map((p, i) => (
                 <View key={i} style={styles.passage}>
                   <Text style={styles.passageLabel}>{i === 0 ? "Main passage" : `Passage ${i + 1}`}</Text>
-                  <TouchableOpacity style={[styles.input, styles.bookBtn]} onPress={() => setBookPickerFor(i)} accessibilityRole="button" accessibilityLabel={`Book${p.book ? `, ${p.book}` : ""}`}>
-                    <Text style={[styles.bookText, !p.book && { color: c.textMuted }]}>{p.book || "Choose a book"}</Text>
-                    <Ionicons name="chevron-down" size={14} color={c.textMuted} />
-                  </TouchableOpacity>
+                  <AppButton label={`${p.book || "Choose a book"}`} onPress={() => setBookPickerFor(i)} variant="secondary" icon="chevron-down" iconPosition="trailing" accessibilityLabel={`Book${p.book ? `, ${p.book}` : ""}`} />
                   <View style={styles.row}>
                     {(["chapter", "startVerse", "endVerse"] as const).map((k) => (
                       <TextInput key={k} style={[styles.input, styles.small]} value={p[k]} onChangeText={(v) => setPassage(i, { [k]: v.replace(/[^0-9]/g, "") })}
@@ -123,9 +121,7 @@ export default function CustomLessonEditor({ visible, lesson, onCancel, onSave }
                       </TouchableOpacity>
                     ))}
                     <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => set({ questions: form.questions.length > 1 ? form.questions.filter((_, j) => j !== i) : [{ text: "", kind: "discussion" }] })} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove question ${i + 1}`}>
-                      <Ionicons name="trash-outline" size={16} color={c.textMuted} />
-                    </TouchableOpacity>
+                    <IconButton icon="trash-outline" accessibilityLabel={`Remove question ${i + 1}`} onPress={() => set({ questions: form.questions.length > 1 ? form.questions.filter((_, j) => j !== i) : [{ text: "", kind: "discussion" }] })} color={c.textMuted} />
                   </View>
                 </View>
               ))}
@@ -146,9 +142,7 @@ export default function CustomLessonEditor({ visible, lesson, onCancel, onSave }
                   <TextInput style={styles.input} value={r.title} onChangeText={(v) => set({ resources: form.resources.map((x, j) => (j === i ? { ...x, title: v } : x)) })} placeholder="Title" placeholderTextColor={c.textMuted} accessibilityLabel={`Link ${i + 1} title`} />
                   <View style={styles.row}>
                     <TextInput style={[styles.input, { flex: 1 }]} value={r.url} onChangeText={(v) => set({ resources: form.resources.map((x, j) => (j === i ? { ...x, url: v } : x)) })} autoCapitalize="none" keyboardType="url" placeholder="https://…" placeholderTextColor={c.textMuted} accessibilityLabel={`Link ${i + 1} address`} />
-                    <TouchableOpacity onPress={() => set({ resources: form.resources.filter((_, j) => j !== i) })} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove link ${i + 1}`}>
-                      <Ionicons name="trash-outline" size={16} color={c.textMuted} />
-                    </TouchableOpacity>
+                    <IconButton icon="trash-outline" accessibilityLabel={`Remove link ${i + 1}`} onPress={() => set({ resources: form.resources.filter((_, j) => j !== i) })} color={c.textMuted} />
                   </View>
                 </View>
               ))}
@@ -164,13 +158,9 @@ export default function CustomLessonEditor({ visible, lesson, onCancel, onSave }
             {problem ? <Text style={styles.problem} accessibilityLiveRegion="assertive">{problem}</Text> : null}
             <View style={styles.row}>
               {!isPublished && (
-                <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={() => save(false)} disabled={!!saving} accessibilityRole="button">
-                  {saving === "draft" ? <ActivityIndicator color={c.textDark} /> : <Text style={styles.btnSecondaryText}>Save draft</Text>}
-                </TouchableOpacity>
+                <AppButton label="Save draft" onPress={() => save(false)} variant="secondary" disabled={!!saving} loading={saving === "draft"} style={{ flex: 1 }} />
               )}
-              <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={() => save(true)} disabled={!!saving} accessibilityRole="button">
-                {saving === "publish" ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>{isPublished ? "Save changes" : "Publish"}</Text>}
-              </TouchableOpacity>
+              <AppButton label={isPublished ? "Save changes" : "Publish"} onPress={() => save(true)} disabled={!!saving} loading={saving === "publish"} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

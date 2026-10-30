@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface PendingAlert {
   id: string; discipleId: string; discipleName: string; careType: string;
@@ -104,7 +105,7 @@ export default function PastoralAlertScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Peer Guide Alerts</Text>
@@ -124,7 +125,7 @@ export default function PastoralAlertScreen() {
             <View key={a.id} style={styles.card}>
               <Text style={styles.cardName}>{a.discipleName}</Text>
               {a.messageSent ? <Text style={styles.cardMessage}>{a.messageSent}</Text> : null}
-              <TouchableOpacity style={styles.callBtn} onPress={() => callNow(a)} disabled={!!callingId}>
+              <TouchableOpacity accessibilityRole="button" style={styles.callBtn} onPress={() => callNow(a)} disabled={!!callingId}>
                 {callingId === a.id ? <ActivityIndicator color="#fff" size="small" /> : (
                   <>
                     <Text style={{ fontSize: 15 }}>📞</Text>
@@ -142,9 +143,7 @@ export default function PastoralAlertScreen() {
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>How did the call with {outcomeAlert?.discipleName} go?</Text>
             {OUTCOME_OPTIONS.map((o) => (
-              <TouchableOpacity key={o.key} style={styles.outcomeBtn} onPress={() => submitOutcome(o.key)} disabled={submittingOutcome}>
-                <Text style={styles.outcomeBtnText}>{o.label}</Text>
-              </TouchableOpacity>
+              <AppButton label={`${o.label}`} onPress={() => submitOutcome(o.key)} variant="outline" disabled={submittingOutcome} key={o.key} palette="fixedLight" />
             ))}
           </View>
         </View>
@@ -167,6 +166,4 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 24 },
   sheet: { backgroundColor: "#fff", borderRadius: 18, padding: 22, width: "100%", gap: 10 },
   sheetTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginBottom: 4, textAlign: "center" },
-  outcomeBtn: { borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-  outcomeBtnText: { color: colors.accentGreen, fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

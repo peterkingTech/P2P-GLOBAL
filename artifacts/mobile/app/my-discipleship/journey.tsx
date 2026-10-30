@@ -17,6 +17,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { authedFetch } from "@/lib/adminFetch";
+import { AppButton } from "@/components/ui";
 
 // My Discipleship Journey — "Where am I in my discipleship?" This is the
 // screen that used to live directly at my-discipleship/index.tsx; the hub
@@ -148,16 +149,9 @@ function MyPeerGuideCard({ guide, s, c }: { guide: MyPeerGuide; s: ReturnType<ty
         </View>
       </View>
       <View style={s.relationshipActionsRow}>
-        <TouchableOpacity style={s.relationshipActionBtn} onPress={handleMessage} disabled={messaging}>
-          {messaging ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-            <><Ionicons name="chatbubble-outline" size={14} color={c.accentGreen} /><Text style={s.relationshipActionText}>Message</Text></>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Message" onPress={handleMessage} variant="outline" icon="chatbubble-outline" disabled={messaging} loading={messaging} style={{ flex: 1 }} />
         {guide.peerGuideUsername && (
-          <TouchableOpacity style={s.relationshipActionBtn} onPress={() => router.push(`/profile/${guide.peerGuideUsername}` as any)}>
-            <Ionicons name="person-outline" size={14} color={c.accentGreen} />
-            <Text style={s.relationshipActionText}>View Profile</Text>
-          </TouchableOpacity>
+          <AppButton label="View Profile" onPress={() => router.push(`/profile/${guide.peerGuideUsername}` as any)} variant="outline" icon="person-outline" style={{ flex: 1 }} />
         )}
       </View>
     </View>
@@ -182,7 +176,7 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
   return (
     <View style={{ gap: 10 }}>
       {disciples.map((d) => (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           key={d.discipleId}
           style={s.relationshipCard}
           activeOpacity={0.85}
@@ -211,16 +205,9 @@ function MyDisciplesSection({ disciples, s, c }: { disciples: MyDisciple[]; s: R
             </Text>
           </View>
           <View style={s.relationshipActionsRow}>
-            <TouchableOpacity style={s.relationshipActionBtn} onPress={() => handleMessage(d.discipleId)} disabled={messagingId === d.discipleId}>
-              {messagingId === d.discipleId ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-                <><Ionicons name="chatbubble-outline" size={14} color={c.accentGreen} /><Text style={s.relationshipActionText}>Message</Text></>
-              )}
-            </TouchableOpacity>
+            <AppButton label="Message" onPress={() => handleMessage(d.discipleId)} variant="outline" icon="chatbubble-outline" disabled={messagingId === d.discipleId} loading={messagingId === d.discipleId} style={{ flex: 1 }} />
             {d.discipleUsername && (
-              <TouchableOpacity style={s.relationshipActionBtn} onPress={() => router.push(`/profile/${d.discipleUsername}` as any)}>
-                <Ionicons name="person-outline" size={14} color={c.accentGreen} />
-                <Text style={s.relationshipActionText}>View Profile</Text>
-              </TouchableOpacity>
+              <AppButton label="View Profile" onPress={() => router.push(`/profile/${d.discipleUsername}` as any)} variant="outline" icon="person-outline" style={{ flex: 1 }} />
             )}
           </View>
         </TouchableOpacity>
@@ -292,7 +279,7 @@ export default function MyDiscipleshipJourneyScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>My Discipleship Journey</Text>
@@ -321,9 +308,7 @@ export default function MyDiscipleshipJourneyScreen() {
                 <Text style={s.firstTimeStepText}>{step}</Text>
               </View>
             ))}
-            <TouchableOpacity style={s.primaryBtn} onPress={() => router.push("/connect/smart-match" as any)}>
-              <Text style={s.primaryBtnText}>Find a Peer Guide</Text>
-            </TouchableOpacity>
+            <AppButton label="Find a Peer Guide" onPress={() => router.push("/connect/smart-match" as any)} style={{ marginTop: 6 }} />
           </View>
         ) : (
           <>
@@ -335,12 +320,8 @@ export default function MyDiscipleshipJourneyScreen() {
               <View style={s.emptyCard}>
                 <Text style={s.emptyCardText}>You don't have a Peer Guide yet. You don't have to walk alone — choose someone to walk with you.</Text>
                 <View style={s.emptyCardActions}>
-                  <TouchableOpacity style={s.primaryBtnSmall} onPress={() => router.push("/connect/smart-match" as any)}>
-                    <Text style={s.primaryBtnSmallText}>Find a Peer Guide</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.secondaryBtnSmall} onPress={() => router.push("/connect/by-username?type=peer_guide" as any)}>
-                    <Text style={s.secondaryBtnSmallText}>Choose Someone I Know</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Find a Peer Guide" onPress={() => router.push("/connect/smart-match" as any)} style={{ alignSelf: "flex-start" }} />
+                  <AppButton label="Choose Someone I Know" onPress={() => router.push("/connect/by-username?type=peer_guide" as any)} variant="outline" style={{ alignSelf: "flex-start" }} />
                 </View>
               </View>
             )}
@@ -353,15 +334,13 @@ export default function MyDiscipleshipJourneyScreen() {
             ) : (
               <View style={s.emptyCard}>
                 <Text style={s.emptyCardText}>Your discipleship journey is beginning.</Text>
-                <TouchableOpacity style={s.primaryBtnSmall} onPress={() => router.push("/connect/smart-match" as any)}>
-                  <Text style={s.primaryBtnSmallText}>Walk With Someone</Text>
-                </TouchableOpacity>
+                <AppButton label="Walk With Someone" onPress={() => router.push("/connect/smart-match" as any)} style={{ alignSelf: "flex-start" }} />
               </View>
             )}
 
             {/* ── My Relationships: requests/confirmations/letters ── */}
             <Text style={s.sectionHeader}>My Relationships</Text>
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/peer-guide-requests" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/peer-guide-requests" as any)}>
               <Ionicons name="people-circle-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Pending Requests</Text>
@@ -373,7 +352,7 @@ export default function MyDiscipleshipJourneyScreen() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/confirmations" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/confirmations" as any)}>
               <Ionicons name="checkmark-done-circle-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Pending Confirmations</Text>
@@ -386,7 +365,7 @@ export default function MyDiscipleshipJourneyScreen() {
             </TouchableOpacity>
 
             {profile?.isPeerGuideEligible && (
-              <TouchableOpacity style={s.linkRow} onPress={() => router.push("/graduates" as any)}>
+              <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/graduates" as any)}>
                 <Ionicons name="mail-open-outline" size={20} color={colors.primaryGreen} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.linkRowTitle}>Completion Letters</Text>
@@ -398,7 +377,7 @@ export default function MyDiscipleshipJourneyScreen() {
 
             {/* ── My Learning ── */}
             <Text style={s.sectionHeader}>My Learning</Text>
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/(tabs)/learn" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/(tabs)/learn" as any)}>
               <Ionicons name="school-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Kingdom School</Text>
@@ -407,7 +386,7 @@ export default function MyDiscipleshipJourneyScreen() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/fruit" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/fruit" as any)}>
               <Ionicons name="flower-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Fruit</Text>
@@ -416,7 +395,7 @@ export default function MyDiscipleshipJourneyScreen() {
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/call/history" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/call/history" as any)}>
               <Ionicons name="time-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>Sessions</Text>
@@ -427,7 +406,7 @@ export default function MyDiscipleshipJourneyScreen() {
 
             {/* ── My Generational Forest ── */}
             <Text style={s.sectionHeader}>My Generational Forest</Text>
-            <TouchableOpacity style={s.linkRow} onPress={() => router.push("/forest" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => router.push("/forest" as any)}>
               <Ionicons name="git-branch-outline" size={20} color={colors.primaryGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.linkRowTitle}>View My Forest</Text>
@@ -479,7 +458,7 @@ export default function MyDiscipleshipJourneyScreen() {
                 <StatRow key={cat} label={CATEGORY_LABEL[cat] ?? cat} value={count} s={s} />
               ))}
               {impactData.mostRecentFruit && (
-                <TouchableOpacity style={s.fruitLink} onPress={() => router.push(`/fruit/${impactData.mostRecentFruit!.fruitKey}` as any)}>
+                <TouchableOpacity accessibilityRole="button" style={s.fruitLink} onPress={() => router.push(`/fruit/${impactData.mostRecentFruit!.fruitKey}` as any)}>
                   <Text style={s.fruitLinkIcon}>{impactData.mostRecentFruit.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={s.fruitLinkLabel}>Most Recently Earned</Text>

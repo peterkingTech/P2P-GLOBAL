@@ -8,6 +8,7 @@ import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { getFamilyDetail, inviteToFamily, removeFamilyMember, type FamilyDetailResponse, type FamilyMember } from "@/lib/familyApi";
 import { FamilyMemberList } from "@/components/family/FamilyMemberList";
 import { FamilyInvitePanel } from "@/components/family/FamilyInvitePanel";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -136,12 +137,7 @@ export default function FamilyMembersScreen() {
                 autoCapitalize="none"
                 accessibilityLabel="Username to invite"
               />
-              <TouchableOpacity
-                style={styles.primaryBtnSmall} onPress={handleInvite} disabled={inviting || !inviteUsername.trim()}
-                accessibilityRole="button" accessibilityLabel="Invite"
-              >
-                {inviting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnSmallText}>Invite</Text>}
-              </TouchableOpacity>
+              <AppButton label="Invite" onPress={handleInvite} disabled={inviting || !inviteUsername.trim()} loading={inviting} accessibilityLabel="Invite" />
             </View>
           </View>
         ) : null}
@@ -168,8 +164,6 @@ function makeStyles(c: AppColors) {
       width: "100%", backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       paddingHorizontal: 14, minHeight: 44, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", marginTop: 10,
     },
-    primaryBtnSmall: { backgroundColor: c.primaryGreen, borderRadius: 10, minHeight: 44, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
-    primaryBtnSmallText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
     inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   });
 }

@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 // My Discipleship Journal — "What is this learning doing in my life?"
 // Aggregates three already-existing private screens (notes.tsx,
 // highlights.tsx, prayer/journal.tsx — all real, all RLS-private, all
@@ -107,7 +108,7 @@ export default function MyDiscipleshipJournalScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>My Discipleship Journal</Text>
@@ -119,10 +120,7 @@ export default function MyDiscipleshipJournalScreen() {
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           <Text style={s.heroSub}>Reflect, remember, pray and grow.</Text>
 
-          <TouchableOpacity style={s.newEntryBtn} onPress={() => setNewEntryOpen(true)}>
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={s.newEntryBtnText}>New Entry</Text>
-          </TouchableOpacity>
+          <AppButton label="New Entry" onPress={() => setNewEntryOpen(true)} icon="add" style={{ marginBottom: 20 }} />
 
           {revisitCandidate && !revisitDismissed && (
             <View style={s.revisitCard}>
@@ -133,22 +131,15 @@ export default function MyDiscipleshipJournalScreen() {
               {revisitCandidate.prompt && <Text style={s.revisitPrompt}>{revisitCandidate.prompt}</Text>}
               <Text style={s.revisitContent} numberOfLines={3}>"{revisitCandidate.content}"</Text>
               <View style={s.revisitActionsRow}>
-                <TouchableOpacity
-                  style={s.revisitPrimaryBtn}
-                  onPress={() => router.push(`/my-discipleship/journal/reflection/${revisitCandidate.rootId}?revisit=true` as any)}
-                >
-                  <Text style={s.revisitPrimaryBtnText}>Reflect Again</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.revisitSecondaryBtn} onPress={() => setRevisitDismissed(true)}>
-                  <Text style={s.revisitSecondaryBtnText}>Not Now</Text>
-                </TouchableOpacity>
+                <AppButton label="Reflect Again" onPress={() => router.push(`/my-discipleship/journal/reflection/${revisitCandidate.rootId}?revisit=true` as any)} />
+                <AppButton label="Not Now" onPress={() => setRevisitDismissed(true)} variant="tertiary" />
               </View>
             </View>
           )}
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={{ gap: 8 }}>
             {FILTERS.map((f) => (
-              <TouchableOpacity key={f.key} style={[s.filterChip, filter === f.key && s.filterChipActive]} onPress={() => setFilter(f.key)}>
+              <TouchableOpacity accessibilityRole="button" key={f.key} style={[s.filterChip, filter === f.key && s.filterChipActive]} onPress={() => setFilter(f.key)}>
                 <Text style={[s.filterChipText, filter === f.key && s.filterChipTextActive]}>{f.label}</Text>
               </TouchableOpacity>
             ))}
@@ -161,9 +152,7 @@ export default function MyDiscipleshipJournalScreen() {
                 <>
                   <Text style={s.emptyCardTitle}>Your discipleship journal is empty.</Text>
                   <Text style={s.emptyCardText}>Start capturing what you're learning, praying about and reflecting on.</Text>
-                  <TouchableOpacity style={s.emptyCardBtn} onPress={() => setNewEntryOpen(true)}>
-                    <Text style={s.emptyCardBtnText}>Create Entry</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Create Entry" onPress={() => setNewEntryOpen(true)} style={{ marginTop: 4 }} />
                 </>
               ) : (
                 <Text style={s.emptyCardText}>
@@ -174,7 +163,7 @@ export default function MyDiscipleshipJournalScreen() {
           ) : (
             <View style={{ gap: 8 }}>
               {filtered.map((entry) => (
-                <TouchableOpacity key={`${entry.type}_${entry.id}`} style={s.entryCard} activeOpacity={0.85} onPress={() => openEntry(entry)}>
+                <TouchableOpacity accessibilityRole="button" key={`${entry.type}_${entry.id}`} style={s.entryCard} activeOpacity={0.85} onPress={() => openEntry(entry)}>
                   <Text style={s.entryIcon}>{TYPE_ICON[entry.type]}</Text>
                   <View style={{ flex: 1 }}>
                     <View style={s.entryTopRow}>
@@ -196,12 +185,12 @@ export default function MyDiscipleshipJournalScreen() {
           <View style={[s.chooserSheet, sheetWidth]}>
             <View style={s.chooserHeader}>
               <Text style={s.chooserTitle}>What would you like to add?</Text>
-              <TouchableOpacity onPress={() => setNewEntryOpen(false)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setNewEntryOpen(false)}>
                 <Ionicons name="close" size={22} color={colors.textDark} />
               </TouchableOpacity>
             </View>
             {(["reflection", "prayer", "highlight", "note"] as const).map((type) => (
-              <TouchableOpacity key={type} style={s.chooserOption} onPress={() => handleChoose(type)}>
+              <TouchableOpacity accessibilityRole="button" key={type} style={s.chooserOption} onPress={() => handleChoose(type)}>
                 <Text style={s.chooserOptionEmoji}>{TYPE_ICON[type]}</Text>
                 <Text style={s.chooserOptionText}>{TYPE_LABEL[type]}</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -228,12 +217,6 @@ function makeStyles(c: AppColors) {
     scroll: { paddingHorizontal: 16, paddingTop: 20 },
     heroSub: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 20, marginBottom: 16 },
 
-    newEntryBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-      backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 13, marginBottom: 20,
-    },
-    newEntryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
     revisitCard: {
       backgroundColor: "rgba(224,164,65,0.1)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
       borderRadius: 16, padding: 16, marginBottom: 20, gap: 6,
@@ -243,10 +226,6 @@ function makeStyles(c: AppColors) {
     revisitPrompt: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", marginTop: 4 },
     revisitContent: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", fontStyle: "italic", lineHeight: 19, marginTop: 2 },
     revisitActionsRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-    revisitPrimaryBtn: { backgroundColor: c.amber, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
-    revisitPrimaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    revisitSecondaryBtn: { paddingHorizontal: 12, paddingVertical: 9 },
-    revisitSecondaryBtnText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
 
     filterRow: { marginBottom: 16, flexGrow: 0 },
     filterChip: { borderWidth: 1, borderColor: c.borderBeige, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: c.card },
@@ -259,8 +238,6 @@ function makeStyles(c: AppColors) {
     emptyCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 20, alignItems: "center", gap: 10 },
     emptyCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     emptyCardText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
-    emptyCardBtn: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, marginTop: 4 },
-    emptyCardBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     entryCard: {
       flexDirection: "row", gap: 12, backgroundColor: c.card, borderRadius: 14,

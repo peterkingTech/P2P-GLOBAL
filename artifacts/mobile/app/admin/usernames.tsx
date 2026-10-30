@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 import { validateUsername, formatUsername } from "@/lib/username";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 type Tab = "reserved" | "search" | "flagged";
 
@@ -188,7 +189,7 @@ export default function AdminUsernamesScreen() {
     <View style={styles.container}>
       <View style={styles.filterBar}>
         {TABS.map((t) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={t.value}
             style={[styles.filterChip, tab === t.value && styles.filterChipActive]}
             onPress={() => setTab(t.value)}
@@ -200,10 +201,7 @@ export default function AdminUsernamesScreen() {
 
       {tab === "reserved" && (
         <>
-          <TouchableOpacity style={styles.reserveBtn} onPress={() => setReserveModalOpen(true)}>
-            <Ionicons name="add-circle" size={16} color="#fff" />
-            <Text style={styles.reserveBtnText}>Reserve a Username</Text>
-          </TouchableOpacity>
+          <AppButton label="Reserve a Username" onPress={() => setReserveModalOpen(true)} icon="add-circle" style={{ marginHorizontal: 14, marginTop: 12 }} palette="fixedLight" />
           {reservedLoading ? (
             <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
           ) : (
@@ -218,17 +216,7 @@ export default function AdminUsernamesScreen() {
                     <Text style={styles.cardUsername}>@{item.username}</Text>
                     {item.reason && <Text style={styles.cardSub}>{item.reason}</Text>}
                   </View>
-                  <TouchableOpacity
-                    style={styles.actionBtnOutline}
-                    onPress={() => confirmUnreserve(item.username)}
-                    disabled={actingId === item.username}
-                  >
-                    {actingId === item.username ? (
-                      <ActivityIndicator size="small" color="#B91C1C" />
-                    ) : (
-                      <Text style={styles.actionBtnOutlineTextDanger}>Unreserve</Text>
-                    )}
-                  </TouchableOpacity>
+                  <AppButton label="Unreserve" onPress={() => confirmUnreserve(item.username)} variant="outline" size="sm" disabled={actingId === item.username} loading={actingId === item.username} style={{ minWidth: 70 }} palette="fixedLight" />
                 </View>
               )}
             />
@@ -268,17 +256,7 @@ export default function AdminUsernamesScreen() {
                   <Text style={styles.cardSub}>{item.role} {item.isPrivate ? "· private profile" : ""}</Text>
                 </View>
                 {item.username && (
-                  <TouchableOpacity
-                    style={styles.actionBtnOutline}
-                    onPress={() => confirmForceChange(item)}
-                    disabled={actingId === item.userId}
-                  >
-                    {actingId === item.userId ? (
-                      <ActivityIndicator size="small" color={colors.accentGreen} />
-                    ) : (
-                      <Text style={styles.actionBtnOutlineText}>Force Change</Text>
-                    )}
-                  </TouchableOpacity>
+                  <AppButton label="Force Change" onPress={() => confirmForceChange(item)} variant="outline" size="sm" disabled={actingId === item.userId} loading={actingId === item.userId} style={{ minWidth: 70 }} palette="fixedLight" />
                 )}
               </View>
             )}
@@ -302,24 +280,8 @@ export default function AdminUsernamesScreen() {
                   <Text style={styles.cardSub}>{item.fullName ?? "Unnamed"} · {item.email ?? "no email"}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity
-                    style={styles.actionBtnOutline}
-                    onPress={() => handleForceChangeFromFlagged(item.userId)}
-                    disabled={actingId === item.userId}
-                  >
-                    <Text style={styles.actionBtnOutlineText}>Confirm</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionBtnOutline}
-                    onPress={() => handleDismissFlag(item.userId)}
-                    disabled={actingId === item.userId}
-                  >
-                    {actingId === item.userId ? (
-                      <ActivityIndicator size="small" color={colors.textMuted} />
-                    ) : (
-                      <Text style={styles.actionBtnOutlineTextMuted}>Dismiss</Text>
-                    )}
-                  </TouchableOpacity>
+                  <AppButton label="Confirm" onPress={() => handleForceChangeFromFlagged(item.userId)} variant="outline" size="sm" disabled={actingId === item.userId} style={{ minWidth: 70 }} palette="fixedLight" />
+                  <AppButton label="Dismiss" onPress={() => handleDismissFlag(item.userId)} variant="outline" size="sm" disabled={actingId === item.userId} loading={actingId === item.userId} style={{ minWidth: 70 }} palette="fixedLight" />
                 </View>
               </View>
             )}
@@ -348,12 +310,8 @@ export default function AdminUsernamesScreen() {
               placeholderTextColor={colors.textMuted}
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setReserveModalOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleReserve} disabled={reserving}>
-                {reserving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalConfirmText}>Reserve</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setReserveModalOpen(false)} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Reserve" onPress={handleReserve} disabled={reserving} loading={reserving} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -372,12 +330,6 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { padding: 14, gap: 10 },
   emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 30 },
-  reserveBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, marginHorizontal: 14, marginTop: 12,
-    borderRadius: 10, height: 42,
-  },
-  reserveBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   card: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
@@ -385,10 +337,6 @@ const styles = StyleSheet.create({
   },
   cardUsername: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   cardSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  actionBtnOutline: { borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, minWidth: 70, alignItems: "center" },
-  actionBtnOutlineText: { fontSize: 12, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
-  actionBtnOutlineTextDanger: { fontSize: 12, fontWeight: "700", color: "#B91C1C", fontFamily: "Inter_700Bold" },
-  actionBtnOutlineTextMuted: { fontSize: 12, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold" },
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
@@ -404,8 +352,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular", marginBottom: 12,
   },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 4 },
-  modalCancelBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige, alignItems: "center", justifyContent: "center" },
   modalCancelText: { fontSize: 14, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
-  modalConfirmBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: colors.accentGreen, alignItems: "center", justifyContent: "center" },
   modalConfirmText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 });

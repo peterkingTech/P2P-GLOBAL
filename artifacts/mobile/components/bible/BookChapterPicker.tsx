@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { CANON, type CanonBook } from "@/lib/bibleReaderApi";
+import { IconButton } from "@/components/ui";
 
 // Book → chapter selection for the Bible reader. Books come from the canon
 // list (structure only), in Bible order, split Old/New Testament, with a
@@ -72,9 +73,7 @@ export default function BookChapterPicker({ visible, onClose, currentBook, curre
       <View style={[styles.screen, { paddingTop: insets.top > 20 ? 12 : insets.top + 12 }]}>
         <View style={styles.header}>
           <Text style={styles.title} accessibilityRole="header">Books</Text>
-          <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-            <Ionicons name="close" size={24} color={c.textDark} />
-          </TouchableOpacity>
+          <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
         </View>
         <View style={styles.search}>
           <Ionicons name="search" size={16} color={c.textMuted} />
@@ -104,7 +103,6 @@ function makeStyles(c: AppColors) {
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
     title: { flex: 1, fontSize: 20, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     search: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, paddingHorizontal: 12, minHeight: 44, borderRadius: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     searchInput: { flex: 1, color: c.textDark, fontSize: 15, fontFamily: "Inter_400Regular", paddingVertical: 8 },
     tabs: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 12 },

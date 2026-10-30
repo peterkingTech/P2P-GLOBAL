@@ -11,6 +11,7 @@ import { getScriptureReference } from "@/lib/prayerTopicsApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { openScripture } from "@/lib/openScripture";
+import { AppButton } from "@/components/ui";
 type Filter = "all" | "answered" | "unanswered";
 const PAGE_SIZE = 20;
 
@@ -150,11 +151,11 @@ export default function PrayerJournalScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Prayer Journal</Text>
-        <TouchableOpacity onPress={() => { setNewCategory(""); setWriteOpen(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" onPress={() => { setNewCategory(""); setWriteOpen(true); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="add" size={24} color={colors.upperRoomAmber} />
         </TouchableOpacity>
       </View>
@@ -165,7 +166,7 @@ export default function PrayerJournalScreen() {
       </View>
       <View style={styles.filterRow}>
         {(["all", "unanswered", "answered"] as Filter[]).map((f) => (
-          <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterChipActive]} onPress={() => setFilter(f)}>
+          <TouchableOpacity accessibilityRole="button" key={f} style={[styles.filterChip, filter === f && styles.filterChipActive]} onPress={() => setFilter(f)}>
             <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
           </TouchableOpacity>
         ))}
@@ -181,7 +182,7 @@ export default function PrayerJournalScreen() {
             const expanded = expandedId === e.id;
             const isPathEntry = e.category?.startsWith("path:");
             return (
-              <TouchableOpacity key={e.id} style={styles.entryCard} activeOpacity={0.9} onPress={() => setExpandedId(expanded ? null : e.id)}>
+              <TouchableOpacity accessibilityRole="button" key={e.id} style={styles.entryCard} activeOpacity={0.9} onPress={() => setExpandedId(expanded ? null : e.id)}>
                 <View style={styles.entryTopRow}>
                   <Text style={styles.entryDate}>{new Date(e.createdAt).toLocaleDateString()}</Text>
                   {e.category ? <View style={styles.categoryTag}><Text style={styles.categoryTagText}>{isPathEntry ? "Prayer Path" : e.category}</Text></View> : null}
@@ -203,15 +204,12 @@ export default function PrayerJournalScreen() {
                           onChangeText={(v) => setAnswerNotesDraft((prev) => ({ ...prev, [e.id]: v }))}
                           multiline
                         />
-                        <TouchableOpacity style={styles.markAnsweredBtn} onPress={() => markAnswered(e.id)}>
-                          <Ionicons name="checkmark" size={14} color="#100B06" />
-                          <Text style={styles.markAnsweredBtnText}>Mark as Answered</Text>
-                        </TouchableOpacity>
+                        <AppButton label="Mark as Answered" onPress={() => markAnswered(e.id)} icon="checkmark" style={{ marginTop: 10 }} />
 
                         <Text style={styles.statusLabel}>How is this prayer going?</Text>
                         <View style={styles.statusChipRow}>
                           {STATUS_OPTIONS.filter((s) => s !== "answered").map((s) => (
-                            <TouchableOpacity key={s} style={[styles.statusChip, e.status === s && styles.statusChipActive]} onPress={() => handleSetStatus(e.id, s)}>
+                            <TouchableOpacity accessibilityRole="button" key={s} style={[styles.statusChip, e.status === s && styles.statusChipActive]} onPress={() => handleSetStatus(e.id, s)}>
                               <Text style={[styles.statusChipText, e.status === s && styles.statusChipTextActive]}>{STATUS_LABELS[s]}</Text>
                             </TouchableOpacity>
                           ))}
@@ -221,25 +219,13 @@ export default function PrayerJournalScreen() {
 
                     <View style={styles.quickActionsRow}>
                       {!!e.scriptureReferenceId && (
-                        <TouchableOpacity style={styles.quickActionBtn} onPress={() => handleReadScripture(e)}>
-                          <Ionicons name="book-outline" size={13} color={colors.upperRoomAmber} />
-                          <Text style={styles.quickActionText}>Read Scripture</Text>
-                        </TouchableOpacity>
+                        <AppButton label="Read Scripture" onPress={() => handleReadScripture(e)} variant="outline" size="sm" icon="book-outline" />
                       )}
                       {isPathEntry && (
-                        <TouchableOpacity style={styles.quickActionBtn} onPress={() => handleContinuePath(e)}>
-                          <Ionicons name="trail-sign-outline" size={13} color={colors.upperRoomAmber} />
-                          <Text style={styles.quickActionText}>Continue Path</Text>
-                        </TouchableOpacity>
+                        <AppButton label="Continue Path" onPress={() => handleContinuePath(e)} variant="outline" size="sm" icon="trail-sign-outline" />
                       )}
-                      <TouchableOpacity style={styles.quickActionBtn} onPress={() => router.push("/prayer/pray-with-me" as any)}>
-                        <Ionicons name="people-outline" size={13} color={colors.upperRoomAmber} />
-                        <Text style={styles.quickActionText}>Pray With Me</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.quickActionBtn} onPress={() => handlePrayAgain(e)}>
-                        <Ionicons name="refresh-outline" size={13} color={colors.upperRoomAmber} />
-                        <Text style={styles.quickActionText}>Pray Again</Text>
-                      </TouchableOpacity>
+                      <AppButton label="Pray With Me" onPress={() => router.push("/prayer/pray-with-me" as any)} variant="outline" size="sm" icon="people-outline" />
+                      <AppButton label="Pray Again" onPress={() => handlePrayAgain(e)} variant="outline" size="sm" icon="refresh-outline" />
                     </View>
                   </View>
                 )}
@@ -249,9 +235,7 @@ export default function PrayerJournalScreen() {
         )}
 
         {!loading && hasMore && (
-          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore}>
-            {loadingMore ? <ActivityIndicator size="small" color={colors.upperRoomAmber} /> : <Text style={styles.loadMoreText}>Load More</Text>}
-          </TouchableOpacity>
+          <AppButton label="Load More" onPress={loadMore} variant="tertiary" disabled={loadingMore} loading={loadingMore} />
         )}
 
         {answeredArchive.length > 0 && (
@@ -278,12 +262,8 @@ export default function PrayerJournalScreen() {
             <TextInput style={styles.modalInput} value={newCategory} onChangeText={setNewCategory} placeholder="Category (optional)" placeholderTextColor={colors.upperRoomMuted} />
             <TextInput style={[styles.modalInput, styles.modalTextarea]} value={newText} onChangeText={setNewText} placeholder="Write your prayer..." placeholderTextColor={colors.upperRoomMuted} multiline />
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setWriteOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={submitNewPrayer} disabled={saving}>
-                {saving ? <ActivityIndicator color="#100B06" size="small" /> : <Text style={styles.modalSaveText}>Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setWriteOpen(false)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Save" onPress={submitNewPrayer} disabled={saving} loading={saving} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -318,8 +298,6 @@ function makeStyles(c: AppColors) {
     expandedBox: { marginTop: 12, borderTopWidth: 1, borderTopColor: c.upperRoomBorder, paddingTop: 12 },
     answerNotesText: { fontSize: 13, color: c.upperRoomAmber, fontFamily: "Inter_400Regular", fontStyle: "italic", lineHeight: 19, marginTop: 6 },
     answerNotesInput: { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 10, color: c.upperRoomCream, fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 50 },
-    markAnsweredBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.upperRoomAmber, borderRadius: 10, paddingVertical: 10, marginTop: 10 },
-    markAnsweredBtnText: { fontSize: 13, fontWeight: "700", color: "#100B06", fontFamily: "Inter_700Bold" },
     statusLabel: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_500Medium", marginTop: 12, marginBottom: 6 },
     statusChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     statusChip: { borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
@@ -327,9 +305,7 @@ function makeStyles(c: AppColors) {
     statusChipText: { fontSize: 11, color: c.upperRoomMuted, fontFamily: "Inter_500Medium" },
     statusChipTextActive: { color: "#100B06", fontFamily: "Inter_700Bold" },
     quickActionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-    quickActionBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
     quickActionText: { fontSize: 11, color: c.upperRoomAmber, fontFamily: "Inter_500Medium" },
-    loadMoreBtn: { alignItems: "center", paddingVertical: 14 },
     loadMoreText: { fontSize: 13, color: c.upperRoomAmber, fontFamily: "Inter_600SemiBold" },
     sectionHeading: { fontSize: 12, fontWeight: "700", color: c.upperRoomMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
@@ -338,9 +314,7 @@ function makeStyles(c: AppColors) {
     modalInput: { backgroundColor: c.upperRoomCard, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, padding: 12, color: c.upperRoomCream, fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 10 },
     modalTextarea: { minHeight: 100, textAlignVertical: "top" },
     modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-    modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
     modalCancelText: { fontSize: 14, color: c.upperRoomMuted, fontFamily: "Inter_600SemiBold" },
-    modalSaveBtn: { flex: 1, backgroundColor: c.upperRoomAmber, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
     modalSaveText: { fontSize: 14, color: "#100B06", fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

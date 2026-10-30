@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radii, spacing, type } from "@/lib/togetherTheme";
 import { getGatheringLesson, type GatheringLesson, type GatheringLessonRef } from "@/lib/familyApi";
 import { getChurchCallLesson } from "@/lib/churchCallApi";
+import { AppButton } from "@/components/ui";
 
 export type LessonScriptureRef = GatheringLesson["scripture"][number];
 
@@ -52,9 +53,7 @@ export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, on
       <View style={styles.empty}>
         <Text style={styles.muted}>{isGuide ? "Choose a lesson to study together." : "The Guide hasn't chosen a lesson yet."}</Text>
         {isGuide && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={onChoose} accessibilityRole="button" accessibilityLabel="Choose a lesson">
-            <Text style={styles.primaryBtnText}>Choose Lesson</Text>
-          </TouchableOpacity>
+          <AppButton label="Choose Lesson" onPress={onChoose} accessibilityLabel="Choose a lesson" palette="fixedDark" />
         )}
       </View>
     );
@@ -68,9 +67,7 @@ export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, on
           <Text style={[styles.title, largeText && styles.titleLarge]} accessibilityRole="header">{lesson?.title ?? lessonRef.title}</Text>
         </View>
         {isGuide && (
-          <TouchableOpacity onPress={onChoose} accessibilityRole="button" accessibilityLabel="Change lesson" style={styles.linkBtn}>
-            <Text style={styles.link}>Change</Text>
-          </TouchableOpacity>
+          <AppButton label="Change" onPress={onChoose} variant="tertiary" accessibilityLabel="Change lesson" style={{ minWidth: 44 }} palette="fixedDark" />
         )}
       </View>
 
@@ -85,10 +82,7 @@ export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, on
           {lesson.scripture.length > 0 && (
             <View style={styles.chips}>
               {lesson.scripture.map((r, i) => (
-                <TouchableOpacity key={i} style={styles.chip} onPress={() => onOpenPassage(r)} accessibilityRole="button" accessibilityLabel={`Read ${scriptureLabel(r)}`}>
-                  <Ionicons name="book-outline" size={14} color={colors.light} />
-                  <Text style={styles.chipText}>{scriptureLabel(r)}</Text>
-                </TouchableOpacity>
+                <AppButton label={`${scriptureLabel(r)}`} onPress={() => onOpenPassage(r)} variant="secondary" size="sm" icon="book-outline" accessibilityLabel={`Read ${scriptureLabel(r)}`} key={i} palette="fixedDark" />
               ))}
             </View>
           )}
@@ -118,10 +112,7 @@ export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, on
           ) : null}
 
           {lesson.media?.provider === "youtube" && onPlayMedia ? (
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => onPlayMedia(lesson.media!.id)} accessibilityRole="button" accessibilityLabel="Play the lesson video for everyone">
-              <Ionicons name="play" size={16} color={colors.textPrimary} />
-              <Text style={styles.secondaryBtnText}>Play lesson video for everyone</Text>
-            </TouchableOpacity>
+            <AppButton label="Play lesson video for everyone" onPress={() => onPlayMedia(lesson.media!.id)} variant="secondary" icon="play" accessibilityLabel="Play the lesson video for everyone" palette="fixedDark" />
           ) : null}
 
           {lesson.resources.map((r, i) => (
@@ -130,10 +121,7 @@ export default function GatheringLessonPanel({ gathering, lessonRef, isGuide, on
             </TouchableOpacity>
           ))}
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => onOpenMine(lesson)} accessibilityRole="button" accessibilityLabel="Open my lesson. The Gathering keeps going.">
-            <Ionicons name="create-outline" size={16} color="#fff" />
-            <Text style={styles.primaryBtnText}>Open my lesson</Text>
-          </TouchableOpacity>
+          <AppButton label="Open my lesson" onPress={() => onOpenMine(lesson)} icon="create-outline" accessibilityLabel="Open my lesson. The Gathering keeps going." palette="fixedDark" />
           <Text style={styles.note}>Your call stays connected while you're in your lesson.</Text>
         </>
       )}
@@ -158,10 +146,5 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: radii.xl, backgroundColor: colors.lightSoft },
   chipText: { color: colors.textPrimary, fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  linkBtn: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "flex-end" },
   link: { color: colors.connection, fontSize: 14, fontFamily: "Inter_600SemiBold", paddingVertical: 6 },
-  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44, borderRadius: 22, backgroundColor: colors.growth, marginTop: spacing.sm, paddingHorizontal: 16 },
-  primaryBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
-  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44, borderRadius: 22, backgroundColor: colors.surfaceRaised, paddingHorizontal: 16 },
-  secondaryBtnText: { color: colors.textPrimary, fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

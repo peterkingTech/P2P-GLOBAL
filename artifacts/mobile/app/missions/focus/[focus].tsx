@@ -27,7 +27,7 @@ export default function MissionFocusScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>{focus ? MISSION_FOCUS_LABELS[focus] : ""}</Text>
@@ -43,7 +43,7 @@ export default function MissionFocusScreen() {
           data={stories} keyExtractor={(s) => s.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/missions/story/${item.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/missions/story/${item.id}` as any)}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               {!!item.summary && <Text style={styles.cardSummary} numberOfLines={2}>{item.summary}</Text>}
             </TouchableOpacity>

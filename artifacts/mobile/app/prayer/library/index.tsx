@@ -11,6 +11,7 @@ import {
   type SavedScripture, type SavedPrayer, type SavedPath, type AnsweredJournalEntry, type RecentActivity,
 } from "@/lib/prayerLibraryApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -63,7 +64,7 @@ export default function MyPrayerLibraryScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>My Prayer Library</Text>
@@ -78,7 +79,7 @@ export default function MyPrayerLibraryScreen() {
           <View key={s.id} style={styles.row}>
             <Ionicons name="book-outline" size={16} color={c.accentGreen} />
             <Text style={styles.rowText}>{s.scripture?.referenceDisplay ?? "Scripture"}</Text>
-            <TouchableOpacity onPress={() => s.scripture && handleUnsaveScripture(s.scripture.id)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => s.scripture && handleUnsaveScripture(s.scripture.id)}>
               <Ionicons name="close-circle-outline" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
@@ -90,10 +91,10 @@ export default function MyPrayerLibraryScreen() {
         ) : savedPaths.map((p) => (
           <View key={p.id} style={styles.row}>
             <Ionicons name="trail-sign-outline" size={16} color={c.accentGreen} />
-            <TouchableOpacity style={{ flex: 1 }} onPress={() => p.path && router.push(`/prayer/paths/${p.path.slug}` as any)}>
+            <TouchableOpacity accessibilityRole="button" style={{ flex: 1 }} onPress={() => p.path && router.push(`/prayer/paths/${p.path.slug}` as any)}>
               <Text style={styles.rowText}>{p.path?.title ?? "Prayer Path"}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => p.path && handleUnsavePath(p.path.id)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => p.path && handleUnsavePath(p.path.id)}>
               <Ionicons name="close-circle-outline" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
@@ -106,7 +107,7 @@ export default function MyPrayerLibraryScreen() {
           <View key={p.id} style={styles.row}>
             <Ionicons name="heart-outline" size={16} color={c.accentGreen} />
             <Text style={styles.rowText} numberOfLines={1}>{p.prayer?.title ?? "Prayer"}</Text>
-            <TouchableOpacity onPress={() => p.prayer && handleUnsavePrayer(p.prayer.id)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => p.prayer && handleUnsavePrayer(p.prayer.id)}>
               <Ionicons name="close-circle-outline" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
@@ -125,9 +126,7 @@ export default function MyPrayerLibraryScreen() {
         <Text style={styles.sectionHeading}>Topics</Text>
         <View style={styles.topicChipsRow}>
           {topics.slice(0, 12).map((t) => (
-            <TouchableOpacity key={t.id} style={styles.topicChip} onPress={() => router.push(`/prayer/pray-the-word/${t.slug}` as any)}>
-              <Text style={styles.topicChipText}>{t.title}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${t.title}`} onPress={() => router.push(`/prayer/pray-the-word/${t.slug}` as any)} variant="secondary" size="sm" key={t.id} />
           ))}
         </View>
 

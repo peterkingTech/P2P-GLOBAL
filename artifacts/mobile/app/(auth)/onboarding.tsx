@@ -21,6 +21,7 @@ import { isSmallPhone, fs } from "@/lib/responsive";
 import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
+import { AppButton } from "@/components/ui";
 
 
 const LOGO = require("@/assets/images/logo.png");
@@ -122,7 +123,7 @@ export default function OnboardingScreen() {
             <Image source={LOGO} style={styles.headerLogoImg} resizeMode="contain" />
           </View>
         )}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.langBtn}
           onPress={() => setLangPickerOpen(true)}
           activeOpacity={0.8}
@@ -189,34 +190,13 @@ export default function OnboardingScreen() {
         {isLast && (
           <ReadableText style={styles.kingdomSchoolIntro}>{t("onboarding.kingdomSchoolIntro")}</ReadableText>
         )}
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={goNext}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnText}>
-            {isLast ? t("onboarding.createAccount") : t("onboarding.continue")}
-          </Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.cream} />
-        </TouchableOpacity>
+        <AppButton label={isLast ? t("onboarding.createAccount") : t("onboarding.continue")} onPress={goNext} size="lg" icon="arrow-forward" iconPosition="trailing" palette="fixedLight" />
 
         {current === 0 && (
-          <TouchableOpacity
-            style={styles.discoverBtn}
-            onPress={() => setCurrent(1)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="compass-outline" size={16} color={colors.accentGreen} />
-            <Text style={styles.discoverBtnText}>{t("onboarding.discoverMore")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("onboarding.discoverMore")} onPress={() => setCurrent(1)} variant="secondary" icon="compass-outline" palette="fixedLight" />
         )}
         {(current === 0 || isLast) && (
-          <TouchableOpacity
-            onPress={() => router.replace("/(auth)/login")}
-            style={styles.skipBtn}
-          >
-            <Text style={styles.skipText}>{t("onboarding.alreadyHaveAccount")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("onboarding.alreadyHaveAccount")} onPress={() => router.replace("/(auth)/login")} variant="tertiary" size="sm" palette="fixedLight" />
         )}
       </View>
 
@@ -227,7 +207,7 @@ export default function OnboardingScreen() {
         transparent
         onRequestClose={() => setLangPickerOpen(false)}
       >
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.overlay}
           activeOpacity={1}
           onPress={() => setLangPickerOpen(false)}
@@ -238,13 +218,13 @@ export default function OnboardingScreen() {
           >
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t("onboarding.selectLanguage")}</Text>
-              <TouchableOpacity onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLangPickerOpen(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMutedLight} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {LANGUAGES.map((lang) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={lang.code}
                   style={[
                     styles.langOption,
@@ -342,16 +322,6 @@ const styles = StyleSheet.create({
     textAlign: "center", lineHeight: 24,
     fontFamily: "Inter_400Regular", maxWidth: READABLE_WIDTH.body,
   },
-  discoverBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 12, borderRadius: 12,
-    borderWidth: 1, borderColor: "rgba(29,158,117,0.35)",
-    backgroundColor: "rgba(29,158,117,0.08)",
-  },
-  discoverBtnText: {
-    color: colors.accentGreen, fontSize: 15, fontWeight: "600",
-    fontFamily: "Inter_600SemiBold", flexShrink: 1, textAlign: "center",
-  },
   dots: { flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 32 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   footer: { paddingHorizontal: 24, gap: 14 },
@@ -360,18 +330,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular", opacity: 0.8, lineHeight: 18,
     maxWidth: READABLE_WIDTH.caption, alignSelf: "center",
   },
-  btn: {
-    // minHeight, not height: a long translation or large accessibility
-    // text grows the button instead of clipping its label.
-    backgroundColor: colors.accentGreen, borderRadius: 14, minHeight: 54,
-    paddingHorizontal: 20, paddingVertical: 12,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-  },
-  btnText: {
-    color: colors.cream, fontSize: 16, fontWeight: "600",
-    fontFamily: "Inter_600SemiBold", flexShrink: 1, textAlign: "center",
-  },
-  skipBtn: { alignItems: "center", paddingVertical: 8 },
   skipText: { color: colors.lightGreen, fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheet: {

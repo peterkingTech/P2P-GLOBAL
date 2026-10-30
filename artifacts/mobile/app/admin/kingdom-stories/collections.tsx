@@ -9,6 +9,7 @@ import {
   getStoryCollectionsAdmin, createStoryCollection, updateStoryCollection, setStoryCollectionStories, deleteStoryCollection,
   getKingdomStoriesAdminList, formatTopicNumber, type StoryCollectionAdmin, type KingdomStory,
 } from "@/lib/kingdomStoriesApi";
+import { IconButton } from "@/components/ui";
 
 // Editorial collections for the Kingdom Stories homepage (migration 215):
 // "Start Here", "Stories of Faith"… Each references existing stories in an
@@ -95,8 +96,8 @@ export default function StoryCollectionsAdmin() {
                   <View key={id} style={styles.pickRow}>
                     <Text style={styles.pickNo}>{i + 1}</Text>
                     <Text style={[ss.body, { flex: 1 }]} numberOfLines={2}>{[formatTopicNumber(s?.topicNumber), s?.title ?? "Unknown story"].filter(Boolean).join(" · ")}{s && s.status !== "published" ? ` (${s.status})` : ""}</Text>
-                    <TouchableOpacity onPress={() => setPicked((p) => { const n = [...p]; if (i > 0) [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Move up"><Ionicons name="arrow-up" size={16} color={colors.textMid} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setPicked((p) => p.filter((x) => x !== id))} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Remove"><Ionicons name="close" size={18} color="#B91C1C" /></TouchableOpacity>
+                    <IconButton icon="arrow-up" accessibilityLabel="Move up" onPress={() => setPicked((p) => { const n = [...p]; if (i > 0) [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })} size="sm" color={colors.textMid} palette="fixedLight" />
+                    <IconButton icon="close" accessibilityLabel="Remove" onPress={() => setPicked((p) => p.filter((x) => x !== id))} size="sm" color="#B91C1C" palette="fixedLight" />
                   </View>
                 );
               })}
@@ -131,5 +132,4 @@ const styles = StyleSheet.create({
   sheet: { width: "100%", maxWidth: 620, alignSelf: "center", backgroundColor: colors.lightCream, borderRadius: 14, padding: 16, gap: 10 },
   pickRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderBeige },
   pickNo: { width: 22, fontSize: 12, color: colors.textMuted, fontFamily: "Inter_700Bold", textAlign: "right" },
-  iconBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
 });

@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { getGathering, createInvitation, type PrayerGathering, type PrayerGatheringParticipant } from "@/lib/prayerCoordinationApi";
 import { formatDuration } from "@/lib/prayerTimeDisplay";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -118,9 +119,7 @@ export default function PrayerCompleteScreen() {
             style={styles.reflectionInput} value={reflection} onChangeText={setReflection} multiline
             placeholder="What stood out to you?" placeholderTextColor={c.textMuted}
           />
-          <TouchableOpacity style={styles.reflectionBtn} onPress={handleSaveReflection} disabled={savingReflection || !reflection.trim()}>
-            {savingReflection ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.reflectionBtnText}>Save to My Journal</Text>}
-          </TouchableOpacity>
+          <AppButton label="Save to My Journal" onPress={handleSaveReflection} disabled={savingReflection || !reflection.trim()} loading={savingReflection} style={{ marginTop: 10 }} />
         </View>
       ) : (
         <Text style={styles.savedText}>Saved to your prayer journal.</Text>
@@ -128,27 +127,21 @@ export default function PrayerCompleteScreen() {
 
       {otherParticipant && (
         <View style={styles.againRow}>
-          <TouchableOpacity style={styles.againBtn} onPress={() => handlePrayAgain("tomorrow")} disabled={!!reInviting}>
-            {reInviting === "tomorrow" ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.againBtnText}>Tomorrow</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.againBtn} onPress={() => handlePrayAgain("week")} disabled={!!reInviting}>
-            {reInviting === "week" ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.againBtnText}>This Week</Text>}
-          </TouchableOpacity>
+          <AppButton label="Tomorrow" onPress={() => handlePrayAgain("tomorrow")} variant="outline" disabled={!!reInviting} loading={reInviting === "tomorrow"} style={{ flex: 1 }} />
+          <AppButton label="This Week" onPress={() => handlePrayAgain("week")} variant="outline" disabled={!!reInviting} loading={reInviting === "week"} style={{ flex: 1 }} />
         </View>
       )}
 
       <View style={styles.nextWrap}>
         <Text style={styles.nextTitle}>What would you like to do next?</Text>
         {NEXT_STEPS.map((step) => (
-          <TouchableOpacity key={step.key} style={styles.nextRow} onPress={() => router.replace(step.route as any)}>
+          <TouchableOpacity accessibilityRole="button" key={step.key} style={styles.nextRow} onPress={() => router.replace(step.route as any)}>
             <Ionicons name={step.icon} size={18} color={c.accentGreen} />
             <Text style={styles.nextRowText}>{step.label}</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace("/(tabs)/prayer" as any)}>
-          <Text style={styles.doneBtnText}>Done</Text>
-        </TouchableOpacity>
+        <AppButton label="Done" onPress={() => router.replace("/(tabs)/prayer" as any)} variant="tertiary" style={{ marginTop: 6 }} />
       </View>
     </View>
   );
@@ -170,12 +163,8 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10,
       padding: 10, minHeight: 60, textAlignVertical: "top", color: c.textDark, fontSize: 13, fontFamily: "Inter_400Regular",
     },
-    reflectionBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center", marginTop: 10 },
-    reflectionBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
     savedText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium", textAlign: "center", marginBottom: 16 },
     againRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-    againBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    againBtnText: { color: c.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold" },
     nextWrap: { gap: 10 },
     nextTitle: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_600SemiBold", marginBottom: 4, textAlign: "center" },
     nextRow: {
@@ -183,7 +172,5 @@ function makeStyles(c: AppColors) {
       borderColor: c.borderBeige, borderRadius: 12, padding: 14,
     },
     nextRowText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    doneBtn: { alignItems: "center", paddingVertical: 14, marginTop: 6 },
-    doneBtnText: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_500Medium" },
   });
 }

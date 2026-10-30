@@ -33,6 +33,7 @@ import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import ReadableText from "@/components/ReadableText";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
+import { AppButton } from "@/components/ui";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -53,13 +54,13 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
     <View style={[styles.nodeWrapper, { marginLeft: depth * 20 }]}>
       <View style={styles.nodeRow}>
         {hasChildren && (
-          <TouchableOpacity onPress={() => setExpanded((e) => !e)} style={styles.expandBtn}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={expanded ? "Collapse" : "Expand"} accessibilityState={{ expanded: !!expanded }} hitSlop={10} onPress={() => setExpanded((e) => !e)} style={styles.expandBtn}>
             <Ionicons name={expanded ? "chevron-down" : "chevron-forward"} size={14} color={colors.textMuted} />
           </TouchableOpacity>
         )}
         {!hasChildren && <View style={{ width: 24 }} />}
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.nodeCard, depth === 0 && styles.rootNode]}
           activeOpacity={depth > 0 && node.username ? 0.7 : 1}
           onPress={() => { if (depth > 0 && node.username) router.push(`/profile/${node.username}` as any); }}
@@ -253,19 +254,19 @@ export default function LivingTreeScreen() {
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityRole="button" style={styles.back} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={20} color={colors.primaryGreen} />
         <Text style={styles.backLabel}>Home</Text>
       </TouchableOpacity>
 
       <View style={styles.segmentRow}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.segmentBtn, tab === "tree" && styles.segmentBtnActive]}
           onPress={() => setTab("tree")}
         >
           <Text style={[styles.segmentText, tab === "tree" && styles.segmentTextActive]}>My Tree</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.segmentBtn, tab === "forest" && styles.segmentBtnActive]}
           onPress={() => setTab("forest")}
         >
@@ -295,10 +296,7 @@ export default function LivingTreeScreen() {
             <Text style={styles.videoHeroEmoji}>{stage.emoji}</Text>
             <Text style={styles.videoHeroText}>{stage.name}</Text>
           </View>
-          <TouchableOpacity style={styles.videoHeroWatchBtn} activeOpacity={0.85} onPress={() => handleWatchGrowth()}>
-            <Ionicons name="play" size={12} color="#fff" />
-            <Text style={styles.videoHeroWatchBtnText}>Watch full growth story</Text>
-          </TouchableOpacity>
+          <AppButton label="Watch full growth story" onPress={() => handleWatchGrowth()} size="sm" icon="play" style={{ position: "absolute", top: 14, right: 14 }} palette="fixedLight" />
         </View>
       )}
 
@@ -460,15 +458,9 @@ export default function LivingTreeScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.allStagesBtn} onPress={() => setTab("forest")} activeOpacity={0.8}>
-            <Text style={styles.allStagesBtnText}>View My Forest</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primaryGreen} />
-          </TouchableOpacity>
+          <AppButton label="View My Forest" onPress={() => setTab("forest")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
 
-          <TouchableOpacity style={styles.allStagesBtn} onPress={() => router.push("/stages")} activeOpacity={0.8}>
-            <Text style={styles.allStagesBtnText}>The Six Stages of Growth</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primaryGreen} />
-          </TouchableOpacity>
+          <AppButton label="The Six Stages of Growth" onPress={() => router.push("/stages")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
@@ -508,10 +500,7 @@ export default function LivingTreeScreen() {
               {forestNodes.map((node) => (
                 <NodeCard key={node.id} node={node} depth={0} />
               ))}
-              <TouchableOpacity style={styles.viewFullForestBtn} onPress={() => router.push("/forest" as any)}>
-                <Text style={styles.viewFullForestBtnText}>View Full Forest</Text>
-                <Ionicons name="chevron-forward" size={16} color="#fff" />
-              </TouchableOpacity>
+              <AppButton label="View Full Forest" onPress={() => router.push("/forest" as any)} icon="chevron-forward" iconPosition="trailing" style={{ marginTop: 8 }} palette="fixedLight" />
             </ScrollView>
           )}
         </View>
@@ -612,11 +601,6 @@ const styles = StyleSheet.create({
   },
   videoHeroEmoji: { fontSize: 16 },
   videoHeroText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  videoHeroWatchBtn: {
-    position: "absolute", top: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-  },
-  videoHeroWatchBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium" },
 
   treeDataCard: {
     borderRadius: 16, marginBottom: 20, backgroundColor: colors.card,
@@ -643,12 +627,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
   tapHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic" },
 
-  allStagesBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige, padding: 16, marginBottom: 8,
-  },
-  allStagesBtnText: { fontSize: 15, fontWeight: "600", color: colors.primaryGreen, fontFamily: "Inter_600SemiBold" },
-
   forestHeader: { paddingHorizontal: 20 },
   stageBanner: {
     flexDirection: "row", gap: 10, alignItems: "center",
@@ -664,11 +642,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
   list: { paddingHorizontal: 16, paddingTop: 12 },
-  viewFullForestBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.primaryGreen, borderRadius: 14, paddingVertical: 14, marginTop: 8,
-  },
-  viewFullForestBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   nodeWrapper: { marginBottom: 8 },
   nodeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   expandBtn: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },

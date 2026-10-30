@@ -7,6 +7,7 @@ import {
   createVoiceController, formatClock, onSessionRateChange, sessionRate, speedLabel, timeAtX,
   SKIP_SECONDS, type VoicePlayerLike, type VoiceState,
 } from "@/lib/voicePlayback";
+import { AppButton, IconButton } from "@/components/ui";
 
 interface Props {
   mediaUrl: string;
@@ -71,9 +72,7 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
       <View style={styles.row}>
         <Ionicons name="alert-circle-outline" size={18} color={muted} />
         <Text style={[styles.errorText, { color: muted }]}>Voice message unavailable</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => controller.retry()} accessibilityRole="button" accessibilityLabel="Try playing again">
-          <Ionicons name="refresh" size={18} color={tint} />
-        </TouchableOpacity>
+        <IconButton icon="refresh" accessibilityLabel="Try playing again" onPress={() => controller.retry()} color={tint} palette="fixedLight" />
       </View>
     );
   }
@@ -81,7 +80,7 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <TouchableOpacity
+        <TouchableOpacity hitSlop={10}
           style={[styles.playBtn, mine ? styles.playBtnMine : styles.playBtnTheirs]}
           onPress={() => controller.toggle()}
           activeOpacity={0.8}
@@ -115,14 +114,8 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
 
       {active ? (
         <View style={styles.controls}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => controller.skip(-SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel={`Back ${SKIP_SECONDS} seconds`}>
-            <Ionicons name="play-back" size={16} color={tint} />
-            <Text style={[styles.skipText, { color: tint }]}>{SKIP_SECONDS}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => controller.skip(SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel={`Forward ${SKIP_SECONDS} seconds`}>
-            <Text style={[styles.skipText, { color: tint }]}>{SKIP_SECONDS}</Text>
-            <Ionicons name="play-forward" size={16} color={tint} />
-          </TouchableOpacity>
+          <AppButton label={`${SKIP_SECONDS}`} onPress={() => controller.skip(-SKIP_SECONDS)} variant="tertiary" icon="play-back" accessibilityLabel={`Back ${SKIP_SECONDS} seconds`} style={{ minWidth: 44 }} palette="fixedLight" />
+          <AppButton label={`${SKIP_SECONDS}`} onPress={() => controller.skip(SKIP_SECONDS)} variant="tertiary" icon="play-forward" iconPosition="trailing" accessibilityLabel={`Forward ${SKIP_SECONDS} seconds`} style={{ minWidth: 44 }} palette="fixedLight" />
           <TouchableOpacity
             style={[styles.speedChip, { borderColor: tint }]} onPress={() => controller.cycleRate()} onLongPress={() => controller.resetRate()}
             accessibilityRole="button" accessibilityLabel={`Playback speed ${speedLabel(rate)}. Tap to change`} accessibilityHint="Long press to return to normal speed"
@@ -130,9 +123,7 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
             <Text style={[styles.speedText, { color: tint }]}>{speedLabel(rate)}</Text>
           </TouchableOpacity>
           {rate !== 1 ? (
-            <TouchableOpacity style={styles.iconBtn} onPress={() => controller.resetRate()} accessibilityRole="button" accessibilityLabel="Normal speed">
-              <Text style={[styles.resetText, { color: muted }]}>1×</Text>
-            </TouchableOpacity>
+            <AppButton label="1×" onPress={() => controller.resetRate()} variant="tertiary" accessibilityLabel="Normal speed" style={{ minWidth: 44 }} palette="fixedLight" />
           ) : null}
         </View>
       ) : null}
@@ -143,11 +134,11 @@ export function VoiceMessageBubble({ mediaUrl, durationSeconds, mine }: Props) {
 export default VoiceMessageBubble;
 
 const styles = StyleSheet.create({
+  playBtnMine: { backgroundColor: "rgba(255,255,255,0.9)" },
   wrap: { minWidth: 200, gap: 2 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   playBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   playBtnTheirs: { backgroundColor: colors.accentGreen },
-  playBtnMine: { backgroundColor: "rgba(255,255,255,0.9)" },
   seekArea: { flex: 1, height: 44, justifyContent: "center" },
   track: { height: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 2, overflow: "hidden" },
   trackMine: { backgroundColor: "rgba(255,255,255,0.35)" },
@@ -155,7 +146,6 @@ const styles = StyleSheet.create({
   thumb: { position: "absolute", width: 12, height: 12, borderRadius: 6, marginLeft: -6, top: 16 },
   time: { fontSize: 11, fontFamily: "Inter_400Regular", minWidth: 34, textAlign: "right" },
   controls: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 40 },
-  iconBtn: { minWidth: 44, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
   skipText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   speedChip: { minWidth: 44, minHeight: 32, paddingHorizontal: 8, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", marginVertical: 6 },
   speedText: { fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },

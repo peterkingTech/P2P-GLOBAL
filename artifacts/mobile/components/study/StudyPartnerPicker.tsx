@@ -52,7 +52,7 @@ export function StudyPartnerPicker({
         <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>Who would you like to study with?</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}>
               <Ionicons name="close" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -64,14 +64,14 @@ export function StudyPartnerPicker({
           ) : people.length === 0 ? (
             <View style={{ gap: 12 }}>
               <Text style={styles.emptyText}>You don't have anyone available to study with yet.</Text>
-              <TouchableOpacity style={styles.connectBtn} onPress={() => { onClose(); router.push("/connect" as any); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.connectBtn} onPress={() => { onClose(); router.push("/connect" as any); }}>
                 <Text style={styles.connectBtnText}>Find Someone to Connect With</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <ScrollView style={{ maxHeight: 420 }}>
               {people.map((p) => (
-                <TouchableOpacity key={p.id} style={styles.personRow} onPress={() => onSelectPerson({ id: p.id, name: p.name })}>
+                <TouchableOpacity accessibilityRole="button" key={p.id} style={styles.personRow} onPress={() => onSelectPerson({ id: p.id, name: p.name })}>
                   {p.photoUrl ? (
                     <Image source={{ uri: p.photoUrl }} style={styles.avatar} />
                   ) : (

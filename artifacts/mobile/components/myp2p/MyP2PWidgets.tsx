@@ -15,6 +15,7 @@ import { bibleRoute, bookByCode } from "@/lib/bibleReaderApi";
 import { studyMinutesToday } from "@/lib/studyTime";
 import { loadReminderSettings, goalProgress } from "@/lib/studyReminders";
 import { journeyMilestones, stageProgress, previewText, UPDATE_TYPES, type Timeline, type WidgetId } from "@/lib/myP2P";
+import { AppButton } from "@/components/ui";
 
 // The My P2P widgets. Each one reads existing data through the services the
 // rest of the app already uses, shows honest loading / empty / error states,
@@ -120,9 +121,7 @@ function JournalWidget({ refreshKey, showPreview, onTogglePreview }: { refreshKe
           <View style={s.inner}>
             <Text style={s.line}>Last entry: {kind} · {new Date(latest.at).toLocaleDateString()}</Text>
             {showPreview ? <Text style={s.preview} numberOfLines={2}>{previewText(latest.preview || latest.title)}</Text> : null}
-            <TouchableOpacity onPress={onTogglePreview} accessibilityRole="button" style={s.linkBtn}>
-              <Text style={s.link}>{showPreview ? "Hide preview" : "Show preview"}</Text>
-            </TouchableOpacity>
+            <AppButton label={showPreview ? "Hide preview" : "Show preview"} onPress={onTogglePreview} variant="tertiary" size="sm" style={{ alignSelf: "flex-start" }} />
           </View>
         )}
       <View style={s.row}>
@@ -260,7 +259,7 @@ function StoriesWidget({ refreshKey }: { refreshKey: number }) {
             {story.subtitle ? <Text style={s.meta} numberOfLines={2}>{story.subtitle}</Text> : null}
             <View style={s.row}>
               <Btn label={started ? "Continue" : "Start"} primary icon="book" s={s} c={c} onPress={() => router.push({ pathname: "/kingdom-stories/[id]", params: { id: story.id, open: "next" } } as any)} />
-              <TouchableOpacity style={s.iconBtn} onPress={toggleFav} accessibilityRole="button" accessibilityState={{ selected: !!fav }} accessibilityLabel={fav ? "Remove from My Favourites" : "Add to My Favourites"}>
+              <TouchableOpacity hitSlop={10} style={s.iconBtn} onPress={toggleFav} accessibilityRole="button" accessibilityState={{ selected: !!fav }} accessibilityLabel={fav ? "Remove from My Favourites" : "Add to My Favourites"}>
                 <Ionicons name={fav ? "heart" : "heart-outline"} size={20} color={fav ? "#E11D48" : c.textMid} />
               </TouchableOpacity>
               <Btn label="Browse" s={s} c={c} onPress={() => router.push("/kingdom-stories" as any)} />

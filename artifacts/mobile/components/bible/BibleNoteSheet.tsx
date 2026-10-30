@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, KeyboardAvo
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
+import { IconButton, AppButton } from "@/components/ui";
 
 // Write or edit a private note on a Bible passage. Notes are the author's
 // own (owner-only RLS); nothing here is shared with a group or a leader.
@@ -45,9 +46,7 @@ export default function BibleNoteSheet({ visible, reference, initial, saving, er
               <Text style={styles.title} accessibilityRole="header">{initial ? "Edit note" : "New note"}</Text>
               <Text style={styles.ref}>{reference}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close without saving">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close without saving" onPress={onClose} color={c.textDark} style={{ marginTop: -8, marginRight: -8 }} />
           </View>
           <View style={styles.privacy}>
             <Ionicons name="lock-closed" size={13} color={c.textMuted} />
@@ -61,13 +60,9 @@ export default function BibleNoteSheet({ visible, reference, initial, saving, er
           <View style={styles.actions}>
             {onDelete ? (
               confirmDelete ? (
-                <TouchableOpacity onPress={onDelete} style={[styles.btn, styles.deleteConfirm]} disabled={saving} accessibilityRole="button" accessibilityLabel="Confirm delete note">
-                  <Text style={styles.deleteConfirmText}>Delete note?</Text>
-                </TouchableOpacity>
+                <AppButton label="Delete note?" onPress={onDelete} variant="destructive" disabled={saving} accessibilityLabel="Confirm delete note" style={{ minWidth: 44 }} />
               ) : (
-                <TouchableOpacity onPress={() => setConfirmDelete(true)} style={styles.btn} disabled={saving} accessibilityRole="button" accessibilityLabel="Delete note">
-                  <Ionicons name="trash-outline" size={18} color={c.textMuted} />
-                </TouchableOpacity>
+                <IconButton icon="trash-outline" accessibilityLabel="Delete note" onPress={() => setConfirmDelete(true)} color={c.textMuted} disabled={saving} />
               )
             ) : <View />}
             <TouchableOpacity onPress={() => onSave(title.trim() || null, body.trim())} disabled={!canSave}
@@ -88,7 +83,6 @@ function makeStyles(c: AppColors) {
     header: { flexDirection: "row", alignItems: "flex-start" },
     title: { fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
     ref: { fontSize: 14, color: c.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 2 },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginTop: -8, marginRight: -8 },
     privacy: { flexDirection: "row", alignItems: "center", gap: 6 },
     privacyText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
     titleInput: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, paddingHorizontal: 12, color: c.textDark, fontSize: 15, fontFamily: "Inter_500Medium" },

@@ -8,6 +8,7 @@ import { useData, PeerGroup } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 export default function Groups() {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
@@ -58,7 +59,7 @@ export default function Groups() {
     <>
       <Stack.Screen options={{ title: "Groups" }} />
       <View style={{ flex: 1, backgroundColor: colors.lightCream }}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.createBar}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCreateOpen(true); }}
         >
@@ -81,7 +82,7 @@ export default function Groups() {
               </View>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.card}
                 activeOpacity={item.isMember || item.isCreator ? 0.7 : 1}
                 onPress={() => {
@@ -99,7 +100,7 @@ export default function Groups() {
                     {item.isCreator ? " · You created this" : ""}
                   </Text>
                 </View>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.joinBtn, item.isMember && styles.leaveBtn]}
                   onPress={() => toggleMembership(item)}
                   disabled={busyId === item.id}
@@ -122,7 +123,7 @@ export default function Groups() {
           <View style={[styles.modalCard, sheetWidth]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Group</Text>
-              <TouchableOpacity onPress={() => setCreateOpen(false)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setCreateOpen(false)}>
                 <Ionicons name="close" size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -144,13 +145,7 @@ export default function Groups() {
               maxLength={200}
             />
             {!!createError && <Text style={styles.errorText}>{createError}</Text>}
-            <TouchableOpacity
-              style={[styles.submitBtn, (!newName.trim() || creating) && styles.submitBtnDisabled]}
-              onPress={handleCreate}
-              disabled={!newName.trim() || creating}
-            >
-              <Text style={styles.submitBtnText}>{creating ? "Creating..." : "Create Group"}</Text>
-            </TouchableOpacity>
+            <AppButton label={creating ? "Creating..." : "Create Group"} onPress={handleCreate} disabled={!newName.trim() || creating} palette="fixedLight" />
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -195,7 +190,4 @@ const styles = StyleSheet.create({
   },
   inputMulti: { minHeight: 80, textAlignVertical: "top" },
   errorText: { color: "#D64545", fontSize: 12, marginBottom: 10, fontFamily: "Inter_400Regular" },
-  submitBtn: { backgroundColor: colors.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

@@ -23,7 +23,7 @@ import { AppColors } from "@/constants/themes";
 // so there is no more legacy/v2 split here. ──
 function PlanProgressCard({ plan, progress, styles, router }: { plan: Plan; progress: number; styles: ReturnType<typeof makeStyles>; router: ReturnType<typeof useRouter> }) {
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={styles.planCard}
       onPress={() => router.push(`/plan/${plan.id}` as any)}
       activeOpacity={0.82}
@@ -63,7 +63,7 @@ export default function ProgressDashboard() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Progress</Text>
@@ -77,7 +77,7 @@ export default function ProgressDashboard() {
         {currentCoreModule && currentCoreLesson && (
           <>
             <Text style={styles.sectionHeader}>Core Curriculum In Progress</Text>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.planCard}
               onPress={() => router.push(`/module/${currentCoreModule.id}` as any)}
               activeOpacity={0.82}

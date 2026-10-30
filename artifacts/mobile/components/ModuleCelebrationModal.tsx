@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface ModuleCelebrationModalProps {
   label: string;
@@ -16,7 +17,7 @@ export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss }: Modu
   return (
     <Modal visible animationType="fade" transparent statusBarTranslucent onRequestClose={onDismiss}>
       <View style={styles.overlay}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button"
           style={[styles.closeBtn, { top: insets.top + 12 }]}
           onPress={onDismiss}
           hitSlop={12}
@@ -32,14 +33,9 @@ export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss }: Modu
             {"\n"}— check your Living Tree
           </Text>
 
-          <TouchableOpacity style={styles.watchBtn} activeOpacity={0.85} onPress={onWatchGrowth}>
-            <Ionicons name="play" size={16} color="#fff" />
-            <Text style={styles.watchBtnText}>Watch your growth</Text>
-          </TouchableOpacity>
+          <AppButton label="Watch your growth" onPress={onWatchGrowth} icon="play" style={{ marginBottom: 14 }} palette="fixedLight" />
 
-          <TouchableOpacity style={styles.laterBtn} activeOpacity={0.7} onPress={onDismiss}>
-            <Text style={styles.laterBtnText}>Maybe later</Text>
-          </TouchableOpacity>
+          <AppButton label="Maybe later" onPress={onDismiss} variant="tertiary" size="sm" palette="fixedLight" />
         </View>
       </View>
     </Modal>
@@ -83,29 +79,5 @@ const styles = StyleSheet.create({
   moduleLabel: {
     fontFamily: "Inter_600SemiBold",
     color: colors.brightYellow,
-  },
-  watchBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.accentGreen,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    marginBottom: 14,
-  },
-  watchBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
-  laterBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  laterBtnText: {
-    color: "#C9B48A",
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
   },
 });

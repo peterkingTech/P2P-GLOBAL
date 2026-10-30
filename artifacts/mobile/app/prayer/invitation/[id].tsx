@@ -10,6 +10,7 @@ import {
   getInvitation, acceptInvitation, declineInvitation, cancelInvitation, type PrayerInvitation,
 } from "@/lib/prayerCoordinationApi";
 import { deviceTimezone, zoneShortLabel, formatTimeInZone, relativeDayLabel, formatDuration } from "@/lib/prayerTimeDisplay";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -104,7 +105,7 @@ export default function PrayerInvitationScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Prayer Invitation</Text>
@@ -150,18 +151,12 @@ export default function PrayerInvitationScreen() {
 
         {invitation.status === "pending" && isRecipient && (
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.declineBtn} onPress={handleDecline} disabled={busy}>
-              <Text style={styles.declineBtnText}>Decline</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
-            </TouchableOpacity>
+            <AppButton label="Decline" onPress={handleDecline} variant="outline" disabled={busy} style={{ flex: 1 }} />
+            <AppButton label="Accept" onPress={handleAccept} disabled={busy} loading={busy} style={{ flex: 1 }} />
           </View>
         )}
         {invitation.status === "pending" && !isRecipient && (
-          <TouchableOpacity style={styles.cancelInviteBtn} onPress={handleCancel} disabled={busy}>
-            {busy ? <ActivityIndicator color="#DC2626" size="small" /> : <Text style={styles.cancelInviteBtnText}>Cancel Invitation</Text>}
-          </TouchableOpacity>
+          <AppButton label="Cancel Invitation" onPress={handleCancel} variant="outline" disabled={busy} loading={busy} style={{ marginTop: 28 }} />
         )}
       </ScrollView>
     </View>
@@ -191,11 +186,5 @@ function makeStyles(c: AppColors) {
       backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
     },
     actionsRow: { flexDirection: "row", gap: 12, marginTop: 28 },
-    declineBtn: { flex: 1, borderWidth: 1.5, borderColor: "#DC2626", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    declineBtnText: { color: "#DC2626", fontSize: 15, fontFamily: "Inter_700Bold" },
-    acceptBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    acceptBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    cancelInviteBtn: { borderWidth: 1.5, borderColor: "#DC2626", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 28 },
-    cancelInviteBtnText: { color: "#DC2626", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

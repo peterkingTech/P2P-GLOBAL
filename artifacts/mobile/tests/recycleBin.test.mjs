@@ -23,15 +23,19 @@ const host = (name) => { const f = ({ [name]: function () { return null; } })[na
 const RN = {
   View: host("View"), Text: host("Text"), TouchableOpacity: host("TouchableOpacity"), ScrollView: host("ScrollView"), TextInput: host("TextInput"),
   Modal: host("Modal"), ActivityIndicator: host("ActivityIndicator"), StyleSheet: { create: (s) => s }, useWindowDimensions: () => ({ width: 1200, height: 800 }),
+  // The shared button system (components/ui) draws with Pressable.
+  Pressable: host("Pressable"), Platform: { OS: "web" },
+  AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: () => ({ remove() {} }) },
 };
 const env = { query: null, pushes: [], fetch: null };
 const mocks = {
-  react: { ...React, useState: (init) => [typeof init === "function" ? init() : init, () => {}], useEffect: () => {}, useRef: (v) => ({ current: v }), useCallback: (f) => f, useMemo: (f) => f() },
+  react: { ...React, useState: (init) => [typeof init === "function" ? init() : init, () => {}], useEffect: () => {}, useRef: (v) => ({ current: v }), useCallback: (f) => f, useMemo: (f) => f(), useContext: () => null },
   "react-native": RN,
   "@expo/vector-icons": { Ionicons: host("Ionicons") },
   "expo-router": { useRouter: () => ({ push: (p) => env.pushes.push(p) }), useFocusEffect: () => {} },
   "@/lib/adminFetch": { authedFetch: (p, i) => env.fetch(p, i) },
   "@/components/studio/useStudioQuery": { useStudioQuery: () => env.query },
+  "@/contexts/ThemeContext": { useTheme: () => ({ colors: loadFile(path.join(root, "constants/themes.ts")).THEMES.light, resolvedMode: "light" }) },
 };
 const cache = new Map();
 function resolveFile(spec, fromDir) {
@@ -64,7 +68,7 @@ function findAll(node, pred, out = []) {
   return out;
 }
 const textOf = (t) => findAll(t, (n) => n.type === RN.Text).map((x) => [].concat(x.props.children).flat(Infinity).filter((c) => typeof c === "string" || typeof c === "number").join("")).join(" | ");
-const buttons = (t) => findAll(t, (n) => n.type === RN.TouchableOpacity && n.props.accessibilityRole === "button");
+const buttons = (t) => findAll(t, (n) => (n.type === RN.TouchableOpacity || n.type === RN.Pressable) && ["button", "radio", "checkbox"].includes(n.props.accessibilityRole));
 const button = (t, label) => buttons(t).find((b) => b.props.accessibilityLabel === label);
 
 // ── API client ──────────────────────────────────────────────────────────────

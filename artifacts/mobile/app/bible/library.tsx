@@ -9,6 +9,7 @@ import {
   BibleApiError, bibleRoute, deleteNote, getLibrary, highlightPalette, removeBookmark, removeHighlight,
   type BibleNote, type Bookmark, type Highlight,
 } from "@/lib/bibleReaderApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // The reader's own Bible library: notes, highlights and saved passages.
 // Private to the signed-in person (owner-only RLS); never shown to leaders.
@@ -91,13 +92,9 @@ export default function BibleLibraryScreen() {
           {note ? <Text style={styles.noteBody} numberOfLines={3}>{note.body}</Text> : null}
         </TouchableOpacity>
         {confirming ? (
-          <TouchableOpacity onPress={() => remove(item)} style={styles.confirm} accessibilityRole="button" accessibilityLabel={`Confirm remove ${item.reference}`}>
-            <Text style={styles.confirmText}>Remove</Text>
-          </TouchableOpacity>
+          <AppButton label="Remove" onPress={() => remove(item)} variant="destructive" size="sm" accessibilityLabel={`Confirm remove ${item.reference}`} />
         ) : (
-          <TouchableOpacity onPress={() => setConfirmId(item.id)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove ${item.reference}`}>
-            <Ionicons name="trash-outline" size={18} color={c.textMuted} />
-          </TouchableOpacity>
+          <IconButton icon="trash-outline" accessibilityLabel={`Remove ${item.reference}`} onPress={() => setConfirmId(item.id)} color={c.textMuted} />
         )}
       </View>
     );
@@ -110,9 +107,7 @@ export default function BibleLibraryScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 4 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={24} color={c.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={() => router.back()} color={c.textDark} />
         <Text style={styles.title} accessibilityRole="header">My Bible library</Text>
       </View>
       <View style={styles.privacy}>
@@ -141,9 +136,7 @@ export default function BibleLibraryScreen() {
           ListEmptyComponent={loading ? <View style={styles.center}><ActivityIndicator color={c.accentGreen} /></View>
             : error ? null : <View style={styles.center}><Text style={styles.muted}>{emptyText}</Text></View>}
           ListFooterComponent={hasMore ? (
-            <TouchableOpacity style={styles.more} onPress={() => load(kind, items.length, "append")} disabled={loading} accessibilityRole="button" accessibilityLabel="Load more">
-              {loading ? <ActivityIndicator color={c.accentGreen} /> : <Text style={styles.moreText}>Load more</Text>}
-            </TouchableOpacity>
+            <AppButton label="Load more" onPress={() => load(kind, items.length, "append")} variant="tertiary" size="lg" disabled={loading} loading={loading} accessibilityLabel="Load more" />
           ) : null}
         />
       )}
@@ -155,7 +148,6 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6 },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     title: { flex: 1, fontSize: 19, color: c.textDark, fontFamily: "Inter_700Bold" },
     privacy: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingTop: 2 },
     privacyText: { flex: 1, fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },

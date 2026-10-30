@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useData, AdminActivityEntry, ContactDepartment, ContactDeptStats } from "@/contexts/DataContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -51,17 +52,14 @@ function StatsRow({ stats }: { stats: { label: string; value: string | number }[
 function SubmitReportButton() {
   const router = useRouter();
   return (
-    <TouchableOpacity style={styles.reportBtn} onPress={() => router.push("/admin/submit-report" as any)}>
-      <Ionicons name="document-text-outline" size={16} color="#fff" />
-      <Text style={styles.reportBtnText}>Submit Report</Text>
-    </TouchableOpacity>
+    <AppButton label="Submit Report" onPress={() => router.push("/admin/submit-report" as any)} icon="document-text-outline" style={{ marginTop: 10 }} palette="fixedLight" />
   );
 }
 
 function QueueLinkCard({ label, sub, path, icon }: { label: string; sub: string; path: string; icon: keyof typeof Ionicons.glyphMap }) {
   const router = useRouter();
   return (
-    <TouchableOpacity style={styles.queueCard} onPress={() => router.push(path as any)}>
+    <TouchableOpacity accessibilityRole="button" style={styles.queueCard} onPress={() => router.push(path as any)}>
       <View style={styles.queueIconWrap}><Ionicons name={icon} size={18} color={colors.accentGreen} /></View>
       <View style={{ flex: 1 }}>
         <Text style={styles.queueLabel}>{label}</Text>
@@ -340,7 +338,7 @@ function SuperAdminDashboard() {
                     const s = deptStats[dept];
                     if (!s) return null;
                     return (
-                      <TouchableOpacity key={dept} style={styles.queueCard} onPress={() => router.push("/admin/email-inbox" as any)}>
+                      <TouchableOpacity accessibilityRole="button" key={dept} style={styles.queueCard} onPress={() => router.push("/admin/email-inbox" as any)}>
                         <View style={styles.queueIconWrap}><Ionicons name="mail" size={18} color={colors.accentGreen} /></View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.queueLabel}>{DEPARTMENT_LABELS[dept]}</Text>
@@ -355,10 +353,7 @@ function SuperAdminDashboard() {
                 </>
               )}
               <Text style={styles.sectionTitle}>Admins</Text>
-              <TouchableOpacity style={styles.reportBtn} onPress={() => router.push("/admin/appoint-admin" as any)}>
-                <Ionicons name="person-add-outline" size={16} color="#fff" />
-                <Text style={styles.reportBtnText}>Add New Admin</Text>
-              </TouchableOpacity>
+              <AppButton label="Add New Admin" onPress={() => router.push("/admin/appoint-admin" as any)} icon="person-add-outline" style={{ marginTop: 10 }} palette="fixedLight" />
               {admins.map((item) => (
                 <View key={item.id} style={styles.adminRow}>
                   <View style={{ flex: 1 }}>
@@ -369,7 +364,7 @@ function SuperAdminDashboard() {
                     </Text>
                     <Text style={styles.queueSub}>This week: {item.casesThisWeek} cases · Rating: {item.avgRating ?? "—"}</Text>
                   </View>
-                  <TouchableOpacity onPress={async () => {
+                  <TouchableOpacity accessibilityRole="button" onPress={async () => {
                     await authedFetch(`/admin/appointments/${item.id}/suspend`, {
                       method: "PUT", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ reason: item.adminIsActive ? "Suspended from Super Admin dashboard" : "Reinstated from Super Admin dashboard" }),
@@ -439,11 +434,6 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 20, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 2, textAlign: "center", fontFamily: "Inter_400Regular" },
-  reportBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.accentGreen, borderRadius: 12, height: 46, marginTop: 10,
-  },
-  reportBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   queueCard: {
     flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 14, padding: 14,

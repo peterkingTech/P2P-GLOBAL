@@ -17,6 +17,7 @@ import {
 } from "expo-audio";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
+import { IconButton } from "@/components/ui";
 
 type Phase = "idle" | "recording" | "cancelling" | "locked" | "uploading";
 
@@ -298,10 +299,8 @@ export default function AudioRecorder({ onSubmit, onActiveChange, disabled }: Pr
             <Text style={styles.activeTimer}>{formatTime(Math.floor(recorderState.durationMillis / 1000))}</Text>
           </View>
           <View style={styles.lockedActions}>
-            <TouchableOpacity onPress={discardRecording} style={styles.lockedCancelBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="trash-outline" size={18} color="#C0392B" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={finishAndSend} style={styles.lockedSendBtn}>
+            <IconButton icon="trash-outline" accessibilityLabel="Delete" onPress={discardRecording} variant="tinted" size="sm" color="#C0392B" palette="fixedLight" />
+            <TouchableOpacity accessibilityLabel="Send" accessibilityRole="button" hitSlop={10} onPress={finishAndSend} style={styles.lockedSendBtn}>
               <Ionicons name="send" size={16} color={colors.cream} />
             </TouchableOpacity>
           </View>
@@ -343,10 +342,6 @@ const styles = StyleSheet.create({
   slideHintCancelling: { color: "#C0392B", fontWeight: "700", fontFamily: "Inter_700Bold" },
   lockHint: { alignItems: "center" },
   lockedActions: { flexDirection: "row", gap: 10, alignItems: "center" },
-  lockedCancelBtn: {
-    width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "#C0392B33",
-  },
   lockedSendBtn: {
     width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center",
     backgroundColor: colors.primaryGreen,

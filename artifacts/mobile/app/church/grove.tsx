@@ -45,7 +45,7 @@ export default function GroveDashboardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 40, paddingHorizontal: 20 }}>
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Church Community Dashboard</Text>
         <View style={{ width: 22 }} />
       </View>
@@ -80,13 +80,13 @@ export default function GroveDashboardScreen() {
           <Text style={styles.sectionTitle}>⚠️ Needs Attention</Text>
           <View style={styles.attentionBox}>
             {grove.inactiveMembers > 0 && (
-              <TouchableOpacity style={styles.attentionRow} onPress={() => router.push("/church/members" as any)}>
+              <TouchableOpacity accessibilityRole="button" style={styles.attentionRow} onPress={() => router.push("/church/members" as any)}>
                 <Text style={styles.attentionRowText}>Inactive members (14+ days)</Text>
                 <Text style={styles.attentionRowValue}>{grove.inactiveMembers}</Text>
               </TouchableOpacity>
             )}
             {grove.newBelieversWithoutGuides > 0 && (
-              <TouchableOpacity style={styles.attentionRow} onPress={() => router.push("/church/members" as any)}>
+              <TouchableOpacity accessibilityRole="button" style={styles.attentionRow} onPress={() => router.push("/church/members" as any)}>
                 <Text style={styles.attentionRowText}>New believers without guides</Text>
                 <Text style={styles.attentionRowValue}>{grove.newBelieversWithoutGuides}</Text>
               </TouchableOpacity>

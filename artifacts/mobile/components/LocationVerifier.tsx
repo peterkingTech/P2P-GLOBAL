@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { countryNameFromCode } from "@/lib/countryNames";
+import { AppButton } from "@/components/ui";
 
 export interface VerifiedLocation {
   city: string;
@@ -82,13 +83,9 @@ export function LocationVerifier({ onVerified, onSkip, compact }: Props) {
           <Text style={styles.subtitle}>
             Your location helps us match you with nearby peer guides and show your country on your profile.
           </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleDetect}>
-            <Text style={styles.primaryBtnText}>Detect My Location</Text>
-          </TouchableOpacity>
+          <AppButton label="Detect My Location" onPress={handleDetect} style={{ marginTop: 4 }} />
           {onSkip && (
-            <TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
-              <Text style={styles.skipBtnText}>Skip for now</Text>
-            </TouchableOpacity>
+            <AppButton label="Skip for now" onPress={onSkip} variant="tertiary" size="sm" style={{ marginTop: 2 }} />
           )}
         </View>
       )}
@@ -109,12 +106,8 @@ export function LocationVerifier({ onVerified, onSkip, compact }: Props) {
           </Text>
           <Text style={styles.subtitle}>This is your verified location</Text>
           <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleDetect}>
-              <Text style={styles.secondaryBtnText}>Try Again</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirm}>
-              <Text style={styles.primaryBtnText}>Confirm</Text>
-            </TouchableOpacity>
+            <AppButton label="Try Again" onPress={handleDetect} variant="outline" style={{ marginTop: 4 }} />
+            <AppButton label="Confirm" onPress={handleConfirm} style={{ marginTop: 4 }} />
           </View>
         </View>
       )}
@@ -126,13 +119,9 @@ export function LocationVerifier({ onVerified, onSkip, compact }: Props) {
           <Text style={styles.subtitle}>{errorMsg}. Please enable location access in your device settings to verify your location.</Text>
           <View style={styles.btnRow}>
             {onSkip && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={onSkip}>
-                <Text style={styles.secondaryBtnText}>Skip for now</Text>
-              </TouchableOpacity>
+              <AppButton label="Skip for now" onPress={onSkip} variant="outline" style={{ marginTop: 4 }} />
             )}
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleDetect}>
-              <Text style={styles.primaryBtnText}>Try Again</Text>
-            </TouchableOpacity>
+            <AppButton label="Try Again" onPress={handleDetect} style={{ marginTop: 4 }} />
           </View>
         </View>
       )}
@@ -146,16 +135,9 @@ export function LocationVerifier({ onVerified, onSkip, compact }: Props) {
           </Text>
           <View style={styles.btnRow}>
             {onSkip && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={onSkip}>
-                <Text style={styles.secondaryBtnText}>Continue without location</Text>
-              </TouchableOpacity>
+              <AppButton label="Continue without location" onPress={onSkip} variant="outline" style={{ marginTop: 4 }} />
             )}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => (Platform.OS === "web" ? handleDetect() : Linking.openSettings())}
-            >
-              <Text style={styles.primaryBtnText}>{Platform.OS === "web" ? "Try Again" : "Open Settings"}</Text>
-            </TouchableOpacity>
+            <AppButton label={Platform.OS === "web" ? "Try Again" : "Open Settings"} onPress={() => (Platform.OS === "web" ? handleDetect() : Linking.openSettings())} style={{ marginTop: 4 }} />
           </View>
         </View>
       )}
@@ -174,12 +156,6 @@ function makeStyles(c: AppColors) {
     title: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     subtitle: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
     resultText: { fontSize: 15, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    primaryBtn: { backgroundColor: c.accentGreen, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
-    primaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryBtn: { borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginTop: 4 },
-    secondaryBtnText: { color: c.textMid, fontSize: 14, fontFamily: "Inter_600SemiBold" },
-    skipBtn: { paddingVertical: 6, marginTop: 2 },
-    skipBtnText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
   });
 }

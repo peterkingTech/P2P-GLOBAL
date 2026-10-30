@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useData, JournalReflection } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { AppButton } from "@/components/ui";
 
 // Reflection chain view — shows the FULL history (spec §15: never
 // overwrite). The original reflection and every later "Reflection Update"
@@ -59,7 +60,7 @@ export default function ReflectionChainScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Reflection</Text>
@@ -102,19 +103,12 @@ export default function ReflectionChainScreen() {
                 autoFocus
               />
               <View style={s.composerActionsRow}>
-                <TouchableOpacity style={s.composerCancelBtn} onPress={() => { setComposerOpen(false); setUpdateText(""); }}>
-                  <Text style={s.composerCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.composerSaveBtn, !updateText.trim() && s.composerSaveBtnDisabled]} onPress={handleAddUpdate} disabled={!updateText.trim() || saving}>
-                  {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.composerSaveText}>Save Update</Text>}
-                </TouchableOpacity>
+                <AppButton label="Cancel" onPress={() => { setComposerOpen(false); setUpdateText(""); }} variant="outline" style={{ flex: 1 }} />
+                <AppButton label="Save Update" onPress={handleAddUpdate} disabled={!updateText.trim() || saving} loading={saving} style={{ flex: 1 }} />
               </View>
             </View>
           ) : (
-            <TouchableOpacity style={s.reflectAgainBtn} onPress={() => setComposerOpen(true)}>
-              <Ionicons name="refresh" size={16} color={colors.primaryGreen} />
-              <Text style={s.reflectAgainBtnText}>Reflect Again</Text>
-            </TouchableOpacity>
+            <AppButton label="Reflect Again" onPress={() => setComposerOpen(true)} variant="outline" icon="refresh" style={{ marginTop: 4 }} />
           )}
         </ScrollView>
       )}
@@ -148,12 +142,6 @@ function makeStyles(c: AppColors) {
     entryDate: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2, marginBottom: 10 },
     entryContent: { fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 21 },
 
-    reflectAgainBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 13, marginTop: 4,
-    },
-    reflectAgainBtnText: { color: c.accentGreen, fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
     composerCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginTop: 4 },
     composerLabel: { fontSize: 13, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", marginBottom: 10 },
     composerInput: {
@@ -161,10 +149,7 @@ function makeStyles(c: AppColors) {
       padding: 12, minHeight: 100, textAlignVertical: "top", fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular",
     },
     composerActionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
-    composerCancelBtn: { flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
     composerCancelText: { color: c.textMid, fontSize: 13, fontFamily: "Inter_600SemiBold" },
-    composerSaveBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    composerSaveBtnDisabled: { opacity: 0.5 },
     composerSaveText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

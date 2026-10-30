@@ -62,7 +62,7 @@ function FruitCard({
 
   if (fruit.isHidden && !earned) {
     return (
-      <TouchableOpacity style={[styles.card, styles.cardHidden]} activeOpacity={0.85} onPress={onPress}>
+      <TouchableOpacity accessibilityRole="button" style={[styles.card, styles.cardHidden]} activeOpacity={0.85} onPress={onPress}>
         <View style={[styles.iconWrap, { backgroundColor: "rgba(255,255,255,0.03)" }]}>
           <Text style={styles.hiddenMark}>?</Text>
         </View>
@@ -74,7 +74,7 @@ function FruitCard({
 
   if (earned) {
     return (
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[styles.card, styles.cardEarned, { shadowColor: dark.greenGlow, borderColor: "rgba(47,190,143,0.4)" }]}
         activeOpacity={0.85}
         onPress={onPress}
@@ -96,7 +96,7 @@ function FruitCard({
   }
 
   return (
-    <TouchableOpacity style={[styles.card, styles.cardLocked]} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={[styles.card, styles.cardLocked]} activeOpacity={0.85} onPress={onPress}>
       <View style={[styles.iconWrap, { backgroundColor: "rgba(255,255,255,0.04)", opacity: 0.4 }]}>
         <Text style={[styles.iconText, { opacity: 0.5 }]}>{fruit.icon}</Text>
       </View>
@@ -130,7 +130,7 @@ export default function FruitScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={dark.cream} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Fruits</Text>

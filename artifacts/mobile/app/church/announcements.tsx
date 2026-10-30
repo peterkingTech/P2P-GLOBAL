@@ -7,6 +7,7 @@ import { useData, ChurchAnnouncement, ChurchAnnouncementType } from "@/contexts/
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
   general: "General", bible_study: "Bible Study", discipleship: "Discipleship", prayer: "Prayer",
   learning_goal: "Learning Goal", study_plan: "Study Plan", event: "Event", important: "Important",
@@ -61,20 +62,17 @@ export default function ChurchAnnouncementsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Announcements</Text>
         {isChurchLeader ? (
-          <TouchableOpacity onPress={() => router.push("/church/settings/announcements" as any)}>
+          <TouchableOpacity accessibilityLabel="Settings" accessibilityRole="button" hitSlop={10} onPress={() => router.push("/church/settings/announcements" as any)}>
             <Ionicons name="settings-outline" size={20} color={colors.textDark} />
           </TouchableOpacity>
         ) : <View style={{ width: 22 }} />}
       </View>
 
       {isChurchLeader && (
-        <TouchableOpacity style={styles.createBtn} onPress={() => setComposerOpen(true)}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={styles.createBtnText}>New Announcement</Text>
-        </TouchableOpacity>
+        <AppButton label="New Announcement" onPress={() => setComposerOpen(true)} icon="add" style={{ marginHorizontal: 16 }} palette="fixedLight" />
       )}
 
       {loading ? (
@@ -117,12 +115,8 @@ export default function ChurchAnnouncementsScreen() {
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
             <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setComposerOpen(false)}>
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalPostBtn} onPress={handlePost} disabled={posting || !title.trim() || !body.trim()}>
-                {posting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalPostBtnText}>Post</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setComposerOpen(false)} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Post" onPress={handlePost} disabled={posting || !title.trim() || !body.trim()} loading={posting} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -136,11 +130,6 @@ const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 12 },
   title: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  createBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, borderRadius: 10, height: 42, marginHorizontal: 16,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
   card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14 },
   cardPinned: { borderColor: colors.accentGreen, borderWidth: 1.5 },
@@ -165,8 +154,4 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 90, textAlignVertical: "top" },
   modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  modalCancelBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  modalPostBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  modalPostBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

@@ -6,6 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { getLearningOverview, SOURCE_LABEL, STATE_LABEL, needsAction, dueLabel, type LearningOverview, type WorkItem } from "@/lib/learningCentreApi";
+import { AppButton } from "@/components/ui";
 
 // Learning Centre: my Comprehensive Checks from Kingdom School, Kingdom
 // Stories, Family Circle and Church in one place — what to do, what waits
@@ -68,7 +69,7 @@ export default function LearningCentreScreen() {
       {error ? (
         <View style={s.card}>
           <Text style={s.error} accessibilityRole="alert">{error}</Text>
-          <TouchableOpacity style={s.btnSecondary} onPress={load} accessibilityRole="button"><Text style={s.btnSecondaryText}>Try again</Text></TouchableOpacity>
+          <AppButton label="Try again" onPress={load} variant="secondary" />
         </View>
       ) : null}
       {!data && !error ? <ActivityIndicator style={{ marginTop: 24 }} color={c.accentGreen} /> : null}
@@ -86,15 +87,9 @@ export default function LearningCentreScreen() {
 
       {data ? (
         <View style={[s.row, { marginTop: 8 }]}>
-          <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-school" as any)} accessibilityRole="button">
-            <Text style={s.btnSecondaryText}>Kingdom School</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-stories" as any)} accessibilityRole="button">
-            <Text style={s.btnSecondaryText}>Kingdom Stories</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/my-discipleship/journal" as any)} accessibilityRole="button">
-            <Text style={s.btnSecondaryText}>My Journal</Text>
-          </TouchableOpacity>
+          <AppButton label="Kingdom School" onPress={() => router.push("/kingdom-school" as any)} variant="secondary" />
+          <AppButton label="Kingdom Stories" onPress={() => router.push("/kingdom-stories" as any)} variant="secondary" />
+          <AppButton label="My Journal" onPress={() => router.push("/my-discipleship/journal" as any)} variant="secondary" />
         </View>
       ) : null}
     </ScrollView>
@@ -119,7 +114,5 @@ function makeStyles(c: AppColors) {
     pillUrgent: { backgroundColor: "rgba(217,164,65,0.18)" },
     pillText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     pillTextUrgent: { color: c.textDark },
-    btnSecondary: { minHeight: 44, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, alignItems: "center", justifyContent: "center" },
-    btnSecondaryText: { color: c.textDark, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   });
 }

@@ -23,6 +23,7 @@ import { Banner, Chip, reviewTone } from "@/components/studio/StudioUI";
 import ChaptersEditor from "@/components/kingdom-stories/ChaptersEditor";
 import MediaDetailsEditor from "@/components/kingdom-stories/MediaDetailsEditor";
 import ImageSlots from "@/components/kingdom-stories/ImageSlots";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -256,13 +257,9 @@ export default function EditKingdomStoryScreen() {
           </View>
           <View style={styles.studioNoticeRow}>
             {canOpenStudio ? (
-              <TouchableOpacity style={styles.studioNoticeBtn} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Open Publishing Studio">
-                <Text style={styles.studioNoticeBtnText}>Open Publishing Studio</Text>
-              </TouchableOpacity>
+              <AppButton label="Open Publishing Studio" onPress={() => router.push("/admin/studio/review" as any)} accessibilityLabel="Open Publishing Studio" palette="fixedLight" />
             ) : null}
-            <TouchableOpacity style={styles.studioNoticeDismiss} onPress={() => setStudioNotice(null)} accessibilityRole="button" accessibilityLabel="Dismiss">
-              <Text style={styles.studioNoticeDismissText}>Dismiss</Text>
-            </TouchableOpacity>
+            <AppButton label="Dismiss" onPress={() => setStudioNotice(null)} variant="outline" accessibilityLabel="Dismiss" palette="fixedLight" />
           </View>
         </View>
       ) : null}
@@ -270,15 +267,9 @@ export default function EditKingdomStoryScreen() {
         <View style={[styles.statusPill, styles[`statusPill_${story.status}` as const]]}>
           <Text style={styles.statusPillText}>{story.status.toUpperCase()}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push(`/kingdom-stories/${story.id}` as any)} style={styles.previewBtn}>
-          <Ionicons name="eye-outline" size={14} color={colors.accentGreen} />
-          <Text style={styles.previewBtnText}>Preview as Peer</Text>
-        </TouchableOpacity>
+        <AppButton label="Preview as Peer" onPress={() => router.push(`/kingdom-stories/${story.id}` as any)} variant="secondary" size="sm" icon="eye-outline" palette="fixedLight" />
         {story.status !== "published" && !!story.chapters?.length && (
-          <TouchableOpacity onPress={handlePrepareActivities} style={styles.previewBtn} accessibilityRole="button" accessibilityLabel="Prepare reflections and Comprehensive Checks">
-            <Ionicons name="school-outline" size={14} color={colors.accentGreen} />
-            <Text style={styles.previewBtnText}>Prepare activities</Text>
-          </TouchableOpacity>
+          <AppButton label="Prepare activities" onPress={handlePrepareActivities} variant="secondary" size="sm" icon="school-outline" accessibilityLabel="Prepare reflections and Comprehensive Checks" palette="fixedLight" />
         )}
       </View>
       {!!story.topicId && (
@@ -304,7 +295,7 @@ export default function EditKingdomStoryScreen() {
       <Text style={styles.fieldLabel}>Category</Text>
       <View style={styles.chipGrid}>
         {categories.map((cat) => (
-          <TouchableOpacity key={cat.id} style={[styles.chip, story.categoryId === cat.id && styles.chipActive]} onPress={() => saveField({ categoryId: cat.id })}>
+          <TouchableOpacity accessibilityRole="button" key={cat.id} style={[styles.chip, story.categoryId === cat.id && styles.chipActive]} onPress={() => saveField({ categoryId: cat.id })}>
             <Text style={[styles.chipText, story.categoryId === cat.id && styles.chipTextActive]}>{cat.title}</Text>
           </TouchableOpacity>
         ))}
@@ -313,7 +304,7 @@ export default function EditKingdomStoryScreen() {
       <Text style={styles.fieldLabel}>Content Type</Text>
       <View style={styles.chipGrid}>
         {CONTENT_TYPES.map((ct) => (
-          <TouchableOpacity key={ct} style={[styles.chip, story.contentType === ct && styles.chipActive]} onPress={() => saveField({ contentType: story.contentType === ct ? null : ct })}>
+          <TouchableOpacity accessibilityRole="button" key={ct} style={[styles.chip, story.contentType === ct && styles.chipActive]} onPress={() => saveField({ contentType: story.contentType === ct ? null : ct })}>
             <Text style={[styles.chipText, story.contentType === ct && styles.chipTextActive]}>{CONTENT_TYPE_LABELS[ct]}</Text>
           </TouchableOpacity>
         ))}
@@ -355,7 +346,7 @@ export default function EditKingdomStoryScreen() {
       {scriptureDisplay && <Text style={styles.attachedScripture}>Attached: {scriptureDisplay}</Text>}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <TextInput style={[styles.input, { flex: 1 }]} value={scriptureInput} onChangeText={setScriptureInput} placeholder="e.g. Habakkuk 2:14" placeholderTextColor={colors.textMuted} />
-        <TouchableOpacity style={styles.smallBtn} onPress={handleAttachScripture}><Text style={styles.smallBtnText}>Attach</Text></TouchableOpacity>
+        <AppButton label="Attach" onPress={handleAttachScripture} palette="fixedLight" />
       </View>
       {story.contentType === "scripture_story" && !story.scriptureReferenceId && (
         <Text style={styles.warningText}>Scripture Stories need a Scripture reference before they can be published.</Text>
@@ -371,18 +362,15 @@ export default function EditKingdomStoryScreen() {
             {m.mediaType === "image" ? <MediaThumb path={m.mediaPath} /> : <View style={styles.mediaThumbPlaceholder}><Ionicons name="videocam" size={20} color={colors.accentGreen} /></View>}
             {m.isCover && <View style={styles.coverBadge}><Text style={styles.coverBadgeText}>COVER</Text></View>}
             <View style={styles.mediaActions}>
-              {!m.isCover && <TouchableOpacity onPress={() => handleSetCover(m.id)}><Text style={styles.mediaActionText}>Set Cover</Text></TouchableOpacity>}
-              <TouchableOpacity onPress={() => handleDeleteMedia(m.id)}><Ionicons name="trash-outline" size={14} color="#B91C1C" /></TouchableOpacity>
+              {!m.isCover && <TouchableOpacity accessibilityRole="button" onPress={() => handleSetCover(m.id)}><Text style={styles.mediaActionText}>Set Cover</Text></TouchableOpacity>}
+              <TouchableOpacity accessibilityLabel="Delete" accessibilityRole="button" hitSlop={10} onPress={() => handleDeleteMedia(m.id)}><Ionicons name="trash-outline" size={14} color="#B91C1C" /></TouchableOpacity>
             </View>
           </View>
         ))}
       </View>
       <MediaDetailsEditor story={story} locked={story.status === "published"} onChanged={load} onError={(title, e) => reportError(title, e)} />
       <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
-        <TouchableOpacity style={styles.addMediaBtn} onPress={handlePickPhoto} disabled={saving}>
-          <Ionicons name="image-outline" size={16} color={colors.accentGreen} />
-          <Text style={styles.addMediaBtnText}>Add Photo</Text>
-        </TouchableOpacity>
+        <AppButton label="Add Photo" onPress={handlePickPhoto} variant="outline" icon="image-outline" disabled={saving} palette="fixedLight" />
         <VideoRecorder disabled={saving} onSubmit={handleAddVideo} />
       </View>
 
@@ -393,12 +381,12 @@ export default function EditKingdomStoryScreen() {
             <Text style={styles.sourceTitle}>{s.title}</Text>
             {!!s.publisher && <Text style={styles.sourceMeta}>{s.publisher}</Text>}
           </View>
-          <TouchableOpacity onPress={() => handleDeleteSource(s.id)}><Ionicons name="trash-outline" size={14} color="#B91C1C" /></TouchableOpacity>
+          <TouchableOpacity accessibilityLabel="Delete" accessibilityRole="button" hitSlop={10} onPress={() => handleDeleteSource(s.id)}><Ionicons name="trash-outline" size={14} color="#B91C1C" /></TouchableOpacity>
         </View>
       ))}
       <TextInput style={styles.input} value={sourceTitle} onChangeText={setSourceTitle} placeholder="Source title" placeholderTextColor={colors.textMuted} />
       <TextInput style={styles.input} value={sourcePublisher} onChangeText={setSourcePublisher} placeholder="Publisher (optional)" placeholderTextColor={colors.textMuted} />
-      <TouchableOpacity style={styles.smallBtn} onPress={handleAddSource}><Text style={styles.smallBtnText}>Add Source</Text></TouchableOpacity>
+      <AppButton label="Add Source" onPress={handleAddSource} palette="fixedLight" />
 
       <Text style={styles.sectionHeading}>Lifecycle</Text>
       {(story.status === "draft" || story.status === "review") && studioItem ? (
@@ -414,14 +402,12 @@ export default function EditKingdomStoryScreen() {
         </View>
       ) : null}
       {(story.status === "draft" || story.status === "review") && !studioItem && canOpenStudio ? (
-        <TouchableOpacity style={[styles.lifecycleBtn, styles.publishBtn, { alignSelf: "flex-start", marginBottom: 8 }]} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Submit, approve and publish in the Publishing Studio">
-          <Text style={styles.publishBtnText}>Submit, approve and publish in the Publishing Studio</Text>
-        </TouchableOpacity>
+        <AppButton label="Submit, approve and publish in the Publishing Studio" onPress={() => router.push("/admin/studio/review" as any)} accessibilityLabel="Submit, approve and publish in the Publishing Studio" style={{ alignSelf: "flex-start", marginBottom: 8 }} palette="fixedLight" />
       ) : null}
       <View style={styles.lifecycleRow}>
-        {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")} accessibilityRole="button" accessibilityLabel="Unpublish to edit"><Text style={styles.lifecycleBtnText}>Unpublish to edit</Text></TouchableOpacity>}
-        {story.status === "published" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("archived")}><Text style={styles.lifecycleBtnText}>Archive</Text></TouchableOpacity>}
-        {story.status === "archived" && <TouchableOpacity style={styles.lifecycleBtn} onPress={() => handleStatusChange("draft")}><Text style={styles.lifecycleBtnText}>Restore to Draft</Text></TouchableOpacity>}
+        {story.status === "published" && <AppButton label="Unpublish to edit" onPress={() => handleStatusChange("draft")} variant="outline" accessibilityLabel="Unpublish to edit" palette="fixedLight" />}
+        {story.status === "published" && <AppButton label="Archive" onPress={() => handleStatusChange("archived")} variant="outline" palette="fixedLight" />}
+        {story.status === "archived" && <AppButton label="Restore to Draft" onPress={() => handleStatusChange("draft")} variant="outline" palette="fixedLight" />}
       </View>
       {studioNotice?.where === "lifecycle" ? (
         <View style={[styles.studioNotice, { marginTop: 10 }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
@@ -431,13 +417,9 @@ export default function EditKingdomStoryScreen() {
           </View>
           <View style={styles.studioNoticeRow}>
             {canOpenStudio ? (
-              <TouchableOpacity style={styles.studioNoticeBtn} onPress={() => router.push("/admin/studio/review" as any)} accessibilityRole="button" accessibilityLabel="Open Publishing Studio">
-                <Text style={styles.studioNoticeBtnText}>Open Publishing Studio</Text>
-              </TouchableOpacity>
+              <AppButton label="Open Publishing Studio" onPress={() => router.push("/admin/studio/review" as any)} accessibilityLabel="Open Publishing Studio" palette="fixedLight" />
             ) : null}
-            <TouchableOpacity style={styles.studioNoticeDismiss} onPress={() => setStudioNotice(null)} accessibilityRole="button" accessibilityLabel="Dismiss">
-              <Text style={styles.studioNoticeDismissText}>Dismiss</Text>
-            </TouchableOpacity>
+            <AppButton label="Dismiss" onPress={() => setStudioNotice(null)} variant="outline" accessibilityLabel="Dismiss" palette="fixedLight" />
           </View>
         </View>
       ) : null}
@@ -448,9 +430,7 @@ export default function EditKingdomStoryScreen() {
             ? <Text style={styles.lifecycleHint}>This story is live, so its text, media and sources are locked. Unpublish it to make changes, then get it approved again.</Text>
             : null}
       </View>
-      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-        <Text style={styles.deleteBtnText}>Delete Story</Text>
-      </TouchableOpacity>
+      <AppButton label="Delete Story" onPress={handleDelete} variant="destructive" style={{ marginTop: 24 }} palette="fixedLight" />
       {saving && <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 10 }} />}
     </ScrollView>
   );

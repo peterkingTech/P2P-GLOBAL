@@ -10,6 +10,7 @@ import SettingsSubHeader from "@/components/SettingsSubHeader";
 import DateOfBirthInput from "@/components/DateOfBirthInput";
 import { authedFetch } from "@/lib/adminFetch";
 import { isValidCalendarDate, parseDMY } from "@/lib/dateOfBirth";
+import { AppButton } from "@/components/ui";
 
 // Settings → Account → Account status. Stage 1: shows the status and lets the
 // user take a reversible break. Everything is decided by the server
@@ -143,13 +144,7 @@ export default function AccountStatusScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, (!choice || saving) && styles.primaryBtnDisabled]}
-            onPress={confirmBreak}
-            disabled={!choice || saving}
-          >
-            {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Take a break</Text>}
-          </TouchableOpacity>
+          <AppButton label="Take a break" onPress={confirmBreak} disabled={!choice || saving} loading={saving} style={{ marginTop: 8 }} />
         </View>
 
         {/* Kept separate from "Take a break": deletion is permanent. */}
@@ -159,7 +154,7 @@ export default function AccountStatusScreen() {
             Permanently removes your account and your journey after a 14-day period in which you can
             change your mind. This can't be undone once it's carried out.
           </Text>
-          <TouchableOpacity style={styles.deleteLink} onPress={() => router.push("/settings/delete-account" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.deleteLink} onPress={() => router.push("/settings/delete-account" as any)}>
             <Text style={styles.deleteLinkText}>Delete my account…</Text>
           </TouchableOpacity>
         </View>
@@ -197,13 +192,7 @@ function makeStyles(c: AppColors) {
       borderRadius: 10, padding: 12, color: c.textDark, fontSize: 14,
       fontFamily: "Inter_400Regular", marginBottom: 6,
     },
-    primaryBtn: {
-      backgroundColor: c.accentGreen, borderRadius: 12, minHeight: 46, marginTop: 8,
-      alignItems: "center", justifyContent: "center", paddingHorizontal: 16,
-    },
-    primaryBtnDisabled: { opacity: 0.5 },
     deleteLink: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: "#B91C1C", alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
     deleteLinkText: { color: "#B91C1C", fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "center" },
-    primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "center" },
   });
 }

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface ConversationRow {
   id: string;
@@ -99,7 +100,7 @@ export default function MessagesScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
@@ -116,9 +117,7 @@ export default function MessagesScreen() {
           <Ionicons name="warning-outline" size={40} color={colors.textMuted} />
           <Text style={styles.emptyText}>Couldn't load conversations.</Text>
           <Text style={styles.emptySub}>{loadError}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.85}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
+          <AppButton label="Retry" onPress={() => load()} style={{ marginTop: 14 }} palette="fixedLight" />
         </View>
       ) : rows.length === 0 ? (
         <View style={styles.centerFill}>
@@ -132,7 +131,7 @@ export default function MessagesScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: 8 }}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.row}
               activeOpacity={0.8}
               onPress={() => router.push(`/messages/${item.id}` as any)}
@@ -167,8 +166,6 @@ const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 40 },
   emptyText: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   emptySub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular" },
-  retryBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.accentGreen },
-  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 20, paddingVertical: 14,

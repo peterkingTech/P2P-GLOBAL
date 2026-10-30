@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchCohort } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const STATUS_COLORS: Record<string, string> = {
   forming: "#D97706", active: colors.accentGreen, completed: colors.primaryGreen, archived: colors.textMuted,
@@ -30,16 +31,13 @@ export default function ChurchCohortsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Cohorts ({cohorts.length})</Text>
         <View style={{ width: 22 }} />
       </View>
 
       {isChurchLeader && (
-        <TouchableOpacity style={styles.createBtn} onPress={() => router.push("/church/create-cohort" as any)}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={styles.createBtnText}>Create New Small Group</Text>
-        </TouchableOpacity>
+        <AppButton label="Create New Small Group" onPress={() => router.push("/church/create-cohort" as any)} icon="add" style={{ marginHorizontal: 16 }} palette="fixedLight" />
       )}
 
       {loading ? (
@@ -74,11 +72,6 @@ const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 12 },
   title: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  createBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, borderRadius: 10, height: 42, marginHorizontal: 16,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
   card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14, gap: 4 },
   cohortName: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },

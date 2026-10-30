@@ -41,6 +41,7 @@ import { Avatar } from "@/components/Avatar";
 import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
 import { GetStartedCard } from "@/components/GetStartedCard";
 import ReadableText from "@/components/ReadableText";
+import { AppButton } from "@/components/ui";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -225,7 +226,7 @@ function RecommendedCard({ rec, onStart, onDismiss, colors, t }: {
 function ElijahCheckInCard({ onPress, colors }: { onPress: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.elijahIconWrap}>
         <Ionicons name="leaf-outline" size={20} color={colors.amber} />
       </View>
@@ -244,7 +245,7 @@ function ElijahCheckInCard({ onPress, colors }: { onPress: () => void; colors: a
 function PeerGuideAlertCard({ count, onPress, colors }: { count: number; onPress: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.elijahIconWrap}>
         <Text style={{ fontSize: 16 }}>📞</Text>
       </View>
@@ -260,7 +261,7 @@ function PeerGuideAlertCard({ count, onPress, colors }: { count: number; onPress
 function UnreadMessagesCard({ count, preview, onPress, colors }: { count: number; preview: string | null; onPress: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.elijahIconWrap}>
         <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accentGreen} />
       </View>
@@ -277,14 +278,12 @@ function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void
   const styles = makeStyles(colors);
   return (
     <View style={styles.guideInviteCard}>
-      <TouchableOpacity style={styles.recDismissBtn} onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={styles.recDismissBtn} onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
       </TouchableOpacity>
       <Text style={styles.guideInviteTitle}>Someone is waiting for a guide like you.</Text>
       <Text style={styles.guideInviteSub}>Ready to meet them?</Text>
-      <TouchableOpacity style={styles.guideInviteBtn} onPress={onFind} activeOpacity={0.85}>
-        <Text style={styles.guideInviteBtnText}>Find Someone to Guide</Text>
-      </TouchableOpacity>
+      <AppButton label="Find Someone to Guide" onPress={onFind} style={{ alignSelf: "flex-start", marginTop: 14 }} />
     </View>
   );
 }
@@ -295,7 +294,7 @@ function GroveHomeCard({ church, grove, memberCount, onPress, colors }: {
 }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.churchCardTopRow}>
         <Text style={{ fontSize: 20 }}>⛪</Text>
         <Text style={styles.churchCardName} numberOfLines={1}>{church.name}</Text>
@@ -322,7 +321,7 @@ function GroveHomeCard({ church, grove, memberCount, onPress, colors }: {
 function RegisterChurchPromptCard({ onPress, colors }: { onPress: () => void; colors: AppColors }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.churchCardTopRow}>
         <Text style={{ fontSize: 20 }}>⛪</Text>
         <Text style={styles.churchCardName}>Register your church</Text>
@@ -341,7 +340,7 @@ function MemberChurchCard({ church, announcement, onPress, colors }: {
 }) {
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity style={styles.churchCardCompact} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.churchCardCompact} activeOpacity={0.9} onPress={onPress}>
       <View style={styles.churchCardTopRow}>
         <Text style={{ fontSize: 16 }}>⛪</Text>
         <Text style={styles.churchCardNameCompact} numberOfLines={1}>{church.name}</Text>
@@ -834,7 +833,7 @@ export default function HomeTab() {
 
       {/* Evaluations waiting */}
       {pendingEvaluations.length > 0 && (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.evalCard}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

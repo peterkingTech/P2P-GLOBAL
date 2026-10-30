@@ -8,6 +8,7 @@ import { useData, ComposeUserSearchResult, ComposeDepartment, OfficialMailDraft 
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
   { value: "support_help", label: "Support & Help" },
   { value: "crisis_safeguarding", label: "Crisis & Safeguarding" },
@@ -138,7 +139,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
         <KeyboardAvoidingView style={[styles.sheet, sheetWidth]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{draftId && !sentOk ? "Compose (Draft)" : "Compose"}</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textDark} />
             </TouchableOpacity>
           </View>
@@ -148,12 +149,8 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
               <Ionicons name="checkmark-circle" size={44} color={colors.accentGreen} />
               <Text style={styles.confirmTitle}>Message sent</Text>
               <Text style={styles.confirmSub}>@{selectedUser.username} will see this in their Messages, clearly marked as coming from {fromIdentityForDepartment(department)}.</Text>
-              <TouchableOpacity style={styles.sendBtn} onPress={resetForm}>
-                <Text style={styles.sendBtnText}>Compose Another</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.linkBtn} onPress={onClose}>
-                <Text style={styles.linkBtnText}>Done</Text>
-              </TouchableOpacity>
+              <AppButton label="Compose Another" onPress={resetForm} style={{ marginTop: 4 }} palette="fixedLight" />
+              <AppButton label="Done" onPress={onClose} variant="tertiary" style={{ marginTop: 6 }} palette="fixedLight" />
             </View>
           ) : (
             <FlatList
@@ -185,7 +182,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                           <Text style={styles.selectedUserName}>{selectedUser.fullName ?? "—"}</Text>
                           {selectedUser.email && <Text style={styles.selectedUserEmail}>{selectedUser.email}</Text>}
                         </View>
-                        <TouchableOpacity onPress={() => setSelectedUser(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={() => setSelectedUser(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                           <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                         </TouchableOpacity>
                       </View>
@@ -204,7 +201,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                           {searching && <ActivityIndicator size="small" color={colors.accentGreen} />}
                         </View>
                         {results.map((item) => (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={item.userId}
                             style={styles.resultRow}
                             onPress={() => { setSelectedUser(item); setQuery(""); setResults([]); }}
@@ -226,7 +223,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
 
                   <View style={styles.section}>
                     <Text style={styles.sectionLabel}>DEPARTMENT</Text>
-                    <TouchableOpacity style={styles.deptSelector} onPress={() => setShowDeptPicker((v) => !v)}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.deptSelector} onPress={() => setShowDeptPicker((v) => !v)}>
                       <Text style={department ? styles.deptSelectorText : styles.deptSelectorPlaceholder}>
                         {department ? DEPARTMENT_OPTIONS.find((d) => d.value === department)?.label : "Select department"}
                       </Text>
@@ -235,7 +232,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                     {showDeptPicker && (
                       <View style={styles.deptOptionsBox}>
                         {DEPARTMENT_OPTIONS.map((opt) => (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={opt.value}
                             style={styles.deptOptionRow}
                             onPress={() => { setDepartment(opt.value); setShowDeptPicker(false); }}
@@ -277,7 +274,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
 
                   {sendError && <Text style={styles.errorText}>{sendError}</Text>}
 
-                  <TouchableOpacity style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]} disabled={!canSend} onPress={handleSend}>
+                  <TouchableOpacity accessibilityRole="button" style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]} disabled={!canSend} onPress={handleSend}>
                     {sending ? (
                       <View style={styles.sendingRow}>
                         <ActivityIndicator color="#fff" size="small" />
@@ -362,6 +359,4 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.5 },
   sendBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   sendingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  linkBtn: { marginTop: 6, padding: 8 },
-  linkBtnText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 });

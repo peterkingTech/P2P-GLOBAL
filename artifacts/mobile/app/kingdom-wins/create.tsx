@@ -14,6 +14,7 @@ import {
 } from "@/lib/kingdomWinsApi";
 import { WINS_COMMUNITY_RULES, WINS_RULES_NOTE, postingStatusMessage, shareOutcome } from "@/lib/winsModerationModel";
 import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -141,7 +142,7 @@ export default function CreateKingdomWinScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Share Your Story</Text>
@@ -150,15 +151,15 @@ export default function CreateKingdomWinScreen() {
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40 }}>
         <View style={styles.typeRow}>
-          <TouchableOpacity style={[styles.typeBtn, entryType === "kingdom_win" && styles.typeBtnActive]} onPress={() => setEntryType("kingdom_win")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.typeBtn, entryType === "kingdom_win" && styles.typeBtnActive]} onPress={() => setEntryType("kingdom_win")}>
             <Text style={[styles.typeBtnText, entryType === "kingdom_win" && styles.typeBtnTextActive]}>Kingdom Win</Text>
             <Text style={[styles.typeBtnHint, entryType === "kingdom_win" && styles.typeBtnHintActive]}>A shorter celebration</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.typeBtn, entryType === "testimony" && styles.typeBtnActive]} onPress={() => setEntryType("testimony")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.typeBtn, entryType === "testimony" && styles.typeBtnActive]} onPress={() => setEntryType("testimony")}>
             <Text style={[styles.typeBtnText, entryType === "testimony" && styles.typeBtnTextActive]}>Testimony</Text>
             <Text style={[styles.typeBtnHint, entryType === "testimony" && styles.typeBtnHintActive]}>A longer, deeper story</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.typeBtn, entryType === "p2p_impact" && styles.typeBtnActive]} onPress={() => setEntryType("p2p_impact")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.typeBtn, entryType === "p2p_impact" && styles.typeBtnActive]} onPress={() => setEntryType("p2p_impact")}>
             <Text style={[styles.typeBtnText, entryType === "p2p_impact" && styles.typeBtnTextActive]}>P2P Impact</Text>
             <Text style={[styles.typeBtnHint, entryType === "p2p_impact" && styles.typeBtnHintActive]}>A guided, reviewed story</Text>
           </TouchableOpacity>
@@ -184,7 +185,7 @@ export default function CreateKingdomWinScreen() {
             <Text style={styles.fieldLabel}>Impact Themes (optional)</Text>
             <View style={styles.categoryGrid}>
               {IMPACT_THEMES.map((theme) => (
-                <TouchableOpacity key={theme} style={[styles.categoryChip, impactThemes.includes(theme) && styles.categoryChipActive]} onPress={() => toggleTheme(theme)}>
+                <TouchableOpacity accessibilityRole="button" key={theme} style={[styles.categoryChip, impactThemes.includes(theme) && styles.categoryChipActive]} onPress={() => toggleTheme(theme)}>
                   <Text style={[styles.categoryChipText, impactThemes.includes(theme) && styles.categoryChipTextActive]}>{IMPACT_THEME_LABELS[theme]}</Text>
                 </TouchableOpacity>
               ))}
@@ -209,7 +210,7 @@ export default function CreateKingdomWinScreen() {
         <Text style={styles.fieldLabel}>Category</Text>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat} style={[styles.categoryChip, category === cat && styles.categoryChipActive]} onPress={() => setCategory(cat)}>
+            <TouchableOpacity accessibilityRole="button" key={cat} style={[styles.categoryChip, category === cat && styles.categoryChipActive]} onPress={() => setCategory(cat)}>
               <Text style={[styles.categoryChipText, category === cat && styles.categoryChipTextActive]}>{KINGDOM_CATEGORY_LABELS[cat]}</Text>
             </TouchableOpacity>
           ))}
@@ -219,7 +220,7 @@ export default function CreateKingdomWinScreen() {
         {photoAsset ? (
           <View style={styles.photoPreviewBox}>
             <Image source={{ uri: photoAsset.uri }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
               <Ionicons name="close-circle" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -227,16 +228,13 @@ export default function CreateKingdomWinScreen() {
           <View style={styles.videoChosenBox}>
             <Ionicons name="videocam" size={16} color={c.accentGreen} />
             <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
               <Ionicons name="close-circle" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <TouchableOpacity style={styles.addPhotoBtn} onPress={handlePickPhoto} disabled={submitting}>
-              <Ionicons name="image-outline" size={18} color={c.accentGreen} />
-              <Text style={styles.addPhotoBtnText}>Add Photo</Text>
-            </TouchableOpacity>
+            <AppButton label="Add Photo" onPress={handlePickPhoto} variant="outline" icon="image-outline" disabled={submitting} style={{ marginBottom: 10 }} />
             <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
           </>
         )}
@@ -250,7 +248,7 @@ export default function CreateKingdomWinScreen() {
         </View>
 
         {isImpact && (
-          <TouchableOpacity style={styles.consentRow} onPress={() => setConsentConfirmed((v) => !v)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.consentRow} onPress={() => setConsentConfirmed((v) => !v)}>
             <Ionicons name={consentConfirmed ? "checkbox" : "square-outline"} size={20} color={consentConfirmed ? c.accentGreen : c.textMuted} />
             <Text style={styles.consentText}>
               I confirm this story is true, I have permission to share anyone pictured or named here, and I'm ready for it to be reviewed and shared with the global P2P community — not for my own recognition, but so God gets the glory.
@@ -277,9 +275,7 @@ export default function CreateKingdomWinScreen() {
         ) : null}
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.draftBtn} onPress={() => handleSubmit("draft")} disabled={submitting || !title.trim() || !hasContent}>
-            <Text style={styles.draftBtnText}>Save Draft</Text>
-          </TouchableOpacity>
+          <AppButton label="Save Draft" onPress={() => handleSubmit("draft")} variant="outline" disabled={submitting || !title.trim() || !hasContent} style={{ flex: 1 }} />
           <TouchableOpacity
             style={[styles.publishBtn, !!restrictedNotice && { opacity: 0.5 }]}
             onPress={() => handleSubmit(isImpact ? "submitted" : "published")}
@@ -316,8 +312,6 @@ function makeStyles(c: AppColors) {
     categoryChipActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
     categoryChipText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
     categoryChipTextActive: { color: "#fff", fontFamily: "Inter_600SemiBold" },
-    addPhotoBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.accentGreen, borderStyle: "dashed", borderRadius: 12, paddingVertical: 14, marginBottom: 10 },
-    addPhotoBtnText: { fontSize: 14, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     photoPreviewBox: { borderRadius: 12, overflow: "hidden", position: "relative" },
     photoPreview: { width: "100%", height: 180, borderRadius: 12, backgroundColor: c.borderBeige },
     removeMediaBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 12 },
@@ -335,8 +329,6 @@ function makeStyles(c: AppColors) {
     restrictedBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: "#FFF4E0", borderWidth: 1, borderColor: "#F0C987" },
     restrictedText: { flex: 1, fontSize: 12, color: "#8A5410", fontFamily: "Inter_500Medium", lineHeight: 17 },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 24 },
-    draftBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    draftBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     publishBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
     publishBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });

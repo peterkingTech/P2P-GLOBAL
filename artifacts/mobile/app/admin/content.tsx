@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export default function ContentManager() {
       {/* Sub-tab bar */}
       <View style={s.subTabBar}>
         {(["curriculum", "prayer"] as ContentTab[]).map((t) => (
-          <TouchableOpacity key={t} style={[s.subTab, tab === t && s.subTabActive]} onPress={() => setTab(t)}>
+          <TouchableOpacity accessibilityRole="button" key={t} style={[s.subTab, tab === t && s.subTabActive]} onPress={() => setTab(t)}>
             <Text style={[s.subTabText, tab === t && s.subTabTextActive]}>
               {t === "curriculum" ? "Curriculum & Plans" : "Prayer & Testimonies"}
             </Text>
@@ -65,10 +66,7 @@ function CurriculumSection({ router }: { router: any }) {
       <Ionicons name="book-outline" size={48} color={colors.accentGreen} />
       <Text style={s.centeredTitle}>Curriculum Manager</Text>
       <Text style={s.centeredSub}>Create and edit the core curriculum and Plans — modules, lessons, and translations. Use the Curriculum/Plans toggle inside.</Text>
-      <TouchableOpacity style={s.bigBtn} onPress={() => router.push("/admin/curriculum")}>
-        <Ionicons name="arrow-forward-circle" size={20} color="#fff" />
-        <Text style={s.bigBtnText}>Open Curriculum Manager</Text>
-      </TouchableOpacity>
+      <AppButton label="Open Curriculum Manager" onPress={() => router.push("/admin/curriculum")} icon="arrow-forward-circle" style={{ marginTop: 8 }} palette="fixedLight" />
     </View>
   );
 }
@@ -111,14 +109,14 @@ function PrayerSection() {
     <View style={s.sectionRoot}>
       <View style={s.sectionHeader}>
         <Text style={s.sectionTitle}>Prayer & Testimonies</Text>
-        <TouchableOpacity onPress={loadPosts} style={s.iconBtn}>
+        <TouchableOpacity accessibilityLabel="Refresh" accessibilityRole="button" hitSlop={10} onPress={loadPosts} style={s.iconBtn}>
           <Ionicons name="refresh-outline" size={20} color={colors.accentGreen} />
         </TouchableOpacity>
       </View>
 
       <View style={s.filterRow}>
         {(["all", "request", "testimony"] as const).map(f => (
-          <TouchableOpacity key={f} style={[s.filterBtn, filter === f && s.filterBtnActive]} onPress={() => setFilter(f)}>
+          <TouchableOpacity accessibilityRole="button" key={f} style={[s.filterBtn, filter === f && s.filterBtnActive]} onPress={() => setFilter(f)}>
             <Text style={[s.filterBtnText, filter === f && s.filterBtnTextActive]}>{f === "all" ? "All" : f === "request" ? "Requests" : "Testimonies"}</Text>
           </TouchableOpacity>
         ))}
@@ -143,7 +141,7 @@ function PrayerSection() {
                 </View>
                 <Text style={s.prayerDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
                 <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={() => removePost(item)} style={s.iconBtn}>
+                <TouchableOpacity accessibilityLabel="Delete" accessibilityRole="button" hitSlop={10} onPress={() => removePost(item)} style={s.iconBtn}>
                   <Ionicons name="trash-outline" size={18} color="#E53E3E" />
                 </TouchableOpacity>
               </View>
@@ -170,15 +168,10 @@ const s = StyleSheet.create({
   centeredSection: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
   centeredTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
   centeredSub: { fontSize: 13, color: colors.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", lineHeight: 20 },
-  bigBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.primaryGreen, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 14, marginTop: 8 },
-  bigBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 
   sectionRoot: { flex: 1 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  addBtnText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 },
   emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
@@ -196,7 +189,6 @@ const s = StyleSheet.create({
   iconBtn: { padding: 4 },
 
   planDetailHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: colors.borderBeige, gap: 8 },
-  backBtn: { padding: 4 },
   planDetailTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", flex: 1 },
 
   innerTabBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: colors.borderBeige, maxHeight: 44 },
@@ -205,9 +197,6 @@ const s = StyleSheet.create({
   innerTabActive: { borderBottomColor: colors.accentGreen },
   innerTabText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   innerTabTextActive: { color: colors.accentGreen, fontFamily: "Inter_700Bold" },
-
-  saveInfoBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 16 },
-  saveInfoBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 
   rowCard: { backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige, padding: 12, marginBottom: 10, flexDirection: "row", alignItems: "flex-start", gap: 8 },
   rowCardTitle: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
@@ -221,14 +210,10 @@ const s = StyleSheet.create({
   lessonCode: { fontSize: 10, fontWeight: "700", color: colors.amber, fontFamily: "Inter_700Bold", marginBottom: 1 },
   lessonTitle: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
 
-  addLessonBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, paddingHorizontal: 4, marginTop: 4 },
-  addLessonBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
-
   qRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#f9f9f6", borderRadius: 8, padding: 10, marginBottom: 6 },
   qText: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", lineHeight: 19 },
   addQRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginTop: 6 },
   addQInput: { flex: 1, backgroundColor: "#fff", borderRadius: 8, borderWidth: 1, borderColor: colors.borderBeige, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", minHeight: 44 },
-  addQBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
 
   filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   filterBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: "#fff" },
@@ -246,9 +231,7 @@ const s = StyleSheet.create({
 const ms = StyleSheet.create({
   modalRoot: { flex: 1, backgroundColor: colors.lightCream },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige, backgroundColor: "#fff" },
-  modalCloseBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   modalTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
-  modalSaveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   modalSaveText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
   modalBody: { padding: 16, paddingBottom: 60 },
   fieldWrap: { marginBottom: 16 },

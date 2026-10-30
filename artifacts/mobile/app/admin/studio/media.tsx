@@ -7,6 +7,7 @@ import { useStudioQuery } from "@/components/studio/useStudioQuery";
 import { Banner, Chip, Pager, Pill, StateView, nativeTone, studioStyles as ss } from "@/components/studio/StudioUI";
 import { getMedia } from "@/lib/studioApi";
 import { NATIVE_STATUS_LABELS, deviceTimeZone, formatInZone } from "@/lib/studioModel";
+import { AppButton } from "@/components/ui";
 
 // Media Library: every image and video attached to a Kingdom Story, with
 // the story it belongs to. Files live in a private storage bucket; uploading,
@@ -51,9 +52,7 @@ export default function StudioMedia() {
                 </View>
                 <Text style={ss.meta}>{m.storyTitle ?? "(story removed)"} · added {formatInZone(m.createdAt, tz)}</Text>
               </View>
-              <TouchableOpacity style={styles.open} onPress={() => router.push(`/admin/kingdom-stories/${m.sourceId}` as any)} accessibilityRole="button" accessibilityLabel={`Open story ${m.storyTitle ?? ""}`}>
-                <Text style={styles.openText}>Open story</Text>
-              </TouchableOpacity>
+              <AppButton label="Open story" onPress={() => router.push(`/admin/kingdom-stories/${m.sourceId}` as any)} variant="secondary" accessibilityLabel={`Open story ${m.storyTitle ?? ""}`} palette="fixedLight" />
             </View>
           )}
         />

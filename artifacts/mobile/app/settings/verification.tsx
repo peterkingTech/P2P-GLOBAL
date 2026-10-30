@@ -10,6 +10,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
+import { AppButton } from "@/components/ui";
 
 const MIN_ACCOUNT_AGE_DAYS = 14;
 
@@ -170,9 +171,7 @@ export default function VerificationScreen() {
             )}
             <Text style={styles.mutedLine}>Estimated decision: within 72 hours</Text>
             <Text style={styles.hintText}>Your submission will be permanently deleted after a decision is made.</Text>
-            <TouchableOpacity style={styles.withdrawBtn} onPress={confirmWithdraw} disabled={withdrawing}>
-              {withdrawing ? <ActivityIndicator color="#B91C1C" size="small" /> : <Text style={styles.withdrawBtnText}>Withdraw Application</Text>}
-            </TouchableOpacity>
+            <AppButton label="Withdraw Application" onPress={confirmWithdraw} variant="outline" disabled={withdrawing} loading={withdrawing} style={{ marginTop: 16 }} />
           </View>
         )}
 
@@ -196,9 +195,7 @@ export default function VerificationScreen() {
             <Text style={styles.tipLine}>✓ Ensure the note text is clearly readable</Text>
             <Text style={styles.tipLine}>✓ Use a fresh photo — not a screenshot</Text>
             {verificationStatus.canReapplyAt && new Date(verificationStatus.canReapplyAt).getTime() <= Date.now() && (
-              <TouchableOpacity style={styles.primaryBtn} onPress={resetFlow}>
-                <Text style={styles.primaryBtnText}>Apply Again</Text>
-              </TouchableOpacity>
+              <AppButton label="Apply Again" onPress={resetFlow} style={{ marginTop: 16 }} />
             )}
           </View>
         )}
@@ -224,18 +221,10 @@ export default function VerificationScreen() {
             </View>
 
             {!hasPhoto && (
-              <TouchableOpacity style={styles.primaryBtnOutline} onPress={() => router.push("/settings/account" as any)}>
-                <Text style={styles.primaryBtnOutlineText}>Go to Profile Settings</Text>
-              </TouchableOpacity>
+              <AppButton label="Go to Profile Settings" onPress={() => router.push("/settings/account" as any)} variant="outline" style={{ marginTop: 12 }} />
             )}
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, !meetsRequirements && styles.primaryBtnDisabled]}
-              onPress={() => setStep("method")}
-              disabled={!meetsRequirements}
-            >
-              <Text style={styles.primaryBtnText}>Start Verification →</Text>
-            </TouchableOpacity>
+            <AppButton label="Start Verification" icon="arrow-forward" iconPosition="trailing" onPress={() => setStep("method")} disabled={!meetsRequirements} style={{ marginTop: 16 }} />
           </View>
         )}
 
@@ -244,7 +233,7 @@ export default function VerificationScreen() {
             <Text style={styles.flowTitle}>Choose your verification method</Text>
             <Text style={styles.flowSubtitle}>Both methods are quick, free, and private. Your submission is reviewed within 72 hours and deleted immediately after the decision.</Text>
 
-            <TouchableOpacity style={styles.methodCard} onPress={() => chooseMethod("selfie_note")}>
+            <TouchableOpacity accessibilityRole="button" style={styles.methodCard} onPress={() => chooseMethod("selfie_note")}>
               <Text style={styles.methodTitle}>📸 Selfie with a note</Text>
               <Text style={styles.methodBody}>
                 Write your @username and today's date on a piece of paper and take a clear selfie holding it.
@@ -255,7 +244,7 @@ export default function VerificationScreen() {
               <View style={styles.chooseBtn}><Text style={styles.chooseBtnText}>Choose this</Text></View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.methodCard} onPress={() => chooseMethod("video_selfie")}>
+            <TouchableOpacity accessibilityRole="button" style={styles.methodCard} onPress={() => chooseMethod("video_selfie")}>
               <Text style={styles.methodTitle}>🎥 Short video selfie</Text>
               <Text style={styles.methodBody}>
                 Record a 3–5 second video clearly showing your face. No note needed — just look directly at the camera and move your head slightly so we can confirm it's a real person.
@@ -265,7 +254,7 @@ export default function VerificationScreen() {
               <View style={styles.chooseBtn}><Text style={styles.chooseBtnText}>Choose this</Text></View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.backLink} onPress={resetFlow}><Text style={styles.backLinkText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.backLink} onPress={resetFlow}><Text style={styles.backLinkText}>Cancel</Text></TouchableOpacity>
           </View>
         )}
 
@@ -285,9 +274,7 @@ export default function VerificationScreen() {
                 <Text style={styles.tipLine}>✓ Paper clearly readable</Text>
                 <Text style={styles.tipLine}>✓ Good lighting</Text>
                 <Text style={styles.tipLine}>✓ Your face matches your profile photo</Text>
-                <TouchableOpacity style={styles.primaryBtn} onPress={() => pickMedia("selfie_note")}>
-                  <Text style={styles.primaryBtnText}>📷 Take Photo</Text>
-                </TouchableOpacity>
+                <AppButton label="Take Photo" icon="camera-outline" onPress={() => pickMedia("selfie_note")} style={{ marginTop: 16 }} />
               </>
             ) : (
               <>
@@ -298,9 +285,7 @@ export default function VerificationScreen() {
                 <Text style={styles.tipLine}>✓ Good lighting — face clearly visible</Text>
                 <Text style={styles.tipLine}>✓ Your face must match your profile photo</Text>
                 <Text style={styles.hintText}>Max file size: 50MB · Accepted formats: MP4, MOV</Text>
-                <TouchableOpacity style={styles.primaryBtn} onPress={() => pickMedia("video_selfie")}>
-                  <Text style={styles.primaryBtnText}>🎥 Record Video</Text>
-                </TouchableOpacity>
+                <AppButton label="Record Video" icon="videocam-outline" onPress={() => pickMedia("video_selfie")} style={{ marginTop: 16 }} />
               </>
             )}
 
@@ -308,7 +293,7 @@ export default function VerificationScreen() {
               Privacy promise: Your {method === "video_selfie" ? "video" : "photo"} is reviewed by our team and permanently deleted after the decision. It is never shown to other users.
             </Text>
 
-            <TouchableOpacity style={styles.backLink} onPress={() => setStep("method")}><Text style={styles.backLinkText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={styles.backLink} onPress={() => setStep("method")}><Text style={styles.backLinkText}>← Back</Text></TouchableOpacity>
           </View>
         )}
 
@@ -332,16 +317,14 @@ export default function VerificationScreen() {
               ["reviewed", "I understand this will be reviewed by the P2P Global team"],
               ["deleted", "I understand the submission will be deleted after review"],
             ] as const).map(([key, label]) => (
-              <TouchableOpacity key={key} style={styles.checkRow} onPress={() => setConfirmChecks((p) => ({ ...p, [key]: !p[key] }))}>
+              <TouchableOpacity accessibilityRole="button" key={key} style={styles.checkRow} onPress={() => setConfirmChecks((p) => ({ ...p, [key]: !p[key] }))}>
                 <Ionicons name={confirmChecks[key] ? "checkbox" : "square-outline"} size={20} color={confirmChecks[key] ? colors.accentGreen : colors.textMuted} />
                 <Text style={styles.checkLabel}>{label}</Text>
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity style={[styles.primaryBtn, !allChecked && styles.primaryBtnDisabled]} onPress={handleSubmit} disabled={!allChecked || submitting}>
-              {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Submit for Review</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.backLink} onPress={() => setStep("instructions")}><Text style={styles.backLinkText}>Start Over</Text></TouchableOpacity>
+            <AppButton label="Submit for Review" onPress={handleSubmit} disabled={!allChecked || submitting} loading={submitting} style={{ marginTop: 16 }} />
+            <TouchableOpacity accessibilityRole="button" style={styles.backLink} onPress={() => setStep("instructions")}><Text style={styles.backLinkText}>Start Over</Text></TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -366,18 +349,11 @@ function makeStyles(c: AppColors) {
     detailLine: { fontSize: 13, color: c.textDark, marginBottom: 4, fontFamily: "Inter_400Regular" },
     toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
     toggleLabel: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium", flex: 1, marginRight: 10 },
-    withdrawBtn: { marginTop: 16, borderWidth: 1.5, borderColor: "#B91C1C", borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center" },
-    withdrawBtnText: { color: "#B91C1C", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     reasonBox: { backgroundColor: c.lightCream, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, padding: 12, marginTop: 8, marginBottom: 8 },
     reasonText: { fontSize: 13, color: c.textDark, lineHeight: 19, fontFamily: "Inter_400Regular" },
     tipLine: { fontSize: 13, color: c.textMid, marginBottom: 6, fontFamily: "Inter_400Regular" },
     reqRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
     reqText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular" },
-    primaryBtn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 48, alignItems: "center", justifyContent: "center", marginTop: 16 },
-    primaryBtnDisabled: { opacity: 0.5 },
-    primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
-    primaryBtnOutline: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center", marginTop: 12 },
-    primaryBtnOutlineText: { color: c.accentGreen, fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     flowTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, marginBottom: 8, fontFamily: "Inter_700Bold" },
     flowSubtitle: { fontSize: 13, color: c.textMid, lineHeight: 19, marginBottom: 12, fontFamily: "Inter_400Regular" },
     methodCard: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 14 },

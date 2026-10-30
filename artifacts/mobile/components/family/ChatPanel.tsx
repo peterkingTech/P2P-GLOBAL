@@ -146,7 +146,7 @@ export default function ChatPanel({
               multiline
               maxLength={2000}
             />
-            <TouchableOpacity style={styles.sendBtn} onPress={onSend} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel="Send message">
+            <TouchableOpacity hitSlop={10} style={styles.sendBtn} onPress={onSend} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel="Send message">
               <Ionicons name="send" size={16} color="#fff" />
             </TouchableOpacity>
           </View>

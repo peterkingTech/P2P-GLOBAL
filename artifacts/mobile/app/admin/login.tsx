@@ -117,7 +117,7 @@ export default function AdminLoginScreen() {
       keyboardShouldPersistTaps="handled"
     >
       {/* Back link to regular login */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.backRow}
         onPress={() => router.replace("/(auth)/login")}
       >
@@ -188,7 +188,7 @@ export default function AdminLoginScreen() {
               placeholder="••••••••"
               placeholderTextColor="rgba(255,255,255,0.3)"
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} hitSlop={10}
               style={styles.eyeBtn}
               onPress={() => setShowPassword((p) => !p)}
             >
@@ -201,7 +201,7 @@ export default function AdminLoginScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.primaryBtn, loading && { opacity: 0.75 }]}
           onPress={handleAdminLogin}
           activeOpacity={0.85}

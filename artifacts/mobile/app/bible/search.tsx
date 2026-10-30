@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { BibleApiError, SCRIPTURE_FONT, bibleRoute, bookByCode, formatRef, searchBible, type SearchResult } from "@/lib/bibleReaderApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Bible search: a reference ("John 3:16", "Ps 23") opens straight to the
 // passage; anything else is a word search through API.Bible in the reader's
@@ -67,17 +68,13 @@ export default function BibleSearchScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 4 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={24} color={c.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={() => router.back()} color={c.textDark} />
         <View style={styles.search}>
           <Ionicons name="search" size={16} color={c.textMuted} />
           <TextInput style={styles.input} value={q} onChangeText={setQ} placeholder="Search words or a reference" placeholderTextColor={c.textMuted}
             autoFocus autoCorrect={false} returnKeyType="search" onSubmitEditing={() => run(q, 0)} accessibilityLabel="Search the Bible" maxLength={120} />
           {q ? (
-            <TouchableOpacity onPress={() => setQ("")} style={styles.clear} accessibilityRole="button" accessibilityLabel="Clear search">
-              <Ionicons name="close-circle" size={18} color={c.textMuted} />
-            </TouchableOpacity>
+            <IconButton icon="close-circle" accessibilityLabel="Clear search" onPress={() => setQ("")} size="sm" color={c.textMuted} />
           ) : null}
         </View>
       </View>
@@ -86,7 +83,7 @@ export default function BibleSearchScreen() {
       {error ? (
         <View style={styles.center}>
           <Text style={styles.muted}>{error}</Text>
-          <TouchableOpacity onPress={() => run(q, 0)} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+          <AppButton label="Try again" onPress={() => run(q, 0)} variant="tertiary" />
         </View>
       ) : ref && refBook ? (
         <TouchableOpacity style={styles.refCard} onPress={() => open(ref.bookCode, ref.chapter, ref.startVerse, ref.endVerse)} accessibilityRole="button"
@@ -115,9 +112,7 @@ export default function BibleSearchScreen() {
               : <View style={styles.center}><Text style={styles.muted}>Try “love one another”, “shepherd”, or a reference like “Romans 8:28”.</Text></View>
           }
           ListFooterComponent={results.length > 0 && results.length < total ? (
-            <TouchableOpacity style={styles.more} onPress={() => run(searched, results.length)} disabled={loading} accessibilityRole="button" accessibilityLabel="Load more results">
-              {loading ? <ActivityIndicator color={c.accentGreen} /> : <Text style={styles.moreText}>Load more</Text>}
-            </TouchableOpacity>
+            <AppButton label="Load more" onPress={() => run(searched, results.length)} variant="tertiary" size="lg" disabled={loading} loading={loading} accessibilityLabel="Load more results" />
           ) : null}
         />
       )}
@@ -129,7 +124,6 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingRight: 14, gap: 4 },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, minHeight: 44, borderRadius: 12, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     input: { flex: 1, color: c.textDark, fontSize: 15, fontFamily: "Inter_400Regular", paddingVertical: 8 },
     clear: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },

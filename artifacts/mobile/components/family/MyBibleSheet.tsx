@@ -7,6 +7,7 @@ import { getBibleTranslations, type WorshipScripture } from "@/lib/familyApi";
 import { useRouter } from "expo-router";
 import { bibleRoute, bookByName, bookByCode } from "@/lib/bibleReaderApi";
 import { loadPosition, savePosition } from "@/lib/bibleReadingPrefs";
+import { AppButton, IconButton } from "@/components/ui";
 
 // "My Bible" during a Gathering (Prompt 6): anyone can read any passage on
 // their own, starting from the group's passage or a lesson reference. It
@@ -68,13 +69,8 @@ export default function MyBibleSheet({ visible, onClose, start }: Props) {
             <Text style={styles.title} accessibilityRole="header">My Bible</Text>
             <Text style={styles.sub}>Only you see this. The group's passage doesn't change.</Text>
           </View>
-          <TouchableOpacity onPress={openFullBible} style={styles.fullBtn} accessibilityRole="button" accessibilityLabel="Open the full Bible with your notes and highlights">
-            <Ionicons name="expand-outline" size={16} color={colors.textPrimary} />
-            <Text style={styles.fullText}>Full Bible</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close My Bible and return to the Gathering">
-            <Ionicons name="close" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <AppButton label="Full Bible" onPress={openFullBible} variant="secondary" icon="expand-outline" accessibilityLabel="Open the full Bible with your notes and highlights" palette="fixedDark" />
+          <IconButton icon="close" accessibilityLabel="Close My Bible and return to the Gathering" onPress={onClose} color={colors.textPrimary} palette="fixedDark" />
         </View>
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Remount when the starting passage changes so the picker starts there. */}
@@ -93,8 +89,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingTop: 56, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   title: { color: colors.textPrimary, fontSize: 18, fontFamily: "Inter_700Bold" },
   sub: { color: colors.textSecondary, ...type.caption, marginTop: 2 },
-  closeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  fullBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 12, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)" },
   fullText: { color: colors.textPrimary, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   scroll: { padding: spacing.lg, paddingBottom: 40 },
 });

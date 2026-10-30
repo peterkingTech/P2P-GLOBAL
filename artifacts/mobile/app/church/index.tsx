@@ -7,6 +7,7 @@ import { useData, ChurchCohort, ChurchAnnouncement, LearningGoal } from "@/conte
 import { ChurchQRCode } from "@/components/ChurchQRCode";
 import { churchRoleLabel } from "@/constants/churchRoles";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 export default function ChurchHomeScreen() {
   const insets = useSafeAreaInsets();
@@ -81,14 +82,9 @@ export default function ChurchHomeScreen() {
           Connect your local church to P2P Global Kingdom School. Track discipleship. Support your congregation. See your church community grow.
         </Text>
         <Text style={styles.freeText}>Completely free. Always.{"\n"}No subscription. No payment. No catch.</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/church/register" as any)}>
-          <Text style={styles.primaryBtnText}>Register Your Church</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
-        </TouchableOpacity>
+        <AppButton label="Register Your Church" onPress={() => router.push("/church/register" as any)} size="lg" icon="arrow-forward" iconPosition="trailing" style={{ width: "100%" }} palette="fixedLight" />
         <Text style={styles.orText}>Already have a code?</Text>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/church/join" as any)}>
-          <Text style={styles.secondaryBtnText}>Join with Invite Code</Text>
-        </TouchableOpacity>
+        <AppButton label="Join with Invite Code" onPress={() => router.push("/church/join" as any)} variant="outline" style={{ width: "100%" }} palette="fixedLight" />
       </ScrollView>
     );
   }
@@ -184,7 +180,7 @@ export default function ChurchHomeScreen() {
           )}
 
           {grove && (grove.inactiveMembers > 0 || grove.newBelieversWithoutGuides > 0) && (
-            <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/grove" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.attentionCard} onPress={() => router.push("/church/grove" as any)}>
               <Text style={styles.attentionTitle}>⚠️ Needs Attention</Text>
               {grove.inactiveMembers > 0 && <Text style={styles.attentionLine}>{grove.inactiveMembers} members inactive 14+ days</Text>}
               {grove.newBelieversWithoutGuides > 0 && <Text style={styles.attentionLine}>{grove.newBelieversWithoutGuides} new believers without guides</Text>}
@@ -210,7 +206,7 @@ export default function ChurchHomeScreen() {
         </>
       ) : (
         <>
-          <TouchableOpacity style={styles.attentionCard} onPress={() => router.push("/church/calls" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.attentionCard} onPress={() => router.push("/church/calls" as any)}>
             <Text style={styles.attentionTitle}>📞 Church Gatherings</Text>
             <Text style={styles.attentionLink}>View Live &amp; Recent Gatherings →</Text>
           </TouchableOpacity>
@@ -226,7 +222,7 @@ export default function ChurchHomeScreen() {
             <Text style={styles.emptyInlineText}>You are not in a small group yet.</Text>
           ) : (
             cohorts.slice(0, 3).map((c) => (
-              <TouchableOpacity key={c.id} style={styles.cohortRow} onPress={() => router.push("/church/cohorts" as any)}>
+              <TouchableOpacity accessibilityRole="button" key={c.id} style={styles.cohortRow} onPress={() => router.push("/church/cohorts" as any)}>
                 <Text style={styles.cohortName}>{c.name}</Text>
                 <Text style={styles.cohortSub}>{c.memberCount ?? 0} members · {c.status}</Text>
               </TouchableOpacity>
@@ -238,16 +234,14 @@ export default function ChurchHomeScreen() {
             <Text style={styles.emptyInlineText}>No announcements yet.</Text>
           ) : (
             announcements.slice(0, 2).map((a) => (
-              <TouchableOpacity key={a.id} style={styles.announcementRow} onPress={() => router.push("/church/announcements" as any)}>
+              <TouchableOpacity accessibilityRole="button" key={a.id} style={styles.announcementRow} onPress={() => router.push("/church/announcements" as any)}>
                 <Text style={styles.announcementTitle}>{a.isPinned ? "📌 " : ""}{a.title}</Text>
                 <Text style={styles.announcementBody} numberOfLines={2}>{a.body}</Text>
               </TouchableOpacity>
             ))
           )}
 
-          <TouchableOpacity style={styles.viewAllBtn} onPress={() => router.push("/church/announcements" as any)}>
-            <Text style={styles.viewAllText}>View all announcements</Text>
-          </TouchableOpacity>
+          <AppButton label="View all announcements" onPress={() => router.push("/church/announcements" as any)} variant="tertiary" style={{ marginTop: 4 }} palette="fixedLight" />
         </>
       )}
     </ScrollView>
@@ -266,7 +260,7 @@ function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
 
 function NavRow({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.navRow} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.navRow} onPress={onPress}>
       <Ionicons name={icon} size={18} color={colors.accentGreen} />
       <Text style={styles.navRowText}>{label}</Text>
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -287,14 +281,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, fontWeight: "700", color: colors.cream, textAlign: "center", fontFamily: "Inter_700Bold", marginBottom: 12 },
   emptyBody: { fontSize: 14, color: colors.lightGreen, textAlign: "center", lineHeight: 21, opacity: 0.85, fontFamily: "Inter_400Regular", marginBottom: 16 },
   freeText: { fontSize: 13, color: colors.accentGreen, textAlign: "center", fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 28, lineHeight: 19 },
-  primaryBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.accentGreen, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 24, width: "100%",
-  },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
   orText: { color: colors.textMuted, fontSize: 13, marginTop: 24, marginBottom: 10, fontFamily: "Inter_400Regular" },
-  secondaryBtn: { borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderRadius: 14, paddingVertical: 13, paddingHorizontal: 24, width: "100%", alignItems: "center" },
-  secondaryBtnText: { color: colors.cream, fontWeight: "600", fontSize: 14, fontFamily: "Inter_600SemiBold" },
   churchHeader: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 24 },
   logo: { width: 56, height: 56, borderRadius: 12 },
   logoPlaceholder: { width: 56, height: 56, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
@@ -334,6 +321,5 @@ const styles = StyleSheet.create({
   announcementRow: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, padding: 14, marginBottom: 8 },
   announcementTitle: { fontSize: 14, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
   announcementBody: { fontSize: 12, color: colors.lightGreen, opacity: 0.75, marginTop: 4, fontFamily: "Inter_400Regular" },
-  viewAllBtn: { alignItems: "center", paddingVertical: 10, marginTop: 4 },
   viewAllText: { fontSize: 13, color: colors.accentGreen, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

@@ -90,7 +90,7 @@ export function StudyPeopleTab({
               </Text>
             </View>
             {isGroup && session.isLeader && session.leaderId !== p.userId && (
-              <TouchableOpacity onPress={() => handleRemove(p.userId, p.name)} disabled={removingId === p.userId}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => handleRemove(p.userId, p.name)} disabled={removingId === p.userId}>
                 <Text style={styles.removeLink}>{removingId === p.userId ? "…" : "Remove"}</Text>
               </TouchableOpacity>
             )}
@@ -99,7 +99,7 @@ export function StudyPeopleTab({
       })}
 
       {!isGroup && session.isLeader && otherParticipants[0] && (
-        <TouchableOpacity style={styles.passLeadBtn} onPress={() => session.passLead(otherParticipants[0].userId)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.passLeadBtn} onPress={() => session.passLead(otherParticipants[0].userId)}>
           <Ionicons name="swap-horizontal" size={16} color="#1D9E75" />
           <Text style={styles.passLeadText}>Pass the Lead to {otherParticipants[0].name}</Text>
         </TouchableOpacity>

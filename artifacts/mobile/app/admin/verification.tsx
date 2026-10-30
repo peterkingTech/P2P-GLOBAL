@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 type Tab = "queue" | "history" | "stats";
 
@@ -192,7 +193,7 @@ export default function AdminVerificationScreen() {
     <View style={styles.container}>
       <View style={styles.filterBar}>
         {(["queue", "history", "stats"] as Tab[]).map((t) => (
-          <TouchableOpacity key={t} style={[styles.filterChip, tab === t && styles.filterChipActive]} onPress={() => setTab(t)}>
+          <TouchableOpacity accessibilityRole="button" key={t} style={[styles.filterChip, tab === t && styles.filterChipActive]} onPress={() => setTab(t)}>
             <Text style={[styles.filterChipText, tab === t && styles.filterChipTextActive]}>
               {t === "queue" ? `Queue${queue.length ? ` (${queue.length})` : ""}` : t === "history" ? "History" : "Stats"}
             </Text>
@@ -222,9 +223,7 @@ export default function AdminVerificationScreen() {
                   <Text style={styles.cardSub}>{item.method === "video_selfie" ? "Video selfie" : "Selfie with note"} · Submitted {timeAgo(item.submittedAt)}</Text>
                   <Text style={styles.cardSub}>Account age: {item.accountAgeDays ?? "?"} days · Attempt {item.attemptNumber}</Text>
                 </View>
-                <TouchableOpacity style={styles.actionBtnOutline} onPress={() => openReview(item.applicationId)}>
-                  <Text style={styles.actionBtnOutlineText}>Review →</Text>
-                </TouchableOpacity>
+                <AppButton label="Review" icon="arrow-forward" iconPosition="trailing" onPress={() => openReview(item.applicationId)} variant="outline" size="sm" palette="fixedLight" />
               </View>
             )}
           />
@@ -300,7 +299,7 @@ export default function AdminVerificationScreen() {
         <View style={styles.reviewContainer}>
           <View style={styles.reviewHeader}>
             <Text style={styles.reviewTitle}>Verification Review</Text>
-            <TouchableOpacity onPress={closeReview}><Ionicons name="close" size={22} color={colors.textDark} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={closeReview}><Ionicons name="close" size={22} color={colors.textDark} /></TouchableOpacity>
           </View>
 
           {detailLoading || !detail ? (
@@ -319,10 +318,8 @@ export default function AdminVerificationScreen() {
                   ? "is now verified. They have been notified. The submission will be deleted in 48 hours."
                   : "has been notified with the reason. The submission has been deleted immediately. They can reapply after 7 days."}
               </Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={reviewNext}>
-                <Text style={styles.primaryBtnText}>Review Next Application →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.backLink} onPress={closeReview}><Text style={styles.backLinkText}>Close</Text></TouchableOpacity>
+              <AppButton label="Review Next Application" icon="arrow-forward" iconPosition="trailing" onPress={reviewNext} palette="fixedLight" />
+              <TouchableOpacity accessibilityRole="button" style={styles.backLink} onPress={closeReview}><Text style={styles.backLinkText}>Close</Text></TouchableOpacity>
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ padding: 20 }}>
@@ -367,23 +364,19 @@ export default function AdminVerificationScreen() {
 
               {!decliningOpen ? (
                 <>
-                  <TouchableOpacity style={styles.approveBtn} onPress={handleApprove} disabled={acting}>
-                    {acting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>✓ Approve Verification</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.declineBtn} onPress={() => setDecliningOpen(true)} disabled={acting}>
-                    <Text style={styles.declineBtnText}>✗ Decline</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Approve Verification" icon="checkmark" onPress={handleApprove} size="lg" disabled={acting} loading={acting} style={{ marginBottom: 10 }} palette="fixedLight" />
+                  <AppButton label="Decline" icon="close" onPress={() => setDecliningOpen(true)} variant="outline" disabled={acting} palette="fixedLight" />
                 </>
               ) : (
                 <View style={{ marginTop: 12 }}>
                   <Text style={styles.mediaLabel}>SELECT REASON</Text>
                   {DECLINE_REASONS.map((r) => (
-                    <TouchableOpacity key={r.value} style={styles.reasonOption} onPress={() => handleDecline(r.value)} disabled={acting}>
+                    <TouchableOpacity accessibilityRole="button" key={r.value} style={styles.reasonOption} onPress={() => handleDecline(r.value)} disabled={acting}>
                       <Ionicons name="radio-button-off" size={16} color={colors.textMuted} />
                       <Text style={styles.reasonOptionText}>{r.label}</Text>
                     </TouchableOpacity>
                   ))}
-                  <TouchableOpacity style={styles.backLink} onPress={() => setDecliningOpen(false)}><Text style={styles.backLinkText}>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" style={styles.backLink} onPress={() => setDecliningOpen(false)}><Text style={styles.backLinkText}>Cancel</Text></TouchableOpacity>
                 </View>
               )}
             </ScrollView>
@@ -420,8 +413,6 @@ const styles = StyleSheet.create({
   },
   cardUsername: { fontSize: 14, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   cardSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-  actionBtnOutline: { borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  actionBtnOutlineText: { fontSize: 12, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
@@ -460,16 +451,11 @@ const styles = StyleSheet.create({
     padding: 12, minHeight: 70, textAlignVertical: "top", color: colors.textDark, fontSize: 13,
     fontFamily: "Inter_400Regular", marginTop: 6, marginBottom: 16,
   },
-  approveBtn: { backgroundColor: colors.accentGreen, borderRadius: 12, height: 50, alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  declineBtn: { borderWidth: 1.5, borderColor: "#B91C1C", borderRadius: 12, height: 44, alignItems: "center", justifyContent: "center" },
-  declineBtnText: { color: "#B91C1C", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   reasonOption: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
   reasonOptionText: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular" },
   outcomeWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30, gap: 10 },
   outcomeTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   outcomeBody: { fontSize: 13, color: colors.textMid, textAlign: "center", lineHeight: 19, marginBottom: 10, fontFamily: "Inter_400Regular" },
-  primaryBtn: { backgroundColor: colors.accentGreen, borderRadius: 12, height: 48, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   backLink: { alignItems: "center", marginTop: 14, paddingVertical: 6 },
   backLinkText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
 });

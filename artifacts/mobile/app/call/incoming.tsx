@@ -378,7 +378,7 @@ export default function IncomingCallScreen() {
       <View style={[styles.buttonRow, { paddingBottom: insets.bottom + 44 }]}>
         {!isCrisis && (
           <View style={styles.buttonColumn}>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={10}
               style={[styles.circleBtn, styles.declineBtn]} onPress={handleDecline} activeOpacity={0.85}
               accessibilityRole="button" accessibilityLabel="Decline call"
             >

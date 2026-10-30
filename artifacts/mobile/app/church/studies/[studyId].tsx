@@ -13,6 +13,7 @@ import {
 } from "@/lib/churchStudyApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -124,12 +125,12 @@ export default function ChurchStudyDetailScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{study.title}</Text>
         {canManage ? (
-          <TouchableOpacity onPress={openEditStudy} accessibilityLabel="Edit study" accessibilityRole="button">
+          <TouchableOpacity hitSlop={10} onPress={openEditStudy} accessibilityLabel="Edit study" accessibilityRole="button">
             <Ionicons name="create-outline" size={20} color={colors.textDark} />
           </TouchableOpacity>
         ) : <View style={{ width: 20 }} />}
@@ -141,7 +142,7 @@ export default function ChurchStudyDetailScreen() {
         {canManage && (
           <View style={styles.statusRow}>
             {(["draft", "published"] as CustomStudyStatus[]).map((s) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={s} disabled={savingStatus || study.status === "archived"}
                 style={[styles.statusChip, study.status === s && styles.statusChipActive]}
                 onPress={() => handleChangeStatus(s)}
@@ -150,7 +151,7 @@ export default function ChurchStudyDetailScreen() {
               </TouchableOpacity>
             ))}
             {study.status !== "archived" && (
-              <TouchableOpacity style={styles.archiveBtn} onPress={handleArchive} accessibilityLabel="Archive study">
+              <TouchableOpacity accessibilityRole="button" hitSlop={10} style={styles.archiveBtn} onPress={handleArchive} accessibilityLabel="Archive study">
                 <Ionicons name="archive-outline" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             )}
@@ -177,12 +178,8 @@ export default function ChurchStudyDetailScreen() {
             <Text style={styles.fieldLabel}>Study Description</Text>
             <TextInput style={[styles.input, { minHeight: 70 }]} value={editDescription} onChangeText={setEditDescription} multiline placeholderTextColor={colors.textMuted} />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditOpen(false)} disabled={savingEdit}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit} disabled={savingEdit || !editTitle.trim()}>
-                {savingEdit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setEditOpen(false)} variant="outline" disabled={savingEdit} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Save" onPress={handleSaveEdit} disabled={savingEdit || !editTitle.trim()} loading={savingEdit} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -209,8 +206,6 @@ const styles = StyleSheet.create({
   archivedNotice: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", marginBottom: 14, fontStyle: "italic" },
   sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sectionLabel: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  createBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.accentGreen, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  createBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
   lessonCard: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card,
     borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige, padding: 14, marginBottom: 8,
@@ -231,11 +226,6 @@ const styles = StyleSheet.create({
   scriptureBook: { flex: 2 },
   scriptureSmall: { flex: 1 },
   questionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
-  addQuestionBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, alignSelf: "flex-start" },
   addQuestionText: { color: colors.accentGreen, fontSize: 12, fontFamily: "Inter_700Bold" },
   sheetRow: { flexDirection: "row", gap: 10, marginTop: 16 },
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  cancelBtnText: { color: colors.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-  saveBtn: { flex: 1, backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

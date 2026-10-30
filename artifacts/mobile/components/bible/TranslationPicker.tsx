@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getLanguageName } from "@/lib/languageNames";
 import type { BibleTranslation } from "@/lib/bibleReaderApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Only translations our API.Bible plan is confirmed to license (the server
 // lists nothing else), grouped by language.
@@ -34,18 +35,16 @@ export default function TranslationPicker({ visible, onClose, translations, curr
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close translations">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close translations">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">Translation</Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
           </View>
           {error ? (
             <View style={{ padding: 16, gap: 10 }}>
               <Text style={styles.muted}>{error}</Text>
-              {onRetry && <TouchableOpacity onPress={onRetry} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>}
+              {onRetry && <AppButton label="Try again" onPress={onRetry} variant="tertiary" style={{ alignSelf: "flex-start" }} />}
             </View>
           ) : (
             <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
@@ -80,7 +79,6 @@ function makeStyles(c: AppColors) {
     sheet: { maxHeight: "80%", backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 12 },
     header: { flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingTop: 6 },
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     group: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 52 },
     rowSelected: { backgroundColor: c.card },

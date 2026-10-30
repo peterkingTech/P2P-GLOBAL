@@ -110,10 +110,10 @@ export default function CategoryDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { backgroundColor: category.colorTheme }]}>
         <View style={styles.headerTopRow}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button"
             onPress={() => shareCategory({ id: category.id, title: category.title, planCount: category.planCount })}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -128,7 +128,7 @@ export default function CategoryDetailScreen() {
       </View>
 
       {celebration && (
-        <TouchableOpacity style={styles.celebrationBanner} onPress={() => setCelebration(null)} activeOpacity={0.85}>
+        <TouchableOpacity accessibilityRole="button" style={styles.celebrationBanner} onPress={() => setCelebration(null)} activeOpacity={0.85}>
           <Text style={styles.celebrationText}>{celebration}</Text>
           <Ionicons name="close" size={16} color="#fff" />
         </TouchableOpacity>
@@ -146,7 +146,7 @@ export default function CategoryDetailScreen() {
             const isInProgress = !isCompleted && p.progressPercent > 0;
             const firstLine = (p.description ?? "").split("\n")[0];
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={p.id}
                 style={[styles.planCard, p.locked && styles.planCardLocked]}
                 activeOpacity={0.88}
@@ -200,7 +200,7 @@ export default function CategoryDetailScreen() {
                     <Text style={styles.actionBtnLockedText}>Locked</Text>
                   </View>
                 ) : (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.actionBtn, { backgroundColor: category.colorTheme }]}
                     onPress={(e) => { e.stopPropagation?.(); goToPlanOrQuestions(p.id); }}
                   >

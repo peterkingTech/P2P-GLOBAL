@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { FONT_MAX, FONT_MIN, LINE_HEIGHT, type BibleReadingPrefs } from "@/lib/bibleReadingPrefs";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Reading comfort for the Bible. Deliberately no light/dark switch here: the
 // Bible always follows the P2P appearance setting.
@@ -35,13 +36,11 @@ export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose }:
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close reading settings">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close reading settings">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">Reading settings</Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} style={{ marginRight: -8 }} />
           </View>
 
           <Text style={[styles.preview, { fontSize: prefs.fontSize, lineHeight: Math.round(prefs.fontSize * LINE_HEIGHT[prefs.lineSpacing]) }]} numberOfLines={3}>
@@ -50,15 +49,9 @@ export default function ReadingPrefsSheet({ visible, prefs, onChange, onClose }:
 
           <Text style={styles.label}>Text size</Text>
           <View style={styles.sizeRow}>
-            <TouchableOpacity style={styles.sizeBtn} onPress={() => onChange({ fontSize: prefs.fontSize - 1 })} disabled={prefs.fontSize <= FONT_MIN}
-              accessibilityRole="button" accessibilityLabel="Smaller text" accessibilityState={{ disabled: prefs.fontSize <= FONT_MIN }}>
-              <Text style={[styles.sizeGlyph, { fontSize: 14 }, prefs.fontSize <= FONT_MIN && { opacity: 0.35 }]}>A</Text>
-            </TouchableOpacity>
+            <AppButton label="A" onPress={() => onChange({ fontSize: prefs.fontSize - 1 })} variant="secondary" disabled={prefs.fontSize <= FONT_MIN} accessibilityLabel="Smaller text" style={{ width: 52 }} />
             <Text style={styles.sizeValue} accessibilityLiveRegion="polite">{prefs.fontSize}</Text>
-            <TouchableOpacity style={styles.sizeBtn} onPress={() => onChange({ fontSize: prefs.fontSize + 1 })} disabled={prefs.fontSize >= FONT_MAX}
-              accessibilityRole="button" accessibilityLabel="Larger text" accessibilityState={{ disabled: prefs.fontSize >= FONT_MAX }}>
-              <Text style={[styles.sizeGlyph, { fontSize: 22 }, prefs.fontSize >= FONT_MAX && { opacity: 0.35 }]}>A</Text>
-            </TouchableOpacity>
+            <AppButton label="A" onPress={() => onChange({ fontSize: prefs.fontSize + 1 })} variant="secondary" disabled={prefs.fontSize >= FONT_MAX} accessibilityLabel="Larger text" style={{ width: 52 }} />
           </View>
 
           <Text style={styles.label}>Line spacing</Text>
@@ -89,11 +82,9 @@ function makeStyles(c: AppColors) {
     sheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 32 },
     header: { flexDirection: "row", alignItems: "center" },
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -8 },
     preview: { color: c.textDark, fontFamily: SCRIPTURE_FONT, backgroundColor: c.card, borderRadius: 12, padding: 14, marginTop: 6, marginBottom: 4 },
     label: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 8 },
     sizeRow: { flexDirection: "row", alignItems: "center", gap: 16 },
-    sizeBtn: { width: 52, height: 44, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, alignItems: "center", justifyContent: "center" },
     sizeGlyph: { color: c.textDark, fontFamily: SCRIPTURE_FONT },
     sizeValue: { minWidth: 32, textAlign: "center", fontSize: 16, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     segment: { flexDirection: "row", gap: 6 },

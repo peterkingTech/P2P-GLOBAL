@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Tex
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { describeError } from "@/lib/studioModel";
+import { AppButton, FilterChip, FixedLightButtons } from "@/components/ui";
 
 // Shared Publishing Studio building blocks, styled with the admin
 // dashboard's existing palette (constants/colors) and Inter type scale.
@@ -79,41 +80,27 @@ export function Chip({ label, tone = "grey" }: { label: string; tone?: ChipTone 
   return <View style={[s.chip, { backgroundColor: t.bg }]}><Text style={[s.chipText, { color: t.fg }]}>{label}</Text></View>;
 }
 
+// Studio's Button and Pill keep their props (every Studio screen is unchanged)
+// and draw with the shared P2P button system (components/ui). The Studio is
+// still drawn in the fixed light palette, so its buttons use it too
+// (FixedLightButtons) — a documented exception until it becomes theme-aware.
 export function Button({ label, onPress, icon, tone = "primary", disabled, busy, accessibilityHint }: {
   label: string; onPress: () => void; icon?: IconName; tone?: "primary" | "secondary" | "danger"; disabled?: boolean; busy?: boolean; accessibilityHint?: string;
 }) {
-  const style = tone === "primary" ? s.btnPrimary : tone === "danger" ? s.btnDanger : s.btnSecondary;
-  const fg = tone === "secondary" ? colors.primaryGreen : "#fff";
   return (
-    <TouchableOpacity
-      style={[s.btn, style, (disabled || busy) && s.btnDisabled]}
-      onPress={onPress}
-      disabled={disabled || busy}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
-    >
-      {busy ? <ActivityIndicator size="small" color={fg} /> : icon ? <Ionicons name={icon} size={15} color={fg} /> : null}
-      <Text style={[s.btnText, { color: fg }]}>{label}</Text>
-    </TouchableOpacity>
+    <FixedLightButtons>
+      <AppButton label={label} onPress={onPress} icon={icon} variant={tone === "primary" ? "primary" : tone === "danger" ? "destructive" : "outline"}
+        disabled={disabled} loading={busy} accessibilityHint={accessibilityHint} />
+    </FixedLightButtons>
   );
 }
 
-/** Selectable filter / option pill. */
+/** Selectable filter / option pill — one choice of a set (announced as a radio button). */
 export function Pill({ label, selected, onPress, disabled }: { label: string; selected: boolean; onPress: () => void; disabled?: boolean }) {
   return (
-    <TouchableOpacity
-      style={[s.pill, selected && s.pillActive, disabled && s.btnDisabled]}
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected, disabled: !!disabled }}
-      aria-selected={selected}
-    >
-      <Text style={[s.pillText, selected && s.pillTextActive]}>{label}</Text>
-    </TouchableOpacity>
+    <FixedLightButtons>
+      <FilterChip label={label} selected={selected} onPress={onPress} disabled={disabled} selection="single" />
+    </FixedLightButtons>
   );
 }
 
@@ -206,16 +193,6 @@ const s = StyleSheet.create({
   bannerText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
   chip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 9, paddingHorizontal: 14, minHeight: 44, minWidth: 44 },
-  btnPrimary: { backgroundColor: colors.primaryGreen },
-  btnDanger: { backgroundColor: "#B91C1C" },
-  btnSecondary: { backgroundColor: "#fff", borderWidth: 1, borderColor: colors.borderBeige },
-  btnDisabled: { opacity: 0.45 },
-  btnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  pill: { paddingHorizontal: 12, minHeight: 44, minWidth: 44, justifyContent: "center", borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
-  pillActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },
-  pillText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  pillTextActive: { color: "#fff", fontFamily: "Inter_600SemiBold" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center", padding: 16 },
   dialog: { width: "100%", maxWidth: 460, backgroundColor: colors.lightCream, borderRadius: 14, padding: 18, gap: 10 },
   dialogTitle: { fontSize: 16, color: colors.textDark, fontFamily: "Inter_700Bold" },

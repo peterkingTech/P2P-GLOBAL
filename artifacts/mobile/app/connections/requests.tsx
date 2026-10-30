@@ -9,6 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { AppButton } from "@/components/ui";
 
 interface PendingRequest {
   id: string;
@@ -82,27 +83,15 @@ export default function MessageRequestsScreen() {
                   {item.fromUsername && <Text style={styles.username}>@{item.fromUsername}</Text>}
                 </View>
                 {item.fromUsername && (
-                  <TouchableOpacity onPress={() => router.push(`/profile/${item.fromUsername}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/profile/${item.fromUsername}` as any)}>
                     <Text style={styles.viewProfile}>View Profile</Text>
                   </TouchableOpacity>
                 )}
               </View>
               {item.message && <Text style={styles.message}>{item.message}</Text>}
               <View style={styles.btnRow}>
-                <TouchableOpacity
-                  style={styles.declineBtn}
-                  disabled={responding === item.id}
-                  onPress={() => handleRespond(item.id, "declined")}
-                >
-                  <Text style={styles.declineBtnText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.acceptBtn}
-                  disabled={responding === item.id}
-                  onPress={() => handleRespond(item.id, "accepted")}
-                >
-                  {responding === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
-                </TouchableOpacity>
+                <AppButton label="Decline" onPress={() => handleRespond(item.id, "declined")} variant="outline" disabled={responding === item.id} style={{ flex: 1 }} />
+                <AppButton label="Accept" onPress={() => handleRespond(item.id, "accepted")} disabled={responding === item.id} loading={responding === item.id} style={{ flex: 1 }} />
               </View>
             </View>
           )}
@@ -128,15 +117,5 @@ function makeStyles(c: AppColors) {
     viewProfile: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     message: { fontSize: 13, color: c.textMid, marginTop: 10, fontFamily: "Inter_400Regular" },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 12 },
-    declineBtn: {
-      flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10,
-      height: 42, alignItems: "center", justifyContent: "center",
-    },
-    declineBtnText: { color: c.textMid, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-    acceptBtn: {
-      flex: 1, backgroundColor: c.accentGreen, borderRadius: 10,
-      height: 42, alignItems: "center", justifyContent: "center",
-    },
-    acceptBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, FlatList } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, FlatList, Image } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +17,7 @@ import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { continueItems, type ContinueItem } from "@/lib/learningHome";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
+import { AppButton } from "@/components/ui";
 
 // The Learning tab — the Learning Centre landing. One clean starting point:
 //   Continue Learning — the most relevant unfinished activity (real progress
@@ -53,12 +54,24 @@ export default function LearnTab() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Every story cover the discover home already returned, by story id — so a
+  // shared study of a story can show that story's photo too.
+  const storyCovers = useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!stories) return out;
+    const all = [stories.continueLearning, stories.favourites, stories.later, stories.recentlyViewed, stories.recentlyAdded,
+      ...stories.collections.map((c) => c.stories), ...stories.categoryRows.map((r) => r.stories)].flat();
+    for (const st of all) { const p = st.media?.[0]?.mediaPath; if (p && !out[st.id]) out[st.id] = p; }
+    if (stories.featured?.hero && !out[stories.featured.id]) out[stories.featured.id] = stories.featured.hero.mediaPath;
+    return out;
+  }, [stories]);
   const items: ContinueItem[] = useMemo(() => continueItems({
     modules,
     stories: stories?.continueLearning ?? [],
     studies: (studies ?? []).slice(0, 3),
     bible: bible ? { book: bible.book, bookName: bookByCode(bible.book)?.name ?? bible.book, chapter: bible.chapter, translation: bible.translation } : null,
-  }), [modules, stories, studies, bible]);
+    storyCovers,
+  }), [modules, stories, studies, bible, storyCovers]);
   const [lead, ...more] = items;
   const { modulesCompleted } = getModuleProgressCounts(modules);
   const go = (r: ContinueItem["route"]) => router.push(r as any);
@@ -78,9 +91,7 @@ export default function LearnTab() {
         <Text style={s.subtitle}>Grow in Scripture, understanding and discipleship.</Text>
         <View style={s.shortcuts}>
           {([["book", "Bible", "/bible"], ["document-text-outline", "Notes", "/notes"], ["bookmark-outline", "Highlights", "/highlights"]] as const).map(([icon, label, route]) => (
-            <TouchableOpacity key={route} style={s.shortcut} onPress={() => router.push(route as any)} accessibilityRole="button" accessibilityLabel={`Open ${label}`}>
-              <Ionicons name={icon} size={15} color={colors.accentGreen} /><Text style={s.shortcutText}>{label}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${label}`} onPress={() => router.push(route as any)} variant="secondary" size="sm" icon={icon} accessibilityLabel={`Open ${label}`} key={route} />
           ))}
         </View>
 
@@ -89,9 +100,7 @@ export default function LearnTab() {
         {lead ? (
           <TouchableOpacity style={s.lead} onPress={() => go(lead.route)} activeOpacity={0.88} accessibilityRole="button"
             accessibilityLabel={`Continue ${lead.typeLabel}: ${lead.title}${lead.detail ? `. ${lead.detail}` : ""}`}>
-            <View style={s.leadArt}>
-              {lead.imagePath ? <CoverArt path={lead.imagePath} /> : <Ionicons name={lead.icon as any} size={34} color={colors.accentGreen} />}
-            </View>
+            <ContinueArt item={lead} size={34} color={colors.accentGreen} frame={s.leadArt} defaultRatio={2 / 3} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={s.kicker}>{lead.typeLabel}</Text>
               <Text style={s.leadTitle} numberOfLines={2}>{lead.title}</Text>
@@ -110,7 +119,9 @@ export default function LearnTab() {
           <FlatList horizontal data={more} keyExtractor={(x) => x.key} showsHorizontalScrollIndicator={Platform.OS === "web"} contentContainerStyle={{ gap: 10, paddingTop: 10 }}
             renderItem={({ item }) => (
               <TouchableOpacity style={s.mini} onPress={() => go(item.route)} accessibilityRole="button" accessibilityLabel={`Continue ${item.typeLabel}: ${item.title}`}>
-                <Ionicons name={item.icon as any} size={18} color={colors.accentGreen} />
+                {item.imagePath || item.imageUrl
+                  ? <ContinueArt item={item} size={18} color={colors.accentGreen} frame={s.miniArt} defaultRatio={16 / 9} />
+                  : <Ionicons name={item.icon as any} size={18} color={colors.accentGreen} />}
                 <Text style={s.kicker} numberOfLines={1}>{item.typeLabel}</Text>
                 <Text style={s.miniTitle} numberOfLines={2}>{item.title}</Text>
                 {item.detail ? <Text style={s.meta} numberOfLines={1}>{item.detail}</Text> : null}
@@ -125,9 +136,7 @@ export default function LearnTab() {
         {/* Your Learning Journey — the existing Learning Centre (My Learning) */}
         <View style={s.sectionRow}>
           <Text style={[s.section, { marginTop: 0, marginBottom: 0, flex: 1 }]} accessibilityRole="header">Your Learning Journey</Text>
-          <TouchableOpacity onPress={() => router.push("/learning" as any)} accessibilityRole="button" accessibilityLabel="Open My Learning" style={s.seeAll}>
-            <Text style={s.seeAllText}>My Learning</Text><Ionicons name="chevron-forward" size={14} color={colors.accentGreen} />
-          </TouchableOpacity>
+          <AppButton label="My Learning" onPress={() => router.push("/learning" as any)} variant="tertiary" icon="chevron-forward" iconPosition="trailing" accessibilityLabel="Open My Learning" />
         </View>
         <TouchableOpacity style={s.journey} onPress={() => router.push("/learning" as any)} activeOpacity={0.85} accessibilityRole="button"
           accessibilityLabel={overview ? `My Learning. ${journey.map((j) => `${j.n} ${j.label}`).join(", ")}. ${modulesCompleted} Kingdom School modules completed` : "My Learning"}>
@@ -149,6 +158,31 @@ export default function LearnTab() {
       </ScrollView>
     </View>
   );
+}
+
+// The photo for a Continue Learning item: a story cover (signed media path),
+// a Kingdom School module photo (plain URL), or the item's icon when there is
+// no photo or it fails to load. Never cropped: the frame takes the photo's
+// own shape once it loads, so the whole picture — faces and characters —
+// shows, with no blur and no empty bands.
+function ContinueArt({ item, size, color, frame, defaultRatio }: { item: ContinueItem; size: number; color: string; frame: object; defaultRatio: number }) {
+  const [failed, setFailed] = useState(false);
+  const [ratio, setRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setRatio(null);
+    if (!item.imagePath && item.imageUrl) Image.getSize(item.imageUrl, (w, h) => { if (w && h) setRatio(w / h); }, () => {});
+  }, [item.imagePath, item.imageUrl]);
+  const r = Math.min(2, Math.max(0.5, ratio ?? defaultRatio));
+  // A fixed-width frame (the large card) widens for wide photos so they
+  // aren't shrunk to a sliver; the small cards' frames are already full width.
+  const widen = (frame as { width?: number }).width && r > 1 ? { width: 150 } : null;
+  let art: React.ReactNode = <Ionicons name={item.icon as any} size={size} color={color} />;
+  if (item.imagePath) art = <CoverArt path={item.imagePath} fit="whole" onRatio={setRatio} />;
+  else if (item.imageUrl && !failed) {
+    art = <Image source={{ uri: item.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="contain" onError={() => setFailed(true)}
+      accessibilityElementsHidden importantForAccessibility="no" />;
+  }
+  return <View style={[frame, { aspectRatio: r }, widen]}>{art}</View>;
 }
 
 function makeStyles(c: AppColors) {
@@ -173,7 +207,8 @@ function makeStyles(c: AppColors) {
     fill: { height: 5, backgroundColor: c.progressFill },
     continueBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: c.primaryGreen },
     continueText: { fontSize: 13, color: "#fff", fontFamily: "Inter_700Bold" },
-    mini: { width: 168, padding: 12, gap: 4, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    mini: { width: 168, padding: 12, gap: 4, borderRadius: 14, overflow: "hidden", backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    miniArt: { marginHorizontal: -12, marginTop: -12, marginBottom: 6, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: c.cardBeige },
     miniTitle: { fontSize: 14, lineHeight: 18, color: c.textDark, fontFamily: "Inter_700Bold" },
     empty: { padding: 14, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     journey: { padding: 14, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },

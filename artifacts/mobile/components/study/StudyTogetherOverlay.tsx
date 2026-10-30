@@ -107,7 +107,7 @@ export function StudyTogetherOverlay({
           <Text style={styles.participants} numberOfLines={1}>{[myName, ...otherParticipants.map((p) => p.name)].join(" • ")}</Text>
           {groupContextLine && <Text style={styles.groupContext} numberOfLines={1}>{groupContextLine}</Text>}
         </View>
-        <TouchableOpacity style={styles.returnBtn} onPress={onReturnToCall}>
+        <TouchableOpacity accessibilityRole="button" style={styles.returnBtn} onPress={onReturnToCall}>
           <Ionicons name="videocam-outline" size={16} color="#fff" />
           <Text style={styles.returnBtnText}>Return to Call</Text>
         </TouchableOpacity>
@@ -117,7 +117,7 @@ export function StudyTogetherOverlay({
 
       <View style={styles.tabBar}>
         {TABS.map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
             <Ionicons name={t.icon} size={16} color={tab === t.key ? "#1D9E75" : "rgba(255,255,255,0.55)"} />
             <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
           </TouchableOpacity>
@@ -134,12 +134,12 @@ export function StudyTogetherOverlay({
 
       <View style={styles.bottomActions}>
         {session.isGroup && (
-          <TouchableOpacity style={styles.leaveStudyBtn} onPress={handleLeaveStudy}>
+          <TouchableOpacity accessibilityRole="button" style={styles.leaveStudyBtn} onPress={handleLeaveStudy}>
             <Ionicons name="exit-outline" size={16} color="rgba(255,255,255,0.7)" />
             <Text style={styles.leaveStudyBtnText}>Leave Study Together</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.endStudyBtn, session.isGroup && { flex: 1 }]} onPress={handleEndStudy}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.endStudyBtn, session.isGroup && { flex: 1 }]} onPress={handleEndStudy}>
           <Ionicons name="checkmark-done" size={16} color="#fff" />
           <Text style={styles.endStudyBtnText}>End Study</Text>
         </TouchableOpacity>

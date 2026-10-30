@@ -35,7 +35,7 @@ export default function ChurchSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Church Settings</Text>
@@ -45,7 +45,7 @@ export default function ChurchSettingsScreen() {
         {SECTIONS.map((s) => {
           const locked = s.creatorOnly && !isChurchCreator;
           return (
-            <TouchableOpacity key={s.route} style={styles.row} activeOpacity={0.8} onPress={() => router.push(s.route as any)}>
+            <TouchableOpacity accessibilityRole="button" key={s.route} style={styles.row} activeOpacity={0.8} onPress={() => router.push(s.route as any)}>
               <Text style={styles.rowEmoji}>{s.emoji}</Text>
               <View style={{ flex: 1 }}>
                 <View style={styles.rowTitleRow}>

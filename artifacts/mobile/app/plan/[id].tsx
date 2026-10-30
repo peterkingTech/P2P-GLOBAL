@@ -18,7 +18,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { sharePlan } from "@/lib/sharing";
-import { useLayout, useCardPhotoWidth, centeredMaxWidth } from "@/hooks/useLayout";
+import { useLayout, useCardPhotoWidth, centeredMaxWidth, useFullScreenPhotoHeight } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 
 const COVER_HEIGHT = 200;
 
@@ -73,6 +74,8 @@ export default function PlanDetailScreen() {
   const insets = useSafeAreaInsets();
   const { readingMaxWidth } = useLayout();
   const photoWidth = useCardPhotoWidth(96);
+  // The cover photo fills the device screen below the header bar.
+  const coverHeight = useFullScreenPhotoHeight(insets.top + 52);
   const { profile } = useAuth();
   const { getPlanProgress, checkCategoryCompletion } = useData();
   const { colors } = useTheme();
@@ -183,12 +186,7 @@ export default function PlanDetailScreen() {
               : lockedInfo.unlockMessage}
           </Text>
           {lockedInfo.previousPlanId && (
-            <TouchableOpacity
-              style={styles.lockedBtn}
-              onPress={() => router.replace(`/plan/${lockedInfo.previousPlanId}` as any)}
-            >
-              <Text style={styles.lockedBtnText}>Go to Previous Plan</Text>
-            </TouchableOpacity>
+            <AppButton label="Go to Previous Plan" onPress={() => router.replace(`/plan/${lockedInfo.previousPlanId}` as any)} style={{ marginTop: 8 }} />
           )}
         </View>
       </View>
@@ -224,7 +222,7 @@ export default function PlanDetailScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{plan.title}</Text>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button"
           onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null }, profile?.username)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
@@ -234,7 +232,7 @@ export default function PlanDetailScreen() {
 
       {plan.category && (
         <View style={styles.breadcrumbRow}>
-          <TouchableOpacity onPress={() => router.push(`/plans/category/${plan.category!.id}` as any)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/plans/category/${plan.category!.id}` as any)}>
             <Text style={styles.breadcrumbLink}>{plan.category.title}</Text>
           </TouchableOpacity>
           <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
@@ -252,7 +250,7 @@ export default function PlanDetailScreen() {
         {plan.coverImageUrl && !imgErr ? (
           <Image
             source={{ uri: plan.coverImageUrl }}
-            style={styles.cover}
+            style={[styles.cover, { height: coverHeight }]}
             resizeMode="cover"
             onError={() => setImgErr(true)}
           />
@@ -291,13 +289,7 @@ export default function PlanDetailScreen() {
             </View>
           ) : null}
 
-          <TouchableOpacity
-            style={styles.sharePlanBtn}
-            onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null }, profile?.username)}
-          >
-            <Ionicons name="share-social-outline" size={18} color="#fff" />
-            <Text style={styles.sharePlanBtnText}>Share this Plan</Text>
-          </TouchableOpacity>
+          <AppButton label="Share this Plan" onPress={() => sharePlan({ id: plan.id, title: plan.title, categoryTitle: plan.category?.title ?? null }, profile?.username)} icon="share-social-outline" style={{ marginTop: 20, marginBottom: 4 }} />
 
           <View style={styles.lessonsBlock}>
             <Text style={styles.sectionHeading}>Modules</Text>
@@ -325,7 +317,7 @@ export default function PlanDetailScreen() {
                   </View>
                 </View>
                 {m.lessons.map((lesson) => (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     key={lesson.id}
                     style={styles.lessonRow}
                     onPress={() => router.push(`/lesson/${lesson.id}` as any)}
@@ -355,22 +347,10 @@ export default function PlanDetailScreen() {
               {(plan.teachingCreditYoutube || plan.teachingCreditInstagram) && (
                 <View style={styles.teacherSocials}>
                   {plan.teachingCreditYoutube ? (
-                    <TouchableOpacity
-                      style={styles.socialBtn}
-                      onPress={() => Linking.openURL(plan.teachingCreditYoutube!.startsWith("http") ? plan.teachingCreditYoutube! : `https://youtube.com/${plan.teachingCreditYoutube}`)}
-                    >
-                      <Ionicons name="logo-youtube" size={14} color="#FF0000" />
-                      <Text style={styles.socialHandle}>{plan.teachingCreditYoutube}</Text>
-                    </TouchableOpacity>
+                    <AppButton label={`${plan.teachingCreditYoutube}`} onPress={() => Linking.openURL(plan.teachingCreditYoutube!.startsWith("http") ? plan.teachingCreditYoutube! : `https://youtube.com/${plan.teachingCreditYoutube}`)} variant="secondary" size="sm" icon="logo-youtube" />
                   ) : null}
                   {plan.teachingCreditInstagram ? (
-                    <TouchableOpacity
-                      style={styles.socialBtn}
-                      onPress={() => Linking.openURL(plan.teachingCreditInstagram!.startsWith("http") ? plan.teachingCreditInstagram! : `https://instagram.com/${plan.teachingCreditInstagram!.replace("@", "")}`)}
-                    >
-                      <Ionicons name="logo-instagram" size={14} color="#C13584" />
-                      <Text style={styles.socialHandle}>{plan.teachingCreditInstagram}</Text>
-                    </TouchableOpacity>
+                    <AppButton label={`${plan.teachingCreditInstagram}`} onPress={() => Linking.openURL(plan.teachingCreditInstagram!.startsWith("http") ? plan.teachingCreditInstagram! : `https://instagram.com/${plan.teachingCreditInstagram!.replace("@", "")}`)} variant="secondary" size="sm" icon="logo-instagram" />
                   ) : null}
                 </View>
               )}
@@ -396,8 +376,6 @@ function makeStyles(c: AppColors) {
     lockedIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: c.cardBeige, alignItems: "center", justifyContent: "center" },
     lockedHeading: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     lockedMessage: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
-    lockedBtn: { backgroundColor: c.accentGreen, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
-    lockedBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
     scroll: { paddingHorizontal: 20, paddingTop: 20 },
     errorText: { fontSize: 15, lineHeight: 22, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
 
@@ -416,9 +394,6 @@ function makeStyles(c: AppColors) {
     progressBarBg: { height: 6, backgroundColor: c.progressTrack, borderRadius: 3, overflow: "hidden" },
     progressBarFill: { height: 6, borderRadius: 3 },
     progressLabel: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
-
-    sharePlanBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#1D9E75", borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginTop: 20, marginBottom: 4 },
-    sharePlanBtnText: { fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold", color: "#fff" },
     overviewBlock: { marginTop: 20 },
     sectionHeading: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.6 },
     overviewText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 22 },
@@ -456,7 +431,6 @@ function makeStyles(c: AppColors) {
     teacherName: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     teacherDetail: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
     teacherSocials: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
-    socialBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: c.borderBeige },
     socialHandle: { fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
   });
 }

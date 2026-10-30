@@ -24,7 +24,7 @@ export function CircleSessionBanner({ circleName, onPress, onDismiss }: CircleSe
 
   return (
     <Animated.View style={[styles.wrap, { top: insets.top + 8, transform: [{ translateY }], opacity }]}>
-      <TouchableOpacity style={styles.pill} onPress={onPress} activeOpacity={0.85}>
+      <TouchableOpacity accessibilityRole="button" style={styles.pill} onPress={onPress} activeOpacity={0.85}>
         <View style={styles.iconCircle}>
           <Ionicons name="videocam" size={16} color="#fff" />
         </View>
@@ -32,7 +32,7 @@ export function CircleSessionBanner({ circleName, onPress, onDismiss }: CircleSe
           <Text style={styles.title} numberOfLines={1}>{circleName} is starting</Text>
           <Text style={styles.subtitle}>Tap to join the group call</Text>
         </View>
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </TouchableOpacity>

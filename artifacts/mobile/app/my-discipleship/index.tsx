@@ -23,7 +23,7 @@ export default function MyDiscipleshipHubScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>My Discipleship</Text>
@@ -32,7 +32,7 @@ export default function MyDiscipleshipHubScreen() {
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         <Text style={s.heroSub}>Walk with others. Help them grow. Remember what God is doing in you.</Text>
 
-        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/my-discipleship/journey" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/my-discipleship/journey" as any)}>
           <Text style={s.hubCardEmoji}>🌱</Text>
           <Text style={s.hubCardTitle}>My Discipleship Journey</Text>
           <Text style={s.hubCardSub}>Your relationships, learning, growth and impact.</Text>
@@ -42,7 +42,7 @@ export default function MyDiscipleshipHubScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/my-discipleship/journal" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/my-discipleship/journal" as any)}>
           <Text style={s.hubCardEmoji}>📖</Text>
           <Text style={s.hubCardTitle}>My Discipleship Journal</Text>
           <Text style={s.hubCardSub}>Reflect, remember, pray and grow.</Text>
@@ -52,7 +52,7 @@ export default function MyDiscipleshipHubScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/study-together" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={s.hubCard} activeOpacity={0.85} onPress={() => router.push("/study-together" as any)}>
           <Text style={s.hubCardEmoji}>🤝</Text>
           <Text style={s.hubCardTitle}>Study Together</Text>
           <Text style={s.hubCardSub}>Invitations and the stories and lessons you're studying with others.</Text>
@@ -88,10 +88,5 @@ function makeStyles(c: AppColors) {
     hubCardSub: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, marginBottom: 16 },
     hubCardBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" },
     hubCardBtnText: { fontSize: 13, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
-    hubCardBtnMuted: {
-      alignSelf: "flex-start", backgroundColor: c.cardBeige, borderRadius: 8,
-      paddingHorizontal: 10, paddingVertical: 5,
-    },
-    hubCardBtnMutedText: { fontSize: 11, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4 },
   });
 }

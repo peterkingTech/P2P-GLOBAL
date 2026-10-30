@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getLibrary, type Library, type LibraryItem } from "@/lib/groupLearningApi";
+import { AppButton } from "@/components/ui";
 
 // The central P2P Library: Core Foundation curriculum and P2P Plans by
 // category — published content only, from the one source of truth
@@ -46,7 +47,7 @@ export default function LearningLibraryScreen() {
       {loading ? <ActivityIndicator color={c.primaryGreen} style={{ marginTop: 40 }} /> : error || !lib ? (
         <View style={styles.center}>
           <Text style={styles.muted}>{error ?? "Couldn't load the library."}</Text>
-          <TouchableOpacity style={styles.retry} onPress={() => { setLoading(true); load(); }} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+          <AppButton label="Try again" onPress={() => { setLoading(true); load(); }} variant="outline" />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.primaryGreen} />}>

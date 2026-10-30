@@ -539,12 +539,12 @@ export default function ChurchCallScreen() {
           {raisedHandUserIds.size > 0 && <View style={styles.badgeDot} />}
         </TouchableOpacity>
         {isHost && (
-          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setToolsOpen(true)} accessibilityRole="button" accessibilityLabel="Ministry tools: Scripture, lesson and media">
+          <TouchableOpacity hitSlop={10} style={styles.iconBtnSmall} onPress={() => setToolsOpen(true)} accessibilityRole="button" accessibilityLabel="Ministry tools: Scripture, lesson and media">
             <Ionicons name="book" size={16} color="#fff" />
           </TouchableOpacity>
         )}
         {isHost && (
-          <TouchableOpacity style={styles.iconBtnSmall} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
+          <TouchableOpacity accessibilityRole="button" hitSlop={10} style={styles.iconBtnSmall} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
             <Ionicons name="share-outline" size={16} color="#fff" />
           </TouchableOpacity>
         )}
@@ -593,7 +593,7 @@ export default function ChurchCallScreen() {
               <Text style={styles.mediaLinkText}>{mediaHidden ? "Show" : "Hide"}</Text>
             </TouchableOpacity>
             {!mediaHidden && (
-              <TouchableOpacity onPress={() => setMediaExpanded(true)} accessibilityRole="button" accessibilityLabel="Expand media to full screen" style={styles.mediaLink}>
+              <TouchableOpacity hitSlop={10} onPress={() => setMediaExpanded(true)} accessibilityRole="button" accessibilityLabel="Expand media to full screen" style={styles.mediaLink}>
                 <Ionicons name="expand-outline" size={15} color="#5B8DEF" />
               </TouchableOpacity>
             )}
@@ -639,27 +639,27 @@ export default function ChurchCallScreen() {
           accessibilityRole="button" accessibilityLabel={handRaised ? "Lower your hand" : "Raise your hand"} accessibilityState={{ selected: handRaised }}>
           <Text style={{ fontSize: 16 }}>✋</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reactionBtn} onPress={() => setChatOpen(true)} accessibilityRole="button" accessibilityLabel="Open chat">
+        <TouchableOpacity hitSlop={10} style={styles.reactionBtn} onPress={() => setChatOpen(true)} accessibilityRole="button" accessibilityLabel="Open chat">
           <Ionicons name="chatbubble-outline" size={16} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reactionBtn} onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel="Open notes">
+        <TouchableOpacity hitSlop={10} style={styles.reactionBtn} onPress={() => setNotesOpen(true)} accessibilityRole="button" accessibilityLabel="Open notes">
           <Ionicons name="document-text-outline" size={16} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reactionBtn} onPress={() => setSoundOpen(true)} accessibilityRole="button" accessibilityLabel="Sound on this phone: media and voices">
+        <TouchableOpacity hitSlop={10} style={styles.reactionBtn} onPress={() => setSoundOpen(true)} accessibilityRole="button" accessibilityLabel="Sound on this phone: media and voices">
           <Ionicons name="volume-medium-outline" size={16} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
 
       <View style={[styles.controlsRow, { paddingBottom: insets.bottom + 14 }]}>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute} accessibilityRole="button"
+        <TouchableOpacity hitSlop={10} style={styles.controlBtn} onPress={toggleMute} accessibilityRole="button"
           accessibilityLabel={micDisabledByHost ? "Microphone muted by the host" : muted ? "Unmute microphone" : "Mute microphone"} accessibilityState={{ selected: muted || micDisabledByHost }}>
           <Ionicons name={muted || micDisabledByHost ? "mic-off" : "mic"} size={18} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera} accessibilityRole="button"
+        <TouchableOpacity hitSlop={10} style={styles.controlBtn} onPress={toggleCamera} accessibilityRole="button"
           accessibilityLabel={videoDisabledByHost ? "Camera turned off by the host" : cameraOn ? "Turn camera off" : "Turn camera on"} accessibilityState={{ selected: !cameraOn || videoDisabledByHost }}>
           <Ionicons name={cameraOn && !videoDisabledByHost ? "videocam" : "videocam-off"} size={18} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.controlBtn, styles.endBtn]} onPress={handleLeave} accessibilityRole="button" accessibilityLabel="Leave the gathering">
+        <TouchableOpacity hitSlop={10} style={[styles.controlBtn, styles.endBtn]} onPress={handleLeave} accessibilityRole="button" accessibilityLabel="Leave the gathering">
           <Ionicons name="call" size={18} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
         </TouchableOpacity>
       </View>
@@ -684,7 +684,7 @@ export default function ChurchCallScreen() {
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Participants</Text>
-              <TouchableOpacity onPress={() => setParticipantsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity hitSlop={10} onPress={() => setParticipantsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 360 }}>
               {detail.participants.map((p) => {
@@ -735,7 +735,7 @@ export default function ChurchCallScreen() {
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Sound on this phone</Text>
-              <TouchableOpacity onPress={() => setSoundOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity hitSlop={10} onPress={() => setSoundOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <View style={{ gap: 16, paddingVertical: 8 }}>
               <AudioSlider label="Media (the shared video or audio)" value={sound.media} onChange={(v) => changeSound({ media: v })} accentColor="#5B8DEF" disabled={!detail.call.media} />
@@ -759,7 +759,7 @@ export default function ChurchCallScreen() {
                   <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>Church chat ›</Text>
                 </TouchableOpacity>
               ) : null}
-              <TouchableOpacity onPress={() => setChatOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity hitSlop={10} onPress={() => setChatOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 300 }}>
               {messages.length === 0 ? (
@@ -780,7 +780,7 @@ export default function ChurchCallScreen() {
                 onChangeText={setChatInput}
                 onSubmitEditing={handleSendChat}
               />
-              <TouchableOpacity style={styles.chatSendBtn} onPress={handleSendChat} accessibilityRole="button" accessibilityLabel="Send message">
+              <TouchableOpacity hitSlop={10} style={styles.chatSendBtn} onPress={handleSendChat} accessibilityRole="button" accessibilityLabel="Send message">
                 <Ionicons name="send" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -797,7 +797,7 @@ export default function ChurchCallScreen() {
           <ScrollView contentContainerStyle={styles.sheetBox} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Ministry Tools</Text>
-              <TouchableOpacity onPress={() => setToolsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity hitSlop={10} onPress={() => setToolsOpen(false)} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
 
             <Text style={styles.toolsLabel}>Scripture</Text>
@@ -931,6 +931,5 @@ const styles = StyleSheet.create({
   },
   toolsBtn: { backgroundColor: "#1D9E75", borderRadius: 10, paddingVertical: 11, alignItems: "center", marginTop: 6 },
   toolsBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  toolsLinkBtn: { alignItems: "center", paddingVertical: 8 },
   toolsLinkText: { color: "#1D9E75", fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });

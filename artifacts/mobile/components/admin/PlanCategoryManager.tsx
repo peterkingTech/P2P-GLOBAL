@@ -11,6 +11,7 @@ import {
   getPlanCategoryStats, movePlanToCategory, reorderPlan, togglePlanLock, duplicatePlan,
   type CategoryStats,
 } from "@/lib/adminPlanCategories";
+import { AppButton } from "@/components/ui";
 
 // Full admin management surface for plan categories + the plans inside them
 // (STEP 2-9 of the Plan Category Management build). Category/lock/move/
@@ -44,11 +45,11 @@ type ActionItem = { label: string; icon: string; onPress: () => void; danger?: b
 function ActionSheet({ title, items, onClose }: { title: string; items: ActionItem[]; onClose: () => void }) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity accessibilityRole="button" style={styles.sheetOverlay} activeOpacity={1} onPress={onClose}>
         <View style={styles.sheetBox} onStartShouldSetResponder={() => true}>
           <Text style={styles.sheetTitle} numberOfLines={1}>{title}</Text>
           {items.map((it, i) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={i}
               style={[styles.sheetItem, it.disabled && { opacity: 0.4 }]}
               disabled={it.disabled}
@@ -134,7 +135,7 @@ function CategoryFormModal({
           <ScrollView contentContainerStyle={{ gap: 14 }}>
             <View style={styles.header}>
               <Text style={styles.headerTitle}>{isEdit ? "Edit Category" : "New Category"}</Text>
-              <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
             </View>
 
             <View style={[styles.previewCard, { borderLeftColor: colorTheme }]}>
@@ -155,7 +156,7 @@ function CategoryFormModal({
             <Field label="Color">
               <View style={styles.swatchRow}>
                 {COLOR_PRESETS.map((c) => (
-                  <TouchableOpacity key={c} style={[styles.swatch, { backgroundColor: c }, colorTheme === c && styles.swatchSelected]} onPress={() => setColorTheme(c)}>
+                  <TouchableOpacity accessibilityRole="button" key={c} style={[styles.swatch, { backgroundColor: c }, colorTheme === c && styles.swatchSelected]} onPress={() => setColorTheme(c)}>
                     {colorTheme === c && <Ionicons name="checkmark" size={13} color="#fff" />}
                   </TouchableOpacity>
                 ))}
@@ -166,7 +167,7 @@ function CategoryFormModal({
             <Field label="Icon">
               <View style={styles.swatchRow}>
                 {ICON_PRESETS.map((e) => (
-                  <TouchableOpacity key={e} style={[styles.iconOpt, icon === e && styles.iconOptSelected]} onPress={() => setIcon(e)}>
+                  <TouchableOpacity accessibilityRole="button" key={e} style={[styles.iconOpt, icon === e && styles.iconOptSelected]} onPress={() => setIcon(e)}>
                     <Text style={{ fontSize: 18 }}>{e}</Text>
                   </TouchableOpacity>
                 ))}
@@ -178,7 +179,7 @@ function CategoryFormModal({
               <Field label="Status">
                 <View style={styles.statusRow}>
                   {(["draft", "published", "archived"] as const).map((s) => (
-                    <TouchableOpacity key={s} style={[styles.statusOpt, status === s && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]} onPress={() => setStatus(s)}>
+                    <TouchableOpacity accessibilityRole="button" key={s} style={[styles.statusOpt, status === s && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]} onPress={() => setStatus(s)}>
                       <Text style={[styles.statusOptText, status === s && { color: "#fff" }]}>{s.charAt(0).toUpperCase() + s.slice(1)}</Text>
                     </TouchableOpacity>
                   ))}
@@ -186,7 +187,7 @@ function CategoryFormModal({
               </Field>
             )}
 
-            <TouchableOpacity style={styles.toggleRow} onPress={() => setIsVisible((v) => !v)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.toggleRow} onPress={() => setIsVisible((v) => !v)}>
               <View style={[styles.toggleTrack, isVisible && styles.toggleTrackOn]}>
                 <View style={[styles.toggleThumb, isVisible && styles.toggleThumbOn]} />
               </View>
@@ -198,24 +199,18 @@ function CategoryFormModal({
 
             {error && <Text style={styles.errorText}>{error}</Text>}
 
-            <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>{isEdit ? "Save Changes" : "Create Category"}</Text>}
             </TouchableOpacity>
 
             {isEdit && category && (
               <View style={styles.dangerZone}>
                 <Text style={styles.dangerZoneTitle}>Danger Zone</Text>
-                <TouchableOpacity
-                  style={styles.dangerBtn}
-                  onPress={() => showConfirm("Archive category?", `"${category.title}" will be hidden from users but kept in admin.`, async () => {
+                <AppButton label="Archive Category" onPress={() => showConfirm("Archive category?", `"${category.title}" will be hidden from users but kept in admin.`, async () => {
                     try { await updatePlanCategory(category.id, { status: "archived" } as any); onSaved(); onClose(); }
                     catch (e: any) { showAlert("Error", e.message); }
-                  }, false)}
-                >
-                  <Ionicons name="archive-outline" size={15} color="#B45309" />
-                  <Text style={[styles.dangerBtnText, { color: "#B45309" }]}>Archive Category</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                  }, false)} variant="outline" icon="archive-outline" palette="fixedLight" />
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.dangerBtn, deleting && { opacity: 0.7 }]}
                   disabled={deleting}
                   onPress={() => showConfirm("Delete category?", "It moves to the Recycle Bin (Admin → Recycle Bin), where it can be restored. Categories with plans inside them can't be deleted — move or delete the plans first.", handleDelete)}
@@ -271,14 +266,14 @@ function MovePlanModal({
         <View style={styles.box}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Move "{plan.title}"</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
           </View>
           <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 8 }}>
             {categories.map((c) => {
               const count = (plansByCategory.get(c.id) ?? []).length;
               const isCurrent = plan.parent_category_id === c.id;
               return (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={c.id}
                   style={[styles.moveRow, isCurrent && styles.moveRowCurrent]}
                   disabled={isCurrent || busy}
@@ -296,15 +291,12 @@ function MovePlanModal({
             {creating ? (
               <View style={styles.moveRow}>
                 <TextInput style={[styles.input, { flex: 1 }]} value={newCatTitle} onChangeText={setNewCatTitle} placeholder="New category title" placeholderTextColor={colors.textMuted} autoFocus />
-                <TouchableOpacity onPress={createAndMove} disabled={createBusy || !newCatTitle.trim()}>
+                <TouchableOpacity accessibilityRole="button" onPress={createAndMove} disabled={createBusy || !newCatTitle.trim()}>
                   {createBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="checkmark-circle" size={22} color={colors.accentGreen} />}
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.addInTreeBtn} onPress={() => setCreating(true)}>
-                <Ionicons name="add" size={14} color={colors.accentGreen} />
-                <Text style={styles.addInTreeText}>Create New Category</Text>
-              </TouchableOpacity>
+              <AppButton label="Create New Category" onPress={() => setCreating(true)} variant="tertiary" size="sm" icon="add" palette="fixedLight" />
             )}
           </ScrollView>
           {busy && <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 10 }} />}
@@ -344,14 +336,14 @@ function PositionModal({
         <View style={[styles.box, { maxWidth: 380 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Change Position</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
           </View>
           <Text style={styles.hintText}>"{plan.title}" is currently topic {plan.topic_number ?? "?"} of {maxPosition}. The unlock chain will be recalculated after moving it.</Text>
           <Field label="Move to position">
             <TextInput style={styles.input} value={value} onChangeText={setValue} keyboardType="number-pad" placeholder={`1 - ${maxPosition}`} placeholderTextColor={colors.textMuted} />
           </Field>
           {error && <Text style={styles.errorText}>{error}</Text>}
-          <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={submit} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={submit} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Move</Text>}
           </TouchableOpacity>
         </View>
@@ -391,10 +383,10 @@ function LockConfirmModal({
         <View style={[styles.box, { maxWidth: 400 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
           </View>
           <Text style={styles.hintText}>{message}</Text>
-          <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={submit} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={submit} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>{isCurrentlyLocked ? "Unlock Plan" : "Re-lock Plan"}</Text>}
           </TouchableOpacity>
         </View>
@@ -424,11 +416,11 @@ function NotesModal({ plan, onClose, onSaved }: { plan: Curriculum; onClose: () 
         <View style={styles.box}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Admin Notes</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
           </View>
           <Text style={styles.hintText}>Internal only — never shown to users.</Text>
           <TextInput style={[styles.input, { minHeight: 100 }]} value={notes} onChangeText={setNotes} multiline textAlignVertical="top" placeholder="e.g. Needs a re-record of module 3 audio" placeholderTextColor={colors.textMuted} />
-          <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={save} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={save} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Save Notes</Text>}
           </TouchableOpacity>
         </View>
@@ -457,7 +449,7 @@ function PlanRow({
       {plan.is_visible === false && <Ionicons name="eye-off-outline" size={13} color={colors.textMuted} />}
       {categoryTitle && <Text style={styles.planRowCategory} numberOfLines={1}>{categoryTitle}</Text>}
       <StatusPill status={plan.status} />
-      <TouchableOpacity onPress={onOpenActions} style={{ padding: 4 }}>
+      <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" hitSlop={10} onPress={onOpenActions} style={{ padding: 4 }}>
         <Ionicons name="ellipsis-vertical" size={15} color={colors.textMuted} />
       </TouchableOpacity>
     </View>
@@ -477,7 +469,7 @@ function CategoryRow({
 }) {
   return (
     <View style={styles.categoryCard}>
-      <TouchableOpacity style={[styles.categoryHeader, { borderLeftColor: category.color_theme || colors.primaryGreen }]} onPress={onToggleExpand}>
+      <TouchableOpacity accessibilityRole="button" style={[styles.categoryHeader, { borderLeftColor: category.color_theme || colors.primaryGreen }]} onPress={onToggleExpand}>
         <Ionicons name={isExpanded ? "chevron-down" : "chevron-forward"} size={15} color={colors.textMid} />
         <Text style={{ fontSize: 17 }}>{category.icon ?? "📁"}</Text>
         <Text style={styles.categoryTitle} numberOfLines={1}>{category.title}</Text>
@@ -485,14 +477,14 @@ function CategoryRow({
         <View style={styles.categoryCountBadge}><Text style={styles.categoryCountText}>{plans.length}</Text></View>
         <StatusPill status={category.status} />
         <View style={styles.reorderBtns}>
-          <TouchableOpacity disabled={isFirst} onPress={() => onMove("up")}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up" hitSlop={10} disabled={isFirst} onPress={() => onMove("up")}>
             <Ionicons name="arrow-up" size={13} color={isFirst ? colors.borderBeige : colors.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity disabled={isLast} onPress={() => onMove("down")}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down" hitSlop={10} disabled={isLast} onPress={() => onMove("down")}>
             <Ionicons name="arrow-down" size={13} color={isLast ? colors.borderBeige : colors.textMuted} />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={onOpenActions} style={{ padding: 4 }}>
+        <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" hitSlop={10} onPress={onOpenActions} style={{ padding: 4 }}>
           <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -692,7 +684,7 @@ export default function PlanCategoryManager({
       <View style={styles.topBar}>
         <View style={styles.tabRow}>
           {(["categories", "all", "uncategorized"] as Tab[]).map((t) => (
-            <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
+            <TouchableOpacity accessibilityRole="button" key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
               <Text style={[styles.tabBtnText, tab === t && styles.tabBtnTextActive]}>
                 {t === "categories" ? "Categories" : t === "all" ? "All Plans" : "Uncategorized"}
                 {t === "uncategorized" && uncategorizedPlans.length > 0 ? ` (${uncategorizedPlans.length})` : ""}
@@ -701,14 +693,8 @@ export default function PlanCategoryManager({
           ))}
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          <TouchableOpacity style={styles.addBtnSmall} onPress={onOpenPdfImport}>
-            <Ionicons name="document-attach-outline" size={15} color={colors.accentGreen} />
-            <Text style={styles.addBtnSmallText}>Import from PDF</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addBtnSmall} onPress={() => setCategoryModal("create")}>
-            <Ionicons name="add" size={16} color={colors.accentGreen} />
-            <Text style={styles.addBtnSmallText}>New Category</Text>
-          </TouchableOpacity>
+          <AppButton label="Import from PDF" onPress={onOpenPdfImport} variant="secondary" size="sm" icon="document-attach-outline" palette="fixedLight" />
+          <AppButton label="New Category" onPress={() => setCategoryModal("create")} variant="secondary" size="sm" icon="add" palette="fixedLight" />
         </View>
       </View>
 
@@ -748,15 +734,15 @@ export default function PlanCategoryManager({
               <TextInput style={styles.searchInput} value={search} onChangeText={setSearch} placeholder="Search plans A-Z…" placeholderTextColor={colors.textMuted} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
-              <TouchableOpacity style={[styles.filterChip, !filterCategoryId && styles.filterChipActive]} onPress={() => setFilterCategoryId(null)}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.filterChip, !filterCategoryId && styles.filterChipActive]} onPress={() => setFilterCategoryId(null)}>
                 <Text style={[styles.filterChipText, !filterCategoryId && styles.filterChipTextActive]}>All</Text>
               </TouchableOpacity>
               {categories.map((c) => (
-                <TouchableOpacity key={c.id} style={[styles.filterChip, filterCategoryId === c.id && styles.filterChipActive]} onPress={() => setFilterCategoryId(c.id)}>
+                <TouchableOpacity accessibilityRole="button" key={c.id} style={[styles.filterChip, filterCategoryId === c.id && styles.filterChipActive]} onPress={() => setFilterCategoryId(c.id)}>
                   <Text style={[styles.filterChipText, filterCategoryId === c.id && styles.filterChipTextActive]}>{c.icon} {c.title}</Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={[styles.filterChip, filterCategoryId === "uncategorized" && styles.filterChipActive]} onPress={() => setFilterCategoryId("uncategorized")}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.filterChip, filterCategoryId === "uncategorized" && styles.filterChipActive]} onPress={() => setFilterCategoryId("uncategorized")}>
                 <Text style={[styles.filterChipText, filterCategoryId === "uncategorized" && styles.filterChipTextActive]}>Uncategorized</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -790,10 +776,8 @@ export default function PlanCategoryManager({
               <View key={p.id} style={styles.planRow}>
                 <Text style={styles.planRowTitle} numberOfLines={1}>{p.title}</Text>
                 <StatusPill status={p.status} />
-                <TouchableOpacity style={styles.assignBtn} onPress={() => setMoveModal(p)}>
-                  <Text style={styles.assignBtnText}>Assign Category</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setPlanSheet(p)} style={{ padding: 4 }}>
+                <AppButton label="Assign Category" onPress={() => setMoveModal(p)} variant="secondary" size="sm" palette="fixedLight" />
+                <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" hitSlop={10} onPress={() => setPlanSheet(p)} style={{ padding: 4 }}>
                   <Ionicons name="ellipsis-vertical" size={15} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -833,9 +817,6 @@ const styles = StyleSheet.create({
   tabBtnText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   tabBtnTextActive: { color: "#fff" },
 
-  addBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  addBtnSmallText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
-
   emptyState: { alignItems: "center", paddingTop: 40, gap: 10 },
   emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
 
@@ -860,9 +841,6 @@ const styles = StyleSheet.create({
   planRowTitle: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
   planRowCategory: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", maxWidth: 140 },
 
-  assignBtn: { backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  assignBtnText: { fontSize: 11, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
-
   filterBar: { padding: 14, paddingBottom: 4, gap: 8, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.lightCream, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   searchInput: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular" },
@@ -870,8 +848,6 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },
   filterChipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   filterChipTextActive: { color: "#fff" },
-
-  addInTreeBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 8, paddingHorizontal: 6 },
   addInTreeText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   // Modals

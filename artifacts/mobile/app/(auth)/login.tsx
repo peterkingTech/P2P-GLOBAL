@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import { isSmallPhone, fs } from "@/lib/responsive";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // An email always contains an @ with something on both sides; a username
 // never contains @ except an optional leading one the user typed as a
@@ -121,7 +122,7 @@ export default function LoginScreen() {
               placeholder="••••••••"
               placeholderTextColor={colors.textMuted}
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} hitSlop={10}
               style={styles.eyeBtn}
               onPress={() => setShowPassword((p) => !p)}
             >
@@ -134,33 +135,22 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password" as any)} style={styles.forgotPasswordLink}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/(auth)/forgot-password" as any)} style={styles.forgotPasswordLink}>
           <Text style={styles.linkText}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={handleLogin}
-          activeOpacity={0.85}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.cream} />
-          ) : (
-            <Text style={styles.primaryBtnText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Sign In" onPress={handleLogin} size="lg" disabled={loading} loading={loading} style={{ marginTop: 8 }} palette="fixedLight" />
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>New here?</Text>
-        <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/(auth)/register")}>
           <Text style={styles.linkText}> Create an account</Text>
         </TouchableOpacity>
       </View>
 
       {/* Admin entry point — subtle, below the fold */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={styles.adminLink}
         onPress={() => router.push("/admin/login" as any)}
       >
@@ -227,20 +217,6 @@ const styles = StyleSheet.create({
   },
   passwordRow: { flexDirection: "row", alignItems: "center" },
   eyeBtn: { position: "absolute", right: 14 },
-  primaryBtn: {
-    backgroundColor: colors.accentGreen,
-    borderRadius: 14,
-    height: 54,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  primaryBtnText: {
-    color: colors.cream,
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
-  },
   footer: { flexDirection: "row", justifyContent: "center", marginTop: 32 },
   footerText: { color: colors.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
   linkText: { color: colors.accentGreen, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },

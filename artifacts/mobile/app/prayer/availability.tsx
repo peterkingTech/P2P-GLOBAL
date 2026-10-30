@@ -12,6 +12,7 @@ import {
 import { deviceTimezone, zoneShortLabel } from "@/lib/prayerTimeDisplay";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -120,11 +121,11 @@ export default function PrayerAvailabilityScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>My Availability</Text>
-        <TouchableOpacity onPress={openSheet} accessibilityLabel="Add availability">
+        <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={openSheet} accessibilityLabel="Add availability">
           <Ionicons name="add-circle" size={26} color={c.accentGreen} />
         </TouchableOpacity>
       </View>
@@ -137,9 +138,7 @@ export default function PrayerAvailabilityScreen() {
         ) : slots.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>You haven't shared any prayer availability yet.</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={openSheet}>
-              <Text style={styles.emptyBtnText}>Set My Availability</Text>
-            </TouchableOpacity>
+            <AppButton label="Set My Availability" onPress={openSheet} />
           </View>
         ) : (
           slots.map((slot) => (
@@ -153,7 +152,7 @@ export default function PrayerAvailabilityScreen() {
                 </View>
               </View>
               <Switch value={slot.isActive} onValueChange={() => handleToggle(slot)} trackColor={{ false: c.borderBeige, true: c.accentGreen }} thumbColor="#fff" />
-              <TouchableOpacity onPress={() => handleDelete(slot)} style={{ marginLeft: 12 }} accessibilityLabel="Delete slot">
+              <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => handleDelete(slot)} style={{ marginLeft: 12 }} accessibilityLabel="Delete slot">
                 <Ionicons name="trash-outline" size={18} color="#DC2626" />
               </TouchableOpacity>
             </View>
@@ -167,27 +166,27 @@ export default function PrayerAvailabilityScreen() {
             <Text style={styles.sheetTitle}>Add Availability</Text>
 
             <View style={styles.recRow}>
-              <TouchableOpacity style={[styles.recBtn, recurrence === "once" && styles.recBtnActive]} onPress={() => setRecurrence("once")}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, recurrence === "once" && styles.recBtnActive]} onPress={() => setRecurrence("once")}>
                 <Text style={[styles.recBtnText, recurrence === "once" && styles.recBtnTextActive]}>One time</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.recBtn, recurrence === "weekly" && styles.recBtnActive]} onPress={() => setRecurrence("weekly")}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, recurrence === "weekly" && styles.recBtnActive]} onPress={() => setRecurrence("weekly")}>
                 <Text style={[styles.recBtnText, recurrence === "weekly" && styles.recBtnTextActive]}>Every week</Text>
               </TouchableOpacity>
             </View>
 
             {recurrence === "once" ? (
               <View style={styles.recRow}>
-                <TouchableOpacity style={[styles.recBtn, dateChoice === "today" && styles.recBtnActive]} onPress={() => setDateChoice("today")}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, dateChoice === "today" && styles.recBtnActive]} onPress={() => setDateChoice("today")}>
                   <Text style={[styles.recBtnText, dateChoice === "today" && styles.recBtnTextActive]}>Today</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.recBtn, dateChoice === "tomorrow" && styles.recBtnActive]} onPress={() => setDateChoice("tomorrow")}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, dateChoice === "tomorrow" && styles.recBtnActive]} onPress={() => setDateChoice("tomorrow")}>
                   <Text style={[styles.recBtnText, dateChoice === "tomorrow" && styles.recBtnTextActive]}>Tomorrow</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.weekdayRow}>
                 {WEEKDAYS.map((w) => (
-                  <TouchableOpacity key={w.key} style={[styles.weekdayChip, dayOfWeek === w.key && styles.weekdayChipActive]} onPress={() => setDayOfWeek(w.key)}>
+                  <TouchableOpacity accessibilityRole="button" key={w.key} style={[styles.weekdayChip, dayOfWeek === w.key && styles.weekdayChipActive]} onPress={() => setDayOfWeek(w.key)}>
                     <Text style={[styles.weekdayChipText, dayOfWeek === w.key && styles.weekdayChipTextActive]}>{w.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -207,21 +206,17 @@ export default function PrayerAvailabilityScreen() {
             <Text style={styles.tzNote}>Your timezone: {zoneShortLabel(tz)}</Text>
 
             <View style={[styles.recRow, { marginTop: 10 }]}>
-              <TouchableOpacity style={[styles.recBtn, visibility === "open" && styles.recBtnActive]} onPress={() => setVisibility("open")}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, visibility === "open" && styles.recBtnActive]} onPress={() => setVisibility("open")}>
                 <Text style={[styles.recBtnText, visibility === "open" && styles.recBtnTextActive]}>Open to peers</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.recBtn, visibility === "private" && styles.recBtnActive]} onPress={() => setVisibility("private")}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.recBtn, visibility === "private" && styles.recBtnActive]} onPress={() => setVisibility("private")}>
                 <Text style={[styles.recBtnText, visibility === "private" && styles.recBtnTextActive]}>Private</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setSheetOpen(false)} disabled={saving}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setSheetOpen(false)} variant="outline" disabled={saving} style={{ flex: 1 }} />
+              <AppButton label="Save" onPress={handleSave} disabled={saving} loading={saving} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -239,8 +234,6 @@ function makeStyles(c: AppColors) {
     tzNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginBottom: 12 },
     emptyState: { alignItems: "center", paddingVertical: 40, gap: 14 },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
-    emptyBtn: { backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10 },
-    emptyBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
     slotCard: {
       flexDirection: "row", alignItems: "center", backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 10,
@@ -269,9 +262,5 @@ function makeStyles(c: AppColors) {
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center",
     },
     sheetRow: { flexDirection: "row", gap: 10, marginTop: 12 },
-    cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    cancelBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-    saveBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    saveBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

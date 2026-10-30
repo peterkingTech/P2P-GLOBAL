@@ -88,7 +88,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
   return (
     <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={[styles.closeBtn, { top: insets.top + 12 }]} onPress={onClose} hitSlop={12}>
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={[styles.closeBtn, { top: insets.top + 12 }]} onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={26} color="#fff" />
         </TouchableOpacity>
 
@@ -113,7 +113,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
         </ViewShot>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleShare} disabled={busy !== null} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionBtn} onPress={handleShare} disabled={busy !== null} activeOpacity={0.85}>
             {busy === "share" ? (
               <ActivityIndicator color="#0B3A2E" size="small" />
             ) : (
@@ -123,7 +123,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
               </>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnOutline} onPress={handleSave} disabled={busy !== null} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" style={styles.actionBtnOutline} onPress={handleSave} disabled={busy !== null} activeOpacity={0.85}>
             {busy === "save" ? (
               <ActivityIndicator color="#E0A441" size="small" />
             ) : (
@@ -135,7 +135,7 @@ export default function CompletionCard({ visible, firstName, completionDate, onC
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.doneBtn} onPress={onClose} activeOpacity={0.7}>
+        <TouchableOpacity accessibilityRole="button" style={styles.doneBtn} onPress={onClose} activeOpacity={0.7}>
           <Text style={styles.doneBtnText}>Done</Text>
         </TouchableOpacity>
       </View>

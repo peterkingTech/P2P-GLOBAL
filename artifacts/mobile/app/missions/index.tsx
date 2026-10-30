@@ -13,6 +13,7 @@ import {
   type MissionStory, type MissionField, type MissionFocusTag,
 } from "@/lib/missionsApi";
 import { getKingdomWinsFeed, type KingdomWin } from "@/lib/kingdomWinsApi";
+import { AppButton } from "@/components/ui";
 
 // Missions — rebuilt Discover-first landing (Stage 2). The old screen's
 // two data sources are handled deliberately:
@@ -111,8 +112,6 @@ function makeStyles(c: AppColors) {
     kingdomWinCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 14, padding: 14, marginBottom: 10, gap: 4 },
     kingdomWinTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
     kingdomWinBody: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
-    shareKingdomWinBtn: { flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 10 },
-    shareKingdomWinBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
   });
 }
 
@@ -186,18 +185,9 @@ export default function MissionsScreen() {
           <Text style={styles.title}>🌍 Missions</Text>
           <Text style={styles.subtitle}>See the mission. Hear the story. Pray for the workers.</Text>
           <View style={styles.goRow}>
-            <TouchableOpacity style={styles.goPill} onPress={() => router.push("/missions/learn" as any)}>
-              <Ionicons name="school-outline" size={14} color={colors.textDark} />
-              <Text style={styles.goPillText}>Learn</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.goPill} onPress={() => router.push("/missions/go" as any)}>
-              <Ionicons name="compass-outline" size={14} color={colors.textDark} />
-              <Text style={styles.goPillText}>Go</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.goPill} onPress={() => router.push("/prayer/library" as any)}>
-              <Ionicons name="bookmark-outline" size={14} color={colors.textDark} />
-              <Text style={styles.goPillText}>Saved</Text>
-            </TouchableOpacity>
+            <AppButton label="Learn" onPress={() => router.push("/missions/learn" as any)} variant="secondary" icon="school-outline" style={{ flex: 1 }} />
+            <AppButton label="Go" onPress={() => router.push("/missions/go" as any)} variant="secondary" icon="compass-outline" style={{ flex: 1 }} />
+            <AppButton label="Saved" onPress={() => router.push("/prayer/library" as any)} variant="secondary" icon="bookmark-outline" style={{ flex: 1 }} />
           </View>
         </View>
 
@@ -208,7 +198,7 @@ export default function MissionsScreen() {
             {featured && (
               <>
                 <Text style={styles.sectionTitle}>Featured Mission Story</Text>
-                <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9} onPress={() => router.push(`/missions/story/${featured.id}` as any)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.featuredCard} activeOpacity={0.9} onPress={() => router.push(`/missions/story/${featured.id}` as any)}>
                   <Text style={styles.featuredBadge}>{featured.storyType.replace("_", " ").toUpperCase()}</Text>
                   <Text style={styles.featuredTitle}>{featured.title}</Text>
                   {!!featured.summary && <Text style={styles.featuredSummary} numberOfLines={3}>{featured.summary}</Text>}
@@ -232,7 +222,7 @@ export default function MissionsScreen() {
             ) : (
               <View style={styles.list}>
                 {remainingStories.map((s) => (
-                  <TouchableOpacity key={s.id} style={styles.storyCard} onPress={() => router.push(`/missions/story/${s.id}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" key={s.id} style={styles.storyCard} onPress={() => router.push(`/missions/story/${s.id}` as any)}>
                     <View style={styles.storyMetaRow}>
                       {!!s.missionField && <Text style={styles.storyFieldText}>{s.missionField.title}</Text>}
                       {!!s.mediaType && <Ionicons name={s.mediaType === "video" ? "videocam-outline" : "image-outline"} size={12} color={colors.textMuted} />}
@@ -253,7 +243,7 @@ export default function MissionsScreen() {
                 horizontal showsHorizontalScrollIndicator={false} data={fields} keyExtractor={(f) => f.id}
                 contentContainerStyle={{ paddingHorizontal: 20 }}
                 renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.fieldCard} onPress={() => router.push(`/missions/field/${item.slug}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.fieldCard} onPress={() => router.push(`/missions/field/${item.slug}` as any)}>
                     <Text style={styles.fieldTitle}>{item.title}</Text>
                     <Text style={styles.fieldCountry}>{item.country}</Text>
                   </TouchableOpacity>
@@ -266,9 +256,7 @@ export default function MissionsScreen() {
               horizontal showsHorizontalScrollIndicator={false} data={FOCUS_CHIPS} keyExtractor={(f) => f}
               contentContainerStyle={{ paddingHorizontal: 20 }}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.focusChip} onPress={() => router.push({ pathname: "/missions/focus/[focus]", params: { focus: item } } as any)}>
-                  <Text style={styles.focusChipText}>{MISSION_FOCUS_LABELS[item]}</Text>
-                </TouchableOpacity>
+                <AppButton label={`${MISSION_FOCUS_LABELS[item]}`} onPress={() => router.push({ pathname: "/missions/focus/[focus]", params: { focus: item } } as any)} variant="secondary" size="sm" style={{ marginRight: 8 }} />
               )}
             />
           </>
@@ -276,7 +264,7 @@ export default function MissionsScreen() {
 
         <View style={styles.kingdomWinsHeaderRow}>
           <Text style={styles.sectionTitle}>Kingdom Wins</Text>
-          <TouchableOpacity onPress={() => router.push("/kingdom-wins" as any)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/kingdom-wins" as any)}>
             <Text style={styles.viewAllLink}>View All</Text>
           </TouchableOpacity>
         </View>
@@ -284,22 +272,19 @@ export default function MissionsScreen() {
         {kingdomWinsLoading ? (
           <View style={styles.loading}><ActivityIndicator color={colors.accentGreen} /></View>
         ) : kingdomWins.length === 0 ? (
-          <TouchableOpacity style={styles.kingdomWinsEmptyCard} onPress={() => router.push("/kingdom-wins/create" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.kingdomWinsEmptyCard} onPress={() => router.push("/kingdom-wins/create" as any)}>
             <Ionicons name="sparkles-outline" size={22} color={colors.accentGreen} />
             <Text style={styles.kingdomWinsEmptyText}>Your story could encourage someone. Share a Kingdom Win.</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.list}>
             {kingdomWins.map((k) => (
-              <TouchableOpacity key={k.id} style={styles.kingdomWinCard} onPress={() => router.push(`/kingdom-wins/${k.id}` as any)}>
+              <TouchableOpacity accessibilityRole="button" key={k.id} style={styles.kingdomWinCard} onPress={() => router.push(`/kingdom-wins/${k.id}` as any)}>
                 <Text style={styles.kingdomWinTitle}>{k.title}</Text>
                 <Text style={styles.kingdomWinBody} numberOfLines={2}>{k.body}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.shareKingdomWinBtn} onPress={() => router.push("/kingdom-wins/create" as any)}>
-              <Ionicons name="add-circle-outline" size={16} color={colors.accentGreen} />
-              <Text style={styles.shareKingdomWinBtnText}>Share a Kingdom Win</Text>
-            </TouchableOpacity>
+            <AppButton label="Share a Kingdom Win" onPress={() => router.push("/kingdom-wins/create" as any)} variant="outline" icon="add-circle-outline" />
           </View>
         )}
 

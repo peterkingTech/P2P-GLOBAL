@@ -11,6 +11,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from "expo
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 type RecorderState = "idle" | "requesting" | "cameraReady" | "recording" | "reviewing" | "uploading";
 
@@ -97,21 +98,7 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
 
   if (state === "idle" || state === "requesting") {
     return (
-      <TouchableOpacity
-        style={[styles.startBtn, (disabled || state === "requesting") && styles.btnDisabled]}
-        onPress={handleOpenCamera}
-        disabled={disabled || state === "requesting"}
-        activeOpacity={0.8}
-      >
-        {state === "requesting" ? (
-          <ActivityIndicator color={colors.accentGreen} size="small" />
-        ) : (
-          <>
-            <Ionicons name="videocam" size={18} color={colors.accentGreen} />
-            <Text style={styles.startBtnText}>Record Video</Text>
-          </>
-        )}
-      </TouchableOpacity>
+      <AppButton label="Record Video" onPress={handleOpenCamera} variant="outline" icon="videocam" disabled={disabled || state === "requesting"} loading={state === "requesting"} palette="fixedLight" />
     );
   }
 
@@ -134,19 +121,17 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
         )}
         <View style={styles.cameraControls}>
           {state === "cameraReady" ? (
-            <TouchableOpacity style={styles.recordBtn} onPress={startRecording} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" style={styles.recordBtn} onPress={startRecording} activeOpacity={0.8}>
               <View style={styles.recordBtnInner} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.stopCameraBtn} onPress={stopRecording} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" style={styles.stopCameraBtn} onPress={stopRecording} activeOpacity={0.8}>
               <View style={styles.stopCameraBtnInner} />
             </TouchableOpacity>
           )}
         </View>
         {state === "cameraReady" && (
-          <TouchableOpacity style={styles.cancelCameraBtn} onPress={() => setState("idle")}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
+          <AppButton label="Cancel" variant="secondary" onPress={() => setState("idle")} palette="fixedLight" />
         )}
       </View>
     );
@@ -168,14 +153,8 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
           />
         )}
         <View style={styles.reviewActions}>
-          <TouchableOpacity style={styles.reRecordBtn} onPress={handleReRecord} activeOpacity={0.8}>
-            <Ionicons name="refresh" size={14} color={colors.textMid} />
-            <Text style={styles.reRecordText}>Re-record</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.useBtn} onPress={handleSubmit} activeOpacity={0.8}>
-            <Ionicons name="checkmark" size={14} color={colors.cream} />
-            <Text style={styles.useText}>Use Video</Text>
-          </TouchableOpacity>
+          <AppButton label="Re-record" onPress={handleReRecord} variant="secondary" icon="refresh" style={{ flex: 1 }} palette="fixedLight" />
+          <AppButton label="Use Video" onPress={handleSubmit} icon="checkmark" style={{ flex: 1 }} palette="fixedLight" />
         </View>
       </View>
     );
@@ -194,13 +173,6 @@ export default function VideoRecorder({ onSubmit, disabled }: Props) {
 }
 
 const styles = StyleSheet.create({
-  startBtn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 12,
-    borderStyle: "dashed", paddingVertical: 14, paddingHorizontal: 16,
-  },
-  btnDisabled: { opacity: 0.5 },
-  startBtnText: { fontSize: 14, fontWeight: "600", color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
   cameraContainer: { borderRadius: 12, overflow: "hidden", gap: 0 },
   camera: { width: "100%", borderRadius: 12 },
@@ -237,9 +209,6 @@ const styles = StyleSheet.create({
   stopCameraBtnInner: {
     width: 28, height: 28, borderRadius: 4, backgroundColor: "#fff",
   },
-  cancelCameraBtn: {
-    backgroundColor: colors.textDark, paddingBottom: 8, alignItems: "center",
-  },
   cancelText: { fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_400Regular" },
 
   reviewBox: {
@@ -251,16 +220,7 @@ const styles = StyleSheet.create({
   videoPreview: { width: "100%", borderRadius: 8, backgroundColor: colors.textDark },
 
   reviewActions: { flexDirection: "row", gap: 8, marginTop: 2 },
-  reRecordBtn: {
-    flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingVertical: 9,
-    backgroundColor: colors.card,
-  },
   reRecordText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  useBtn: {
-    flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 9,
-  },
   useText: { fontSize: 13, color: colors.cream, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 
   uploadingBox: {

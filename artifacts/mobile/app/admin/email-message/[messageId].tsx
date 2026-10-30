@@ -11,6 +11,7 @@ import {
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
   help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
 };
@@ -40,10 +41,10 @@ function ForwardModal({
           <Text style={styles.modalTitle}>Forward Message</Text>
 
           <View style={styles.modeRow}>
-            <TouchableOpacity style={[styles.modeChip, mode === "department" && styles.modeChipActive]} onPress={() => setMode("department")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.modeChip, mode === "department" && styles.modeChipActive]} onPress={() => setMode("department")}>
               <Text style={[styles.modeChipText, mode === "department" && styles.modeChipTextActive]}>To Department</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.modeChip, mode === "admin" && styles.modeChipActive]} onPress={() => setMode("admin")}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.modeChip, mode === "admin" && styles.modeChipActive]} onPress={() => setMode("admin")}>
               <Text style={[styles.modeChipText, mode === "admin" && styles.modeChipTextActive]}>To Admin (@username)</Text>
             </TouchableOpacity>
           </View>
@@ -51,7 +52,7 @@ function ForwardModal({
           {mode === "department" ? (
             <View style={styles.deptPickRow}>
               {(Object.keys(DEPARTMENT_LABELS) as ContactDepartment[]).map((d) => (
-                <TouchableOpacity key={d} style={[styles.deptChip, department === d && styles.deptChipActive]} onPress={() => setDepartment(d)}>
+                <TouchableOpacity accessibilityRole="button" key={d} style={[styles.deptChip, department === d && styles.deptChipActive]} onPress={() => setDepartment(d)}>
                   <Text style={[styles.deptChipText, department === d && styles.deptChipTextActive]}>{DEPARTMENT_LABELS[d]}</Text>
                 </TouchableOpacity>
               ))}
@@ -79,21 +80,14 @@ function ForwardModal({
           <Text style={styles.disclaimer}>The sender will NOT be notified that this message was forwarded.</Text>
 
           <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalSubmitBtn}
-              onPress={() => {
+            <AppButton label="Cancel" onPress={onClose} variant="secondary" style={{ flex: 1 }} palette="fixedLight" />
+            <AppButton label="Forward" onPress={() => {
                 if (mode === "admin" && !username.trim()) {
                   Alert.alert("Enter a username to forward to.");
                   return;
                 }
                 onSubmit(mode === "department" ? { toDepartment: department, note: note.trim() || undefined } : { toUsername: username.trim(), note: note.trim() || undefined });
-              }}
-            >
-              <Text style={styles.modalSubmitText}>Forward</Text>
-            </TouchableOpacity>
+              }} style={{ flex: 1 }} palette="fixedLight" />
           </View>
         </View>
       </View>
@@ -222,11 +216,11 @@ export default function AdminEmailMessageDetail() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{message.subject}</Text>
-        <TouchableOpacity onPress={handleToggleStar} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={message.isStarredByMe ? "Remove star" : "Star"} accessibilityState={{ selected: !!message.isStarredByMe }} onPress={handleToggleStar} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name={message.isStarredByMe ? "star" : "star-outline"} size={20} color={message.isStarredByMe ? colors.amber : colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -240,7 +234,7 @@ export default function AdminEmailMessageDetail() {
           <Text style={styles.metaDate}>{new Date(message.createdAt).toLocaleString()}</Text>
         </View>
 
-        <TouchableOpacity style={styles.senderCard} onPress={() => message.fromUsername && router.push(`/profile/${message.fromUsername}` as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.senderCard} onPress={() => message.fromUsername && router.push(`/profile/${message.fromUsername}` as any)}>
           <View style={styles.senderTopRow}>
             <Text style={styles.senderName}>{message.fromDisplayName}</Text>
             {message.fromIsVerified && <Ionicons name="checkmark-circle" size={14} color={colors.accentGreen} />}
@@ -258,7 +252,7 @@ export default function AdminEmailMessageDetail() {
         <View style={styles.priorityRow}>
           <Text style={styles.priorityLabel}>Priority:</Text>
           {PRIORITY_OPTIONS.map((p) => (
-            <TouchableOpacity key={p} disabled={busy} style={[styles.priorityChip, message.priority === p && styles.priorityChipActive]} onPress={() => handlePriority(p)}>
+            <TouchableOpacity accessibilityRole="button" key={p} disabled={busy} style={[styles.priorityChip, message.priority === p && styles.priorityChipActive]} onPress={() => handlePriority(p)}>
               <Text style={[styles.priorityChipText, message.priority === p && styles.priorityChipTextActive]}>{p}</Text>
             </TouchableOpacity>
           ))}
@@ -288,18 +282,16 @@ export default function AdminEmailMessageDetail() {
 
         <View style={styles.quickRow}>
           {QUICK_RESPONSES.map((q, i) => (
-            <TouchableOpacity key={i} style={styles.quickChip} onPress={() => setComposeText(q)}>
-              <Text style={styles.quickChipText} numberOfLines={1}>{q}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${q}`} onPress={() => setComposeText(q)} variant="secondary" size="sm" key={i} palette="fixedLight" />
           ))}
         </View>
 
         <View style={styles.composeCard}>
           <View style={styles.composeToggleRow}>
-            <TouchableOpacity style={[styles.composeToggle, !composeAsNote && styles.composeToggleActive]} onPress={() => setComposeAsNote(false)}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.composeToggle, !composeAsNote && styles.composeToggleActive]} onPress={() => setComposeAsNote(false)}>
               <Text style={[styles.composeToggleText, !composeAsNote && styles.composeToggleTextActive]}>Reply to sender</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.composeToggle, composeAsNote && styles.composeToggleActive]} onPress={() => setComposeAsNote(true)}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.composeToggle, composeAsNote && styles.composeToggleActive]} onPress={() => setComposeAsNote(true)}>
               <Text style={[styles.composeToggleText, composeAsNote && styles.composeToggleTextActive]}>🔒 Internal note</Text>
             </TouchableOpacity>
           </View>
@@ -311,33 +303,15 @@ export default function AdminEmailMessageDetail() {
             placeholderTextColor={colors.textMuted}
             multiline
           />
-          <TouchableOpacity
-            style={[styles.sendBtn, (sending || composeText.trim().length === 0) && styles.sendBtnDisabled]}
-            disabled={sending || composeText.trim().length === 0}
-            onPress={handleSend}
-          >
-            {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.sendBtnText}>{composeAsNote ? "Add Note" : "Send Reply"}</Text>}
-          </TouchableOpacity>
+          <AppButton label={composeAsNote ? "Add Note" : "Send Reply"} onPress={handleSend} disabled={sending || composeText.trim().length === 0} loading={sending} palette="fixedLight" />
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={handleMarkUnread}>
-            <Ionicons name="mail-unread-outline" size={16} color={colors.textDark} />
-            <Text style={styles.actionBtnText}>Mark Unread</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={() => setShowForward(true)}>
-            <Ionicons name="arrow-redo" size={16} color={colors.textDark} />
-            <Text style={styles.actionBtnText}>Forward</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} disabled={busy} onPress={handleToggleArchive}>
-            <Ionicons name={message.isArchived ? "arrow-undo-outline" : "archive-outline"} size={16} color={colors.textDark} />
-            <Text style={styles.actionBtnText}>{message.isArchived ? "Unarchive" : "Archive"}</Text>
-          </TouchableOpacity>
+          <AppButton label="Mark Unread" onPress={handleMarkUnread} variant="secondary" icon="mail-unread-outline" disabled={busy} style={{ flex: 1 }} palette="fixedLight" />
+          <AppButton label="Forward" onPress={() => setShowForward(true)} variant="secondary" icon="arrow-redo" disabled={busy} style={{ flex: 1 }} palette="fixedLight" />
+          <AppButton label={message.isArchived ? "Unarchive" : "Archive"} onPress={handleToggleArchive} variant="secondary" icon={message.isArchived ? "arrow-undo-outline" : "archive-outline"} disabled={busy} style={{ flex: 1 }} palette="fixedLight" />
           {message.status !== "closed" && (
-            <TouchableOpacity style={[styles.actionBtn, styles.closeBtn]} disabled={busy} onPress={handleClose}>
-              <Ionicons name="checkmark-done" size={16} color="#fff" />
-              <Text style={[styles.actionBtnText, { color: "#fff" }]}>Close</Text>
-            </TouchableOpacity>
+            <AppButton label="Close" onPress={handleClose} variant="secondary" icon="checkmark-done" disabled={busy} style={{ flex: 1 }} palette="fixedLight" />
           )}
         </View>
       </ScrollView>
@@ -391,13 +365,7 @@ const styles = StyleSheet.create({
   composeToggleText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   composeToggleTextActive: { color: "#fff", fontWeight: "700" },
   composeInput: { minHeight: 70, fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", textAlignVertical: "top", marginBottom: 10 },
-  sendBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, alignItems: "center", paddingVertical: 11 },
-  sendBtnDisabled: { opacity: 0.5 },
-  sendBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   actionRow: { flexDirection: "row", gap: 10 },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
-  actionBtnText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
-  closeBtn: { backgroundColor: colors.textDark, borderColor: colors.textDark },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
   modalCard: { backgroundColor: colors.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
@@ -415,8 +383,6 @@ const styles = StyleSheet.create({
   noteInput: { minHeight: 70, textAlignVertical: "top" },
   disclaimer: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic" },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 4 },
-  modalCancelBtn: { flex: 1, alignItems: "center", paddingVertical: 12, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
   modalCancelText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
-  modalSubmitBtn: { flex: 1, alignItems: "center", paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primaryGreen },
   modalSubmitText: { fontSize: 13, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
 });

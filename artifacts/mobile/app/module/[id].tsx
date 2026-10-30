@@ -18,6 +18,8 @@ import colors from "@/constants/colors";
 import { useTranslation } from "react-i18next";
 import LockExplanationSheet from "@/components/learning/LockExplanationSheet";
 import { explainLessonLock, nextAction, progressSummary, type LockExplanation, type LockLesson } from "@/lib/lessonLocks";
+import { AppButton } from "@/components/ui";
+import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
 
 const HERO_HEIGHT = 230;
 
@@ -115,6 +117,8 @@ export default function ModuleDetailScreen() {
   const openLessonFromSheet = (lessonId: string) => { setLockSheet(null); router.push(`/lesson/${lessonId}`); };
 
   const topOffset = insets.top + (Platform.OS === "web" ? 67 : 0);
+  // The hero photo fills the device screen (it starts at the very top).
+  const heroHeight = useFullScreenPhotoHeight();
 
   if (!coreModule && fallbackLoading) {
     return (
@@ -133,11 +137,11 @@ export default function ModuleDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         {/* ── Hero ── */}
-        <View style={[styles.hero, { height: HERO_HEIGHT + topOffset }]}>
+        <View style={[styles.hero, { height: Math.max(heroHeight, HERO_HEIGHT + topOffset) }]}>
           <HeroImage uri={heroImageUri} isLocked={isLocked} />
           <View style={styles.heroOverlay} />
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button"
             style={[styles.backBtn, { top: topOffset + 12 }]}
             onPress={() => router.back()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -185,11 +189,7 @@ export default function ModuleDetailScreen() {
 
         {/* ── Continue learning: the next ELIGIBLE lesson (never a locked one) ── */}
         {continueNext?.lessonId ? (
-          <TouchableOpacity style={styles.continueBtn} onPress={() => router.push(`/lesson/${continueNext.lessonId}`)}
-            accessibilityRole="button" accessibilityLabel={continueNext.label}>
-            <Ionicons name={continueNext.kind === "fix_revision" ? "create-outline" : "play"} size={16} color={colors.cream} />
-            <Text style={styles.continueBtnText} numberOfLines={1}>{continueNext.label}</Text>
-          </TouchableOpacity>
+          <AppButton label={`${continueNext.label}`} onPress={() => router.push(`/lesson/${continueNext.lessonId}`)} icon={continueNext.kind === "fix_revision" ? "create-outline" : "play"} accessibilityLabel={continueNext.label} style={{ marginHorizontal: 20, marginTop: 16 }} palette="fixedLight" />
         ) : continueNext?.kind === "wait_for_review" ? (
           <Text style={styles.continueNote}>Your submitted lessons are waiting for peer review.</Text>
         ) : null}
@@ -270,8 +270,6 @@ export default function ModuleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  continueBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 48, marginHorizontal: 20, marginTop: 16, borderRadius: 24, backgroundColor: colors.accentGreen, paddingHorizontal: 16 },
-  continueBtnText: { color: colors.cream, fontSize: 15, fontFamily: "Inter_700Bold", flexShrink: 1 },
   continueNote: { marginHorizontal: 20, marginTop: 14, fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium", textAlign: "center" },
   lockedCard: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 20, marginTop: 14, padding: 12, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: colors.card },
   lockedCardText: { flex: 1, fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },

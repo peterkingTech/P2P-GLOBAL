@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { FamilyApiError, previewFamilyInvite, requestToJoinFamily, type FamilyInvitePreview } from "@/lib/familyApi";
 import { FAMILY_ROLE_LABEL } from "@/lib/familyMembersModel";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Opened from a Family Circle invite QR / link. Shows which family it is and
 // lets the person ASK to join. Nothing here joins anyone: a Shepherd or
@@ -55,9 +56,7 @@ export default function FamilyJoinScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <TouchableOpacity onPress={goBack} style={styles.back} accessibilityRole="button" accessibilityLabel="Go back">
-        <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-      </TouchableOpacity>
+      <IconButton icon="arrow-back" accessibilityLabel="Go back" onPress={goBack} color={colors.textDark} />
 
       <View style={styles.card}>
         <Ionicons name="home-outline" size={36} color={colors.accentGreen} />
@@ -76,7 +75,7 @@ export default function FamilyJoinScreen() {
         ) : phase === "error" ? (
           <>
             <Text style={styles.title}>Couldn't open this invite</Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={load} accessibilityRole="button"><Text style={styles.primaryBtnText}>Try again</Text></TouchableOpacity>
+            <AppButton label="Try again" onPress={load} style={{ minWidth: 180, marginTop: 10 }} />
           </>
         ) : preview ? (
           <>
@@ -93,9 +92,7 @@ export default function FamilyJoinScreen() {
                 <Text style={styles.body}>
                   Ask to join as {FAMILY_ROLE_LABEL[preview.role]?.toLowerCase() ?? "a member"}. The Family Shepherd or a Co-Shepherd reviews every request.
                 </Text>
-                <TouchableOpacity style={styles.primaryBtn} onPress={ask} disabled={phase === "sending"} accessibilityRole="button">
-                  {phase === "sending" ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Ask to join</Text>}
-                </TouchableOpacity>
+                <AppButton label="Ask to join" onPress={ask} disabled={phase === "sending"} loading={phase === "sending"} style={{ minWidth: 180, marginTop: 10 }} />
               </>
             )}
           </>
@@ -113,6 +110,4 @@ const makeStyles = (c: AppColors) =>
     title: { fontSize: 20, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center", marginTop: 8 },
     body: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
     status: { fontSize: 14, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold", textAlign: "center", marginTop: 6 },
-    primaryBtn: { minHeight: 48, minWidth: 180, paddingHorizontal: 24, borderRadius: 14, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center", marginTop: 10 },
-    primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
   });

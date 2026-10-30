@@ -14,6 +14,9 @@ import { storyIntro, progressSummary, STATE_LABEL, lockedMessage } from "@/lib/s
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips } from "@/components/kingdom-stories/ScriptureLinks";
 import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
+import { AppButton, IconButton } from "@/components/ui";
+import { CoverArt } from "@/components/kingdom-stories/DiscoverRow";
+import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
 
 // A Kingdom Story as a book: cover, introduction, the reader's progress,
 // Start/Continue Reading, a table of contents (each chapter's status in words
@@ -36,6 +39,8 @@ export default function KingdomStoryBookScreen() {
   const router = useRouter();
   const { colors: c } = useTheme();
   const s = makeStyles(c);
+  // The cover fills the device screen below the header (status bar + 56).
+  const coverH = useFullScreenPhotoHeight(insets.top + 56);
   // open=next: "Start / Continue Story" from discovery — open the reader at the
   // chapter the reader is up to (once; the book stays underneath for Back).
   const { id, open } = useLocalSearchParams<{ id: string; open?: string }>();
@@ -108,13 +113,9 @@ export default function KingdomStoryBookScreen() {
     <View style={[s.screen, { paddingTop: insets.top + 8 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button" style={s.iconBtn}>
-          <Ionicons name="arrow-back" size={22} color={c.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => router.back()} color={c.textDark} />
         <Text style={s.headerType} numberOfLines={1}>{story.category?.title ?? (story.contentType ? CONTENT_TYPE_LABELS[story.contentType] : "Kingdom Story")}</Text>
-        <TouchableOpacity onPress={handleShare} accessibilityLabel="Share" accessibilityRole="button" style={s.iconBtn}>
-          <Ionicons name="share-outline" size={20} color={c.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="share-outline" accessibilityLabel="Share" onPress={handleShare} color={c.textDark} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
@@ -126,8 +127,12 @@ export default function KingdomStoryBookScreen() {
           </View>
         )}
 
+        {cover ? (
+          <View style={{ width: "100%", height: coverH }}>
+            <CoverArt fit="cover" path={cover.mediaPath} alt={cover.altText ?? "Story cover"} />
+          </View>
+        ) : null}
         <View style={s.page}>
-          {cover ? <StoryImage media={cover} aspectRatio={1} rounded={18} /> : null}
 
           {formatTopicNumber(story.topicNumber) ? <Text style={s.topicNo}>{formatTopicNumber(story.topicNumber)}</Text> : null}
           <Text style={s.title} accessibilityRole="header">{story.title}</Text>
@@ -181,10 +186,7 @@ export default function KingdomStoryBookScreen() {
                 <Ionicons name={mine.later ? "bookmark" : "bookmark-outline"} size={18} color={mine.later ? c.accentGreen : c.textMid} />
                 <Text style={s.libraryText}>{mine.later ? "Saved" : "Save for Later"}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.libraryBtn} onPress={handleShare} accessibilityRole="button" accessibilityLabel="Share this story">
-                <Ionicons name="share-social-outline" size={18} color={c.textMid} />
-                <Text style={s.libraryText}>Share</Text>
-              </TouchableOpacity>
+              <AppButton label="Share" onPress={handleShare} variant="secondary" icon="share-social-outline" accessibilityLabel="Share this story" />
             </View>
           )}
 
@@ -199,7 +201,7 @@ export default function KingdomStoryBookScreen() {
           )}
 
           {scripture && (
-            <TouchableOpacity style={s.scriptureRow}
+            <TouchableOpacity accessibilityRole="button" style={s.scriptureRow}
               onPress={() => router.push({ pathname: "/prayer/study/[scriptureId]", params: { scriptureId: scripture.id, topicTitle: story.title } } as any)}>
               <Ionicons name="book" size={14} color={c.accentGreen} />
               <View style={{ flex: 1 }}>
@@ -247,30 +249,22 @@ export default function KingdomStoryBookScreen() {
           {(story.related?.missionField || story.related?.missionStory || story.related?.curriculum || story.related?.kingdomWin) && (
             <View style={s.actionsRow}>
               {story.related?.missionField && (
-                <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/missions/field/${story.related!.missionField!.slug}` as any)}>
-                  <Ionicons name="flag-outline" size={16} color={c.textMuted} /><Text style={s.actionText}>Explore Missions</Text>
-                </TouchableOpacity>
+                <AppButton label="Explore Missions" onPress={() => router.push(`/missions/field/${story.related!.missionField!.slug}` as any)} variant="outline" icon="flag-outline" />
               )}
               {story.related?.missionStory && (
-                <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/missions/story/${story.related!.missionStory!.id}` as any)}>
-                  <Ionicons name="flag-outline" size={16} color={c.textMuted} /><Text style={s.actionText}>Mission Story</Text>
-                </TouchableOpacity>
+                <AppButton label="Mission Story" onPress={() => router.push(`/missions/story/${story.related!.missionStory!.id}` as any)} variant="outline" icon="flag-outline" />
               )}
               {story.related?.curriculum && (
-                <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/curriculum/${story.related!.curriculum!.id}` as any)}>
-                  <Ionicons name="school-outline" size={16} color={c.textMuted} /><Text style={s.actionText}>Study This</Text>
-                </TouchableOpacity>
+                <AppButton label="Study This" onPress={() => router.push(`/curriculum/${story.related!.curriculum!.id}` as any)} variant="outline" icon="school-outline" />
               )}
               {story.related?.kingdomWin && (
-                <TouchableOpacity style={s.actionBtn} onPress={() => router.push(`/kingdom-wins/${story.related!.kingdomWin!.id}` as any)}>
-                  <Ionicons name="sparkles-outline" size={16} color={c.textMuted} /><Text style={s.actionText}>Kingdom Win</Text>
-                </TouchableOpacity>
+                <AppButton label="Kingdom Win" onPress={() => router.push(`/kingdom-wins/${story.related!.kingdomWin!.id}` as any)} variant="outline" icon="sparkles-outline" />
               )}
             </View>
           )}
 
           {story.related?.story && (
-            <TouchableOpacity style={s.relatedCard} onPress={() => router.push(`/kingdom-stories/${story.related!.story!.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" style={s.relatedCard} onPress={() => router.push(`/kingdom-stories/${story.related!.story!.id}` as any)}>
               <Ionicons name="book-outline" size={14} color={c.accentGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={s.relatedLabel}>Related Kingdom Story</Text>
@@ -353,7 +347,7 @@ function makeStyles(c: AppColors) {
     headerType: { flex: 1, textAlign: "center", fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6 },
     previewBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 12, padding: 10, borderRadius: 10, backgroundColor: "rgba(234,179,8,0.18)" },
     previewText: { flex: 1, fontSize: 12, color: c.textDark, fontFamily: "Inter_500Medium" },
-    page: { paddingHorizontal: 16, maxWidth: 720, width: "100%", alignSelf: "center" },
+    page: { paddingHorizontal: 16, width: "100%", alignSelf: "center" },
     topicNo: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase", textAlign: "left", marginTop: 18 },
     libraryRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 12, flexWrap: "wrap" },
     libraryBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },

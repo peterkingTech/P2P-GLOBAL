@@ -6,6 +6,7 @@ import type { AppColors } from "@/constants/themes";
 import { getLanguageName } from "@/lib/languageNames";
 import type { BibleTranslation } from "@/lib/bibleReaderApi";
 import { MAX_TRANSLATIONS } from "@/lib/bibleCompare";
+import { IconButton, AppButton } from "@/components/ui";
 
 // Choose up to three more licensed translations to read beside the current
 // one. Only translations the server lists can be chosen.
@@ -31,13 +32,11 @@ export default function CompareSheet({ visible, onClose, translations, primary, 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close compare">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close compare">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">Compare translations</Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
           </View>
           <Text style={styles.sub}>Reading {primaryT ? `${primaryT.name} (${primary})` : primary}. Add up to {max} more to read the same verses side by side.</Text>
           <ScrollView contentContainerStyle={{ paddingBottom: 8 }}>
@@ -59,9 +58,7 @@ export default function CompareSheet({ visible, onClose, translations, primary, 
           </ScrollView>
           <View style={styles.actions}>
             {selected.length ? (
-              <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={() => onApply([])} accessibilityRole="button" accessibilityLabel="Stop comparing">
-                <Text style={styles.btnGhostText}>Stop comparing</Text>
-              </TouchableOpacity>
+              <AppButton label="Stop comparing" onPress={() => onApply([])} variant="outline" accessibilityLabel="Stop comparing" />
             ) : null}
             <TouchableOpacity style={[styles.btn, !picked.length && { opacity: 0.5 }]} disabled={!picked.length} onPress={() => onApply(picked)} accessibilityRole="button"
               accessibilityLabel={picked.length ? `Compare ${picked.length + 1} translations` : "Choose a translation to compare"}>
@@ -80,7 +77,6 @@ function makeStyles(c: AppColors) {
     sheet: { maxHeight: "85%", backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 16 },
     header: { flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingTop: 6 },
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", paddingHorizontal: 16, paddingBottom: 8 },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, minHeight: 56 },
     rowOn: { backgroundColor: c.card },
@@ -91,7 +87,5 @@ function makeStyles(c: AppColors) {
     actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
     btn: { minHeight: 44, paddingHorizontal: 18, borderRadius: 22, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
     btnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-    btnGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: c.borderBeige },
-    btnGhostText: { color: c.textDark, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   });
 }

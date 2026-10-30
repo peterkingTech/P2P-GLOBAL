@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface InviterPreview {
   username: string;
@@ -86,11 +87,8 @@ export default function JoinScreen() {
         </Text>
         <Text style={styles.verse}>"Go and make disciples of all nations." — Matthew 28:19</Text>
 
-        <TouchableOpacity style={styles.continueBtn} onPress={() => router.replace("/(auth)/register")} activeOpacity={0.85}>
-          <Text style={styles.continueBtnText}>Create Your Account</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.cream} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.loginLink} onPress={() => router.replace("/(auth)/login")}>
+        <AppButton label="Create Your Account" onPress={() => router.replace("/(auth)/register")} size="lg" icon="arrow-forward" iconPosition="trailing" style={{ width: "100%", marginTop: 28 }} palette="fixedLight" />
+        <TouchableOpacity accessibilityRole="button" style={styles.loginLink} onPress={() => router.replace("/(auth)/login")}>
           <Text style={styles.loginLinkText}>Already have an account? Log in</Text>
         </TouchableOpacity>
       </View>
@@ -109,11 +107,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 4, fontFamily: "Inter_400Regular" },
   description: { fontSize: 14, color: "rgba(255,255,255,0.75)", textAlign: "center", lineHeight: 20, marginTop: 20, fontFamily: "Inter_400Regular" },
   verse: { fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center", fontStyle: "italic", marginTop: 12, fontFamily: "Inter_400Regular" },
-  continueBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 52, width: "100%", marginTop: 28,
-  },
-  continueBtnText: { fontSize: 15, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
   loginLink: { marginTop: 16, padding: 6 },
   loginLinkText: { fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_500Medium" },
 });

@@ -37,7 +37,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
           autoCapitalize="words"
           onSubmitEditing={handleLookup}
         />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleLookup} disabled={loading}>
+        <TouchableOpacity accessibilityRole="button" style={styles.searchBtn} onPress={handleLookup} disabled={loading}>
           {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
@@ -49,7 +49,7 @@ export function StudyScriptureTab({ session }: { session: ReturnType<typeof useS
           <Text style={styles.resultText}>"{result.text}"</Text>
           <ReadableText style={styles.resultRef}>— {result.reference}</ReadableText>
           <ReadInBibleLink reference={result.reference} label="Read in context" />
-          <TouchableOpacity style={styles.shareBtn} onPress={() => session.shareScripture(result.reference, result.text)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.shareBtn} onPress={() => session.shareScripture(result.reference, result.text)}>
             <Ionicons name="people" size={14} color="#fff" />
             <Text style={styles.shareBtnText}>Share with Group</Text>
           </TouchableOpacity>

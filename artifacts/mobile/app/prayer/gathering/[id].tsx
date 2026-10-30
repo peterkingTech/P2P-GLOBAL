@@ -10,6 +10,7 @@ import { getGathering, cancelGathering, type PrayerGathering, type PrayerGatheri
 import { deviceTimezone, zoneShortLabel, formatTimeInZone, relativeDayLabel } from "@/lib/prayerTimeDisplay";
 import ReadableText from "@/components/ReadableText";
 import { openScripture } from "@/lib/openScripture";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -120,7 +121,7 @@ export default function PrayerGatheringScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Prayer Gathering</Text>
@@ -153,7 +154,7 @@ export default function PrayerGatheringScreen() {
         )}
 
         {!!scriptureRef && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.scriptureRow}
             onPress={() => openScripture(scriptureRef)}
           >
@@ -174,20 +175,11 @@ export default function PrayerGatheringScreen() {
         </View>
 
         {["scheduled", "starting"].includes(gathering.status) && (
-          <TouchableOpacity
-            style={[styles.enterBtn, !canEnter && styles.enterBtnDisabled]}
-            onPress={handleEnter}
-            disabled={!canEnter}
-          >
-            <Ionicons name="mic" size={18} color={canEnter ? "#fff" : c.textMuted} />
-            <Text style={[styles.enterBtnText, !canEnter && styles.enterBtnTextDisabled]}>Enter Prayer</Text>
-          </TouchableOpacity>
+          <AppButton label="Enter Prayer" onPress={handleEnter} size="lg" icon="mic" disabled={!canEnter} style={{ marginTop: 24 }} />
         )}
 
         {gathering.status === "scheduled" && (
-          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={busy}>
-            {busy ? <ActivityIndicator color="#DC2626" size="small" /> : <Text style={styles.cancelBtnText}>Cancel Gathering</Text>}
-          </TouchableOpacity>
+          <AppButton label="Cancel Gathering" onPress={handleCancel} variant="outline" disabled={busy} loading={busy} style={{ marginTop: 12 }} />
         )}
       </ScrollView>
     </View>
@@ -223,14 +215,5 @@ function makeStyles(c: AppColors) {
     rosterAvatarText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_700Bold" },
     rosterName: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     rosterStatus: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    enterBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 15, marginTop: 24,
-    },
-    enterBtnDisabled: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
-    enterBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    enterBtnTextDisabled: { color: c.textMuted },
-    cancelBtn: { borderWidth: 1.5, borderColor: "#DC2626", borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 12 },
-    cancelBtnText: { color: "#DC2626", fontSize: 13, fontFamily: "Inter_700Bold" },
   });
 }

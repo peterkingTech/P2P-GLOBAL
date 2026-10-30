@@ -28,7 +28,7 @@ export default function PrayerPathsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Prayer Paths</Text>
@@ -46,7 +46,7 @@ export default function PrayerPathsScreen() {
           keyExtractor={(p) => p.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/prayer/paths/${item.slug}` as any)} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/prayer/paths/${item.slug}` as any)} activeOpacity={0.85}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               {!!item.description && <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>}
               <View style={styles.metaRow}>

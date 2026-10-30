@@ -35,7 +35,7 @@ export function StudyLessonTab({ session }: { session: ReturnType<typeof useStud
     return (
       <View style={styles.centerFill}>
         <Text style={styles.errorText}>Kingdom School couldn't load this lesson.</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => lessonId && session.getSharedLessonData(lessonId).then(setData)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.retryBtn} onPress={() => lessonId && session.getSharedLessonData(lessonId).then(setData)}>
           <Text style={styles.retryBtnText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -57,7 +57,7 @@ export function StudyLessonTab({ session }: { session: ReturnType<typeof useStud
       {!session.isFollowing && (
         <View style={styles.exploreBanner}>
           <Text style={styles.exploreBannerText}>You're exploring on your own.</Text>
-          <TouchableOpacity onPress={session.returnToGroup}>
+          <TouchableOpacity accessibilityRole="button" onPress={session.returnToGroup}>
             <Text style={styles.exploreBannerLink}>Return to Group</Text>
           </TouchableOpacity>
         </View>
@@ -88,7 +88,7 @@ export function StudyLessonTab({ session }: { session: ReturnType<typeof useStud
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.navBtn, (!canControl || index === 0) && styles.navBtnDisabled]}
           onPress={() => (session.isFollowing ? goTo(index - 1) : session.exploreIndependently())}
           disabled={session.isFollowing ? (!canControl || index === 0) : false}
@@ -97,14 +97,14 @@ export function StudyLessonTab({ session }: { session: ReturnType<typeof useStud
           <Text style={styles.navBtnText}>Previous</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.exploreToggleBtn}
           onPress={() => (session.isFollowing ? session.exploreIndependently() : session.returnToGroup())}
         >
           <Text style={styles.exploreToggleText}>{session.isFollowing ? "Explore on My Own" : "Return to Group"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.navBtn, (!canControl || index >= totalSections - 1) && styles.navBtnDisabled]}
           onPress={() => goTo(index + 1)}
           disabled={!canControl || index >= totalSections - 1}

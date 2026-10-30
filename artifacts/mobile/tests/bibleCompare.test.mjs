@@ -13,6 +13,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "package.json"));
@@ -28,6 +29,8 @@ const RN = { View: host("View"), Text: host("Text"), TouchableOpacity: host("Tou
 const store = new Map();
 const env = { state: null };
 const mocks = {
+  // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+  "@/components/ui": buttonDouble(React, RN),
   react: { ...React, useState: (init) => [env.state && typeof init === "object" && init !== null && !Array.isArray(init) && Object.keys(init).length === 0 ? env.state : (typeof init === "function" ? init() : init), () => {}],
     useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f, useRef: (v) => ({ current: v }) },
   "react-native": RN,

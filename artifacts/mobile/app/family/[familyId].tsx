@@ -11,6 +11,7 @@ import {
   getFamilyDetail, startFamilyWorship, removeFamilyMember, getContinueStudy,
   type FamilyDetailResponse, type ContinueStudyResponse,
 } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -198,22 +199,9 @@ export default function FamilyDetailScreen() {
             <Text style={styles.nextText} numberOfLines={2}>Next: {next.nextLessonTitle}</Text>
           )}
 
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={primary === "continue" ? openLesson : handleStartGathering}
-            disabled={startingGathering && primary !== "continue"}
-            accessibilityRole="button"
-          >
-            {startingGathering && primary !== "continue" ? <ActivityIndicator color={c.primaryGreen} size="small" /> : (
-              <Text style={styles.primaryBtnText}>
-                {primary === "join" ? "Join Gathering" : primary === "continue" ? "Continue Learning" : "Start Gathering"}
-              </Text>
-            )}
-          </TouchableOpacity>
+          <AppButton label={primary === "join" ? "Join Gathering" : primary === "continue" ? "Continue Learning" : "Start Gathering"} size="lg" onPress={primary === "continue" ? openLesson : handleStartGathering} variant="secondary" disabled={startingGathering && primary !== "continue"} loading={startingGathering && primary !== "continue"} style={{ marginTop: 14 }} />
           {primary === "continue" && (
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleStartGathering} disabled={startingGathering} accessibilityRole="button">
-              {startingGathering ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.secondaryBtnText}>Start Gathering</Text>}
-            </TouchableOpacity>
+            <AppButton label="Start Gathering" onPress={handleStartGathering} variant="secondary" disabled={startingGathering} loading={startingGathering} style={{ marginTop: 8 }} />
           )}
         </View>
 
@@ -241,9 +229,7 @@ export default function FamilyDetailScreen() {
             <Text style={styles.cardTitle}>Continue Study</Text>
             {!!next.curriculumTitle && <Text style={styles.cardSub}>{next.curriculumTitle}</Text>}
             <Text style={styles.cardBody}>Next: {next.nextLessonTitle}</Text>
-            <TouchableOpacity style={styles.cardLinkBtn} onPress={openLesson} accessibilityRole="button">
-              <Text style={styles.cardLinkBtnText}>Open Study Workspace →</Text>
-            </TouchableOpacity>
+            <AppButton label="Open Study Workspace" icon="arrow-forward" iconPosition="trailing" onPress={openLesson} variant="tertiary" style={{ marginTop: 6 }} />
           </View>
         )}
 
@@ -256,13 +242,7 @@ export default function FamilyDetailScreen() {
             <Text style={styles.cardBody}>
               {Math.round(continueStudy.previousGathering.durationSeconds / 60)}m · {continueStudy.previousGathering.participantCount} participant{continueStudy.previousGathering.participantCount === 1 ? "" : "s"}
             </Text>
-            <TouchableOpacity
-              style={styles.cardLinkBtn}
-              onPress={() => router.push({ pathname: "/family/gathering-summary", params: { historyId: continueStudy.previousGathering!.historyId, familyId } } as any)}
-              accessibilityRole="button"
-            >
-              <Text style={styles.cardLinkBtnText}>View Summary →</Text>
-            </TouchableOpacity>
+            <AppButton label="View Summary" icon="arrow-forward" iconPosition="trailing" onPress={() => router.push({ pathname: "/family/gathering-summary", params: { historyId: continueStudy.previousGathering!.historyId, familyId } } as any)} variant="tertiary" style={{ marginTop: 6 }} />
           </View>
         )}
 
@@ -314,16 +294,6 @@ function makeStyles(c: AppColors) {
     liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#4ADE80" },
     liveText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
     nextText: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 12 },
-    primaryBtn: {
-      alignItems: "center", justifyContent: "center", minHeight: 48,
-      backgroundColor: "#fff", borderRadius: 12, paddingVertical: 13, marginTop: 14,
-    },
-    primaryBtnText: { color: c.primaryGreen, fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryBtn: {
-      alignItems: "center", justifyContent: "center", minHeight: 44,
-      backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 12, paddingVertical: 11, marginTop: 8,
-    },
-    secondaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 
     listCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14 },
     listRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
@@ -339,8 +309,6 @@ function makeStyles(c: AppColors) {
     cardTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
     cardSub: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     cardBody: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular" },
-    cardLinkBtn: { marginTop: 6 },
-    cardLinkBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     journeyRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
     journeyRowText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", flex: 1 },
   });

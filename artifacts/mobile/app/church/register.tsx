@@ -13,6 +13,7 @@ import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const CHURCH_TYPES = [
   { value: "local_church", label: "Local Church" },
   { value: "christian_fellowship", label: "Christian Fellowship" },
@@ -57,12 +58,9 @@ function PickerField({ label, value, options, onSelect, placeholder }: {
   return (
     <View style={{ marginBottom: 16 }}>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity style={styles.pickerBtn} onPress={() => setOpen(true)}>
-        <Text style={[styles.pickerBtnText, !selected && { color: colors.textMuted }]}>{selected?.label ?? placeholder}</Text>
-        <Ionicons name="chevron-down" size={16} color={colors.lightGreen} />
-      </TouchableOpacity>
+      <AppButton label={`${selected?.label ?? placeholder}`} onPress={() => setOpen(true)} variant="secondary" icon="chevron-down" iconPosition="trailing" palette="fixedLight" />
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.modalOverlay} activeOpacity={1} onPress={() => setOpen(false)}>
           <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>{label}</Text>
             <FlatList
@@ -70,7 +68,7 @@ function PickerField({ label, value, options, onSelect, placeholder }: {
               keyExtractor={(o) => o.value}
               style={{ maxHeight: 340 }}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.optionRow} onPress={() => { onSelect(item.value); setOpen(false); }}>
+                <TouchableOpacity accessibilityRole="button" style={styles.optionRow} onPress={() => { onSelect(item.value); setOpen(false); }}>
                   <Text style={styles.optionRowText}>{item.label}</Text>
                   {item.value === value && <Ionicons name="checkmark" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
@@ -212,29 +210,14 @@ export default function RegisterChurchScreen() {
         </View>
         <Text style={styles.helperText}>Share this link with your congregation to invite them to your church community.</Text>
 
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={async () => { await Clipboard.setStringAsync(createdChurch.inviteLink); Alert.alert("Copied", "Invite link copied to clipboard."); }}
-        >
-          <Ionicons name="copy-outline" size={16} color={colors.accentGreen} />
-          <Text style={styles.secondaryBtnText}>Copy Invite Link</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={() => shareChurchInvite({ name: createdChurch.name, inviteLink: createdChurch.inviteLink, city: createdChurch.city ?? "", country: createdChurch.country })}
-        >
-          <Ionicons name="share-outline" size={16} color={colors.accentGreen} />
-          <Text style={styles.secondaryBtnText}>Share Invite Link</Text>
-        </TouchableOpacity>
+        <AppButton label="Copy Invite Link" onPress={async () => { await Clipboard.setStringAsync(createdChurch.inviteLink); Alert.alert("Copied", "Invite link copied to clipboard."); }} variant="outline" icon="copy-outline" style={{ marginTop: 12 }} palette="fixedLight" />
+        <AppButton label="Share Invite Link" onPress={() => shareChurchInvite({ name: createdChurch.name, inviteLink: createdChurch.inviteLink, city: createdChurch.city ?? "", country: createdChurch.country })} variant="outline" icon="share-outline" style={{ marginTop: 12 }} palette="fixedLight" />
 
         <View style={{ marginTop: 12 }}>
           <ChurchQRCode church={{ name: createdChurch.name, city: createdChurch.city, country: createdChurch.country, inviteLink: createdChurch.inviteLink, inviteCode: createdChurch.inviteCode }} />
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/church" as any)}>
-          <Text style={styles.primaryBtnText}>Go to My Church</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
-        </TouchableOpacity>
+        <AppButton label="Go to My Church" onPress={() => router.replace("/church" as any)} size="lg" icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 20 }} palette="fixedLight" />
       </ScrollView>
     );
   }
@@ -244,7 +227,7 @@ export default function RegisterChurchScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 24) }]}>
-      <TouchableOpacity onPress={() => (step === 1 ? router.back() : setStep(step - 1))} style={styles.backBtn}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => (step === 1 ? router.back() : setStep(step - 1))} style={styles.backBtn}>
         <Ionicons name="arrow-back" size={22} color={colors.lightGreen} />
       </TouchableOpacity>
       <Text style={styles.title}>Register Your Church</Text>
@@ -271,15 +254,13 @@ export default function RegisterChurchScreen() {
 
           <Field label="City" value={city} onChangeText={setCity} placeholder="City" />
           <Field label="Country" value={country} onChangeText={setCountry} placeholder="Country" />
-          <TouchableOpacity style={styles.checkboxRow} onPress={() => setLocationHidden((v) => !v)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.checkboxRow} onPress={() => setLocationHidden((v) => !v)}>
             <Ionicons name={locationHidden ? "checkbox" : "square-outline"} size={20} color={colors.accentGreen} />
             <Text style={styles.checkboxLabel}>Physical location not publicly displayed</Text>
           </TouchableOpacity>
           <Field label="Official Website (optional)" value={website} onChangeText={setWebsite} placeholder="https://www.examplechurch.org" autoCapitalize="none" />
 
-          <TouchableOpacity style={[styles.primaryBtn, !step1Valid && styles.btnDisabled]} onPress={() => setStep(2)} disabled={!step1Valid}>
-            <Text style={styles.primaryBtnText}>Continue</Text>
-          </TouchableOpacity>
+          <AppButton label="Continue" onPress={() => setStep(2)} size="lg" disabled={!step1Valid} style={{ marginTop: 20 }} palette="fixedLight" />
         </View>
       )}
 
@@ -288,10 +269,10 @@ export default function RegisterChurchScreen() {
           <Text style={styles.subtitle}>You'll be registered as this church's Church Leader.</Text>
           <Text style={styles.label}>Are you the primary contact for this church?</Text>
           <View style={styles.yesNoRow}>
-            <TouchableOpacity style={[styles.yesNoBtn, isPrimaryContact === true && styles.yesNoBtnActive]} onPress={() => setIsPrimaryContact(true)}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.yesNoBtn, isPrimaryContact === true && styles.yesNoBtnActive]} onPress={() => setIsPrimaryContact(true)}>
               <Text style={[styles.yesNoBtnText, isPrimaryContact === true && styles.yesNoBtnTextActive]}>Yes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.yesNoBtn, isPrimaryContact === false && styles.yesNoBtnActive]} onPress={() => setIsPrimaryContact(false)}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.yesNoBtn, isPrimaryContact === false && styles.yesNoBtnActive]} onPress={() => setIsPrimaryContact(false)}>
               <Text style={[styles.yesNoBtnText, isPrimaryContact === false && styles.yesNoBtnTextActive]}>No</Text>
             </TouchableOpacity>
           </View>
@@ -306,16 +287,14 @@ export default function RegisterChurchScreen() {
             <Text style={styles.helperText}>We'll use your account name and email ({profile?.email ?? ""}) as the church contact.</Text>
           )}
 
-          <TouchableOpacity style={[styles.primaryBtn, !step2Valid && styles.btnDisabled]} onPress={() => setStep(3)} disabled={!step2Valid}>
-            <Text style={styles.primaryBtnText}>Continue</Text>
-          </TouchableOpacity>
+          <AppButton label="Continue" onPress={() => setStep(3)} size="lg" disabled={!step2Valid} style={{ marginTop: 20 }} palette="fixedLight" />
         </View>
       )}
 
       {step === 3 && (
         <View style={styles.form}>
           <Text style={styles.label}>Church Logo (optional)</Text>
-          <TouchableOpacity style={styles.logoPicker} onPress={handlePickLogo} disabled={uploadingLogo}>
+          <TouchableOpacity accessibilityRole="button" style={styles.logoPicker} onPress={handlePickLogo} disabled={uploadingLogo}>
             {uploadingLogo ? (
               <ActivityIndicator color={colors.accentGreen} />
             ) : logoUrl ? (
@@ -328,7 +307,7 @@ export default function RegisterChurchScreen() {
             )}
           </TouchableOpacity>
           {logoUrl && (
-            <TouchableOpacity onPress={() => setLogoUrl(null)}><Text style={styles.removeLogoText}>Remove logo</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setLogoUrl(null)}><Text style={styles.removeLogoText}>Remove logo</Text></TouchableOpacity>
           )}
 
           <Text style={[styles.label, { marginTop: 20 }]}>Social Media Presence (optional)</Text>
@@ -341,21 +320,16 @@ export default function RegisterChurchScreen() {
               <View style={{ flex: 1.4 }}>
                 <Field label="Handle / URL" value={s.handleOrUrl} onChangeText={(v) => updateSocialRow(i, { handleOrUrl: v })} placeholder="@examplechurch" autoCapitalize="none" />
               </View>
-              <TouchableOpacity style={styles.removeSocialBtn} onPress={() => removeSocialRow(i)}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.removeSocialBtn} onPress={() => removeSocialRow(i)}>
                 <Ionicons name="close-circle" size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           ))}
           {socialAccounts.length < MAX_SOCIAL_ACCOUNTS && (
-            <TouchableOpacity style={styles.addSocialBtn} onPress={addSocialRow}>
-              <Ionicons name="add" size={16} color={colors.accentGreen} />
-              <Text style={styles.addSocialBtnText}>Add Social Media Account</Text>
-            </TouchableOpacity>
+            <AppButton label="Add Social Media Account" onPress={addSocialRow} variant="tertiary" icon="add" style={{ marginBottom: 20, marginTop: 4 }} palette="fixedLight" />
           )}
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep(4)}>
-            <Text style={styles.primaryBtnText}>Continue</Text>
-          </TouchableOpacity>
+          <AppButton label="Continue" onPress={() => setStep(4)} size="lg" style={{ marginTop: 20 }} palette="fixedLight" />
         </View>
       )}
 
@@ -370,7 +344,7 @@ export default function RegisterChurchScreen() {
                 <Text key={d.id} style={styles.duplicateCardItem}>• {d.name}{d.city ? `, ${d.city}` : ""}, {d.country}</Text>
               ))}
               <Text style={styles.duplicateCardHelp}>If this is your church, ask its leadership for their invite code instead of registering a duplicate. Otherwise, it's fine to continue.</Text>
-              <TouchableOpacity onPress={() => setDuplicateWarningDismissed(true)}><Text style={styles.duplicateCardDismiss}>Continue anyway</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" onPress={() => setDuplicateWarningDismissed(true)}><Text style={styles.duplicateCardDismiss}>Continue anyway</Text></TouchableOpacity>
             </View>
           )}
 
@@ -394,9 +368,7 @@ export default function RegisterChurchScreen() {
             </ReviewSection>
           )}
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={submitting}>
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Submit Church Registration</Text>}
-          </TouchableOpacity>
+          <AppButton label="Submit Church Registration" onPress={handleSubmit} size="lg" disabled={submitting} loading={submitting} style={{ marginTop: 20 }} palette="fixedLight" />
         </View>
       )}
     </ScrollView>
@@ -454,12 +426,6 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 80, textAlignVertical: "top" },
   charCounter: { fontSize: 11, color: colors.textMuted, textAlign: "right", marginTop: 4, marginBottom: 12, fontFamily: "Inter_400Regular" },
   helperText: { fontSize: 12, color: colors.textMuted, marginTop: -8, marginBottom: 16, fontFamily: "Inter_400Regular" },
-  pickerBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
-    borderRadius: 12, padding: 14,
-  },
-  pickerBtnText: { color: colors.cream, fontSize: 15, fontFamily: "Inter_400Regular" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: { backgroundColor: colors.darkBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4, width: "100%", alignSelf: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700", color: colors.cream, marginBottom: 10, fontFamily: "Inter_700Bold" },
@@ -484,8 +450,6 @@ const styles = StyleSheet.create({
   removeLogoText: { color: "#F87171", fontSize: 12, marginBottom: 12, fontFamily: "Inter_500Medium" },
   socialRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   removeSocialBtn: { paddingTop: 34 },
-  addSocialBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 20, marginTop: 4 },
-  addSocialBtnText: { color: colors.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   duplicateCard: {
     backgroundColor: "rgba(217,119,6,0.1)", borderWidth: 1, borderColor: "rgba(217,119,6,0.3)",
     borderRadius: 12, padding: 14, marginBottom: 16, gap: 4,
@@ -499,12 +463,6 @@ const styles = StyleSheet.create({
   reviewRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, gap: 12 },
   reviewRowLabel: { color: colors.textMuted, fontSize: 12, fontFamily: "Inter_400Regular" },
   reviewRowValue: { color: colors.cream, fontSize: 12, fontFamily: "Inter_500Medium", flex: 1, textAlign: "right" },
-  primaryBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 52, marginTop: 20,
-  },
-  btnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
   confirmTitle: { fontSize: 22, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold" },
   confirmChurchName: { fontSize: 18, fontWeight: "700", color: colors.accentGreen, marginTop: 12, fontFamily: "Inter_700Bold" },
   confirmLocation: { fontSize: 13, color: colors.lightGreen, opacity: 0.8, marginTop: 2, fontFamily: "Inter_400Regular" },
@@ -513,9 +471,4 @@ const styles = StyleSheet.create({
   freeCardText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium", lineHeight: 18 },
   linkBox: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderRadius: 10, padding: 12 },
   linkText: { fontSize: 13, color: colors.cream, fontFamily: "Inter_400Regular" },
-  secondaryBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 12, height: 46, marginTop: 12,
-  },
-  secondaryBtnText: { color: colors.accentGreen, fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

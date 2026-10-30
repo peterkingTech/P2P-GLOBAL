@@ -41,13 +41,11 @@ import FocusBar from "@/components/focus/FocusBar";
 import type { FamilyIconName } from "@/components/family/FamilyIcon";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 // "Expand" on a Gathering resource panel (Bible, Media, Study Workspace).
 function ExpandButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.expandBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Expand ${label} to full screen`}>
-      <Ionicons name="expand-outline" size={16} color={colors.connection} />
-      <Text style={styles.shelfLink}>Expand</Text>
-    </TouchableOpacity>
+    <AppButton label="Expand" onPress={onPress} variant="tertiary" icon="expand-outline" accessibilityLabel={`Expand ${label} to full screen`} style={{ minWidth: 44 }} palette="fixedDark" />
   );
 }
 
@@ -753,16 +751,9 @@ export default function FamilyWorshipScreen() {
       {!focused && (
         <View style={styles.resourceRow}>
           {(lessonRef || isHost) && session.currentMode !== "teaching" && (
-            <TouchableOpacity style={styles.resourceBtn} onPress={() => (lessonRef ? setLessonSheetOpen(true) : setLessonPickerOpen(true))}
-              accessibilityRole="button" accessibilityLabel={lessonRef ? `Lesson: ${lessonRef.title}. Follow along` : "Choose a lesson"}>
-              <Ionicons name="school-outline" size={16} color={colors.light} />
-              <Text style={styles.resourceText} numberOfLines={1}>{lessonRef ? lessonRef.title : "Choose Lesson"}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${lessonRef ? lessonRef.title : "Choose Lesson"}`} onPress={() => (lessonRef ? setLessonSheetOpen(true) : setLessonPickerOpen(true))} variant="secondary" icon="school-outline" accessibilityLabel={lessonRef ? `Lesson: ${lessonRef.title}. Follow along` : "Choose a lesson"} style={{ maxWidth: "100%", flexShrink: 1 }} palette="fixedDark" />
           )}
-          <TouchableOpacity style={styles.resourceBtn} onPress={() => openMyBible(null)} accessibilityRole="button" accessibilityLabel="My Bible. Read on your own; the group's passage doesn't change">
-            <Ionicons name="book-outline" size={16} color={colors.light} />
-            <Text style={styles.resourceText}>My Bible</Text>
-          </TouchableOpacity>
+          <AppButton label="My Bible" onPress={() => openMyBible(null)} variant="secondary" icon="book-outline" accessibilityLabel="My Bible. Read on your own; the group's passage doesn't change" style={{ maxWidth: "100%", flexShrink: 1 }} palette="fixedDark" />
         </View>
       )}
       {session.currentMode === "worship" && (
@@ -1067,11 +1058,9 @@ const styles = StyleSheet.create({
   scrollFocused: { flexGrow: 1, paddingBottom: 12 },
   // Kept mounted but out of the way while a resource is expanded.
   hidden: { display: "none" },
-  expandBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, minWidth: 44, justifyContent: "center" },
   shelfLink: { color: colors.connection, ...type.caption, fontFamily: "Inter_600SemiBold" },
   silentHint: { color: colors.textSecondary, ...type.body, marginTop: spacing.xs },
   resourceRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  resourceBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, maxWidth: "100%", paddingHorizontal: 14, borderRadius: 22, backgroundColor: colors.surfaceRaised, flexShrink: 1 },
   resourceText: { color: colors.textPrimary, fontSize: 14, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
 
   companionsLabel: { color: colors.textTertiary, ...type.label, marginBottom: spacing.sm },

@@ -9,6 +9,7 @@ import {
   TOPIC_STATUSES, TOPIC_STATUS_LABELS, TOPIC_PRIORITIES, PRIORITY_LABELS,
   type KingdomStoryTopic, type KingdomStoryCategory, type KingdomStory, type TopicInput,
 } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 // One catalogue topic (editors): its category, tags, status and research
 // fields; its story — start one (an empty draft; nothing is generated) or
@@ -75,7 +76,7 @@ export default function TopicEditorScreen() {
   const categoryChips = (selected: string | undefined, onPick: (id: string) => void) => (
     <View style={styles.chips}>
       {categories.map((c) => (
-        <TouchableOpacity key={c.id} style={[styles.chip, selected === c.id && styles.chipActive]} onPress={() => onPick(c.id)}>
+        <TouchableOpacity accessibilityRole="button" key={c.id} style={[styles.chip, selected === c.id && styles.chipActive]} onPress={() => onPick(c.id)}>
           <Text style={[styles.chipText, selected === c.id && styles.chipTextActive]}>{c.title}{c.status !== "published" ? " (inactive)" : ""}</Text>
         </TouchableOpacity>
       ))}
@@ -99,9 +100,7 @@ export default function TopicEditorScreen() {
         <Text style={styles.label}>Category</Text>
         {categoryChips(draft.categoryId, (categoryId) => setDraft({ ...draft, categoryId }))}
         <Text style={styles.hint}>New topics start with the status “Topic”. Add research details after creating it.</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={create} disabled={busy}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create topic</Text>}
-        </TouchableOpacity>
+        <AppButton label="Create topic" onPress={create} disabled={busy} loading={busy} style={{ marginTop: 8 }} palette="fixedLight" />
       </ScrollView>
     );
   }
@@ -129,7 +128,7 @@ export default function TopicEditorScreen() {
       <Text style={styles.label}>Status</Text>
       <View style={styles.chips}>
         {TOPIC_STATUSES.map((s) => (
-          <TouchableOpacity key={s} style={[styles.chip, topic.status === s && styles.chipActive]} onPress={() => topic.status !== s && save({ status: s })} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" key={s} style={[styles.chip, topic.status === s && styles.chipActive]} onPress={() => topic.status !== s && save({ status: s })} disabled={busy}>
             <Text style={[styles.chipText, topic.status === s && styles.chipTextActive]}>{TOPIC_STATUS_LABELS[s]}</Text>
           </TouchableOpacity>
         ))}
@@ -138,7 +137,7 @@ export default function TopicEditorScreen() {
       <Text style={styles.label}>Priority</Text>
       <View style={styles.chips}>
         {TOPIC_PRIORITIES.map((p) => (
-          <TouchableOpacity key={p} style={[styles.chip, topic.priority === p && styles.chipActive]} onPress={() => topic.priority !== p && save({ priority: p })} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" key={p} style={[styles.chip, topic.priority === p && styles.chipActive]} onPress={() => topic.priority !== p && save({ priority: p })} disabled={busy}>
             <Text style={[styles.chipText, topic.priority === p && styles.chipTextActive]}>{PRIORITY_LABELS[p]}</Text>
           </TouchableOpacity>
         ))}
@@ -171,11 +170,11 @@ export default function TopicEditorScreen() {
             <Text style={styles.storyTitle}>{s.title}</Text>
             <Text style={styles.storyMeta}>{s.status}</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push(`/admin/kingdom-stories/${s.id}` as any)} style={styles.smallBtn}><Text style={styles.smallBtnText}>Edit</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push(`/kingdom-stories/${s.id}` as any)} style={styles.outlineBtn} accessibilityLabel="Preview as reader">
+          <AppButton label="Edit" onPress={() => router.push(`/admin/kingdom-stories/${s.id}` as any)} size="sm" palette="fixedLight" />
+          <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => router.push(`/kingdom-stories/${s.id}` as any)} style={styles.outlineBtn} accessibilityLabel="Preview as reader">
             <Ionicons name="eye-outline" size={14} color={colors.accentGreen} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={async () => { try { await unlinkStoryFromTopic(topic.id, s.id); await load(); } catch (e: any) { showAlert("Couldn't unlink", e?.message ?? ""); } }} accessibilityLabel="Unlink story">
+          <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={async () => { try { await unlinkStoryFromTopic(topic.id, s.id); await load(); } catch (e: any) { showAlert("Couldn't unlink", e?.message ?? ""); } }} accessibilityLabel="Unlink story">
             <Ionicons name="unlink-outline" size={16} color="#B91C1C" />
           </TouchableOpacity>
         </View>
@@ -183,19 +182,15 @@ export default function TopicEditorScreen() {
       {!(topic.stories ?? []).length && <Text style={styles.hint}>No story yet. Start an empty draft for this topic, or link a story that already exists.</Text>}
       <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
         {!(topic.stories ?? []).length && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={startStory} disabled={busy}>
-            <Text style={styles.primaryBtnText}>Start story draft</Text>
-          </TouchableOpacity>
+          <AppButton label="Start story draft" onPress={startStory} disabled={busy} style={{ marginTop: 8 }} palette="fixedLight" />
         )}
-        <TouchableOpacity style={styles.outlineBtnWide} onPress={linking ? () => setLinking(false) : openLinkPicker}>
-          <Text style={styles.outlineBtnText}>{linking ? "Cancel" : "Link existing story"}</Text>
-        </TouchableOpacity>
+        <AppButton label={linking ? "Cancel" : "Link existing story"} onPress={linking ? () => setLinking(false) : openLinkPicker} variant="outline" style={{ marginTop: 8 }} palette="fixedLight" />
       </View>
       {linking && (
         <View style={{ gap: 6, marginTop: 6 }}>
           <TextInput style={styles.input} value={storyQuery} onChangeText={setStoryQuery} placeholder="Find a story by title" placeholderTextColor={colors.textMuted} />
           {pickable.slice(0, 20).map((s) => (
-            <TouchableOpacity key={s.id} style={styles.storyRow} onPress={async () => {
+            <TouchableOpacity accessibilityRole="button" key={s.id} style={styles.storyRow} onPress={async () => {
               try { await linkStoryToTopic(topic.id, s.id); setLinking(false); await load(); }
               catch (e: any) { showAlert("Couldn't link", e?.message ?? ""); }
             }}>
@@ -236,11 +231,5 @@ const styles = StyleSheet.create({
   storyRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 10 },
   storyTitle: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   storyMeta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
-  primaryBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingHorizontal: 16, minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 8 },
-  primaryBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
-  smallBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  smallBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   outlineBtn: { borderWidth: 1, borderColor: colors.accentGreen, borderRadius: 8, padding: 6 },
-  outlineBtnWide: { borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 10, paddingHorizontal: 14, minHeight: 44, justifyContent: "center", marginTop: 8 },
-  outlineBtnText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold" },
 });

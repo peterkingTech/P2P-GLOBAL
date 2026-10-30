@@ -21,7 +21,7 @@ const hub = src("app/family/[familyId].tsx");
 ok("primary action by state: live → Join, next lesson → Continue Learning, else Start", /const primary: "join" \| "continue" \| "start" = live \? "join" : next \? "continue" : "start";/.test(hub)
   && /primary === "join" \? "Join Gathering" : primary === "continue" \? "Continue Learning" : "Start Gathering"/.test(hub));
 ok("Continue Learning opens the existing Study Workspace (lesson screen)", /pathname: "\/lesson\/\[id\]", params: \{ id: next\.nextLessonId \}/.test(hub) && /onPress=\{primary === "continue" \? openLesson : handleStartGathering\}/.test(hub));
-ok("Start Gathering still offered beside Continue Learning", /\{primary === "continue" && \(\s*\n\s*<TouchableOpacity style=\{styles\.secondaryBtn\} onPress=\{handleStartGathering\}/.test(hub));
+ok("Start Gathering still offered beside Continue Learning", /\{primary === "continue" && \(\s*\n\s*<AppButton label="Start Gathering" onPress=\{handleStartGathering\} variant="secondary"/.test(hub));
 ok("Gathering start/join logic unchanged (existing session joined, else started)", /if \(data\.activeSessionId\) \{\s*\n\s*router\.push\(\{ pathname: "\/family\/worship\/\[sessionId\]", params: \{ sessionId: data\.activeSessionId \} \}/.test(hub)
   && /const session = await startFamilyWorship\(data\.family\.id\);/.test(hub));
 ok("live Gathering announced for screen readers", /A Gathering is happening now/.test(hub) && /accessibilityLiveRegion="polite"/.test(hub));
@@ -43,7 +43,7 @@ ok("Continue Study card only when the button isn't already Continue Learning", /
 ok("Last Gathering, Discipleship Journey, Leave kept", /Last Gathering/.test(hub) && /Discipleship Journey/.test(hub) && /Leave this Family Circle/.test(hub) && /\{!isShepherd && \(/.test(hub));
 ok("real members' avatars (no placeholders invented)", /data\.members\.slice\(0, 5\)/.test(hub) && /<Avatar photoUrl=\{m\.avatarUrl\} name=\{m\.name\} size=\{30\} \/>/.test(hub));
 ok("loading / not-a-member / error states kept", /<ActivityIndicator color=\{c\.primaryGreen\} \/>/.test(hub) && /You're not part of this Family Circle\./.test(hub) && /Couldn't load this Family Circle/.test(hub));
-ok("touch targets ≥ 44pt on new controls", /primaryBtn: \{[\s\S]{0,80}minHeight: 48/.test(hub) && /secondaryBtn: \{[\s\S]{0,80}minHeight: 44/.test(hub) && /listRow: \{[^}]*minHeight: 56/.test(hub) && /identityRow: \{[^}]*minHeight: 44/.test(hub));
+ok("touch targets ≥ 44pt on new controls", /<AppButton label=\{primary === "join"[^\n]*size="lg"/.test(hub) /* 52pt shared button */ && /<AppButton label="Start Gathering"/.test(hub) /* 44pt shared button */ && /listRow: \{[^}]*minHeight: 56/.test(hub) && /identityRow: \{[^}]*minHeight: 44/.test(hub));
 ok("no Share in the hub's primary area", !/Share/.test(hub));
 
 // ── Calls on People ─────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const history = src("app/family/history.tsx");
 ok("History links to Family Circle Highlights", /pathname: "\/family\/journey", params: \{ familyId \}/.test(history));
 
 // ── Labels ───────────────────────────────────────────────────────────────
-ok("prayer submit says 'Add request' (was a misleading 'Share')", />Add request</.test(src("app/family/prayer.tsx")) && !/>Share</.test(src("app/family/prayer.tsx"))
+ok("prayer submit says 'Add request' (was a misleading 'Share')", /label="Add request"/.test(src("app/family/prayer.tsx")) && !/>Share<|label="Share"/.test(src("app/family/prayer.tsx"))
   && />Add request</.test(src("components/family/PrayerSpacePanel.tsx")) && !/>Share</.test(src("components/family/PrayerSpacePanel.tsx")));
 ok("summary section is 'Discussion' (it's a message count)", /<Text style=\{styles\.sectionTitle\}>Discussion<\/Text>/.test(src("app/family/gathering-summary.tsx")));
 ok("real sharing kept: Gathering room invite + family invite links/QR", /<ShareRoomPanel/.test(src("app/family/worship/[sessionId].tsx")) && /QrShareSheet/.test(src("components/family/FamilyInvitePanel.tsx")));

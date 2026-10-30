@@ -6,6 +6,7 @@ import type { AppColors } from "@/constants/themes";
 import { useData } from "@/contexts/DataContext";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { storyShareMessage, sendStoryToChat } from "@/lib/storyShare";
+import { IconButton } from "@/components/ui";
 
 // Share a Kingdom Story: into one of your existing P2P chats (a peer, a
 // friend, your Family Circle, Church, or Circle chat — whatever you're a
@@ -44,13 +45,11 @@ export default function ShareStorySheet({ visible, onClose, story }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close sharing">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close sharing">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">Share this story</Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
           </View>
           <Text style={styles.sub}>Only the story is shared — never your progress, notes or answers.</Text>
           {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
@@ -90,7 +89,6 @@ function makeStyles(c: AppColors) {
     sheet: { maxHeight: "80%", backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 16 },
     header: { flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingTop: 6 },
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", paddingHorizontal: 16, paddingBottom: 6 },
     error: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium", paddingHorizontal: 16, paddingBottom: 6 },
     group: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },

@@ -7,6 +7,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { validateUsername, formatUsername, generateUsernameSuggestions } from "@/lib/username";
+import { AppButton } from "@/components/ui";
 
 // Mandatory, unskippable username-setup step for accounts that predate the
 // @username system, or that an admin has force-flagged via Admin >
@@ -114,21 +115,15 @@ export default function UsernameSetupScreen() {
         {suggestions.length > 0 && (
           <View style={styles.suggestionRow}>
             {suggestions.map((s) => (
-              <TouchableOpacity key={s} style={styles.suggestionChip} onPress={() => setUsername(s)}>
-                <Text style={styles.suggestionChipText}>@{s}</Text>
-              </TouchableOpacity>
+              <AppButton label={`@${s}`} onPress={() => setUsername(s)} variant="secondary" size="sm" key={s} palette="fixedLight" />
             ))}
           </View>
         )}
       </View>
 
-      <TouchableOpacity style={styles.continueBtn} onPress={handleContinue} disabled={status !== "available" || saving}>
-        {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.continueBtnText}>Continue</Text>}
-      </TouchableOpacity>
+      <AppButton label="Continue" onPress={handleContinue} size="lg" disabled={status !== "available" || saving} loading={saving} palette="fixedLight" />
 
-      <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-        <Text style={styles.signOutBtnText}>Sign out</Text>
-      </TouchableOpacity>
+      <AppButton label="Sign out" onPress={signOut} variant="tertiary" style={{ marginTop: 20 }} palette="fixedLight" />
     </KeyboardAwareScrollView>
   );
 }
@@ -156,8 +151,4 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6,
   },
   suggestionChipText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
-  continueBtn: { backgroundColor: colors.accentGreen, borderRadius: 14, height: 52, alignItems: "center", justifyContent: "center" },
-  continueBtnText: { color: "#fff", fontWeight: "700", fontSize: 16, fontFamily: "Inter_700Bold" },
-  signOutBtn: { alignItems: "center", marginTop: 20 },
-  signOutBtnText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
 });

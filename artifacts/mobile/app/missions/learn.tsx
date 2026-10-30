@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { MISSION_FOCUS_LABELS, type MissionFocusTag } from "@/lib/missionsApi";
+import { AppButton } from "@/components/ui";
 
 // Missions Stage 6 — LEARN. Reuses the existing mission-focus taxonomy
 // (no second topic system) and the existing Curriculum for "Study" —
@@ -24,7 +25,7 @@ export default function MissionLearnScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Learn</Text>
@@ -36,25 +37,16 @@ export default function MissionLearnScreen() {
 
         <Text style={styles.sectionHeading}>Mission Learning Topics</Text>
         {LEARN_TOPICS.map((topic) => (
-          <TouchableOpacity key={topic} style={styles.topicRow} onPress={() => router.push(`/missions/focus/${topic}` as any)}>
+          <TouchableOpacity accessibilityRole="button" key={topic} style={styles.topicRow} onPress={() => router.push(`/missions/focus/${topic}` as any)}>
             <Ionicons name="book-outline" size={16} color={c.accentGreen} />
             <Text style={styles.topicText}>{MISSION_FOCUS_LABELS[topic]}</Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity style={styles.studyBtn} onPress={() => router.push("/curriculum" as any)}>
-          <Ionicons name="school-outline" size={16} color="#fff" />
-          <Text style={styles.studyBtnText}>Explore Study & Curriculum</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.studySecondary} onPress={() => router.push("/prayer/pray-the-word" as any)}>
-          <Ionicons name="sparkles-outline" size={16} color={c.accentGreen} />
-          <Text style={styles.studySecondaryText}>Pray the Word</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.studySecondary} onPress={() => router.push("/my-discipleship/journey" as any)}>
-          <Ionicons name="leaf-outline" size={16} color={c.accentGreen} />
-          <Text style={styles.studySecondaryText}>Discipleship Journey</Text>
-        </TouchableOpacity>
+        <AppButton label="Explore Study & Curriculum" onPress={() => router.push("/curriculum" as any)} icon="school-outline" style={{ marginTop: 20 }} />
+        <AppButton label="Pray the Word" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="sparkles-outline" style={{ marginTop: 10 }} />
+        <AppButton label="Discipleship Journey" onPress={() => router.push("/my-discipleship/journey" as any)} variant="outline" icon="leaf-outline" style={{ marginTop: 10 }} />
       </ScrollView>
     </View>
   );
@@ -69,8 +61,6 @@ function makeStyles(c: AppColors) {
     sectionHeading: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
     topicRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 14, marginBottom: 8 },
     topicText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    studyBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 20 },
-    studyBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
     studySecondary: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12, marginTop: 10 },
     studySecondaryText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
   });

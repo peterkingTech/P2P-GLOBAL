@@ -18,6 +18,7 @@ import { getGathering, joinGathering, leaveGathering, type PrayerGathering, type
 import { setActiveGathering, clearActiveGathering } from "@/lib/activeGathering";
 import { openScripture } from "@/lib/openScripture";
 import { readerTarget } from "@/lib/bibleReaderApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string, onDismiss?: () => void) {
   if (Platform.OS === "web") {
@@ -269,12 +270,8 @@ export default function PrayerCallScreen() {
             </View>
           )}
         </View>
-        <TouchableOpacity style={styles.beginBtn} onPress={() => setPhase("call")}>
-          <Text style={styles.beginBtnText}>Begin Prayer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.notYetBtn} onPress={() => router.back()}>
-          <Text style={styles.notYetBtnText}>Not yet</Text>
-        </TouchableOpacity>
+        <AppButton label="Begin Prayer" onPress={() => setPhase("call")} size="lg" style={{ width: "100%" }} />
+        <AppButton label="Not yet" onPress={() => router.back()} variant="tertiary" style={{ width: "100%" }} />
       </View>
     );
   }
@@ -284,7 +281,7 @@ export default function PrayerCallScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => handleLeave()} accessibilityRole="button" accessibilityLabel="Leave prayer">
+        <TouchableOpacity hitSlop={10} onPress={() => handleLeave()} accessibilityRole="button" accessibilityLabel="Leave prayer">
           <Ionicons name="chevron-back" size={22} color={p2pColors.textPrimary} />
         </TouchableOpacity>
         <View style={{ alignItems: "center" }}>
@@ -359,9 +356,5 @@ function makeStyles(p2p: P2PCallColors) {
     prepFocusCard: { backgroundColor: p2p.surface, borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 14, padding: 16, marginTop: 24, width: "100%" },
     prepFocusLabel: { fontSize: 11, color: p2p.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 },
     prepFocusText: { fontSize: 14, color: p2p.textPrimary, fontFamily: "Inter_400Regular", lineHeight: 20, textAlign: "center" },
-    beginBtn: { backgroundColor: p2p.accent, borderRadius: 14, paddingVertical: 16, alignItems: "center", width: "100%" },
-    beginBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
-    notYetBtn: { paddingVertical: 14, alignItems: "center", width: "100%" },
-    notYetBtnText: { color: p2p.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
   });
 }

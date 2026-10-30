@@ -14,6 +14,7 @@ import {
   getAttachmentStatus, myDrafts, removeDraft, uploadFile, getFileLink, attachmentsFor, attachmentLabel, formatBytes,
   type Attachment, type AttachmentStatus, type TargetKind,
 } from "@/lib/learningAttachmentsApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Drawings, photos and PDFs on a Comprehensive Check answer. Optional: the
 // typed answer box above it always works, and nothing here is required.
@@ -140,15 +141,9 @@ export function AttachmentTray({ trayKey, disabled, onChange }: {
   return (
     <View style={s.wrap}>
       <View style={s.row}>
-        <TouchableOpacity style={s.addBtn} onPress={addDrawing} disabled={disabled} accessibilityRole="button" accessibilityLabel="Add a drawing or handwriting">
-          <Ionicons name="brush-outline" size={16} color={c.accentGreen} /><Text style={s.addText}>Add drawing</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.addBtn} onPress={addPhoto} disabled={disabled} accessibilityRole="button" accessibilityLabel="Add a photo">
-          <Ionicons name="image-outline" size={16} color={c.accentGreen} /><Text style={s.addText}>Add photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.addBtn} onPress={addPdf} disabled={disabled} accessibilityRole="button" accessibilityLabel="Add a PDF">
-          <Ionicons name="document-attach-outline" size={16} color={c.accentGreen} /><Text style={s.addText}>Add PDF</Text>
-        </TouchableOpacity>
+        <AppButton label="Add drawing" onPress={addDrawing} variant="secondary" icon="brush-outline" disabled={disabled} accessibilityLabel="Add a drawing or handwriting" />
+        <AppButton label="Add photo" onPress={addPhoto} variant="secondary" icon="image-outline" disabled={disabled} accessibilityLabel="Add a photo" />
+        <AppButton label="Add PDF" onPress={addPdf} variant="secondary" icon="document-attach-outline" disabled={disabled} accessibilityLabel="Add a PDF" />
       </View>
       {items.map((it) => (
         <View key={it.key} style={s.item}>
@@ -161,13 +156,9 @@ export function AttachmentTray({ trayKey, disabled, onChange }: {
           </TouchableOpacity>
           {it.status === "uploading" ? <ActivityIndicator color={c.accentGreen} /> : null}
           {it.status === "failed" && it.local ? (
-            <TouchableOpacity style={s.iconBtn} onPress={() => startUpload(it.local!, it.kind, it)} accessibilityRole="button" accessibilityLabel={`Retry upload of ${it.label}`}>
-              <Ionicons name="refresh" size={18} color={c.accentGreen} />
-            </TouchableOpacity>
+            <IconButton icon="refresh" accessibilityLabel={`Retry upload of ${it.label}`} onPress={() => startUpload(it.local!, it.kind, it)} color={c.accentGreen} />
           ) : null}
-          <TouchableOpacity style={s.iconBtn} onPress={() => remove(it)} disabled={disabled} accessibilityRole="button" accessibilityLabel={`Remove ${it.label}`}>
-            <Ionicons name="close" size={18} color={c.textMid} />
-          </TouchableOpacity>
+          <IconButton icon="close" accessibilityLabel={`Remove ${it.label}`} onPress={() => remove(it)} color={c.textMid} disabled={disabled} />
         </View>
       ))}
       {error ? <Text style={s.itemError} accessibilityRole="alert">{error}</Text> : null}
@@ -215,13 +206,11 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     wrap: { gap: 6, marginTop: 6, marginBottom: 6 },
     row: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    addBtn: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 44, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     addText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     item: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     itemText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
     caption: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular" },
     itemError: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium" },
-    iconBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
     track: { height: 4, borderRadius: 2, backgroundColor: c.borderBeige, overflow: "hidden", marginTop: 4 },
     fill: { height: 4, backgroundColor: c.accentGreen },
   });

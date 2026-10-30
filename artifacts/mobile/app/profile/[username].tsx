@@ -16,6 +16,7 @@ import { PeerGuideRequestModal } from "@/components/PeerGuideRequestModal";
 import { grainLabel } from "@/lib/grain";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 type ConnectionStatus = "none" | "pending_sent" | "pending_received" | "connected";
 
 interface PublicProfile {
@@ -258,7 +259,7 @@ export default function PublicProfileScreen() {
       <View style={[styles.root, { paddingTop: topPad }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
         </View>
@@ -274,15 +275,13 @@ export default function PublicProfileScreen() {
       <View style={[styles.root, { paddingTop: topPad }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.headerBar}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
         </View>
         <View style={styles.centerFill}>
           <Text style={styles.notFoundText}>This profile is not available.</Text>
-          <TouchableOpacity style={styles.unblockBtn} onPress={handleUnblock}>
-            <Text style={styles.unblockBtnText}>Unblock @{data.username}</Text>
-          </TouchableOpacity>
+          <AppButton label={`Unblock @${data.username}`} onPress={handleUnblock} />
         </View>
       </View>
     );
@@ -292,12 +291,12 @@ export default function PublicProfileScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>@{data.username}</Text>
         {!isOwnProfile ? (
-          <TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" onPress={() => setMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="ellipsis-vertical" size={20} color={colors.textDark} />
           </TouchableOpacity>
         ) : <View style={{ width: 22 }} />}
@@ -344,7 +343,7 @@ export default function PublicProfileScreen() {
         )}
 
         {grainCount > 0 && (
-          <TouchableOpacity style={styles.grainRow} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.grainRow} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
             <Text style={styles.grainRowText}>{grainLabel(grainCount)}</Text>
           </TouchableOpacity>
         )}
@@ -361,19 +360,12 @@ export default function PublicProfileScreen() {
               <View style={{ width: "100%", gap: 8 }}>
                 <Text style={styles.incomingRequestText}>P2P Connect Request — {data.fullName || `@${data.username}`} wants to connect with you</Text>
                 <View style={{ flexDirection: "row", gap: 10 }}>
-                  <TouchableOpacity style={styles.actionBtnPrimary} onPress={() => handleRespond("accepted")} disabled={responding}>
-                    {responding ? <ActivityIndicator color="#fff" size="small" /> : (
-                      <><Ionicons name="checkmark" size={15} color="#fff" /><Text style={styles.actionBtnPrimaryText}>Accept</Text></>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => handleRespond("declined")} disabled={responding}>
-                    <Ionicons name="close" size={15} color={colors.accentGreen} />
-                    <Text style={styles.actionBtnSecondaryText}>Decline</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Accept" onPress={() => handleRespond("accepted")} icon="checkmark" disabled={responding} loading={responding} style={{ flex: 1, flexBasis: "47%" }} />
+                  <AppButton label="Decline" onPress={() => handleRespond("declined")} variant="outline" icon="close" disabled={responding} style={{ flex: 1, flexBasis: "47%" }} />
                 </View>
               </View>
             ) : (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={data.connectionStatus === "connected" ? styles.actionBtnSecondary : styles.actionBtnPrimary}
                 onPress={handleConnect}
                 disabled={connecting || data.connectionStatus !== "none"}
@@ -396,17 +388,10 @@ export default function PublicProfileScreen() {
                 and p2p_start_direct_conversation enforce the real boundary
                 server-side regardless of what the client shows. */}
             {data.canContact && (
-              <TouchableOpacity style={styles.actionBtnSecondary} onPress={handleMessage} disabled={messaging}>
-                {messaging ? <ActivityIndicator color={colors.accentGreen} size="small" /> : (
-                  <><Ionicons name="chatbubble-outline" size={15} color={colors.accentGreen} /><Text style={styles.actionBtnSecondaryText}>Message</Text></>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Message" onPress={handleMessage} variant="outline" icon="chatbubble-outline" disabled={messaging} loading={messaging} style={{ flex: 1, flexBasis: "47%" }} />
             )}
             {data.isPeerGuideEligible && (
-              <TouchableOpacity style={[styles.actionBtnSecondary, { flexBasis: "100%" }]} onPress={() => setPeerGuideModalOpen(true)}>
-                <Ionicons name="compass-outline" size={15} color={colors.accentGreen} />
-                <Text style={styles.actionBtnSecondaryText}>Ask to Be My Peer Guide</Text>
-              </TouchableOpacity>
+              <AppButton label="Ask to Be My Peer Guide" onPress={() => setPeerGuideModalOpen(true)} variant="outline" icon="compass-outline" style={{ flex: 1, flexBasis: "100%" }} />
             )}
           </View>
         )}
@@ -415,17 +400,17 @@ export default function PublicProfileScreen() {
       </ScrollView>
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={[styles.menuSheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
-            <TouchableOpacity style={styles.menuRow} onPress={handleShare}>
+            <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={handleShare}>
               <Ionicons name="share-outline" size={18} color={colors.textDark} />
               <Text style={styles.menuRowText}>Share Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={handleReport}>
+            <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={handleReport}>
               <Ionicons name="flag-outline" size={18} color={colors.textDark} />
               <Text style={styles.menuRowText}>Report User</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={handleBlock}>
+            <TouchableOpacity accessibilityRole="button" style={styles.menuRow} onPress={handleBlock}>
               <Ionicons name="ban-outline" size={18} color="#B91C1C" />
               <Text style={[styles.menuRowText, { color: "#B91C1C" }]}>Block User</Text>
             </TouchableOpacity>
@@ -445,11 +430,10 @@ export default function PublicProfileScreen() {
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
+    actionBtnSecondary: { flex: 1, flexBasis: "47%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
     root: { flex: 1, backgroundColor: c.lightCream },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
     notFoundText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    unblockBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
-    unblockBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     headerBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
     headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center", marginHorizontal: 10 },
     content: { paddingHorizontal: 20, paddingTop: 24 },
@@ -474,7 +458,6 @@ function makeStyles(c: AppColors) {
     actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
     actionBtnPrimary: { flex: 1, flexBasis: "47%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
     actionBtnPrimaryText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    actionBtnSecondary: { flex: 1, flexBasis: "47%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
     actionBtnSecondaryText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     incomingRequestText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
     joinedText: { fontSize: 12, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", marginTop: 8 },

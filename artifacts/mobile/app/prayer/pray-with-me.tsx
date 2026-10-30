@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { createPrayerRequest, type PrayerMode, type PrayerRequestVisibility } from "@/lib/prayerCoordinationApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -70,7 +71,7 @@ export default function PrayWithMeScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Pray With Me</Text>
@@ -94,7 +95,7 @@ export default function PrayWithMeScreen() {
 
         <Text style={styles.fieldLabel}>What kind of prayer?</Text>
         {MODES.map((m) => (
-          <TouchableOpacity key={m.key} style={styles.modeRow} onPress={() => setMode(m.key)}>
+          <TouchableOpacity accessibilityRole="button" key={m.key} style={styles.modeRow} onPress={() => setMode(m.key)}>
             <Ionicons name={mode === m.key ? "radio-button-on" : "radio-button-off"} size={20} color={c.accentGreen} />
             <View style={{ flex: 1 }}>
               <Text style={styles.modeLabel}>{m.label}</Text>
@@ -105,11 +106,11 @@ export default function PrayWithMeScreen() {
 
         <Text style={styles.fieldLabel}>Who can see this?</Text>
         <View style={styles.visRow}>
-          <TouchableOpacity style={[styles.visBtn, visibility === "open" && styles.visBtnActive]} onPress={() => setVisibility("open")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.visBtn, visibility === "open" && styles.visBtnActive]} onPress={() => setVisibility("open")}>
             <Ionicons name="earth" size={14} color={visibility === "open" ? c.accentGreen : c.textMuted} />
             <Text style={[styles.visBtnText, visibility === "open" && styles.visBtnTextActive]}>Open to peers</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.visBtn, visibility === "private" && styles.visBtnActive]} onPress={() => setVisibility("private")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.visBtn, visibility === "private" && styles.visBtnActive]} onPress={() => setVisibility("private")}>
             <Ionicons name="lock-closed" size={14} color={visibility === "private" ? c.accentGreen : c.textMuted} />
             <Text style={[styles.visBtnText, visibility === "private" && styles.visBtnTextActive]}>Private (invite only)</Text>
           </TouchableOpacity>
@@ -123,9 +124,7 @@ export default function PrayWithMeScreen() {
           <Switch value={isAnonymous} onValueChange={setIsAnonymous} trackColor={{ false: c.borderBeige, true: c.accentGreen }} thumbColor="#fff" />
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting || !title.trim() || !prayerPoint.trim()}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Share Prayer Request</Text>}
-        </TouchableOpacity>
+        <AppButton label="Share Prayer Request" onPress={handleSubmit} disabled={submitting || !title.trim() || !prayerPoint.trim()} loading={submitting} style={{ marginTop: 24 }} />
       </ScrollView>
     </View>
   );
@@ -158,7 +157,5 @@ function makeStyles(c: AppColors) {
       borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
     },
     anonLabel: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    submitBtn: { backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 24 },
-    submitBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   });
 }

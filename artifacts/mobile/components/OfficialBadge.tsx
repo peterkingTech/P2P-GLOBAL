@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 export type OfficialAccountType = "crisis_response" | "announcement" | "support" | "general";
 export type BadgeSize = "small" | "medium";
 
@@ -30,7 +31,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
 
   return (
     <>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         onPress={() => setExplainOpen(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={[styles.badge, { backgroundColor: config.color }, size === "small" && styles.badgeSmall]}
@@ -40,7 +41,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
       </TouchableOpacity>
 
       <Modal visible={explainOpen} animationType="slide" transparent onRequestClose={() => setExplainOpen(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
           <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
             <View style={styles.sheetHeaderRow}>
               <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
@@ -57,9 +58,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
             <Text style={styles.sheetWarning}>
               If you receive a message claiming to be from P2P Official from a different account — report it immediately using the three-dot menu.
             </Text>
-            <TouchableOpacity style={styles.gotItBtn} onPress={() => setExplainOpen(false)}>
-              <Text style={styles.gotItBtnText}>Got it</Text>
-            </TouchableOpacity>
+            <AppButton label="Got it" onPress={() => setExplainOpen(false)} style={{ marginTop: 20 }} />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -91,7 +90,5 @@ function makeStyles(c: AppColors) {
     sheetTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", flex: 1 },
     sheetBody: { fontSize: 14, color: c.textMid, lineHeight: 20, marginBottom: 12, fontFamily: "Inter_400Regular" },
     sheetWarning: { fontSize: 13, color: "#B91C1C", lineHeight: 19, marginBottom: 8, fontFamily: "Inter_500Medium" },
-    gotItBtn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center", marginTop: 20 },
-    gotItBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

@@ -48,7 +48,7 @@ export default function KingdomStoryCategoryScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={2}>{category?.title || fallbackTitle || "Kingdom Stories"}</Text>

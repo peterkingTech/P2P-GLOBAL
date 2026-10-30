@@ -7,6 +7,7 @@ import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
+import { AppButton } from "@/components/ui";
 
 const LOGO = require("@/assets/images/logo.png");
 
@@ -68,17 +69,8 @@ export default function AccountPausedScreen() {
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.btn} onPress={reactivate} disabled={busy !== null} activeOpacity={0.85}>
-          {busy === "reactivate" ? <ActivityIndicator color={colors.cream} /> : (
-            <>
-              <Text style={styles.btnText}>{scheduled ? "Keep my account" : "Reactivate my account"}</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.cream} />
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={handleSignOut} disabled={busy !== null}>
-          {busy === "signout" ? <ActivityIndicator color={colors.lightGreen} /> : <Text style={styles.secondaryText}>Sign out</Text>}
-        </TouchableOpacity>
+        <AppButton label={scheduled ? "Keep my account" : "Reactivate my account"} onPress={reactivate} size="lg" icon="arrow-forward" iconPosition="trailing" disabled={busy !== null} loading={busy === "reactivate"} palette="fixedLight" />
+        <AppButton label="Sign out" onPress={handleSignOut} variant="tertiary" disabled={busy !== null} loading={busy === "signout"} palette="fixedLight" />
       </View>
     </View>
   );
@@ -97,12 +89,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular", marginBottom: 10, maxWidth: READABLE_WIDTH.body,
   },
   footer: { paddingHorizontal: 24, gap: 14 },
-  btn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, minHeight: 54,
-    paddingHorizontal: 20, paddingVertical: 12,
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-  },
-  btnText: { color: colors.cream, fontSize: 16, fontFamily: "Inter_600SemiBold", flexShrink: 1, textAlign: "center" },
-  secondaryBtn: { alignItems: "center", paddingVertical: 10 },
   secondaryText: { color: colors.lightGreen, fontSize: 14, fontFamily: "Inter_400Regular" },
 });

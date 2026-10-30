@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import type { LessonState, LockExplanation } from "@/lib/lessonLocks";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Explains a locked lesson/module in plain language: why, what's done, what's
 // left (each item labelled in words and an icon, never colour alone), and
@@ -31,14 +32,12 @@ export default function LockExplanationSheet({ visible, explanation, progress, p
   const pct = progress && progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.head}>
             <Ionicons name="lock-closed" size={18} color={c.amber} />
             <Text style={styles.title} accessibilityRole="header">{explanation.headline}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} style={{ marginRight: -10 }} />
           </View>
           <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 10 }}>
             {explanation.reasons.map((r, i) => <Text key={i} style={styles.reason}>{r}</Text>)}
@@ -65,10 +64,7 @@ export default function LockExplanationSheet({ visible, explanation, progress, p
             <Text style={styles.encourage}>Every step counts — keep going at your own pace.</Text>
           </ScrollView>
           {primary ? (
-            <TouchableOpacity style={styles.primary} onPress={primary.onPress} accessibilityRole="button" accessibilityLabel={primary.label}>
-              <Text style={styles.primaryText} numberOfLines={1}>{primary.label}</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label={`${primary.label}`} onPress={primary.onPress} size="lg" icon="arrow-forward" iconPosition="trailing" accessibilityLabel={primary.label} />
           ) : explanation.next.kind === "wait_for_review" ? (
             <Text style={styles.waiting}>Your submitted lessons are with a peer reviewer — you'll be notified when they're approved.</Text>
           ) : null}

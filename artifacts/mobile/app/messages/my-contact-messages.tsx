@@ -37,7 +37,7 @@ export default function MyContactMessages() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Messages to P2P Global</Text>
@@ -60,7 +60,7 @@ export default function MyContactMessages() {
           renderItem={({ item }) => {
             const statusInfo = STATUS_DISPLAY[item.status];
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.card}
                 activeOpacity={0.85}
                 onPress={() => router.push(`/messages/contact-thread/${item.id}` as any)}

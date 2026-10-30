@@ -73,7 +73,7 @@ export default function KingdomSchoolSettingsScreen() {
             <ActivityIndicator color={colors.accentGreen} />
           ) : (
             LEARNING_FORMAT_OPTIONS.map((opt, i) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.optionRow, i === LEARNING_FORMAT_OPTIONS.length - 1 && styles.rowLast]}
                 onPress={() => setLearningFormatValue(opt.value)}
@@ -88,7 +88,7 @@ export default function KingdomSchoolSettingsScreen() {
         <Text style={styles.sectionTitle}>Session Length Preference</Text>
         <View style={styles.card}>
           {SESSION_LENGTH_OPTIONS.map((opt, i) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={opt.value}
               style={[styles.optionRow, i === SESSION_LENGTH_OPTIONS.length - 1 && styles.rowLast]}
               onPress={() => updateProfile({ preferredSessionLength: opt.value })}

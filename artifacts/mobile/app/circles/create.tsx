@@ -8,6 +8,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { AppButton } from "@/components/ui";
 
 const CIRCLE_TYPES: { value: string; label: string }[] = [
   { value: "open", label: "Open — anyone can request to join" },
@@ -78,7 +79,7 @@ export default function CreateCircleScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Create Circle</Text>
@@ -94,10 +95,10 @@ export default function CreateCircleScreen() {
 
         <Text style={styles.fieldLabel}>What will you go through together?</Text>
         <View style={styles.chipRow}>
-          <TouchableOpacity style={[styles.chip, source === "plan" && styles.chipActive]} onPress={() => { setSource("plan"); setSelectedModuleId(null); }}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.chip, source === "plan" && styles.chipActive]} onPress={() => { setSource("plan"); setSelectedModuleId(null); }}>
             <Text style={[styles.chipText, source === "plan" && styles.chipTextActive]}>A Plan</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.chip, source === "module" && styles.chipActive]} onPress={() => { setSource("module"); setSelectedPlanId(null); }}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.chip, source === "module" && styles.chipActive]} onPress={() => { setSource("module"); setSelectedPlanId(null); }}>
             <Text style={[styles.chipText, source === "module" && styles.chipTextActive]}>Foundation Module</Text>
           </TouchableOpacity>
         </View>
@@ -105,7 +106,7 @@ export default function CreateCircleScreen() {
         {source === "plan" && (
           <View style={styles.pickList}>
             {plans.map((p) => (
-              <TouchableOpacity key={p.id} style={[styles.pickRow, selectedPlanId === p.id && styles.pickRowActive]} onPress={() => setSelectedPlanId(p.id)}>
+              <TouchableOpacity accessibilityRole="button" key={p.id} style={[styles.pickRow, selectedPlanId === p.id && styles.pickRowActive]} onPress={() => setSelectedPlanId(p.id)}>
                 <Text style={[styles.pickRowText, selectedPlanId === p.id && styles.pickRowTextActive]} numberOfLines={1}>{p.title}</Text>
                 {selectedPlanId === p.id && <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />}
               </TouchableOpacity>
@@ -115,7 +116,7 @@ export default function CreateCircleScreen() {
         {source === "module" && (
           <View style={styles.pickList}>
             {modules.map((m) => (
-              <TouchableOpacity key={m.id} style={[styles.pickRow, selectedModuleId === m.id && styles.pickRowActive]} onPress={() => setSelectedModuleId(m.id)}>
+              <TouchableOpacity accessibilityRole="button" key={m.id} style={[styles.pickRow, selectedModuleId === m.id && styles.pickRowActive]} onPress={() => setSelectedModuleId(m.id)}>
                 <Text style={[styles.pickRowText, selectedModuleId === m.id && styles.pickRowTextActive]} numberOfLines={1}>{m.title}</Text>
                 {selectedModuleId === m.id && <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />}
               </TouchableOpacity>
@@ -126,7 +127,7 @@ export default function CreateCircleScreen() {
         <Text style={styles.fieldLabel}>Circle type</Text>
         <View style={{ gap: 8 }}>
           {CIRCLE_TYPES.map((t) => (
-            <TouchableOpacity key={t.value} style={[styles.optionRow, circleType === t.value && styles.optionRowActive]} onPress={() => setCircleType(t.value)}>
+            <TouchableOpacity accessibilityRole="button" key={t.value} style={[styles.optionRow, circleType === t.value && styles.optionRowActive]} onPress={() => setCircleType(t.value)}>
               <Text style={[styles.optionRowText, circleType === t.value && styles.optionRowTextActive]}>{t.label}</Text>
               {circleType === t.value && <Ionicons name="checkmark-circle" size={16} color={colors.accentGreen} />}
             </TouchableOpacity>
@@ -145,15 +146,13 @@ export default function CreateCircleScreen() {
         <Text style={styles.fieldLabel}>Meeting preference</Text>
         <View style={styles.chipRow}>
           {MEETING_OPTIONS.map((m) => (
-            <TouchableOpacity key={m.value} style={[styles.chip, meetingPreference === m.value && styles.chipActive]} onPress={() => setMeetingPreference(m.value)}>
+            <TouchableOpacity accessibilityRole="button" key={m.value} style={[styles.chip, meetingPreference === m.value && styles.chipActive]} onPress={() => setMeetingPreference(m.value)}>
               <Text style={[styles.chipText, meetingPreference === m.value && styles.chipTextActive]}>{m.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleCreate} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>Create Circle</Text>}
-        </TouchableOpacity>
+        <AppButton label="Create Circle" onPress={handleCreate} size="lg" disabled={saving} loading={saving} style={{ marginTop: 32 }} />
       </ScrollView>
     </View>
   );
@@ -182,7 +181,5 @@ function makeStyles(c: AppColors) {
     optionRowActive: { borderColor: c.accentGreen },
     optionRowText: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
     optionRowTextActive: { color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
-    submitBtn: { backgroundColor: c.accentGreen, borderRadius: 14, height: 52, alignItems: "center", justifyContent: "center", marginTop: 32 },
-    submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

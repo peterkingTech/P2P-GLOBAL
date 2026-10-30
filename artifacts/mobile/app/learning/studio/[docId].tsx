@@ -14,6 +14,7 @@ import {
   saveLocalDraft, loadLocalDraft, clearLocalDraft, emitStudioSaved, type DrawingDoc, type Background, type Stroke,
 } from "@/lib/handwriting";
 import { createDrawing, saveDrawing, getDrawing } from "@/lib/learningAttachmentsApi";
+import { AppButton } from "@/components/ui";
 
 // Handwriting Studio — full-screen drawing for Comprehensive Check answers.
 // Opens from an answer box ("Add drawing"); typing stays available there and
@@ -207,7 +208,7 @@ export default function HandwritingStudio() {
     </TouchableOpacity>
   );
   const iconBtn = (icon: React.ComponentProps<typeof Ionicons>["name"], label: string, onPress: () => void, disabled?: boolean) => (
-    <TouchableOpacity key={label} style={[s.iconBtn, disabled && { opacity: 0.4 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
+    <TouchableOpacity hitSlop={10} key={label} style={[s.iconBtn, disabled && { opacity: 0.4 }]} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
       <Ionicons name={icon} size={20} color={c.textDark} />
     </TouchableOpacity>
   );
@@ -222,9 +223,7 @@ export default function HandwritingStudio() {
         {iconBtn("add-circle-outline", "Zoom in", () => setZoom((z) => Math.min(4, z + 0.5)), zoom >= 4)}
         <View style={{ flex: 1 }} />
         <Text style={s.meta} accessibilityLiveRegion="polite">{saving ? "Saving…" : dirtyServer.current ? "Saved on this device" : attachmentId ? "Saved" : ""}</Text>
-        <TouchableOpacity style={s.doneBtn} onPress={done} disabled={saving} accessibilityRole="button" accessibilityLabel="Save and close">
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.doneText}>Done</Text>}
-        </TouchableOpacity>
+        <AppButton label="Done" onPress={done} disabled={saving} loading={saving} accessibilityLabel="Save and close" style={{ minWidth: 72, marginLeft: 6 }} />
       </View>
       {note ? <Text style={s.note} accessibilityLiveRegion="polite">{note}</Text> : null}
       {error ? <Text style={s.error} accessibilityRole="alert">{error}</Text> : null}
@@ -242,9 +241,7 @@ export default function HandwritingStudio() {
           <Text style={s.pageText}>{pageLabel}</Text>
           {iconBtn("chevron-forward", "Next page", () => setPageIndex((i) => Math.min(doc.pages.length - 1, i + 1)), pageIndex >= doc.pages.length - 1)}
           {iconBtn("document-outline", "Add a page after this one", addPage)}
-          <TouchableOpacity style={s.smallBtn} onPress={cycleBackground} accessibilityRole="button" accessibilityLabel={`Page background: ${BACKGROUND_LABEL[page.background]}. Tap to change`}>
-            <Text style={s.smallText}>{BACKGROUND_LABEL[page.background]}</Text>
-          </TouchableOpacity>
+          <AppButton label={`${BACKGROUND_LABEL[page.background]}`} onPress={cycleBackground} variant="secondary" accessibilityLabel={`Page background: ${BACKGROUND_LABEL[page.background]}. Tap to change`} style={{ minWidth: 44 }} />
           {iconBtn("trash-outline", doc.pages.length > 1 ? "Delete this page" : "Clear this page", () => setConfirm(doc.pages.length > 1 ? "deletePage" : "clear"))}
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.toolRow}>
@@ -290,7 +287,6 @@ function makeStyles(c: AppColors) {
     viewPage: { gap: 6, alignItems: "flex-start" },
     topRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.borderBeige, backgroundColor: c.card },
     iconBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 10 },
-    doneBtn: { minHeight: 44, minWidth: 72, paddingHorizontal: 16, borderRadius: 10, backgroundColor: c.primaryGreen, alignItems: "center", justifyContent: "center", marginLeft: 6 },
     doneText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     meta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
     note: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold", paddingHorizontal: 12, paddingTop: 6 },

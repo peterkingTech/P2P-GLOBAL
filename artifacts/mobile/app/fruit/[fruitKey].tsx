@@ -104,7 +104,7 @@ export default function FruitDetailScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={dark.cream} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{isHiddenAndUnearned ? "Hidden Achievement" : fruit.name}</Text>
@@ -198,7 +198,7 @@ export default function FruitDetailScreen() {
               <View style={styles.block}>
                 <Text style={styles.blockTitle}>Related Fruits</Text>
                 {relatedFruits.map((rf) => (
-                  <TouchableOpacity key={rf.fruitKey} style={styles.relatedRow} onPress={() => router.push(`/fruit/${rf.fruitKey}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" key={rf.fruitKey} style={styles.relatedRow} onPress={() => router.push(`/fruit/${rf.fruitKey}` as any)}>
                     <Text style={styles.relatedIcon}>{rf.isHidden && !userFruits.some((u) => u.fruitKey === rf.fruitKey) ? "?" : rf.icon}</Text>
                     <Text style={styles.relatedName}>{rf.isHidden && !userFruits.some((u) => u.fruitKey === rf.fruitKey) ? "Hidden Achievement" : rf.name}</Text>
                     <Ionicons name="chevron-forward" size={16} color={dark.textFaint} />

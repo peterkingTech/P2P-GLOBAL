@@ -24,6 +24,7 @@ import DateOfBirthInput from "@/components/DateOfBirthInput";
 import { validateUsername, formatUsername, generateUsernameSuggestions } from "@/lib/username";
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import type { SignUpLocation } from "@/contexts/AuthContext";
+import { AppButton } from "@/components/ui";
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
@@ -196,7 +197,7 @@ export default function RegisterScreen() {
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} style={styles.backBtn} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={22} color={colors.lightGreen} />
       </TouchableOpacity>
 
@@ -289,9 +290,7 @@ export default function RegisterScreen() {
           {usernameSuggestions.length > 0 && (
             <View style={styles.suggestionsRow}>
               {usernameSuggestions.map((s) => (
-                <TouchableOpacity key={s} style={styles.suggestionChip} onPress={() => setUsername(s)}>
-                  <Text style={styles.suggestionChipText}>@{s}</Text>
-                </TouchableOpacity>
+                <AppButton label={`@${s}`} onPress={() => setUsername(s)} variant="secondary" size="sm" key={s} palette="fixedLight" />
               ))}
             </View>
           )}
@@ -322,7 +321,7 @@ export default function RegisterScreen() {
               placeholder="Min. 6 characters"
               placeholderTextColor={colors.textMuted}
             />
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} hitSlop={10}
               style={styles.eyeBtn}
               onPress={() => setShowPassword((p) => !p)}
             >
@@ -351,7 +350,7 @@ export default function RegisterScreen() {
               <Text style={styles.locationConfirmedText}>
                 {location.city ? `${location.city} · ` : ""}{location.country}
               </Text>
-              <TouchableOpacity onPress={() => setLocation(null)}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => setLocation(null)}>
                 <Text style={styles.locationChangeText}>Change</Text>
               </TouchableOpacity>
             </View>
@@ -360,23 +359,12 @@ export default function RegisterScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={handleRegister}
-          activeOpacity={0.85}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.cream} />
-          ) : (
-            <Text style={styles.primaryBtnText}>Create Account</Text>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Create Account" onPress={handleRegister} size="lg" disabled={loading} loading={loading} style={{ marginTop: 8 }} palette="fixedLight" />
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Already have an account?</Text>
-        <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.replace("/(auth)/login")}>
           <Text style={styles.linkText}> Sign in</Text>
         </TouchableOpacity>
       </View>
@@ -450,20 +438,6 @@ const styles = StyleSheet.create({
   passwordRow: { flexDirection: "row", alignItems: "center" },
   eyeBtn: { position: "absolute", right: 14 },
   dobNote: { color: colors.textMuted, fontSize: 12, marginTop: 2, fontFamily: "Inter_400Regular" },
-  primaryBtn: {
-    backgroundColor: colors.accentGreen,
-    borderRadius: 14,
-    height: 54,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  primaryBtnText: {
-    color: colors.cream,
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
-  },
   footer: { flexDirection: "row", justifyContent: "center", marginTop: 32 },
   footerText: { color: colors.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
   linkText: { color: colors.accentGreen, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },

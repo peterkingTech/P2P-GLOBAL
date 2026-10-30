@@ -8,6 +8,7 @@ import {
   KINGDOM_CATEGORY_LABELS, IMPACT_THEME_LABELS, type KingdomWin, type WinsRestriction,
 } from "@/lib/kingdomWinsApi";
 import { RESTRICTION_DURATIONS, formatUntil, isWinsModerator, restrictionExpiry, type RestrictionDuration } from "@/lib/winsModerationModel";
+import { AppButton, IconButton } from "@/components/ui";
 
 type QueueStatus = "submitted" | "published" | "rejected" | "archived" | "removed";
 
@@ -170,18 +171,12 @@ export default function KingdomWinsReviewScreen() {
                     value={noteDrafts[item.id] ?? ""} onChangeText={(t) => setNoteDrafts((prev) => ({ ...prev, [item.id]: t }))}
                   />
                   <View style={styles.actionsRow}>
-                    <TouchableOpacity style={[styles.actionBtn, styles.actionApprove]} onPress={() => confirmAction(item, "approve")} disabled={acting === item.id} accessibilityRole="button" accessibilityLabel={item.heldForReview ? "Release and publish" : "Approve"}>
-                      <Text style={styles.actionBtnText}>{item.heldForReview ? "Release & publish" : "Approve"}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, styles.actionReject]} onPress={() => confirmAction(item, "reject")} disabled={acting === item.id} accessibilityRole="button" accessibilityLabel="Reject">
-                      <Text style={styles.actionBtnText}>Reject</Text>
-                    </TouchableOpacity>
+                    <AppButton label={item.heldForReview ? "Release & publish" : "Approve"} onPress={() => confirmAction(item, "approve")} disabled={acting === item.id} accessibilityLabel={item.heldForReview ? "Release and publish" : "Approve"} style={{ flex: 1 }} palette="fixedLight" />
+                    <AppButton label="Reject" onPress={() => confirmAction(item, "reject")} variant="destructive" disabled={acting === item.id} accessibilityLabel="Reject" style={{ flex: 1 }} palette="fixedLight" />
                   </View>
                 </>
               ) : item.status === "published" && canModerate ? (
-                <TouchableOpacity style={[styles.actionBtn, styles.actionArchive, { marginTop: 8 }]} onPress={() => confirmAction(item, "archive")} disabled={acting === item.id} accessibilityRole="button" accessibilityLabel="Archive">
-                  <Text style={styles.actionBtnText}>Archive</Text>
-                </TouchableOpacity>
+                <AppButton label="Archive" onPress={() => confirmAction(item, "archive")} variant="secondary" disabled={acting === item.id} accessibilityLabel="Archive" style={{ flex: 1, marginTop: 8 }} palette="fixedLight" />
               ) : item.status !== "published" ? (
                 <View style={[styles.statusPill, item.status === "archived" ? styles.statusPillArchived : styles.statusPillRejected]}>
                   <Text style={styles.statusPillText}>{item.status.toUpperCase()}</Text>
@@ -192,10 +187,7 @@ export default function KingdomWinsReviewScreen() {
                 restrictionFor === item.authorId ? (
                   <RestrictionPanel userId={item.authorId} onClose={() => setRestrictionFor(null)} />
                 ) : (
-                  <TouchableOpacity style={styles.linkBtn} onPress={() => setRestrictionFor(item.authorId)} accessibilityRole="button" accessibilityLabel="Posting restriction for this author">
-                    <Ionicons name="lock-closed-outline" size={13} color={colors.textMid} />
-                    <Text style={styles.linkBtnText}>Posting restriction…</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Posting restriction…" onPress={() => setRestrictionFor(item.authorId)} variant="tertiary" icon="lock-closed-outline" accessibilityLabel="Posting restriction for this author" style={{ marginTop: 4, alignSelf: "flex-start" }} palette="fixedLight" />
                 )
               ) : null}
             </View>
@@ -245,9 +237,7 @@ function RestrictionPanel({ userId, onClose }: { userId: string; onClose: () => 
     <View style={styles.panel} accessibilityLabel="Posting restriction">
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>Posting restriction</Text>
-        <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close posting restriction" style={styles.closeBtn}>
-          <Ionicons name="close" size={18} color={colors.textMid} />
-        </TouchableOpacity>
+        <IconButton icon="close" accessibilityLabel="Close posting restriction" onPress={onClose} color={colors.textMid} palette="fixedLight" />
       </View>
       {items === null ? <ActivityIndicator color={colors.primaryGreen} /> : active.length ? (
         <>
@@ -255,9 +245,7 @@ function RestrictionPanel({ userId, onClose }: { userId: string; onClose: () => 
             <Text key={r.id} style={styles.panelText}>Restricted {r.expiresAt ? `until ${formatUntil(r.expiresAt)}` : "until lifted"} — {r.reason}</Text>
           ))}
           <TextInput style={styles.noteInput} placeholder="Reason for lifting" placeholderTextColor={colors.textMuted} accessibilityLabel="Reason for lifting" value={reason} onChangeText={setReason} />
-          <TouchableOpacity style={[styles.actionBtn, styles.actionApprove, { marginTop: 8 }]} onPress={liftAll} disabled={busy} accessibilityRole="button" accessibilityLabel="Lift restriction">
-            <Text style={styles.actionBtnText}>Lift restriction</Text>
-          </TouchableOpacity>
+          <AppButton label="Lift restriction" onPress={liftAll} disabled={busy} accessibilityLabel="Lift restriction" style={{ flex: 1, marginTop: 8 }} palette="fixedLight" />
         </>
       ) : (
         <>
@@ -273,9 +261,7 @@ function RestrictionPanel({ userId, onClose }: { userId: string; onClose: () => 
             ))}
           </View>
           <TextInput style={styles.noteInput} placeholder="Reason (kept for moderators; not shown to the member)" placeholderTextColor={colors.textMuted} accessibilityLabel="Reason for restriction" value={reason} onChangeText={setReason} />
-          <TouchableOpacity style={[styles.actionBtn, styles.actionReject, { marginTop: 8 }]} onPress={restrict} disabled={busy} accessibilityRole="button" accessibilityLabel="Restrict posting">
-            <Text style={styles.actionBtnText}>Restrict posting</Text>
-          </TouchableOpacity>
+          <AppButton label="Restrict posting" onPress={restrict} variant="destructive" disabled={busy} accessibilityLabel="Restrict posting" style={{ flex: 1, marginTop: 8 }} palette="fixedLight" />
         </>
       )}
     </View>
@@ -312,8 +298,6 @@ const styles = StyleSheet.create({
   noteExisting: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium", marginTop: 4, fontStyle: "italic" },
   noteInput: { borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8, paddingHorizontal: 10, minHeight: 44, fontSize: 12, color: colors.textDark, marginTop: 8, fontFamily: "Inter_400Regular" },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  actionBtn: { flex: 1, minHeight: 44, justifyContent: "center", borderRadius: 8, alignItems: "center" },
-  actionBtnText: { fontSize: 12, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
   actionApprove: { backgroundColor: colors.primaryGreen },
   actionReject: { backgroundColor: "#B91C1C" },
   actionArchive: { backgroundColor: "#D97706" },
@@ -321,12 +305,9 @@ const styles = StyleSheet.create({
   statusPillText: { fontSize: 11, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
   statusPillRejected: { backgroundColor: "#B91C1C" },
   statusPillArchived: { backgroundColor: "#D97706" },
-  linkBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, marginTop: 4, alignSelf: "flex-start" },
-  linkBtnText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   panel: { marginTop: 8, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: colors.lightCream, gap: 4 },
   panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   panelTitle: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_700Bold" },
   panelText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
-  closeBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   durationRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 6 },
 });

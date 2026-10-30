@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -229,15 +230,9 @@ export default function IntakeScreen() {
       {/* Navigation buttons */}
       <View style={styles.navRow}>
         {step === 2 && (
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => { setError(null); setStep(1); }}
-          >
-            <Ionicons name="arrow-back" size={18} color={colors.accentGreen} />
-            <Text style={styles.backBtnText}>Back</Text>
-          </TouchableOpacity>
+          <AppButton label="Back" onPress={() => { setError(null); setStep(1); }} variant="outline" size="lg" icon="arrow-back" palette="fixedLight" />
         )}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.nextBtn, step === 1 ? { flex: 1 } : { flex: 1 }]}
           onPress={step === 1 ? handleNext : handleSubmit}
           disabled={saving}
@@ -254,12 +249,7 @@ export default function IntakeScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.skipBtn}
-        onPress={() => router.replace("/(auth)/profile-setup")}
-      >
-        <Text style={styles.skipText}>Skip for now</Text>
-      </TouchableOpacity>
+      <AppButton label="Skip for now" onPress={() => router.replace("/(auth)/profile-setup")} variant="tertiary" palette="fixedLight" />
     </KeyboardAwareScrollView>
   );
 }
@@ -357,7 +347,7 @@ function Section1Form({
           {languages.map((l) => {
             const selected = values.primary_language === l.code;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={l.code}
                 style={[styles.pill, selected && styles.pillSelected]}
                 onPress={() => set("primary_language", l.code)}
@@ -378,7 +368,7 @@ function Section1Form({
             .map((l) => {
               const selected = values.other_languages.includes(l.code);
               return (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={l.code}
                   style={[styles.pill, selected && styles.pillSelected]}
                   onPress={() => toggleOtherLang(l.code)}
@@ -417,7 +407,7 @@ function Section2Form({
           {FAITH_STAGES.map((stage) => {
             const selected = values.faith_journey_stage === stage.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={stage.value}
                 style={[styles.stageTile, selected && styles.stageTileSelected]}
                 onPress={() => set("faith_journey_stage", stage.value)}
@@ -443,7 +433,7 @@ function Section2Form({
           {BORN_AGAIN_OPTIONS.map((o) => {
             const selected = values.born_again === o.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={o.value}
                 style={[styles.pill, selected && styles.pillSelected]}
                 onPress={() => set("born_again", o.value)}
@@ -474,7 +464,7 @@ function Section2Form({
           {DURATION_OPTIONS.map((o) => {
             const selected = values.walking_with_christ_duration === o.value;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={o.value}
                 style={[styles.durationOption, selected && styles.durationSelected]}
                 onPress={() => set("walking_with_christ_duration", o.value)}
@@ -600,18 +590,11 @@ const styles = StyleSheet.create({
 
   // Navigation
   navRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-  backBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 18, height: 52,
-    borderRadius: 14, borderWidth: 1, borderColor: colors.accentGreen,
-  },
-  backBtnText: { fontSize: 15, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
   nextBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     height: 52, borderRadius: 14,
     backgroundColor: colors.accentGreen,
   },
   nextBtnText: { fontSize: 16, fontWeight: "600", color: colors.cream, fontFamily: "Inter_600SemiBold" },
-  skipBtn: { alignItems: "center", paddingVertical: 12 },
   skipText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular" },
 });

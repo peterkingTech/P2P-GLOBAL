@@ -5,6 +5,7 @@ import ConnectionHealth from "./ConnectionHealth";
 import FamilyIcon from "./FamilyIcon";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import type { VoicePhase } from "@/hooks/useVoiceSpace";
+import { AppButton } from "@/components/ui";
 
 interface Props {
   phase: VoicePhase;
@@ -44,12 +45,8 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
         <View style={styles.failBox}>
           <Text style={styles.failText}>{error ?? "Unable to connect to Voice"}</Text>
           <View style={styles.failBtnRow}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Together">
-              <Text style={styles.secondaryBtnText}>Leave Together</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry connecting to Voice">
-              <Text style={styles.primaryBtnText}>Retry</Text>
-            </TouchableOpacity>
+            <AppButton label="Leave Together" onPress={onLeave} variant="outline" accessibilityLabel="Leave Together" style={{ flex: 1 }} palette="fixedDark" />
+            <AppButton label="Retry" variant="secondary" onPress={onRetry} accessibilityLabel="Retry connecting to Voice" style={{ flex: 1 }} palette="fixedDark" />
           </View>
         </View>
       )}
@@ -60,7 +57,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
             <ConnectionHealth phase={phase} />
           </View>
           <View style={styles.controlsRow}>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={10}
               style={[styles.iconBtn, micMuted && styles.iconBtnActive]}
               onPress={onToggleMic}
               accessibilityRole="button"
@@ -69,7 +66,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
             >
               <Ionicons name={micMuted ? "mic-off" : "mic-outline"} size={20} color={colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={10}
               style={[styles.iconBtn, !listening && styles.iconBtnActive]}
               onPress={onToggleListening}
               accessibilityRole="button"
@@ -78,9 +75,7 @@ export default function VoiceSpace({ phase, error, onJoin, onRetry, onLeave, mic
             >
               <Ionicons name={listening ? "ear" : "ear-outline"} size={20} color={colors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryBtnSmall} onPress={onLeave} accessibilityRole="button" accessibilityLabel="Leave Voice">
-              <Text style={styles.secondaryBtnText}>Leave Voice</Text>
-            </TouchableOpacity>
+            <AppButton label="Leave Voice" onPress={onLeave} variant="outline" accessibilityLabel="Leave Voice" style={{ marginLeft: "auto" }} palette="fixedDark" />
           </View>
         </View>
       )}
@@ -102,11 +97,6 @@ const styles = StyleSheet.create({
   failBox: { backgroundColor: colors.restSoft, borderRadius: radii.lg, padding: spacing.md, gap: spacing.md },
   failText: { color: colors.textPrimary, ...type.caption, lineHeight: 17 },
   failBtnRow: { flexDirection: "row", gap: spacing.sm },
-  primaryBtn: { flex: 1, backgroundColor: colors.connection, borderRadius: radii.md, minHeight: MIN_TOUCH_TARGET, alignItems: "center", justifyContent: "center" },
-  primaryBtnText: { color: colors.textPrimary, ...type.bodyEmph },
-  secondaryBtn: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, minHeight: MIN_TOUCH_TARGET, alignItems: "center", justifyContent: "center" },
-  secondaryBtnSmall: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, minHeight: MIN_TOUCH_TARGET, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center", marginLeft: "auto" },
-  secondaryBtnText: { color: colors.textSecondary, ...type.bodyEmph },
 
   connectedHeaderRow: { marginBottom: spacing.sm },
   controlsRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

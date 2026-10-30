@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const DESCRIPTION_MAX = 280;
 
@@ -30,7 +31,7 @@ export default function ChurchGeneralSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.headerTitle}>General</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -57,9 +58,7 @@ export default function ChurchGeneralSettingsScreen() {
         <Text style={styles.charCounter}>{description.length}/{DESCRIPTION_MAX}</Text>
 
         {isChurchCreator && (
-          <TouchableOpacity style={[styles.saveBtn, !name.trim() && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving || !name.trim()}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
-          </TouchableOpacity>
+          <AppButton label="Save Changes" onPress={handleSave} size="lg" disabled={saving || !name.trim()} loading={saving} style={{ marginTop: 24 }} palette="fixedLight" />
         )}
       </ScrollView>
     </View>
@@ -84,7 +83,4 @@ const styles = StyleSheet.create({
   },
   textArea: { minHeight: 90, textAlignVertical: "top" },
   charCounter: { fontSize: 11, color: colors.textMuted, textAlign: "right", marginTop: 4, fontFamily: "Inter_400Regular" },
-  saveBtn: { backgroundColor: colors.accentGreen, borderRadius: 12, height: 50, alignItems: "center", justifyContent: "center", marginTop: 24 },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

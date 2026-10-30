@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
+import { AppButton } from "@/components/ui";
 
 // New Journal reflection — the one genuinely new piece of My Discipleship
 // Journal. Free-form, prompts are suggestions only (spec explicitly says
@@ -55,7 +56,7 @@ export default function NewReflectionScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>New Reflection</Text>
@@ -66,20 +67,18 @@ export default function NewReflectionScreen() {
           <>
             <Text style={s.sectionLabel}>Choose a prompt, or write freely</Text>
             {PROMPTS.map((p) => (
-              <TouchableOpacity key={p} style={s.promptCard} onPress={() => setSelectedPrompt(p)}>
+              <TouchableOpacity accessibilityRole="button" key={p} style={s.promptCard} onPress={() => setSelectedPrompt(p)}>
                 <Text style={s.promptCardText}>{p}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={s.freeWriteBtn} onPress={() => setSelectedPrompt("")}>
-              <Text style={s.freeWriteBtnText}>Write Freely (No Prompt)</Text>
-            </TouchableOpacity>
+            <AppButton label="Write Freely (No Prompt)" onPress={() => setSelectedPrompt("")} variant="tertiary" style={{ marginTop: 4 }} />
           </>
         ) : (
           <>
             {selectedPrompt !== "" && (
               <View style={s.chosenPromptCard}>
                 <Text style={s.chosenPromptText}>{selectedPrompt}</Text>
-                <TouchableOpacity onPress={() => setSelectedPrompt(null)}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedPrompt(null)}>
                   <Text style={s.changePromptText}>Change</Text>
                 </TouchableOpacity>
               </View>
@@ -94,21 +93,19 @@ export default function NewReflectionScreen() {
               autoFocus
             />
 
-            <TouchableOpacity style={s.linkRow} onPress={() => setLessonPickerOpen(true)}>
+            <TouchableOpacity accessibilityRole="button" style={s.linkRow} onPress={() => setLessonPickerOpen(true)}>
               <Ionicons name="book-outline" size={18} color={colors.accentGreen} />
               <Text style={s.linkRowText}>
                 {linkedLesson ? `Linked: ${linkedLesson.title}` : "Link a Kingdom School lesson (optional)"}
               </Text>
               {linkedLesson && (
-                <TouchableOpacity onPress={() => setLinkedLesson(null)}>
+                <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLinkedLesson(null)}>
                   <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={[s.saveBtn, !content.trim() && s.saveBtnDisabled]} onPress={handleSave} disabled={!content.trim() || saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Save Reflection</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save Reflection" onPress={handleSave} size="lg" disabled={!content.trim() || saving} loading={saving} />
           </>
         )}
       </ScrollView>
@@ -138,8 +135,6 @@ function makeStyles(c: AppColors) {
     sectionLabel: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", marginBottom: 12 },
     promptCard: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 10 },
     promptCardText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium", lineHeight: 20 },
-    freeWriteBtn: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
-    freeWriteBtnText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     chosenPromptCard: {
       backgroundColor: "rgba(29,158,117,0.08)", borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",
@@ -158,9 +153,5 @@ function makeStyles(c: AppColors) {
       borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, padding: 13, marginBottom: 20,
     },
     linkRowText: { flex: 1, fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular" },
-
-    saveBtn: { backgroundColor: c.primaryGreen, borderRadius: 14, height: 52, alignItems: "center", justifyContent: "center" },
-    saveBtnDisabled: { opacity: 0.5 },
-    saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

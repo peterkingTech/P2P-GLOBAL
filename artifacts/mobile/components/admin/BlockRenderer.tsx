@@ -5,6 +5,7 @@ import colors from "@/constants/colors";
 import { LessonBlock } from "@/lib/curriculumBlocks";
 import { lookupVerseForAdmin } from "@/lib/bibleClient";
 import { pickAndUploadImage, pickAndUploadAudio } from "@/lib/curriculumMedia";
+import { AppButton } from "@/components/ui";
 
 interface Props {
   block: LessonBlock;
@@ -80,7 +81,7 @@ export default function BlockRenderer({ block, moduleId, lessonId, onChangeConte
             <Ionicons name={s.icon as any} size={16} color={s.border} />
             <View style={{ flexDirection: "row", gap: 6, marginLeft: "auto" }}>
               {(["info", "warning", "tip"] as const).map((opt) => (
-                <TouchableOpacity key={opt} onPress={() => patch(block, onChangeContent, "style", opt)}>
+                <TouchableOpacity accessibilityRole="button" key={opt} onPress={() => patch(block, onChangeContent, "style", opt)}>
                   <View
                     style={[
                       styles.styleDot,
@@ -257,9 +258,7 @@ function ScriptureBlockEditor({
           placeholder="e.g. John 3:16"
           placeholderTextColor={colors.textMutedLight}
         />
-        <TouchableOpacity style={styles.lookupBtn} onPress={handleLookup} disabled={looking}>
-          {looking ? <ActivityIndicator size="small" color={colors.primaryGreen} /> : <Text style={styles.lookupBtnText}>Look up</Text>}
-        </TouchableOpacity>
+        <AppButton label="Look up" onPress={handleLookup} size="sm" disabled={looking} loading={looking} style={{ minWidth: 64 }} palette="fixedLight" />
       </View>
       <TextInput
         style={[textInputBase, styles.scriptureText]}
@@ -319,15 +318,12 @@ function AssignmentBlockEditor({ block, onChangeContent }: { block: LessonBlock;
             placeholderTextColor={colors.textMutedLight}
             multiline
           />
-          <TouchableOpacity onPress={() => setQuestions(questions.filter((_, idx) => idx !== i))}>
+          <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setQuestions(questions.filter((_, idx) => idx !== i))}>
             <Ionicons name="close-circle-outline" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       ))}
-      <TouchableOpacity style={styles.addQuestionBtn} onPress={() => setQuestions([...questions, { question: "" }])}>
-        <Ionicons name="add" size={16} color={colors.primaryGreen} />
-        <Text style={styles.addQuestionText}>Add question</Text>
-      </TouchableOpacity>
+      <AppButton label="Add question" onPress={() => setQuestions([...questions, { question: "" }])} variant="tertiary" icon="add" style={{ alignSelf: "flex-start" }} palette="fixedLight" />
       <View style={styles.dueRow}>
         <Text style={styles.dueLabel}>Due after</Text>
         <TextInput
@@ -374,18 +370,8 @@ function ImageBlockEditor({
         </View>
       )}
       <View style={styles.imageActionsRow}>
-        <TouchableOpacity style={styles.imageActionBtn} onPress={handlePick} disabled={uploading}>
-          {uploading ? <ActivityIndicator size="small" color={colors.primaryGreen} /> : (
-            <>
-              <Ionicons name="cloud-upload-outline" size={14} color={colors.primaryGreen} />
-              <Text style={styles.imageActionText}>Upload</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.imageActionBtn} onPress={() => setUrlMode((v) => !v)}>
-          <Ionicons name="link-outline" size={14} color={colors.primaryGreen} />
-          <Text style={styles.imageActionText}>Use URL</Text>
-        </TouchableOpacity>
+        <AppButton label="Upload" onPress={handlePick} variant="outline" size="sm" icon="cloud-upload-outline" disabled={uploading} loading={uploading} palette="fixedLight" />
+        <AppButton label="Use URL" onPress={() => setUrlMode((v) => !v)} variant="outline" size="sm" icon="link-outline" palette="fixedLight" />
       </View>
       {urlMode && (
         <TextInput
@@ -442,7 +428,7 @@ function AudioBlockEditor({
         />
         <Text style={styles.mediaUrlDisplay} numberOfLines={1}>{c.url || "No file uploaded"}</Text>
       </View>
-      <TouchableOpacity style={styles.imageActionBtn} onPress={handlePick} disabled={uploading}>
+      <TouchableOpacity accessibilityRole="button" style={styles.imageActionBtn} onPress={handlePick} disabled={uploading}>
         {uploading ? <ActivityIndicator size="small" color={colors.primaryGreen} /> : <Ionicons name="cloud-upload-outline" size={16} color={colors.primaryGreen} />}
       </TouchableOpacity>
     </View>
@@ -474,8 +460,6 @@ const styles = StyleSheet.create({
   memoryVerseWrap: { backgroundColor: "#FEF9E7", borderColor: "#F0E1AE" },
   scriptureHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   scriptureRefInput: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.textDark, flex: 1 },
-  lookupBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.primaryGreen, minWidth: 64, alignItems: "center" },
-  lookupBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   scriptureText: { fontSize: 15, fontFamily: "Inter_500Medium", fontStyle: "italic", color: colors.textDark, lineHeight: 22 },
   translationTag: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.textMuted, alignSelf: "flex-end" },
   assignmentWrap: { backgroundColor: colors.cardBeige, borderRadius: 10, padding: 12, gap: 8 },
@@ -483,7 +467,6 @@ const styles = StyleSheet.create({
   assignmentTitleInput: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.textDark, flex: 1 },
   assignmentQuestionRow: { flexDirection: "row", gap: 6, alignItems: "flex-start" },
   assignmentQuestionNum: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.textMuted, marginTop: 2 },
-  addQuestionBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
   addQuestionText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryGreen },
   dueRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   dueLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.textMuted },

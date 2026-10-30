@@ -8,6 +8,7 @@ import {
   getLearningHome, startJourney, markCovered, customStudyPath, manageCustomPath, LearningApiError,
   type GroupScope, type LearningHome,
 } from "@/lib/groupLearningApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -85,9 +86,7 @@ export default function LearningHomeScreen() {
         <Stack.Screen options={{ title: "Learning" }} />
         <Text style={styles.muted}>{denied ? `You're not part of this ${scope === "family" ? "Family Circle" : "church"}.` : error?.message ?? "Couldn't load Learning."}</Text>
         {!denied && (
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setLoading(true); load(); }} accessibilityRole="button">
-            <Text style={styles.secondaryBtnText}>Try again</Text>
-          </TouchableOpacity>
+          <AppButton label="Try again" onPress={() => { setLoading(true); load(); }} variant="outline" />
         )}
       </View>
     );
@@ -112,13 +111,9 @@ export default function LearningHomeScreen() {
               {j.currentLesson ? (
                 <>
                   <Text style={styles.heroSub} numberOfLines={2}>{j.currentLesson.moduleTitle} · {j.currentLesson.title}</Text>
-                  <TouchableOpacity style={styles.heroBtn} onPress={() => openLesson(j.currentLesson!.id)} accessibilityRole="button" accessibilityLabel={`Open lesson ${j.currentLesson.title}`}>
-                    <Text style={styles.heroBtnText}>Open lesson</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Open lesson" size="lg" onPress={() => openLesson(j.currentLesson!.id)} variant="secondary" accessibilityLabel={`Open lesson ${j.currentLesson.title}`} style={{ marginTop: 10 }} />
                   {data.canManage && (
-                    <TouchableOpacity style={styles.heroSecondary} onPress={handleCovered} disabled={busy === "covered"} accessibilityRole="button" accessibilityLabel="Mark this lesson covered together and move to the next">
-                      {busy === "covered" ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.heroSecondaryText}>We covered this — next lesson</Text>}
-                    </TouchableOpacity>
+                    <AppButton label="We covered this — next lesson" onPress={handleCovered} variant="secondary" disabled={busy === "covered"} loading={busy === "covered"} accessibilityLabel="Mark this lesson covered together and move to the next" style={{ marginTop: 8 }} />
                   )}
                 </>
               ) : <Text style={styles.heroSub}>Every lesson in this series has been covered together.</Text>}
@@ -132,9 +127,7 @@ export default function LearningHomeScreen() {
               <Text style={styles.heroSub}>
                 {data.canManage ? "Choose a Core Foundation series or a P2P Plan to study together." : "Your leaders haven't chosen a series yet. You can still explore the P2P Library."}
               </Text>
-              <TouchableOpacity style={styles.heroBtn} onPress={openLibrary} accessibilityRole="button">
-                <Text style={styles.heroBtnText}>{data.canManage ? "Choose from the P2P Library" : "Explore the P2P Library"}</Text>
-              </TouchableOpacity>
+              <AppButton label={data.canManage ? "Choose from the P2P Library" : "Explore the P2P Library"} size="lg" onPress={openLibrary} variant="secondary" style={{ marginTop: 10 }} />
             </>
           )}
         </View>
@@ -184,9 +177,7 @@ export default function LearningHomeScreen() {
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Our Custom Lessons</Text>
             {data.canManage && (
-              <TouchableOpacity onPress={() => router.push(manageCustomPath(scope, groupId) as any)} accessibilityRole="button" style={styles.linkBtn}>
-                <Text style={styles.linkText}>Manage</Text>
-              </TouchableOpacity>
+              <AppButton label="Manage" onPress={() => router.push(manageCustomPath(scope, groupId) as any)} variant="tertiary" style={{ minWidth: 44 }} />
             )}
           </View>
           <Text style={styles.cardNote}>Written by your {scope === "family" ? "family" : "church"} — not official P2P curriculum.</Text>
@@ -237,9 +228,7 @@ export default function LearningHomeScreen() {
                     <Text style={styles.rowSub}>{h.status === "completed" ? "Completed" : "Paused"} · {h.group.covered} of {h.group.total} covered together</Text>
                   </TouchableOpacity>
                   {data.canManage && h.status === "paused" && (
-                    <TouchableOpacity style={styles.smallBtn} onPress={() => handleResume(h.curriculum.id)} disabled={!!busy} accessibilityRole="button" accessibilityLabel={`Resume ${h.curriculum.title}`}>
-                      {busy === h.curriculum.id ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.linkText}>Resume</Text>}
-                    </TouchableOpacity>
+                    <AppButton label="Resume" onPress={() => handleResume(h.curriculum.id)} variant="tertiary" disabled={!!busy} loading={busy === h.curriculum.id} accessibilityLabel={`Resume ${h.curriculum.title}`} style={{ minWidth: 64 }} />
                   )}
                 </View>
               ))}

@@ -53,7 +53,7 @@ ok("audio call: no camera / flip / smoothing / blur", /\{!isAudioCall && mediaMo
   && /\{!isAudioCall && mediaMode === "video" && \(\s*\n\s*<P2PControlButton size=\{controlSize\} onPress=\{flipCamera\}/.test(vid)
   && /\{!isAudioCall && cameraOn && mediaMode === "video" && \(/.test(vid) && /\.\.\.\(!isAudioCall && mediaMode === "video" && cameraOn/.test(vid));
 const strip = between(vid, "const participantStrip = (", "\n  );");
-ok("audio call: Study Together strip has no camera button or video", /\{!isAudioCall && \(\s*\n\s*<TouchableOpacity style=\{styles\.studyMiniBtn\} onPress=\{toggleCamera\}>/.test(strip)
+ok("audio call: Study Together strip has no camera button or video", /\{!isAudioCall && \(\s*\n\s*<TouchableOpacity[^>\n]*style=\{styles\.studyMiniBtn\} onPress=\{toggleCamera\}>/.test(strip)
   && /remoteUid !== null && !isAudioCall \? <RtcSurfaceView/.test(strip) && /\{!isAudioCall && cameraOn && localJoined && \(/.test(strip));
 ok("audio call: 4 controls — Speaker, Mute, More, End", /controlSizeFor\(isAudioCall \? 4 :/.test(vid)
   && /onPress=\{toggleSpeaker\}/.test(vid) && /onPress=\{toggleMute\} active=\{muted\}/.test(vid) && /accessibilityLabel="More call options"/.test(vid) && /danger accessibilityLabel="End call"/.test(vid));

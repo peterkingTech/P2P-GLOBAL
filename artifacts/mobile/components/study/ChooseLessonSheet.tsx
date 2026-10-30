@@ -63,7 +63,7 @@ export function ChooseLessonSheet({
         <View style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title}>{browsing ? "Choose a Lesson" : "Study Together"}</Text>
-            <TouchableOpacity onPress={browsing ? () => setBrowsing(false) : onClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={browsing ? "Back" : "Close"} hitSlop={10} onPress={browsing ? () => setBrowsing(false) : onClose}>
               <Ionicons name={browsing ? "arrow-back" : "close"} size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -72,7 +72,7 @@ export function ChooseLessonSheet({
             <View style={{ gap: 12 }}>
               <Text style={styles.sub}>Learn together through Kingdom School.</Text>
               {currentLesson && (
-                <TouchableOpacity style={styles.optionCard} onPress={() => choose(currentLesson)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.optionCard} onPress={() => choose(currentLesson)}>
                   <Ionicons name="play-circle" size={22} color="#1D9E75" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.optionTitle}>{continueLabel}</Text>
@@ -80,7 +80,7 @@ export function ChooseLessonSheet({
                   </View>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.optionCard} onPress={() => setBrowsing(true)}>
+              <TouchableOpacity accessibilityRole="button" style={styles.optionCard} onPress={() => setBrowsing(true)}>
                 <Ionicons name="book" size={22} color="#1D9E75" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.optionTitle}>Choose a Lesson to Study Together</Text>
@@ -92,12 +92,12 @@ export function ChooseLessonSheet({
             <ScrollView style={{ maxHeight: 380 }}>
               {modules.map((m) => (
                 <View key={m.id} style={{ marginBottom: 6 }}>
-                  <TouchableOpacity style={styles.moduleRow} onPress={() => setExpandedModuleId((prev) => (prev === m.id ? null : m.id))}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.moduleRow} onPress={() => setExpandedModuleId((prev) => (prev === m.id ? null : m.id))}>
                     <Text style={styles.moduleTitle}>{m.title}</Text>
                     <Ionicons name={expandedModuleId === m.id ? "chevron-up" : "chevron-down"} size={16} color="rgba(255,255,255,0.6)" />
                   </TouchableOpacity>
                   {expandedModuleId === m.id && lessons.filter((l) => l.moduleId === m.id).map((l) => (
-                    <TouchableOpacity key={l.id} style={styles.lessonRow} onPress={() => choose({ id: l.id, moduleId: m.id, title: l.title })}>
+                    <TouchableOpacity accessibilityRole="button" key={l.id} style={styles.lessonRow} onPress={() => choose({ id: l.id, moduleId: m.id, title: l.title })}>
                       <Text style={styles.lessonRowText}>{l.title}</Text>
                       <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.4)" />
                     </TouchableOpacity>

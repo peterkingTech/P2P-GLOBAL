@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const MIN_LENGTH = 50;
 
@@ -121,7 +122,7 @@ export default function WriteCompletionLetterScreen() {
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="arrow-back" size={22} color="rgba(255,255,255,0.7)" />
       </TouchableOpacity>
 
@@ -138,7 +139,7 @@ export default function WriteCompletionLetterScreen() {
 
         <View style={styles.promptsWrap}>
           {PROMPTS.map((p, i) => (
-            <TouchableOpacity key={i} style={styles.promptRow} onPress={() => setOpenPrompt(openPrompt === i ? null : i)} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" key={i} style={styles.promptRow} onPress={() => setOpenPrompt(openPrompt === i ? null : i)} activeOpacity={0.8}>
               <Ionicons name={openPrompt === i ? "chevron-down" : "chevron-forward"} size={14} color={colors.amber} />
               <Text style={styles.promptText}>{p.replace("{name}", learnerName)}</Text>
             </TouchableOpacity>
@@ -159,12 +160,8 @@ export default function WriteCompletionLetterScreen() {
 
         {!alreadySent && (
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.draftBtn} onPress={handleSaveDraft} disabled={saving !== null}>
-              {saving === "draft" ? <ActivityIndicator color={colors.amber} size="small" /> : <Text style={styles.draftBtnText}>Save Draft</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]} onPress={handleSendPress} disabled={!canSend || saving !== null}>
-              {saving === "send" ? <ActivityIndicator color="#0B1F19" size="small" /> : <Text style={styles.sendBtnText}>Send Letter</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save Draft" onPress={handleSaveDraft} variant="outline" size="lg" disabled={saving !== null} loading={saving === "draft"} style={{ flex: 1 }} palette="fixedLight" />
+            <AppButton label="Send Letter" onPress={handleSendPress} size="lg" disabled={!canSend || saving !== null} loading={saving === "send"} style={{ flex: 1 }} palette="fixedLight" />
           </View>
         )}
       </ScrollView>
@@ -198,12 +195,4 @@ const styles = StyleSheet.create({
   charCount: { fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "Inter_400Regular", marginTop: 6, textAlign: "right" },
 
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 20 },
-  draftBtn: {
-    flex: 1, height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "rgba(224,164,65,0.4)",
-  },
-  draftBtnText: { color: colors.amber, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  sendBtn: { flex: 1, height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.amber },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendBtnText: { color: "#0B1F19", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

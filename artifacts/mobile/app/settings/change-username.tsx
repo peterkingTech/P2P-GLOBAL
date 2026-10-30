@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { formatUsername, validateUsername, generateUsernameSuggestions } from "@/lib/username";
+import { AppButton } from "@/components/ui";
 
 type UsernameStatus = "idle" | "checking" | "available" | "unavailable";
 
@@ -120,9 +121,7 @@ export default function ChangeUsernameScreen() {
             {suggestions.length > 0 && (
               <View style={styles.suggestionRow}>
                 {suggestions.map((s) => (
-                  <TouchableOpacity key={s} style={styles.suggestionChip} onPress={() => setUsername(s)}>
-                    <Text style={styles.suggestionChipText}>@{s}</Text>
-                  </TouchableOpacity>
+                  <AppButton label={`@${s}`} onPress={() => setUsername(s)} variant="secondary" size="sm" key={s} />
                 ))}
               </View>
             )}
@@ -133,9 +132,7 @@ export default function ChangeUsernameScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={status !== "available" || saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Username</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save Username" onPress={handleSave} disabled={status !== "available" || saving} loading={saving} />
           </>
         )}
       </View>
@@ -168,8 +165,6 @@ function makeStyles(c: AppColors) {
     suggestionChipText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
     noteCard: { backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, padding: 12, marginTop: 20, marginBottom: 20 },
     noteText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 18 },
-    saveBtn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 48, alignItems: "center", justifyContent: "center" },
-    saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     warningCard: {
       flexDirection: "row", gap: 10, alignItems: "flex-start",
       backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,

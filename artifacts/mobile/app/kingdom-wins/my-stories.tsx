@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getMyKingdomWins, updateKingdomWin, deleteKingdomWin, KINGDOM_CATEGORY_LABELS, type KingdomWin } from "@/lib/kingdomWinsApi";
+import { AppButton } from "@/components/ui";
 
 const ENTRY_TYPE_LABELS: Record<KingdomWin["entryType"], string> = { kingdom_win: "Kingdom Win", testimony: "Testimony", p2p_impact: "P2P Impact" };
 
@@ -71,11 +72,11 @@ export default function MyKingdomWinsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>My Stories</Text>
-        <TouchableOpacity onPress={() => router.push("/kingdom-wins/create" as any)}>
+        <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" hitSlop={10} onPress={() => router.push("/kingdom-wins/create" as any)}>
           <Ionicons name="add-circle" size={24} color={c.accentGreen} />
         </TouchableOpacity>
       </View>
@@ -87,17 +88,13 @@ export default function MyKingdomWinsScreen() {
           <Text style={styles.sectionHeading}>Drafts</Text>
           {drafts.length === 0 ? <Text style={styles.emptyText}>No drafts.</Text> : drafts.map((e) => (
             <View key={e.id} style={styles.card}>
-              <TouchableOpacity onPress={() => router.push(`/kingdom-wins/${e.id}` as any)}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/kingdom-wins/${e.id}` as any)}>
                 <Text style={styles.cardTitle}>{e.title}</Text>
                 <Text style={styles.cardMeta}>{KINGDOM_CATEGORY_LABELS[e.category]} · {e.status}</Text>
               </TouchableOpacity>
               <View style={styles.cardActions}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handlePublish(e)}>
-                  <Text style={styles.actionBtnText}>{e.entryType === "p2p_impact" ? "Submit for Review" : "Publish"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDelete(e.id)}>
-                  <Text style={styles.actionBtnDangerText}>Delete</Text>
-                </TouchableOpacity>
+                <AppButton label={e.entryType === "p2p_impact" ? "Submit for Review" : "Publish"} onPress={() => handlePublish(e)} size="sm" />
+                <AppButton label="Delete" onPress={() => handleDelete(e.id)} variant="destructive" size="sm" />
               </View>
             </View>
           ))}
@@ -116,7 +113,7 @@ export default function MyKingdomWinsScreen() {
 
           <Text style={styles.sectionHeading}>Published</Text>
           {published.length === 0 ? <Text style={styles.emptyText}>Nothing published yet.</Text> : published.map((e) => (
-            <TouchableOpacity key={e.id} style={styles.card} onPress={() => router.push(`/kingdom-wins/${e.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" key={e.id} style={styles.card} onPress={() => router.push(`/kingdom-wins/${e.id}` as any)}>
               <Text style={styles.cardTitle}>{e.title}</Text>
               <Text style={styles.cardMeta}>{KINGDOM_CATEGORY_LABELS[e.category]} · Published</Text>
             </TouchableOpacity>
@@ -151,9 +148,5 @@ function makeStyles(c: AppColors) {
     cardTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
     cardMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
     cardActions: { flexDirection: "row", gap: 8 },
-    actionBtn: { backgroundColor: c.primaryGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-    actionBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
-    actionBtnDanger: { borderWidth: 1, borderColor: "#c0392b", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-    actionBtnDangerText: { color: "#c0392b", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   });
 }

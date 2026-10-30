@@ -42,7 +42,7 @@ export default function PrayerSettingsScreen() {
                 {CONFESSION_TIMES.map((time) => {
                   const selected = (profile?.morningConfessionTime ?? "07:00") === time;
                   return (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={time}
                       style={[styles.chip, selected && styles.chipActive]}
                       onPress={() => updateProfile({ morningConfessionTime: time })}

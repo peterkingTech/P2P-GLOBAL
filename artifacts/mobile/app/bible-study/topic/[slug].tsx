@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { getTopic, type PrayerTopicDetail } from "@/lib/prayerTopicsApi";
 import { topicPassageRoute } from "@/lib/bibleStudy";
+import { AppButton, IconButton } from "@/components/ui";
 
 // One Scripture topic (Bible Study → Explore Scripture by Topic): the
 // editorially curated references for the topic, each opened in context in the
@@ -37,15 +38,13 @@ export default function BibleTopicScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/bible-study" as any))} style={s.back} accessibilityRole="button" accessibilityLabel="Back">
-            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-          </TouchableOpacity>
+          <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/bible-study" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
           <Text style={[s.title, { flex: 1 }]} accessibilityRole="header" numberOfLines={2}>{topic?.title ?? "Topic"}</Text>
         </View>
         {error ? (
           <View style={{ gap: 8 }}>
             <Text style={s.meta}>{error}</Text>
-            <TouchableOpacity onPress={load} style={s.retry} accessibilityRole="button"><Text style={s.retryText}>Try again</Text></TouchableOpacity>
+            <AppButton label="Try again" onPress={load} variant="tertiary" />
           </View>
         ) : !topic ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel="Loading topic" />
           : (

@@ -16,6 +16,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { supabase } from "@/contexts/AuthContext";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Same "is this a plausible email" check as everywhere else that validates
 // one locally in this app — not a full RFC 5322 validator, just enough to
@@ -84,9 +85,7 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.subtitle}>
             We’ve sent a password reset link to your email address. If you don’t see it, please check your spam or junk folder.
           </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/(auth)/login")} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Back to Sign In</Text>
-          </TouchableOpacity>
+          <AppButton label="Back to Sign In" onPress={() => router.replace("/(auth)/login")} size="lg" style={{ marginTop: 8 }} palette="fixedLight" />
         </View>
       </View>
     );
@@ -129,13 +128,11 @@ export default function ForgotPasswordScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} activeOpacity={0.85} disabled={loading}>
-          {loading ? <ActivityIndicator color={colors.cream} /> : <Text style={styles.primaryBtnText}>Send Reset Link</Text>}
-        </TouchableOpacity>
+        <AppButton label="Send Reset Link" onPress={handleSubmit} size="lg" disabled={loading} loading={loading} style={{ marginTop: 8 }} palette="fixedLight" />
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}>
           <Text style={styles.linkText}>Back to Sign In</Text>
         </TouchableOpacity>
       </View>
@@ -172,11 +169,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 12, padding: 14, color: colors.cream, fontSize: 15, fontFamily: "Inter_400Regular",
   },
-  primaryBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
-    alignItems: "center", justifyContent: "center", marginTop: 8,
-  },
-  primaryBtnText: { color: colors.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   footer: { flexDirection: "row", justifyContent: "center", marginTop: 32 },
   linkText: { color: colors.accentGreen, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

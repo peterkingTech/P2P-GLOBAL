@@ -69,7 +69,7 @@ export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudy
           placeholderTextColor="rgba(255,255,255,0.4)"
           multiline
         />
-        <TouchableOpacity style={[styles.saveBtn, (!draft.trim() || saving) && styles.saveBtnDisabled]} onPress={handleSave} disabled={!draft.trim() || saving}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.saveBtn, (!draft.trim() || saving) && styles.saveBtnDisabled]} onPress={handleSave} disabled={!draft.trim() || saving}>
           {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Add Note</Text>}
         </TouchableOpacity>
       </View>
@@ -85,10 +85,10 @@ export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudy
               <>
                 <TextInput style={styles.editInput} value={editDraft} onChangeText={setEditDraft} multiline autoFocus />
                 <View style={styles.editRow}>
-                  <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditingId(null)}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.editCancelBtn} onPress={() => setEditingId(null)}>
                     <Text style={styles.editCancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.editSaveBtn} onPress={() => handleSaveEdit(n.id)} disabled={editSaving || !editDraft.trim()}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.editSaveBtn} onPress={() => handleSaveEdit(n.id)} disabled={editSaving || !editDraft.trim()}>
                     {editSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
                   </TouchableOpacity>
                 </View>
@@ -100,7 +100,7 @@ export function StudyNotesTab({ session }: { session: ReturnType<typeof useStudy
                   <Text style={styles.noteDate}>
                     {n.updatedAt !== n.createdAt ? `Updated ${new Date(n.updatedAt).toLocaleDateString()}` : new Date(n.createdAt).toLocaleDateString()}
                   </Text>
-                  <TouchableOpacity onPress={() => startEdit(n)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => startEdit(n)}>
                     <Text style={styles.editLink}>Edit</Text>
                   </TouchableOpacity>
                 </View>

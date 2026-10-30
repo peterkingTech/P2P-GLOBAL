@@ -26,6 +26,9 @@ const RN = {
   View: host("View"), Text: host("Text"), TouchableOpacity: host("TouchableOpacity"), ScrollView: host("ScrollView"),
   FlatList: host("FlatList"), TextInput: host("TextInput"), Modal: host("Modal"), ActivityIndicator: host("ActivityIndicator"),
   StyleSheet: { create: (s) => s }, useWindowDimensions: () => env.window,
+  // The shared button system (components/ui) draws with Pressable.
+  Pressable: host("Pressable"), Platform: { OS: "web" },
+  AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: () => ({ remove() {} }) },
 };
 const Ionicons = host("Ionicons");
 const env = { window: { width: 1200, height: 800 }, profile: { id: "u-me", role: "admin_content" }, query: null, params: {}, pushes: [], pathname: "/admin/studio", stateSwap: null };
@@ -33,7 +36,7 @@ const reactMock = {
   ...React,
   // env.stateSwap lets a test start a screen in another mode (keyed by the initial value).
   useState: (init) => { const v = typeof init === "function" ? init() : init; return [env.stateSwap && typeof v === "string" && v in env.stateSwap ? env.stateSwap[v] : v, () => {}]; },
-  useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f, useRef: (v) => ({ current: v }),
+  useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f, useRef: (v) => ({ current: v }), useContext: () => null,
 };
 const mocks = {
   react: reactMock,
@@ -46,6 +49,7 @@ const mocks = {
   "@/contexts/AuthContext": { useAuth: () => ({ profile: env.profile }), supabase: {} },
   "@/lib/adminFetch": { authedFetch: (p, i) => env.fetch(p, i) },
   "@/components/studio/useStudioQuery": { useStudioQuery: () => env.query },
+  "@/contexts/ThemeContext": { useTheme: () => ({ colors: loadFile(path.join(root, "constants/themes.ts")).THEMES.light, resolvedMode: "light" }) },
 };
 
 const cache = new Map();
@@ -89,7 +93,11 @@ function findAll(node, pred, out = []) {
   return out;
 }
 const textOf = (tree) => findAll(tree, (n) => n.type === RN.Text).map((t) => [].concat(t.props.children).flat(Infinity).filter((c) => typeof c === "string" || typeof c === "number").join("")).join(" | ");
-const buttons = (tree) => findAll(tree, (n) => n.type === RN.TouchableOpacity && ["button", "link", "tab"].includes(n.props.accessibilityRole));
+const buttons = (tree) => findAll(tree, (n) => (n.type === RN.TouchableOpacity || n.type === RN.Pressable) && ["button", "link", "tab", "radio", "checkbox"].includes(n.props.accessibilityRole));
+// The style a control is drawn with at rest (Pressable styles are functions of its state), flattened.
+const restStyle = (n) => [].concat(typeof n.props.style === "function" ? n.props.style({ pressed: false }) : n.props.style).flat(Infinity).filter(Boolean);
+// The tap target: its height plus any extra tap area (hitSlop).
+const tapHeight = (n) => Math.max(...restStyle(n).map((s) => s.minHeight ?? s.height ?? 0)) + ((n.props.hitSlop?.top ?? 0) + (n.props.hitSlop?.bottom ?? 0));
 const button = (tree, label) => buttons(tree).find((b) => b.props.accessibilityLabel === label);
 const render = (rel) => expand(React.createElement(load(rel).default));
 const q = (data, o = {}) => ({ data, loading: false, error: null, reload: async () => {}, ...o });
@@ -204,10 +212,10 @@ const A = load("lib/studioActions.ts");
   ok("state: server error offers retry", !!button(expand(React.createElement(U.StateView, { error: new Api.StudioApiError("x", "server", 500), onRetry: () => {} })), "Try again"));
   ok("state: loading and empty", findAll(expand(React.createElement(U.StateView, { loading: true })), (n) => n.type === RN.ActivityIndicator).length === 1
     && /Nothing to see/.test(textOf(expand(React.createElement(U.StateView, { empty: true, emptyText: "Nothing to see" })))));
-  const dis = expand(React.createElement(U.Button, { label: "Approve", onPress: () => {}, disabled: true }));
-  ok("button: disabled state exposed, 44px target", dis.props.accessibilityState.disabled === true && dis.props.style.some((s) => s && s.minHeight === 44));
-  const pill = expand(React.createElement(U.Pill, { label: "Any", selected: true, onPress: () => {} }));
-  ok("pill: selected state reaches the browser (aria-selected), 44px target", pill.props["aria-selected"] === true && pill.props.style.some((s) => s && s.minHeight === 44));
+  const dis = button(expand(React.createElement(U.Button, { label: "Approve", onPress: () => {}, disabled: true })), "Approve");
+  ok("button: disabled state exposed, 44px target", dis.props.accessibilityState.disabled === true && tapHeight(dis) >= 44);
+  const pill = findAll(expand(React.createElement(U.Pill, { label: "Any", selected: true, onPress: () => {} })), (n) => n.type === RN.Pressable)[0];
+  ok("pill: selected state reaches the browser (aria-selected), 44px target", pill.props["aria-selected"] === true && tapHeight(pill) >= 44);
   const dlg = expand(React.createElement(U.ConfirmDialog, { visible: true, title: "Request changes?", message: "m", confirmLabel: "Request changes", notePrompt: "What needs to change?", noteRequired: true, onConfirm: () => {}, onCancel: () => {} }));
   ok("confirm: required note blocks confirmation", button(dlg, "Request changes").props.disabled === true);
   const pager = expand(React.createElement(U.Pager, { page: 0, pageSize: 20, total: 45, onPage: () => {} }));
@@ -358,7 +366,7 @@ const A = load("lib/studioActions.ts");
     && /reportError\("Couldn't update status", e, "lifecycle"\)/.test(editor) && /studioNotice\?\.where === "lifecycle"/.test(editor));
   ok("editor: Studio link only for Studio roles", /canOpenStudio = !!profile && STUDIO_VIEW_ROLES\.includes\(profile\.role\)/.test(editor) && /\{canOpenStudio \? \(/.test(editor));
   ok("editor: live-story edits and media/source changes report via the notice", ["Couldn't remove media", "Couldn't add source", "Couldn't remove source", "Couldn't add photo"].every((t) => editor.includes(`reportError("${t}", e)`)));
-  ok("editor: Unpublish to edit offered for live stories", /handleStatusChange\("draft"\)} accessibilityRole="button" accessibilityLabel="Unpublish to edit"/.test(editor));
+  ok("editor: Unpublish to edit offered for live stories", /<AppButton label="Unpublish to edit" onPress=\{\(\) => handleStatusChange\("draft"\)\}/.test(editor));
   ok("editor: one review process — no old Move to Review / direct Publish, the Studio's steps instead", !editor.includes("Move to Review") && !/handleStatusChange\("(review|published)"\)/.test(editor)
     && /<StudioSteps item=\{studioItem\}/.test(editor) && /Submit, approve and publish in the Publishing Studio/.test(editor));
   const dir = path.join(root, "app/admin/studio");

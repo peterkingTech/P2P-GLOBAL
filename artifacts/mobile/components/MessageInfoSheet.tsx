@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { fetchReceiptDetails, type ReceiptDetailRow } from "@/lib/messageReceiptsApi";
 import { recipientState, type RecipientState } from "@/lib/messageReceipts";
+import { IconButton } from "@/components/ui";
 
 // Message info for the sender's own message: when it was sent, and for each
 // recipient (one row per participant in a group) whether it was delivered
@@ -62,13 +63,11 @@ export function MessageInfoSheet({
 
   return (
     <Modal visible={!!messageId} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close message info">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close message info">
         <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">Message info</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={20} color={colors.textMid} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={colors.textMid} style={{ marginRight: -10 }} palette="fixedLight" />
           </View>
           {sentAt ? <Text style={styles.sentAt}>Sent {formatReceiptTime(sentAt)}</Text> : null}
 
@@ -126,7 +125,6 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontSize: 17, color: colors.textDark, fontFamily: "Inter_700Bold" },
-  closeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -10 },
   sentAt: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginBottom: 12 },
   error: { fontSize: 14, color: colors.textMid, fontFamily: "Inter_400Regular", marginVertical: 20, textAlign: "center" },
   empty: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", marginVertical: 20, textAlign: "center" },

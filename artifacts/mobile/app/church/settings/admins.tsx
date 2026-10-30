@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMember } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Church Portal — General Overseer's Church Admin management screen.
 // "Church Admin" here means p2p_church_members.role IN (discipleship_pastor,
@@ -101,7 +102,7 @@ export default function ChurchAdminsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Church Admins</Text>
@@ -134,10 +135,7 @@ export default function ChurchAdminsScreen() {
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionLabel}>Church Admins ({admins.length})</Text>
             {isChurchCreator && (
-              <TouchableOpacity style={styles.addBtn} onPress={handleAddAdmin}>
-                <Ionicons name="add" size={16} color={colors.accentGreen} />
-                <Text style={styles.addBtnText}>Add</Text>
-              </TouchableOpacity>
+              <AppButton label="Add" onPress={handleAddAdmin} variant="tertiary" icon="add" palette="fixedLight" />
             )}
           </View>
 
@@ -152,7 +150,7 @@ export default function ChurchAdminsScreen() {
                   <Text style={styles.rowSub}>{m.role === "discipleship_pastor" ? "Discipleship Pastor" : "Small Group Leader"}</Text>
                 </View>
                 {isChurchCreator && (
-                  <TouchableOpacity onPress={() => handleRemoveAdmin(m)} disabled={busyId === m.userId}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => handleRemoveAdmin(m)} disabled={busyId === m.userId}>
                     <Text style={styles.removeLink}>{busyId === m.userId ? "…" : "Remove"}</Text>
                   </TouchableOpacity>
                 )}
@@ -179,8 +177,6 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 60 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.4, fontFamily: "Inter_700Bold" },
   sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 22 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  addBtnText: { color: colors.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   row: {
     flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14, marginTop: 10,

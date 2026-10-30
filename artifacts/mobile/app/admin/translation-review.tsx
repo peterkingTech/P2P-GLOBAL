@@ -6,6 +6,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -167,7 +168,7 @@ export default function TranslationReviewScreen() {
       {/* ── Filters ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={{ gap: 6, paddingHorizontal: 16 }}>
         {["all", ...langs].map((l) => (
-          <TouchableOpacity key={l} style={[styles.chip, filterLang === l && styles.chipActive]} onPress={() => setFilterLang(l)}>
+          <TouchableOpacity accessibilityRole="button" key={l} style={[styles.chip, filterLang === l && styles.chipActive]} onPress={() => setFilterLang(l)}>
             <Text style={[styles.chipText, filterLang === l && styles.chipTextActive]}>
               {l === "all" ? "All Languages" : (LANG_NAMES[l] ?? l.toUpperCase())}
             </Text>
@@ -175,7 +176,7 @@ export default function TranslationReviewScreen() {
         ))}
         <View style={styles.chipDivider} />
         {["all", "curriculum", "module", "lesson"].map((t) => (
-          <TouchableOpacity key={t} style={[styles.chip, filterType === t && styles.chipActive]} onPress={() => setFilterType(t)}>
+          <TouchableOpacity accessibilityRole="button" key={t} style={[styles.chip, filterType === t && styles.chipActive]} onPress={() => setFilterType(t)}>
             <Text style={[styles.chipText, filterType === t && styles.chipTextActive]}>
               {t === "all" ? "All Types" : TYPE_LABELS[t] ?? t}
             </Text>
@@ -212,9 +213,7 @@ export default function TranslationReviewScreen() {
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.reviewBtn} onPress={() => openReview(item)}>
-                <Text style={styles.reviewBtnText}>Review</Text>
-              </TouchableOpacity>
+              <AppButton label="Review" onPress={() => openReview(item)} size="sm" palette="fixedLight" />
             </View>
           )}
         />
@@ -225,7 +224,7 @@ export default function TranslationReviewScreen() {
         <View style={styles.modalRoot}>
           {/* Modal header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setReviewing(null)} style={styles.closeBtn}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setReviewing(null)} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color="#333" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
@@ -323,30 +322,12 @@ export default function TranslationReviewScreen() {
 
           {/* Action buttons */}
           <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.rejectBtn]}
-              onPress={() => Alert.alert(
+            <AppButton label="Reject" onPress={() => Alert.alert(
                 "Reject Translation",
                 "This will mark the translation as rejected. It won't be shown to users.",
                 [{ text: "Cancel", style: "cancel" }, { text: "Reject", style: "destructive", onPress: () => updateStatus("rejected") }]
-              )}
-              disabled={saving}
-            >
-              <Ionicons name="close-circle" size={18} color="#EF4444" />
-              <Text style={[styles.actionButtonText, { color: "#EF4444" }]}>Reject</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.approveBtn]}
-              onPress={() => updateStatus("approved")}
-              disabled={saving}
-            >
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : (
-                <>
-                  <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                  <Text style={styles.actionButtonText}>Approve & Publish</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              )} variant="destructive" icon="close-circle" disabled={saving} style={{ flex: 1 }} palette="fixedLight" />
+            <AppButton label="Approve & Publish" onPress={() => updateStatus("approved")} icon="checkmark-circle" disabled={saving} loading={saving} style={{ flex: 1 }} palette="fixedLight" />
           </View>
         </View>
       </Modal>
@@ -395,8 +376,6 @@ const styles = StyleSheet.create({
   typeBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primaryGreen },
   draftTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#222" },
   draftMeta: { fontSize: 11, color: "#999", fontFamily: "Inter_400Regular", marginTop: 1 },
-  reviewBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  reviewBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   modalRoot: { flex: 1, backgroundColor: "#F9FAFB" },
   modalHeader: {
@@ -428,11 +407,4 @@ const styles = StyleSheet.create({
     flexDirection: "row", gap: 12, padding: 16,
     backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#E5E7EB",
   },
-  actionButton: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, borderRadius: 10, paddingVertical: 14,
-  },
-  actionButtonText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
-  rejectBtn: { backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" },
-  approveBtn: { backgroundColor: colors.primaryGreen },
 });

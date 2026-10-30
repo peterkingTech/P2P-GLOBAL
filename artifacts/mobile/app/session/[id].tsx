@@ -20,6 +20,7 @@ import { supabase, useAuth } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // The REAL p2p_sessions row — distinct from DataContext's `sessions` array,
 // which reads a mismatched set of columns (participant_count, is_live,
@@ -196,7 +197,7 @@ export default function SessionScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.cream} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -208,9 +209,7 @@ export default function SessionScreen() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.leaveBtn} onPress={() => router.back()}>
-          <Text style={styles.leaveBtnText}>Leave</Text>
-        </TouchableOpacity>
+        <AppButton label="Leave" onPress={() => router.back()} variant="destructive" size="sm" palette="fixedLight" />
       </View>
 
       {/* Verse of the session */}
@@ -220,14 +219,7 @@ export default function SessionScreen() {
       </View>
 
       {isParticipant && canJoinVideo && (
-        <TouchableOpacity style={styles.joinVideoBtn} onPress={joinVideoSession} disabled={joiningVideo} activeOpacity={0.85}>
-          {joiningVideo ? <ActivityIndicator color={colors.cream} size="small" /> : (
-            <>
-              <Ionicons name="videocam" size={16} color={colors.cream} />
-              <Text style={styles.joinVideoBtnText}>Join Video Session</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Join Video Session" onPress={joinVideoSession} icon="videocam" disabled={joiningVideo} loading={joiningVideo} style={{ marginHorizontal: 16, marginTop: 10 }} palette="fixedLight" />
       )}
 
       {/* Mark session complete — this is what actually fires the Fellowship
@@ -240,16 +232,7 @@ export default function SessionScreen() {
             <Text style={styles.completeBannerText}>Session marked complete</Text>
           </View>
         ) : (
-          <TouchableOpacity style={styles.completeBtn} onPress={handleMarkComplete} disabled={completing} activeOpacity={0.85}>
-            {completing ? (
-              <ActivityIndicator color={colors.cream} size="small" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-done" size={16} color={colors.cream} />
-                <Text style={styles.completeBtnText}>Mark Session Complete</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <AppButton label="Mark Session Complete" onPress={handleMarkComplete} icon="checkmark-done" disabled={completing} loading={completing} style={{ marginHorizontal: 16, marginTop: 10 }} palette="fixedLight" />
         )
       )}
 
@@ -297,7 +280,7 @@ export default function SessionScreen() {
           multiline
           maxLength={500}
         />
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Send" accessibilityRole="button" hitSlop={10}
           style={[styles.sendBtn, { opacity: input.trim() ? 1 : 0.4 }]}
           onPress={sendMessage}
           disabled={!input.trim()}
@@ -312,7 +295,7 @@ export default function SessionScreen() {
             <Text style={styles.reflectionTitle}>How did your session go?</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <TouchableOpacity key={n} onPress={() => setReflectionRating(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Rate ${n} out of 5`} accessibilityState={{ selected: n <= reflectionRating }} key={n} onPress={() => setReflectionRating(n)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                   <Ionicons name={n <= reflectionRating ? "star" : "star-outline"} size={28} color={colors.amber} />
                 </TouchableOpacity>
               ))}
@@ -326,12 +309,8 @@ export default function SessionScreen() {
               multiline
             />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-              <TouchableOpacity style={styles.reflectionSkipBtn} onPress={() => setReflectionModalOpen(false)}>
-                <Text style={styles.reflectionSkipText}>Skip</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.reflectionSaveBtn} onPress={submitReflection} disabled={savingReflection}>
-                {savingReflection ? <ActivityIndicator color={colors.cream} size="small" /> : <Text style={styles.reflectionSaveText}>Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Skip" onPress={() => setReflectionModalOpen(false)} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Save" onPress={submitReflection} disabled={savingReflection} loading={savingReflection} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -351,23 +330,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF4444" },
   metaText: { fontSize: 12, color: colors.lightGreen, opacity: 0.8, fontFamily: "Inter_400Regular" },
-  leaveBtn: {
-    backgroundColor: "rgba(185,28,28,0.2)",
-    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
-  },
-  leaveBtnText: { color: "#FCA5A5", fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  completeBtn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.accentGreen, marginHorizontal: 16, marginTop: 10,
-    borderRadius: 10, paddingVertical: 10,
-  },
-  completeBtnText: { color: colors.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  joinVideoBtn: {
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-    backgroundColor: "#DC2626", marginHorizontal: 16, marginTop: 10,
-    borderRadius: 10, paddingVertical: 10,
-  },
-  joinVideoBtnText: { color: colors.cream, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   reflectionOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: 24 },
   reflectionSheet: { backgroundColor: colors.navBg, borderRadius: 18, padding: 22, width: "100%", gap: 14, borderWidth: 1, borderColor: colors.navBorder },
   reflectionTitle: { fontSize: 16, fontWeight: "700", color: colors.cream, fontFamily: "Inter_700Bold", textAlign: "center" },
@@ -376,9 +338,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, borderWidth: 1, borderColor: colors.navBorder,
     padding: 12, color: colors.cream, fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 70,
   },
-  reflectionSkipBtn: { flex: 1, borderWidth: 1, borderColor: colors.navBorder, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   reflectionSkipText: { color: colors.lightGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  reflectionSaveBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   reflectionSaveText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   completeBanner: {
     flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",

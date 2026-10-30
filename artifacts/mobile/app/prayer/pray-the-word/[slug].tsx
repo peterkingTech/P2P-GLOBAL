@@ -10,6 +10,7 @@ import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -151,7 +152,7 @@ export default function PrayTheWordFlowScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={[styles.screen, styles.centerFill]}>
           <Text style={styles.emptyText}>This topic isn't available right now.</Text>
-          <TouchableOpacity onPress={() => router.back()}><Text style={styles.linkText}>Go back</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}><Text style={styles.linkText}>Go back</Text></TouchableOpacity>
         </View>
       </>
     );
@@ -161,7 +162,7 @@ export default function PrayTheWordFlowScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{topic.title}</Text>
@@ -184,10 +185,7 @@ export default function PrayTheWordFlowScreen() {
             ) : (
               <Text style={styles.verseUnavailable}>This verse's text couldn't be loaded right now — you can still reflect and pray using the reference above.</Text>
             )}
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => goToPhase("reflect")}>
-              <Text style={styles.primaryBtnText}>Reflect</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Reflect" onPress={() => goToPhase("reflect")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -199,10 +197,7 @@ export default function PrayTheWordFlowScreen() {
               style={styles.textarea} value={reflection} onChangeText={setReflection} multiline
               placeholder="Write what stands out to you..." placeholderTextColor={c.textMuted}
             />
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => goToPhase("pray")}>
-              <Text style={styles.primaryBtnText}>Pray</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Pray" onPress={() => goToPhase("pray")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -217,10 +212,7 @@ export default function PrayTheWordFlowScreen() {
               style={styles.textarea} value={prayerText} onChangeText={setPrayerText} multiline
               placeholder="Lord, thank You for..." placeholderTextColor={c.textMuted}
             />
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => goToPhase("respond")}>
-              <Text style={styles.primaryBtnText}>Respond</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Respond" onPress={() => goToPhase("respond")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -232,10 +224,7 @@ export default function PrayTheWordFlowScreen() {
               style={styles.textarea} value={response} onChangeText={setResponse} multiline
               placeholder="Write it out..." placeholderTextColor={c.textMuted}
             />
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => goToPhase("remember")}>
-              <Text style={styles.primaryBtnText}>Remember</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Remember" onPress={() => goToPhase("remember")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -244,46 +233,18 @@ export default function PrayTheWordFlowScreen() {
             <View style={styles.labelPill}><Text style={styles.labelPillText}>REMEMBER</Text></View>
             <Text style={styles.promptText}>{currentScripture.referenceDisplay}</Text>
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleSaveScripture} disabled={scriptureSaved}>
-              <Ionicons name={scriptureSaved ? "bookmark" : "bookmark-outline"} size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>{scriptureSaved ? "Scripture Saved" : "Save Scripture"}</Text>
-            </TouchableOpacity>
+            <AppButton label={scriptureSaved ? "Scripture Saved" : "Save Scripture"} onPress={handleSaveScripture} variant="outline" icon={scriptureSaved ? "bookmark" : "bookmark-outline"} disabled={scriptureSaved} />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleAddToJournal} disabled={saving || savedThisRound}>
-              {saving ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-                <>
-                  <Ionicons name={savedThisRound ? "checkmark-circle" : "book-outline"} size={16} color={c.accentGreen} />
-                  <Text style={styles.secondaryBtnText}>{savedThisRound ? "Saved to Journal" : "Add to Journal"}</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <AppButton label={savedThisRound ? "Saved to Journal" : "Add to Journal"} onPress={handleAddToJournal} variant="outline" icon={savedThisRound ? "checkmark-circle" : "book-outline"} disabled={saving || savedThisRound} loading={saving} />
 
             {/* Stage 7 ecosystem connections — route into EXISTING systems only */}
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { scriptureRef: currentScripture.referenceDisplay, topicTitle: topic.title } } as any)}
-            >
-              <Ionicons name="people-outline" size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Pray With Me</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => router.push({ pathname: "/prayer/study/[scriptureId]", params: { scriptureId: currentScripture.id, topicTitle: topic.title } } as any)}
-            >
-              <Ionicons name="school-outline" size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Study This Scripture</Text>
-            </TouchableOpacity>
+            <AppButton label="Pray With Me" onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { scriptureRef: currentScripture.referenceDisplay, topicTitle: topic.title } } as any)} variant="outline" icon="people-outline" />
+            <AppButton label="Study This Scripture" onPress={() => router.push({ pathname: "/prayer/study/[scriptureId]", params: { scriptureId: currentScripture.id, topicTitle: topic.title } } as any)} variant="outline" icon="school-outline" />
             {topic.slug === "family" && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/family/prayer" as any)}>
-                <Ionicons name="home-outline" size={16} color={c.accentGreen} />
-                <Text style={styles.secondaryBtnText}>Take to Family Circle Prayer</Text>
-              </TouchableOpacity>
+              <AppButton label="Take to Family Circle Prayer" onPress={() => router.push("/family/prayer" as any)} variant="outline" icon="home-outline" />
             )}
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue}>
-              <Text style={styles.primaryBtnText}>{scriptureIndex + 1 < topic.scriptures.length ? "Continue" : "Finish"}</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label={scriptureIndex + 1 < topic.scriptures.length ? "Continue" : "Finish"} onPress={handleContinue} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
       </ScrollView>
@@ -311,16 +272,6 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       padding: 14, minHeight: 100, textAlignVertical: "top", color: c.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
     },
-    primaryBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 4,
-    },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12,
-    },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     linkText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
   });

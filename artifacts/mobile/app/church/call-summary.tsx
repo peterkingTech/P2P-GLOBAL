@@ -11,6 +11,7 @@ import {
   CHURCH_CALL_PURPOSE_LABELS, type ChurchCallSummary,
 } from "@/lib/churchCallApi";
 import GatheringFollowUp from "@/components/study/GatheringFollowUp";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -97,7 +98,7 @@ export default function CallSummaryScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/church/calls" as any))} accessibilityRole="button" accessibilityLabel="Back"><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity hitSlop={10} onPress={() => (router.canGoBack() ? router.back() : router.replace("/church/calls" as any))} accessibilityRole="button" accessibilityLabel="Back"><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{summary.overview.title}</Text>
         <View style={{ width: 22 }} />
       </View>
@@ -133,16 +134,9 @@ export default function CallSummaryScreen() {
               </Text>
               {/* Your own answers, reflections and assignments live in the lesson — still private unless you share them. */}
               {summary.lessonRef && (
-                <TouchableOpacity
-                  style={styles.openLessonBtn}
-                  onPress={() => router.push((summary.lessonRef!.kind === "church" && summary.lessonRef!.studyId
+                <AppButton label="Open lesson · reflections & Comprehensive Checks" onPress={() => router.push((summary.lessonRef!.kind === "church" && summary.lessonRef!.studyId
                     ? { pathname: "/church/studies/lesson/[lessonId]", params: { lessonId: summary.lessonRef!.id, studyId: summary.lessonRef!.studyId } }
-                    : { pathname: "/lesson/[id]", params: { id: summary.lessonRef!.id } }) as any)}
-                  accessibilityRole="button" accessibilityLabel={`Open the lesson ${summary.lessonRef.title}`}
-                >
-                  <Ionicons name="book-outline" size={15} color={colors.accentGreen} />
-                  <Text style={styles.openLessonText}>Open lesson · reflections & Comprehensive Checks</Text>
-                </TouchableOpacity>
+                    : { pathname: "/lesson/[id]", params: { id: summary.lessonRef!.id } }) as any)} variant="tertiary" icon="book-outline" accessibilityLabel={`Open the lesson ${summary.lessonRef.title}`} style={{ marginTop: 6 }} />
               )}
             </View>
           </>
@@ -170,9 +164,7 @@ export default function CallSummaryScreen() {
               style={styles.textArea} value={hostSummaryInput} onChangeText={setHostSummaryInput}
               placeholder="What happened in this gathering?" placeholderTextColor={colors.textMuted} multiline
             />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveHostSummary} disabled={savingSummary}>
-              {savingSummary ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save" onPress={handleSaveHostSummary} disabled={savingSummary} loading={savingSummary} />
           </View>
         ) : (
           <View style={styles.card}><Text style={styles.rowText}>{summary.hostSummary || "Not written yet."}</Text></View>
@@ -185,9 +177,7 @@ export default function CallSummaryScreen() {
               style={styles.textArea} value={continuityInput} onChangeText={setContinuityInput}
               placeholder="What should we pick up next time?" placeholderTextColor={colors.textMuted} multiline
             />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveContinuity} disabled={savingContinuity}>
-              {savingContinuity ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save" onPress={handleSaveContinuity} disabled={savingContinuity} loading={savingContinuity} />
           </View>
         ) : (
           <View style={styles.card}><Text style={styles.rowText}>{summary.continuityNotes || "Not written yet."}</Text></View>
@@ -210,7 +200,6 @@ export default function CallSummaryScreen() {
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-  openLessonBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, marginTop: 6 },
   openLessonText: { color: colors.accentGreen, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   container: { flex: 1, backgroundColor: colors.lightCream },
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -222,7 +211,5 @@ function makeStyles(colors: AppColors) {
   rowText: { fontSize: 14, color: colors.textDark, fontFamily: "Inter_500Medium" },
   rowMeta: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   textArea: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_400Regular", minHeight: 70 },
-  saveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });
 }

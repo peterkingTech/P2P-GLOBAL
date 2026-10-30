@@ -10,6 +10,7 @@ import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -104,7 +105,7 @@ export default function ScriptureDevotionalScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scripture Study</Text>
@@ -128,10 +129,7 @@ export default function ScriptureDevotionalScreen() {
                 : ""}
               Read it slowly. Let the words settle before moving on — there's no need to rush.
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep("reflect")}>
-              <Text style={styles.primaryBtnText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={() => setStep("reflect")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -145,10 +143,7 @@ export default function ScriptureDevotionalScreen() {
               style={styles.textarea} value={reflectionNote} onChangeText={setReflectionNote} multiline
               placeholder="Write your reflection (optional)..." placeholderTextColor={c.textMuted}
             />
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep("respond")}>
-              <Text style={styles.primaryBtnText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={() => setStep("respond")} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -161,28 +156,13 @@ export default function ScriptureDevotionalScreen() {
               placeholder="What are you bringing before God?" placeholderTextColor={c.textMuted}
             />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleSaveScripture} disabled={scriptureSaved}>
-              <Ionicons name={scriptureSaved ? "bookmark" : "bookmark-outline"} size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>{scriptureSaved ? "Scripture Saved" : "Save Scripture"}</Text>
-            </TouchableOpacity>
+            <AppButton label={scriptureSaved ? "Scripture Saved" : "Save Scripture"} onPress={handleSaveScripture} variant="outline" icon={scriptureSaved ? "bookmark" : "bookmark-outline"} disabled={scriptureSaved} />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handlePrayThisScripture} disabled={saving || completed}>
-              {saving ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-                <>
-                  <Ionicons name={completed ? "checkmark-circle" : "hand-left-outline"} size={16} color={c.accentGreen} />
-                  <Text style={styles.secondaryBtnText}>{completed ? "Prayed & Saved" : "Pray This Scripture"}</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <AppButton label={completed ? "Prayed & Saved" : "Pray This Scripture"} onPress={handlePrayThisScripture} variant="outline" icon={completed ? "checkmark-circle" : "hand-left-outline"} disabled={saving || completed} loading={saving} />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/prayer/pray-the-word" as any)}>
-              <Ionicons name="book-outline" size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Study More</Text>
-            </TouchableOpacity>
+            <AppButton label="Study More" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="book-outline" />
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
-              <Text style={styles.primaryBtnText}>Continue Prayer</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue Prayer" onPress={() => router.back()} style={{ marginTop: 4 }} />
           </View>
         )}
       </ScrollView>
@@ -211,9 +191,5 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       padding: 14, minHeight: 90, textAlignVertical: "top", color: c.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
     },
-    primaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 4 },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

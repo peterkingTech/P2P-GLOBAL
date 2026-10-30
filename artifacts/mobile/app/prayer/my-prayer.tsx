@@ -81,7 +81,7 @@ export default function MyPrayerScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>🙏 My Prayer</Text>
@@ -106,7 +106,7 @@ export default function MyPrayerScreen() {
           <Text style={styles.mutedText}>Nothing scheduled yet.</Text>
         ) : (
           upcoming.map((g) => (
-            <TouchableOpacity key={g.id} style={styles.row} onPress={() => router.push({ pathname: "/prayer/gathering/[id]", params: { id: g.id } } as any)}>
+            <TouchableOpacity accessibilityRole="button" key={g.id} style={styles.row} onPress={() => router.push({ pathname: "/prayer/gathering/[id]", params: { id: g.id } } as any)}>
               <Ionicons name="calendar" size={16} color={c.accentGreen} />
               <Text style={styles.rowText} numberOfLines={1}>{g.prayerFocus || "Prayer together"} · {relativeDayLabel(g.scheduledStartAt)} {formatTimeInZone(g.scheduledStartAt, tz)}</Text>
             </TouchableOpacity>
@@ -149,7 +149,7 @@ export default function MyPrayerScreen() {
                 <Text style={styles.rowText} numberOfLines={1}>{r.title}</Text>
                 {!!r.answerNote && <Text style={styles.rowSub} numberOfLines={2}>{r.answerNote}</Text>}
               </View>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => router.push({ pathname: "/prayer/testimony/record", params: { requestId: r.id, requestTitle: r.title } } as any)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -161,7 +161,7 @@ export default function MyPrayerScreen() {
 
         <View style={[styles.sectionHeaderRow, { marginTop: 22 }]}>
           <Text style={styles.sectionHeading}>PRAYER JOURNAL</Text>
-          <TouchableOpacity onPress={() => router.push("/prayer/journal" as any)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/prayer/journal" as any)}>
             <Text style={styles.viewAllText}>View All</Text>
           </TouchableOpacity>
         </View>

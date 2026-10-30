@@ -15,6 +15,7 @@ import {
 } from "@/lib/familyStudyPlanApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -198,12 +199,12 @@ export default function FamilyStudyPlanScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{plan.title}</Text>
         {manageable ? (
-          <TouchableOpacity onPress={openEdit} accessibilityLabel="Edit plan" accessibilityRole="button">
+          <TouchableOpacity hitSlop={10} onPress={openEdit} accessibilityLabel="Edit plan" accessibilityRole="button">
             <Ionicons name="create-outline" size={20} color={c.textDark} />
           </TouchableOpacity>
         ) : <View style={{ width: 20 }} />}
@@ -230,10 +231,7 @@ export default function FamilyStudyPlanScreen() {
         <View style={styles.sectionRow}>
           <Text style={styles.sectionLabel}>LESSONS</Text>
           {manageable && (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setPickerOpen(true)} disabled={busy}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Add Lesson</Text>
-            </TouchableOpacity>
+            <AppButton label="Add Lesson" onPress={() => setPickerOpen(true)} size="sm" icon="add" disabled={busy} />
           )}
         </View>
 
@@ -244,7 +242,7 @@ export default function FamilyStudyPlanScreen() {
             const isCurrent = item.itemId === progress.currentItemId;
             return (
               <View key={item.itemId} style={styles.lessonRow}>
-                <TouchableOpacity style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => openLesson(item.lessonId)}>
+                <TouchableOpacity accessibilityRole="button" style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }} onPress={() => openLesson(item.lessonId)}>
                   <Text style={styles.lessonNumber}>{String(index + 1).padStart(2, "0")}</Text>
                   <Text style={styles.lessonTitle} numberOfLines={2}>{item.lessonTitle}</Text>
                   {item.done ? (
@@ -255,13 +253,13 @@ export default function FamilyStudyPlanScreen() {
                 </TouchableOpacity>
                 {manageable && (
                   <View style={{ flexDirection: "row", gap: 6 }}>
-                    <TouchableOpacity onPress={() => handleMove(index, -1)} disabled={busy || index === 0} accessibilityLabel="Move up">
+                    <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => handleMove(index, -1)} disabled={busy || index === 0} accessibilityLabel="Move up">
                       <Ionicons name="chevron-up" size={18} color={index === 0 ? c.borderBeige : c.textMuted} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleMove(index, 1)} disabled={busy || index === items.length - 1} accessibilityLabel="Move down">
+                    <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => handleMove(index, 1)} disabled={busy || index === items.length - 1} accessibilityLabel="Move down">
                       <Ionicons name="chevron-down" size={18} color={index === items.length - 1 ? c.borderBeige : c.textMuted} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleRemove(item.itemId)} disabled={busy} accessibilityLabel="Remove lesson">
+                    <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={() => handleRemove(item.itemId)} disabled={busy} accessibilityLabel="Remove lesson">
                       <Ionicons name="close-circle-outline" size={18} color="#DC2626" />
                     </TouchableOpacity>
                   </View>
@@ -272,31 +270,20 @@ export default function FamilyStudyPlanScreen() {
         )}
 
         {items.length > 0 && (
-          <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={() => openLesson((items.find((i) => i.itemId === progress.currentItemId) ?? items[0]).lessonId)}
-          >
-            <Text style={styles.continueBtnText}>{progress.currentItemId ? "Continue Study" : "Review Study"}</Text>
-          </TouchableOpacity>
+          <AppButton label={progress.currentItemId ? "Continue Study" : "Review Study"} onPress={() => openLesson((items.find((i) => i.itemId === progress.currentItemId) ?? items[0]).lessonId)} style={{ marginTop: 6, marginBottom: 12 }} />
         )}
 
         {manageable && plan.status === "published" && !isActivePlan && (
-          <TouchableOpacity style={styles.activeBtn} onPress={handleSetActive} disabled={busy}>
-            <Text style={styles.activeBtnText}>Set as Active Study Plan</Text>
-          </TouchableOpacity>
+          <AppButton label="Set as Active Study Plan" onPress={handleSetActive} variant="outline" disabled={busy} style={{ marginBottom: 12 }} />
         )}
 
         {manageable && (
           <View style={styles.manageRow}>
             {plan.status === "draft" && (
-              <TouchableOpacity style={styles.publishBtn} onPress={handlePublish} disabled={busy}>
-                <Text style={styles.publishBtnText}>Publish</Text>
-              </TouchableOpacity>
+              <AppButton label="Publish" onPress={handlePublish} disabled={busy} style={{ flex: 1 }} />
             )}
             {plan.status !== "archived" && (
-              <TouchableOpacity style={styles.archiveBtn} onPress={handleArchive} disabled={busy}>
-                <Text style={styles.archiveBtnText}>Archive</Text>
-              </TouchableOpacity>
+              <AppButton label="Archive" onPress={handleArchive} variant="outline" disabled={busy} style={{ flex: 1 }} />
             )}
           </View>
         )}
@@ -313,12 +300,8 @@ export default function FamilyStudyPlanScreen() {
             <Text style={styles.fieldLabel}>Description</Text>
             <TextInput style={[styles.input, { minHeight: 70 }]} value={description} onChangeText={setDescription} multiline placeholderTextColor={c.textMuted} />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditOpen(false)} disabled={busy}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit} disabled={busy || !title.trim()}>
-                {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setEditOpen(false)} variant="outline" disabled={busy} style={{ flex: 1 }} />
+              <AppButton label="Save" onPress={handleSaveEdit} disabled={busy || !title.trim()} loading={busy} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -340,8 +323,6 @@ function makeStyles(c: AppColors) {
     progressText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 6 },
     sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
     sectionLabel: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-    createBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-    createBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     lessonRow: {
       flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card,
@@ -349,15 +330,7 @@ function makeStyles(c: AppColors) {
     },
     lessonNumber: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", width: 22 },
     lessonTitle: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
-    continueBtn: { backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 6, marginBottom: 12 },
-    continueBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    activeBtn: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 12 },
-    activeBtnText: { color: c.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold" },
     manageRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-    publishBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    publishBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
-    archiveBtn: { flex: 1, borderWidth: 1.5, borderColor: "#DC2626", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    archiveBtnText: { color: "#DC2626", fontSize: 13, fontFamily: "Inter_700Bold" },
     statusPill: {
       alignSelf: "flex-start", marginBottom: 6, fontSize: 10, fontFamily: "Inter_700Bold", color: c.accentGreen,
       backgroundColor: "rgba(29,158,117,0.12)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
@@ -376,9 +349,5 @@ function makeStyles(c: AppColors) {
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular",
     },
     sheetRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-    cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    cancelBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-    saveBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    saveBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

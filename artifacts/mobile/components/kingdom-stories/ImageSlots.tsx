@@ -137,7 +137,7 @@ export default function ImageSlots({ story, locked, onChanged, onError }: { stor
       )}
 
       <Modal visible={!!choosing} transparent animationType="fade" onRequestClose={() => setChoosing(null)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setChoosing(null)} accessibilityLabel="Close">
+        <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={() => setChoosing(null)} accessibilityLabel="Close">
           <TouchableOpacity activeOpacity={1} style={styles.sheet}>
             <Text style={styles.sheetTitle}>Choose an image from this story</Text>
             <ScrollView contentContainerStyle={styles.chooseGrid}>

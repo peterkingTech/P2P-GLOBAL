@@ -141,7 +141,7 @@ export default function MediaPlayer({ storagePath, submissionType, durationSecon
         )}
       </View>
       <View style={styles.progressRow}>
-        <TouchableOpacity style={styles.playBtn} onPress={toggleAudio} activeOpacity={0.8}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isPlaying ? "Pause" : "Play"} hitSlop={10} style={styles.playBtn} onPress={toggleAudio} activeOpacity={0.8}>
           <Ionicons name={isPlaying ? "pause" : "play"} size={18} color={colors.cream} />
         </TouchableOpacity>
         <View style={styles.progressTrack}>

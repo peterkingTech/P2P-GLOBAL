@@ -19,15 +19,20 @@ export interface ContinueItem {
   /** 0..1 from real progress, or null when that experience has none to show. */
   progress: number | null;
   icon: string;
+  /** A Kingdom Stories media path (signed on display). */
   imagePath?: string | null;
+  /** A ready-to-show image URL (Kingdom School module photo). */
+  imageUrl?: string | null;
   route: { pathname: string; params?: Record<string, string> };
 }
 
 export interface ContinueInputs {
-  modules?: { id: string; title: string; lessonCount: number; completedLessons: number; isLocked: boolean }[];
+  modules?: { id: string; title: string; lessonCount: number; completedLessons: number; isLocked: boolean; imageUrl?: string | null }[];
   stories?: { id: string; title: string; category?: { title: string } | null; myProgress?: { totalChapters: number; doneChapters: number; started: boolean } | null; lastChapterNumber?: number | null; media?: { mediaPath: string }[] }[];
-  studies?: { id: string; title: string; contentType: string; destination: { type: string; name: string | null }; lastOpenedAt: string | null; updatedAt: string }[];
+  studies?: { id: string; title: string; contentType: string; contentId?: string; destination: { type: string; name: string | null }; lastOpenedAt: string | null; updatedAt: string }[];
   bible?: { book: string; bookName: string; chapter: number; translation: string } | null;
+  /** Story id → cover media path, so a shared study of a story shows its photo. */
+  storyCovers?: Record<string, string>;
 }
 
 const TYPE = { school: "Kingdom School", story: "Kingdom Stories", together: "Study Together", bible: "Bible Study" } as const;
@@ -38,6 +43,7 @@ export function continueItems(i: ContinueInputs, max = 6): ContinueItem[] {
   const moduleItem = (m: NonNullable<typeof mod>): ContinueItem => ({
     key: `school:${m.id}`, kind: "school", typeLabel: TYPE.school, title: m.title,
     detail: `${m.completedLessons} of ${m.lessonCount} lessons`, progress: m.completedLessons / m.lessonCount, icon: "school-outline",
+    imageUrl: m.imageUrl ?? null,
     route: { pathname: "/module/[id]", params: { id: m.id } },
   });
   if (mod && mod.completedLessons > 0) out.push(moduleItem(mod));
@@ -55,7 +61,8 @@ export function continueItems(i: ContinueInputs, max = 6): ContinueItem[] {
     out.push({
       key: `together:${s.id}`, kind: "together", typeLabel: TYPE.together, title: s.title,
       detail: [s.contentType === "lesson" ? "Kingdom School lesson" : "Kingdom Story", s.destination.name].filter(Boolean).join(" · "),
-      progress: null, icon: "people-outline", route: { pathname: "/study-together/[id]", params: { id: s.id } },
+      progress: null, icon: "people-outline",
+      imagePath: s.contentType === "kingdom_story" && s.contentId ? i.storyCovers?.[s.contentId] ?? null : null, route: { pathname: "/study-together/[id]", params: { id: s.id } },
     });
   }
   if (i.bible) {

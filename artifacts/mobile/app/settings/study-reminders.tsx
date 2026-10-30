@@ -12,6 +12,7 @@ import {
   saveReminderSettings, snoozeStudyReminder, type ScheduleResult, type StudyFocus, type StudyReminderSettings,
 } from "@/lib/studyReminders";
 import { studyMinutesToday, localDayKey } from "@/lib/studyTime";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Personal study reminders and a daily goal — for this person only (no group
 // reminders, no streak penalties, no one else can see it). Reminders are
@@ -117,9 +118,9 @@ export default function StudyRemindersScreen() {
 
         <Text style={styles.sectionTitle}>Time</Text>
         <View style={[styles.card, styles.timeRow]}>
-          <TouchableOpacity style={styles.step} onPress={() => setTime(hour - 1, minute)} accessibilityRole="button" accessibilityLabel="One hour earlier"><Ionicons name="remove" size={18} color={c.textDark} /></TouchableOpacity>
+          <IconButton icon="remove" accessibilityLabel="One hour earlier" onPress={() => setTime(hour - 1, minute)} variant="tinted" color={c.textDark} />
           <Text style={styles.time} accessibilityLiveRegion="polite">{timeLabel}</Text>
-          <TouchableOpacity style={styles.step} onPress={() => setTime(hour + 1, minute)} accessibilityRole="button" accessibilityLabel="One hour later"><Ionicons name="add" size={18} color={c.textDark} /></TouchableOpacity>
+          <IconButton icon="add" accessibilityLabel="One hour later" onPress={() => setTime(hour + 1, minute)} variant="tinted" color={c.textDark} />
           <View style={styles.minutes}>
             {MINUTE_STEPS.map((m) => (
               <TouchableOpacity key={m} style={[styles.minChip, minute === m && styles.chipOn]} onPress={() => setTime(hour, m)} accessibilityRole="radio" accessibilityState={{ selected: minute === m }} accessibilityLabel={`:${String(m).padStart(2, "0")}`}>
@@ -154,10 +155,7 @@ export default function StudyRemindersScreen() {
         <Text style={styles.footnote}>Tapping a reminder opens {s.focus.length === 1 && s.focus[0] === "bible" ? "the Bible" : s.focus.length === 1 && s.focus[0] === "plans" ? "your Plans" : "Learn"}. Opening it never marks anything complete.</Text>
 
         {s.enabled && (
-          <TouchableOpacity style={styles.snooze} disabled={snoozed} onPress={async () => setSnoozed(await snoozeStudyReminder(s, 60))} accessibilityRole="button">
-            <Ionicons name="alarm-outline" size={16} color={c.textDark} />
-            <Text style={styles.snoozeText}>{snoozed ? "I'll remind you in an hour" : "Remind me again in an hour"}</Text>
-          </TouchableOpacity>
+          <AppButton label={snoozed ? "I'll remind you in an hour" : "Remind me again in an hour"} onPress={async () => setSnoozed(await snoozeStudyReminder(s, 60))} variant="outline" icon="alarm-outline" disabled={snoozed} />
         )}
       </ScrollView>
     </View>

@@ -8,6 +8,7 @@ import { useData, GroupMember, DiscoverablePeer, PeerGroup } from "@/contexts/Da
 import { publicLocationLabel, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
 import { Avatar } from "@/components/Avatar";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 export default function GroupDetail() {
   const insets = useSafeAreaInsets();
@@ -76,10 +77,7 @@ export default function GroupDetail() {
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Members ({members.length})</Text>
               {group?.isCreator && (
-                <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
-                  <Ionicons name="person-add" size={16} color={colors.primaryGreen} />
-                  <Text style={styles.addBtnText}>Add peer</Text>
-                </TouchableOpacity>
+                <AppButton label="Add peer" onPress={openAddModal} variant="tertiary" icon="person-add" palette="fixedLight" />
               )}
             </View>
             <FlatList
@@ -93,7 +91,7 @@ export default function GroupDetail() {
                     <Text style={styles.name}>{item.fullName}</Text>
                   </View>
                   {group?.isCreator && item.userId !== group.peerGuideId && (
-                    <TouchableOpacity onPress={() => handleRemove(item.userId)} disabled={busyId === item.userId}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => handleRemove(item.userId)} disabled={busyId === item.userId}>
                       {busyId === item.userId ? (
                         <ActivityIndicator size="small" color={colors.textMuted} />
                       ) : (
@@ -112,7 +110,7 @@ export default function GroupDetail() {
         <View style={[styles.modalContainer, { paddingTop: insets.top + 12 }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add a Peer</Text>
-            <TouchableOpacity onPress={() => setAddOpen(false)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setAddOpen(false)}>
               <Ionicons name="close" size={24} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
@@ -149,15 +147,7 @@ export default function GroupDetail() {
                       <Text style={styles.name}>{item.fullName}</Text>
                       <Text style={styles.meta}>{publicLocationLabel(item.city, item.country) ?? NO_PUBLIC_LOCATION}</Text>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.smallBtn, already && styles.smallBtnDisabled]}
-                      onPress={() => handleAdd(item.id)}
-                      disabled={already || busyId === item.id}
-                    >
-                      <Text style={styles.smallBtnText}>
-                        {busyId === item.id ? "..." : already ? "Added" : "Add"}
-                      </Text>
-                    </TouchableOpacity>
+                    <AppButton label={busyId === item.id ? "..." : already ? "Added" : "Add"} onPress={() => handleAdd(item.id)} size="sm" disabled={already || busyId === item.id} palette="fixedLight" />
                   </View>
                 );
               }}
@@ -177,8 +167,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4,
   },
   sectionTitle: { fontSize: 15, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  addBtnText: { color: colors.primaryGreen, fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   card: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.borderBeige,
@@ -200,9 +188,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: 20, marginBottom: 8,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
-  smallBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  smallBtnDisabled: { backgroundColor: colors.textMuted },
-  smallBtnText: { color: "#fff", fontWeight: "700", fontSize: 12, fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", marginTop: 60 },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular" },
 });

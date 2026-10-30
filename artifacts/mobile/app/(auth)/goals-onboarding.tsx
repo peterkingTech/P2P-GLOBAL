@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Shorter, onboarding-specific version of the 5-question pre-plan flow
 // (plans/pre-plan-questions.tsx) — Prompt 6 explicitly asks for 4 quick
@@ -108,9 +109,7 @@ export default function GoalsOnboardingScreen() {
           ))}
         </View>
         {step < 4 && (
-          <TouchableOpacity onPress={skip} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.skipBtn}>
-            <Text style={styles.skipBtnText}>Skip for now</Text>
-          </TouchableOpacity>
+          <AppButton label="Skip for now" onPress={skip} variant="tertiary" palette="fixedLight" />
         )}
       </View>
 
@@ -121,15 +120,13 @@ export default function GoalsOnboardingScreen() {
             <Text style={styles.question}>What are you hoping for in Kingdom School?</Text>
             <View style={styles.optionsList}>
               {GOAL_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[styles.optionRow, goals.includes(opt) && styles.optionRowActive]} onPress={() => toggleGoal(opt)}>
+                <TouchableOpacity accessibilityRole="button" key={opt} style={[styles.optionRow, goals.includes(opt) && styles.optionRowActive]} onPress={() => toggleGoal(opt)}>
                   <Text style={[styles.optionText, goals.includes(opt) && styles.optionTextActive]}>{opt}</Text>
                   {goals.includes(opt) && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 32 }} palette="fixedLight" />
           </>
         )}
 
@@ -138,15 +135,13 @@ export default function GoalsOnboardingScreen() {
             <Text style={styles.question}>Where are you in your faith journey?</Text>
             <View style={styles.optionsList}>
               {FAITH_JOURNEY_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionRow, faithJourney === opt.value && styles.optionRowActive]} onPress={() => setFaithJourney(opt.value)}>
+                <TouchableOpacity accessibilityRole="button" key={opt.value} style={[styles.optionRow, faithJourney === opt.value && styles.optionRowActive]} onPress={() => setFaithJourney(opt.value)}>
                   <Text style={[styles.optionText, faithJourney === opt.value && styles.optionTextActive]}>{opt.label}</Text>
                   {faithJourney === opt.value && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.nextBtn, !faithJourney && styles.nextBtnDisabled]} onPress={goNext} disabled={!faithJourney}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" disabled={!faithJourney} style={{ marginTop: 32 }} palette="fixedLight" />
           </>
         )}
 
@@ -156,15 +151,13 @@ export default function GoalsOnboardingScreen() {
             <Text style={styles.question}>What is your current life situation?</Text>
             <View style={styles.optionsList}>
               {LIFE_SITUATION_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionRow, lifeSituation === opt.value && styles.optionRowActive]} onPress={() => setLifeSituation(opt.value)}>
+                <TouchableOpacity accessibilityRole="button" key={opt.value} style={[styles.optionRow, lifeSituation === opt.value && styles.optionRowActive]} onPress={() => setLifeSituation(opt.value)}>
                   <Text style={[styles.optionText, lifeSituation === opt.value && styles.optionTextActive]}>{opt.label}</Text>
                   {lifeSituation === opt.value && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 32 }} palette="fixedLight" />
           </>
         )}
 
@@ -173,15 +166,13 @@ export default function GoalsOnboardingScreen() {
             <Text style={styles.question}>How would you like to learn?</Text>
             <View style={styles.optionsList}>
               {FORMAT_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionRow, format === opt.value && styles.optionRowActive]} onPress={() => setFormat(opt.value)}>
+                <TouchableOpacity accessibilityRole="button" key={opt.value} style={[styles.optionRow, format === opt.value && styles.optionRowActive]} onPress={() => setFormat(opt.value)}>
                   <Text style={[styles.optionText, format === opt.value && styles.optionTextActive]}>{opt.label}</Text>
                   {format === opt.value && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.nextBtn, !format && styles.nextBtnDisabled]} onPress={goNext} disabled={!format}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" disabled={!format} style={{ marginTop: 32 }} palette="fixedLight" />
           </>
         )}
 
@@ -193,9 +184,7 @@ export default function GoalsOnboardingScreen() {
             <Text style={styles.question}>Perfect.</Text>
             <Text style={styles.affirmationSub}>We will suggest content that matches your journey.</Text>
             <Text style={styles.affirmationSub}>Your first recommendation is waiting for you.</Text>
-            <TouchableOpacity style={styles.nextBtn} onPress={finish} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.nextBtnText}>Enter Kingdom School</Text>}
-            </TouchableOpacity>
+            <AppButton label="Enter Kingdom School" onPress={finish} size="lg" disabled={saving} loading={saving} style={{ marginTop: 32 }} palette="fixedLight" />
           </View>
         )}
       </View>
@@ -212,8 +201,6 @@ function makeStyles() {
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.borderBeige },
     dotActive: { backgroundColor: c.accentGreen },
     dotCurrent: { width: 20 },
-    skipBtn: { padding: 4 },
-    skipBtnText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium" },
     content: { flex: 1, paddingHorizontal: 24, paddingTop: 12 },
     eyebrow: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_600SemiBold", textAlign: "center", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
     question: { fontSize: 21, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", lineHeight: 28, textAlign: "center" },
@@ -225,9 +212,6 @@ function makeStyles() {
     optionRowActive: { borderColor: c.accentGreen, backgroundColor: `${c.accentGreen}0D` },
     optionText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
     optionTextActive: { color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
-    nextBtn: { backgroundColor: c.accentGreen, borderRadius: 14, height: 54, alignItems: "center", justifyContent: "center", marginTop: 32 },
-    nextBtnDisabled: { opacity: 0.5 },
-    nextBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
     affirmationWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
     affirmationIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center", marginBottom: 20 },
     affirmationSub: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },

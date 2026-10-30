@@ -29,6 +29,7 @@ import { withAlpha } from "@/lib/colorUtils";
 import { LINE_HEIGHT, loadPosition, savePosition, useBibleReadingPrefs } from "@/lib/bibleReadingPrefs";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { useAuth } from "@/contexts/AuthContext";
+import { AppButton, IconButton } from "@/components/ui";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -421,29 +422,15 @@ export default function BibleReaderScreen() {
   // ── Render ───────────────────────────────────────────────────────────────
   const header = !focus && (
     <View style={[styles.header, { paddingTop: gathering ? 4 : insets.top + 4 }]}>
-      <TouchableOpacity onPress={goBack} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
-        <Ionicons name="chevron-back" size={24} color={c.textDark} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.titleBtn} onPress={() => setSheet("books")} disabled={!loc} accessibilityRole="button"
-        accessibilityLabel={book ? `${book.name} chapter ${loc?.chapter}. Choose book and chapter` : "Choose book and chapter"}>
-        <Text style={styles.titleText} numberOfLines={1}>{book ? `${book.name} ${loc?.chapter}` : "Bible"}</Text>
-        <Ionicons name="chevron-down" size={16} color={c.textMid} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.trPill} onPress={() => setSheet("translations")} accessibilityRole="button"
-        accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`}>
-        <Text style={styles.trPillText}>{loc?.t ?? "—"}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
+      <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={goBack} color={c.textDark} />
+      <AppButton label={book ? `${book.name} ${loc?.chapter}` : "Bible"} onPress={() => setSheet("books")} variant="tertiary" icon="chevron-down" iconPosition="trailing" disabled={!loc} accessibilityLabel={book ? `${book.name} chapter ${loc?.chapter}. Choose book and chapter` : "Choose book and chapter"} style={{ flex: 1 }} />
+      <AppButton label={`${loc?.t ?? "—"}`} onPress={() => setSheet("translations")} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
+      <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
         accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
         <Ionicons name={compare.length ? "git-compare" : "git-compare-outline"} size={21} color={compare.length ? c.accentGreen : c.textDark} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={() => router.push({ pathname: "/bible/search", params: { t: loc?.t ?? "" } } as any)}
-        accessibilityRole="button" accessibilityLabel="Search the Bible">
-        <Ionicons name="search" size={21} color={c.textDark} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={() => setSheet("menu")} accessibilityRole="button" accessibilityLabel="More options">
-        <Ionicons name="ellipsis-horizontal" size={22} color={c.textDark} />
-      </TouchableOpacity>
+      <IconButton icon="search" accessibilityLabel="Search the Bible" onPress={() => router.push({ pathname: "/bible/search", params: { t: loc?.t ?? "" } } as any)} color={c.textDark} />
+      <IconButton icon="ellipsis-horizontal" accessibilityLabel="More options" onPress={() => setSheet("menu")} color={c.textDark} />
     </View>
   );
 
@@ -451,18 +438,8 @@ export default function BibleReaderScreen() {
   const footerEl = data && !focus ? (
     <View style={styles.footer}>
       <View style={styles.navRow}>
-        <TouchableOpacity style={[styles.navBtn, !data.previous && styles.navBtnOff]} disabled={!data.previous}
-          onPress={() => data.previous && go(data.previous.bookCode, data.previous.chapter)} accessibilityRole="button"
-          accessibilityLabel={data.previous ? `Previous chapter, ${formatRef(bookByCode(data.previous.bookCode), data.previous.chapter)}` : "No previous chapter"}>
-          <Ionicons name="chevron-back" size={18} color={c.textDark} />
-          <Text style={styles.navText} numberOfLines={1}>{data.previous ? formatRef(bookByCode(data.previous.bookCode), data.previous.chapter) : "Start"}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.navBtn, styles.navBtnRight, !data.next && styles.navBtnOff]} disabled={!data.next}
-          onPress={() => data.next && go(data.next.bookCode, data.next.chapter)} accessibilityRole="button"
-          accessibilityLabel={data.next ? `Next chapter, ${formatRef(bookByCode(data.next.bookCode), data.next.chapter)}` : "No next chapter"}>
-          <Text style={styles.navText} numberOfLines={1}>{data.next ? formatRef(bookByCode(data.next.bookCode), data.next.chapter) : "End"}</Text>
-          <Ionicons name="chevron-forward" size={18} color={c.textDark} />
-        </TouchableOpacity>
+        <AppButton label={`${data.previous ? formatRef(bookByCode(data.previous.bookCode), data.previous.chapter) : "Start"}`} onPress={() => data.previous && go(data.previous.bookCode, data.previous.chapter)} variant="secondary" icon="chevron-back" disabled={!data.previous} accessibilityLabel={data.previous ? `Previous chapter, ${formatRef(bookByCode(data.previous.bookCode), data.previous.chapter)}` : "No previous chapter"} style={{ flex: 1 }} />
+        <AppButton label={`${data.next ? formatRef(bookByCode(data.next.bookCode), data.next.chapter) : "End"}`} onPress={() => data.next && go(data.next.bookCode, data.next.chapter)} variant="secondary" icon="chevron-forward" iconPosition="trailing" disabled={!data.next} accessibilityLabel={data.next ? `Next chapter, ${formatRef(bookByCode(data.next.bookCode), data.next.chapter)}` : "No next chapter"} style={{ flex: 1 }} />
       </View>
       <Text style={styles.copyright}>{data.translation.name}{data.copyright ? `\n${data.copyright}` : ""}</Text>
     </View>
@@ -575,9 +552,7 @@ export default function BibleReaderScreen() {
           <View style={styles.actionHead}>
             <Text style={styles.actionRef} numberOfLines={1}>{selLabel}</Text>
             {busy ? <ActivityIndicator size="small" color={c.accentGreen} /> : null}
-            <TouchableOpacity onPress={() => { setRange(null); anchorRef.current = null; }} style={styles.iconBtnSm} accessibilityRole="button" accessibilityLabel="Clear selection">
-              <Ionicons name="close" size={20} color={c.textMid} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Clear selection" onPress={() => { setRange(null); anchorRef.current = null; }} color={c.textMid} />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeRow} accessibilityRole="radiogroup">
             {MODES.map((m) => (
@@ -590,11 +565,11 @@ export default function BibleReaderScreen() {
           {textMode && range ? (
             <View style={styles.nudgeRow}>
               <Text style={styles.nudgeLabel}>Start</Text>
-              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "start", -1))} accessibilityRole="button" accessibilityLabel="Start one word earlier"><Ionicons name="chevron-back" size={16} color={c.textDark} /></TouchableOpacity>
-              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "start", 1))} accessibilityRole="button" accessibilityLabel="Start one word later"><Ionicons name="chevron-forward" size={16} color={c.textDark} /></TouchableOpacity>
+              <IconButton icon="chevron-back" accessibilityLabel="Start one word earlier" onPress={() => setRange(nudgeRange(verseList, range, "start", -1))} variant="tinted" size="sm" color={c.textDark} />
+              <IconButton icon="chevron-forward" accessibilityLabel="Start one word later" onPress={() => setRange(nudgeRange(verseList, range, "start", 1))} variant="tinted" size="sm" color={c.textDark} />
               <Text style={[styles.nudgeLabel, { marginLeft: 12 }]}>End</Text>
-              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "end", -1))} accessibilityRole="button" accessibilityLabel="End one word earlier"><Ionicons name="chevron-back" size={16} color={c.textDark} /></TouchableOpacity>
-              <TouchableOpacity style={styles.nudge} onPress={() => setRange(nudgeRange(verseList, range, "end", 1))} accessibilityRole="button" accessibilityLabel="End one word later"><Ionicons name="chevron-forward" size={16} color={c.textDark} /></TouchableOpacity>
+              <IconButton icon="chevron-back" accessibilityLabel="End one word earlier" onPress={() => setRange(nudgeRange(verseList, range, "end", -1))} variant="tinted" size="sm" color={c.textDark} />
+              <IconButton icon="chevron-forward" accessibilityLabel="End one word later" onPress={() => setRange(nudgeRange(verseList, range, "end", 1))} variant="tinted" size="sm" color={c.textDark} />
             </View>
           ) : null}
           <View style={styles.swatches}>
@@ -646,7 +621,7 @@ export default function BibleReaderScreen() {
         </TouchableOpacity>
       ) : null}
       <Modal visible={modeSheet} transparent animationType="fade" onRequestClose={() => setModeSheet(false)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setModeSheet(false)} accessibilityLabel="Close">
+        <TouchableOpacity accessibilityRole="button" style={styles.menuOverlay} activeOpacity={1} onPress={() => setModeSheet(false)} accessibilityLabel="Close">
           <View style={[styles.menu, { top: insets.top + 52 }]} accessibilityRole="radiogroup">
             {MODES.map((m) => (
               <TouchableOpacity key={m.key} style={styles.menuItem} onPress={() => chooseMode(m.key)} accessibilityRole="radio" accessibilityState={{ selected: mode === m.key }}>
@@ -666,7 +641,7 @@ export default function BibleReaderScreen() {
 
       {/* Overflow menu */}
       <Modal visible={sheet === "menu"} transparent animationType="fade" onRequestClose={() => setSheet(null)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setSheet(null)} accessibilityLabel="Close menu">
+        <TouchableOpacity accessibilityRole="button" style={styles.menuOverlay} activeOpacity={1} onPress={() => setSheet(null)} accessibilityLabel="Close menu">
           <View style={[styles.menu, { top: insets.top + 52 }]}>
             <MenuItem styles={styles} c={c} icon="library-outline" label="My notes & highlights" onPress={() => { setSheet(null); router.push("/bible/library" as any); }} />
             <MenuItem styles={styles} c={c} icon="school-outline" label="Lessons on this chapter" onPress={() => setSheet("related")} />
@@ -722,7 +697,7 @@ function StateMessage({ styles, c, icon, title, message, action, onAction }: { s
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateMsg}>{message}</Text>
       {action && onAction && (
-        <TouchableOpacity style={styles.stateBtn} onPress={onAction} accessibilityRole="button"><Text style={styles.stateBtnText}>{action}</Text></TouchableOpacity>
+        <AppButton label={`${action}`} onPress={onAction} style={{ marginTop: 6 }} />
       )}
     </View>
   );

@@ -25,11 +25,19 @@ export function pageGutter(windowWidth: number): number {
   return windowWidth >= LARGE_TABLET_BREAKPOINT ? 24 : 16;
 }
 
-// Fluid page-column width for a window: fills the window (minus gutters) on
-// tablets up to PAGE_MAX_WIDTH, then centers. undefined = phone, no cap.
-export function pageContentWidth(windowWidth: number): number | undefined {
-  if (windowWidth < TABLET_BREAKPOINT) return undefined;
-  return Math.min(windowWidth - 2 * pageGutter(windowWidth), PAGE_MAX_WIDTH);
+// Page-column width cap for a window. Owner decision (2026-10-30): every
+// screen fills the device's full width at any size, so there is no cap —
+// undefined everywhere (each screen keeps its own padding). PAGE_MAX_WIDTH
+// and pageGutter remain for callers that size things explicitly.
+export function pageContentWidth(_windowWidth: number): number | undefined {
+  return undefined;
+}
+
+// Banner / cover photos fill the device screen: the full window height less
+// whatever sits above the photo (status bar, header), never below 240.
+export function useFullScreenPhotoHeight(aboveHeight = 0): number {
+  const { height } = useWindowDimensions();
+  return Math.max(240, Math.round(height - aboveHeight));
 }
 
 export function useLayout() {
@@ -44,7 +52,8 @@ export function useLayout() {
     isLargeTablet,
     isLandscape: width > height,
     contentMaxWidth,
-    readingMaxWidth: contentMaxWidth ? Math.min(READING_MAX_WIDTH, contentMaxWidth) : undefined,
+    // Full width too (owner decision 2026-10-30): reading screens fill the device.
+    readingMaxWidth: undefined as number | undefined,
     formMaxWidth: isTablet ? MAX_CONTENT_WIDTH : undefined,
   };
 }

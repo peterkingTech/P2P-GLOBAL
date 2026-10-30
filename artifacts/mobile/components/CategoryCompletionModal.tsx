@@ -46,10 +46,10 @@ export function CategoryCompletionModal({ completion, onContinue }: Props) {
             <Text style={{ color: completion.categoryColorTheme, fontFamily: "Inter_700Bold" }}>{completion.categoryTitle}</Text>
           </Text>
 
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: completion.categoryColorTheme }]} activeOpacity={0.85} onPress={handleShare}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, { backgroundColor: completion.categoryColorTheme }]} activeOpacity={0.85} onPress={handleShare}>
             <Text style={styles.primaryBtnText}>Share This Milestone</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.7} onPress={onContinue}>
+          <TouchableOpacity accessibilityRole="button" style={styles.secondaryBtn} activeOpacity={0.7} onPress={onContinue}>
             <Text style={styles.secondaryBtnText}>Continue</Text>
           </TouchableOpacity>
         </Animated.View>

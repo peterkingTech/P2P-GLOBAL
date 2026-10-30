@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
+import { AppButton } from "@/components/ui";
 
 // Moved verbatim from the old settings.tsx "My Goals" section — same fields,
 // same behavior, just living on its own screen now.
@@ -124,13 +125,7 @@ export default function GoalsSettingsScreen() {
               {goalsRow?.success_vision ? (
                 <Text style={styles.goalsVisionText}>"{goalsRow.success_vision}"</Text>
               ) : null}
-              <TouchableOpacity
-                style={styles.updateGoalsBtn}
-                onPress={() => router.push("/plans/pre-plan-questions?returnTo=/settings/goals" as any)}
-              >
-                <Ionicons name="refresh-outline" size={15} color={colors.accentGreen} />
-                <Text style={styles.updateGoalsBtnText}>Update my goals</Text>
-              </TouchableOpacity>
+              <AppButton label="Update my goals" onPress={() => router.push("/plans/pre-plan-questions?returnTo=/settings/goals" as any)} variant="outline" icon="refresh-outline" style={{ marginTop: 14 }} />
             </>
           )}
         </View>
@@ -139,7 +134,7 @@ export default function GoalsSettingsScreen() {
           <Text style={styles.fieldLabel}>Life stage</Text>
           <View style={styles.chipWrapRow}>
             {LIFE_STAGE_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.chip, goalsRow?.life_stage === opt.value && styles.chipActive]}
                 onPress={() => updateGoalField("life_stage", goalsRow?.life_stage === opt.value ? null : opt.value)}
@@ -152,7 +147,7 @@ export default function GoalsSettingsScreen() {
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Life situation</Text>
           <View style={styles.chipWrapRow}>
             {LIFE_SITUATION_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.chip, goalsRow?.life_situation === opt.value && styles.chipActive]}
                 onPress={() => updateGoalField("life_situation", goalsRow?.life_situation === opt.value ? null : opt.value)}
@@ -165,7 +160,7 @@ export default function GoalsSettingsScreen() {
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Topic interests</Text>
           <View style={styles.chipWrapRow}>
             {TOPIC_INTEREST_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.chip, goalsRow?.topic_interests?.includes(opt.value) && styles.chipActive]}
                 onPress={() => toggleTopicInterest(opt.value)}
@@ -178,7 +173,7 @@ export default function GoalsSettingsScreen() {
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Learning format preference</Text>
           <View style={styles.chipWrapRow}>
             {LEARNING_FORMAT_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.chip, goalsRow?.learning_format === opt.value && styles.chipActive]}
                 onPress={() => updateGoalField("learning_format", goalsRow?.learning_format === opt.value ? null : opt.value)}
@@ -191,14 +186,14 @@ export default function GoalsSettingsScreen() {
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Age range</Text>
           <Text style={styles.ageRangeHint}>Optional — helps us suggest age-appropriate content</Text>
           <View style={styles.chipWrapRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.chip, !goalsRow?.age_range && styles.chipActive]}
               onPress={() => updateGoalField("age_range", null)}
             >
               <Text style={[styles.chipText, !goalsRow?.age_range && styles.chipTextActive]}>Prefer not to say</Text>
             </TouchableOpacity>
             {AGE_RANGE_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={opt.value}
                 style={[styles.chip, goalsRow?.age_range === opt.value && styles.chipActive]}
                 onPress={() => updateGoalField("age_range", opt.value)}
@@ -228,8 +223,6 @@ function makeStyles(c: AppColors) {
     chipReadonlyText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
     goalsEmptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", marginBottom: 4 },
     goalsVisionText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", fontStyle: "italic", marginTop: 10, lineHeight: 19 },
-    updateGoalsBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14, borderWidth: 1, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 11 },
-    updateGoalsBtnText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     ageRangeHint: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: -4, marginBottom: 8 },
   });
 }

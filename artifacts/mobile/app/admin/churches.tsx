@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Activity
 import { Ionicons } from "@expo/vector-icons";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface AdminChurch {
   id: string; name: string; city: string | null; country: string; status: string;
@@ -53,7 +54,7 @@ export default function AdminChurchesScreen() {
     <View style={styles.container}>
       <View style={styles.tabsRow}>
         {(["all", "pending", "stats"] as const).map((tb) => (
-          <TouchableOpacity key={tb} style={[styles.tabChip, tab === tb && styles.tabChipActive]} onPress={() => setTab(tb)}>
+          <TouchableOpacity accessibilityRole="button" key={tb} style={[styles.tabChip, tab === tb && styles.tabChipActive]} onPress={() => setTab(tb)}>
             <Text style={[styles.tabChipText, tab === tb && styles.tabChipTextActive]}>
               {tb === "all" ? "All Churches" : tb === "pending" ? "Verification Queue" : "Stats"}
             </Text>
@@ -100,12 +101,10 @@ export default function AdminChurchesScreen() {
 
               {!item.isVerified ? (
                 <View style={styles.actionsRow}>
-                  <TouchableOpacity style={styles.verifyBtn} onPress={() => handleVerify(item.id, true)}>
-                    <Text style={styles.verifyBtnText}>Verify ✓</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Verify" icon="checkmark" iconPosition="trailing" onPress={() => handleVerify(item.id, true)} size="sm" palette="fixedLight" />
                 </View>
               ) : (
-                <TouchableOpacity style={styles.unverifyLink} onPress={() => handleVerify(item.id, false)}>
+                <TouchableOpacity accessibilityRole="button" style={styles.unverifyLink} onPress={() => handleVerify(item.id, false)}>
                   <Text style={styles.unverifyLinkText}>Remove verification</Text>
                 </TouchableOpacity>
               )}
@@ -149,8 +148,6 @@ const styles = StyleSheet.create({
   badgePending: { backgroundColor: "rgba(217,119,6,0.15)", color: "#D97706" },
   cardMeta: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular" },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  verifyBtn: { backgroundColor: colors.accentGreen, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  verifyBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   unverifyLink: { marginTop: 8 },
   unverifyLinkText: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium" },
   statRow: {

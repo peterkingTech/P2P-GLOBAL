@@ -107,7 +107,7 @@ export function StudyQuestionsTab({ session, otherParticipants }: { session: Ret
 
       {rows.map((row, i) => (
         <View key={row.id} style={styles.questionBlock}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.discussBtn, session.discussingQuestionId === row.id && styles.discussBtnActive]}
             onPress={() => session.discussQuestion(row.id)}
           >
@@ -135,7 +135,7 @@ export function StudyQuestionsTab({ session, otherParticipants }: { session: Ret
                   placeholderTextColor="rgba(255,255,255,0.4)"
                   onSubmitEditing={handleSendDiscussion}
                 />
-                <TouchableOpacity style={styles.discussionSendBtn} onPress={handleSendDiscussion}>
+                <TouchableOpacity accessibilityLabel="Send" accessibilityRole="button" hitSlop={10} style={styles.discussionSendBtn} onPress={handleSendDiscussion}>
                   <Ionicons name="send" size={14} color="#fff" />
                 </TouchableOpacity>
               </View>

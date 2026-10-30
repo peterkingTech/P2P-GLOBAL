@@ -32,7 +32,7 @@ export function MessageBanner({
 
   return (
     <Animated.View style={[styles.wrap, { top: insets.top + 8, transform: [{ translateY }], opacity }]}>
-      <TouchableOpacity style={styles.pill} onPress={onPress} activeOpacity={0.85}>
+      <TouchableOpacity accessibilityRole="button" style={styles.pill} onPress={onPress} activeOpacity={0.85}>
         {senderPhotoUrl ? (
           <Image source={{ uri: senderPhotoUrl }} style={styles.avatar} />
         ) : (
@@ -47,7 +47,7 @@ export function MessageBanner({
           </View>
           <Text style={styles.message} numberOfLines={1}>{messageBody}</Text>
         </View>
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </TouchableOpacity>

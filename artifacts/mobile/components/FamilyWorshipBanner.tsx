@@ -24,7 +24,7 @@ export function FamilyWorshipBanner({ hostName, onPress, onDismiss }: FamilyWors
 
   return (
     <Animated.View style={[styles.wrap, { top: insets.top + 8, transform: [{ translateY }], opacity }]}>
-      <TouchableOpacity style={styles.pill} onPress={onPress} activeOpacity={0.85}>
+      <TouchableOpacity accessibilityRole="button" style={styles.pill} onPress={onPress} activeOpacity={0.85}>
         <View style={styles.iconCircle}>
           <Text style={styles.iconText}>📅</Text>
         </View>
@@ -32,7 +32,7 @@ export function FamilyWorshipBanner({ hostName, onPress, onDismiss }: FamilyWors
           <Text style={styles.title} numberOfLines={1}>Gathering</Text>
           <Text style={styles.subtitle} numberOfLines={1}>{hostName} started a Gathering</Text>
         </View>
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </TouchableOpacity>

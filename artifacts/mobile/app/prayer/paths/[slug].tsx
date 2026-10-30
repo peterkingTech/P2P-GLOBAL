@@ -10,6 +10,7 @@ import { getScriptureText } from "@/lib/prayerScriptureDisplay";
 import { createJournalEntry } from "@/lib/prayerJournal2Api";
 import { savePath, saveScripture, logPrayerActivity } from "@/lib/prayerLibraryApi";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -146,7 +147,7 @@ export default function PrayerPathFlowScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{path.title}</Text>
@@ -169,10 +170,7 @@ export default function PrayerPathFlowScreen() {
                 </>
               )}
             </View>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStart}>
-              <Text style={styles.primaryBtnText}>{path.myProgress?.status === "in_progress" ? "Resume Prayer Path" : "Start Prayer Path"}</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label={path.myProgress?.status === "in_progress" ? "Resume Prayer Path" : "Start Prayer Path"} onPress={handleStart} icon="arrow-forward" iconPosition="trailing" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -188,10 +186,7 @@ export default function PrayerPathFlowScreen() {
             ) : (
               <Text style={styles.verseUnavailable}>This verse's text couldn't be loaded right now.</Text>
             )}
-            <TouchableOpacity onPress={handleSaveScriptureStep} style={styles.inlineSaveBtn}>
-              <Ionicons name="bookmark-outline" size={14} color={c.accentGreen} />
-              <Text style={styles.inlineSaveText}>Save this Scripture</Text>
-            </TouchableOpacity>
+            <AppButton label="Save this Scripture" onPress={handleSaveScriptureStep} variant="tertiary" icon="bookmark-outline" style={{ alignSelf: "flex-start" }} />
 
             <View style={styles.divider} />
             <View style={styles.labelPill}><Text style={styles.labelPillText}>REFLECT</Text></View>
@@ -206,21 +201,11 @@ export default function PrayerPathFlowScreen() {
             <Text style={styles.promptText}>{currentStep.respondPrompt ?? "What are you bringing before God today?"}</Text>
             <TextInput style={styles.textarea} value={response} onChangeText={setResponse} multiline placeholder="Write it out..." placeholderTextColor={c.textMuted} />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleSaveReflection} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-                <><Ionicons name="book-outline" size={16} color={c.accentGreen} /><Text style={styles.secondaryBtnText}>Save to Journal</Text></>
-              )}
-            </TouchableOpacity>
+            <AppButton label="Save to Journal" onPress={handleSaveReflection} variant="outline" icon="book-outline" disabled={saving} loading={saving} />
 
             <View style={styles.navRow}>
-              <TouchableOpacity style={[styles.navBtn, stepIndex === 0 && styles.navBtnDisabled]} onPress={() => stepIndex > 0 && goToStep(stepIndex - 1)} disabled={stepIndex === 0}>
-                <Ionicons name="arrow-back" size={16} color={stepIndex === 0 ? c.textMuted : c.textDark} />
-                <Text style={[styles.navBtnText, stepIndex === 0 && { color: c.textMuted }]}>Previous</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.navBtnPrimary} onPress={() => goToStep(stepIndex + 1)}>
-                <Text style={styles.navBtnPrimaryText}>{stepIndex + 1 < path.steps.length ? "Next" : "Finish"}</Text>
-                <Ionicons name="arrow-forward" size={16} color="#fff" />
-              </TouchableOpacity>
+              <AppButton label="Previous" onPress={() => stepIndex > 0 && goToStep(stepIndex - 1)} variant="outline" icon="arrow-back" disabled={stepIndex === 0} style={{ flex: 1 }} />
+              <AppButton label={stepIndex + 1 < path.steps.length ? "Next" : "Finish"} onPress={() => goToStep(stepIndex + 1)} icon="arrow-forward" iconPosition="trailing" style={{ flex: 1 }} />
             </View>
           </View>
         )}
@@ -232,37 +217,19 @@ export default function PrayerPathFlowScreen() {
             <Text style={styles.pathDesc}>You've reached the end of "{path.title}."</Text>
 
             {!reflectionSaved ? (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleWriteCompletionReflection} disabled={saving}>
-                {saving ? <ActivityIndicator size="small" color={c.accentGreen} /> : (
-                  <><Ionicons name="create-outline" size={16} color={c.accentGreen} /><Text style={styles.secondaryBtnText}>Write Reflection</Text></>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Write Reflection" onPress={handleWriteCompletionReflection} variant="outline" icon="create-outline" disabled={saving} loading={saving} />
             ) : <Text style={styles.savedNote}>Saved to your journal.</Text>}
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleSavePath} disabled={pathSaved}>
-              <Ionicons name={pathSaved ? "bookmark" : "bookmark-outline"} size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>{pathSaved ? "Path Saved" : "Save Path"}</Text>
-            </TouchableOpacity>
+            <AppButton label={pathSaved ? "Path Saved" : "Save Path"} onPress={handleSavePath} variant="outline" icon={pathSaved ? "bookmark" : "bookmark-outline"} disabled={pathSaved} />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/prayer/pray-with-me" as any)}>
-              <Ionicons name="people-outline" size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Pray With Me</Text>
-            </TouchableOpacity>
+            <AppButton label="Pray With Me" onPress={() => router.push("/prayer/pray-with-me" as any)} variant="outline" icon="people-outline" />
 
             {!!path.topicId && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/prayer/pray-the-word" as any)}>
-                <Ionicons name="book-outline" size={16} color={c.accentGreen} />
-                <Text style={styles.secondaryBtnText}>Read Related Scriptures</Text>
-              </TouchableOpacity>
+              <AppButton label="Read Related Scriptures" onPress={() => router.push("/prayer/pray-the-word" as any)} variant="outline" icon="book-outline" />
             )}
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/missions" as any)}>
-              <Ionicons name="earth-outline" size={16} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Pray for Missions</Text>
-            </TouchableOpacity>
+            <AppButton label="Pray for Missions" onPress={() => router.push("/missions" as any)} variant="outline" icon="earth-outline" />
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/(tabs)/prayer" as any)}>
-              <Text style={styles.primaryBtnText}>Return to Prayer</Text>
-            </TouchableOpacity>
+            <AppButton label="Return to Prayer" onPress={() => router.replace("/(tabs)/prayer" as any)} style={{ marginTop: 4 }} />
           </View>
         )}
       </ScrollView>
@@ -288,7 +255,6 @@ function makeStyles(c: AppColors) {
     referenceText: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
     verseText: { fontSize: 15, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
     verseUnavailable: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    inlineSaveBtn: { flexDirection: "row", gap: 5, alignItems: "center", alignSelf: "flex-start" },
     inlineSaveText: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium" },
     divider: { height: 1, backgroundColor: c.borderBeige, marginVertical: 4 },
     promptText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold", lineHeight: 20 },
@@ -296,17 +262,8 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10,
       padding: 12, minHeight: 70, textAlignVertical: "top", color: c.textDark, fontSize: 13, fontFamily: "Inter_400Regular",
     },
-    primaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 4 },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     savedNote: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_500Medium", textAlign: "center" },
     navRow: { flexDirection: "row", gap: 10, marginTop: 6 },
-    navBtn: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, paddingVertical: 12 },
-    navBtnDisabled: { opacity: 0.5 },
-    navBtnText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    navBtnPrimary: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12 },
-    navBtnPrimaryText: { fontSize: 13, color: "#fff", fontFamily: "Inter_700Bold" },
     completeEmoji: { fontSize: 40, textAlign: "center" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
   });

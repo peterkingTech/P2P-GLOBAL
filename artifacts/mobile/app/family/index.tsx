@@ -9,6 +9,7 @@ import {
   getMyFamilies, createFamily, respondToFamilyInvitation,
   type MyFamiliesResponse, FamilyApiError,
 } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -120,12 +121,8 @@ export default function MyFamiliesScreen() {
               <View key={inv.id} style={styles.inviteCard}>
                 <Text style={styles.inviteText}>You've been invited to join a Family Circle as {ROLE_LABEL[inv.role] ?? inv.role}.</Text>
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => handleRespond(inv.id, "decline")}>
-                    <Text style={styles.secondaryBtnText}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.primaryBtnSmall} onPress={() => handleRespond(inv.id, "accept")}>
-                    <Text style={styles.primaryBtnSmallText}>Accept</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Decline" onPress={() => handleRespond(inv.id, "decline")} variant="outline" style={{ flex: 1 }} />
+                  <AppButton label="Accept" onPress={() => handleRespond(inv.id, "accept")} />
                 </View>
               </View>
             ))}
@@ -163,7 +160,7 @@ export default function MyFamiliesScreen() {
               <Ionicons name="alert-circle-outline" size={40} color={c.textMuted} />
               <Text style={styles.emptyTitle}>Couldn't load your Family Circles</Text>
               <Text style={styles.emptyText}>{loadError}</Text>
-              <TouchableOpacity onPress={load} style={{ marginTop: 10 }}>
+              <TouchableOpacity accessibilityRole="button" onPress={load} style={{ marginTop: 10 }}>
                 <Text style={{ color: c.accentGreen, fontWeight: "600" }}>Try again</Text>
               </TouchableOpacity>
             </View>
@@ -187,12 +184,8 @@ export default function MyFamiliesScreen() {
               onChangeText={setNewFamilyName}
             />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setShowCreateForm(false); setNewFamilyName(""); }}>
-                <Text style={styles.secondaryBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryBtnSmall} onPress={handleCreateFamily} disabled={creating || !newFamilyName.trim()}>
-                {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnSmallText}>Create</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => { setShowCreateForm(false); setNewFamilyName(""); }} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Create" onPress={handleCreateFamily} disabled={creating || !newFamilyName.trim()} loading={creating} />
             </View>
           </View>
         ) : (
@@ -222,10 +215,6 @@ function makeStyles(c: AppColors) {
       width: "100%", backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", marginTop: 10,
     },
-    primaryBtnSmall: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
-    primaryBtnSmallText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flex: 1, borderWidth: 1.5, borderColor: c.borderBeige, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-    secondaryBtnText: { color: c.textMid, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 
     section: {
       backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 16, gap: 6,

@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import FamilyIcon from "@/components/family/FamilyIcon";
 import GatheringFollowUp from "@/components/study/GatheringFollowUp";
 import { getFamilyDetail, getWorshipSessionSummary, updateGuideSummary, updateContinuityNotes, type WorshipSessionSummary } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -97,25 +98,21 @@ function EditableNoteSection({
             placeholderTextColor={c.textMuted}
           />
           <View style={styles.editRow}>
-            <TouchableOpacity style={styles.secondaryBtnSmall} onPress={() => setEditing(false)} disabled={saving}>
-              <Text style={styles.secondaryBtnSmallText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtnSmall} onPress={save} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnSmallText}>Save</Text>}
-            </TouchableOpacity>
+            <AppButton label="Cancel" onPress={() => setEditing(false)} variant="outline" disabled={saving} />
+            <AppButton label="Save" onPress={save} disabled={saving} loading={saving} />
           </View>
         </>
       ) : value ? (
         <>
           <Text style={styles.bodyText}>{value}</Text>
           {canEdit && (
-            <TouchableOpacity onPress={startEditing} style={{ marginTop: 8 }}>
+            <TouchableOpacity accessibilityRole="button" onPress={startEditing} style={{ marginTop: 8 }}>
               <Text style={styles.linkText}>Edit</Text>
             </TouchableOpacity>
           )}
         </>
       ) : canEdit ? (
-        <TouchableOpacity onPress={startEditing}>
+        <TouchableOpacity accessibilityRole="button" onPress={startEditing}>
           <Text style={styles.linkText}>{addLinkText}</Text>
         </TouchableOpacity>
       ) : (
@@ -259,7 +256,7 @@ export default function GatheringSummaryScreen() {
               <Text style={styles.bodyText}>{summary.lessonRef.title}</Text>
               <Text style={styles.overviewLine}>Family lesson</Text>
               {summary.lessonRef.studyId && (
-                <TouchableOpacity onPress={() => router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: summary.lessonRef!.id, studyId: summary.lessonRef!.studyId! } } as any)} style={{ marginTop: 6 }}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/family/studies/lesson/[lessonId]", params: { lessonId: summary.lessonRef!.id, studyId: summary.lessonRef!.studyId! } } as any)} style={{ marginTop: 6 }}>
                   <Text style={styles.linkText}>Open Lesson →</Text>
                 </TouchableOpacity>
               )}
@@ -270,7 +267,7 @@ export default function GatheringSummaryScreen() {
               <Text style={styles.overviewLine}>
                 {summary.study.moduleTitle}{summary.study.curriculumTitle ? ` · ${summary.study.curriculumTitle}` : ""}
               </Text>
-              <TouchableOpacity onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: summary.study!.lessonId } } as any)} style={{ marginTop: 6 }}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: summary.study!.lessonId } } as any)} style={{ marginTop: 6 }}>
                 <Text style={styles.linkText}>Open Lesson →</Text>
               </TouchableOpacity>
             </>
@@ -300,7 +297,7 @@ export default function GatheringSummaryScreen() {
                   ))}
                 </View>
               )}
-              <TouchableOpacity onPress={() => router.push({ pathname: "/family/prayer", params: { familyId } } as any)} style={{ marginTop: 6 }}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/family/prayer", params: { familyId } } as any)} style={{ marginTop: 6 }}>
                 <Text style={styles.linkText}>View Prayer →</Text>
               </TouchableOpacity>
             </>

@@ -122,7 +122,13 @@ const discover = src("components/kingdom-stories/DiscoverRow.tsx");
 const sharpCover = (s) => (s.match(/contentFit="cover"(?![^>]*blurRadius)/g) ?? []).length;
 ok("images: StoryImage shows the whole picture", storyImg.includes('contentFit="contain"') && sharpCover(storyImg) === 0);
 ok("images: full-width images take the picture's own shape", storyImg.includes("setNatural(width / height)"));
-ok("images: cards + hero show the whole picture (blurred fill only behind)", discover.includes('contentFit="contain"') && sharpCover(discover) === 0);
+ok("images: cards + hero show the whole picture (blurred fill only behind)", discover.includes('contentFit="contain"') && sharpCover(discover) === 1 && /fit = "contain"/.test(discover));
+ok("images: only an explicit fit=\"cover\" crops (banners)", /url && fit === "cover" \?/.test(discover));
+ok("images: Continue Learning shows the whole photo in a frame of the photo's own shape (no crop, no blur)", /url && fit === "whole" \?/.test(discover) && /onRatio\?\.\(width \/ height\)/.test(discover)
+  && /<CoverArt path=\{item\.imagePath\} fit="whole" onRatio=\{setRatio\} \/>/.test(src("app/(tabs)/learn.tsx")) && /resizeMode="contain"/.test(src("app/(tabs)/learn.tsx")) && !/resizeMode="cover"/.test(src("app/(tabs)/learn.tsx")));
+ok("images: banners and covers fill the device screen, cropped to fit", /const heroH = useFullScreenPhotoHeight\(\);/.test(src("app/kingdom-stories/index.tsx")) && /<CoverArt fit="cover" path=\{item\.hero/.test(src("app/kingdom-stories/index.tsx"))
+  && /useFullScreenPhotoHeight\(insets\.top \+ 56\)/.test(src("app/kingdom-stories/[id].tsx")) && /useFullScreenPhotoHeight/.test(src("app/module/[id].tsx")) && /useFullScreenPhotoHeight/.test(src("app/curriculum/[id].tsx")) && /useFullScreenPhotoHeight/.test(src("app/plan/[id].tsx")));
+ok("layout: every screen fills the device width (no page column cap)", /export function pageContentWidth\(_windowWidth: number\): number \| undefined \{\s*return undefined;/.test(src("hooks/useLayout.ts")));
 ok("images: nothing laid over a card's picture except top-corner badges", !discover.includes("posterShade") && /posterText: \{ paddingTop/.test(discover));
 ok("images: hero title sits below the image", /heroText: \{ paddingHorizontal: 16, paddingTop: 14/.test(src("app/kingdom-stories/index.tsx")));
 ok("images: admin slot previews uncropped", src("components/kingdom-stories/ImageSlots.tsx").includes('resizeMode="contain"'));

@@ -50,18 +50,18 @@ export default function TestimonyFeedScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Testimonies</Text>
-        <TouchableOpacity onPress={() => router.push("/prayer/testimony/record" as any)} accessibilityLabel="Share a testimony" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.push("/prayer/testimony/record" as any)} accessibilityLabel="Share a testimony" accessibilityRole="button">
           <Ionicons name="add-circle" size={26} color={c.accentGreen} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.tabRow}>
         {TABS.map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
             <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -81,7 +81,7 @@ export default function TestimonyFeedScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={c.accentGreen} />}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/prayer/testimony/${item.id}` as any)} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/prayer/testimony/${item.id}` as any)} activeOpacity={0.85}>
               <View style={styles.cardHeader}>
                 <Ionicons name={item.testimonyType === "answered_prayer" ? "checkmark-circle" : "leaf"} size={16} color={c.accentGreen} />
                 <Text style={styles.cardType}>{item.testimonyType === "answered_prayer" ? "Answered Prayer" : "Growth"}</Text>

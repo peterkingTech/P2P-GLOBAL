@@ -103,7 +103,7 @@ export default function ConnectHub() {
 
         <View style={[styles.pathGrid, pathTiles.containerStyle]} onLayout={pathTiles.onLayout}>
           {MATCH_PATHS.map((path) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={path.id}
               style={[styles.pathCard, pathTiles.tileStyle]}
               activeOpacity={0.85}

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
+import { IconButton } from "@/components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ export default function RegistrationsScreen() {
           { paddingBottom: insets.bottom + 40 },
         ]}
       >
-        <TouchableOpacity style={styles.detailBack} onPress={() => setSelected(null)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.detailBack} onPress={() => setSelected(null)}>
           <Ionicons name="arrow-back" size={18} color={colors.accentGreen} />
           <Text style={styles.detailBackText}>Back to list</Text>
         </TouchableOpacity>
@@ -198,7 +199,7 @@ export default function RegistrationsScreen() {
           <Text style={styles.fieldLabel}>Status</Text>
           <View style={styles.statusPills}>
             {STATUS_OPTIONS.filter((o) => o.value !== "all").map((o) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={o.value}
                 style={[
                   styles.statusPill,
@@ -229,7 +230,7 @@ export default function RegistrationsScreen() {
             textAlignVertical="top"
           />
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.saveBtn, savingNotes && { opacity: 0.7 }]}
             onPress={saveAdmin}
             disabled={savingNotes}
@@ -262,14 +263,12 @@ export default function RegistrationsScreen() {
             returnKeyType="search"
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setSearch("")}>
               <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchList}>
-          <Ionicons name="refresh" size={18} color={colors.accentGreen} />
-        </TouchableOpacity>
+        <IconButton icon="refresh" accessibilityLabel="Refresh" onPress={fetchList} variant="tinted" color={colors.accentGreen} palette="fixedLight" />
       </View>
 
       {/* Status filter chips */}
@@ -281,7 +280,7 @@ export default function RegistrationsScreen() {
         {STATUS_OPTIONS.map((o) => {
           const active = statusFilter === o.value;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={o.value}
               style={[styles.filterChip, active && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]}
               onPress={() => setStatusFilter(o.value as any)}
@@ -310,7 +309,7 @@ export default function RegistrationsScreen() {
           renderItem={({ item }) => {
             const statusColor = STATUS_OPTIONS.find((s) => s.value === item.follow_up_status)?.color ?? colors.textMuted;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.regCard}
                 onPress={() => openDetail(item.id)}
                 activeOpacity={0.85}
@@ -386,11 +385,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 12, height: 42,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular" },
-  refreshBtn: {
-    width: 42, height: 42, borderRadius: 12,
-    backgroundColor: "rgba(29,158,117,0.1)",
-    alignItems: "center", justifyContent: "center",
-  },
 
   // Filter chips
   filterRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },

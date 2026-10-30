@@ -12,6 +12,7 @@ import { pathForNotification } from "@/lib/push";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { NotificationRow } from "@/components/notifications/NotificationRow";
 import { NOTIFICATION_PAGE_SIZE } from "@/lib/notificationModel";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -197,22 +198,8 @@ export default function NotificationsScreen() {
                 <NotificationRow n={n} category={category} busy={navigatingId === n.id} onPress={() => handlePress(n)} />
                 {showConnectionActions && (
                   <View style={styles.connectionActionsRow}>
-                    <TouchableOpacity
-                      style={styles.connectionAcceptBtn}
-                      onPress={() => handleConnectionRespond(n, "accepted")}
-                      disabled={respondingId === n.id}
-                      accessibilityRole="button" accessibilityLabel="Accept connection request"
-                    >
-                      {respondingId === n.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.connectionAcceptText}>Accept</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.connectionDeclineBtn}
-                      onPress={() => handleConnectionRespond(n, "declined")}
-                      disabled={respondingId === n.id}
-                      accessibilityRole="button" accessibilityLabel="Decline connection request"
-                    >
-                      <Text style={styles.connectionDeclineText}>Decline</Text>
-                    </TouchableOpacity>
+                    <AppButton label="Accept" onPress={() => handleConnectionRespond(n, "accepted")} disabled={respondingId === n.id} loading={respondingId === n.id} accessibilityLabel="Accept connection request" style={{ flex: 1 }} />
+                    <AppButton label="Decline" onPress={() => handleConnectionRespond(n, "declined")} variant="outline" disabled={respondingId === n.id} accessibilityLabel="Decline connection request" style={{ flex: 1 }} />
                   </View>
                 )}
               </View>
@@ -220,9 +207,7 @@ export default function NotificationsScreen() {
           })
         )}
         {!loading && hasMore ? (
-          <TouchableOpacity style={styles.loadMore} onPress={loadMore} disabled={loadingMore} accessibilityRole="button" accessibilityLabel="Load older notifications">
-            {loadingMore ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Text style={styles.markAllText}>Load older notifications</Text>}
-          </TouchableOpacity>
+          <AppButton label="Load older notifications" onPress={loadMore} variant="tertiary" disabled={loadingMore} loading={loadingMore} accessibilityLabel="Load older notifications" />
         ) : null}
       </ScrollView>
     </View>
@@ -250,15 +235,7 @@ function makeStyles(c: AppColors) {
     rowDate: { fontSize: 10, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 4 },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.accentGreen },
     connectionActionsRow: { flexDirection: "row", gap: 8 },
-    connectionAcceptBtn: {
-      flex: 1, alignItems: "center", justifyContent: "center", minHeight: 44,
-      borderRadius: 10, backgroundColor: c.accentGreen,
-    },
     connectionAcceptText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    connectionDeclineBtn: {
-      flex: 1, alignItems: "center", justifyContent: "center", minHeight: 44,
-      borderRadius: 10, borderWidth: 1.5, borderColor: c.accentGreen,
-    },
     connectionDeclineText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

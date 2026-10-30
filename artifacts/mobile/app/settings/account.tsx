@@ -16,6 +16,7 @@ import { getFlagEmoji } from "@/lib/countryGeo";
 import { resolveMediaUpload } from "@/lib/mediaUpload";
 import MinistryRolePicker, { MINISTRY_ROLE_OPTIONS } from "@/components/MinistryRolePicker";
 import { MinistryRole } from "@/contexts/AuthContext";
+import { AppButton } from "@/components/ui";
 
 
 function timeAgo(iso: string): string {
@@ -168,7 +169,7 @@ export default function AccountSettingsScreen() {
       <SettingsSubHeader title="Account" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickPhoto} disabled={uploadingPhoto} style={styles.avatarWrap}>
+          <TouchableOpacity accessibilityRole="button" onPress={handlePickPhoto} disabled={uploadingPhoto} style={styles.avatarWrap}>
             {profile?.avatarUrl ? (
               <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
             ) : (
@@ -190,12 +191,10 @@ export default function AccountSettingsScreen() {
           <Text style={styles.fieldLabel}>Date of birth</Text>
           <DateOfBirthInput value={dob} onChangeText={setDob} style={styles.input} />
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile} disabled={savingProfile}>
-            {savingProfile ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Profile</Text>}
-          </TouchableOpacity>
+          <AppButton label="Save Profile" onPress={handleSaveProfile} disabled={savingProfile} loading={savingProfile} />
         </View>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/change-username" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/settings/change-username" as any)}>
           <Text style={styles.fieldLabel}>Username</Text>
           <View style={styles.usernameRow}>
             <View style={{ flex: 1 }}>
@@ -210,7 +209,7 @@ export default function AccountSettingsScreen() {
 
         <View style={styles.card}>
           <Text style={styles.fieldLabel}>Ministry Role</Text>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.usernameRow, { justifyContent: "space-between" }]}
             onPress={() => setShowMinistryPicker((v) => !v)}
           >
@@ -247,9 +246,7 @@ export default function AccountSettingsScreen() {
             multiline
             maxLength={280}
           />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBio} disabled={savingBio}>
-            {savingBio ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Bio</Text>}
-          </TouchableOpacity>
+          <AppButton label="Save Bio" onPress={handleSaveBio} disabled={savingBio} loading={savingBio} />
         </View>
 
         <View style={styles.card}>
@@ -280,7 +277,7 @@ export default function AccountSettingsScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/blocked-users" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/settings/blocked-users" as any)}>
           <View style={styles.usernameRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.fieldLabel}>Blocked Users</Text>
@@ -290,7 +287,7 @@ export default function AccountSettingsScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/verification" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/settings/verification" as any)}>
           <Text style={styles.fieldLabel}>Verification</Text>
           <View style={styles.usernameRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
@@ -319,18 +316,13 @@ export default function AccountSettingsScreen() {
             placeholderTextColor={colors.textMuted}
           />
           {email.trim() !== profile?.email && (
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEmail} disabled={savingEmail}>
-              {savingEmail ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Update Email</Text>}
-            </TouchableOpacity>
+            <AppButton label="Update Email" onPress={handleSaveEmail} disabled={savingEmail} loading={savingEmail} />
           )}
         </View>
 
         <View style={styles.card}>
           {!showPasswordField ? (
-            <TouchableOpacity style={styles.changePwBtn} onPress={() => setShowPasswordField(true)}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.accentGreen} />
-              <Text style={styles.changePwBtnText}>Change Password</Text>
-            </TouchableOpacity>
+            <AppButton label="Change Password" onPress={() => setShowPasswordField(true)} variant="tertiary" size="sm" icon="lock-closed-outline" />
           ) : (
             <>
               <Text style={styles.fieldLabel}>New password</Text>
@@ -342,9 +334,7 @@ export default function AccountSettingsScreen() {
                 placeholder="Min. 6 characters"
                 placeholderTextColor={colors.textMuted}
               />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleChangePassword} disabled={savingPassword}>
-                {savingPassword ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save New Password</Text>}
-              </TouchableOpacity>
+              <AppButton label="Save New Password" onPress={handleChangePassword} disabled={savingPassword} loading={savingPassword} />
             </>
           )}
         </View>
@@ -354,7 +344,7 @@ export default function AccountSettingsScreen() {
           {showLocationVerifier ? (
             <LocationVerifier onVerified={handleLocationVerified} onSkip={() => setShowLocationVerifier(false)} compact />
           ) : (
-            <TouchableOpacity style={styles.locationRow} onPress={() => setShowLocationVerifier(true)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.locationRow} onPress={() => setShowLocationVerifier(true)}>
               <Ionicons name="location-outline" size={18} color={colors.accentGreen} />
               <View style={{ flex: 1 }}>
                 {profile?.locationVerified ? (
@@ -375,7 +365,7 @@ export default function AccountSettingsScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/settings/account-status" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/settings/account-status" as any)}>
           <View style={styles.usernameRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.fieldLabel}>Account status</Text>
@@ -423,10 +413,6 @@ function makeStyles(c: AppColors) {
       borderRadius: 10, padding: 12, color: c.textDark, fontSize: 14,
       fontFamily: "Inter_400Regular", marginBottom: 14,
     },
-    saveBtn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center" },
-    saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-    changePwBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 4 },
-    changePwBtnText: { fontSize: 14, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     locationRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
     locationText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium" },
     locationSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },

@@ -43,7 +43,7 @@ export default function SettingsIndexScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
@@ -51,7 +51,7 @@ export default function SettingsIndexScreen() {
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
         {CATEGORIES.map((cat) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={cat.route}
             style={styles.row}
             activeOpacity={0.8}

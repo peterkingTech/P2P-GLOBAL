@@ -9,6 +9,7 @@ import { useData } from "@/contexts/DataContext";
 import LivingTree from "@/components/LivingTree";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // The Completion Moment — a 4-phase, mostly-non-skippable cinematic
 // experience that fires exactly once, the moment DataContext detects all 12
@@ -285,9 +286,7 @@ function Phase2Letter({ learnerId, learnerName, onContinue }: { learnerId: strin
       )}
 
       {canContinue && (
-        <TouchableOpacity style={styles.continueBtn} onPress={onContinue} activeOpacity={0.85}>
-          <Text style={styles.continueBtnText}>Continue</Text>
-        </TouchableOpacity>
+        <AppButton label="Continue" onPress={onContinue} size="lg" style={{ marginTop: 32 }} palette="fixedLight" />
       )}
     </Animated.View>
   );
@@ -342,9 +341,7 @@ function Phase3ForestReveal({ treeData, mentees, modules, countriesReached, onCo
       </View>
 
       {visibleLines >= lines.length && (
-        <TouchableOpacity style={styles.continueBtn} onPress={onContinue} activeOpacity={0.85}>
-          <Text style={styles.continueBtnText}>Continue</Text>
-        </TouchableOpacity>
+        <AppButton label="Continue" onPress={onContinue} size="lg" style={{ marginTop: 32 }} palette="fixedLight" />
       )}
     </Animated.View>
   );
@@ -404,9 +401,7 @@ function Phase4Commission({ onReady }: { onReady: () => void }) {
 
       {showButton && !confirmed && (
         <Animated.View style={{ opacity: buttonOpacity, marginTop: 40 }}>
-          <TouchableOpacity style={styles.readyBtn} onPress={handleReady} disabled={confirming} activeOpacity={0.85}>
-            {confirming ? <ActivityIndicator color="#0B1F19" /> : <Text style={styles.readyBtnText}>I am ready</Text>}
-          </TouchableOpacity>
+          <AppButton label="I am ready" onPress={handleReady} size="lg" disabled={confirming} loading={confirming} palette="fixedLight" />
         </Animated.View>
       )}
     </View>
@@ -448,9 +443,6 @@ const styles = StyleSheet.create({
   letterShimmer: { alignItems: "center", gap: 14, marginTop: 40 },
   shimmerText: { fontSize: 14, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_400Regular", fontStyle: "italic", textAlign: "center" },
 
-  continueBtn: { backgroundColor: colors.accentGreen, borderRadius: 14, height: 52, paddingHorizontal: 40, alignItems: "center", justifyContent: "center", marginTop: 32 },
-  continueBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
   forestWrap: { alignItems: "center", justifyContent: "center", position: "relative", height: 220 },
   menteeRing: { position: "absolute", top: "50%", left: "50%" },
   menteeDot: { position: "absolute", width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(29,158,117,0.15)", alignItems: "center", justifyContent: "center" },
@@ -459,6 +451,4 @@ const styles = StyleSheet.create({
   commissionContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   commissionLine: { fontSize: 20, color: "#E0A441", fontFamily: "Inter_600SemiBold", textAlign: "center", lineHeight: 30 },
   confirmText: { fontSize: 14, color: colors.accentGreen, fontFamily: "Inter_500Medium", textAlign: "center", marginTop: 24 },
-  readyBtn: { backgroundColor: colors.amber, borderRadius: 14, height: 54, paddingHorizontal: 48, alignItems: "center", justifyContent: "center" },
-  readyBtnText: { color: "#0B1F19", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

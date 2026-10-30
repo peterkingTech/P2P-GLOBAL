@@ -22,6 +22,7 @@ import { isAttachedOnlyText } from "@/lib/learningAttachmentsApi";
 import ReviewPrompts from "@/components/ReviewPrompts";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
+import { AppButton } from "@/components/ui";
 
 interface CirclePendingEvaluation {
   submissionId: string;
@@ -98,16 +99,8 @@ function CircleEvaluationCard({ evaluation, onResolved }: { evaluation: CirclePe
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={[styles.actionBtn, styles.reviseBtn]} onPress={() => handleResolve("needs_revision")} disabled={submitting !== null} activeOpacity={0.85}>
-          {submitting === "needs_revision" ? <ActivityIndicator color={colors.textDark} size="small" /> : (
-            <><Ionicons name="refresh" size={16} color={colors.textDark} /><Text style={styles.reviseBtnText}>Ask for Revision</Text></>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.approveBtn]} onPress={() => handleResolve("approved")} disabled={submitting !== null} activeOpacity={0.85}>
-          {submitting === "approved" ? <ActivityIndicator color={colors.cream} size="small" /> : (
-            <><Ionicons name="checkmark" size={16} color={colors.cream} /><Text style={styles.approveBtnText}>Approve</Text></>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Ask for Revision" onPress={() => handleResolve("needs_revision")} variant="secondary" icon="refresh" disabled={submitting !== null} loading={submitting === "needs_revision"} style={{ flex: 1 }} palette="fixedLight" />
+        <AppButton label="Approve" onPress={() => handleResolve("approved")} icon="checkmark" disabled={submitting !== null} loading={submitting === "approved"} style={{ flex: 1 }} palette="fixedLight" />
       </View>
     </View>
   );
@@ -250,36 +243,8 @@ function EvaluationCard({ evaluation }: { evaluation: PendingEvaluation }) {
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.reviseBtn]}
-          onPress={() => handleResolve("needs_revision")}
-          disabled={submitting !== null}
-          activeOpacity={0.85}
-        >
-          {submitting === "needs_revision" ? (
-            <ActivityIndicator color={colors.textDark} size="small" />
-          ) : (
-            <>
-              <Ionicons name="refresh" size={16} color={colors.textDark} />
-              <Text style={styles.reviseBtnText}>Ask for Revision</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.approveBtn]}
-          onPress={() => handleResolve("approved")}
-          disabled={submitting !== null}
-          activeOpacity={0.85}
-        >
-          {submitting === "approved" ? (
-            <ActivityIndicator color={colors.cream} size="small" />
-          ) : (
-            <>
-              <Ionicons name="checkmark" size={16} color={colors.cream} />
-              <Text style={styles.approveBtnText}>Approve</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Ask for Revision" onPress={() => handleResolve("needs_revision")} variant="secondary" icon="refresh" disabled={submitting !== null} loading={submitting === "needs_revision"} style={{ flex: 1 }} palette="fixedLight" />
+        <AppButton label="Approve" onPress={() => handleResolve("approved")} icon="checkmark" disabled={submitting !== null} loading={submitting === "approved"} style={{ flex: 1 }} palette="fixedLight" />
       </View>
     </View>
   );
@@ -305,7 +270,7 @@ function MySubmissionCard({ submission }: { submission: MySubmission }) {
   const isMedia = submission.submissionType === "audio" || submission.submissionType === "video";
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={styles.card}
       activeOpacity={0.85}
       onPress={() => router.push(`/lesson/${submission.lessonId}` as any)}
@@ -438,14 +403,14 @@ export default function EvaluationsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Peer Review</Text>
       </View>
 
       <View style={styles.tabRow}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.tabBtn, tab === "toReview" && styles.tabBtnActive]}
           onPress={() => setTab("toReview")}
         >
@@ -453,7 +418,7 @@ export default function EvaluationsScreen() {
             To Review{(pendingEvaluations.length + circleEvals.length) > 0 ? ` (${pendingEvaluations.length + circleEvals.length})` : ""}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.tabBtn, tab === "submitted" && styles.tabBtnActive]}
           onPress={() => setTab("submitted")}
         >
@@ -461,7 +426,7 @@ export default function EvaluationsScreen() {
             Submitted — Awaiting Approval{submittedSubmissions.length > 0 ? ` (${submittedSubmissions.length})` : ""}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.tabBtn, tab === "approved" && styles.tabBtnActive]}
           onPress={() => setTab("approved")}
         >
@@ -599,11 +564,6 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular" },
   actionRow: { flexDirection: "row", gap: 10 },
-  actionBtn: { flex: 1, height: 44, borderRadius: 12, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" },
-  reviseBtn: { backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige },
-  reviseBtnText: { fontSize: 13, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold" },
-  approveBtn: { backgroundColor: colors.primaryGreen },
-  approveBtnText: { fontSize: 13, fontWeight: "600", color: colors.cream, fontFamily: "Inter_600SemiBold" },
   statusBadge: {
     flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "flex-start",
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,

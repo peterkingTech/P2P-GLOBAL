@@ -11,6 +11,7 @@ import {
   getMyAttempts, submitAssignment, getSubmissionsForReview, reviewSubmission, updateAssignment,
   type Assignment, type Submission, type WorkScope,
 } from "@/lib/lessonWorkApi";
+import { AppButton } from "@/components/ui";
 
 function notify(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -168,9 +169,7 @@ export default function AssignmentScreen() {
 
 function SmallBtn({ styles, label, busy, onPress }: { styles: ReturnType<typeof makeStyles>; label: string; busy: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.small} onPress={onPress} disabled={busy} accessibilityRole="button">
-      {busy ? <ActivityIndicator size="small" /> : <Text style={styles.smallText}>{label}</Text>}
-    </TouchableOpacity>
+    <AppButton label={`${label}`} onPress={onPress} variant="secondary" disabled={busy} loading={busy} />
   );
 }
 

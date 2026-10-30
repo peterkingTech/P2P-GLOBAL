@@ -11,6 +11,7 @@ import {
 } from "@/lib/churchCallApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -150,7 +151,7 @@ export default function ChurchCallsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Gatherings</Text>
         <View style={{ width: 22 }} />
       </View>
@@ -160,10 +161,7 @@ export default function ChurchCallsScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {isChurchLeader && (
-            <TouchableOpacity style={styles.startBtn} onPress={() => setStartOpen(true)} accessibilityRole="button">
-              <Ionicons name="call" size={16} color="#fff" />
-              <Text style={styles.startBtnText}>Start Gathering</Text>
-            </TouchableOpacity>
+            <AppButton label="Start Gathering" onPress={() => setStartOpen(true)} icon="call" style={{ marginBottom: 8 }} palette="fixedLight" />
           )}
 
           <Text style={styles.sectionLabel}>LIVE NOW</Text>
@@ -193,7 +191,7 @@ export default function ChurchCallsScreen() {
                   <Text style={styles.cardSub}>{CHURCH_CALL_PURPOSE_LABELS[c.purpose]} · {formatWhen(c.scheduledStartAt!)}</Text>
                 </View>
                 {isChurchLeader && (
-                  <TouchableOpacity onPress={() => handleStartScheduled(c)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => handleStartScheduled(c)}>
                     <Text style={styles.joinText}>Start →</Text>
                   </TouchableOpacity>
                 )}
@@ -206,7 +204,7 @@ export default function ChurchCallsScreen() {
             <Text style={styles.emptyText}>No past Church Gatherings yet.</Text>
           ) : (
             recent.map((c) => (
-              <TouchableOpacity key={c.id} style={styles.card} onPress={() => router.push({ pathname: "/church/call-summary", params: { callId: c.id } } as any)}>
+              <TouchableOpacity accessibilityRole="button" key={c.id} style={styles.card} onPress={() => router.push({ pathname: "/church/call-summary", params: { callId: c.id } } as any)}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle} numberOfLines={1}>{c.title}</Text>
                   <Text style={styles.cardSub}>
@@ -234,24 +232,24 @@ export default function ChurchCallsScreen() {
             <Text style={styles.fieldLabel}>Purpose</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
               {PURPOSES.map((p) => (
-                <TouchableOpacity key={p} style={[styles.chip, purpose === p && styles.chipActive]} onPress={() => setPurpose(p)}>
+                <TouchableOpacity accessibilityRole="button" key={p} style={[styles.chip, purpose === p && styles.chipActive]} onPress={() => setPurpose(p)}>
                   <Text style={[styles.chipText, purpose === p && styles.chipTextActive]}>{CHURCH_CALL_PURPOSE_LABELS[p]}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <Text style={styles.fieldLabel}>Scope</Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity style={[styles.chip, scope === "church" && styles.chipActive]} onPress={() => { setScope("church"); setCohortId(null); }}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.chip, scope === "church" && styles.chipActive]} onPress={() => { setScope("church"); setCohortId(null); }}>
                 <Text style={[styles.chipText, scope === "church" && styles.chipTextActive]}>Whole Church</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.chip, scope === "cohort" && styles.chipActive]} onPress={() => setScope("cohort")} disabled={cohorts.length === 0}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.chip, scope === "cohort" && styles.chipActive]} onPress={() => setScope("cohort")} disabled={cohorts.length === 0}>
                 <Text style={[styles.chipText, scope === "cohort" && styles.chipTextActive]}>Small Group</Text>
               </TouchableOpacity>
             </View>
             {scope === "cohort" && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
                 {cohorts.map((c) => (
-                  <TouchableOpacity key={c.id} style={[styles.chip, cohortId === c.id && styles.chipActive]} onPress={() => setCohortId(c.id)}>
+                  <TouchableOpacity accessibilityRole="button" key={c.id} style={[styles.chip, cohortId === c.id && styles.chipActive]} onPress={() => setCohortId(c.id)}>
                     <Text style={[styles.chipText, cohortId === c.id && styles.chipTextActive]}>{c.name}</Text>
                   </TouchableOpacity>
                 ))}
@@ -276,12 +274,8 @@ export default function ChurchCallsScreen() {
             )}
 
             <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setStartOpen(false)} disabled={starting}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleStart} disabled={starting || !title.trim()}>
-                {starting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>{scheduleLater ? "Schedule" : "Start"}</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setStartOpen(false)} variant="outline" disabled={starting} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label={scheduleLater ? "Schedule" : "Start"} onPress={handleStart} disabled={starting || !title.trim()} loading={starting} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </ScrollView>
         </View>
@@ -297,12 +291,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   scroll: { padding: 16, paddingBottom: 40, gap: 8 },
   emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginBottom: 12 },
-
-  startBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: colors.primaryGreen, borderRadius: 12, paddingVertical: 13, marginBottom: 8,
-  },
-  startBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
   sectionLabel: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginTop: 12, marginBottom: 6 },
   card: {
@@ -328,8 +316,4 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: colors.textDark, fontFamily: "Inter_500Medium" },
   chipTextActive: { color: "#fff", fontFamily: "Inter_700Bold" },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 10 },
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  cancelBtnText: { color: colors.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-  saveBtn: { flex: 1, backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

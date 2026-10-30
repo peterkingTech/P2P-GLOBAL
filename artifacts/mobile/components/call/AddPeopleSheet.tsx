@@ -58,7 +58,7 @@ export function AddPeopleSheet({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>Add People</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={onClose}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
           </View>
           <Text style={styles.sub}>Who would you like to add?</Text>
 
@@ -93,7 +93,7 @@ export function AddPeopleSheet({
                     {pending ? (
                       <View style={styles.pendingChip}><Text style={styles.pendingChipText}>Invitation pending</Text></View>
                     ) : (
-                      <TouchableOpacity style={styles.inviteBtn} onPress={() => handleInvite(p)} disabled={invitingId === p.userId}>
+                      <TouchableOpacity accessibilityRole="button" style={styles.inviteBtn} onPress={() => handleInvite(p)} disabled={invitingId === p.userId}>
                         {invitingId === p.userId ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.inviteBtnText}>Invite</Text>}
                       </TouchableOpacity>
                     )}

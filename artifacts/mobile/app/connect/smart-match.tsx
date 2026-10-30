@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { AppButton } from "@/components/ui";
 
 // Peer Guide specific matching — replaces the old generic gift/country
 // smart-match with a real eligibility + scoring flow against
@@ -91,9 +92,7 @@ export default function SmartMatch() {
             <Text style={styles.subtitle}>
               Your peer guide is someone one step ahead of you on the journey — ready to walk with you through every lesson.
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={findMatch} disabled={loading} activeOpacity={0.85}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Find My Match</Text>}
-            </TouchableOpacity>
+            <AppButton label="Find My Match" onPress={findMatch} size="lg" disabled={loading} loading={loading} style={{ marginTop: 24, minWidth: 200 }} palette="fixedLight" />
           </View>
         )}
 
@@ -101,7 +100,7 @@ export default function SmartMatch() {
           <View>
             <Text style={styles.title}>Your Matches</Text>
             {candidates.some((c) => c.isVerified) && (
-              <TouchableOpacity style={styles.filterToggle} onPress={() => setVerifiedOnly((v) => !v)} activeOpacity={0.8}>
+              <TouchableOpacity accessibilityRole="button" style={styles.filterToggle} onPress={() => setVerifiedOnly((v) => !v)} activeOpacity={0.8}>
                 <Ionicons name={verifiedOnly ? "checkbox" : "square-outline"} size={18} color={verifiedOnly ? colors.accentGreen : colors.textMuted} />
                 <Text style={styles.filterToggleText}>Show verified only</Text>
               </TouchableOpacity>
@@ -161,18 +160,7 @@ export default function SmartMatch() {
                         </View>
                       )}
 
-                      <TouchableOpacity
-                        style={styles.connectBtn}
-                        onPress={() => connect(c)}
-                        disabled={connecting === c.id}
-                        activeOpacity={0.85}
-                      >
-                        {connecting === c.id ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={styles.connectBtnText}>Connect</Text>
-                        )}
-                      </TouchableOpacity>
+                      <AppButton label="Connect" onPress={() => connect(c)} disabled={connecting === c.id} loading={connecting === c.id} palette="fixedLight" />
                     </View>
                   ))}
                 </View>
@@ -209,11 +197,6 @@ const styles = StyleSheet.create({
   filterToggleText: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
   subtitle: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21, marginBottom: 6 },
   subtitleMuted: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic", textAlign: "center", marginTop: 12 },
-  primaryBtn: {
-    backgroundColor: colors.primaryGreen, borderRadius: 14, height: 52, paddingHorizontal: 32,
-    alignItems: "center", justifyContent: "center", marginTop: 24, minWidth: 200,
-  },
-  primaryBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
   emptyCard: {
     backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige,
@@ -244,9 +227,4 @@ const styles = StyleSheet.create({
   reasonsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 },
   reasonPill: { backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   reasonPillText: { fontSize: 11, color: colors.primaryGreen, fontFamily: "Inter_500Medium" },
-
-  connectBtn: {
-    backgroundColor: colors.primaryGreen, borderRadius: 12, height: 44, alignItems: "center", justifyContent: "center",
-  },
-  connectBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

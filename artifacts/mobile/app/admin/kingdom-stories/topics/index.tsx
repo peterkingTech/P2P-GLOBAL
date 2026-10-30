@@ -8,6 +8,7 @@ import {
   TOPIC_STATUSES, TOPIC_STATUS_LABELS, TOPIC_PRIORITIES,
   type KingdomStoryTopic, type KingdomStoryCategory, type TopicStatus, type TopicPriority,
 } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 // Catalogue topics (editors). Filter by category, status, priority, period,
 // region; search titles. Within one category (no other filter) the topics can
@@ -89,10 +90,7 @@ export default function TopicsScreen() {
             <Ionicons name="search" size={15} color={colors.textMuted} />
             <TextInput style={styles.searchInput} value={q} onChangeText={setQ} placeholder="Search topic titles" placeholderTextColor={colors.textMuted} accessibilityLabel="Search topic titles" />
           </View>
-          <TouchableOpacity style={styles.newBtn} onPress={() => router.push(`/admin/kingdom-stories/topics/new${category ? `?category=${category}` : ""}` as any)}>
-            <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.newBtnText}>New</Text>
-          </TouchableOpacity>
+          <AppButton label="New" onPress={() => router.push(`/admin/kingdom-stories/topics/new${category ? `?category=${category}` : ""}` as any)} icon="add" palette="fixedLight" />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           <Chip active={!category} label="All categories" onPress={() => setCategory(undefined)} />
@@ -105,7 +103,7 @@ export default function TopicsScreen() {
         <View style={styles.chipRow}>
           <Chip active={!priority} label="Any priority" onPress={() => setPriority(undefined)} />
           {TOPIC_PRIORITIES.map((p) => <Chip key={p} active={priority === p} label={p} onPress={() => setPriority(p)} />)}
-          <TouchableOpacity onPress={() => setMoreFilters(!moreFilters)} style={{ marginLeft: "auto" }}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setMoreFilters(!moreFilters)} style={{ marginLeft: "auto" }}>
             <Text style={styles.link}>{moreFilters ? "Fewer filters" : "Period / region"}</Text>
           </TouchableOpacity>
         </View>
@@ -127,7 +125,7 @@ export default function TopicsScreen() {
         ListEmptyComponent={loading ? <ActivityIndicator color={colors.primaryGreen} style={{ marginTop: 30 }} /> : <Text style={styles.empty}>No topics match.</Text>}
         onEndReached={() => { if (!loading && !canReorder && topics.length < total) load(Math.floor(topics.length / PAGE)); }}
         renderItem={({ item, index }) => (
-          <TouchableOpacity style={styles.card} onPress={() => router.push(`/admin/kingdom-stories/topics/${item.id}` as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/admin/kingdom-stories/topics/${item.id}` as any)}>
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.cardMeta}>
@@ -138,10 +136,10 @@ export default function TopicsScreen() {
             </View>
             {canReorder ? (
               <View style={{ gap: 4 }}>
-                <TouchableOpacity disabled={index === 0 || reordering} onPress={() => move(index, -1)} style={[styles.arrow, (index === 0 || reordering) && { opacity: 0.3 }]} accessibilityLabel={`Move ${item.title} up`}>
+                <TouchableOpacity accessibilityRole="button" hitSlop={10} disabled={index === 0 || reordering} onPress={() => move(index, -1)} style={[styles.arrow, (index === 0 || reordering) && { opacity: 0.3 }]} accessibilityLabel={`Move ${item.title} up`}>
                   <Ionicons name="arrow-up" size={14} color={colors.textMid} />
                 </TouchableOpacity>
-                <TouchableOpacity disabled={index === topics.length - 1 || reordering} onPress={() => move(index, 1)} style={[styles.arrow, (index === topics.length - 1 || reordering) && { opacity: 0.3 }]} accessibilityLabel={`Move ${item.title} down`}>
+                <TouchableOpacity accessibilityRole="button" hitSlop={10} disabled={index === topics.length - 1 || reordering} onPress={() => move(index, 1)} style={[styles.arrow, (index === topics.length - 1 || reordering) && { opacity: 0.3 }]} accessibilityLabel={`Move ${item.title} down`}>
                   <Ionicons name="arrow-down" size={14} color={colors.textMid} />
                 </TouchableOpacity>
               </View>
@@ -161,8 +159,6 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: "row", gap: 8 },
   search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, paddingHorizontal: 10, minHeight: 40 },
   searchInput: { flex: 1, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular", paddingVertical: 8 },
-  newBtn: { flexDirection: "row", gap: 4, alignItems: "center", backgroundColor: colors.accentGreen, borderRadius: 10, paddingHorizontal: 12 },
-  newBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   chipRow: { flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "nowrap" },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige },
   chipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },

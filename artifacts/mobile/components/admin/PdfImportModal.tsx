@@ -6,6 +6,7 @@ import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
 import { listPlanCategories, createPlanCategory, type AdminPlanCategory } from "@/lib/adminPlanCategories";
+import { AppButton } from "@/components/ui";
 
 // Admin PDF Plan Importer — upload one or more P2P Plan PDFs, then assign
 // each to a plan category (auto-detected from the PDF's text where
@@ -265,7 +266,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
         <View style={styles.box}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Import from PDF</Text>
-            <TouchableOpacity onPress={close}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={close}><Ionicons name="close" size={22} color={colors.textMid} /></TouchableOpacity>
           </View>
 
           {step === "upload" && (
@@ -274,11 +275,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
               <Text style={styles.uploadHint}>
                 Choose one PDF to preview before importing, or select up to 20 to bulk-import them. You'll assign a category to each on the next step.
               </Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={pickFiles} disabled={busy}>
-                {busy ? <ActivityIndicator color="#fff" size="small" /> : (
-                  <><Ionicons name="folder-open-outline" size={16} color="#fff" /><Text style={styles.primaryBtnText}>Choose PDF(s)</Text></>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Choose PDF(s)" onPress={pickFiles} icon="folder-open-outline" disabled={busy} loading={busy} palette="fixedLight" />
             </View>
           )}
 
@@ -309,7 +306,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
                   {categories.map((c) => {
                     const selected = selectedCategoryId === c.id;
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={c.id}
                         style={[styles.categoryChip, { borderColor: c.colorTheme }, selected && { backgroundColor: c.colorTheme }]}
                         onPress={() => setSelectedCategoryId(c.id)}
@@ -325,20 +322,17 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
               {creatingCategory ? (
                 <View style={styles.inlineCreateRow}>
                   <TextInput style={[styles.input, { flex: 1 }]} value={newCategoryTitle} onChangeText={setNewCategoryTitle} placeholder="New category title" placeholderTextColor={colors.textMuted} autoFocus />
-                  <TouchableOpacity onPress={() => handleCreateCategory("single")} disabled={categoryBusy || !newCategoryTitle.trim()}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => handleCreateCategory("single")} disabled={categoryBusy || !newCategoryTitle.trim()}>
                     {categoryBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="checkmark-circle" size={24} color={colors.accentGreen} />}
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.addInlineBtn} onPress={() => setCreatingCategory(true)}>
-                  <Ionicons name="add" size={14} color={colors.accentGreen} />
-                  <Text style={styles.addInlineText}>Create a New Category</Text>
-                </TouchableOpacity>
+                <AppButton label="Create a New Category" onPress={() => setCreatingCategory(true)} variant="tertiary" size="sm" icon="add" palette="fixedLight" />
               )}
 
               {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-              <TouchableOpacity style={[styles.primaryBtn, !selectedCategoryId && { opacity: 0.5 }]} onPress={proceedToPreview} disabled={!selectedCategoryId}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, !selectedCategoryId && { opacity: 0.5 }]} onPress={proceedToPreview} disabled={!selectedCategoryId}>
                 <Text style={styles.primaryBtnText}>Continue to Preview</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -360,7 +354,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
                       {categories.map((c) => {
                         const selected = row.categoryId === c.id;
                         return (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={c.id}
                             style={[styles.categoryChipSm, { borderColor: c.colorTheme }, selected && { backgroundColor: c.colorTheme }]}
                             onPress={() => setBulkRows((prev) => prev.map((r, i) => (i === idx ? { ...r, categoryId: c.id, detected: false } : r)))}
@@ -377,18 +371,15 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
               {creatingCategory ? (
                 <View style={styles.inlineCreateRow}>
                   <TextInput style={[styles.input, { flex: 1 }]} value={newCategoryTitle} onChangeText={setNewCategoryTitle} placeholder="New category title" placeholderTextColor={colors.textMuted} autoFocus />
-                  <TouchableOpacity onPress={() => handleCreateCategory("single")} disabled={categoryBusy || !newCategoryTitle.trim()}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => handleCreateCategory("single")} disabled={categoryBusy || !newCategoryTitle.trim()}>
                     {categoryBusy ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="checkmark-circle" size={24} color={colors.accentGreen} />}
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.addInlineBtn} onPress={() => setCreatingCategory(true)}>
-                  <Ionicons name="add" size={14} color={colors.accentGreen} />
-                  <Text style={styles.addInlineText}>Create a New Category</Text>
-                </TouchableOpacity>
+                <AppButton label="Create a New Category" onPress={() => setCreatingCategory(true)} variant="tertiary" size="sm" icon="add" palette="fixedLight" />
               )}
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.primaryBtn, bulkNeedsCategoryCount > 0 && { opacity: 0.5 }]}
                 onPress={handleBulkImportAll}
                 disabled={bulkNeedsCategoryCount > 0}
@@ -423,7 +414,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
                 <TextInput style={[styles.input, { minHeight: 70 }]} value={plan.description} onChangeText={(v) => updatePlanField("description", v)} multiline textAlignVertical="top" />
               </PreviewField>
               <PreviewField label="Category">
-                <TouchableOpacity style={styles.changeCategoryRow} onPress={() => setStep("category")}>
+                <TouchableOpacity accessibilityRole="button" style={styles.changeCategoryRow} onPress={() => setStep("category")}>
                   <Text style={styles.changeCategoryText}>
                     {categories.find((c) => c.id === plan.parentCategoryId)?.title ?? "None selected"}
                   </Text>
@@ -437,7 +428,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
 
               {plan.modules.map((mod, mi) => (
                 <View key={mi} style={styles.moduleBlock}>
-                  <TouchableOpacity style={styles.moduleHeaderRow} onPress={() => toggleModule(mi)}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.moduleHeaderRow} onPress={() => toggleModule(mi)}>
                     <Ionicons name={expandedModules.has(mi) ? "chevron-down" : "chevron-forward"} size={16} color={colors.textMid} />
                     <Text style={styles.moduleHeaderText}>Module {mi + 1}: {mod.title}</Text>
                     <Text style={styles.moduleHeaderCount}>{mod.lessons.length}</Text>
@@ -454,7 +445,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
                 </View>
               ))}
 
-              <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={handleConfirmImport} disabled={busy}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, busy && { opacity: 0.7 }]} onPress={handleConfirmImport} disabled={busy}>
                 {busy ? <ActivityIndicator color="#fff" size="small" /> : (
                   <><Ionicons name="checkmark" size={16} color="#fff" /><Text style={styles.primaryBtnText}>Import as Draft</Text></>
                 )}
@@ -483,12 +474,8 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
                 <Text style={styles.uploadHint}>"{importedTitle}" was imported as a draft plan.</Text>
               )}
               <View style={styles.successBtnRow}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={reset}>
-                  <Text style={styles.secondaryBtnText}>Import another</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtn} onPress={close}>
-                  <Text style={styles.primaryBtnText}>Done</Text>
-                </TouchableOpacity>
+                <AppButton label="Import another" onPress={reset} variant="outline" palette="fixedLight" />
+                <AppButton label="Done" onPress={close} palette="fixedLight" />
               </View>
             </View>
           )}
@@ -497,9 +484,7 @@ export default function PdfImportModal({ visible, onClose, onImported }: {
             <View style={styles.uploadBody}>
               <Ionicons name="warning-outline" size={40} color="#B91C1C" />
               <Text style={styles.errorText}>{errorMsg}</Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep("upload")}>
-                <Text style={styles.primaryBtnText}>Try again</Text>
-              </TouchableOpacity>
+              <AppButton label="Try again" onPress={() => setStep("upload")} palette="fixedLight" />
             </View>
           )}
         </View>
@@ -528,8 +513,6 @@ const styles = StyleSheet.create({
 
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accentGreen, borderRadius: 12, height: 46, paddingHorizontal: 20 },
   primaryBtnText: { fontSize: 14, fontWeight: "600", color: "#fff", fontFamily: "Inter_600SemiBold" },
-  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, height: 46, paddingHorizontal: 20, borderWidth: 1, borderColor: colors.borderBeige },
-  secondaryBtnText: { fontSize: 14, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   successBtnRow: { flexDirection: "row", gap: 10 },
 
   previewScroll: { maxHeight: 500 },
@@ -561,7 +544,6 @@ const styles = StyleSheet.create({
   categoryChipTextSm: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   inlineCreateRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  addInlineBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6 },
   addInlineText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   bulkRow: { gap: 8, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 10 },

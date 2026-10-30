@@ -6,6 +6,7 @@ import {
   addChapter, updateChapter, deleteChapter, reorderChapters, addKingdomStorySource, deleteKingdomStorySource, updateKingdomStoryMedia,
   CHAPTER_ITEMS, type KingdomStory, type KingdomStoryChapter, type ChapterInput,
 } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 // Chapters of a Kingdom Story (editor). Saves each field when the editor
 // leaves it, like the rest of the story editor. A chapter is complete — and
@@ -157,7 +158,7 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
               <Ionicons name="image-outline" size={14} color={colors.textMuted} />
               <Text style={[styles.sourceMeta, { flex: 1 }]} numberOfLines={1}>{m.caption || m.mediaPath.split("/").pop()}</Text>
               {!locked && (
-                <TouchableOpacity onPress={() => placeImage(m.id, null)} accessibilityLabel="Move image back to the story gallery">
+                <TouchableOpacity accessibilityRole="button" onPress={() => placeImage(m.id, null)} accessibilityLabel="Move image back to the story gallery">
                   <Text style={styles.linkText}>Move to story</Text>
                 </TouchableOpacity>
               )}
@@ -167,7 +168,7 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
             <View key={m.id} style={styles.sourceRow}>
               <Ionicons name="images-outline" size={14} color={colors.textMuted} />
               <Text style={[styles.sourceMeta, { flex: 1 }]} numberOfLines={1}>{m.caption || m.mediaPath.split("/").pop()}{m.isCover ? " · cover" : ""}</Text>
-              <TouchableOpacity onPress={() => placeImage(m.id, chapter.id)} accessibilityLabel="Place this image in the chapter">
+              <TouchableOpacity accessibilityRole="button" onPress={() => placeImage(m.id, chapter.id)} accessibilityLabel="Place this image in the chapter">
                 <Text style={styles.linkText}>Place here</Text>
               </TouchableOpacity>
             </View>
@@ -182,7 +183,7 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
                 {!!s.publisher && <Text style={styles.sourceMeta}>{s.publisher}</Text>}
               </View>
               {!locked && (
-                <TouchableOpacity onPress={async () => { try { await deleteKingdomStorySource(story.id, s.id); await onChanged(); } catch (e) { onError("Couldn't remove source", e); } }} accessibilityLabel="Remove source">
+                <TouchableOpacity accessibilityRole="button" hitSlop={10} onPress={async () => { try { await deleteKingdomStorySource(story.id, s.id); await onChanged(); } catch (e) { onError("Couldn't remove source", e); } }} accessibilityLabel="Remove source">
                   <Ionicons name="trash-outline" size={14} color="#B91C1C" />
                 </TouchableOpacity>
               )}
@@ -193,20 +194,20 @@ function ChapterCard({ story, chapter, index, count, locked, onChanged, onError 
               <TextInput style={styles.input} value={srcTitle} onChangeText={setSrcTitle} placeholder="Source title (a real, checkable source)" placeholderTextColor={colors.textMuted} />
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TextInput style={[styles.input, { flex: 1 }]} value={srcPublisher} onChangeText={setSrcPublisher} placeholder="Publisher (optional)" placeholderTextColor={colors.textMuted} />
-                <TouchableOpacity style={styles.smallBtn} onPress={addSource}><Text style={styles.smallBtnText}>Add</Text></TouchableOpacity>
+                <AppButton label="Add" onPress={addSource} palette="fixedLight" />
               </View>
             </>
           )}
 
           {!locked && (
             <View style={styles.cardActions}>
-              <TouchableOpacity disabled={index === 0} onPress={() => move(-1)} style={[styles.iconBtn, index === 0 && { opacity: 0.3 }]} accessibilityLabel="Move chapter up">
+              <TouchableOpacity accessibilityRole="button" hitSlop={10} disabled={index === 0} onPress={() => move(-1)} style={[styles.iconBtn, index === 0 && { opacity: 0.3 }]} accessibilityLabel="Move chapter up">
                 <Ionicons name="arrow-up" size={16} color={colors.textMid} />
               </TouchableOpacity>
-              <TouchableOpacity disabled={index === count - 1} onPress={() => move(1)} style={[styles.iconBtn, index === count - 1 && { opacity: 0.3 }]} accessibilityLabel="Move chapter down">
+              <TouchableOpacity accessibilityRole="button" hitSlop={10} disabled={index === count - 1} onPress={() => move(1)} style={[styles.iconBtn, index === count - 1 && { opacity: 0.3 }]} accessibilityLabel="Move chapter down">
                 <Ionicons name="arrow-down" size={16} color={colors.textMid} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={{ marginLeft: "auto" }}
                 onPress={() => confirm("Move this chapter to the Recycle Bin?", "Its text, lessons, questions, images and sources move to the Recycle Bin; the chapters after it move up. It can be restored from Admin → Recycle Bin.", async () => {
                   try { await deleteChapter(story.id, chapter.id); await onChanged(); } catch (e) { onError("Couldn't delete chapter", e); }
@@ -238,14 +239,7 @@ export default function ChaptersEditor(props: Props) {
         <ChapterCard key={`${ch.id}:${ch.chapterNumber}`} {...props} chapter={ch} index={i} count={chapters.length} />
       ))}
       {!props.locked && (
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={async () => { try { await addChapter(props.story.id, { title: "" }); await props.onChanged(); } catch (e) { props.onError("Couldn't add chapter", e); } }}
-          accessibilityRole="button"
-        >
-          <Ionicons name="add" size={16} color={colors.accentGreen} />
-          <Text style={styles.addBtnText}>Add chapter</Text>
-        </TouchableOpacity>
+        <AppButton label="Add chapter" onPress={async () => { try { await addChapter(props.story.id, { title: "" }); await props.onChanged(); } catch (e) { props.onError("Couldn't add chapter", e); } }} variant="outline" icon="add" style={{ alignSelf: "flex-start" }} palette="fixedLight" />
       )}
     </View>
   );
@@ -274,12 +268,8 @@ const styles = StyleSheet.create({
   sourceRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.borderBeige },
   sourceTitle: { fontSize: 12, color: colors.textDark, fontFamily: "Inter_600SemiBold" },
   sourceMeta: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular" },
-  smallBtn: { backgroundColor: colors.primaryGreen, borderRadius: 10, paddingHorizontal: 14, justifyContent: "center" },
-  smallBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   cardActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
   iconBtn: { borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8, padding: 8 },
   deleteText: { color: "#B91C1C", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   linkText: { color: colors.accentGreen, fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  addBtn: { flexDirection: "row", gap: 6, alignItems: "center", alignSelf: "flex-start", borderWidth: 1, borderColor: colors.accentGreen, borderStyle: "dashed", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  addBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 });

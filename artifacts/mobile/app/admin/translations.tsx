@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
+import { AppButton } from "@/components/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -165,7 +166,7 @@ export default function TranslationsDashboard() {
       {/* ── Header row ── */}
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>Translation Dashboard</Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={load}>
+        <TouchableOpacity accessibilityLabel="Refresh" accessibilityRole="button" hitSlop={10} style={styles.refreshBtn} onPress={load}>
           <Ionicons name="refresh" size={16} color={colors.primaryGreen} />
         </TouchableOpacity>
       </View>
@@ -180,27 +181,9 @@ export default function TranslationsDashboard() {
 
       {/* ── Quick actions ── */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => router.push("/admin/translation-review" as any)}
-        >
-          <Ionicons name="eye-outline" size={15} color={colors.cream} />
-          <Text style={styles.actionBtnText}>Review Queue ({reviewCount})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary]}
-          onPress={() => router.push("/admin/translation-jobs" as any)}
-        >
-          <Ionicons name="list" size={15} color={colors.primaryGreen} />
-          <Text style={[styles.actionBtnText, { color: colors.primaryGreen }]}>Job Log</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnSecondary]}
-          onPress={() => setTriggerModal(true)}
-        >
-          <Ionicons name="flash" size={15} color={colors.primaryGreen} />
-          <Text style={[styles.actionBtnText, { color: colors.primaryGreen }]}>Translate a Lesson</Text>
-        </TouchableOpacity>
+        <AppButton label={`Review Queue (${reviewCount})`} onPress={() => router.push("/admin/translation-review" as any)} size="sm" icon="eye-outline" palette="fixedLight" />
+        <AppButton label="Job Log" onPress={() => router.push("/admin/translation-jobs" as any)} variant="secondary" size="sm" icon="list" palette="fixedLight" />
+        <AppButton label="Translate a Lesson" onPress={() => setTriggerModal(true)} variant="secondary" size="sm" icon="flash" palette="fixedLight" />
       </View>
 
       {/* ── On-demand translation notice ── */}
@@ -239,7 +222,7 @@ export default function TranslationsDashboard() {
               <View style={[styles.tableCell, styles.tableCellNum]}>
                 <CoverageBar pct={lesPct} draft={lesDraft} total={cov?.lessons.total ?? 0} />
               </View>
-              <TouchableOpacity
+              <TouchableOpacity hitSlop={10} accessibilityRole="button" accessibilityLabel={`Translate a lesson into ${lang.name_en}`}
                 style={[styles.tableCell, styles.tableCellAction, styles.translateBtn]}
                 onPress={() => {
                   setTriggerLang(lang.code);
@@ -286,7 +269,7 @@ export default function TranslationsDashboard() {
             ) : (
               <ScrollView style={styles.pickerScroll} nestedScrollEnabled>
                 {languages.map((l) => (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     key={l.code}
                     style={[styles.pickerItem, triggerLang === l.code && styles.pickerItemActive]}
                     onPress={() => setTriggerLang(l.code)}
@@ -306,22 +289,8 @@ export default function TranslationsDashboard() {
             ) : null}
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnSecondary]}
-                onPress={() => { setTriggerModal(false); setTriggerResult(null); setTriggerLessonId(""); }}
-                disabled={triggerRunning}
-              >
-                <Text style={[styles.modalBtnText, { color: "#666" }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnPrimary, triggerRunning && styles.modalBtnDisabled]}
-                onPress={runSingleLessonTrigger}
-                disabled={triggerRunning}
-              >
-                {triggerRunning
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.modalBtnText}>Translate</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => { setTriggerModal(false); setTriggerResult(null); setTriggerLessonId(""); }} variant="outline" disabled={triggerRunning} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Translate" onPress={runSingleLessonTrigger} disabled={triggerRunning} loading={triggerRunning} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -377,15 +346,6 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 10, color: "#666", textAlign: "center", fontFamily: "Inter_500Medium" },
 
   actionsRow: { flexDirection: "row", gap: 8, marginBottom: 20, flexWrap: "wrap" },
-  actionBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: colors.primaryGreen, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 8,
-  },
-  actionBtnSecondary: {
-    backgroundColor: "#fff", borderWidth: 1, borderColor: colors.primaryGreen,
-  },
-  actionBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   infoBanner: {
     flexDirection: "row", gap: 8, alignItems: "flex-start",
@@ -431,9 +391,4 @@ const styles = StyleSheet.create({
   progressBox: { backgroundColor: "#F3F4F6", borderRadius: 8, padding: 10 },
   progressText: { fontSize: 12, color: "#555", fontFamily: "Inter_400Regular" },
   modalButtons: { flexDirection: "row", gap: 10, marginTop: 4 },
-  modalBtn: { flex: 1, borderRadius: 8, padding: 12, alignItems: "center" },
-  modalBtnPrimary: { backgroundColor: colors.primaryGreen },
-  modalBtnSecondary: { borderWidth: 1, borderColor: "#E5E7EB" },
-  modalBtnDisabled: { opacity: 0.5 },
-  modalBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

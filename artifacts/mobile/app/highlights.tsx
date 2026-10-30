@@ -7,6 +7,7 @@ import { useData, UserHighlight } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const HIGHLIGHT_SWATCH: Record<string, string> = {
   yellow: "#FACC15",
   green: "#4ADE80",
@@ -67,7 +68,7 @@ export default function Highlights() {
               </View>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.card}
                 activeOpacity={item.lessonId ? 0.7 : 1}
                 onPress={() => item.lessonId && router.push({ pathname: "/lesson/[id]", params: { id: item.lessonId } })}
@@ -83,14 +84,14 @@ export default function Highlights() {
                   {!!item.quote && <Text style={styles.quote}>"{item.quote}"</Text>}
                   <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
                 </View>
-                <TouchableOpacity onPress={async () => { await deleteHighlight(item.id); load(); }}>
+                <TouchableOpacity accessibilityLabel="Delete" accessibilityRole="button" hitSlop={10} onPress={async () => { await deleteHighlight(item.id); load(); }}>
                   <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               </TouchableOpacity>
             )}
           />
         )}
-        <TouchableOpacity style={[styles.fab, { bottom: insets.bottom + 24 }]} onPress={() => setModalOpen(true)}>
+        <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" hitSlop={10} style={[styles.fab, { bottom: insets.bottom + 24 }]} onPress={() => setModalOpen(true)}>
           <Ionicons name="add" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -100,13 +101,11 @@ export default function Highlights() {
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>New Highlight</Text>
-              <TouchableOpacity onPress={() => setModalOpen(false)}><Ionicons name="close" size={20} color={colors.textMid} /></TouchableOpacity>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setModalOpen(false)}><Ionicons name="close" size={20} color={colors.textMid} /></TouchableOpacity>
             </View>
             <TextInput style={styles.input} placeholder="Reference (e.g. John 3:16)" placeholderTextColor={colors.textMuted} value={reference} onChangeText={setReference} />
             <TextInput style={[styles.input, styles.textarea]} placeholder="Quote (optional)" placeholderTextColor={colors.textMuted} value={quote} onChangeText={setQuote} multiline numberOfLines={4} />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Highlight</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save Highlight" onPress={handleSave} disabled={saving} loading={saving} palette="fixedLight" />
           </View>
         </View>
       </Modal>
@@ -141,6 +140,4 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 12, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 12,
   },
   textarea: { minHeight: 80, textAlignVertical: "top" },
-  saveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center" },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

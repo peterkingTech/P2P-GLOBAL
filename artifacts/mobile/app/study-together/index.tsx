@@ -8,6 +8,7 @@ import {
   getMyStudies, respondToStudy, invitationNote, hubItems, hubFilters, HUB_FILTER_LABELS,
   type MyStudies, type StudyCard, type HubFilter, type HubItem,
 } from "@/lib/studyTogetherApi";
+import { AppButton, ChipRow, FilterChip, SegmentedControl } from "@/components/ui";
 
 // Study Together — the hub for every shared study the reader may open, wherever
 // it was started (a Kingdom Story, a Kingdom School lesson, a Family Circle,
@@ -62,7 +63,7 @@ export default function StudyTogetherHub() {
       {error ? (
         <View style={s.row}>
           <Text style={[s.error, { flex: 1 }]} accessibilityRole="alert">{error}</Text>
-          <TouchableOpacity onPress={load} style={s.btnSecondary} accessibilityRole="button"><Text style={s.btnSecondaryText}>Try again</Text></TouchableOpacity>
+          <AppButton label="Try again" onPress={load} variant="secondary" />
         </View>
       ) : null}
       {!data && !error ? <ActivityIndicator style={{ marginTop: 24 }} color={c.accentGreen} accessibilityLabel="Loading your studies" /> : null}
@@ -89,13 +90,9 @@ export default function StudyTogetherHub() {
           <Text style={s.cardTitle}>{x.title}</Text>
           <Text style={s.meta}>{x.host.name} invited you. {invitationNote(x) ?? ""}</Text>
           <View style={s.row}>
-            <TouchableOpacity style={s.btn} disabled={busy === x.id} onPress={() => respond(x, "accepted")} accessibilityRole="button" accessibilityLabel={`Accept invitation to study ${x.title}`}>
-              {busy === x.id ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Accept</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={s.btnSecondary} disabled={busy === x.id} onPress={() => respond(x, "declined")} accessibilityRole="button" accessibilityLabel={`Decline invitation to study ${x.title}`}>
-              <Text style={s.btnSecondaryText}>Decline</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.btnSecondary} onPress={() => router.push(`/study-together/${x.id}` as any)} accessibilityRole="button" accessibilityLabel={`Details: ${x.title}`}><Text style={s.btnSecondaryText}>Details</Text></TouchableOpacity>
+            <AppButton label="Accept" onPress={() => respond(x, "accepted")} disabled={busy === x.id} loading={busy === x.id} accessibilityLabel={`Accept invitation to study ${x.title}`} />
+            <AppButton label="Decline" onPress={() => respond(x, "declined")} variant="secondary" disabled={busy === x.id} accessibilityLabel={`Decline invitation to study ${x.title}`} />
+            <AppButton label="Details" onPress={() => router.push(`/study-together/${x.id}` as any)} variant="secondary" accessibilityLabel={`Details: ${x.title}`} />
           </View>
         </View>
       ))}
@@ -105,22 +102,15 @@ export default function StudyTogetherHub() {
         <>
           <Text style={s.section} accessibilityRole="header">All Shared Studies</Text>
           {filters.length > 2 ? (
-            <View style={s.row} accessibilityRole="tablist" accessibilityLabel="Filter by kind">
+            <ChipRow accessibilityLabel="Filter by kind" single>
               {filters.map((f) => (
-                <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[s.pill, activeFilter === f && s.pillOn]} accessibilityRole="tab" accessibilityState={{ selected: activeFilter === f }}>
-                  <Text style={[s.pillText, activeFilter === f && s.pillTextOn]}>{HUB_FILTER_LABELS[f]}</Text>
-                </TouchableOpacity>
+                <FilterChip key={f} label={HUB_FILTER_LABELS[f]} selected={activeFilter === f} selection="single" onPress={() => setFilter(f)} />
               ))}
-            </View>
+            </ChipRow>
           ) : null}
           {hasCompleted ? (
-            <View style={s.row} accessibilityRole="tablist" accessibilityLabel="Show">
-              {(["progress", "completed"] as const).map((v) => (
-                <TouchableOpacity key={v} onPress={() => setView(v)} style={[s.pill, view === v && s.pillOn]} accessibilityRole="tab" accessibilityState={{ selected: view === v }}>
-                  <Text style={[s.pillText, view === v && s.pillTextOn]}>{v === "progress" ? "In progress" : "Completed"}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <SegmentedControl accessibilityLabel="Show" value={view} onChange={setView}
+              options={[{ value: "progress", label: "In progress" }, { value: "completed", label: "Completed" }]} />
           ) : null}
           {listed.length === 0 ? <Text style={s.meta}>{view === "completed" ? "No completed studies yet." : "No shared studies yet. Start one below, or accept an invitation."}</Text> : null}
           {listed.map((x) => (
@@ -140,12 +130,8 @@ export default function StudyTogetherHub() {
       <Text style={s.section} accessibilityRole="header">Start a Study</Text>
       <Text style={s.meta}>Choose what to study, then tap Study Together on it to invite a peer or start it with a group you lead.</Text>
       <View style={s.row}>
-        <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-stories" as any)} accessibilityRole="button" accessibilityLabel="Choose a Kingdom Story to study together">
-          <Ionicons name="library-outline" size={16} color={c.accentGreen} /><Text style={s.btnSecondaryText}>A Kingdom Story</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.btnSecondary} onPress={() => router.push("/kingdom-school" as any)} accessibilityRole="button" accessibilityLabel="Choose a Kingdom School lesson to study together">
-          <Ionicons name="school-outline" size={16} color={c.accentGreen} /><Text style={s.btnSecondaryText}>A Kingdom School lesson</Text>
-        </TouchableOpacity>
+        <AppButton label="A Kingdom Story" onPress={() => router.push("/kingdom-stories" as any)} variant="secondary" icon="library-outline" accessibilityLabel="Choose a Kingdom Story to study together" />
+        <AppButton label="A Kingdom School lesson" onPress={() => router.push("/kingdom-school" as any)} variant="secondary" icon="school-outline" accessibilityLabel="Choose a Kingdom School lesson to study together" />
       </View>
       <Text style={s.section} accessibilityRole="header">Join a Study</Text>
       <Text style={s.meta}>Peer invitations appear under Invitations. Studies your Family Circle, Church, circle or group starts appear here automatically for every member.</Text>
@@ -173,13 +159,6 @@ function makeStyles(c: AppColors) {
     cardTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
     row: { flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" },
     continueBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: c.primaryGreen, alignItems: "center", justifyContent: "center" },
-    btn: { minHeight: 44, paddingHorizontal: 16, borderRadius: 10, backgroundColor: c.primaryGreen, alignItems: "center", justifyContent: "center" },
     btnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
-    btnSecondary: { flexDirection: "row", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, alignItems: "center", justifyContent: "center" },
-    btnSecondaryText: { color: c.textDark, fontSize: 14, fontFamily: "Inter_600SemiBold" },
-    pill: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, justifyContent: "center", borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
-    pillOn: { backgroundColor: c.primaryGreen, borderColor: c.primaryGreen },
-    pillText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    pillTextOn: { color: "#fff" },
   });
 }

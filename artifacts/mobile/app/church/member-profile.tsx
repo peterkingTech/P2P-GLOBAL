@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData, ChurchMemberProfile } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const STAGE_LABELS: Record<string, string> = {
   dormant_seed: "Dormant Seed", sprout: "Sprout", young_tree: "Young Tree",
@@ -48,7 +49,7 @@ export default function ChurchMemberProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40, paddingHorizontal: 20 }}>
-      <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={{ marginBottom: 16 }}>
         <Ionicons name="arrow-back" size={22} color={colors.textDark} />
       </TouchableOpacity>
 
@@ -98,9 +99,7 @@ export default function ChurchMemberProfileScreen() {
         placeholderTextColor={colors.textMuted}
         multiline
       />
-      <TouchableOpacity style={styles.saveNotesBtn} onPress={handleSaveNotes} disabled={savingNotes}>
-        {savingNotes ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveNotesBtnText}>Save Note</Text>}
-      </TouchableOpacity>
+      <AppButton label="Save Note" onPress={handleSaveNotes} disabled={savingNotes} loading={savingNotes} style={{ marginTop: 10 }} palette="fixedLight" />
 
       <View style={styles.privacyNote}>
         <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
@@ -124,8 +123,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
     padding: 12, fontSize: 13, color: colors.textDark, minHeight: 80, textAlignVertical: "top", fontFamily: "Inter_400Regular",
   },
-  saveNotesBtn: { backgroundColor: colors.accentGreen, borderRadius: 10, height: 42, alignItems: "center", justifyContent: "center", marginTop: 10 },
-  saveNotesBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   privacyNote: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: 24, padding: 12, backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige },
   privacyNoteText: { flex: 1, fontSize: 11, color: colors.textMuted, lineHeight: 16, fontFamily: "Inter_400Regular" },
 });

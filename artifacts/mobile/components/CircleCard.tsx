@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AppButton } from "@/components/ui";
 
 // One shared rectangular circle card, replacing three near-identical local
 // implementations (app/circles/index.tsx "My Circles", app/circles/discover.tsx
@@ -59,9 +60,7 @@ export function CircleCard({
       {!!description && <Text style={styles.description} numberOfLines={2}>{description}</Text>}
 
       {action && action !== "chevron" && (
-        <TouchableOpacity style={styles.actionBtn} onPress={action.onPress} disabled={action.loading}>
-          {action.loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.actionBtnText}>{action.label}</Text>}
-        </TouchableOpacity>
+        <AppButton label={`${action.label}`} onPress={action.onPress} disabled={action.loading} loading={action.loading} style={{ marginTop: 12 }} />
       )}
     </Container>
   );
@@ -83,7 +82,5 @@ function makeStyles(c: { card: string; borderBeige: string; textDark: string; te
     statusPillForming: { backgroundColor: "rgba(224,164,65,0.18)" },
     statusPillText: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     description: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 8, lineHeight: 17 },
-    actionBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center", marginTop: 12 },
-    actionBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

@@ -25,6 +25,7 @@ import {
 import { shareRoomInvitation } from "@/lib/sharing";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -175,7 +176,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>Share Room</Text>
-            <TouchableOpacity onPress={onClose} accessibilityLabel="Close" accessibilityRole="button">
+            <TouchableOpacity hitSlop={10} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button">
               <Ionicons name="close" size={22} color={c.textDark} />
             </TouchableOpacity>
           </View>
@@ -190,7 +191,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
           {state.kind === "error" && (
             <View style={styles.centerBox}>
               <Text style={styles.errorText}>{state.message}</Text>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={check}><Text style={styles.secondaryBtnText}>Try Again</Text></TouchableOpacity>
+              <AppButton label="Try Again" onPress={check} variant="outline" />
             </View>
           )}
 
@@ -198,9 +199,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
             <View style={styles.centerBox}>
               <Ionicons name="link-outline" size={28} color={c.textMuted} />
               <Text style={styles.helperText}>No active invitation yet.</Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleGenerate} disabled={busy}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Generate Link</Text>}
-              </TouchableOpacity>
+              <AppButton label="Generate Link" onPress={handleGenerate} disabled={busy} loading={busy} style={{ minWidth: 180 }} />
             </View>
           )}
 
@@ -208,9 +207,7 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
             <View style={styles.centerBox}>
               <Ionicons name="alert-circle-outline" size={28} color={c.textMuted} />
               <Text style={styles.helperText}>An invitation link already exists for this room, but this device doesn't have it saved.</Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleRegenerate} disabled={busy}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Generate New Link</Text>}
-              </TouchableOpacity>
+              <AppButton label="Generate New Link" onPress={handleRegenerate} disabled={busy} loading={busy} style={{ minWidth: 180 }} />
               <Text style={styles.errorText}>This will revoke the existing link.</Text>
             </View>
           )}
@@ -241,35 +238,18 @@ export default function ShareRoomPanel({ visible, onClose, roomType, roomId, roo
                 </View>
               </ViewShot>
 
-              <TouchableOpacity style={styles.saveQrBtn} onPress={handleSaveQR} disabled={savingQR}>
-                {savingQR ? <ActivityIndicator color={c.accentGreen} size="small" /> : (
-                  <>
-                    <Ionicons name="download-outline" size={15} color={c.accentGreen} />
-                    <Text style={styles.saveQrBtnText}>Save QR to Photos</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Save QR to Photos" onPress={handleSaveQR} variant="tertiary" size="sm" icon="download-outline" disabled={savingQR} loading={savingQR} style={{ alignSelf: "center" }} />
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.actionBtn} onPress={handleCopy} disabled={busy}>
-                  <Ionicons name={copied ? "checkmark" : "copy-outline"} size={16} color={c.accentGreen} />
-                  <Text style={styles.actionBtnText}>{copied ? "Copied" : "Copy Link"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={handleShare} disabled={busy}>
-                  <Ionicons name="share-outline" size={16} color={c.accentGreen} />
-                  <Text style={styles.actionBtnText}>Share</Text>
-                </TouchableOpacity>
+                <AppButton label={copied ? "Copied" : "Copy Link"} onPress={handleCopy} variant="outline" icon={copied ? "checkmark" : "copy-outline"} disabled={busy} style={{ flex: 1 }} />
+                <AppButton label="Share" onPress={handleShare} variant="outline" icon="share-outline" disabled={busy} style={{ flex: 1 }} />
               </View>
 
               <Text style={styles.authNote}>Joining still requires a P2P account and applicable authorization — sharing this link does not grant access by itself.</Text>
 
               <View style={styles.dangerRow}>
-                <TouchableOpacity style={styles.linkBtn} onPress={handleRegenerate} disabled={busy}>
-                  <Text style={styles.linkBtnText}>Generate New Link</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.linkBtn} onPress={handleRevoke} disabled={busy}>
-                  <Text style={[styles.linkBtnText, { color: "#B91C1C" }]}>Revoke</Text>
-                </TouchableOpacity>
+                <AppButton label="Generate New Link" onPress={handleRegenerate} variant="tertiary" size="sm" disabled={busy} />
+                <AppButton label="Revoke" onPress={handleRevoke} variant="destructive" size="sm" disabled={busy} />
               </View>
             </View>
           )}
@@ -300,18 +280,8 @@ function makeStyles(c: AppColors) {
     qrCardTitle: { fontSize: 14, color: "#0D1117", fontFamily: "Inter_700Bold", textAlign: "center" },
     qrWrap: { marginVertical: 14 },
     scanLabel: { fontSize: 11, color: "#6b7280", fontFamily: "Inter_400Regular", textAlign: "center" },
-    saveQrBtn: { flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", alignSelf: "center", paddingVertical: 6 },
-    saveQrBtnText: { color: c.accentGreen, fontSize: 12, fontFamily: "Inter_600SemiBold" },
     actionsRow: { flexDirection: "row", gap: 10 },
-    actionBtn: { flex: 1, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
-    actionBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     authNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16, marginTop: 4 },
     dangerRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
-    linkBtn: { paddingVertical: 8 },
-    linkBtnText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_600SemiBold" },
-    primaryBtn: { backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, alignItems: "center", minWidth: 180 },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 20 },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 13, fontFamily: "Inter_700Bold" },
   });
 }

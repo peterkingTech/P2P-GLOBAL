@@ -7,6 +7,7 @@ import { useStudioQuery } from "@/components/studio/useStudioQuery";
 import { Banner, Chip, Pill, StateView, studioStyles as ss } from "@/components/studio/StudioUI";
 import { getCalendar, type CalendarEvent } from "@/lib/studioApi";
 import { ACTION_LABELS, SCHEDULE_STATUS_LABELS, dateKeyInZone, deviceTimeZone, eventsByDay, formatInZone, gridRange, isOverdue, monthGrid } from "@/lib/studioModel";
+import { IconButton } from "@/components/ui";
 
 // Content Calendar: scheduled jobs (all statuses) and publications of
 // Kingdom Stories for the visible month, grouped by day in the device's time
@@ -107,9 +108,7 @@ function EventRow({ e, tz, now, onOpen }: { e: CalendarEvent; tz: string; now: n
 
 function NavBtn({ icon, label, onPress }: { icon: "chevron-back" | "chevron-forward"; label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.navBtn}>
-      <Ionicons name={icon} size={18} color={colors.primaryGreen} />
-    </TouchableOpacity>
+    <IconButton icon={icon} accessibilityLabel={label} onPress={onPress} variant="tinted" color={colors.primaryGreen} palette="fixedLight" />
   );
 }
 
@@ -125,5 +124,4 @@ const styles = StyleSheet.create({
   badgeRed: { backgroundColor: "#B91C1C" },
   badgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" },
   event: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.borderBeige, padding: 12, minHeight: 48 },
-  navBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: colors.borderBeige, backgroundColor: "#fff" },
 });

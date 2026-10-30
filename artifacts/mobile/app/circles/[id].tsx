@@ -12,6 +12,7 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { Avatar } from "@/components/Avatar";
 import { QrShareSheet } from "@/components/qr/QrShareSheet";
 import { circleQr } from "@/lib/qrLinks";
+import { AppButton } from "@/components/ui";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; username: string | null; isVerified: boolean }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -300,9 +301,7 @@ export default function CircleDetailScreen() {
       <View style={[styles.root, { paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <Text style={styles.errorText}>This Circle isn't available.</Text>
-        <TouchableOpacity style={styles.notFoundBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/circles" as any))} accessibilityRole="button">
-          <Text style={styles.notFoundBtnText}>Go back</Text>
-        </TouchableOpacity>
+        <AppButton label="Go back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/circles" as any))} variant="outline" style={{ marginTop: 16 }} />
       </View>
     );
   }
@@ -314,7 +313,7 @@ export default function CircleDetailScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle} numberOfLines={1}>{circle.name}</Text>
@@ -337,9 +336,7 @@ export default function CircleDetailScreen() {
               <Text style={styles.joinNote}>Request sent. The Circle leader will review it.</Text>
             ) : (
               <>
-                <TouchableOpacity style={styles.startSessionBtn} onPress={requestToJoin} disabled={joinState === "sending"} accessibilityRole="button">
-                  {joinState === "sending" ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.startSessionBtnText}>Request to Join</Text>}
-                </TouchableOpacity>
+                <AppButton label="Request to Join" onPress={requestToJoin} disabled={joinState === "sending"} loading={joinState === "sending"} style={{ marginBottom: 16 }} />
                 <Text style={styles.joinNote}>The Circle leader reviews every request.</Text>
               </>
             )}
@@ -347,7 +344,7 @@ export default function CircleDetailScreen() {
         ) : null}
 
         {pendingEvals.length > 0 && (
-          <TouchableOpacity style={styles.reviewBanner} onPress={() => setReviewOpen(true)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.reviewBanner} onPress={() => setReviewOpen(true)}>
             <Ionicons name="clipboard-outline" size={18} color={colors.upperRoomAmber} />
             <Text style={styles.reviewBannerText}>Review Submissions ({pendingEvals.length})</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.upperRoomAmber} />
@@ -355,16 +352,7 @@ export default function CircleDetailScreen() {
         )}
 
         {isLeader && (
-          <TouchableOpacity style={styles.startSessionBtn} onPress={startSession} disabled={startingSession}>
-            {startingSession ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Ionicons name="videocam" size={18} color="#fff" />
-                <Text style={styles.startSessionBtnText}>Start Session</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <AppButton label="Start Session" onPress={startSession} icon="videocam" disabled={startingSession} loading={startingSession} style={{ marginBottom: 16 }} />
         )}
 
         {isLeader && joinRequests.length > 0 && (
@@ -376,10 +364,10 @@ export default function CircleDetailScreen() {
                   <Text style={styles.requestName}>{r.userName}</Text>
                   {r.message ? <Text style={styles.requestMessage}>{r.message}</Text> : null}
                 </View>
-                <TouchableOpacity style={styles.approveBtn} onPress={() => respondToRequest(r.id, "approve")}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Confirm" hitSlop={10} style={styles.approveBtn} onPress={() => respondToRequest(r.id, "approve")}>
                   <Ionicons name="checkmark" size={16} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.declineBtn} onPress={() => respondToRequest(r.id, "decline")}>
+                <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.declineBtn} onPress={() => respondToRequest(r.id, "decline")}>
                   <Ionicons name="close" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -390,14 +378,14 @@ export default function CircleDetailScreen() {
         <View style={styles.membersHeaderRow}>
           <Text style={styles.sectionHeading}>Members ({circle.members.length})</Text>
           {isLeader && (
-            <TouchableOpacity onPress={() => setTransferOpen(true)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setTransferOpen(true)}>
               <Text style={styles.transferLink}>Transfer Leadership</Text>
             </TouchableOpacity>
           )}
         </View>
         <View style={styles.membersCard}>
           {circle.members.map((m, i) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={m.id}
               style={[styles.memberRow, i === circle.members.length - 1 && styles.memberRowLast]}
               activeOpacity={isLeader && m.userId !== profile?.id ? 0.6 : 1}
@@ -423,10 +411,7 @@ export default function CircleDetailScreen() {
         </View>
 
         {isLeader && (
-          <TouchableOpacity style={styles.addMemberBtn} onPress={() => { setAddMemberOpen(true); setAddUsername(""); setAddPreview(null); setAddError(null); }}>
-            <Ionicons name="person-add-outline" size={16} color={colors.accentGreen} />
-            <Text style={styles.addMemberBtnText}>Add a member by username</Text>
-          </TouchableOpacity>
+          <AppButton label="Add a member by username" onPress={() => { setAddMemberOpen(true); setAddUsername(""); setAddPreview(null); setAddError(null); }} variant="outline" icon="person-add-outline" style={{ marginTop: 12 }} />
         )}
 
         <Text style={styles.sectionHeading}>Sessions</Text>
@@ -441,10 +426,7 @@ export default function CircleDetailScreen() {
           <Text style={styles.emptyMuted}>No upcoming session scheduled.</Text>
         )}
         {isLeader && (
-          <TouchableOpacity style={styles.newSessionBtn} onPress={() => setSessionModalOpen(true)}>
-            <Ionicons name="add" size={16} color={colors.accentGreen} />
-            <Text style={styles.newSessionBtnText}>Schedule Session</Text>
-          </TouchableOpacity>
+          <AppButton label="Schedule Session" onPress={() => setSessionModalOpen(true)} variant="outline" icon="add" style={{ marginTop: 10 }} />
         )}
         {pastSessions.length > 0 && (
           <View style={{ marginTop: 12 }}>
@@ -464,7 +446,7 @@ export default function CircleDetailScreen() {
       <Modal visible={reviewOpen} animationType="slide" onRequestClose={() => setReviewOpen(false)}>
         <View style={[styles.root, { paddingTop: insets.top }]}>
           <View style={styles.headerBar}>
-            <TouchableOpacity onPress={() => setReviewOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={() => setReviewOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textDark} />
             </TouchableOpacity>
             <Text style={styles.headerBarTitle}>Review Submissions</Text>
@@ -488,12 +470,8 @@ export default function CircleDetailScreen() {
                     multiline
                   />
                   <View style={styles.evalActionsRow}>
-                    <TouchableOpacity style={styles.approveEvalBtn} onPress={() => submitEvaluation(e, "approved")}>
-                      <Text style={styles.approveEvalBtnText}>Approve</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.reviseEvalBtn} onPress={() => submitEvaluation(e, "needs_revision")}>
-                      <Text style={styles.reviseEvalBtnText}>Needs Revision</Text>
-                    </TouchableOpacity>
+                    <AppButton label="Approve" onPress={() => submitEvaluation(e, "approved")} style={{ flex: 1 }} />
+                    <AppButton label="Needs Revision" onPress={() => submitEvaluation(e, "needs_revision")} variant="outline" style={{ flex: 1 }} />
                   </View>
                 </View>
               ))
@@ -510,12 +488,8 @@ export default function CircleDetailScreen() {
             <Text style={styles.fieldLabel}>Lesson ID</Text>
             <TextInput style={styles.input} value={sessionLessonId} onChangeText={setSessionLessonId} placeholder="Lesson ID for this session" placeholderTextColor={colors.textMuted} />
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSessionModalOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={createSession} disabled={savingSession}>
-                {savingSession ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Schedule</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setSessionModalOpen(false)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Schedule" onPress={createSession} disabled={savingSession} loading={savingSession} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -537,19 +511,15 @@ export default function CircleDetailScreen() {
                 autoCorrect={false}
                 onSubmitEditing={searchAddMember}
               />
-              <TouchableOpacity style={styles.usernameSearchBtn} onPress={searchAddMember} disabled={addSearching}>
+              <TouchableOpacity accessibilityRole="button" style={styles.usernameSearchBtn} onPress={searchAddMember} disabled={addSearching}>
                 {addSearching ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={16} color="#fff" />}
               </TouchableOpacity>
             </View>
             {addError && <Text style={styles.addErrorText}>{addError}</Text>}
             {addPreview && <Text style={styles.addPreviewText}>@{addUsername.trim().replace(/^@/, "")} — {addPreview.fullName}</Text>}
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAddMemberOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={confirmAddMember} disabled={!addPreview || addingMember}>
-                {addingMember ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Add to Circle</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setAddMemberOpen(false)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Add to Circle" onPress={confirmAddMember} disabled={!addPreview || addingMember} loading={addingMember} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -571,12 +541,8 @@ export default function CircleDetailScreen() {
               autoCorrect={false}
             />
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setTransferOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleTransferLeadership} disabled={!transferUsername.trim() || transferring}>
-                {transferring ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Transfer</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setTransferOpen(false)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Transfer" onPress={handleTransferLeadership} disabled={!transferUsername.trim() || transferring} loading={transferring} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -592,13 +558,9 @@ function makeStyles(c: AppColors) {
     headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     scroll: { padding: 20 },
     errorText: { fontSize: 15, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    notFoundBtn: { minHeight: 44, paddingHorizontal: 24, marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
-    notFoundBtnText: { color: c.accentGreen, fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     joinCard: { marginBottom: 16 },
     joinNote: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: -8 },
     description: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 21, marginBottom: 16 },
-    startSessionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 14, marginBottom: 16 },
-    startSessionBtnText: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     reviewBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(224,164,65,0.12)", borderWidth: 1, borderColor: "rgba(224,164,65,0.3)", borderRadius: 12, padding: 14, marginBottom: 16 },
     reviewBannerText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
     sectionHeading: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 20, marginBottom: 10 },
@@ -622,8 +584,6 @@ function makeStyles(c: AppColors) {
     leaderPill: { backgroundColor: "rgba(224,164,65,0.18)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
     coLeaderPill: { backgroundColor: "rgba(29,158,117,0.15)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
     leaderPillText: { fontSize: 10, fontWeight: "700", color: c.upperRoomAmber, fontFamily: "Inter_700Bold" },
-    addMemberBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 11, marginTop: 12 },
-    addMemberBtnText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     usernameSearchRow: { flexDirection: "row", gap: 8 },
     usernameSearchBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
     addErrorText: { fontSize: 12, color: "#C0392B", marginTop: 8, fontFamily: "Inter_400Regular" },
@@ -631,8 +591,6 @@ function makeStyles(c: AppColors) {
     sessionCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 14 },
     sessionText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
     emptyMuted: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    newSessionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12, marginTop: 10 },
-    newSessionBtnText: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     pastSessionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
     pastSessionText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
 
@@ -642,10 +600,6 @@ function makeStyles(c: AppColors) {
     evalConsensus: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
     feedbackInput: { backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 10, fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", marginTop: 10, minHeight: 50 },
     evalActionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-    approveEvalBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-    approveEvalBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    reviseEvalBtn: { flex: 1, borderWidth: 1, borderColor: "#C0392B", borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-    reviseEvalBtnText: { color: "#C0392B", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
     modalBox: { width: "85%", backgroundColor: "#fff", borderRadius: 18, padding: 22, gap: 4, maxWidth: 560 },
@@ -653,9 +607,7 @@ function makeStyles(c: AppColors) {
     fieldLabel: { fontSize: 12, fontWeight: "600", color: c.textMid, marginBottom: 6, fontFamily: "Inter_600SemiBold" },
     input: { backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
     modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-    modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
     modalCancelText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    modalSaveBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
     modalSaveText: { fontSize: 14, color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

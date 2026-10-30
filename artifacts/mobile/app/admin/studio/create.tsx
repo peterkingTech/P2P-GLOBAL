@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { Card, Chip, studioStyles as ss } from "@/components/studio/StudioUI";
 import { STUDIO_EDIT_ROLES } from "@/lib/studioModel";
+import { AppButton } from "@/components/ui";
 
 // Create Content: one entry point that hands off to each content type's
 // EXISTING editor and workflow. Types without an admin editor say so
@@ -38,10 +39,7 @@ export default function StudioCreate() {
             </View>
           </View>
           {o.path && o.allowed ? (
-            <TouchableOpacity style={styles.go} onPress={() => router.push(o.path as any)} accessibilityRole="button" accessibilityLabel={`Create ${o.title}`}>
-              <Text style={styles.goText}>Start</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </TouchableOpacity>
+            <AppButton label="Start" onPress={() => router.push(o.path as any)} icon="arrow-forward" iconPosition="trailing" accessibilityLabel={`Create ${o.title}`} style={{ alignSelf: "flex-start" }} palette="fixedLight" />
           ) : (
             <Chip label={o.unavailable ?? "Your role cannot create this"} tone="grey" />
           )}

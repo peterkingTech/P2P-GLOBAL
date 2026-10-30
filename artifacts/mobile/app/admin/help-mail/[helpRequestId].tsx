@@ -120,7 +120,7 @@ export default function HelpMailThreadScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -129,7 +129,7 @@ export default function HelpMailThreadScreen() {
             <Text style={styles.tierBadgeText}>{config.label}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleCall} disabled={calling} style={styles.callBtn}>
+        <TouchableOpacity accessibilityRole="button" onPress={handleCall} disabled={calling} style={styles.callBtn}>
           {calling ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="call-outline" size={20} color={colors.accentGreen} />}
         </TouchableOpacity>
       </View>
@@ -169,7 +169,7 @@ export default function HelpMailThreadScreen() {
           placeholderTextColor={colors.textMuted}
           multiline
         />
-        <TouchableOpacity style={[styles.sendBtn, (sending || !body.trim()) && styles.sendBtnDisabled]} onPress={handleSend} disabled={sending || !body.trim()}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.sendBtn, (sending || !body.trim()) && styles.sendBtnDisabled]} onPress={handleSend} disabled={sending || !body.trim()}>
           {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="send" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>

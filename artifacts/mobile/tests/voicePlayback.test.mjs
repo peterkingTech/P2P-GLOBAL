@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -51,6 +52,8 @@ const RN = {
   PanResponder: { create: (cfg) => ({ panHandlers: { __pan: cfg } }) },
 };
 const mocks = {
+  // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+  "@/components/ui": buttonDouble(React, RN),
   react: reactMock, "react-native": RN, "@expo/vector-icons": { Ionicons: host("Ionicons") },
   "expo-audio": { createAudioPlayer: (src) => fakePlayer(src.uri) },
   "@/constants/colors": { default: { accentGreen: "#0b0", textMuted: "#777" }, __esModule: true },

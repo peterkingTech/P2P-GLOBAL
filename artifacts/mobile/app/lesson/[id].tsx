@@ -45,6 +45,7 @@ import { useActiveGathering } from "@/lib/activeGathering";
 import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
+import { AppButton } from "@/components/ui";
 
 interface LessonContent {
   title: string;
@@ -75,7 +76,7 @@ function TypeTabs({
   return (
     <View style={tabStyles.row}>
       {tabs.map((tab) => (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           key={tab.type}
           style={[tabStyles.tab, value === tab.type && tabStyles.tabActive]}
           onPress={() => !disabled && onChange(tab.type)}
@@ -232,10 +233,7 @@ export function QuestionResponseCard({
       <View style={[qStyles.focusScreen, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
         <View style={qStyles.focusBar}>
           <Text style={qStyles.focusTitle} numberOfLines={1}>Question {questionIndex + 1}</Text>
-          <TouchableOpacity style={qStyles.focusDone} onPress={() => setFocusWriting(false)} accessibilityRole="button" accessibilityLabel="Done, return to the lesson">
-            <Ionicons name="contract-outline" size={18} color={colors.accentGreen} />
-            <Text style={qStyles.expandBtnText}>Done</Text>
-          </TouchableOpacity>
+          <AppButton label="Done" onPress={() => setFocusWriting(false)} variant="tertiary" icon="contract-outline" accessibilityLabel="Done, return to the lesson" style={{ minWidth: 44 }} />
         </View>
         <Text style={qStyles.focusQuestion}>{question.question}</Text>
         <TextInput
@@ -267,7 +265,7 @@ export function QuestionResponseCard({
       {submitted ? (
         <>
           {kind === "assignment" && submitted.evaluationStatus === "needs_revision" ? (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]}
               onPress={() => { setSubmitted(null); setExpanded(true); }}
               activeOpacity={0.7}
@@ -290,7 +288,7 @@ export function QuestionResponseCard({
           ) : null}
         </>
       ) : (
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={qStyles.shareToggle}
           onPress={() => setExpanded((v) => !v)}
           activeOpacity={0.75}
@@ -315,29 +313,11 @@ export function QuestionResponseCard({
               />
               <View style={qStyles.draftRow}>
                 <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">{text.trim() ? "Draft saved — it continues on your other devices" : " "}</Text>
-                <TouchableOpacity
-                  style={qStyles.expandBtn} onPress={() => setFocusWriting(true)}
-                  accessibilityRole="button" accessibilityLabel="Expand writing to full screen"
-                >
-                  <Ionicons name="expand-outline" size={16} color={colors.accentGreen} />
-                  <Text style={qStyles.expandBtnText}>Expand</Text>
-                </TouchableOpacity>
+                <AppButton label="Expand" onPress={() => setFocusWriting(true)} variant="tertiary" icon="expand-outline" accessibilityLabel="Expand writing to full screen" />
               </View>
               {kind === "assignment" ? <AttachmentTray key={trayReset} trayKey={trayKey} disabled={submitting} onChange={setFiles} /> : null}
               {error && <Text style={qStyles.error}>{error}</Text>}
-              <TouchableOpacity
-                style={[qStyles.submitBtn, (!canSend || submitting) && qStyles.submitBtnDisabled]}
-                onPress={handleTextSubmit}
-                disabled={!canSend || submitting}
-                activeOpacity={0.85}
-              >
-                {submitting ? <ActivityIndicator color={colors.cream} size="small" /> : (
-                  <>
-                    <Ionicons name="send" size={14} color={colors.cream} />
-                    <Text style={qStyles.submitBtnText}>{t("lesson.shareResponse")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <AppButton label={t("lesson.shareResponse")} onPress={handleTextSubmit} icon="send" disabled={!canSend || submitting} loading={submitting} />
             </>
           ) : mode === "audio" ? (
             <>
@@ -391,8 +371,6 @@ function makeQStyles(c: AppColors) {
   inputArea: { marginLeft: 36, marginTop: 8 },
   draftRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   draftNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-  expandBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, paddingHorizontal: 8 },
-  expandBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
   focusScreen: { flex: 1, backgroundColor: c.lightCream, paddingHorizontal: 18 },
   focusBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 },
   focusTitle: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -409,13 +387,6 @@ function makeQStyles(c: AppColors) {
     marginBottom: 10, backgroundColor: c.lightCream,
   },
   error: { fontSize: 12, color: "#C0392B", marginBottom: 8, fontFamily: "Inter_400Regular" },
-  submitBtn: {
-    flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: c.primaryGreen, borderRadius: 10,
-    paddingVertical: 10, paddingHorizontal: 16,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: c.cream, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   });
 }
 
@@ -825,7 +796,7 @@ export default function LessonScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <GatheringReturnBar />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
           <Text style={styles.headerLabel}>{t("lesson.title")}</Text>
@@ -848,7 +819,7 @@ export default function LessonScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <GatheringReturnBar />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerLabel}>{t("lesson.title")}</Text>
@@ -859,7 +830,7 @@ export default function LessonScreen() {
           </View>
         )}
         {content && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityLabel="Share" accessibilityRole="button"
             onPress={() => id && shareLesson({ id, title: content.title }, authProfile?.username)}
             style={styles.shareBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -984,19 +955,7 @@ export default function LessonScreen() {
 
           {(!assignment || assignmentQuestions.length === 0) && (
             !completed ? (
-              <TouchableOpacity
-                style={[styles.completeBtn, completing && styles.completeBtnDisabled]}
-                onPress={handleComplete}
-                activeOpacity={0.85}
-                disabled={completing}
-              >
-                {completing ? <ActivityIndicator color={colors.cream} /> : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.cream} />
-                    <Text style={styles.completeBtnText}>{t("lesson.markComplete")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <AppButton label={t("lesson.markComplete")} onPress={handleComplete} size="lg" icon="checkmark-circle" disabled={completing} loading={completing} />
             ) : (
               <View style={styles.completedBanner}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accentGreen} />
@@ -1006,7 +965,7 @@ export default function LessonScreen() {
           )}
 
           {lessonMeta && !activeGathering && (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.studyTogetherCard}
               onPress={() => setStudyPickerOpen(true)}
               disabled={!!startingStudyWith}
@@ -1060,7 +1019,7 @@ export default function LessonScreen() {
         animationType="fade"
         onRequestClose={() => { setPendingHighlight(null); setEditingHighlight(null); }}
       >
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.colorPickerOverlay}
           activeOpacity={1}
           onPress={() => { setPendingHighlight(null); setEditingHighlight(null); }}
@@ -1083,10 +1042,7 @@ export default function LessonScreen() {
               ))}
             </View>
             {editingHighlight && (
-              <TouchableOpacity style={styles.removeHighlightBtn} onPress={handleRemoveHighlight}>
-                <Ionicons name="trash-outline" size={16} color="#B91C1C" />
-                <Text style={styles.removeHighlightBtnText}>Remove highlight</Text>
-              </TouchableOpacity>
+              <AppButton label="Remove highlight" onPress={handleRemoveHighlight} variant="destructive" icon="trash-outline" style={{ marginTop: 18 }} />
             )}
           </View>
         </TouchableOpacity>
@@ -1140,20 +1096,12 @@ function makeStyles(c: AppColors) {
   colorSwatchRow: { flexDirection: "row", gap: 14, marginBottom: 6 },
   colorSwatch: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: "transparent" },
   colorSwatchSelected: { borderColor: c.textDark },
-  removeHighlightBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 18 },
-  removeHighlightBtnText: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium" },
   questionsCard: {
     backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
     padding: 16, marginBottom: 28, marginTop: 8,
   },
   questionsHeader: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 16 },
   questionsTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-  completeBtn: {
-    backgroundColor: c.primaryGreen, borderRadius: 14, height: 54,
-    flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-  },
-  completeBtnDisabled: { opacity: 0.7 },
-  completeBtnText: { color: c.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   completedBanner: {
     backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 14, borderWidth: 1,
     borderColor: "rgba(29,158,117,0.3)", height: 54,

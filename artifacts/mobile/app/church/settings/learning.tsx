@@ -7,6 +7,7 @@ import { useData, LearningGoal, LearningGoalLevel, LearningGoalTimeframe, Learni
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const TIMEFRAME_OPTIONS: { value: LearningGoalTimeframe; label: string }[] = [
   { value: "today", label: "Today" }, { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" }, { value: "custom", label: "Custom" },
@@ -90,7 +91,7 @@ export default function ChurchLearningGoalsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.headerTitle}>Learning Goals</Text>
       </View>
 
@@ -99,10 +100,7 @@ export default function ChurchLearningGoalsScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           {!creating ? (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreating(true)}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Create Learning Goal</Text>
-            </TouchableOpacity>
+            <AppButton label="Create Learning Goal" onPress={() => setCreating(true)} icon="add" style={{ marginBottom: 20 }} palette="fixedLight" />
           ) : (
             <View style={styles.form}>
               <Text style={styles.label}>Goal Name</Text>
@@ -111,27 +109,17 @@ export default function ChurchLearningGoalsScreen() {
               <Text style={styles.label}>What are we studying?</Text>
               <View style={styles.chipRow}>
                 {LEVEL_OPTIONS.map((o) => (
-                  <TouchableOpacity key={o.value} style={[styles.chip, level === o.value && styles.chipActive]} onPress={() => { setLevel(o.value); setModuleId(null); setLessonId(null); }}>
+                  <TouchableOpacity accessibilityRole="button" key={o.value} style={[styles.chip, level === o.value && styles.chipActive]} onPress={() => { setLevel(o.value); setModuleId(null); setLessonId(null); }}>
                     <Text style={[styles.chipText, level === o.value && styles.chipTextActive]}>{o.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
               {(level === "module" || level === "lesson") && (
-                <TouchableOpacity style={styles.pickerBtn} onPress={() => setModulePickerOpen(true)}>
-                  <Text style={[styles.pickerBtnText, !moduleId && { color: colors.textMuted }]}>
-                    {modules.find((m) => m.id === moduleId)?.title ?? "Choose a module"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
+                <AppButton label={`${modules.find((m) => m.id === moduleId)?.title ?? "Choose a module"}`} onPress={() => setModulePickerOpen(true)} variant="secondary" icon="chevron-down" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
               )}
               {level === "lesson" && moduleId && (
-                <TouchableOpacity style={styles.pickerBtn} onPress={() => setLessonPickerOpen(true)}>
-                  <Text style={[styles.pickerBtnText, !lessonId && { color: colors.textMuted }]}>
-                    {lessons.find((l) => l.id === lessonId)?.title ?? "Choose a lesson"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
+                <AppButton label={`${lessons.find((l) => l.id === lessonId)?.title ?? "Choose a lesson"}`} onPress={() => setLessonPickerOpen(true)} variant="secondary" icon="chevron-down" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
               )}
               {level === "curriculum" && !curriculumId && (
                 <Text style={styles.warnText}>Curriculum content hasn't loaded yet — try again shortly.</Text>
@@ -140,7 +128,7 @@ export default function ChurchLearningGoalsScreen() {
               <Text style={[styles.label, { marginTop: 16 }]}>Timeframe</Text>
               <View style={styles.chipRow}>
                 {TIMEFRAME_OPTIONS.map((o) => (
-                  <TouchableOpacity key={o.value} style={[styles.chip, timeframe === o.value && styles.chipActive]} onPress={() => setTimeframe(o.value)}>
+                  <TouchableOpacity accessibilityRole="button" key={o.value} style={[styles.chip, timeframe === o.value && styles.chipActive]} onPress={() => setTimeframe(o.value)}>
                     <Text style={[styles.chipText, timeframe === o.value && styles.chipTextActive]}>{o.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -154,22 +142,18 @@ export default function ChurchLearningGoalsScreen() {
 
               <Text style={[styles.label, { marginTop: 16 }]}>Target</Text>
               <View style={styles.chipRow}>
-                <TouchableOpacity style={[styles.chip, targetType === "percentage" && styles.chipActive]} onPress={() => setTargetType("percentage")}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.chip, targetType === "percentage" && styles.chipActive]} onPress={() => setTargetType("percentage")}>
                   <Text style={[styles.chipText, targetType === "percentage" && styles.chipTextActive]}>% of active members</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.chip, targetType === "member_count" && styles.chipActive]} onPress={() => setTargetType("member_count")}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.chip, targetType === "member_count" && styles.chipActive]} onPress={() => setTargetType("member_count")}>
                   <Text style={[styles.chipText, targetType === "member_count" && styles.chipTextActive]}>Number of members</Text>
                 </TouchableOpacity>
               </View>
               <TextInput style={styles.input} value={targetValue} onChangeText={setTargetValue} keyboardType="number-pad" placeholder={targetType === "percentage" ? "80" : "20"} placeholderTextColor={colors.textMuted} />
 
               <View style={styles.formBtnRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setCreating(false); resetForm(); }}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleCreate} disabled={submitting || !title.trim()}>
-                  {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Create Goal</Text>}
-                </TouchableOpacity>
+                <AppButton label="Cancel" onPress={() => { setCreating(false); resetForm(); }} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+                <AppButton label="Create Goal" onPress={handleCreate} disabled={submitting || !title.trim()} loading={submitting} style={{ flex: 1 }} palette="fixedLight" />
               </View>
             </View>
           )}
@@ -192,7 +176,7 @@ export default function ChurchLearningGoalsScreen() {
                 <Text style={styles.goalProgressText}>
                   {g.achieved ? "🎉 Goal reached! " : ""}{g.completedCount ?? 0} of {g.totalMembers ?? 0} members ({Math.round(g.progressPercent ?? 0)}%)
                 </Text>
-                <TouchableOpacity onPress={() => handleArchive(g.id)}><Text style={styles.archiveText}>Archive</Text></TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" onPress={() => handleArchive(g.id)}><Text style={styles.archiveText}>Archive</Text></TouchableOpacity>
               </View>
             ))
           )}
@@ -200,11 +184,11 @@ export default function ChurchLearningGoalsScreen() {
       )}
 
       <Modal visible={modulePickerOpen} animationType="slide" transparent onRequestClose={() => setModulePickerOpen(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModulePickerOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.modalOverlay} activeOpacity={1} onPress={() => setModulePickerOpen(false)}>
           <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Choose a Module</Text>
             <FlatList data={modules} keyExtractor={(m) => m.id} style={{ maxHeight: 340 }} renderItem={({ item }) => (
-              <TouchableOpacity style={styles.optionRow} onPress={() => { setModuleId(item.id); setLessonId(null); setModulePickerOpen(false); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.optionRow} onPress={() => { setModuleId(item.id); setLessonId(null); setModulePickerOpen(false); }}>
                 <Text style={styles.optionRowText}>{item.title}</Text>
               </TouchableOpacity>
             )} />
@@ -212,11 +196,11 @@ export default function ChurchLearningGoalsScreen() {
         </TouchableOpacity>
       </Modal>
       <Modal visible={lessonPickerOpen} animationType="slide" transparent onRequestClose={() => setLessonPickerOpen(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setLessonPickerOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.modalOverlay} activeOpacity={1} onPress={() => setLessonPickerOpen(false)}>
           <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Choose a Lesson</Text>
             <FlatList data={lessonsInModule} keyExtractor={(l) => l.id} style={{ maxHeight: 340 }} renderItem={({ item }) => (
-              <TouchableOpacity style={styles.optionRow} onPress={() => { setLessonId(item.id); setLessonPickerOpen(false); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.optionRow} onPress={() => { setLessonId(item.id); setLessonPickerOpen(false); }}>
                 <Text style={styles.optionRowText}>{item.title}</Text>
               </TouchableOpacity>
             )} />
@@ -234,11 +218,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   content: { padding: 20, paddingBottom: 60 },
   lockedText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
-  createBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, borderRadius: 10, height: 46, marginBottom: 20,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   form: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 14, padding: 16, marginBottom: 24 },
   label: { fontSize: 13, color: colors.textMid, marginBottom: 6, fontFamily: "Inter_500Medium" },
   input: {
@@ -250,18 +229,9 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen },
   chipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   chipTextActive: { color: "#fff", fontWeight: "700" },
-  pickerBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.lightCream,
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 12, marginBottom: 8,
-  },
-  pickerBtnText: { color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },
   warnText: { fontSize: 12, color: "#D97706", marginBottom: 8, fontFamily: "Inter_400Regular" },
   dateRow: { flexDirection: "row", gap: 8 },
   formBtnRow: { flexDirection: "row", gap: 10, marginTop: 16 },
-  cancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  cancelBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  saveBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   sectionLabel: { fontSize: 13, fontWeight: "700", color: colors.textDark, marginBottom: 10, fontFamily: "Inter_700Bold" },
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 20, lineHeight: 20, fontFamily: "Inter_400Regular" },
   goalCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14, marginBottom: 10 },

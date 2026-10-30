@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getKingdomWinsFeed, KINGDOM_CATEGORY_LABELS, type KingdomWin, type KingdomEntryType } from "@/lib/kingdomWinsApi";
+import { AppButton } from "@/components/ui";
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -45,11 +46,11 @@ export default function KingdomWinsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Kingdom Wins</Text>
-        <TouchableOpacity onPress={() => router.push("/kingdom-wins/my-stories" as any)} accessibilityLabel="My Stories" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.push("/kingdom-wins/my-stories" as any)} accessibilityLabel="My Stories" accessibilityRole="button">
           <Ionicons name="person-circle-outline" size={24} color={c.textDark} />
         </TouchableOpacity>
       </View>
@@ -57,7 +58,7 @@ export default function KingdomWinsScreen() {
 
       <View style={styles.tabRow}>
         {(["all", "kingdom_win", "p2p_impact", "testimony"] as const).map((f) => (
-          <TouchableOpacity key={f} style={[styles.tab, filter === f && styles.tabActive]} onPress={() => setFilter(f)}>
+          <TouchableOpacity accessibilityRole="button" key={f} style={[styles.tab, filter === f && styles.tabActive]} onPress={() => setFilter(f)}>
             <Text style={[styles.tabText, filter === f && styles.tabTextActive]}>
               {f === "all" ? "All" : f === "kingdom_win" ? "God's Faithfulness" : f === "p2p_impact" ? "P2P Impact" : "Testimonies"}
             </Text>
@@ -65,10 +66,7 @@ export default function KingdomWinsScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.shareBtn} onPress={() => router.push("/kingdom-wins/create" as any)}>
-        <Ionicons name="add-circle" size={18} color="#fff" />
-        <Text style={styles.shareBtnText}>Share a Kingdom Win</Text>
-      </TouchableOpacity>
+      <AppButton label="Share a Kingdom Win" onPress={() => router.push("/kingdom-wins/create" as any)} icon="add-circle" style={{ marginHorizontal: 16, marginBottom: 14 }} />
 
       {loading ? (
         <View style={styles.centerFill}><ActivityIndicator color={c.accentGreen} /></View>
@@ -77,9 +75,7 @@ export default function KingdomWinsScreen() {
           <Ionicons name="sparkles-outline" size={32} color={c.textMuted} />
           <Text style={styles.emptyTitle}>Your story could encourage someone.</Text>
           <Text style={styles.emptyText}>These are stories of what God is doing in the lives of people in this community — be the first to share.</Text>
-          <TouchableOpacity style={styles.emptyCta} onPress={() => router.push("/kingdom-wins/create" as any)}>
-            <Text style={styles.emptyCtaText}>Share a Kingdom Win</Text>
-          </TouchableOpacity>
+          <AppButton label="Share a Kingdom Win" onPress={() => router.push("/kingdom-wins/create" as any)} style={{ marginTop: 8 }} />
         </View>
       ) : (
         <FlatList
@@ -87,7 +83,7 @@ export default function KingdomWinsScreen() {
           keyExtractor={(e) => e.id}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 10 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/kingdom-wins/${item.id}` as any)} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/kingdom-wins/${item.id}` as any)} activeOpacity={0.85}>
               <View style={styles.cardHeader}>
                 <View style={[styles.entryBadge, item.entryType === "testimony" && styles.entryBadgeTestimony, item.entryType === "p2p_impact" && styles.entryBadgeImpact]}>
                   <Text style={styles.entryBadgeText}>{item.entryType === "testimony" ? "Testimony" : item.entryType === "p2p_impact" ? "P2P Impact" : "Kingdom Win"}</Text>
@@ -123,8 +119,6 @@ function makeStyles(c: AppColors) {
     tabActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
     tabText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
     tabTextActive: { color: "#fff", fontFamily: "Inter_600SemiBold" },
-    shareBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 12, marginHorizontal: 16, marginBottom: 14 },
-    shareBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
     emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 40 },
     emptyTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },

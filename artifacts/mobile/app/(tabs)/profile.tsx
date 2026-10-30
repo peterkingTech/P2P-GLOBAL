@@ -32,6 +32,7 @@ import { skillLabel } from "@/constants/skillsTaxonomy";
 import LivingTree, { stageLabel } from "@/components/LivingTree";
 import "@/lib/i18n";
 import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
+import { AppButton } from "@/components/ui";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "school" },
@@ -68,7 +69,6 @@ function makeStyles(c: AppColors) {
       paddingHorizontal: 16, paddingVertical: 14,
       borderBottomWidth: 1, borderBottomColor: c.borderBeige,
     },
-    backBtn: { padding: 4 },
     headerTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     content: { paddingHorizontal: 20, paddingTop: 24 },
     avatarSection: { alignItems: "center", marginBottom: 24 },
@@ -184,12 +184,6 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 10, paddingHorizontal: 6,
     },
     qrActionText: { fontSize: 12, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
-    signOutBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      backgroundColor: "rgba(185,28,28,0.08)",
-      borderRadius: 14, borderWidth: 1, borderColor: "rgba(185,28,28,0.2)",
-      height: 48,
-    },
     signOutText: { fontSize: 15, color: "#B91C1C", fontWeight: "600", fontFamily: "Inter_600SemiBold" },
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     sheet: {
@@ -226,10 +220,6 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
       borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: "top",
       color: c.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
-    },
-    submitReachOutBtn: {
-      backgroundColor: c.accentGreen, borderRadius: 12, height: 46,
-      alignItems: "center", justifyContent: "center", marginTop: 16,
     },
     submitReachOutText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     // Appearance shortcut (full picker lives at Settings -> Appearance)
@@ -411,7 +401,7 @@ export default function ProfileScreen() {
           {!!profile?.grainCount && (
             <>
               <View style={styles.statDivider} />
-              <TouchableOpacity style={styles.statItem} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
+              <TouchableOpacity accessibilityRole="button" style={styles.statItem} onPress={() => setGrainSheetOpen(true)} activeOpacity={0.7}>
                 <Text style={styles.statNum}>🌾 {profile.grainCount}</Text>
                 <Text style={styles.statLabel}>Grain</Text>
               </TouchableOpacity>
@@ -453,7 +443,7 @@ export default function ProfileScreen() {
         )}
 
         {/* Invite Someone */}
-        <TouchableOpacity style={styles.inviteRow} activeOpacity={0.85} onPress={handleShareInvite} disabled={invitingBusy}>
+        <TouchableOpacity accessibilityRole="button" style={styles.inviteRow} activeOpacity={0.85} onPress={handleShareInvite} disabled={invitingBusy}>
           <View style={styles.inviteIconWrap}>
             <Text style={{ fontSize: 20 }}>🌾</Text>
           </View>
@@ -491,10 +481,7 @@ export default function ProfileScreen() {
               <Text style={styles.giftChipText}>{GIFT_LABELS[gift] ?? gift}</Text>
             </View>
           ))}
-          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8} onPress={openGiftsModal}>
-            <Ionicons name="add" size={14} color={colors.accentGreen} />
-            <Text style={styles.addGiftChipText}>{t("profile.add")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("profile.add")} onPress={openGiftsModal} variant="outline" size="sm" icon="add" />
         </View>
 
         {/* Skills */}
@@ -505,15 +492,12 @@ export default function ProfileScreen() {
               <Text style={styles.giftChipText}>{skillLabel(skill)}</Text>
             </View>
           ))}
-          <TouchableOpacity style={styles.addGiftChip} activeOpacity={0.8} onPress={() => setSkillsOpen(true)}>
-            <Ionicons name="add" size={14} color={colors.accentGreen} />
-            <Text style={styles.addGiftChipText}>{t("profile.add")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("profile.add")} onPress={() => setSkillsOpen(true)} variant="outline" size="sm" icon="add" />
         </View>
 
         {/* Peer Guide dashboard */}
         {profile?.role === "peer_guide" && (
-          <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
             <Ionicons name="compass-outline" size={18} color={colors.primaryGreen} />
             <View style={{ flex: 1 }}>
               <Text style={styles.dashboardTitle}>{t("profile.peerGuideDashboard")}</Text>
@@ -525,7 +509,7 @@ export default function ProfileScreen() {
 
         {/* Admin dashboard */}
         {profile?.role && ADMIN_ROLES.has(profile.role) && (
-          <TouchableOpacity style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/team")}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/team")}>
             <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryGreen} />
             <View style={{ flex: 1 }}>
               <Text style={styles.dashboardTitle}>{t("profile.adminDashboard")}</Text>
@@ -567,7 +551,7 @@ export default function ProfileScreen() {
             { icon: "map-outline", label: "How to use P2P", route: "/get-started" },
             { icon: "person-add-outline", label: "Invite a Peer", route: "/connect/invite" },
           ].map((item) => (
-            <TouchableOpacity key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
+            <TouchableOpacity accessibilityRole="button" key={item.label} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
               <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
               <Text style={styles.settingsLabel}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
@@ -576,7 +560,7 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>{t("profile.support")}</Text>
-        <TouchableOpacity style={styles.reachOutBtn} onPress={openReachOut} activeOpacity={0.85}>
+        <TouchableOpacity accessibilityRole="button" style={styles.reachOutBtn} onPress={openReachOut} activeOpacity={0.85}>
           <Ionicons name="hand-left-outline" size={18} color={colors.accentGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.reachOutTitle}>{t("profile.imStruggling")}</Text>
@@ -585,10 +569,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.85}>
-          <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
-          <Text style={styles.signOutText}>{t("profile.signOut")}</Text>
-        </TouchableOpacity>
+        <AppButton label={t("profile.signOut")} onPress={handleSignOut} variant="outline" icon="log-out-outline" />
       </ScrollView>
 
       {/* Reach Out Modal */}
@@ -597,7 +578,7 @@ export default function ProfileScreen() {
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>Reach Out</Text>
-              <TouchableOpacity onPress={() => setReachOutOpen(false)} style={styles.closeBtn}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setReachOutOpen(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
@@ -617,7 +598,7 @@ export default function ProfileScreen() {
                 <Text style={styles.fieldLabel}>Category (optional)</Text>
                 <View style={styles.categoryRow}>
                   {STRUGGLE_CATEGORIES.map((c) => (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={c.value}
                       style={[styles.categoryChip, category === c.value && styles.categoryChipActive]}
                       onPress={() => setCategory(category === c.value ? null : c.value)}
@@ -638,13 +619,7 @@ export default function ProfileScreen() {
                   multiline
                   numberOfLines={4}
                 />
-                <TouchableOpacity style={styles.submitReachOutBtn} onPress={handleReachOutSubmit} disabled={submitting}>
-                  {submitting ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.submitReachOutText}>Send</Text>
-                  )}
-                </TouchableOpacity>
+                <AppButton label="Send" onPress={handleReachOutSubmit} disabled={submitting} loading={submitting} style={{ marginTop: 16 }} />
               </ScrollView>
             )}
           </View>
@@ -657,7 +632,7 @@ export default function ProfileScreen() {
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }, isTablet && { maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", width: "100%" }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t("profile.spiritualGifts")}</Text>
-              <TouchableOpacity onPress={() => setGiftsOpen(false)} style={styles.closeBtn}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setGiftsOpen(false)} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color={colors.textMid} />
               </TouchableOpacity>
             </View>
@@ -667,7 +642,7 @@ export default function ProfileScreen() {
                 {ALL_GIFTS.map((gift) => {
                   const selected = selectedGifts.includes(gift.key);
                   return (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={gift.key}
                       style={[styles.giftCard, selected && styles.giftCardSelected]}
                       onPress={() => toggleGift(gift.key)}
@@ -681,13 +656,7 @@ export default function ProfileScreen() {
                   );
                 })}
               </View>
-              <TouchableOpacity style={styles.submitReachOutBtn} onPress={handleSaveGifts} disabled={savingGifts}>
-                {savingGifts ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.submitReachOutText}>Save</Text>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Save" onPress={handleSaveGifts} disabled={savingGifts} loading={savingGifts} style={{ marginTop: 16 }} />
             </ScrollView>
           </View>
         </View>

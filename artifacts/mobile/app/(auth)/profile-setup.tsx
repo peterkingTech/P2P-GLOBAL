@@ -15,6 +15,7 @@ import { useAuth, SpiritualGift, MinistryRole } from "@/contexts/AuthContext";
 import { LocationVerifier, VerifiedLocation } from "@/components/LocationVerifier";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "school" },
@@ -158,7 +159,7 @@ export default function ProfileSetupScreen() {
         {GIFTS.map((gift) => {
           const selected = selectedGifts.includes(gift.key);
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={gift.key}
               style={[styles.giftCard, selected && styles.giftCardSelected]}
               onPress={() => toggleGift(gift.key)}
@@ -182,20 +183,7 @@ export default function ProfileSetupScreen() {
         })}
       </View>
 
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        onPress={handleGiftsDone}
-        activeOpacity={0.85}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.cream} />
-        ) : (
-          <Text style={styles.primaryBtnText}>
-            {selectedGifts.length === 0 ? "Skip for Now" : "Continue"}
-          </Text>
-        )}
-      </TouchableOpacity>
+      <AppButton label={selectedGifts.length === 0 ? "Skip for Now" : "Continue"} onPress={handleGiftsDone} size="lg" disabled={loading} loading={loading} palette="fixedLight" />
     </ScrollView>
   );
 }
@@ -268,18 +256,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryGreen,
     alignItems: "center",
     justifyContent: "center",
-  },
-  primaryBtn: {
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 14,
-    height: 54,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryBtnText: {
-    color: colors.cream,
-    fontSize: 16,
-    fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
   },
 });

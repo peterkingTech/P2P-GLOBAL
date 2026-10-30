@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import colors from "@/constants/colors";
 import { getKingdomStoriesAdminList, type KingdomStory, type KingdomStoryStatus } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 const STATUS_FILTERS: Array<{ value: KingdomStoryStatus | "all"; label: string }> = [
   { value: "draft", label: "Draft" }, { value: "review", label: "Review" },
@@ -44,14 +45,11 @@ export default function KingdomStoriesAdminListScreen() {
       </TouchableOpacity>
       <View style={styles.filterBar}>
         {STATUS_FILTERS.map((f) => (
-          <TouchableOpacity key={f.value} style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]} onPress={() => setStatusFilter(f.value)}>
+          <TouchableOpacity accessibilityRole="button" key={f.value} style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]} onPress={() => setStatusFilter(f.value)}>
             <Text style={[styles.filterChipText, statusFilter === f.value && styles.filterChipTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={styles.newBtn} onPress={() => router.push("/admin/kingdom-stories/create" as any)}>
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={styles.newBtnText}>New</Text>
-        </TouchableOpacity>
+        <AppButton label="New" onPress={() => router.push("/admin/kingdom-stories/create" as any)} size="sm" icon="add" style={{ marginLeft: "auto" }} palette="fixedLight" />
       </View>
 
       {loading ? (
@@ -63,7 +61,7 @@ export default function KingdomStoriesAdminListScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={<Text style={styles.emptyText}>No stories here yet.</Text>}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push(`/admin/kingdom-stories/${item.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(`/admin/kingdom-stories/${item.id}` as any)}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{item.title}</Text>
                 <Text style={styles.cardMeta}>{item.isFeatured ? "★ Featured · " : ""}Updated {new Date(item.updatedAt).toLocaleDateString()}</Text>
@@ -87,8 +85,6 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },
   filterChipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   filterChipTextActive: { color: "#fff", fontWeight: "600" },
-  newBtn: { flexDirection: "row", gap: 4, alignItems: "center", backgroundColor: colors.accentGreen, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: "auto" },
-  newBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { padding: 14, gap: 10 },
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },

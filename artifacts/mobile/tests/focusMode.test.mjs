@@ -85,7 +85,7 @@ ok("Bible text larger when expanded; passage / translation state untouched", /la
 ok("focus hook called before the loading return (hooks order stable)", g.indexOf("useFocusMode<FocusKey>(focusable)") < g.indexOf("if (loading || !session) {"));
 
 const bar = src("components/focus/FocusBar.tsx");
-ok("FocusBar: 44pt targets, labelled Done; only calls handlers it's given", /width: 44, height: 44/.test(bar) && /minHeight: 44/.test(bar) && /accessibilityLabel=\{`Done, close full screen \$\{title\}`\}/.test(bar) && !/agora|leave|endCall/i.test(bar));
+ok("FocusBar: 44pt targets, labelled Done; only calls handlers it's given", /width: 44, height: 44/.test(bar) && /<AppButton label="Done"/.test(bar) /* 44pt shared button */ && /accessibilityLabel=\{`Done, close full screen \$\{title\}`\}/.test(bar) && !/agora|leave|endCall/i.test(bar));
 
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

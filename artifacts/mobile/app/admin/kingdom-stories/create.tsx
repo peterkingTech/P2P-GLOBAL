@@ -6,6 +6,7 @@ import {
   createKingdomStory, getKingdomStoryCategories, CONTENT_TYPE_LABELS,
   type KingdomStoryCategory, type KingdomStoryContentType,
 } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -57,7 +58,7 @@ export default function CreateKingdomStoryScreen() {
       <Text style={styles.fieldLabel}>Category</Text>
       <View style={styles.chipGrid}>
         {categories.map((cat) => (
-          <TouchableOpacity key={cat.id} style={[styles.chip, categoryId === cat.id && styles.chipActive]} onPress={() => setCategoryId(cat.id)}>
+          <TouchableOpacity accessibilityRole="button" key={cat.id} style={[styles.chip, categoryId === cat.id && styles.chipActive]} onPress={() => setCategoryId(cat.id)}>
             <Text style={[styles.chipText, categoryId === cat.id && styles.chipTextActive]}>{cat.title}{cat.status !== "published" ? ` (${cat.status})` : ""}</Text>
           </TouchableOpacity>
         ))}
@@ -66,15 +67,13 @@ export default function CreateKingdomStoryScreen() {
       <Text style={styles.fieldLabel}>Content Type (optional)</Text>
       <View style={styles.chipGrid}>
         {CONTENT_TYPES.map((ct) => (
-          <TouchableOpacity key={ct} style={[styles.chip, contentType === ct && styles.chipActive]} onPress={() => setContentType(contentType === ct ? null : ct)}>
+          <TouchableOpacity accessibilityRole="button" key={ct} style={[styles.chip, contentType === ct && styles.chipActive]} onPress={() => setContentType(contentType === ct ? null : ct)}>
             <Text style={[styles.chipText, contentType === ct && styles.chipTextActive]}>{CONTENT_TYPE_LABELS[ct]}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={submitting || !title.trim() || !body.trim() || !categoryId}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.createBtnText}>Create Draft</Text>}
-      </TouchableOpacity>
+      <AppButton label="Create Draft" onPress={handleCreate} disabled={submitting || !title.trim() || !body.trim() || !categoryId} loading={submitting} style={{ marginTop: 24 }} palette="fixedLight" />
     </ScrollView>
   );
 }
@@ -91,6 +90,4 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primaryGreen, borderColor: colors.primaryGreen },
   chipText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   chipTextActive: { color: "#fff", fontFamily: "Inter_600SemiBold" },
-  createBtn: { backgroundColor: colors.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 24 },
-  createBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

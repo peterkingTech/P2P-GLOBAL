@@ -8,6 +8,7 @@ import {
   getCurriculumOutline, getLearningHome, startJourney, setCurrentLesson, markCovered, unmarkCovered,
   type CurriculumOutline, type GroupScope, type LearningHome,
 } from "@/lib/groupLearningApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -69,10 +70,7 @@ export default function CurriculumOutlineScreen() {
         <Text style={styles.badge}>Official P2P {outline.curriculum.type === "plan" ? "Plan" : "curriculum"}</Text>
 
         {canManage && !journey && (
-          <TouchableOpacity style={styles.primary} onPress={() => run("start", () => startJourney(scope!, groupId!, outline.curriculum.id), "Couldn't choose this series")}
-            accessibilityRole="button" accessibilityLabel={`Study ${outline.curriculum.title} together`}>
-            {busy === "start" ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Study this together</Text>}
-          </TouchableOpacity>
+          <AppButton label="Study this together" onPress={() => run("start", () => startJourney(scope!, groupId!, outline.curriculum.id), "Couldn't choose this series")} loading={busy === "start"} accessibilityLabel={`Study ${outline.curriculum.title} together`} />
         )}
         {journey && <Text style={styles.current}>Your {scope === "family" ? "family" : "church"} is studying this · {journey.group.covered} of {journey.group.total} covered together</Text>}
 
@@ -92,17 +90,11 @@ export default function CurriculumOutlineScreen() {
                   </TouchableOpacity>
                   {journey && canManage && journey.status === "active" && (
                     isCovered ? (
-                      <TouchableOpacity style={styles.smallBtn} onPress={() => run(l.id, () => unmarkCovered(scope!, groupId!, journey.id, l.id), "Couldn't update")} accessibilityRole="button" accessibilityLabel={`Undo covered for ${l.title}`}>
-                        {busy === l.id ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.smallText}>Undo</Text>}
-                      </TouchableOpacity>
+                      <AppButton label="Undo" onPress={() => run(l.id, () => unmarkCovered(scope!, groupId!, journey.id, l.id), "Couldn't update")} variant="tertiary" loading={busy === l.id} accessibilityLabel={`Undo covered for ${l.title}`} style={{ minWidth: 64 }} />
                     ) : isCurrent ? (
-                      <TouchableOpacity style={styles.smallBtn} onPress={() => run(l.id, () => markCovered(scope!, groupId!, journey.id, l.id, true), "Couldn't update")} accessibilityRole="button" accessibilityLabel={`Mark ${l.title} covered together`}>
-                        {busy === l.id ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.smallText}>Covered</Text>}
-                      </TouchableOpacity>
+                      <AppButton label="Covered" onPress={() => run(l.id, () => markCovered(scope!, groupId!, journey.id, l.id, true), "Couldn't update")} variant="tertiary" loading={busy === l.id} accessibilityLabel={`Mark ${l.title} covered together`} style={{ minWidth: 64 }} />
                     ) : (
-                      <TouchableOpacity style={styles.smallBtn} onPress={() => run(l.id, () => setCurrentLesson(scope!, groupId!, journey.id, l.id), "Couldn't update")} accessibilityRole="button" accessibilityLabel={`Make ${l.title} the group's current lesson`}>
-                        {busy === l.id ? <ActivityIndicator size="small" color={c.accentGreen} /> : <Text style={styles.smallText}>Go here</Text>}
-                      </TouchableOpacity>
+                      <AppButton label="Go here" onPress={() => run(l.id, () => setCurrentLesson(scope!, groupId!, journey.id, l.id), "Couldn't update")} variant="tertiary" loading={busy === l.id} accessibilityLabel={`Make ${l.title} the group's current lesson`} style={{ minWidth: 64 }} />
                     )
                   )}
                 </View>
@@ -130,7 +122,6 @@ function makeStyles(c: AppColors) {
     moduleTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
     lessonRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     lessonTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
-    smallBtn: { minHeight: 44, minWidth: 64, alignItems: "center", justifyContent: "center" },
     smallText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     muted: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
   });

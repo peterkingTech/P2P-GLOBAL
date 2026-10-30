@@ -11,6 +11,8 @@ import {
   type DiscoverHome, type CatalogueCategory, type KingdomStory, type StoryCard, type HeroSource,
 } from "@/lib/kingdomStoriesApi";
 import { CoverArt, DiscoverRow, StoryPosterCard, progressOf, storyAction } from "@/components/kingdom-stories/DiscoverRow";
+import { AppButton, IconButton } from "@/components/ui";
+import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
 
 // Kingdom Stories — a learning library with a cinematic browse, in the
 // reader's light/dark theme. Everything shown is real:
@@ -100,10 +102,9 @@ export default function KingdomStoriesDiscoverScreen() {
   const hAction = hero ? storyAction(hero) : null;
   const journey = home?.journey ?? null;
   const catInfo = new Map(categories.map((c) => [c.id, c]));
-  // The Featured image is shown WHOLE (its own 16:9 shape, capped on wide screens with the sides softly
-  // filled) so the corner credit — “P2P Global | Creative Studios” — is never cropped or covered;
-  // the title and buttons sit below it.
-  const heroH = Math.max(insets.top + 120, Math.min(560, Math.round(width * 9 / 16)));
+  // The Featured image fills the device screen (owner decision 2026-10-30): full width and height,
+  // cropped to fit. The title and buttons sit below it.
+  const heroH = useFullScreenPhotoHeight();
   const barIcon = hero ? ART_TEXT.text : T.textPrimary;
   return (
     <View style={styles.screen}>
@@ -119,17 +120,17 @@ export default function KingdomStoriesDiscoverScreen() {
               accessibilityLabel={`Featured stories, ${slides.length} ${slides.length === 1 ? "slide" : "slides"}. Swipe to see more`}
               renderItem={({ item }) => (
                 <TouchableOpacity activeOpacity={0.95} onPress={() => open(item)} style={{ width, height: heroH }} accessibilityRole="button" accessibilityLabel={`${item.title}. Open story details`}>
-                  <CoverArt path={item.hero?.mediaPath ?? item.media?.[0]?.mediaPath} alt={item.hero?.altText ?? item.media?.[0]?.altText ?? null} />
+                  <CoverArt fit="cover" path={item.hero?.mediaPath ?? item.media?.[0]?.mediaPath} alt={item.hero?.altText ?? item.media?.[0]?.altText ?? null} />
                 </TouchableOpacity>
               )} />
           ) : null}
           {hero ? <LinearGradient colors={["rgba(0,0,0,0.6)", "rgba(0,0,0,0)"]} locations={[0, 0.45]} style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
           <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-            <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
+            <TouchableOpacity hitSlop={10} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
               <Ionicons name="arrow-back" size={22} color={barIcon} />
             </TouchableOpacity>
             <Text style={[styles.brand, { color: barIcon }]} accessibilityRole="header">Kingdom Stories</Text>
-            <TouchableOpacity onPress={() => router.push("/kingdom-stories/library" as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="My library">
+            <TouchableOpacity hitSlop={10} onPress={() => router.push("/kingdom-stories/library" as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="My library">
               <Ionicons name="library-outline" size={22} color={barIcon} />
             </TouchableOpacity>
           </View>
@@ -157,18 +158,10 @@ export default function KingdomStoriesDiscoverScreen() {
               </View>
             ) : null}
             <View style={styles.heroActions}>
-              <TouchableOpacity style={styles.playBtn} onPress={() => startOrContinue(hero)} accessibilityRole="button"
-                accessibilityLabel={`${hAction.label}: ${hero.title}${hProg ? `. ${hProg.label}` : ""}`}>
-                <Ionicons name={hAction.icon} size={18} color={T.onLight} />
-                <Text style={styles.playText}>{hAction.label}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ghostBtn} onPress={() => open(hero)} accessibilityRole="button" accessibilityLabel={`View story details: ${hero.title}`}>
-                <Ionicons name="information-circle-outline" size={18} color={T.textPrimary} /><Text style={styles.ghostText}>View Story Details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.roundBtn} onPress={toggleHeroFavourite} accessibilityRole="button" accessibilityState={{ selected: heroFav }}
-                accessibilityLabel={heroFav ? "Remove from My Favourites" : "Add to My Favourites"}>
-                <Ionicons name={heroFav ? "heart" : "heart-outline"} size={20} color={heroFav ? "#FB7185" : T.textPrimary} />
-              </TouchableOpacity>
+              <AppButton label={hAction.label} onPress={() => startOrContinue(hero)} size="lg" icon={hAction.icon} accessibilityLabel={`${hAction.label}: ${hero.title}${hProg ? `. ${hProg.label}` : ""}`} />
+              <AppButton label="View Story Details" onPress={() => open(hero)} variant="secondary" size="lg" icon="information-circle-outline" accessibilityLabel={`View story details: ${hero.title}`} />
+              <IconButton icon="heart-outline" selectedIcon="heart" selected={heroFav} variant="tinted" onPress={toggleHeroFavourite}
+                color={heroFav ? "#E11D48" : undefined} accessibilityLabel={heroFav ? "Remove from My Favourites" : "Add to My Favourites"} />
             </View>
           </View>
         ) : null}
@@ -191,7 +184,7 @@ export default function KingdomStoriesDiscoverScreen() {
             <View style={styles.empty}>
               <Ionicons name="cloud-offline-outline" size={30} color={T.textTertiary} />
               <Text style={styles.emptyText}>Kingdom Stories couldn't load. Check your connection.</Text>
-              <TouchableOpacity onPress={() => { setLoading(true); load(); }} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+              <AppButton label="Try again" onPress={() => { setLoading(true); load(); }} variant="tertiary" />
             </View>
           ) : results !== null || searching ? (
             <View style={styles.resultsGrid}>
@@ -303,7 +296,7 @@ function makeStyles(T: StoryPalette) {
     dotHit: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: T.border },
     dotOn: { width: 20, backgroundColor: T.growth },
-    heroText: { paddingHorizontal: 16, paddingTop: 14, gap: 6, maxWidth: 760, width: "100%" },
+    heroText: { paddingHorizontal: 16, paddingTop: 14, gap: 6, width: "100%" },
     heroKicker: { color: T.light, ...TT.label, textTransform: "uppercase" },
     heroTitle: { color: T.textPrimary, fontSize: 30, lineHeight: 36, fontFamily: "Inter_700Bold" },
     heroSub: { color: T.textSecondary, ...TT.body },
@@ -312,11 +305,6 @@ function makeStyles(T: StoryPalette) {
     heroFill: { height: 4, backgroundColor: T.growth },
     heroProgressText: { color: T.textSecondary, ...TT.caption },
     heroActions: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" },
-    playBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F4EFE4", borderRadius: 10, paddingHorizontal: 18, minHeight: 46, borderWidth: 1, borderColor: "rgba(0,0,0,0.08)" },
-    playText: { color: T.onLight, ...TT.bodyEmph, fontSize: 15 },
-    ghostBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surfaceRaised, borderRadius: 10, paddingHorizontal: 16, minHeight: 46, borderWidth: 1, borderColor: T.borderFaint },
-    ghostText: { color: T.textPrimary, ...TT.bodyEmph },
-    roundBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: T.surfaceRaised, borderWidth: 1, borderColor: T.borderFaint },
     searchWrap: { paddingHorizontal: 16, marginTop: 14 },
     searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: T.surfaceRaised, borderRadius: 12, paddingHorizontal: 12, minHeight: MIN_TOUCH_TARGET, borderWidth: 1, borderColor: T.borderFaint },
     searchInput: { flex: 1, color: T.textPrimary, ...TT.body, paddingVertical: 10 },

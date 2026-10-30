@@ -55,17 +55,17 @@ export default function GatheringFooter({
       >
         <FamilyIcon name="raiseHand" size={ICON} active={handRaised} color={handRaised ? colors.light : colors.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenChat} accessibilityRole="button" accessibilityLabel="Open Chat">
+      <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={onOpenChat} accessibilityRole="button" accessibilityLabel="Open Chat">
         <Ionicons name="chatbubble-outline" size={ICON} color={colors.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenNotes} accessibilityRole="button" accessibilityLabel="Open Notes">
+      <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={onOpenNotes} accessibilityRole="button" accessibilityLabel="Open Notes">
         <Ionicons name="document-text-outline" size={ICON} color={colors.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} onPress={onOpenAudioBalance} accessibilityRole="button" accessibilityLabel="Open Audio">
+      <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={onOpenAudioBalance} accessibilityRole="button" accessibilityLabel="Open Audio">
         <Ionicons name="options-outline" size={ICON} color={colors.textPrimary} />
       </TouchableOpacity>
       {isHost && (
-        <TouchableOpacity style={styles.iconBtn} onPress={onOpenTransfer} accessibilityRole="button" accessibilityLabel="Transfer Guide role">
+        <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={onOpenTransfer} accessibilityRole="button" accessibilityLabel="Transfer Guide role">
           <Ionicons name="swap-horizontal-outline" size={ICON} color={colors.textPrimary} />
         </TouchableOpacity>
       )}

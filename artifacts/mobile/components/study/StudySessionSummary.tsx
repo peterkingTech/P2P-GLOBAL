@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { StudySessionSummary as Summary } from "@/hooks/useStudySession";
+import { AppButton } from "@/components/ui";
 
 function formatDuration(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -45,7 +46,7 @@ export function StudySessionSummary({
           <Text style={styles.footnote}>Lesson progress was updated individually for everyone in the session.</Text>
 
           {!prayed ? (
-            <TouchableOpacity style={styles.prayBtn} onPress={() => setPrayed(true)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.prayBtn} onPress={() => setPrayed(true)}>
               <Ionicons name="heart" size={16} color="#fff" />
               <Text style={styles.prayBtnText}>Pray Together</Text>
             </TouchableOpacity>
@@ -54,12 +55,8 @@ export function StudySessionSummary({
           )}
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={onEndCall}>
-              <Text style={styles.secondaryBtnText}>End Call</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onContinueCall}>
-              <Text style={styles.primaryBtnText}>Continue Call</Text>
-            </TouchableOpacity>
+            <AppButton label="End Call" onPress={onEndCall} variant="destructive" style={{ flex: 1 }} palette="fixedDark" />
+            <AppButton label="Continue Call" onPress={onContinueCall} style={{ flex: 1 }} palette="fixedDark" />
           </View>
         </View>
       </View>
@@ -85,8 +82,4 @@ const styles = StyleSheet.create({
   prayBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   prayedText: { color: "rgba(255,255,255,0.7)", fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginBottom: 14 },
   actionsRow: { flexDirection: "row", gap: 10 },
-  secondaryBtn: { flex: 1, borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  secondaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  primaryBtn: { flex: 1, backgroundColor: "#1D9E75", borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  primaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

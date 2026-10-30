@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { useRouter } from "expo-router";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 function currentWeekRange(): { start: Date; end: Date; label: string } {
   const now = new Date();
@@ -73,9 +74,7 @@ export default function SubmitReportScreen() {
         numberOfLines={6}
       />
 
-      <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Submit Report</Text>}
-      </TouchableOpacity>
+      <AppButton label="Submit Report" onPress={handleSubmit} size="lg" disabled={submitting} loading={submitting} style={{ marginTop: 20 }} palette="fixedLight" />
 
       <Text style={styles.footerNote}>Report will be sent to your supervisor and the Administrative Supervisor.</Text>
     </ScrollView>
@@ -106,7 +105,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12,
     padding: 12, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular", minHeight: 120, textAlignVertical: "top",
   },
-  submitBtn: { backgroundColor: colors.accentGreen, borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 20 },
-  submitBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
   footerNote: { fontSize: 11, color: colors.textMuted, textAlign: "center", marginTop: 12, fontFamily: "Inter_400Regular" },
 });

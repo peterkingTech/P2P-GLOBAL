@@ -102,7 +102,7 @@ const chapter = src("app/kingdom-stories/chapter.tsx");
 const links = src("components/kingdom-stories/ScriptureLinks.tsx");
 const img = src("components/kingdom-stories/StoryImage.tsx");
 ok("book: cover, introduction, progress, Start/Continue Reading, contents, sources & credits",
-  ["StoryImage media={cover}", "Introduction", "progressBox", "Start Reading", "Continue Reading", "Contents", "Sources & credits"].every((x) => book.includes(x)));
+  ['CoverArt fit="cover" path={cover.mediaPath}', "Introduction", "progressBox", "Start Reading", "Continue Reading", "Contents", "Sources & credits"].every((x) => book.includes(x)));
 ok("book: chapter status in words (not colour/icon only) and locked reason", book.includes("STATE_LABEL[st]") && book.includes("lockedMessage(chapters, ch.id)") && book.includes("accessibilityLabel={`Chapter ${ch.chapterNumber}"));
 ok("book: progress refreshed when returning from a chapter", book.includes("useFocusEffect"));
 ok("book: chapter images stay with their chapter (not in the story gallery)", book.includes("media.filter((m) => !m.chapterId && m.id !== cover?.id && m.id !== overview?.id)")); // overview image sits with the introduction (migration 215)
@@ -139,7 +139,7 @@ ok("an empty copy never replaces writing", D.pickDraft({ text: "kept", at: 1 }, 
 const draftsSrc = src("lib/drafts.ts");
 ok("drafts: device copy first, online best-effort, deleted on submit", draftsSrc.includes("saveDraft(key, latest.current") && draftsSrc.includes('from("p2p_answer_drafts")') && draftsSrc.includes("void removeOnline(key)") && /catch \{ \/\* offline/.test(draftsSrc));
 ok("draft wording no longer says 'on this device' only", !src("app/lesson/[id].tsx").includes('"Draft saved on this device"') && src("app/lesson/[id].tsx").includes("continues on your other devices"));
-const RP = load("components/ReviewPrompts.tsx", { react: { default: { createElement: () => null } }, "react-native": { StyleSheet: { create: (x) => x }, View: "View", Text: "Text", TouchableOpacity: "TouchableOpacity" }, "@/constants/colors": { default: {} } });
+const RP = load("components/ReviewPrompts.tsx", { react: { default: { createElement: () => null } }, "react-native": { StyleSheet: { create: (x) => x }, View: "View", Text: "Text", TouchableOpacity: "TouchableOpacity" }, "@/constants/colors": { default: {} }, "@/components/ui": { AppButton: "AppButton" } });
 ok("reviewer prompts: encouraging questions, not grades", RP.REVIEW_PROMPTS.length === 4 && RP.REVIEW_PROMPTS.every((p) => !/score|grade|wrong|fail/i.test(p)));
 ok("reviewer prompt added once, on its own line", RP.addPrompt("Good work.", RP.REVIEW_PROMPTS[0]) === `Good work.\n${RP.REVIEW_PROMPTS[0]} ` && RP.addPrompt(`x ${RP.REVIEW_PROMPTS[0]}`, RP.REVIEW_PROMPTS[0]) === `x ${RP.REVIEW_PROMPTS[0]}`);
 ok("reviewer prompts on both review cards", (src("app/evaluations.tsx").match(/<ReviewPrompts feedback=\{feedback\} onChange=\{setFeedback\} \/>/g) ?? []).length === 2);

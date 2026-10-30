@@ -59,7 +59,7 @@ ok("draft → Draft saved", M.shareOutcome("draft", { status: "draft" }).title =
 const create = read("app/kingdom-wins/create.tsx");
 ok("create: shows the community rules", /WINS_COMMUNITY_RULES\.map/.test(create) && /Community rules/.test(create));
 ok("create: loads the member's posting status", /getMyWinsPostingStatus\(\)/.test(create));
-ok("create: Share disabled while restricted (drafts still allowed)", /disabled=\{[^}]*!!restrictedNotice\}/.test(create) && /handleSubmit\("draft"\)\} disabled=\{submitting \|\| !title\.trim\(\) \|\| !hasContent\}/.test(create));
+ok("create: Share disabled while restricted (drafts still allowed)", /disabled=\{[^}]*!!restrictedNotice\}/.test(create) && /handleSubmit\("draft"\)\}[^\n]*disabled=\{submitting \|\| !title\.trim\(\) \|\| !hasContent\}/.test(create));
 ok("create: alert reflects a held post", /shareOutcome\(status, saved\)/.test(create));
 ok("create: P2P Impact still submits for review with consent", /handleSubmit\(isImpact \? "submitted" : "published"\)/.test(create) && /isImpact && !consentConfirmed/.test(create));
 
@@ -74,9 +74,24 @@ ok("review: moderators see the automatic English translation", /item\.screeningT
 ok("review: 'not yet translated' holds are explained", /translation: "Not yet translated/.test(review));
 ok("rules note tells members other languages are translated, and by whom", /translated for this check by our AI provider \(Anthropic\)/.test(M.WINS_RULES_NOTE));
 ok("held message doesn't assume the reason", /couldn't be checked automatically/.test(M.shareOutcome("published", { status: "submitted", heldForReview: true }).message));
-ok("review: every button labelled", (review.match(/<TouchableOpacity/g) ?? []).length === (review.match(/accessibilityLabel=/g) ?? []).length - (review.match(/<TextInput[^>]*accessibilityLabel=/g) ?? []).length - (review.match(/<View[^>]*accessibilityLabel=/g) ?? []).length,
-  `${(review.match(/<TouchableOpacity/g) ?? []).length} buttons`);
-ok("review: 44px targets for chips and buttons", /filterChip: \{[^}]*minHeight: 44/.test(review) && /actionBtn: \{[^}]*minHeight: 44/.test(review));
+// Every tappable carries a spoken label: TouchableOpacity / IconButton by accessibilityLabel, AppButton by its label.
+const reviewButtons = (() => {
+  const sf = ts.createSourceFile("r.tsx", review, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const out = [];
+  const visit = (n) => {
+    const op = ts.isJsxElement(n) ? n.openingElement : ts.isJsxSelfClosingElement(n) ? n : null;
+    const name = op?.tagName.getText();
+    if (name && ["TouchableOpacity", "AppButton", "IconButton"].includes(name)) {
+      const has = (k) => op.attributes.properties.some((a) => a.name?.getText() === k);
+      out.push({ name, labelled: name === "AppButton" ? has("label") : has("accessibilityLabel") });
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return out;
+})();
+ok("review: every button labelled", reviewButtons.length > 0 && reviewButtons.every((b) => b.labelled), `${reviewButtons.filter((b) => !b.labelled).length} unlabelled of ${reviewButtons.length}`);
+ok("review: 44px targets for chips and buttons", /filterChip: \{[^}]*minHeight: 44/.test(review) && /<AppButton /.test(review) && !/<AppButton [^\n]*size="sm"/.test(review) /* shared buttons: 44pt */);
 
 // Admin nav.
 const nav = read("app/admin/_layout.tsx");

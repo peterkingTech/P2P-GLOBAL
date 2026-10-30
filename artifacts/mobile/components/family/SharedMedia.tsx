@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import SyncedMediaPlayer from "./SyncedMediaPlayer";
 import { colors, radii, spacing, type, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import type { WorshipSession } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 interface Props {
   session: WorshipSession;
@@ -41,16 +42,13 @@ export default function SharedMedia({
        <View style={rotated ? { width: length, transform: [{ rotate: "90deg" }] } : undefined}>
         <SyncedMediaPlayer session={session} mediaVolume={mediaVolume} resyncNonce={resyncNonce} onDriftStatus={onDriftStatus} onEnded={onEnded} />
         {isBehind && (
-          <TouchableOpacity style={styles.returnToLiveBadge} onPress={onReturnToLive} accessibilityRole="button" accessibilityLabel="Return to live playback">
-            <Ionicons name="refresh" size={12} color={colors.textPrimary} />
-            <Text style={styles.returnToLiveText}>Return to Live</Text>
-          </TouchableOpacity>
+          <AppButton label="Return to Live" onPress={onReturnToLive} size="sm" icon="refresh" accessibilityLabel="Return to live playback" style={{ position: "absolute", bottom: 10, alignSelf: "center" }} palette="fixedDark" />
         )}
        </View>
       </View>
       {canControl && !rotated && (
         <View style={styles.controlRow}>
-          <TouchableOpacity
+          <TouchableOpacity hitSlop={10}
             style={styles.playBtn} onPress={onTogglePlay}
             accessibilityRole="button" accessibilityLabel={session.isPlaying ? "Pause Media" : "Play Media"}
           >
@@ -65,9 +63,7 @@ export default function SharedMedia({
             autoCapitalize="none"
             accessibilityLabel="YouTube link for Media"
           />
-          <TouchableOpacity style={styles.setBtn} onPress={onSetMedia} accessibilityRole="button" accessibilityLabel="Set Media">
-            <Text style={styles.setBtnText}>Set</Text>
-          </TouchableOpacity>
+          <AppButton label="Set" onPress={onSetMedia} accessibilityLabel="Set Media" palette="fixedDark" />
         </View>
       )}
       {rotated ? <StatusBar hidden /> : null}
@@ -84,6 +80,4 @@ const styles = StyleSheet.create({
   controlRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
   playBtn: { width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, borderRadius: MIN_TOUCH_TARGET / 2, backgroundColor: colors.growth, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, backgroundColor: colors.surfaceRaised, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: MIN_TOUCH_TARGET, color: colors.textPrimary, ...type.body },
-  setBtn: { backgroundColor: colors.growth, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: MIN_TOUCH_TARGET, justifyContent: "center", alignItems: "center" },
-  setBtnText: { color: colors.textPrimary, ...type.bodyEmph },
 });

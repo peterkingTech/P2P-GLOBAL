@@ -19,7 +19,7 @@ export default function MinistryRolePicker({ value, onSelect }: { value: Ministr
       {MINISTRY_ROLE_OPTIONS.map((opt) => {
         const selected = value === opt.key;
         return (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={opt.key}
             style={[styles.card, selected && styles.cardSelected]}
             onPress={() => onSelect(opt.key)}

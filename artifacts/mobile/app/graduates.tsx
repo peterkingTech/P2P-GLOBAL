@@ -77,7 +77,7 @@ export default function GraduatesScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Completion Letters</Text>
@@ -94,7 +94,7 @@ export default function GraduatesScreen() {
           </View>
         ) : (
           graduates.map((g) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={g.id}
               style={styles.graduateCard}
               activeOpacity={0.85}

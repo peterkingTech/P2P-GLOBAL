@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -37,6 +38,8 @@ const RN = {
 const colors = { accentGreen: "#0b0", lightCream: "#fff", card: "#fff", borderBeige: "#ddd", textDark: "#111", textMid: "#333", textMuted: "#777" };
 const QRCode = host("QRCode");
 const mocks = {
+  // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+  "@/components/ui": buttonDouble(React, RN),
   react: reactMock, "react-native": RN,
   "@expo/vector-icons": { Ionicons: host("Ionicons") },
   "expo-clipboard": { setStringAsync: async (s) => { copies.push(s); return true; } },
@@ -219,7 +222,8 @@ await byLabel("Share link").props.onPress();
 ok("sheet: Share opens the OS share sheet with the URL", shares.length === 1 && shares[0].message.includes(prof.url));
 ok("sheet: Enlarge and Close are labelled buttons", nodes.filter((n) => n.props?.accessibilityLabel === "Enlarge QR code").length >= 1 && !!byLabel("Close"));
 const buttons = ["Copy link", "Share link", "Close"].map(byLabel);
-ok("sheet: 44pt touch targets", src("components/qr/QrShareSheet.tsx").match(/minHeight: 44/g).length >= 3);
+// Copy / Share / Close are shared buttons (44pt by design) or styles with minHeight 44.
+ok("sheet: 44pt touch targets", ((src("components/qr/QrShareSheet.tsx").match(/minHeight: 44/g) ?? []).length + (src("components/qr/QrShareSheet.tsx").match(/<AppButton (?![^\n]*size="sm")/g) ?? []).length) >= 3);
 slots = []; slot = 0;
 ok("sheet: nothing rendered without a spec", QrShareSheet({ spec: null, visible: true, onClose() {} }) === null);
 // Enlarged view: flip the enlarged state slot and re-render.

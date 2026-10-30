@@ -8,6 +8,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const TIER_FILTERS: Array<{ value: HelpRequestTier | "all"; label: string }> = [
   { value: "all", label: "All Tiers" },
@@ -153,7 +154,7 @@ export default function HelpRequestsScreen() {
       <View style={styles.filterBar}>
         <View style={styles.filterGroup}>
           {TIER_FILTERS.map((f) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={f.value}
               style={[styles.filterChip, tierFilter === f.value && styles.filterChipActive]}
               onPress={() => setTierFilter(f.value)}
@@ -164,7 +165,7 @@ export default function HelpRequestsScreen() {
         </View>
         <View style={styles.filterGroup}>
           {STATUS_FILTERS.map((f) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={f.value}
               style={[styles.filterChip, statusFilter === f.value && styles.filterChipActive]}
               onPress={() => setStatusFilter(f.value)}
@@ -197,32 +198,12 @@ export default function HelpRequestsScreen() {
               </Text>
               {item.category && <Text style={styles.category}>Category: {item.category}</Text>}
               {item.note && <Text style={styles.note}>{item.note}</Text>}
-              <TouchableOpacity style={[styles.statusBtn, styles[`status_${item.status}` as const]]} onPress={() => cycleStatus(item)}>
+              <TouchableOpacity accessibilityRole="button" style={[styles.statusBtn, styles[`status_${item.status}` as const]]} onPress={() => cycleStatus(item)}>
                 <Text style={styles.statusBtnText}>{item.status.toUpperCase()} · tap to advance</Text>
               </TouchableOpacity>
               <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.messageBtn, styles.actionBtnHalf]}
-                  onPress={() => handleMessageThem(item)}
-                  disabled={calling === item.id}
-                >
-                  <Ionicons name="mail-outline" size={14} color={colors.accentGreen} />
-                  <Text style={styles.messageBtnText}>Mail</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.callBtn, styles.actionBtnHalf]}
-                  onPress={() => handleCallThem(item)}
-                  disabled={calling === item.id}
-                >
-                  {calling === item.id ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="call-outline" size={14} color="#fff" />
-                      <Text style={styles.callBtnText}>Call</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                <AppButton label="Mail" onPress={() => handleMessageThem(item)} variant="secondary" size="sm" icon="mail-outline" disabled={calling === item.id} style={{ flex: 1, marginTop: 0 }} palette="fixedLight" />
+                <AppButton label="Call" onPress={() => handleCallThem(item)} size="sm" icon="call-outline" disabled={calling === item.id} loading={calling === item.id} style={{ flex: 1, marginTop: 0 }} palette="fixedLight" />
               </View>
             </View>
           )}

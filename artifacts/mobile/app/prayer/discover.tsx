@@ -42,7 +42,7 @@ export default function PrayerDiscoverScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Pray the Word</Text>
@@ -55,7 +55,7 @@ export default function PrayerDiscoverScreen() {
 
         <View style={styles.grid}>
           {SITUATIONS.map((s) => (
-            <TouchableOpacity key={s.key} style={styles.situationCard} onPress={() => handleSelect(s.target)} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" key={s.key} style={styles.situationCard} onPress={() => handleSelect(s.target)} activeOpacity={0.85}>
               <Text style={styles.situationText}>{s.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={c.accentGreen} />
             </TouchableOpacity>

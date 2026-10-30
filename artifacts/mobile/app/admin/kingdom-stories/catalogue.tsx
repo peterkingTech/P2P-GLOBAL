@@ -6,6 +6,7 @@ import colors from "@/constants/colors";
 import {
   getCatalogueOverview, TOPIC_STATUSES, TOPIC_STATUS_LABELS, TOPIC_PRIORITIES, PRIORITY_LABELS, type CatalogueOverview,
 } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 // Catalogue progress for editors. Counts only — no completion percentages:
 // a topic count says what is planned, not how much of the catalogue is
@@ -29,10 +30,7 @@ export default function KingdomStoriesCatalogueScreen() {
       </TouchableOpacity>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Catalogue</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/admin/kingdom-stories/topics/new" as any)}>
-          <Ionicons name="add" size={15} color="#fff" />
-          <Text style={styles.primaryBtnText}>New topic</Text>
-        </TouchableOpacity>
+        <AppButton label="New topic" onPress={() => router.push("/admin/kingdom-stories/topics/new" as any)} icon="add" palette="fixedLight" />
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : !data ? <ActivityIndicator color={colors.primaryGreen} style={{ marginTop: 40 }} /> : (
@@ -54,7 +52,7 @@ export default function KingdomStoriesCatalogueScreen() {
           <Text style={styles.heading}>Topics by status</Text>
           <View style={styles.chips}>
             {TOPIC_STATUSES.map((s) => (
-              <TouchableOpacity key={s} style={styles.statChip} onPress={() => router.push(`/admin/kingdom-stories/topics?status=${s}` as any)}>
+              <TouchableOpacity accessibilityRole="button" key={s} style={styles.statChip} onPress={() => router.push(`/admin/kingdom-stories/topics?status=${s}` as any)}>
                 <Text style={styles.statChipNum}>{data.topicsByStatus[s] ?? 0}</Text>
                 <Text style={styles.statChipLabel}>{TOPIC_STATUS_LABELS[s]}</Text>
               </TouchableOpacity>
@@ -64,7 +62,7 @@ export default function KingdomStoriesCatalogueScreen() {
           <Text style={styles.heading}>Topics by priority</Text>
           <View style={styles.chips}>
             {TOPIC_PRIORITIES.map((p) => (
-              <TouchableOpacity key={p} style={styles.statChip} onPress={() => router.push(`/admin/kingdom-stories/topics?priority=${p}` as any)}>
+              <TouchableOpacity accessibilityRole="button" key={p} style={styles.statChip} onPress={() => router.push(`/admin/kingdom-stories/topics?priority=${p}` as any)}>
                 <Text style={styles.statChipNum}>{data.topicsByPriority[p] ?? 0}</Text>
                 <Text style={styles.statChipLabel}>{PRIORITY_LABELS[p]}</Text>
               </TouchableOpacity>
@@ -80,7 +78,7 @@ export default function KingdomStoriesCatalogueScreen() {
             <>
               <Text style={styles.heading}>Stories in progress</Text>
               {data.storiesInProgress.map((s) => (
-                <TouchableOpacity key={s.id} style={styles.row} onPress={() => router.push(`/admin/kingdom-stories/${s.id}` as any)}>
+                <TouchableOpacity accessibilityRole="button" key={s.id} style={styles.row} onPress={() => router.push(`/admin/kingdom-stories/${s.id}` as any)}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{s.title}</Text>
                     <Text style={styles.rowMeta}>
@@ -95,7 +93,7 @@ export default function KingdomStoriesCatalogueScreen() {
 
           <Text style={styles.heading}>Categories</Text>
           {data.categories.map((c) => (
-            <TouchableOpacity key={c.id} style={[styles.row, c.status !== "published" && { opacity: 0.6 }]} onPress={() => router.push(`/admin/kingdom-stories/topics?category=${c.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" key={c.id} style={[styles.row, c.status !== "published" && { opacity: 0.6 }]} onPress={() => router.push(`/admin/kingdom-stories/topics?category=${c.id}` as any)}>
               <Ionicons name={(c.icon ?? "book-outline") as any} size={18} color={colors.accentGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{c.title}{c.status !== "published" ? " (inactive)" : ""}</Text>
@@ -118,8 +116,6 @@ const styles = StyleSheet.create({
   backText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontSize: 20, color: colors.textDark, fontFamily: "Inter_700Bold" },
-  primaryBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.primaryGreen, borderRadius: 9, paddingHorizontal: 12, minHeight: 40 },
-  primaryBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   error: { color: "#B91C1C", fontFamily: "Inter_500Medium", marginTop: 20 },
   totals: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   totalCard: { flexBasis: "47%", flexGrow: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 12 },

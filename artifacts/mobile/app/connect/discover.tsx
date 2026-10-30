@@ -13,6 +13,7 @@ import DiscoveryRadiusSlider, { DEFAULT_RADIUS_KM } from "@/components/Discovery
 import { skillLabel } from "@/constants/skillsTaxonomy";
 import colors from "@/constants/colors";
 import { publicLocationLabel, calledToValue, NO_PUBLIC_LOCATION } from "@/lib/publicIdentity";
+import { AppButton, IconButton } from "@/components/ui";
 
 // P2P Connection audit — Discovery used to show a Report/Flag icon and an
 // always-available Message icon for every listed peer, regardless of any
@@ -177,14 +178,7 @@ export default function Discover() {
           <Ionicons name="location-outline" size={32} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>{t("discovery.needsLocationTitle")}</Text>
           <Text style={styles.emptyText}>{t("discovery.needsLocationBody")}</Text>
-          <TouchableOpacity
-            style={styles.emptyAction}
-            onPress={() => router.push("/settings/account?verifyLocation=1" as any)}
-            accessibilityRole="button"
-          >
-            <Ionicons name="navigate-outline" size={14} color="#fff" />
-            <Text style={styles.emptyActionText}>{t("discovery.verifyLocation")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("discovery.verifyLocation")} onPress={() => router.push("/settings/account?verifyLocation=1" as any)} icon="navigate-outline" style={{ marginTop: 8 }} palette="fixedLight" />
         </View>
       );
     }
@@ -194,10 +188,7 @@ export default function Discover() {
           <Ionicons name="cloud-offline-outline" size={32} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>{t("discovery.errorTitle")}</Text>
           <Text style={styles.emptyText}>{t("discovery.errorBody")}</Text>
-          <TouchableOpacity style={styles.emptyAction} onPress={() => load()} accessibilityRole="button">
-            <Ionicons name="refresh" size={14} color="#fff" />
-            <Text style={styles.emptyActionText}>{t("discovery.retry")}</Text>
-          </TouchableOpacity>
+          <AppButton label={t("discovery.retry")} onPress={() => load()} icon="refresh" style={{ marginTop: 8 }} palette="fixedLight" />
         </View>
       );
     }
@@ -234,14 +225,9 @@ export default function Discover() {
         </View>
 
         <View style={styles.filterRow}>
-          <TouchableOpacity style={styles.skillFilterBtn} onPress={() => setSkillPickerOpen(true)}>
-            <Ionicons name="options-outline" size={14} color={colors.accentGreen} />
-            <Text style={styles.skillFilterBtnText}>
-              {skillFilter.length > 0 ? `Skills (${skillFilter.length})` : "Filter by skill"}
-            </Text>
-          </TouchableOpacity>
+          <AppButton label={skillFilter.length > 0 ? `Skills (${skillFilter.length})` : "Filter by skill"} onPress={() => setSkillPickerOpen(true)} variant="secondary" size="sm" icon="options-outline" palette="fixedLight" />
           {skillFilter.length > 0 && (
-            <TouchableOpacity onPress={() => setSkillFilter([])}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setSkillFilter([])}>
               <Text style={styles.clearFilterText}>Clear</Text>
             </TouchableOpacity>
           )}
@@ -327,20 +313,14 @@ export default function Discover() {
                 </View>
                 {item.connectionStatus === "pending_received" ? (
                   <View style={{ flexDirection: "row", gap: 6 }}>
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.acceptBtn}
                       onPress={(e) => { e.stopPropagation(); handleRespond(item, "accepted"); }}
                       disabled={responding === item.id}
                     >
                       {responding === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="checkmark" size={16} color="#fff" />}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.declineBtn}
-                      onPress={(e) => { e.stopPropagation(); handleRespond(item, "declined"); }}
-                      disabled={responding === item.id}
-                    >
-                      <Ionicons name="close" size={16} color={colors.accentGreen} />
-                    </TouchableOpacity>
+                    <IconButton icon="close" accessibilityLabel="Close" onPress={(e) => { e.stopPropagation(); handleRespond(item, "declined"); }} variant="tinted" size="sm" color={colors.accentGreen} disabled={responding === item.id} palette="fixedLight" />
                   </View>
                 ) : item.canContact ? (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -350,7 +330,7 @@ export default function Discover() {
                         <Text style={styles.connectedPillText}>P2P Connected</Text>
                       </View>
                     )}
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={styles.msgBtn}
                       onPress={(e) => { e.stopPropagation(); handleMessage(item); }}
                       disabled={messaging === item.id}
@@ -363,7 +343,7 @@ export default function Discover() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.connectBtn, item.connectionStatus === "pending_sent" && styles.connectBtnPending]}
                     onPress={(e) => { e.stopPropagation(); handleConnect(item); }}
                     disabled={connecting === item.id || item.connectionStatus === "pending_sent" || item.canContact === undefined}
@@ -408,12 +388,6 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     marginHorizontal: 20, marginTop: 10,
   },
-  skillFilterBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6,
-  },
-  skillFilterBtnText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
   clearFilterText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginHorizontal: 20, marginTop: 8 },
   skillChip: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
@@ -431,7 +405,6 @@ const styles = StyleSheet.create({
   connectedPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   connectedPillText: { fontSize: 11, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold" },
   acceptBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.primaryGreen },
-  declineBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderBeige },
   connectBtn: {
     flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 16, backgroundColor: colors.primaryGreen,

@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { resolveRoomInvitation, type RoomInvitationPreview, type RoomType } from "@/lib/roomInvitationsApi";
 import { joinChurchCall } from "@/lib/churchCallApi";
+import { AppButton } from "@/components/ui";
 
 // P2P Rooms — Shareable Room Links (Stage C).
 //
@@ -107,7 +108,7 @@ export default function RoomInvitationScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Room Invitation</Text>
@@ -121,9 +122,7 @@ export default function RoomInvitationScreen() {
 
         {state.kind === "auth_required" && (
           <StateCard icon="lock-closed-outline" title="Sign in required" body="You need to sign in to your P2P account to view this invitation.">
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/(auth)/login" as any)}>
-              <Text style={styles.primaryBtnText}>Sign In</Text>
-            </TouchableOpacity>
+            <AppButton label="Sign In" onPress={() => router.push("/(auth)/login" as any)} style={{ marginTop: 10, minWidth: 180 }} />
           </StateCard>
         )}
 
@@ -141,7 +140,7 @@ export default function RoomInvitationScreen() {
         )}
         {state.kind === "network_error" && (
           <StateCard icon="cloud-offline-outline" title="Couldn't load invitation" body="Check your connection and try again.">
-            <TouchableOpacity style={styles.secondaryBtn} onPress={resolve}><Text style={styles.secondaryBtnText}>Try Again</Text></TouchableOpacity>
+            <AppButton label="Try Again" onPress={resolve} variant="outline" style={{ marginTop: 6 }} />
           </StateCard>
         )}
 
@@ -167,13 +166,7 @@ export default function RoomInvitationScreen() {
 
             {!!joinError && <Text style={styles.errorText}>{joinError}</Text>}
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, !state.preview.canAttemptJoin && styles.primaryBtnDisabled]}
-              onPress={handleJoin}
-              disabled={!state.preview.canAttemptJoin || joining}
-            >
-              {joining ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{state.preview.roomType === "family_worship" ? "Open Gathering" : "Join Room"}</Text>}
-            </TouchableOpacity>
+            <AppButton label={state.preview.roomType === "family_worship" ? "Open Gathering" : "Join Room"} onPress={handleJoin} disabled={!state.preview.canAttemptJoin || joining} loading={joining} style={{ marginTop: 10, minWidth: 180 }} />
             <Text style={styles.authNote}>Joining still requires your P2P account and applicable authorization — this link only points you to the room.</Text>
           </View>
         )}
@@ -203,11 +196,6 @@ function makeStyles(c: AppColors) {
     stateDotLive: { backgroundColor: "#DC2626" },
     stateText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_500Medium" },
     errorText: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium", textAlign: "center" },
-    primaryBtn: { backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, marginTop: 10, alignItems: "center", minWidth: 180 },
-    primaryBtnDisabled: { opacity: 0.5 },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, marginTop: 6 },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     authNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 10, lineHeight: 16 },
   });
 }

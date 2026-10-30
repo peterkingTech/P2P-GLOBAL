@@ -80,7 +80,7 @@ export default function AudioBalance({
                           disabled={!voiceConnected || muted}
                         />
                       </View>
-                      <TouchableOpacity
+                      <TouchableOpacity hitSlop={10}
                         style={styles.muteBtn}
                         onPress={() => onToggleMute(c.userId)}
                         accessibilityRole="button"

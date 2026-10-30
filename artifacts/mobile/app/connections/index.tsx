@@ -10,6 +10,7 @@ import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { Avatar } from "@/components/Avatar";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
+import { AppButton } from "@/components/ui";
 
 // P2P Connections management hub — the "Discover -> P2P Connect -> Accept ->
 // Communicate" lifecycle needs one place to see every stage of it, not just
@@ -140,7 +141,7 @@ export default function P2PConnectionsScreen() {
       <SettingsSubHeader title="P2P Connections" />
       <View style={styles.tabRow}>
         {tabs.map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
             <Text style={[styles.tabBtnText, tab === t.key && styles.tabBtnTextActive]}>
               {t.label}{t.count > 0 ? ` (${t.count})` : ""}
             </Text>
@@ -166,19 +167,15 @@ export default function P2PConnectionsScreen() {
                   <Text style={styles.dateText}>Received {new Date(item.createdAt).toLocaleDateString()}</Text>
                 </View>
                 {item.fromUsername && (
-                  <TouchableOpacity onPress={() => router.push(`/profile/${item.fromUsername}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/profile/${item.fromUsername}` as any)}>
                     <Text style={styles.viewProfile}>View Profile</Text>
                   </TouchableOpacity>
                 )}
               </View>
               <Text style={styles.p2pLabel}>P2P Connect Request</Text>
               <View style={styles.btnRow}>
-                <TouchableOpacity style={styles.declineBtn} disabled={busyId === item.id} onPress={() => handleRespond(item.id, "declined")}>
-                  <Text style={styles.declineBtnText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.acceptBtn} disabled={busyId === item.id} onPress={() => handleRespond(item.id, "accepted")}>
-                  {busyId === item.id ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.acceptBtnText}>Accept</Text>}
-                </TouchableOpacity>
+                <AppButton label="Decline" onPress={() => handleRespond(item.id, "declined")} variant="outline" disabled={busyId === item.id} style={{ flex: 1 }} />
+                <AppButton label="Accept" onPress={() => handleRespond(item.id, "accepted")} disabled={busyId === item.id} loading={busyId === item.id} style={{ flex: 1 }} />
               </View>
             </View>
           )}
@@ -199,7 +196,7 @@ export default function P2PConnectionsScreen() {
                   <Text style={styles.dateText}>Sent {new Date(item.createdAt).toLocaleDateString()}</Text>
                 </View>
                 {item.toUsername && (
-                  <TouchableOpacity onPress={() => router.push(`/profile/${item.toUsername}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/profile/${item.toUsername}` as any)}>
                     <Text style={styles.viewProfile}>View Profile</Text>
                   </TouchableOpacity>
                 )}
@@ -208,9 +205,7 @@ export default function P2PConnectionsScreen() {
                 <Ionicons name="time-outline" size={12} color={colors.textMuted} />
                 <Text style={styles.pendingPillText}>P2P Connect Pending</Text>
               </View>
-              <TouchableOpacity style={[styles.declineBtn, { marginTop: 10 }]} disabled={busyId === item.id} onPress={() => handleCancel(item.id)}>
-                {busyId === item.id ? <ActivityIndicator size="small" color={colors.textMid} /> : <Text style={styles.declineBtnText}>Cancel Request</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel Request" onPress={() => handleCancel(item.id)} variant="outline" disabled={busyId === item.id} loading={busyId === item.id} style={{ marginTop: 10, flex: 1 }} />
             </View>
           )}
         />
@@ -229,7 +224,7 @@ export default function P2PConnectionsScreen() {
                   {item.otherUsername && <Text style={styles.username}>@{item.otherUsername}</Text>}
                 </View>
                 {item.otherUsername && (
-                  <TouchableOpacity onPress={() => router.push(`/profile/${item.otherUsername}` as any)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/profile/${item.otherUsername}` as any)}>
                     <Text style={styles.viewProfile}>View Profile</Text>
                   </TouchableOpacity>
                 )}
@@ -239,11 +234,7 @@ export default function P2PConnectionsScreen() {
                   <Ionicons name="checkmark" size={12} color={colors.primaryGreen} />
                   <Text style={styles.connectedPillText}>P2P Connected</Text>
                 </View>
-                <TouchableOpacity style={styles.messageBtn} disabled={busyId === item.otherUserId} onPress={() => handleMessage(item.otherUserId)}>
-                  {busyId === item.otherUserId ? <ActivityIndicator size="small" color={colors.accentGreen} /> : (
-                    <><Ionicons name="chatbubble-outline" size={14} color={colors.accentGreen} /><Text style={styles.messageBtnText}>Message</Text></>
-                  )}
-                </TouchableOpacity>
+                <AppButton label="Message" onPress={() => handleMessage(item.otherUserId)} variant="secondary" size="sm" icon="chatbubble-outline" disabled={busyId === item.otherUserId} loading={busyId === item.otherUserId} />
               </View>
             </View>
           )}
@@ -302,15 +293,9 @@ function makeStyles(c: AppColors) {
     viewProfile: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     p2pLabel: { fontSize: 11, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginTop: 10, textTransform: "uppercase", letterSpacing: 0.5 },
     btnRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 },
-    declineBtn: { flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, height: 40, alignItems: "center", justifyContent: "center" },
-    declineBtnText: { color: c.textMid, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-    acceptBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 10, height: 40, alignItems: "center", justifyContent: "center" },
-    acceptBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     pendingPill: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", backgroundColor: "rgba(0,0,0,0.05)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, marginTop: 10 },
     pendingPillText: { fontSize: 11, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold" },
     connectedPill: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
     connectedPillText: { fontSize: 11, fontWeight: "700", color: c.primaryGreen, fontFamily: "Inter_700Bold" },
-    messageBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-    messageBtnText: { fontSize: 12, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
   });
 }

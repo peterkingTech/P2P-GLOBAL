@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { ComposeMessageModal } from "@/components/ComposeMessageModal";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // P2P Official Mail — the unified surface for Contact P2P Global (received
 // tickets, p2p_contact_messages) and Compose (sent official messages,
@@ -163,10 +164,7 @@ export default function AdminEmailInbox() {
             <Text style={styles.mailBrand}>P2P OFFICIAL MAIL</Text>
             <Text style={styles.inboxTitle}>{getDepartmentLabel(profile?.role ?? "")}</Text>
           </View>
-          <TouchableOpacity style={styles.composeBtn} onPress={() => { setResumeDraft(null); setShowCompose(true); }}>
-            <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.composeBtnText}>Compose</Text>
-          </TouchableOpacity>
+          <AppButton label="Compose" onPress={() => { setResumeDraft(null); setShowCompose(true); }} size="sm" icon="add" palette="fixedLight" />
         </View>
         <View style={styles.inboxStats}>
           <Text style={styles.unreadCount}>{unreadCount} unread</Text>
@@ -176,7 +174,7 @@ export default function AdminEmailInbox() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>
         {TABS.map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tabChip, tab === t.key && styles.tabChipActive]} onPress={() => setTab(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tabChip, tab === t.key && styles.tabChipActive]} onPress={() => setTab(t.key)}>
             <Text style={[styles.tabChipText, tab === t.key && styles.tabChipTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -184,11 +182,11 @@ export default function AdminEmailInbox() {
 
       {isContactTab && availableDepartments.length > 1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.deptBar} contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}>
-          <TouchableOpacity style={[styles.deptChip, deptFilter === "all" && styles.deptChipActive]} onPress={() => setDeptFilter("all")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.deptChip, deptFilter === "all" && styles.deptChipActive]} onPress={() => setDeptFilter("all")}>
             <Text style={[styles.deptChipText, deptFilter === "all" && styles.deptChipTextActive]}>All Departments</Text>
           </TouchableOpacity>
           {availableDepartments.map((d) => (
-            <TouchableOpacity key={d} style={[styles.deptChip, deptFilter === d && styles.deptChipActive]} onPress={() => setDeptFilter(d)}>
+            <TouchableOpacity accessibilityRole="button" key={d} style={[styles.deptChip, deptFilter === d && styles.deptChipActive]} onPress={() => setDeptFilter(d)}>
               <Text style={[styles.deptChipText, deptFilter === d && styles.deptChipTextActive]}>{DEPARTMENT_LABELS[d]}</Text>
             </TouchableOpacity>
           ))}
@@ -217,7 +215,7 @@ export default function AdminEmailInbox() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={<Text style={styles.emptyText}>No drafts. Anything you start writing and close without sending is saved here.</Text>}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => { setResumeDraft(item); setShowCompose(true); }}>
+            <TouchableOpacity accessibilityRole="button" style={styles.card} activeOpacity={0.85} onPress={() => { setResumeDraft(item); setShowCompose(true); }}>
               <View style={styles.cardTopRow}>
                 <Text style={styles.senderName}>
                   {item.targetUsername ? `To @${item.targetUsername}` : "No recipient yet"}
@@ -228,7 +226,7 @@ export default function AdminEmailInbox() {
               <Text style={styles.preview} numberOfLines={1}>{item.body || "(No message)"}</Text>
               <View style={styles.tagsRow}>
                 {item.department && <Text style={styles.referenceTag}>{COMPOSE_DEPARTMENT_LABELS[item.department]}</Text>}
-                <TouchableOpacity onPress={() => handleDeleteDraft(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => handleDeleteDraft(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                   <Text style={styles.deleteDraftText}>Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -270,7 +268,7 @@ export default function AdminEmailInbox() {
             const isUrgent = item.priority === "urgent";
             const isHigh = item.priority === "high";
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.card, isUnread && styles.cardUnread, isUrgent && styles.cardUrgent]}
                 onPress={() => router.push(`/admin/email-message/${item.id}` as any)}
                 activeOpacity={0.85}
@@ -279,10 +277,10 @@ export default function AdminEmailInbox() {
                   <Text style={[styles.senderName, isUnread && styles.boldText]}>@{item.fromUsername ?? "unknown"}</Text>
                   <View style={styles.cardTopRowActions}>
                     <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
-                    <TouchableOpacity onPress={() => handleToggleStar(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={item.isStarredByMe ? "Remove star" : "Star"} accessibilityState={{ selected: !!item.isStarredByMe }} onPress={() => handleToggleStar(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name={item.isStarredByMe ? "star" : "star-outline"} size={16} color={item.isStarredByMe ? colors.amber : colors.textMuted} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleToggleArchive(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={tab === "archived" ? "Restore from archive" : "Archive"} onPress={() => handleToggleArchive(item)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                       <Ionicons name={tab === "archived" ? "arrow-undo-outline" : "archive-outline"} size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
@@ -319,15 +317,6 @@ const styles = StyleSheet.create({
   mailBrand: { fontSize: 10, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 1 },
   inboxTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 2 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sentIconBtn: {
-    width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
-  },
-  composeBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.primaryGreen,
-    borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7,
-  },
-  composeBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   inboxStats: { flexDirection: "row", gap: 14, marginTop: 4 },
   unreadCount: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_500Medium" },
   overdueCount: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_600SemiBold" },

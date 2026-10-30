@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -38,6 +39,8 @@ function load(rel, extraMocks = {}) {
       if (n === "react-native") return RN;
       if (n === "@expo/vector-icons") return { Ionicons };
       if (n === "@/lib/messageReceipts") return loadPlain("lib/messageReceipts.ts");
+      // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+      if (n === "@/components/ui") return buttonDouble(React, RN);
       if (n in extraMocks) return extraMocks[n];
       throw new Error("unexpected import " + n);
     },

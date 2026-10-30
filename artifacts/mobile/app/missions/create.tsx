@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import VideoRecorder from "@/components/VideoRecorder";
 import { createMissionStory, uploadMissionStoryVideo, uploadMissionStoryPhoto, type MissionStoryType } from "@/lib/missionsApi";
 import { createOrFindScriptureReference, parseScriptureInput } from "@/lib/prayerTopicsApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -105,7 +106,7 @@ export default function CreateMissionStoryScreen() {
       <View style={[styles.screen, styles.centerFill]}>
         <Ionicons name="lock-closed-outline" size={32} color={c.textMuted} />
         <Text style={styles.emptyText}>Mission Story creation is currently limited to authorized contributors.</Text>
-        <TouchableOpacity onPress={() => router.back()}><Text style={styles.linkText}>Go back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}><Text style={styles.linkText}>Go back</Text></TouchableOpacity>
       </View>
     );
   }
@@ -113,7 +114,7 @@ export default function CreateMissionStoryScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Share a Mission Story</Text>
@@ -123,7 +124,7 @@ export default function CreateMissionStoryScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40 }}>
         <Text style={styles.fieldLabel}>Type</Text>
         {STORY_TYPES.map((t) => (
-          <TouchableOpacity key={t.key} style={styles.modeRow} onPress={() => setStoryType(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={styles.modeRow} onPress={() => setStoryType(t.key)}>
             <Ionicons name={storyType === t.key ? "radio-button-on" : "radio-button-off"} size={20} color={c.accentGreen} />
             <Text style={styles.modeLabel}>{t.label}</Text>
           </TouchableOpacity>
@@ -148,7 +149,7 @@ export default function CreateMissionStoryScreen() {
         {photoAsset ? (
           <View style={styles.photoPreviewBox}>
             <Image source={{ uri: photoAsset.uri }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} style={styles.removeMediaBtn} onPress={() => setPhotoAsset(null)}>
               <Ionicons name="close-circle" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -156,27 +157,20 @@ export default function CreateMissionStoryScreen() {
           <View style={styles.videoChosenBox}>
             <Ionicons name="videocam" size={16} color={c.accentGreen} />
             <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
               <Ionicons name="close-circle" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <TouchableOpacity style={styles.addPhotoBtn} onPress={handlePickPhoto} disabled={submitting}>
-              <Ionicons name="image-outline" size={18} color={c.accentGreen} />
-              <Text style={styles.addPhotoBtnText}>Add Photo</Text>
-            </TouchableOpacity>
+            <AppButton label="Add Photo" onPress={handlePickPhoto} variant="outline" icon="image-outline" disabled={submitting} style={{ marginBottom: 10 }} />
             <VideoRecorder disabled={submitting} onSubmit={async (localUri, durationSeconds) => { setVideoUri(localUri); setVideoDuration(durationSeconds); }} />
           </>
         )}
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.draftBtn} onPress={() => handleSubmit("draft")} disabled={submitting || !title.trim() || !body.trim()}>
-            <Text style={styles.draftBtnText}>Save Draft</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.publishBtn} onPress={() => handleSubmit("published")} disabled={submitting || !title.trim() || !body.trim()}>
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.publishBtnText}>Publish</Text>}
-          </TouchableOpacity>
+          <AppButton label="Save Draft" onPress={() => handleSubmit("draft")} variant="outline" disabled={submitting || !title.trim() || !body.trim()} style={{ flex: 1 }} />
+          <AppButton label="Publish" onPress={() => handleSubmit("published")} disabled={submitting || !title.trim() || !body.trim()} loading={submitting} style={{ flex: 1 }} />
         </View>
       </ScrollView>
     </View>
@@ -197,18 +191,9 @@ function makeStyles(c: AppColors) {
     modeLabel: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     videoChosenBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 12 },
     videoChosenText: { flex: 1, fontSize: 13, color: c.textDark, fontFamily: "Inter_500Medium" },
-    addPhotoBtn: {
-      flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center",
-      borderWidth: 1, borderColor: c.accentGreen, borderStyle: "dashed", borderRadius: 12, paddingVertical: 14, marginBottom: 10,
-    },
-    addPhotoBtnText: { fontSize: 14, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     photoPreviewBox: { borderRadius: 12, overflow: "hidden", position: "relative" },
     photoPreview: { width: "100%", height: 200, borderRadius: 12, backgroundColor: c.borderBeige },
     removeMediaBtn: { position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 12 },
     btnRow: { flexDirection: "row", gap: 10, marginTop: 24 },
-    draftBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    draftBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-    publishBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
-    publishBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

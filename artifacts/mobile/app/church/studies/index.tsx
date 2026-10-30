@@ -9,6 +9,7 @@ import { getChurchStudies, createChurchStudy, type ChurchStudy } from "@/lib/chu
 import { getChurchStudyPlans, createChurchStudyPlan, type ChurchStudyPlan } from "@/lib/churchStudyPlanApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -96,7 +97,7 @@ export default function ChurchStudiesScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Study</Text>
@@ -108,7 +109,7 @@ export default function ChurchStudiesScreen() {
             available and always shown first, never hidden by a Church
             Studies preference (Stage 5 will add the default-source setting;
             this screen never removes either option). */}
-        <TouchableOpacity style={styles.p2pCard} onPress={() => router.push("/curriculum" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.p2pCard} onPress={() => router.push("/curriculum" as any)}>
           <View style={styles.p2pIconWrap}><Ionicons name="book" size={20} color="#fff" /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.p2pTitle}>P2P Curriculum & Plans</Text>
@@ -120,10 +121,7 @@ export default function ChurchStudiesScreen() {
         <View style={styles.sectionRow}>
           <Text style={styles.sectionLabel}>CUSTOM STUDY PLANS</Text>
           {isChurchLeader && (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreatePlanOpen(true)}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Create Plan</Text>
-            </TouchableOpacity>
+            <AppButton label="Create Plan" onPress={() => setCreatePlanOpen(true)} size="sm" icon="add" palette="fixedLight" />
           )}
         </View>
         {loading ? null : plans.length === 0 ? (
@@ -132,7 +130,7 @@ export default function ChurchStudiesScreen() {
           </Text>
         ) : (
           plans.map((p) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={p.id}
               style={styles.studyCard}
               onPress={() => router.push({ pathname: "/church/study-plans/[planId]", params: { planId: p.id } } as any)}
@@ -152,10 +150,7 @@ export default function ChurchStudiesScreen() {
         <View style={[styles.sectionRow, { marginTop: 18 }]}>
           <Text style={styles.sectionLabel}>CHURCH STUDIES</Text>
           {isChurchLeader && (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreateOpen(true)}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Create Study</Text>
-            </TouchableOpacity>
+            <AppButton label="Create Study" onPress={() => setCreateOpen(true)} size="sm" icon="add" palette="fixedLight" />
           )}
         </View>
 
@@ -167,7 +162,7 @@ export default function ChurchStudiesScreen() {
           </Text>
         ) : (
           studies.map((s) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={s.id}
               style={styles.studyCard}
               onPress={() => router.push({ pathname: "/church/studies/[studyId]", params: { studyId: s.id } } as any)}
@@ -197,12 +192,8 @@ export default function ChurchStudiesScreen() {
               placeholder="What is this study about? (optional)" placeholderTextColor={colors.textMuted}
             />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreateOpen(false)} disabled={creating}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCreate} disabled={creating || !title.trim()}>
-                {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Create</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setCreateOpen(false)} variant="outline" disabled={creating} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Create" onPress={handleCreate} disabled={creating || !title.trim()} loading={creating} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -220,12 +211,8 @@ export default function ChurchStudiesScreen() {
               placeholder="What is this plan about? (optional)" placeholderTextColor={colors.textMuted}
             />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreatePlanOpen(false)} disabled={creating}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCreatePlan} disabled={creating || !title.trim()}>
-                {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Create</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setCreatePlanOpen(false)} variant="outline" disabled={creating} style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Create" onPress={handleCreatePlan} disabled={creating || !title.trim()} loading={creating} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </View>
         </View>
@@ -248,8 +235,6 @@ const styles = StyleSheet.create({
   p2pSub: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_400Regular", marginTop: 2 },
   sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   sectionLabel: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  createBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.accentGreen, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  createBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
   emptyText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   studyCard: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card,
@@ -271,8 +256,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, fontFamily: "Inter_400Regular",
   },
   sheetRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  cancelBtnText: { color: colors.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-  saveBtn: { flex: 1, backgroundColor: colors.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

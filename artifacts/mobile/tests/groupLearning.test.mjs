@@ -20,7 +20,7 @@ const home = src("app/learning/[scope]/[groupId].tsx");
 ok("one screen for Family and Church (scope from the route, validated)", /rawScope === "family" \|\| rawScope === "church" \? rawScope : null/.test(home));
 ok("four parts: Continue Learning, P2P Library, Our Custom Lessons, Progress", ["CONTINUE LEARNING", ">P2P Library<", ">Our Custom Lessons<", ">Progress<"].every((t) => home.includes(t)));
 ok("Continue opens the existing lesson screen", /pathname: "\/lesson\/\[id\]", params: \{ id: lessonId \}/.test(home));
-ok("only leaders see choose/mark/resume/manage actions (server enforces too)", /\{data\.canManage && \(\s*\n\s*<TouchableOpacity style=\{styles\.heroSecondary\}/.test(home) && /\{data\.canManage && h\.status === "paused" && \(/.test(home) && /\{data\.canManage && \(\s*\n\s*<TouchableOpacity onPress=\{\(\) => router\.push\(manageCustomPath/.test(home));
+ok("only leaders see choose/mark/resume/manage actions (server enforces too)", /\{data\.canManage && \(\s*\n\s*<AppButton label="We covered this — next lesson" onPress=\{handleCovered\}/.test(home) && /\{data\.canManage && h\.status === "paused" && \(/.test(home) && /\{data\.canManage && \(\s*\n\s*<AppButton label="Manage" onPress=\{\(\) => router\.push\(manageCustomPath/.test(home));
 ok("custom lessons labelled as the group's own, never official P2P", /not official P2P curriculum/.test(home) && /Draft \(only leaders see this\)/.test(home));
 ok("progress: Together and You shown separately and explained", /label="Together"/.test(home) && /label="You"/.test(home) && /"Together" counts lessons your group covered\. "You" is your own lesson progress/.test(home));
 ok("loading, error (retry), not-a-member and empty states", /ActivityIndicator/.test(home) && /Try again/.test(home) && /You're not part of this/.test(home) && /Nothing chosen yet/.test(home) && /No custom lessons yet/.test(home));
@@ -34,7 +34,7 @@ const outline = src("app/learning/curriculum/[curriculumId].tsx");
 ok("outline: marked as official P2P content", /Official P2P \{outline\.curriculum\.type === "plan" \? "Plan" : "curriculum"\}/.test(outline));
 ok("outline: leaders can choose it, set the current lesson, mark covered / undo", /startJourney\(scope!, groupId!, outline\.curriculum\.id\)/.test(outline) && /setCurrentLesson\(/.test(outline) && /markCovered\(/.test(outline) && /unmarkCovered\(/.test(outline) && /const canManage = !!home\?\.canManage/.test(outline));
 ok("outline: every lesson opens the existing lesson view (no duplicate lesson renderer)", /pathname: "\/lesson\/\[id\]", params: \{ id: l\.id \}/.test(outline) && existsSync(path.join(root, "app/lesson/[id].tsx")));
-ok("touch targets ≥ 44pt", /smallBtn: \{ minHeight: 44/.test(outline) && /heroBtn: \{[^}]*minHeight: 48/.test(home) && /linkBtn: \{ minHeight: 44/.test(home));
+ok("touch targets ≥ 44pt", /<AppButton /.test(outline) && !/<AppButton [^\n]*size="sm"/.test(outline) /* shared buttons: 44pt+ */ && /<AppButton label="Open lesson" size="lg"/.test(home) /* 52pt hero */);
 
 ok("Family home → Learning home", /pathname: "\/learning\/\[scope\]\/\[groupId\]", params: \{ scope: "family", groupId: familyId \}/.test(src("app/family/[familyId].tsx")));
 ok("existing custom-study screens still reachable (Manage / custom lesson rows)", /pathname: "\/family\/studies", params: \{ familyId: groupId \}/.test(api) && /pathname: "\/family\/studies\/\[studyId\]"/.test(api));

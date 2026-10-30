@@ -16,6 +16,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { getP2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
+import { AppButton, IconButton } from "@/components/ui";
 
 interface CircleMember { id: string; userId: string; role: string; status: string; name: string; avatarUrl: string | null; country?: string | null }
 interface CircleSession { id: string; lessonId: string; scheduledAt: string | null; completedAt: string | null; sessionStatus: string; notes: string | null }
@@ -624,9 +625,7 @@ export default function GroupCallScreen() {
                 </View>
               </View>
               {isHost && member && raisedHandUserIds.has(member.userId) && (
-                <TouchableOpacity style={styles.ackHandBtn} onPress={() => acknowledgeHand(member.userId)}>
-                  <Text style={{ fontSize: 12 }}>✋</Text>
-                </TouchableOpacity>
+                <IconButton icon="hand-left" variant="overlay" size="sm" accessibilityLabel="Acknowledge raised hand" onPress={() => acknowledgeHand(member.userId)} style={{ position: "absolute", top: 6, right: 6 }} />
               )}
               {reactions[uid] && (
                 <View style={styles.reactionBubble} pointerEvents="none">
@@ -639,13 +638,11 @@ export default function GroupCallScreen() {
       </ScrollView>
 
       {currentQuestion && (
-        <TouchableOpacity style={styles.questionBar} onPress={() => setLessonSheetOpen(true)} activeOpacity={0.85}>
+        <TouchableOpacity accessibilityRole="button" style={styles.questionBar} onPress={() => setLessonSheetOpen(true)} activeOpacity={0.85}>
           <Text style={styles.questionLabel}>CURRENT QUESTION</Text>
           <Text style={styles.questionText} numberOfLines={2}>"{currentQuestion.question}"</Text>
           {isHost && questionIndex < questions.length - 1 && (
-            <TouchableOpacity style={styles.nextQBtn} onPress={nextQuestion}>
-              <Text style={styles.nextQBtnText}>Next →</Text>
-            </TouchableOpacity>
+            <AppButton label="Next" icon="arrow-forward" iconPosition="trailing" onPress={nextQuestion} variant="tertiary" style={{ alignSelf: "flex-end", marginTop: 4 }} />
           )}
         </TouchableOpacity>
       )}
@@ -678,12 +675,8 @@ export default function GroupCallScreen() {
 
       {isHost && (
         <View style={styles.hostBar}>
-          <TouchableOpacity style={styles.hostBtn} onPress={muteAll}>
-            <Text style={styles.hostBtnText}>Mute All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.hostBtn} onPress={() => setCompletionOpen(true)}>
-            <Text style={styles.hostBtnText}>Complete Session</Text>
-          </TouchableOpacity>
+          <AppButton label="Mute All" onPress={muteAll} variant="outline" size="sm" />
+          <AppButton label="Complete Session" onPress={() => setCompletionOpen(true)} variant="outline" size="sm" />
         </View>
       )}
 
@@ -693,13 +686,13 @@ export default function GroupCallScreen() {
           <View style={styles.sheetBox}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{lessonTitle}</Text>
-              <TouchableOpacity onPress={() => setLessonSheetOpen(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setLessonSheetOpen(false)}><Ionicons name="close" size={22} color="#fff" /></TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 300 }}>
               {questions.length === 0 ? (
                 <Text style={styles.sheetEmpty}>No discussion questions for this lesson.</Text>
               ) : questions.map((q, i) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={q.id}
                   style={[styles.questionRow, i === questionIndex && styles.questionRowActive]}
                   onPress={() => isHost && (setQuestionIndex(i), sendSignal("next_question", { index: i }))}
@@ -711,9 +704,7 @@ export default function GroupCallScreen() {
               ))}
             </ScrollView>
             {currentQuestion && (
-              <TouchableOpacity style={styles.markDiscussedBtn} onPress={markDiscussed}>
-                <Text style={styles.markDiscussedText}>Mark Discussed</Text>
-              </TouchableOpacity>
+              <AppButton label="Mark Discussed" onPress={markDiscussed} style={{ marginTop: 6 }} />
             )}
           </View>
         </View>
@@ -736,12 +727,8 @@ export default function GroupCallScreen() {
               multiline
             />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCompletionOpen(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCompleteSession} disabled={ending}>
-                {ending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>End and Save</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setCompletionOpen(false)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="End and Save" onPress={handleCompleteSession} disabled={ending} loading={ending} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -778,7 +765,6 @@ function makeStyles(p2p: P2PCallColors) {
   tileName: { color: "#fff", fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
   tileBadgeRow: { flexDirection: "row", gap: 4, alignItems: "center" },
   tileHandEmoji: { fontSize: 12 },
-  ackHandBtn: { position: "absolute", top: 6, right: 6, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10, padding: 4 },
   reactionBubble: {
     position: "absolute", top: 6, left: 6, backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 14, width: 28, height: 28, alignItems: "center", justifyContent: "center",
@@ -788,14 +774,10 @@ function makeStyles(p2p: P2PCallColors) {
   questionBar: { marginHorizontal: 12, marginBottom: 8, backgroundColor: p2p.surface, borderRadius: 12, padding: 12, gap: 4 },
   questionLabel: { color: p2p.accent, fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
   questionText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic" },
-  nextQBtn: { alignSelf: "flex-end", marginTop: 4 },
-  nextQBtnText: { color: p2p.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   controlsRow: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 16, paddingTop: 8 },
 
   hostBar: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 10, justifyContent: "center" },
-  hostBtn: { borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  hostBtnText: { color: p2p.textPrimary, fontSize: 12, fontFamily: "Inter_500Medium" },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   sheetBox: { backgroundColor: p2p.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
@@ -805,16 +787,11 @@ function makeStyles(p2p: P2PCallColors) {
   questionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: p2p.surfaceBorder },
   questionRowActive: { backgroundColor: p2p.pillBg },
   questionRowText: { color: p2p.textPrimary, fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
-  markDiscussedBtn: { backgroundColor: p2p.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 6 },
   markDiscussedText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
   notesInput: {
     backgroundColor: p2p.pillBg, borderRadius: 10, padding: 12, color: p2p.textPrimary,
     fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 70,
   },
-  cancelBtn: { flex: 1, borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  cancelBtnText: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  saveBtn: { flex: 1, backgroundColor: p2p.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

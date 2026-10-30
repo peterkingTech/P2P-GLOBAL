@@ -87,10 +87,10 @@ export function FruitCelebrationModal({ celebration, onViewFruits, onContinue }:
             <Text style={styles.evidence}>{celebration.evidenceSummary}</Text>
           )}
 
-          <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={onViewFruits}>
+          <TouchableOpacity accessibilityRole="button" style={styles.primaryBtn} activeOpacity={0.85} onPress={onViewFruits}>
             <Text style={styles.primaryBtnText}>View My Fruits</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.7} onPress={onContinue}>
+          <TouchableOpacity accessibilityRole="button" style={styles.secondaryBtn} activeOpacity={0.7} onPress={onContinue}>
             <Text style={styles.secondaryBtnText}>Continue</Text>
           </TouchableOpacity>
         </Animated.View>

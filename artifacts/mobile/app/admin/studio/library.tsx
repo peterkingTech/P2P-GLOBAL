@@ -5,13 +5,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { useStudioQuery } from "@/components/studio/useStudioQuery";
-import { Banner, Chip, ConfirmDialog, Pager, Pill, StateView, nativeTone, reviewTone, studioStyles as ss } from "@/components/studio/StudioUI";
+import { Banner, Button, Chip, ConfirmDialog, Pager, Pill, StateView, nativeTone, reviewTone, studioStyles as ss } from "@/components/studio/StudioUI";
 import { getStudioItems, type SourceType, type StudioItem } from "@/lib/studioApi";
 import {
   ACTION_LABELS, NATIVE_STATUS_LABELS, REVIEW_LABELS, SOURCE_LABELS, STATUS_FILTERS, STUDIO_AUDIT_ROLES,
   deviceTimeZone, formatInZone, isApprovalStale, nextSchedule, publishNowBlocker, reviewStateOf,
 } from "@/lib/studioModel";
 import { runStatusChange, type ActionOutcome } from "@/lib/studioActions";
+import { AppButton } from "@/components/ui";
 
 // Content Library: the canonical records themselves (no copies), page by page.
 // Kingdom Stories open in their existing editor and can be published (after
@@ -90,7 +91,7 @@ export default function StudioLibrary() {
             accessibilityLabel="Search by title"
             returnKeyType="search"
           />
-          <Pill label="Search" selected={false} onPress={search} />
+          <Button label="Search" icon="search" tone="secondary" onPress={search} />
         </View>
         <View style={ss.row}>
           <Text style={ss.label}>Status</Text>
@@ -147,10 +148,7 @@ export default function StudioLibrary() {
 
 function IconAction({ icon, label, onPress }: { icon: React.ComponentProps<typeof Ionicons>["name"]; label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.iconAction} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      <Ionicons name={icon} size={15} color={colors.primaryGreen} />
-      <Text style={styles.iconActionText}>{label}</Text>
-    </TouchableOpacity>
+    <AppButton label={`${label}`} onPress={onPress} variant="secondary" icon={icon} accessibilityLabel={label} style={{ alignSelf: "flex-start" }} palette="fixedLight" />
   );
 }
 

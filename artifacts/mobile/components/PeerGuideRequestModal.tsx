@@ -6,6 +6,7 @@ import { authedFetch } from "@/lib/adminFetch";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 interface PeerGuideRequestModalProps {
   visible: boolean;
   onClose: () => void;
@@ -67,15 +68,13 @@ export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetNa
               <Ionicons name="checkmark-circle" size={44} color={colors.accentGreen} />
               <Text style={styles.confirmTitle}>Request sent</Text>
               <Text style={styles.confirmSub}>{targetName} will be notified that you'd like them to be your Peer Guide.</Text>
-              <TouchableOpacity style={styles.sendBtn} onPress={onClose}>
-                <Text style={styles.sendBtnText}>Done</Text>
-              </TouchableOpacity>
+              <AppButton label="Done" onPress={onClose} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           ) : (
             <>
               <View style={styles.header}>
                 <Text style={styles.title}>Ask {targetName} to Be Your Peer Guide?</Text>
-                <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={22} color={colors.textDark} />
                 </TouchableOpacity>
               </View>
@@ -98,12 +97,8 @@ export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetNa
               {error && <Text style={styles.errorText}>{error}</Text>}
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={sending}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.sendBtn, sending && styles.sendBtnDisabled]} onPress={handleSend} disabled={sending}>
-                  {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.sendBtnText}>Send Request</Text>}
-                </TouchableOpacity>
+                <AppButton label="Cancel" onPress={onClose} variant="outline" disabled={sending} style={{ flex: 1 }} palette="fixedLight" />
+                <AppButton label="Send Request" onPress={handleSend} disabled={sending} loading={sending} style={{ flex: 1 }} palette="fixedLight" />
               </View>
             </>
           )}
@@ -129,11 +124,6 @@ const styles = StyleSheet.create({
   charCount: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 4 },
   errorText: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium", marginTop: 10 },
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-  cancelBtn: { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: colors.borderBeige },
-  cancelBtnText: { fontSize: 14, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
-  sendBtn: { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primaryGreen },
-  sendBtnDisabled: { opacity: 0.6 },
-  sendBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   confirmWrap: { alignItems: "center", paddingVertical: 30, gap: 10 },
   confirmTitle: { fontSize: 17, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   confirmSub: { fontSize: 13, color: colors.textMid, textAlign: "center", fontFamily: "Inter_400Regular", paddingHorizontal: 20, marginBottom: 10 },

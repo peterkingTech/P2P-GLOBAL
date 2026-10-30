@@ -7,6 +7,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { createScanHandler, scannerGate } from "@/lib/qrLinks";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Scan a P2P Global QR code. The camera permission is asked only when the
 // person taps "Allow camera" (explained first); if it's refused, a pasted
@@ -40,9 +41,7 @@ export default function ScanQrScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="arrow-back" accessibilityLabel="Go back" onPress={() => router.back()} color={colors.textDark} />
         <Text style={styles.headerTitle}>Scan QR code</Text>
         <View style={styles.headerBtn} />
       </View>
@@ -70,13 +69,7 @@ export default function ScanQrScreen() {
                   ? "P2P Global uses the camera only while this screen is open, to read QR codes for profiles and Circles. Nothing is recorded."
                   : "To scan codes, allow camera access for P2P Global in your phone's Settings. You can also paste a link below."}
               </Text>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => (gate === "explain" ? void requestPermission() : void Linking.openSettings())}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryBtnText}>{gate === "explain" ? "Allow camera" : "Open Settings"}</Text>
-              </TouchableOpacity>
+              <AppButton label={gate === "explain" ? "Allow camera" : "Open Settings"} onPress={() => (gate === "explain" ? void requestPermission() : void Linking.openSettings())} style={{ marginTop: 4 }} />
             </View>
           )}
 
@@ -86,9 +79,7 @@ export default function ScanQrScreen() {
             <View style={styles.errorBox} accessibilityLiveRegion="polite">
               <Ionicons name="alert-circle-outline" size={18} color={colors.textMid} />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={scanAgain} style={styles.scanAgainBtn} accessibilityRole="button">
-                <Text style={styles.scanAgainText}>Scan again</Text>
-              </TouchableOpacity>
+              <AppButton label="Scan again" onPress={scanAgain} variant="tertiary" />
             </View>
           ) : null}
 
@@ -129,12 +120,10 @@ const makeStyles = (c: AppColors) =>
     permissionCard: { alignItems: "center", gap: 10, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     permissionTitle: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     permissionText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
-    primaryBtn: { minHeight: 44, paddingHorizontal: 24, borderRadius: 12, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center", marginTop: 4 },
     primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
     hint: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
     errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     errorText: { flex: 1, fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
-    scanAgainBtn: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
     scanAgainText: { color: c.accentGreen, fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
     pasteLabel: { fontSize: 13, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 8 },
     pasteRow: { flexDirection: "row", gap: 8 },

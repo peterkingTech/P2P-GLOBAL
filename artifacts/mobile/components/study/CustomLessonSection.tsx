@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import CustomLessonEditor from "@/components/study/CustomLessonEditor";
 import { passageLabel, readPassages, statusLabel, type CustomLesson, type LessonApi, type LessonInput, type LessonStatus } from "@/lib/customLessonModel";
+import { AppButton, IconButton } from "@/components/ui";
 
 function notify(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -91,10 +92,7 @@ export default function CustomLessonSection({ lessons, onLessonsChange, canManag
       <View style={styles.sectionRow}>
         <Text style={styles.sectionLabel}>LESSONS</Text>
         {canManage && (
-          <TouchableOpacity style={styles.createBtn} onPress={() => setEditing({ lesson: null })} accessibilityRole="button">
-            <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.createBtnText}>Add lesson</Text>
-          </TouchableOpacity>
+          <AppButton label="Add lesson" onPress={() => setEditing({ lesson: null })} size="sm" icon="add" />
         )}
       </View>
       {lessons.length === 0 ? (
@@ -118,9 +116,7 @@ export default function CustomLessonSection({ lessons, onLessonsChange, canManag
             )}
             {canManage && (
               busyId === lesson.id ? <ActivityIndicator size="small" color={c.accentGreen} style={styles.more} /> : (
-                <TouchableOpacity style={styles.more} onPress={() => openActions(lesson)} accessibilityRole="button" accessibilityLabel={`Actions for ${lesson.title}`}>
-                  <Ionicons name="ellipsis-horizontal" size={18} color={c.textMuted} />
-                </TouchableOpacity>
+                <IconButton icon="ellipsis-horizontal" accessibilityLabel={`Actions for ${lesson.title}`} onPress={() => openActions(lesson)} color={c.textMuted} />
               )
             )}
           </TouchableOpacity>
@@ -135,8 +131,6 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
     sectionLabel: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-    createBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 14, minHeight: 36 },
-    createBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
     empty: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     card: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, paddingLeft: 14, paddingVertical: 10, marginBottom: 8, minHeight: 56 },
     number: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_700Bold", width: 20 },

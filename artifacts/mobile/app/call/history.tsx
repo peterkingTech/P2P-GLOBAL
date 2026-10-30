@@ -112,7 +112,7 @@ export default function CallHistoryScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Call History</Text>
@@ -143,7 +143,7 @@ export default function CallHistoryScreen() {
             const typeLabel = TYPE_LABEL[item.callType] ?? "Call";
             const directionLabel = item.direction ? (incoming ? "Incoming" : "Outgoing") : null;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.row}
                 activeOpacity={canCallBack || item.conversationId ? 0.7 : 1}
                 disabled={callingBackId === item.id}

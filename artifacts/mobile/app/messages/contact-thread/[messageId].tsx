@@ -73,7 +73,7 @@ export default function ContactThreadScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{thread.message.subject}</Text>
@@ -109,7 +109,7 @@ export default function ContactThreadScreen() {
         )}
 
         {thread.replies.length > 0 && (
-          <TouchableOpacity style={styles.inboxLink} onPress={() => router.push("/(tabs)/messages" as any)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.inboxLink} onPress={() => router.push("/(tabs)/messages" as any)}>
             <Text style={styles.inboxLinkText}>View reply in your messages inbox →</Text>
           </TouchableOpacity>
         )}

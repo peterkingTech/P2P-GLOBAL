@@ -61,6 +61,8 @@ c = continueItems({ modules: [mod({ completedLessons: 0 })], stories: [], studie
 ok("continue: a module not yet begun comes last, as 'not started' (0%)", c.length === 1 && c[0].kind === "school" && c[0].progress === 0 && /not started/.test(c[0].detail));
 ok("continue: finished, locked and empty things are left out", continueItems({ modules: [mod({ isLocked: true }), mod({ id: "m2", completedLessons: 8 })], stories: [story({ myProgress: { totalChapters: 6, doneChapters: 6, started: true } }), story({ id: "s2", myProgress: { totalChapters: 6, doneChapters: 0, started: false } })] }).length === 0);
 ok("continue: nothing at all → empty (the screen explains where to begin)", continueItems({}).length === 0);
+c = continueItems({ modules: [mod({ imageUrl: "https://x/m.jpg" })], stories: [story()], studies: [{ ...study, contentId: "s9" }, { ...study, id: "t2", contentType: "lesson", contentId: "s9" }], storyCovers: { s9: "c/d.jpg" } });
+ok("continue: each item carries its photo (story cover, module photo, shared story's cover; lessons none)", c[0].imageUrl === "https://x/m.jpg" && c[1].imagePath === "a/b.jpg" && c[2].imagePath === "c/d.jpg" && c[3].imagePath === null);
 
 // ── 2. Study Together hub ───────────────────────────────────────────────
 const st = loadFile(path.join(root, "lib/studyTogetherApi.ts"));

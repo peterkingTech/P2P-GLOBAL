@@ -14,6 +14,7 @@ import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { InviteCard } from "@/components/InviteCard";
 import { CircleCard } from "@/components/CircleCard";
+import { AppButton } from "@/components/ui";
 
 interface DiscoverCircleSummary {
   id: string;
@@ -79,8 +80,6 @@ function makeStyles(c: AppColors) {
     searchEmpty: { padding: 40, alignItems: "center", gap: 14 },
     searchEmptyTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", textAlign: "center" },
     searchEmptySub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18 },
-    searchEmptyBtn: { borderWidth: 1, borderColor: c.accentGreen, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, marginTop: 6 },
-    searchEmptyBtnText: { color: c.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
     searchResultRow: {
       flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige, padding: 12, marginBottom: 10,
@@ -89,8 +88,6 @@ function makeStyles(c: AppColors) {
     searchAvatarText: { fontSize: 15, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     searchResultUsername: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     searchResultMeta: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-    connectBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-    connectBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     liveSectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
     liveSectionHeading: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
@@ -106,8 +103,6 @@ function makeStyles(c: AppColors) {
     liveRoomCategoryPill: { backgroundColor: c.borderBeige, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, flexShrink: 0 },
     liveRoomCategoryText: { fontSize: 10, fontWeight: "600", color: c.textMuted, fontFamily: "Inter_600SemiBold" },
     liveRoomMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
-    joinRoomBtn: { backgroundColor: "#DC2626", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
-    joinRoomBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
     seeAllRoomsText: { fontSize: 12, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold", textAlign: "center", marginBottom: 16 },
     circleCard: {
       backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
@@ -116,10 +111,6 @@ function makeStyles(c: AppColors) {
     circleCardName: { fontSize: 14, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     circleCardMeta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
     circlesActionsRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-    circlePrimaryBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.accentGreen, borderRadius: 12, paddingVertical: 11 },
-    circlePrimaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    circleSecondaryBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 11 },
-    circleSecondaryBtnText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }
 
@@ -260,7 +251,7 @@ export default function DiscoverTab() {
             autoCorrect={false}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={() => setSearchQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -281,7 +272,7 @@ export default function DiscoverTab() {
               <View key={group.type} style={{ marginBottom: 18 }}>
                 <Text style={styles.sectionHeading}>{group.label}</Text>
                 {group.results.map((r) => (
-                  <TouchableOpacity key={`${r.type}-${r.id}`} style={styles.searchResultRow} activeOpacity={0.8} onPress={() => router.push(r.route as any)}>
+                  <TouchableOpacity accessibilityRole="button" key={`${r.type}-${r.id}`} style={styles.searchResultRow} activeOpacity={0.8} onPress={() => router.push(r.route as any)}>
                     <View style={styles.searchAvatar}>
                       <Ionicons name={SEARCH_RESULT_ICONS[r.type] ?? "search-outline"} size={18} color={colors.accentGreen} />
                     </View>
@@ -306,7 +297,7 @@ export default function DiscoverTab() {
         <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.liveSectionHeaderRow}>
             <Text style={styles.liveSectionHeading}>🔴 LIVE NOW</Text>
-            <TouchableOpacity onPress={() => router.push("/call/create-room" as any)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/call/create-room" as any)}>
               <Text style={styles.liveSectionAction}>+ Start a Room</Text>
             </TouchableOpacity>
           </View>
@@ -331,13 +322,11 @@ export default function DiscoverTab() {
                       Hosted by {r.hostName} · {r.currentParticipants} listening{r.speakingMode === "structured" ? " · Structured" : ""}
                     </Text>
                   </View>
-                  <TouchableOpacity style={styles.joinRoomBtn} onPress={() => joinRoom(r.id)} disabled={joiningRoomId === r.id}>
-                    <Text style={styles.joinRoomBtnText}>Join</Text>
-                  </TouchableOpacity>
+                  <AppButton label="Join" onPress={() => joinRoom(r.id)} disabled={joiningRoomId === r.id} />
                 </View>
               ))}
               {liveRooms.length > 3 && (
-                <TouchableOpacity onPress={() => setShowAllRooms((v) => !v)}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => setShowAllRooms((v) => !v)}>
                   <Text style={styles.seeAllRoomsText}>{showAllRooms ? "Show fewer rooms" : `See all ${liveRooms.length} rooms`}</Text>
                 </TouchableOpacity>
               )}
@@ -346,7 +335,7 @@ export default function DiscoverTab() {
 
           <ResponsiveGrid minItemWidth={340} maxColumns={3} gap={12}>
           {cards.map((c) => (
-            <TouchableOpacity key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route as any)}>
+            <TouchableOpacity accessibilityRole="button" key={c.key} style={styles.card} activeOpacity={0.85} onPress={() => router.push(c.route as any)}>
               <View style={styles.iconWrap}>
                 <Ionicons name={c.icon} size={22} color={colors.accentGreen} />
               </View>
@@ -366,14 +355,8 @@ export default function DiscoverTab() {
 
           <Text style={styles.sectionHeading}>Peer Circles</Text>
           <View style={styles.circlesActionsRow}>
-            <TouchableOpacity style={styles.circlePrimaryBtn} onPress={() => router.push("/circles/create" as any)}>
-              <Ionicons name="add-circle-outline" size={15} color="#fff" />
-              <Text style={styles.circlePrimaryBtnText}>Start a Circle</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.circleSecondaryBtn} onPress={() => router.push("/circles/discover" as any)}>
-              <Ionicons name="search" size={15} color={colors.accentGreen} />
-              <Text style={styles.circleSecondaryBtnText}>Find a Circle</Text>
-            </TouchableOpacity>
+            <AppButton label="Start a Circle" onPress={() => router.push("/circles/create" as any)} icon="add-circle-outline" style={{ flex: 1 }} />
+            <AppButton label="Find a Circle" onPress={() => router.push("/circles/discover" as any)} variant="outline" icon="search" style={{ flex: 1 }} />
           </View>
           {circles.map((c) => (
             <CircleCard
@@ -388,19 +371,16 @@ export default function DiscoverTab() {
 
           <Text style={styles.sectionHeading}>⛪ Churches on P2P Global</Text>
           {profile?.isMinistryLeader && !userChurch && (
-            <TouchableOpacity style={styles.circlePrimaryBtn} onPress={() => router.push("/church/register" as any)}>
-              <Ionicons name="add-circle-outline" size={15} color="#fff" />
-              <Text style={styles.circlePrimaryBtnText}>Register Your Church — Free</Text>
-            </TouchableOpacity>
+            <AppButton label="Register Your Church — Free" onPress={() => router.push("/church/register" as any)} icon="add-circle-outline" style={{ flex: 1 }} />
           )}
           {!userChurch && (
-            <TouchableOpacity style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church/join" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church/join" as any)}>
               <Text style={styles.circleCardName}>Join Your Church Community</Text>
               <Text style={styles.circleCardMeta}>Has your church registered on P2P Global? Join with their invite code.</Text>
             </TouchableOpacity>
           )}
           {userChurch && (
-            <TouchableOpacity style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church" as any)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.circleCard} activeOpacity={0.85} onPress={() => router.push("/church" as any)}>
               <Text style={styles.circleCardName}>My Church</Text>
               <Text style={styles.circleCardMeta}>{userChurch.name}</Text>
             </TouchableOpacity>

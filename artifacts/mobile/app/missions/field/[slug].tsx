@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getMissionField, MISSION_FOCUS_LABELS, type MissionFieldDetail } from "@/lib/missionsApi";
+import { AppButton } from "@/components/ui";
 
 export default function MissionFieldScreen() {
   const insets = useSafeAreaInsets();
@@ -30,7 +31,7 @@ export default function MissionFieldScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <View style={{ width: 22 }} />
@@ -47,13 +48,7 @@ export default function MissionFieldScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { topicTitle: field.title, missionFieldId: field.id } } as any)}
-        >
-          <Ionicons name="hand-left-outline" size={18} color="#fff" />
-          <Text style={styles.primaryBtnText}>Pray for This Mission Field</Text>
-        </TouchableOpacity>
+        <AppButton label="Pray for This Mission Field" onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { topicTitle: field.title, missionFieldId: field.id } } as any)} icon="hand-left-outline" style={{ marginTop: 20 }} />
 
         {field.prayerPoints.length > 0 && (
           <View style={{ marginTop: 22 }}>
@@ -72,7 +67,7 @@ export default function MissionFieldScreen() {
           {field.stories.length === 0 ? (
             <Text style={styles.emptyText}>No stories from this field yet.</Text>
           ) : field.stories.map((s) => (
-            <TouchableOpacity key={s.id} style={styles.storyCard} onPress={() => router.push(`/missions/story/${s.id}` as any)}>
+            <TouchableOpacity accessibilityRole="button" key={s.id} style={styles.storyCard} onPress={() => router.push(`/missions/story/${s.id}` as any)}>
               <Text style={styles.storyTitle}>{s.title}</Text>
               {!!s.summary && <Text style={styles.storySummary} numberOfLines={2}>{s.summary}</Text>}
             </TouchableOpacity>
@@ -95,8 +90,6 @@ function makeStyles(c: AppColors) {
     focusRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
     focusTag: { backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
     focusTagText: { fontSize: 11, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
-    primaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 20 },
-    primaryBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
     sectionHeading: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
     prayerPointCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 12, gap: 4, marginBottom: 8 },
     prayerPointTitle: { fontSize: 13, color: c.textDark, fontFamily: "Inter_700Bold" },

@@ -82,7 +82,7 @@ export default function DiscoverCirclesScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Find a Circle</Text>
@@ -95,10 +95,10 @@ export default function DiscoverCirclesScreen() {
       </View>
 
       <View style={styles.filterRow}>
-        <TouchableOpacity style={[styles.filterChip, openOnly && styles.filterChipActive]} onPress={() => setOpenOnly((v) => !v)}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.filterChip, openOnly && styles.filterChipActive]} onPress={() => setOpenOnly((v) => !v)}>
           <Text style={[styles.filterChipText, openOnly && styles.filterChipTextActive]}>Open circles only</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.filterChip, formingOnly && styles.filterChipActive]} onPress={() => setFormingOnly((v) => !v)}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.filterChip, formingOnly && styles.filterChipActive]} onPress={() => setFormingOnly((v) => !v)}>
           <Text style={[styles.filterChipText, formingOnly && styles.filterChipTextActive]}>Forming (not started)</Text>
         </TouchableOpacity>
       </View>
@@ -153,7 +153,5 @@ function makeStyles(c: AppColors) {
     statusPillText: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
     circleDesc: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 6, lineHeight: 17 },
     circleMeta: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
-    joinBtn: { backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 10, alignItems: "center", marginTop: 12 },
-    joinBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

@@ -54,12 +54,12 @@ export default function PrayerSpacePanel({
         </View>
         {p.scripture_reference && <Text style={styles.requestScripture}>{formatScriptureReference(p.scripture_reference)}</Text>}
         <View style={styles.requestActions}>
-          {p.status === "open" && <TouchableOpacity onPress={() => onMarkPrayed(p.id)}><Text style={styles.requestAction}>Prayed</Text></TouchableOpacity>}
+          {p.status === "open" && <TouchableOpacity accessibilityRole="button" onPress={() => onMarkPrayed(p.id)}><Text style={styles.requestAction}>Prayed</Text></TouchableOpacity>}
           {p.user_id === myUserId && p.status !== "answered" && (
-            <TouchableOpacity onPress={() => onMarkAnswered(p.id)}><Text style={styles.requestAction}>Answered</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={() => onMarkAnswered(p.id)}><Text style={styles.requestAction}>Answered</Text></TouchableOpacity>
           )}
           {isGuide && (
-            <TouchableOpacity onPress={() => onSetFocus(isFocused ? null : p.id)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => onSetFocus(isFocused ? null : p.id)}>
               <Text style={styles.requestAction}>{isFocused ? "Clear focus" : "Focus"}</Text>
             </TouchableOpacity>
           )}

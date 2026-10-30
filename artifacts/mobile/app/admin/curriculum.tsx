@@ -13,6 +13,7 @@ import BlockEditorPanel from "@/components/admin/BlockEditorPanel";
 import PdfImportModal from "@/components/admin/PdfImportModal";
 import PlanCategoryManager from "@/components/admin/PlanCategoryManager";
 import { previewMoveToBin, moveToBin, moveToBinMessage, type DeletePreview, type RecycleType } from "@/lib/recycleBinApi";
+import { AppButton } from "@/components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -358,7 +359,7 @@ export default function CurriculumManagerScreen() {
     const mods = modulesMap[c.id] ?? [];
     return (
       <View key={c.id} style={{ marginBottom: 10 }}>
-        <TouchableOpacity style={[styles.navRow, cSel && !selectedModuleId && styles.navRowSelected]} onPress={() => selectCurriculum(c.id)} onLongPress={editCurriculumSettings}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.navRow, cSel && !selectedModuleId && styles.navRowSelected]} onPress={() => selectCurriculum(c.id)} onLongPress={editCurriculumSettings}>
           <Ionicons name={adminTab === "plans" ? "radio-outline" : "book-outline"} size={14} color={colors.primaryGreen} />
           <Text style={[styles.navLabel, { flex: 1, fontFamily: "Inter_700Bold" }]} numberOfLines={1}>{c.title}</Text>
           <StatusBadge status={c.status} />
@@ -370,15 +371,15 @@ export default function CurriculumManagerScreen() {
               const mSel = selectedModuleId === m.id;
               const lessonCount = (lessonsMap[m.id] ?? []).length;
               return (
-                <TouchableOpacity key={m.id} style={[styles.navRow, styles.moduleRow, mSel && styles.navRowSelected]} onPress={() => selectModule(m.id)}>
+                <TouchableOpacity accessibilityRole="button" key={m.id} style={[styles.navRow, styles.moduleRow, mSel && styles.navRowSelected]} onPress={() => selectModule(m.id)}>
                   <View style={[styles.moduleColorDot, { backgroundColor: m.color_theme || colors.primaryGreen }]} />
                   <Text style={[styles.navLabel, { flex: 1 }]} numberOfLines={1}>{m.title}</Text>
                   <Text style={styles.navMeta}>{lessonCount}L</Text>
                   <View style={styles.reorderBtns}>
-                    <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "up", c.id, setModulesMap)}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up" hitSlop={10} onPress={() => moveItem("p2p_modules", mods, m.id, "up", c.id, setModulesMap)}>
                       <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => moveItem("p2p_modules", mods, m.id, "down", c.id, setModulesMap)}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down" hitSlop={10} onPress={() => moveItem("p2p_modules", mods, m.id, "down", c.id, setModulesMap)}>
                       <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
@@ -386,10 +387,7 @@ export default function CurriculumManagerScreen() {
                 </TouchableOpacity>
               );
             })}
-            <TouchableOpacity style={styles.addInTreeBtn} onPress={() => openCreate("module", c.id)}>
-              <Ionicons name="add" size={12} color={colors.accentGreen} />
-              <Text style={styles.addInTreeText}>Add module</Text>
-            </TouchableOpacity>
+            <AppButton label="Add module" onPress={() => openCreate("module", c.id)} variant="tertiary" size="sm" icon="add" style={{ marginTop: 4 }} palette="fixedLight" />
           </View>
         )}
       </View>
@@ -402,15 +400,9 @@ export default function CurriculumManagerScreen() {
         <Text style={styles.navPanelTitle}>{adminTab === "plans" ? "Study Plans" : "Curricula"}</Text>
         <View style={{ flexDirection: "row", gap: 6 }}>
           {adminTab === "plans" && (
-            <TouchableOpacity style={styles.addBtnSmall} onPress={() => setPdfImportVisible(true)}>
-              <Ionicons name="document-attach-outline" size={16} color={colors.accentGreen} />
-              <Text style={styles.addBtnSmallText}>Import from PDF</Text>
-            </TouchableOpacity>
+            <AppButton label="Import from PDF" onPress={() => setPdfImportVisible(true)} variant="secondary" size="sm" icon="document-attach-outline" palette="fixedLight" />
           )}
-          <TouchableOpacity style={styles.addBtnSmall} onPress={() => openCreate(adminTab === "plans" ? "plan" : "curriculum")}>
-            <Ionicons name="add" size={16} color={colors.accentGreen} />
-            <Text style={styles.addBtnSmallText}>New</Text>
-          </TouchableOpacity>
+          <AppButton label="New" onPress={() => openCreate(adminTab === "plans" ? "plan" : "curriculum")} variant="secondary" size="sm" icon="add" palette="fixedLight" />
         </View>
       </View>
 
@@ -428,7 +420,7 @@ export default function CurriculumManagerScreen() {
             const isExpanded = expandedCategories.has(cat.id);
             return (
               <View key={cat.id} style={{ marginBottom: 10 }}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.categoryHeaderRow, { borderLeftColor: cat.color_theme || colors.primaryGreen }]}
                   onPress={() => toggleCategoryExpanded(cat.id)}
                 >
@@ -450,7 +442,7 @@ export default function CurriculumManagerScreen() {
           })}
           {(plansByCategory.get(UNCATEGORIZED_KEY) ?? []).length > 0 && (
             <View style={{ marginBottom: 10 }}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.categoryHeaderRow, { borderLeftColor: colors.textMuted }]}
                 onPress={() => toggleCategoryExpanded(UNCATEGORIZED_KEY)}
               >
@@ -478,7 +470,7 @@ export default function CurriculumManagerScreen() {
         <>
           <View style={styles.lessonPanelHeader}>
             <Text style={styles.lessonPanelTitle} numberOfLines={1}>{selectedModule.title}</Text>
-            <TouchableOpacity onPress={editModuleSettings} style={styles.gearBtn}>
+            <TouchableOpacity accessibilityLabel="Settings" accessibilityRole="button" hitSlop={10} onPress={editModuleSettings} style={styles.gearBtn}>
               <Ionicons name="settings-outline" size={16} color={colors.textMid} />
             </TouchableOpacity>
           </View>
@@ -492,18 +484,18 @@ export default function CurriculumManagerScreen() {
               lessonsForSelected.map((l) => {
                 const lSel = selectedLessonId === l.id;
                 return (
-                  <TouchableOpacity key={l.id} style={[styles.navRow, lSel && styles.navRowSelected]} onPress={() => selectLesson(l.id)}>
+                  <TouchableOpacity accessibilityRole="button" key={l.id} style={[styles.navRow, lSel && styles.navRowSelected]} onPress={() => selectLesson(l.id)}>
                     <Ionicons name="document-text" size={13} color={colors.textMuted} />
                     <Text style={[styles.navLabel, { flex: 1 }]} numberOfLines={1}>{l.title}</Text>
                     <View style={styles.reorderBtns}>
-                      <TouchableOpacity onPress={() => moveItem("p2p_lessons", lessonsForSelected, l.id, "up", selectedModule.id, setLessonsMap)}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up" hitSlop={10} onPress={() => moveItem("p2p_lessons", lessonsForSelected, l.id, "up", selectedModule.id, setLessonsMap)}>
                         <Ionicons name="arrow-up" size={11} color={colors.textMuted} />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => moveItem("p2p_lessons", lessonsForSelected, l.id, "down", selectedModule.id, setLessonsMap)}>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down" hitSlop={10} onPress={() => moveItem("p2p_lessons", lessonsForSelected, l.id, "down", selectedModule.id, setLessonsMap)}>
                         <Ionicons name="arrow-down" size={11} color={colors.textMuted} />
                       </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => handleDuplicateLesson(l)} style={{ paddingHorizontal: 4 }}>
+                    <TouchableOpacity accessibilityLabel="Copy" accessibilityRole="button" hitSlop={10} onPress={() => handleDuplicateLesson(l)} style={{ paddingHorizontal: 4 }}>
                       <Ionicons name="copy-outline" size={14} color={colors.textMuted} />
                     </TouchableOpacity>
                     <StatusBadge status={l.status} />
@@ -511,10 +503,7 @@ export default function CurriculumManagerScreen() {
                 );
               })
             )}
-            <TouchableOpacity style={styles.addInTreeBtn} onPress={() => openCreate("lesson", selectedModule.id)}>
-              <Ionicons name="add" size={12} color={colors.accentGreen} />
-              <Text style={styles.addInTreeText}>Add lesson</Text>
-            </TouchableOpacity>
+            <AppButton label="Add lesson" onPress={() => openCreate("lesson", selectedModule.id)} variant="tertiary" size="sm" icon="add" style={{ marginTop: 4 }} palette="fixedLight" />
           </ScrollView>
         </>
       ) : (
@@ -575,19 +564,16 @@ export default function CurriculumManagerScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.adminTabRow}>
-        <TouchableOpacity style={[styles.adminTab, adminTab === "curriculum" && styles.adminTabActive]} onPress={() => switchAdminTab("curriculum")}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.adminTab, adminTab === "curriculum" && styles.adminTabActive]} onPress={() => switchAdminTab("curriculum")}>
           <Ionicons name="book-outline" size={13} color={adminTab === "curriculum" ? "#fff" : colors.textMid} />
           <Text style={[styles.adminTabText, adminTab === "curriculum" && styles.adminTabTextActive]}>Curriculum</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.adminTab, adminTab === "plans" && styles.adminTabActive]} onPress={() => switchAdminTab("plans")}>
+        <TouchableOpacity accessibilityRole="button" style={[styles.adminTab, adminTab === "plans" && styles.adminTabActive]} onPress={() => switchAdminTab("plans")}>
           <Ionicons name="radio-outline" size={13} color={adminTab === "plans" ? "#fff" : colors.textMid} />
           <Text style={[styles.adminTabText, adminTab === "plans" && styles.adminTabTextActive]}>Plans</Text>
         </TouchableOpacity>
         {adminTab === "plans" && plansView === "editor" && (
-          <TouchableOpacity style={styles.backToPlansBtn} onPress={() => setPlansView("manage")}>
-            <Ionicons name="arrow-back" size={14} color={colors.accentGreen} />
-            <Text style={styles.backToPlansText}>Back to Plans</Text>
-          </TouchableOpacity>
+          <AppButton label="Back to Plans" onPress={() => setPlansView("manage")} variant="tertiary" size="sm" icon="arrow-back" style={{ marginLeft: "auto" }} palette="fixedLight" />
         )}
       </View>
 
@@ -609,7 +595,7 @@ export default function CurriculumManagerScreen() {
         <View style={{ flex: 1 }}>
           {mobilePanel !== "modules" && (
             <View style={[styles.mobileEditorHeader, { paddingTop: insets.top + 8 }]}>
-              <TouchableOpacity onPress={() => setMobilePanel(mobilePanel === "editor" && selectedModule ? "lessons" : "modules")}>
+              <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => setMobilePanel(mobilePanel === "editor" && selectedModule ? "lessons" : "modules")}>
                 <Ionicons name="arrow-back" size={22} color={colors.textDark} />
               </TouchableOpacity>
               <Text style={styles.mobileEditorTitle}>
@@ -632,10 +618,8 @@ export default function CurriculumManagerScreen() {
             </Text>
             <TextInput style={styles.modalInput} value={createTitle} onChangeText={setCreateTitle} placeholder="Title" placeholderTextColor={colors.textMuted} autoFocus />
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setCreateModal(null)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalCreate, createLoading && { opacity: 0.7 }]} onPress={handleCreate} disabled={createLoading}>
+              <AppButton label="Cancel" onPress={() => setCreateModal(null)} variant="outline" palette="fixedLight" />
+              <TouchableOpacity accessibilityRole="button" style={[styles.modalCreate, createLoading && { opacity: 0.7 }]} onPress={handleCreate} disabled={createLoading}>
                 {createLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalCreateText}>Create</Text>}
               </TouchableOpacity>
             </View>
@@ -786,18 +770,12 @@ function CurriculumEditor({
           <View style={{ gap: 8 }}>
             <Image source={{ uri: coverImage }} style={{ width: "100%", height: 130, borderRadius: 10 }} resizeMode="cover" />
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={pickAndUploadCover} disabled={uploadingCover}>
-                {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={() => setCoverImage(null)} disabled={uploadingCover}>
-                <Ionicons name="trash-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Remove</Text>
-              </TouchableOpacity>
+              <AppButton label="Replace image" onPress={pickAndUploadCover} variant="outline" icon="swap-horizontal" disabled={uploadingCover} loading={uploadingCover} style={{ marginTop: 4, flex: 1 }} palette="fixedLight" />
+              <AppButton label="Remove" onPress={() => setCoverImage(null)} variant="outline" icon="trash-outline" disabled={uploadingCover} style={{ flex: 1, marginTop: 4 }} palette="fixedLight" />
             </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadCover} disabled={uploadingCover}>
-            {uploadingCover ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload cover image</Text></>}
-          </TouchableOpacity>
+          <AppButton label="Upload cover image" onPress={pickAndUploadCover} variant="outline" icon="image-outline" disabled={uploadingCover} loading={uploadingCover} style={{ marginTop: 4 }} palette="fixedLight" />
         )}
       </EditorField>
 
@@ -806,7 +784,7 @@ function CurriculumEditor({
           <EditorField label="Color Theme">
             <View style={styles.colorRow}>
               {MODULE_COLOR_PALETTE.map((clr) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={clr}
                   style={[styles.colorSwatch, { backgroundColor: clr }, colorTheme === clr && styles.colorSwatchSelected]}
                   onPress={() => setColorTheme(clr)}
@@ -820,7 +798,7 @@ function CurriculumEditor({
           <EditorField label="Difficulty Level">
             <View style={styles.statusRow}>
               {DIFFICULTY_LEVELS.map((lvl) => (
-                <TouchableOpacity key={lvl} style={[styles.statusOpt, difficultyLevel === lvl && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]} onPress={() => setDifficultyLevel(lvl)}>
+                <TouchableOpacity accessibilityRole="button" key={lvl} style={[styles.statusOpt, difficultyLevel === lvl && { backgroundColor: colors.accentGreen, borderColor: colors.accentGreen }]} onPress={() => setDifficultyLevel(lvl)}>
                   <Text style={[styles.statusOptText, difficultyLevel === lvl && { color: "#fff" }]}>{lvl.charAt(0).toUpperCase() + lvl.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
@@ -835,7 +813,7 @@ function CurriculumEditor({
             <TextInput style={styles.edInput} value={tagsInput} onChangeText={setTagsInput} placeholder="purity, relationships, men" placeholderTextColor={colors.textMuted} />
           </EditorField>
 
-          <TouchableOpacity style={styles.toggleRow} onPress={() => setIsFeatured((v) => !v)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.toggleRow} onPress={() => setIsFeatured((v) => !v)}>
             <View style={[styles.toggleTrack, isFeatured && styles.toggleTrackOn]}>
               <View style={[styles.toggleThumb, isFeatured && styles.toggleThumbOn]} />
             </View>
@@ -947,18 +925,12 @@ function ModuleEditor({
           <View style={{ gap: 8 }}>
             <Image source={{ uri: imageUrl }} style={{ width: "100%", height: 120, borderRadius: 10 }} resizeMode="cover" />
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={pickAndUploadImage} disabled={uploading}>
-                {uploading ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="swap-horizontal" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Replace image</Text></>}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.addBtn, { flex: 1 }]} onPress={() => setImageUrl(null)} disabled={uploading}>
-                <Ionicons name="trash-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Remove</Text>
-              </TouchableOpacity>
+              <AppButton label="Replace image" onPress={pickAndUploadImage} variant="outline" icon="swap-horizontal" disabled={uploading} loading={uploading} style={{ marginTop: 4, flex: 1 }} palette="fixedLight" />
+              <AppButton label="Remove" onPress={() => setImageUrl(null)} variant="outline" icon="trash-outline" disabled={uploading} style={{ flex: 1, marginTop: 4 }} palette="fixedLight" />
             </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.addBtn} onPress={pickAndUploadImage} disabled={uploading}>
-            {uploading ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <><Ionicons name="image-outline" size={15} color={colors.accentGreen} /><Text style={styles.addBtnText}>Upload thumbnail</Text></>}
-          </TouchableOpacity>
+          <AppButton label="Upload thumbnail" onPress={pickAndUploadImage} variant="outline" icon="image-outline" disabled={uploading} loading={uploading} style={{ marginTop: 4 }} palette="fixedLight" />
         )}
       </EditorField>
       {error && <Text style={styles.edError}>{error}</Text>}
@@ -976,10 +948,7 @@ function EditorHeader({ icon, label, onDelete }: { icon: string; label: string; 
         <Ionicons name={icon as any} size={16} color={colors.primaryGreen} />
         <Text style={styles.editorHeaderLabel}>{label}</Text>
       </View>
-      <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-        <Ionicons name="trash-outline" size={15} color="#B91C1C" />
-        <Text style={styles.deleteBtnText}>Delete</Text>
-      </TouchableOpacity>
+      <AppButton label="Delete" onPress={onDelete} variant="destructive" icon="trash-outline" palette="fixedLight" />
     </View>
   );
 }
@@ -998,7 +967,7 @@ function StatusSelector({ value, onChange }: { value: Status; onChange: (s: Stat
   return (
     <View style={styles.statusRow}>
       {options.map((s) => (
-        <TouchableOpacity key={s} style={[styles.statusOpt, value === s && { backgroundColor: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }]} onPress={() => onChange(s)}>
+        <TouchableOpacity accessibilityRole="button" key={s} style={[styles.statusOpt, value === s && { backgroundColor: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }]} onPress={() => onChange(s)}>
           <Text style={[styles.statusOptText, value === s && { color: "#fff" }]}>{s.charAt(0).toUpperCase() + s.slice(1)}</Text>
         </TouchableOpacity>
       ))}
@@ -1008,7 +977,7 @@ function StatusSelector({ value, onChange }: { value: Status; onChange: (s: Stat
 
 function SaveButton({ onPress, saving }: { onPress: () => void; saving: boolean }) {
   return (
-    <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={onPress} disabled={saving}>
+    <TouchableOpacity accessibilityRole="button" style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={onPress} disabled={saving}>
       {saving ? <ActivityIndicator color="#fff" size="small" /> : <><Ionicons name="checkmark" size={16} color="#fff" /><Text style={styles.saveBtnText}>Save</Text></>}
     </TouchableOpacity>
   );
@@ -1030,15 +999,12 @@ const styles = StyleSheet.create({
   categoryHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 8, borderLeftWidth: 3, backgroundColor: colors.cardBeige, borderRadius: 6 },
   categoryHeaderText: { flex: 1, fontSize: 13, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   categoryHeaderCount: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_500Medium" },
-  addBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(29,158,117,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  addBtnSmallText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
   adminTabRow: { flexDirection: "row", alignItems: "center", gap: 6, margin: 12, marginBottom: 0, backgroundColor: colors.cardBeige, borderRadius: 10, padding: 4 },
   adminTab: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 7, paddingHorizontal: 14, borderRadius: 8 },
   adminTabActive: { backgroundColor: colors.primaryGreen },
   adminTabText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_600SemiBold" },
   adminTabTextActive: { color: "#fff" },
-  backToPlansBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: "auto", paddingHorizontal: 10, paddingVertical: 6 },
   backToPlansText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
 
   emptyTree: { alignItems: "center", paddingTop: 40, gap: 10 },
@@ -1052,7 +1018,6 @@ const styles = StyleSheet.create({
   moduleRow: { paddingVertical: 6 },
   moduleColorDot: { width: 8, height: 8, borderRadius: 4 },
   reorderBtns: { flexDirection: "column", gap: 1 },
-  addInTreeBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 6, marginTop: 4 },
   addInTreeText: { fontSize: 11, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   lessonPanel: { flex: 1, backgroundColor: "#fff" },
@@ -1073,8 +1038,6 @@ const styles = StyleSheet.create({
   editorHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   editorHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
   editorHeaderLabel: { fontSize: 16, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
-  deleteBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  deleteBtnText: { fontSize: 12, color: "#B91C1C", fontFamily: "Inter_500Medium" },
 
   editorField: { gap: 6 },
   editorFieldLabel: { fontSize: 13, fontWeight: "600", color: colors.textMid, fontFamily: "Inter_600SemiBold" },
@@ -1097,9 +1060,6 @@ const styles = StyleSheet.create({
 
   creditSection: { gap: 16, marginTop: 4, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderBeige },
   creditSectionTitle: { fontSize: 13, fontWeight: "700", color: colors.primaryGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
-
-  addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.borderBeige, paddingHorizontal: 14, marginTop: 4 },
-  addBtnText: { fontSize: 13, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   edError: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_400Regular", textAlign: "center" },
 

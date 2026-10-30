@@ -6,6 +6,7 @@ import FamilyIcon from "@/components/family/FamilyIcon";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getFamilyPrayerRequests, createFamilyPrayerRequest, updateFamilyPrayerRequestStatus, type FamilyPrayerRequest } from "@/lib/familyApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -91,7 +92,7 @@ export default function FamilyPrayerScreen() {
                   {p.visibility === "private" ? "Only you" : "Shared"} · {p.status === "answered" ? "Answered" : p.status === "prayed" ? "Prayed" : "Open"}
                 </Text>
                 {p.status === "open" && (
-                  <TouchableOpacity onPress={() => handleMarkPrayed(p.id)}>
+                  <TouchableOpacity accessibilityRole="button" onPress={() => handleMarkPrayed(p.id)}>
                     <Text style={styles.prayerAction}>Mark prayed</Text>
                   </TouchableOpacity>
                 )}
@@ -108,13 +109,8 @@ export default function FamilyPrayerScreen() {
             multiline
           />
           <View style={styles.inviteRow}>
-            <TouchableOpacity style={styles.secondaryBtnSmall} onPress={() => setNewPrayerPrivate((v) => !v)}>
-              <Ionicons name={newPrayerPrivate ? "lock-closed" : "people"} size={14} color={c.accentGreen} />
-              <Text style={styles.secondaryBtnSmallText}>{newPrayerPrivate ? "Private" : "Family Circle"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtnSmall} onPress={handleAddPrayer} disabled={!newPrayer.trim()} accessibilityRole="button" accessibilityLabel="Add prayer request">
-              <Text style={styles.primaryBtnSmallText}>Add request</Text>
-            </TouchableOpacity>
+            <AppButton label={newPrayerPrivate ? "Private" : "Family Circle"} onPress={() => setNewPrayerPrivate((v) => !v)} variant="outline" icon={newPrayerPrivate ? "lock-closed" : "people"} />
+            <AppButton label="Add request" onPress={handleAddPrayer} disabled={!newPrayer.trim()} accessibilityLabel="Add prayer request" />
           </View>
         </View>
       </ScrollView>
@@ -132,10 +128,6 @@ function makeStyles(c: AppColors) {
       width: "100%", backgroundColor: c.lightCream, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12,
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", marginTop: 10,
     },
-    primaryBtnSmall: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
-    primaryBtnSmallText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryBtnSmall: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
-    secondaryBtnSmallText: { color: c.accentGreen, fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
     inviteRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 },
     prayerRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
     prayerContentRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },

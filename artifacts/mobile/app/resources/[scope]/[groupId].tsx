@@ -12,6 +12,7 @@ import {
   MAX_UPLOAD_BYTES, ResourceApiError, deleteResource, fileKind, formatBytes, getDownloadUrl, listResources, uploadResource,
   type GroupResource, type GroupScope, type UploadHandle,
 } from "@/lib/groupResourcesApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Files & Resources of ONE Family Circle or Church. Only its active members
 // can see or open anything here (checked by the server on every request);
@@ -108,13 +109,9 @@ export default function GroupResourcesScreen() {
           </View>
         </TouchableOpacity>
         {canDelete && (confirmDelete === item.id ? (
-          <TouchableOpacity onPress={() => remove(item.id)} style={styles.confirm} accessibilityRole="button" accessibilityLabel={`Confirm remove ${item.fileName}`}>
-            <Text style={styles.confirmText}>Remove</Text>
-          </TouchableOpacity>
+          <AppButton label="Remove" onPress={() => remove(item.id)} variant="destructive" size="sm" accessibilityLabel={`Confirm remove ${item.fileName}`} />
         ) : (
-          <TouchableOpacity onPress={() => setConfirmDelete(item.id)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={`Remove ${item.fileName}`}>
-            <Ionicons name="trash-outline" size={18} color={c.textMuted} />
-          </TouchableOpacity>
+          <IconButton icon="trash-outline" accessibilityLabel={`Remove ${item.fileName}`} onPress={() => setConfirmDelete(item.id)} color={c.textMuted} />
         ))}
       </View>
     );
@@ -123,17 +120,13 @@ export default function GroupResourcesScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 4 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={24} color={c.textDark} />
-        </TouchableOpacity>
+        <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={() => router.back()} color={c.textDark} />
         <View style={{ flex: 1 }}>
           <Text style={styles.title} accessibilityRole="header">Files & Resources</Text>
           <Text style={styles.sub} numberOfLines={1}>{name || groupLabel}</Text>
         </View>
         {perm.canUpload && perm.available && (
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)} accessibilityRole="button" accessibilityLabel="Add a file">
-            <Ionicons name="add" size={18} color="#fff" /><Text style={styles.addText}>Add</Text>
-          </TouchableOpacity>
+          <AppButton label="Add" onPress={() => setAddOpen(true)} icon="add" accessibilityLabel="Add a file" />
         )}
       </View>
       <View style={styles.privacy}>
@@ -169,7 +162,7 @@ export default function GroupResourcesScreen() {
       )}
 
       <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setAddOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={() => setAddOpen(false)}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Add to {name || groupLabel}</Text>
             <TouchableOpacity style={styles.sheetRow} onPress={pickImage} accessibilityRole="button"><Ionicons name="image-outline" size={20} color={c.textDark} /><Text style={styles.sheetText}>Photo</Text></TouchableOpacity>
@@ -181,7 +174,7 @@ export default function GroupResourcesScreen() {
 
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.previewBg}>
-          <TouchableOpacity style={[styles.previewClose, { top: insets.top + 10 }]} onPress={() => setPreview(null)} accessibilityRole="button" accessibilityLabel="Close preview">
+          <TouchableOpacity hitSlop={10} style={[styles.previewClose, { top: insets.top + 10 }]} onPress={() => setPreview(null)} accessibilityRole="button" accessibilityLabel="Close preview">
             <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
           {preview && <Image source={{ uri: preview.url }} style={{ width: "100%", height: "80%" }} resizeMode="contain" accessibilityLabel={preview.name} />}
@@ -196,10 +189,8 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingRight: 14, gap: 4 },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     title: { fontSize: 19, color: c.textDark, fontFamily: "Inter_700Bold" },
     sub: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium" },
-    addBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: c.accentGreen },
     addText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
     privacy: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 8 },
     privacyText: { flex: 1, fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },

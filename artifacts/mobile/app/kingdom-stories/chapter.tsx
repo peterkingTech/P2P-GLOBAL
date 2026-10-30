@@ -18,6 +18,7 @@ import { usePageTurn } from "@/components/kingdom-stories/usePageTurn";
 // The Core Curriculum answer card: persisted drafts, text/audio/video,
 // submission and peer-review status — reused, not re-implemented.
 import { QuestionResponseCard } from "@/app/lesson/[id]";
+import { AppButton, IconButton } from "@/components/ui";
 
 // One chapter of a Kingdom Story, read like a page of an illustrated book.
 // Order: opening illustration, title, Scripture, the narrative (further
@@ -130,7 +131,7 @@ export default function KingdomStoryChapterScreen() {
       <View style={[s.screen, s.center, { padding: 24 }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <Text style={s.muted}>{error ?? "This chapter isn't available."}</Text>
-        <TouchableOpacity onPress={toContents} style={s.linkBtn} accessibilityRole="button"><Text style={s.linkText}>Back to the story</Text></TouchableOpacity>
+        <AppButton label="Back to the story" onPress={toContents} variant="tertiary" style={{ marginTop: 8 }} />
       </View>
     );
   }
@@ -152,7 +153,7 @@ export default function KingdomStoryChapterScreen() {
           <Ionicons name="lock-closed" size={32} color={c.textMuted} />
           <Text style={s.lockedTitle}>Chapter {ch.chapterNumber}: {ch.title}</Text>
           <Text style={s.mutedCenter}>{lockedMessage(chapters, ch.id)}</Text>
-          <TouchableOpacity onPress={toContents} style={s.linkBtn} accessibilityRole="button"><Text style={s.linkText}>Back to contents</Text></TouchableOpacity>
+          <AppButton label="Back to contents" onPress={toContents} variant="tertiary" style={{ marginTop: 8 }} />
         </View>
       </View>
     );
@@ -179,9 +180,7 @@ export default function KingdomStoryChapterScreen() {
       <View style={[s.screen, { paddingTop: insets.top + 4 }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={s.header}>
-          <TouchableOpacity onPress={toContents} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Return to the story">
-            <Ionicons name="arrow-back" size={22} color={c.textDark} />
-          </TouchableOpacity>
+          <IconButton icon="arrow-back" accessibilityLabel="Return to the story" onPress={toContents} color={c.textDark} />
           <TouchableOpacity style={s.headerMid} onPress={() => setChaptersOpen(true)} accessibilityRole="button"
             accessibilityLabel={`Chapter ${ch.chapterNumber} of ${chapters.length}: ${ch.title}. Choose a chapter`}>
             <Text style={s.headerTitle} numberOfLines={1}>{story.title} · {ch.chapterNumber} of {chapters.length}</Text>
@@ -323,18 +322,14 @@ export default function KingdomStoryChapterScreen() {
               <Text style={s.statusText}>{statusText}</Text>
             </View>
             {!preview && !check && state !== "completed" && learning?.lessonId && (
-              <TouchableOpacity style={s.primaryBtn} onPress={finish} disabled={finishing} accessibilityRole="button">
-                {finishing ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>Finish chapter</Text>}
-              </TouchableOpacity>
+              <AppButton label="Finish chapter" onPress={finish} size="lg" disabled={finishing} loading={finishing} style={{ marginTop: 12 }} />
             )}
 
             <View style={s.navRow}>
               <TouchableOpacity style={[s.navBtn, !prev && { opacity: 0.35 }]} disabled={!prev} onPress={() => prev && go(prev)} accessibilityRole="button" accessibilityLabel={prev ? `Previous: Chapter ${prev.chapterNumber}` : "No previous chapter"}>
                 <Ionicons name="chevron-back" size={16} color={c.textDark} /><Text style={s.navText}>Previous</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.navBtn} onPress={() => setChaptersOpen(true)} accessibilityRole="button" accessibilityLabel="Choose a chapter">
-                <Ionicons name="list" size={16} color={c.textDark} /><Text style={s.navText}>Chapters</Text>
-              </TouchableOpacity>
+              <AppButton label="Chapters" onPress={() => setChaptersOpen(true)} variant="outline" icon="list" accessibilityLabel="Choose a chapter" />
               <TouchableOpacity style={[s.navBtn, !next && { opacity: 0.35 }]} disabled={!next} onPress={() => next && go(next)} accessibilityRole="button"
                 accessibilityLabel={next ? `Next: Chapter ${next.chapterNumber}${next.learning?.state === "locked" ? ", locked" : ""}` : "No next chapter"}>
                 <Text style={s.navText}>Next</Text>
@@ -346,17 +341,17 @@ export default function KingdomStoryChapterScreen() {
                 {chapters.map((x) => <View key={x.id} style={[s.dot, x.learning?.state === "completed" && s.dotDone, x.id === ch.id && s.dotHere]} />)}
               </View>
             ) : null}
-            <TouchableOpacity onPress={toContents} style={[s.linkBtn, { alignSelf: "center" }]} accessibilityRole="button"><Text style={s.linkText}>Return to Story</Text></TouchableOpacity>
+            <AppButton label="Return to Story" onPress={toContents} variant="tertiary" style={{ alignSelf: "center", marginTop: 8 }} />
           </Animated.View>
         </ScrollView>
       </View>
 
       <Modal visible={chaptersOpen} transparent animationType="fade" onRequestClose={() => setChaptersOpen(false)}>
-        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setChaptersOpen(false)} accessibilityLabel="Close chapters">
+        <TouchableOpacity accessibilityRole="button" style={s.overlay} activeOpacity={1} onPress={() => setChaptersOpen(false)} accessibilityLabel="Close chapters">
           <TouchableOpacity activeOpacity={1} style={s.sheet}>
             <View style={s.sheetHead}>
               <Text style={s.sheetTitle} accessibilityRole="header">Chapters</Text>
-              <TouchableOpacity onPress={() => setChaptersOpen(false)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={22} color={c.textDark} /></TouchableOpacity>
+              <IconButton icon="close" accessibilityLabel="Close" onPress={() => setChaptersOpen(false)} color={c.textDark} />
             </View>
             <ScrollView>
               {chapters.map((x) => {
@@ -390,7 +385,6 @@ function makeStyles(c: AppColors, k: number) {
     muted: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular" },
     mutedCenter: { fontSize: 15, color: c.textMid, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
     lockedTitle: { fontSize: 20, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "center" },
-    linkBtn: { marginTop: 8, minHeight: 44, justifyContent: "center", paddingHorizontal: 12 },
     linkText: { color: c.accentGreen, fontSize: 15, fontFamily: "Inter_600SemiBold" },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, gap: 4 },
     iconBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
@@ -417,7 +411,7 @@ function makeStyles(c: AppColors, k: number) {
     sizeRow: { flexDirection: "row" },
     sizeSmall: { fontSize: 14, color: c.textDark, fontFamily: SCRIPTURE_FONT },
     sizeLarge: { fontSize: 20, color: c.textDark, fontFamily: SCRIPTURE_FONT },
-    page: { paddingHorizontal: 16, paddingTop: 8, maxWidth: 680, width: "100%", alignSelf: "center" },
+    page: { paddingHorizontal: 16, paddingTop: 8, width: "100%", alignSelf: "center" },
     kicker: { marginTop: 20, fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 1, textAlign: "left" },
     title: { marginTop: 6, fontSize: 26 * k, lineHeight: 32 * k, color: c.textDark, fontFamily: SCRIPTURE_FONT, fontWeight: "700", textAlign: "left" },
     statePill: { alignSelf: "flex-start", marginTop: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
@@ -448,8 +442,6 @@ function makeStyles(c: AppColors, k: number) {
     sourceRow: { paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: c.borderBeige, gap: 2 },
     statusBox: { flexDirection: "row", gap: 10, alignItems: "flex-start", padding: 14, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     statusText: { flex: 1, fontSize: 14, lineHeight: 21, color: c.textDark, fontFamily: "Inter_500Medium" },
-    primaryBtn: { marginTop: 12, minHeight: 50, borderRadius: 14, backgroundColor: c.primaryGreen ?? c.accentGreen, alignItems: "center", justifyContent: "center" },
-    primaryBtnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
     navRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 24 },
     navBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige },
     navText: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },

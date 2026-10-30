@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useData, PendingPeerConfirmation, PeerConfirmationType } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const ACTION_LABEL: Record<PeerConfirmationType, string> = {
   encouragement: "left you encouraging feedback",
@@ -89,33 +90,8 @@ function ConfirmationCard({ item }: { item: PendingPeerConfirmation }) {
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.declineBtn]}
-          onPress={() => handle("decline")}
-          disabled={submitting !== null}
-          activeOpacity={0.85}
-        >
-          {submitting === "decline" ? (
-            <ActivityIndicator color={colors.textMuted} size="small" />
-          ) : (
-            <Text style={styles.declineBtnText}>Not quite</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.confirmBtn]}
-          onPress={() => handle("confirm")}
-          disabled={submitting !== null}
-          activeOpacity={0.85}
-        >
-          {submitting === "confirm" ? (
-            <ActivityIndicator color={colors.cream} size="small" />
-          ) : (
-            <>
-              <Ionicons name="checkmark" size={15} color={colors.cream} />
-              <Text style={styles.confirmBtnText}>Yes, confirm</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Not quite" onPress={() => handle("decline")} variant="secondary" disabled={submitting !== null} loading={submitting === "decline"} style={{ flex: 1 }} palette="fixedLight" />
+        <AppButton label="Yes, confirm" onPress={() => handle("confirm")} icon="checkmark" disabled={submitting !== null} loading={submitting === "confirm"} style={{ flex: 1 }} palette="fixedLight" />
       </View>
     </View>
   );
@@ -130,7 +106,7 @@ export default function ConfirmationsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pending Confirmations</Text>
@@ -189,9 +165,4 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 12, color: "#C0392B", marginBottom: 10, fontFamily: "Inter_400Regular" },
 
   actionRow: { flexDirection: "row", gap: 10 },
-  actionBtn: { flex: 1, height: 40, borderRadius: 10, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" },
-  declineBtn: { backgroundColor: colors.cardBeige, borderWidth: 1, borderColor: colors.borderBeige },
-  declineBtnText: { fontSize: 13, fontWeight: "600", color: colors.textMuted, fontFamily: "Inter_600SemiBold" },
-  confirmBtn: { backgroundColor: colors.primaryGreen },
-  confirmBtnText: { fontSize: 13, fontWeight: "600", color: colors.cream, fontFamily: "Inter_600SemiBold" },
 });

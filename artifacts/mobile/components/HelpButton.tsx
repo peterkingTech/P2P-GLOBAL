@@ -36,7 +36,7 @@ export function HelpButton({ variant = "fab" }: { variant?: "fab" | "inline" }) 
   }
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button" hitSlop={10}
       style={variant === "fab" ? [styles.fab, { bottom: insets.bottom + (Platform.OS === "web" ? 24 : 90) }] : styles.inlineBtn}
       onPress={handlePress}
       activeOpacity={0.85}

@@ -18,7 +18,7 @@ import { useData, Module } from "@/contexts/DataContext";
 import LockExplanationSheet from "@/components/learning/LockExplanationSheet";
 import { explainModuleLock } from "@/lib/lessonLocks";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCardPhotoWidth } from "@/hooks/useLayout";
+import { useCardPhotoWidth, useFullScreenPhotoHeight } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
 
 function showAlert(title: string, message: string) {
@@ -53,11 +53,13 @@ function ModuleCardImage({ uri }: { uri: string | null | undefined }) {
   );
 }
 
-function CoverBanner({ curriculum }: { curriculum: CurriculumDetailInfo }) {
+// The banner photo fills the device screen below the header.
+function CoverBanner({ curriculum, aboveHeight }: { curriculum: CurriculumDetailInfo; aboveHeight: number }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const height = useFullScreenPhotoHeight(aboveHeight);
   const showImage = !!curriculum.coverImage && !imageFailed;
   return (
-    <View style={styles.banner}>
+    <View style={[styles.banner, { height }]}>
       {showImage ? (
         <Image source={{ uri: curriculum.coverImage! }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setImageFailed(true)} />
       ) : (
@@ -107,7 +109,7 @@ export default function CurriculumDetailScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{detail?.curriculum.title ?? "Curriculum"}</Text>
@@ -117,7 +119,7 @@ export default function CurriculumDetailScreen() {
         <View style={styles.loadingContainer}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-          <CoverBanner curriculum={detail.curriculum} />
+          <CoverBanner curriculum={detail.curriculum} aboveHeight={insets.top + (Platform.OS === "web" ? 67 : 0) + 59} />
           <View style={styles.content}>
           <Text style={styles.description}>{detail.curriculum.description}</Text>
 

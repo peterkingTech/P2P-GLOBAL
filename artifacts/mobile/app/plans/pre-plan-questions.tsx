@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { AppButton } from "@/components/ui";
 
 const GOAL_OPTIONS = [
   "I want to grow closer to God",
@@ -152,7 +153,7 @@ export default function PrePlanQuestionsScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={goBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <View style={styles.progressDots}>
@@ -161,7 +162,7 @@ export default function PrePlanQuestionsScreen() {
           ))}
         </View>
         {isGeneral && step < 5 ? (
-          <TouchableOpacity onPress={() => router.replace((returnTo as any) ?? "/settings/index")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.replace((returnTo as any) ?? "/settings/index")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.skipHeaderText}>Skip</Text>
           </TouchableOpacity>
         ) : (
@@ -176,15 +177,13 @@ export default function PrePlanQuestionsScreen() {
             <Text style={styles.hint}>Pick all that apply</Text>
             <View style={styles.optionsList}>
               {GOAL_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[styles.optionRow, goals.includes(opt) && styles.optionRowActive]} onPress={() => toggle(goals, setGoals, opt)}>
+                <TouchableOpacity accessibilityRole="button" key={opt} style={[styles.optionRow, goals.includes(opt) && styles.optionRowActive]} onPress={() => toggle(goals, setGoals, opt)}>
                   <Text style={[styles.optionText, goals.includes(opt) && styles.optionTextActive]}>{opt}</Text>
                   {goals.includes(opt) && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 32 }} />
           </>
         )}
 
@@ -200,12 +199,8 @@ export default function PrePlanQuestionsScreen() {
               placeholderTextColor={colors.textMuted}
               multiline
             />
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.skipBtn} onPress={goNext}>
-              <Text style={styles.skipBtnText}>Skip</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 32 }} />
+            <AppButton label="Skip" onPress={goNext} variant="tertiary" />
           </>
         )}
 
@@ -214,15 +209,13 @@ export default function PrePlanQuestionsScreen() {
             <Text style={styles.question}>How much time can you give each week?</Text>
             <View style={styles.optionsList}>
               {WEEKLY_TIME_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionRow, weeklyTime === opt.value && styles.optionRowActive]} onPress={() => { setWeeklyTime(opt.value); }}>
+                <TouchableOpacity accessibilityRole="button" key={opt.value} style={[styles.optionRow, weeklyTime === opt.value && styles.optionRowActive]} onPress={() => { setWeeklyTime(opt.value); }}>
                   <Text style={[styles.optionText, weeklyTime === opt.value && styles.optionTextActive]}>{opt.label}</Text>
                   {weeklyTime === opt.value && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.nextBtn, !weeklyTime && styles.nextBtnDisabled]} onPress={goNext} disabled={!weeklyTime}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" disabled={!weeklyTime} style={{ marginTop: 32 }} />
           </>
         )}
 
@@ -231,15 +224,13 @@ export default function PrePlanQuestionsScreen() {
             <Text style={styles.question}>How would you like to go through this?</Text>
             <View style={styles.optionsList}>
               {FORMAT_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt.value} style={[styles.optionRow, format === opt.value && styles.optionRowActive]} onPress={() => { setFormat(opt.value); }}>
+                <TouchableOpacity accessibilityRole="button" key={opt.value} style={[styles.optionRow, format === opt.value && styles.optionRowActive]} onPress={() => { setFormat(opt.value); }}>
                   <Text style={[styles.optionText, format === opt.value && styles.optionTextActive]}>{opt.label}</Text>
                   {format === opt.value && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={[styles.nextBtn, !format && styles.nextBtnDisabled]} onPress={goNext} disabled={!format}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" disabled={!format} style={{ marginTop: 32 }} />
           </>
         )}
 
@@ -249,18 +240,14 @@ export default function PrePlanQuestionsScreen() {
             <Text style={styles.hint}>Optional</Text>
             <View style={styles.optionsList}>
               {BLOCKER_OPTIONS.map((opt) => (
-                <TouchableOpacity key={opt} style={[styles.optionRow, blockers.includes(opt) && styles.optionRowActive]} onPress={() => toggle(blockers, setBlockers, opt)}>
+                <TouchableOpacity accessibilityRole="button" key={opt} style={[styles.optionRow, blockers.includes(opt) && styles.optionRowActive]} onPress={() => toggle(blockers, setBlockers, opt)}>
                   <Text style={[styles.optionText, blockers.includes(opt) && styles.optionTextActive]}>{opt}</Text>
                   {blockers.includes(opt) && <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />}
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>Continue</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.skipBtn} onPress={goNext}>
-              <Text style={styles.skipBtnText}>Skip</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 32 }} />
+            <AppButton label="Skip" onPress={goNext} variant="tertiary" />
           </>
         )}
 
@@ -282,9 +269,7 @@ export default function PrePlanQuestionsScreen() {
                 <Text style={styles.summaryValue}>{formatLabel}</Text>
               </View>
             ) : null}
-            <TouchableOpacity style={styles.nextBtn} onPress={finish} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.nextBtnText}>{isGeneral ? "Save" : "Start"}</Text>}
-            </TouchableOpacity>
+            <AppButton label={isGeneral ? "Save" : "Start"} onPress={finish} size="lg" disabled={saving} loading={saving} style={{ marginTop: 32 }} />
           </>
         )}
       </View>
@@ -317,11 +302,6 @@ function makeStyles(c: AppColors) {
       padding: 16, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", minHeight: 100,
       textAlignVertical: "top", marginTop: 24,
     },
-    nextBtn: { backgroundColor: c.accentGreen, borderRadius: 14, height: 54, alignItems: "center", justifyContent: "center", marginTop: 32 },
-    nextBtnDisabled: { opacity: 0.5 },
-    nextBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    skipBtn: { alignItems: "center", paddingVertical: 14 },
-    skipBtnText: { color: c.textMuted, fontSize: 14, fontFamily: "Inter_500Medium" },
     summaryIconWrap: {
       width: 56, height: 56, borderRadius: 28, backgroundColor: c.accentGreen,
       alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 20,

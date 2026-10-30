@@ -51,7 +51,7 @@ export default function FamilyCustomLessonScreen() {
       {/* Opened from a live Gathering: return to it (the call keeps running). */}
       <GatheringReturnBar />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: c.textDark }]}>Lesson</Text>

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { type as TT, MIN_TOUCH_TARGET } from "@/lib/togetherTheme";
 import { ART_TEXT, useStoryStyles, type StoryPalette } from "@/lib/storyTheme";
 import { formatTopicNumber, getKingdomStoryMediaSignedUrl, type StoryCard } from "@/lib/kingdomStoriesApi";
+import { AppButton } from "@/components/ui";
 
 // Cinematic Kingdom Stories rows, in the reader's light/dark theme
 // (lib/storyTheme.ts). Cards show only real data: cover art, topic number,
@@ -16,9 +17,13 @@ import { formatTopicNumber, getKingdomStoryMediaSignedUrl, type StoryCard } from
  * cropped: the whole picture — including the "P2P Global | Creative Studios"
  * credit in its corner — shows inside the card/banner shape, over a soft
  * blurred copy of itself. `position: "top"` pins it to the top (the hero,
- * whose title sits over the lower part).
+ * whose title sits over the lower part). `fit: "cover"` instead fills the
+ * frame, cropping to its shape, with no blurred backdrop (banners).
+ * `fit: "whole"` shows the whole picture with no blur and reports its shape
+ * through `onRatio` (width ÷ height) so the frame can take that shape
+ * (Continue Learning — faces and characters always show).
  */
-export function CoverArt({ path, alt, style, position = "center" }: { path: string | null | undefined; alt?: string | null; style?: object; position?: "center" | "top" }) {
+export function CoverArt({ path, alt, style, position = "center", fit = "contain", onRatio }: { path: string | null | undefined; alt?: string | null; style?: object; position?: "center" | "top"; fit?: "contain" | "cover" | "whole"; onRatio?: (ratio: number) => void }) {
   const { T, s } = useStoryStyles(makeStyles);
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -29,7 +34,12 @@ export function CoverArt({ path, alt, style, position = "center" }: { path: stri
   }, [path]);
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: T.sheet }, style]} accessible={!!alt} accessibilityLabel={alt ?? undefined}>
-      {url ? (
+      {url && fit === "cover" ? (
+        <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition={position} transition={200} />
+      ) : url && fit === "whole" ? (
+        <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="contain" contentPosition={position} transition={200}
+          onLoad={(e) => { const { width, height } = e.source ?? {}; if (width && height) onRatio?.(width / height); }} />
+      ) : url ? (
         <>
           <Image source={{ uri: url, cacheKey: path ?? undefined }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={28} accessible={false} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.25)" }]} />
@@ -104,9 +114,7 @@ export function DiscoverRow({ title, subtitle, stories, onOpen, onSeeAll, wide =
           {subtitle ? <Text style={s.rowSub} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
         {onSeeAll ? (
-          <TouchableOpacity onPress={onSeeAll} style={s.seeAll} accessibilityRole="button" accessibilityLabel={`See all: ${title}`}>
-            <Text style={s.seeAllText}>See all</Text><Ionicons name="chevron-forward" size={14} color={T.growth} />
-          </TouchableOpacity>
+          <AppButton label="See all" onPress={onSeeAll} variant="tertiary" icon="chevron-forward" iconPosition="trailing" accessibilityLabel={`See all: ${title}`} />
         ) : null}
       </View>
       <FlatList horizontal data={stories} keyExtractor={(x) => x.id} showsHorizontalScrollIndicator={Platform.OS === "web"}

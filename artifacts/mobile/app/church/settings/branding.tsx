@@ -60,7 +60,7 @@ export default function ChurchBrandingSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.headerTitle}>Branding</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -73,7 +73,7 @@ export default function ChurchBrandingSettingsScreen() {
 
         <Text style={styles.label}>Church Logo</Text>
         {!logoUrl && <Text style={styles.helperText}>No church logo uploaded. Add a logo to personalize your church profile.</Text>}
-        <TouchableOpacity style={styles.logoPicker} onPress={handlePick} disabled={!isChurchCreator || uploading || saving}>
+        <TouchableOpacity accessibilityRole="button" style={styles.logoPicker} onPress={handlePick} disabled={!isChurchCreator || uploading || saving}>
           {uploading || saving ? (
             <ActivityIndicator color={colors.accentGreen} />
           ) : logoUrl ? (
@@ -87,8 +87,8 @@ export default function ChurchBrandingSettingsScreen() {
         </TouchableOpacity>
         {isChurchCreator && logoUrl && (
           <View style={styles.logoActionsRow}>
-            <TouchableOpacity onPress={handlePick}><Text style={styles.actionText}>Replace</Text></TouchableOpacity>
-            <TouchableOpacity onPress={handleRemove}><Text style={styles.actionTextDestructive}>Remove</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={handlePick}><Text style={styles.actionText}>Replace</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={handleRemove}><Text style={styles.actionTextDestructive}>Remove</Text></TouchableOpacity>
           </View>
         )}
       </ScrollView>

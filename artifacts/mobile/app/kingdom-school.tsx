@@ -32,6 +32,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import CompletionCard from "@/components/CompletionCard";
 import { PLAN_CATEGORIES } from "@/lib/planCategories";
+import { AppButton } from "@/components/ui";
 
 const LOGO = require("@/assets/images/logo.png");
 const SPLASH_SEEN_KEY_PREFIX = "kingdomSchoolSplashSeen:";
@@ -97,9 +98,7 @@ function KingdomSchoolSplash({ status, foundationPct, onEnter, colors }: {
       </Animated.View>
 
       <Animated.View style={{ opacity: buttonOpacity, width: "100%" }}>
-        <TouchableOpacity style={styles.enterBtn} onPress={onEnter} activeOpacity={0.9}>
-          <Text style={styles.enterBtnText}>{cta}</Text>
-        </TouchableOpacity>
+        <AppButton label={`${cta}`} onPress={onEnter} size="lg" />
       </Animated.View>
     </View>
   );
@@ -115,8 +114,6 @@ function splashStyles(c: AppColors) {
     heading: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4 },
     progressLine: { fontSize: 13, fontWeight: "600", color: c.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 10 },
-    enterBtn: { backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 16, alignItems: "center" },
-    enterBtnText: { color: "#fff", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }
 
@@ -265,7 +262,7 @@ function KingdomSchoolCards({
   const cardSelectorStyles = makeCardSelectorStyles(colors);
   return (
     <View style={cardSelectorStyles.row}>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[cardSelectorStyles.card, cardSelectorStyles.foundationCard, selected === "foundation" && cardSelectorStyles.cardSelected]}
         activeOpacity={0.9}
         onPress={() => onSelect(selected === "foundation" ? null : "foundation")}
@@ -282,7 +279,7 @@ function KingdomSchoolCards({
       {/* Navigates straight to Find Plans (Categories sub-tab, its default)
           instead of expanding inline, since Electives is now a full
           10-category/144-plan browsing experience of its own. */}
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         style={[cardSelectorStyles.card, cardSelectorStyles.electivesCard]}
         activeOpacity={0.9}
         onPress={() => router.push("/plans?tab=find" as any)}
@@ -364,6 +361,8 @@ function makeStyles(c: AppColors) {
       backgroundColor: c.primaryGreen, borderRadius: 16,
       padding: 16, flexDirection: "row", alignItems: "center", gap: 12,
     },
+    continuePhoto: { width: 64, height: 64, borderRadius: 12 },
+    photoFallback: { alignItems: "center", justifyContent: "center" },
     continueLabel: { fontSize: 11, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
     continueTitle: { fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
     continueBtn: {
@@ -512,25 +511,15 @@ export default function KingdomSchoolScreen() {
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
-          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+          <TouchableOpacity hitSlop={10} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
             accessibilityRole="button" accessibilityLabel="Back to Learning Centre">
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
           <Text style={{ flex: 1, fontSize: 22, lineHeight: 28, color: colors.textDark, fontFamily: "Inter_700Bold" }} accessibilityRole="header">Kingdom School</Text>
         </View>
         <View style={styles.topBarRow}>
-          <TouchableOpacity
-            style={styles.topBarMenuBtn}
-            onPress={() => router.push("/bible" as any)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Open the Bible"
-          >
-            <Ionicons name="book" size={15} color={colors.accentGreen} />
-            <Text style={styles.topBarMenuBtnText}>Bible</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          <AppButton label="Bible" onPress={() => router.push("/bible" as any)} variant="secondary" size="sm" icon="book" accessibilityLabel="Open the Bible" />
+          <TouchableOpacity accessibilityRole="button"
             style={[styles.topBarMenuBtn, schoolMenuOpen && styles.topBarMenuBtnActive]}
             onPress={() => setSchoolMenuOpen(true)}
             activeOpacity={0.8}
@@ -543,10 +532,10 @@ export default function KingdomSchoolScreen() {
         </View>
 
         <Modal visible={schoolMenuOpen} transparent animationType="fade" onRequestClose={() => setSchoolMenuOpen(false)}>
-          <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setSchoolMenuOpen(false)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setSchoolMenuOpen(false)}>
             <View style={[styles.dropdownCard, { top: topPad + 46 }]}>
               <View style={styles.dropdownCaret} />
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.dropdownRow}
                 onPress={() => { setSchoolMenuOpen(false); router.push("/notes" as any); }}
                 activeOpacity={0.7}
@@ -561,7 +550,7 @@ export default function KingdomSchoolScreen() {
                 <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
               </TouchableOpacity>
               <View style={styles.dropdownDivider} />
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.dropdownRow}
                 onPress={() => { setSchoolMenuOpen(false); router.push("/highlights" as any); }}
                 activeOpacity={0.7}
@@ -625,11 +614,14 @@ export default function KingdomSchoolScreen() {
             </View>
 
             {currentModule && (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.continueCard}
                 activeOpacity={0.9}
                 onPress={() => router.push(`/module/${currentModule.id}`)}
               >
+                {currentModule.imageUrl ? (
+                  <CategoryPhotoBlock uri={currentModule.imageUrl} icon="school-outline" colorTheme="#FFFFFF" style={styles.continuePhoto} fallbackStyle={styles.photoFallback} />
+                ) : null}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.continueLabel}>{t("learn.currentModule")}</Text>
                   <Text style={styles.continueTitle} numberOfLines={1}>{currentModule.title}</Text>

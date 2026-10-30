@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useData, PublicUserProfile } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 const ROLE_OPTIONS: { value: string; label: string; needsZone?: boolean; needsCountry?: boolean }[] = [
   { value: "admin_zone", label: "Zone Admin", needsZone: true },
@@ -93,9 +94,7 @@ export default function AppointAdminScreen() {
           autoCorrect={false}
           onSubmitEditing={handleSearch}
         />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch} disabled={searching}>
-          {searching ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.searchBtnText}>Search</Text>}
-        </TouchableOpacity>
+        <AppButton label="Search" onPress={handleSearch} disabled={searching} loading={searching} palette="fixedLight" />
       </View>
 
       {notFound && <Text style={styles.notFoundText}>No user found with that username.</Text>}
@@ -114,7 +113,7 @@ export default function AppointAdminScreen() {
         <>
           <Text style={styles.label}>Select role</Text>
           {ROLE_OPTIONS.map((opt) => (
-            <TouchableOpacity key={opt.value} style={styles.roleRow} onPress={() => setRole(opt.value)}>
+            <TouchableOpacity accessibilityRole="button" key={opt.value} style={styles.roleRow} onPress={() => setRole(opt.value)}>
               <Ionicons name={role === opt.value ? "radio-button-on" : "radio-button-off"} size={18} color={role === opt.value ? colors.accentGreen : colors.textMuted} />
               <Text style={styles.roleLabel}>{opt.label}</Text>
             </TouchableOpacity>
@@ -125,7 +124,7 @@ export default function AppointAdminScreen() {
               <Text style={styles.label}>Zone</Text>
               <View style={styles.zoneRow}>
                 {ZONES.map((z) => (
-                  <TouchableOpacity key={z} style={[styles.zoneChip, zone === z && styles.zoneChipActive]} onPress={() => setZone(z)}>
+                  <TouchableOpacity accessibilityRole="button" key={z} style={[styles.zoneChip, zone === z && styles.zoneChipActive]} onPress={() => setZone(z)}>
                     <Text style={[styles.zoneChipText, zone === z && styles.zoneChipTextActive]}>{z.replace("_", " ")}</Text>
                   </TouchableOpacity>
                 ))}
@@ -150,9 +149,7 @@ export default function AppointAdminScreen() {
             multiline
           />
 
-          <TouchableOpacity style={styles.appointBtn} onPress={handleAppoint} disabled={submitting || !role || !reason.trim()}>
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.appointBtnText}>Appoint as Admin</Text>}
-          </TouchableOpacity>
+          <AppButton label="Appoint as Admin" onPress={handleAppoint} size="lg" disabled={submitting || !role || !reason.trim()} loading={submitting} style={{ marginTop: 24 }} palette="fixedLight" />
         </>
       )}
     </ScrollView>
@@ -170,8 +167,6 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige,
     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.textDark, fontFamily: "Inter_400Regular",
   },
-  searchBtn: { backgroundColor: colors.accentGreen, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  searchBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   notFoundText: { color: "#B91C1C", fontSize: 12, marginTop: 8, fontFamily: "Inter_400Regular" },
   foundCard: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(29,158,117,0.08)",
@@ -191,6 +186,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 10, color: colors.textDark, fontFamily: "Inter_400Regular",
   },
   textArea: { minHeight: 80, textAlignVertical: "top" },
-  appointBtn: { backgroundColor: colors.accentGreen, borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 24 },
-  appointBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

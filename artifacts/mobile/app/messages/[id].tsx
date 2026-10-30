@@ -48,6 +48,7 @@ import {
 import { deliveryAcker } from "@/lib/receiptSession";
 import { clearConversationNotifications, dismissConversationNotifications } from "@/lib/conversationNotifications";
 import { setOpenConversation } from "@/lib/push";
+import { AppButton, IconButton } from "@/components/ui";
 
 interface Message {
   id: string;
@@ -263,7 +264,7 @@ function MessageBubbleRow({
     >
       <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
         {!mine && (
-          <TouchableOpacity onPress={onOpenProfile} disabled={!item.senderUsername} style={styles.bubbleAvatar}>
+          <TouchableOpacity accessibilityRole="button" onPress={onOpenProfile} disabled={!item.senderUsername} style={styles.bubbleAvatar}>
             <Avatar photoUrl={item.senderPhotoUrl} name={item.senderName} size={28} />
           </TouchableOpacity>
         )}
@@ -283,7 +284,7 @@ function MessageBubbleRow({
           >
             {!mine && item.senderName ? <Text style={styles.senderName}>{item.senderName}</Text> : null}
             {preview && (
-              <TouchableOpacity onPress={onScrollToReply} style={[styles.replyQuote, mine && styles.replyQuoteMine]}>
+              <TouchableOpacity accessibilityRole="button" onPress={onScrollToReply} style={[styles.replyQuote, mine && styles.replyQuoteMine]}>
                 <Text style={[styles.replyQuoteName, mine && styles.bubbleTextMine]} numberOfLines={1}>{preview.label}</Text>
                 <Text style={[styles.replyQuoteText, mine && styles.bubbleTextMine]} numberOfLines={1}>{preview.text}</Text>
               </TouchableOpacity>
@@ -324,7 +325,7 @@ function MessageBubbleRow({
           {reactionCounts.size > 0 && (
             <View style={[styles.reactionRow, mine && styles.reactionRowMine]}>
               {Array.from(reactionCounts.entries()).map(([emoji, count]) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={emoji}
                   style={[styles.reactionPill, myReaction === emoji && styles.reactionPillMine]}
                   onPress={() => onToggleReaction(emoji)}
@@ -1259,10 +1260,10 @@ export default function ChatScreen() {
       <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color={colors.textDark} />
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
             disabled={!isDirect || !otherUserUsername}
             onPress={() => openProfile(otherUserUsername)}
@@ -1284,10 +1285,10 @@ export default function ChatScreen() {
           </TouchableOpacity>
           {isDirect && otherUserId && !otherUserOfficialType && (
             <View style={styles.headerCallBtns}>
-              <TouchableOpacity onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
                 {callingType === "audio" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="call-outline" size={20} color={colors.accentGreen} />}
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => initiateCall("video")} disabled={!!callingType} style={styles.headerIconBtn}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => initiateCall("video")} disabled={!!callingType} style={styles.headerIconBtn}>
                 {callingType === "video" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="videocam-outline" size={22} color={colors.accentGreen} />}
               </TouchableOpacity>
             </View>
@@ -1302,7 +1303,7 @@ export default function ChatScreen() {
         {crisisType && crisisType !== "help_request" && <CrisisThreadBanner crisisType={crisisType} submittedAt={crisisSubmittedAt} />}
 
         {showFeedbackPrompt && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={styles.feedbackPrompt}
             onPress={() => {
               setShowFeedbackPrompt(false);
@@ -1321,7 +1322,7 @@ export default function ChatScreen() {
             from "no pinned messages" (which renders nothing at all here),
             and must never block or clear normal chat history above. */}
         {pinnedLoadError && pinnedMessages.length === 0 && (
-          <TouchableOpacity style={styles.pinnedErrorRow} onPress={() => load()} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.pinnedErrorRow} onPress={() => load()} activeOpacity={0.7}>
             <Ionicons name="warning-outline" size={14} color={colors.textMuted} />
             <Text style={styles.pinnedErrorText}>Couldn't load pinned messages · Tap to retry</Text>
           </TouchableOpacity>
@@ -1329,14 +1330,14 @@ export default function ChatScreen() {
 
         {pinnedMessages.length > 0 && (
           <View style={styles.pinnedBar}>
-            <TouchableOpacity style={styles.pinnedBarHeader} onPress={() => setPinnedExpanded((v) => !v)}>
+            <TouchableOpacity accessibilityRole="button" style={styles.pinnedBarHeader} onPress={() => setPinnedExpanded((v) => !v)}>
               <Text style={styles.pinnedBarTitle}>
                 📌 {pinnedMessages.length} pinned message{pinnedMessages.length === 1 ? "" : "s"}
               </Text>
               <Ionicons name={pinnedExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.textMuted} />
             </TouchableOpacity>
             {pinnedExpanded && pinnedMessages.map((pm) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={pm.id}
                 style={styles.pinnedItem}
                 onPress={() => scrollToMessage(pm.id)}
@@ -1360,9 +1361,7 @@ export default function ChatScreen() {
             <Ionicons name="warning-outline" size={32} color={colors.textMuted} />
             <Text style={styles.loadErrorText}>Couldn't load this conversation.</Text>
             <Text style={styles.loadErrorSub}>{loadError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => load()} activeOpacity={0.85}>
-              <Text style={styles.retryBtnText}>Retry</Text>
-            </TouchableOpacity>
+            <AppButton label="Retry" onPress={() => load()} style={{ marginTop: 14 }} palette="fixedLight" />
           </View>
         ) : (
           <FlatList
@@ -1473,14 +1472,7 @@ export default function ChatScreen() {
         {!loading && !loadError && messages.length === 0 && startersVisible && (
           <View style={styles.startersRow}>
             {STARTERS.map((chip) => (
-              <TouchableOpacity
-                key={chip}
-                style={styles.starterChip}
-                onPress={() => { setText(chip); setStartersVisible(false); }}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.starterChipText}>{chip}</Text>
-              </TouchableOpacity>
+              <AppButton label={`${chip}`} onPress={() => { setText(chip); setStartersVisible(false); }} variant="secondary" size="sm" key={chip} palette="fixedLight" />
             ))}
           </View>
         )}
@@ -1488,7 +1480,7 @@ export default function ChatScreen() {
         {mentionResults.length > 0 && (
           <View style={styles.mentionDropdown}>
             {mentionResults.map((r) => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={r.username}
                 style={styles.mentionRow}
                 onPress={() => selectMention(r.username)}
@@ -1511,7 +1503,7 @@ export default function ChatScreen() {
                 {replyTarget.message_type === "voice" ? "🎤 Voice message" : (replyTarget.body ?? "")}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setReplyTarget(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" onPress={() => setReplyTarget(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
@@ -1519,14 +1511,7 @@ export default function ChatScreen() {
 
         <View style={[styles.inputRow, { paddingBottom: insets.bottom + 10 }]}>
           {!recordingActive && (
-            <TouchableOpacity
-              style={styles.emojiBtn}
-              onPress={() => { Keyboard.dismiss(); pendingReactionTargetRef.current = null; setEmojiPickerOpen(true); }}
-              accessibilityLabel="Open emoji picker"
-              accessibilityRole="button"
-            >
-              <Ionicons name="happy-outline" size={24} color={colors.textMuted} />
-            </TouchableOpacity>
+            <IconButton icon="happy-outline" accessibilityLabel="Open emoji picker" onPress={() => { Keyboard.dismiss(); pendingReactionTargetRef.current = null; setEmojiPickerOpen(true); }} size="sm" color={colors.textMuted} palette="fixedLight" />
           )}
           {!recordingActive && (
             <TextInput
@@ -1539,7 +1524,7 @@ export default function ChatScreen() {
             />
           )}
           {!recordingActive && text.trim() ? (
-            <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending}>
+            <TouchableOpacity accessibilityLabel="Send" accessibilityRole="button" hitSlop={10} style={styles.sendBtn} onPress={handleSend} disabled={sending}>
               <Ionicons name="send" size={18} color="#fff" />
             </TouchableOpacity>
           ) : (
@@ -1582,29 +1567,24 @@ export default function ChatScreen() {
         />
 
         <Modal visible={!!reactionPickerFor} transparent animationType="fade" onRequestClose={() => setReactionPickerFor(null)}>
-          <TouchableOpacity style={styles.reactionModalBackdrop} activeOpacity={1} onPress={() => setReactionPickerFor(null)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.reactionModalBackdrop} activeOpacity={1} onPress={() => setReactionPickerFor(null)}>
             <View style={styles.reactionModalCard}>
               {SUGGESTED_REACTIONS.map((emoji) => (
                 <TouchableOpacity
                   key={emoji}
                   style={styles.reactionModalEmojiBtn}
                   onPress={() => { if (reactionPickerFor) handleToggleReaction(reactionPickerFor, emoji); }}
+                  accessibilityRole="button"
                   accessibilityLabel={`React with ${emoji}`}
                 >
                   <Text style={styles.reactionModalEmoji}>{emoji}</Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity
-                style={styles.reactionModalEmojiBtn}
-                onPress={() => {
+              <IconButton icon="add-circle-outline" accessibilityLabel="Choose a different emoji reaction" onPress={() => {
                   pendingReactionTargetRef.current = reactionPickerFor;
                   setReactionPickerFor(null);
                   setEmojiPickerOpen(true);
-                }}
-                accessibilityLabel="Choose a different emoji reaction"
-              >
-                <Ionicons name="add-circle-outline" size={26} color={colors.textMuted} />
-              </TouchableOpacity>
+                }} color={colors.textMuted} palette="fixedLight" />
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1637,8 +1617,6 @@ const styles = StyleSheet.create({
   centerFill: { flex: 1, alignItems: "center", justifyContent: "center" },
   loadErrorText: { fontSize: 15, fontWeight: "600", color: colors.textDark, fontFamily: "Inter_600SemiBold", marginTop: 10 },
   loadErrorSub: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 4, textAlign: "center", paddingHorizontal: 40 },
-  retryBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.accentGreen },
-  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   callCard: {
     flexDirection: "row", alignItems: "center", gap: 10,
     borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, minWidth: 170,
@@ -1744,7 +1722,6 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: colors.accentGreen, alignItems: "center", justifyContent: "center",
   },
-  emojiBtn: { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
   bubbleEmojiOnly: { backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 0, paddingVertical: 2 },
   emojiOnlyText: { fontSize: 42, lineHeight: 50 },
   reactionRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 3 },

@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FruitCatalogEntry, EarnedFruit } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import ReadableText from "@/components/ReadableText";
+import { AppButton } from "@/components/ui";
 
 const CATEGORY_LABEL: Record<string, string> = {
   personal_growth: "Personal Growth",
@@ -31,7 +32,7 @@ export default function FruitDetailCard({ visible, catalogEntry, earnedFruit, on
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={() => {}}>
+        <TouchableOpacity accessibilityRole="button" activeOpacity={1} style={styles.card} onPress={() => {}}>
           <View style={styles.iconWrap}>
             <Ionicons name={(catalogEntry.icon as keyof typeof Ionicons.glyphMap) || "leaf"} size={26} color={colors.accentGreen} />
           </View>
@@ -48,9 +49,7 @@ export default function FruitDetailCard({ visible, catalogEntry, earnedFruit, on
             </View>
           )}
           {earnedDate && <Text style={styles.earnedDate}>Earned {earnedDate}</Text>}
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
-            <Text style={styles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
+          <AppButton label="Close" onPress={onClose} accessibilityLabel="Close" style={{ marginTop: 14 }} palette="fixedLight" />
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -72,6 +71,4 @@ const styles = StyleSheet.create({
   verseText: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", fontStyle: "italic", textAlign: "center" },
   verseRef: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_600SemiBold", marginTop: 2 },
   earnedDate: { fontSize: 11, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 10 },
-  closeBtn: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 10, backgroundColor: colors.accentGreen },
-  closeBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

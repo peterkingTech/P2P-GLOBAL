@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors as together } from "@/lib/togetherTheme";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Compact bar shown while a resource (Bible, Media, Workspace) is expanded:
 // what's open, Done (restore), and — during a live session — the controls
@@ -26,7 +27,7 @@ export default function FocusBar({ title, subtitle, onDone, mic, onOpenChat, top
         {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       {mic?.connected ? (
-        <TouchableOpacity
+        <TouchableOpacity hitSlop={10}
           style={[styles.iconBtn, mic.muted && styles.iconBtnActive]} onPress={mic.onToggle}
           accessibilityRole="button" accessibilityLabel={mic.muted ? "Unmute microphone" : "Mute microphone"} accessibilityState={{ selected: mic.muted }}
         >
@@ -34,20 +35,15 @@ export default function FocusBar({ title, subtitle, onDone, mic, onOpenChat, top
         </TouchableOpacity>
       ) : null}
       {onOpenChat ? (
-        <TouchableOpacity style={styles.iconBtn} onPress={onOpenChat} accessibilityRole="button" accessibilityLabel="Open chat">
-          <Ionicons name="chatbubble-ellipses-outline" size={18} color={together.textPrimary} />
-        </TouchableOpacity>
+        <IconButton icon="chatbubble-ellipses-outline" accessibilityLabel="Open chat" onPress={onOpenChat} variant="tinted" color={together.textPrimary} palette="fixedDark" />
       ) : null}
       {rotate ? (
-        <TouchableOpacity style={[styles.iconBtn, rotate.rotated && styles.iconBtnOn]} onPress={rotate.onToggle} accessibilityRole="button"
+        <TouchableOpacity hitSlop={10} style={[styles.iconBtn, rotate.rotated && styles.iconBtnOn]} onPress={rotate.onToggle} accessibilityRole="button"
           accessibilityLabel={rotate.rotated ? "Back to portrait" : "Rotate to landscape"} accessibilityState={{ selected: rotate.rotated }}>
           <Ionicons name="phone-landscape-outline" size={18} color={together.textPrimary} />
         </TouchableOpacity>
       ) : null}
-      <TouchableOpacity style={styles.doneBtn} onPress={onDone} accessibilityRole="button" accessibilityLabel={`Done, close full screen ${title}`}>
-        <Ionicons name="contract-outline" size={16} color="#fff" />
-        <Text style={styles.doneText}>Done</Text>
-      </TouchableOpacity>
+      <AppButton label="Done" onPress={onDone} icon="contract-outline" accessibilityLabel={`Done, close full screen ${title}`} palette="fixedDark" />
     </View>
   );
 }
@@ -59,6 +55,5 @@ const styles = StyleSheet.create({
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center" },
   iconBtnActive: { backgroundColor: "rgba(220,38,38,0.55)" },
   iconBtnOn: { backgroundColor: together.growth },
-  doneBtn: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: together.growth },
   doneText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

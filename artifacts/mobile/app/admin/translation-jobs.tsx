@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/apiUrl";
+import { AppButton } from "@/components/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export default function TranslationJobsScreen() {
         style={styles.tabBar} contentContainerStyle={{ gap: 6, paddingHorizontal: 16 }}
       >
         {statusTabs.map((s) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={s}
             style={[styles.tab, filter === s && { backgroundColor: STATUS_COLORS[s] ?? colors.primaryGreen }]}
             onPress={() => setFilter(s)}
@@ -199,20 +200,7 @@ export default function TranslationJobsScreen() {
 
               {/* Retry button (if failed or retrying) */}
               {(item.status === "failed") && item.attempts < item.max_attempts ? (
-                <TouchableOpacity
-                  style={styles.retryBtn}
-                  onPress={() => retryJobAction(item.id)}
-                  disabled={!!retrying}
-                >
-                  {retrying === item.id ? (
-                    <ActivityIndicator size="small" color={colors.primaryGreen} />
-                  ) : (
-                    <>
-                      <Ionicons name="refresh" size={13} color={colors.primaryGreen} />
-                      <Text style={styles.retryBtnText}>Retry</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                <AppButton label="Retry" onPress={() => retryJobAction(item.id)} variant="outline" size="sm" icon="refresh" disabled={!!retrying} loading={retrying === item.id} style={{ alignSelf: "flex-start", marginTop: 2 }} palette="fixedLight" />
               ) : item.status === "failed" ? (
                 <Text style={styles.maxAttemptsText}>Max attempts reached</Text>
               ) : null}
@@ -261,12 +249,5 @@ const styles = StyleSheet.create({
 
   errorBox: { backgroundColor: "#FEF2F2", borderRadius: 6, padding: 8 },
   errorText: { fontSize: 11, color: "#DC2626", fontFamily: "Inter_400Regular", lineHeight: 16 },
-
-  retryBtn: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    alignSelf: "flex-start", borderWidth: 1, borderColor: colors.primaryGreen,
-    borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, marginTop: 2,
-  },
-  retryBtnText: { fontSize: 12, color: colors.primaryGreen, fontFamily: "Inter_600SemiBold" },
   maxAttemptsText: { fontSize: 11, color: "#999", fontFamily: "Inter_400Regular", fontStyle: "italic" },
 });

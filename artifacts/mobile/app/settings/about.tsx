@@ -9,6 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { shareInviteLink } from "@/lib/sharing";
+import { AppButton } from "@/components/ui";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -46,14 +47,7 @@ export default function AboutSettingsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <SettingsSubHeader title="About" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.shareAppBtn} onPress={handleShareInvite} activeOpacity={0.85} disabled={inviting}>
-          {inviting ? <ActivityIndicator color="#fff" size="small" /> : (
-            <>
-              <Ionicons name="share-social-outline" size={20} color="#fff" />
-              <Text style={styles.shareAppBtnText}>Invite Someone · Share your link</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Invite Someone · Share your link" onPress={handleShareInvite} size="lg" icon="share-social-outline" disabled={inviting} loading={inviting} style={{ marginBottom: 16 }} />
         {!!profile?.grainCount && <Text style={styles.grainEarnedText}>🌾 {profile.grainCount} Grain earned so far</Text>}
 
         <View style={styles.card}>
@@ -64,15 +58,15 @@ export default function AboutSettingsScreen() {
         </View>
 
         <View style={styles.card}>
-          <TouchableOpacity style={styles.linkRow} onPress={() => notPublishedYet("Terms of Service")}>
+          <TouchableOpacity accessibilityRole="button" style={styles.linkRow} onPress={() => notPublishedYet("Terms of Service")}>
             <Text style={styles.label}>Terms of Service</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkRow} onPress={() => notPublishedYet("Privacy Policy")}>
+          <TouchableOpacity accessibilityRole="button" style={styles.linkRow} onPress={() => notPublishedYet("Privacy Policy")}>
             <Text style={styles.label}>Privacy Policy</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, styles.rowLast]} onPress={() => notPublishedYet("Contact support")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.linkRow, styles.rowLast]} onPress={() => notPublishedYet("Contact support")}>
             <Text style={styles.label}>Contact Support</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
           </TouchableOpacity>
@@ -91,11 +85,6 @@ function makeStyles(c: AppColors) {
     container: { flex: 1, backgroundColor: c.lightCream },
     content: { paddingHorizontal: 20, paddingTop: 20 },
     card: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 16 },
-    shareAppBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-      backgroundColor: c.accentGreen, borderRadius: 14, height: 52, marginBottom: 16,
-    },
-    shareAppBtnText: { fontSize: 16, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
     grainEarnedText: { fontSize: 12, color: c.textMuted, textAlign: "center", marginTop: -8, marginBottom: 16, fontFamily: "Inter_400Regular" },
     row: {
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",

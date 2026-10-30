@@ -12,6 +12,7 @@ import {
   type Encouragement, type SnoozeOption, SNOOZE_LABELS,
   isEligible, pickEncouragement, recordVisit, recordShown, recordRemindLater, recordInviteShared,
 } from "@/lib/inviteEncouragement";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -96,32 +97,21 @@ export function InviteEncouragementCard({ modulesCompleted }: { modulesCompleted
           <Text style={styles.snoozeLabel}>Remind me…</Text>
           <View style={styles.snoozeRow}>
             {(Object.keys(SNOOZE_LABELS) as SnoozeOption[]).map((opt) => (
-              <TouchableOpacity key={opt} style={styles.snoozeChip} onPress={() => { void handleSnooze(opt); }}>
-                <Text style={styles.snoozeChipText}>{SNOOZE_LABELS[opt]}</Text>
-              </TouchableOpacity>
+              <AppButton label={`${SNOOZE_LABELS[opt]}`} onPress={() => { void handleSnooze(opt); }} variant="outline" key={opt} />
             ))}
           </View>
-          <TouchableOpacity onPress={() => setChoosingSnooze(false)} style={{ alignSelf: "center", marginTop: 8 }}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setChoosingSnooze(false)} style={{ alignSelf: "center", marginTop: 8 }}>
             <Text style={styles.linkText}>Back</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => { void handleInvite(); }} disabled={busy} activeOpacity={0.85}>
-            {busy ? <ActivityIndicator color="#fff" size="small" /> : (
-              <>
-                <Ionicons name="person-add-outline" size={16} color="#fff" />
-                <Text style={styles.primaryBtnText}>Invite a Peer</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setChoosingSnooze(true)} disabled={busy} activeOpacity={0.85}>
-            <Text style={styles.secondaryBtnText}>Remind Me Later</Text>
-          </TouchableOpacity>
+          <AppButton label="Invite a Peer" onPress={() => { void handleInvite(); }} icon="person-add-outline" disabled={busy} loading={busy} style={{ flex: 1 }} />
+          <AppButton label="Remind Me Later" onPress={() => setChoosingSnooze(true)} variant="outline" disabled={busy} style={{ flex: 1 }} />
         </View>
       )}
 
-      <TouchableOpacity onPress={() => router.push("/connect/invite" as any)} style={{ alignSelf: "center", marginTop: 10 }}>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/connect/invite" as any)} style={{ alignSelf: "center", marginTop: 10 }}>
         <Text style={styles.linkText}>What is an Electronic Evangelist?</Text>
       </TouchableOpacity>
     </View>
@@ -139,16 +129,6 @@ function makeStyles(c: AppColors) {
     title: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginBottom: 4 },
     body: { fontSize: 14, color: c.textDark, opacity: 0.85, lineHeight: 20, fontFamily: "Inter_400Regular" },
     actions: { flexDirection: "row", gap: 10 },
-    primaryBtn: {
-      flex: 1, flexDirection: "row", gap: 6, backgroundColor: c.accentGreen, borderRadius: 12, height: 44,
-      alignItems: "center", justifyContent: "center",
-    },
-    primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-    secondaryBtn: {
-      flex: 1, borderRadius: 12, height: 44, alignItems: "center", justifyContent: "center",
-      borderWidth: 1, borderColor: c.borderBeige,
-    },
-    secondaryBtnText: { color: c.textDark, fontWeight: "600", fontSize: 14, fontFamily: "Inter_600SemiBold" },
     snoozeLabel: { fontSize: 13, color: c.textMuted, marginBottom: 8, fontFamily: "Inter_500Medium" },
     snoozeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     snoozeChip: { borderRadius: 18, borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14, paddingVertical: 9 },

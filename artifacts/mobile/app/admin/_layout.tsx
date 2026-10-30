@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
 import { IMPACT_REVIEWER_ROLES } from "@/lib/winsModerationModel";
+import { AppButton } from "@/components/ui";
 
 const ADMIN_ROLES = new Set([
   "peer_guide",
@@ -164,14 +165,7 @@ export default function AdminLayout() {
         </ScrollView>
 
         {/* Right: Exit Admin */}
-        <TouchableOpacity
-          style={styles.exitBtn}
-          onPress={() => router.replace("/(tabs)")}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="exit-outline" size={15} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.exitBtnText}>Exit Admin</Text>
-        </TouchableOpacity>
+        <AppButton label="Exit Admin" onPress={() => router.replace("/(tabs)")} variant="outline" icon="exit-outline" style={{ flexShrink: 0 }} palette="fixedLight" />
       </View>
 
       {/* Page content */}
@@ -239,24 +233,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   navTabLabelActive: { color: colors.cream },
-
-  // Exit Admin button — right side, understated but visible
-  exitBtn: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    minHeight: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  exitBtnText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.6)",
-    fontFamily: "Inter_500Medium",
-  },
 
   body: { flex: 1 },
 });

@@ -8,6 +8,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { authedFetch } from "@/lib/adminFetch";
 import { getFlagEmoji } from "@/lib/countryGeo";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 interface FoundProfile {
   userId: string; username: string; fullName: string | null; photoUrl: string | null;
@@ -103,7 +104,7 @@ export default function ConnectByUsernameScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{params.type === "peer_guide" ? "Choose Someone I Know" : "Find Someone by Username"}</Text>
@@ -123,7 +124,7 @@ export default function ConnectByUsernameScreen() {
             autoCorrect={false}
             onSubmitEditing={handleSearch}
           />
-          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch} disabled={searching}>
+          <TouchableOpacity accessibilityRole="button" style={styles.searchBtn} onPress={handleSearch} disabled={searching}>
             {searching ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="search" size={18} color="#fff" />}
           </TouchableOpacity>
         </View>
@@ -146,11 +147,11 @@ export default function ConnectByUsernameScreen() {
 
             <Text style={styles.sectionLabel}>Connection type</Text>
             <View style={styles.typeOptions}>
-              <TouchableOpacity style={styles.typeRow} onPress={() => setRequestType("connect")}>
+              <TouchableOpacity accessibilityRole="button" style={styles.typeRow} onPress={() => setRequestType("connect")}>
                 <Ionicons name={requestType === "connect" ? "radio-button-on" : "radio-button-off"} size={18} color={colors.accentGreen} />
                 <Text style={styles.typeRowText}>Connect (follow each other)</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.typeRow} onPress={() => setRequestType("peer_guide")}>
+              <TouchableOpacity accessibilityRole="button" style={styles.typeRow} onPress={() => setRequestType("peer_guide")}>
                 <Ionicons name={requestType === "peer_guide" ? "radio-button-on" : "radio-button-off"} size={18} color={colors.accentGreen} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.typeRowText}>Request as Peer Guide</Text>
@@ -158,7 +159,7 @@ export default function ConnectByUsernameScreen() {
                 </View>
               </TouchableOpacity>
               {myCircles.length > 0 && (
-                <TouchableOpacity style={styles.typeRow} onPress={() => setRequestType("circle_invite")}>
+                <TouchableOpacity accessibilityRole="button" style={styles.typeRow} onPress={() => setRequestType("circle_invite")}>
                   <Ionicons name={requestType === "circle_invite" ? "radio-button-on" : "radio-button-off"} size={18} color={colors.accentGreen} />
                   <Text style={styles.typeRowText}>Invite to a Circle</Text>
                 </TouchableOpacity>
@@ -168,7 +169,7 @@ export default function ConnectByUsernameScreen() {
             {requestType === "circle_invite" && myCircles.length > 0 && (
               <View style={styles.circlePicker}>
                 {myCircles.map((c) => (
-                  <TouchableOpacity key={c.id} style={[styles.circleChip, selectedCircleId === c.id && styles.circleChipActive]} onPress={() => setSelectedCircleId(c.id)}>
+                  <TouchableOpacity accessibilityRole="button" key={c.id} style={[styles.circleChip, selectedCircleId === c.id && styles.circleChipActive]} onPress={() => setSelectedCircleId(c.id)}>
                     <Text style={[styles.circleChipText, selectedCircleId === c.id && styles.circleChipTextActive]}>{c.name}</Text>
                   </TouchableOpacity>
                 ))}
@@ -191,12 +192,8 @@ export default function ConnectByUsernameScreen() {
             )}
 
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setFound(null)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.sendBtn} onPress={handleSend} disabled={sending}>
-                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.sendBtnText}>Send Request</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setFound(null)} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label="Send Request" onPress={handleSend} disabled={sending} loading={sending} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </>
         )}
@@ -233,8 +230,4 @@ const styles = StyleSheet.create({
   messageInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 12, minHeight: 70, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },
   charCount: { fontSize: 11, color: colors.textMuted, textAlign: "right", marginTop: 4, fontFamily: "Inter_400Regular" },
   actionsRow: { flexDirection: "row", gap: 10, marginTop: 24 },
-  cancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
-  cancelBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  sendBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
-  sendBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

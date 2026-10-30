@@ -74,7 +74,7 @@ export default function ChurchMembersScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.title}>Members ({members.length})</Text>
         <View style={{ width: 22 }} />
       </View>
@@ -100,7 +100,7 @@ export default function ChurchMembersScreen() {
           contentContainerStyle={{ padding: 16, gap: 8 }}
           ListEmptyComponent={<Text style={styles.emptyText}>No members found.</Text>}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={styles.row}
               onPress={() => item.visible && router.push({ pathname: "/church/member-profile", params: { userId: item.userId } } as any)}
               onLongPress={() => handleMenu(item)}
@@ -127,7 +127,7 @@ export default function ChurchMembersScreen() {
                   </>
                 )}
               </View>
-              {item.visible && <TouchableOpacity onPress={() => handleMenu(item)}><Ionicons name="ellipsis-vertical" size={18} color={colors.textMuted} /></TouchableOpacity>}
+              {item.visible && <TouchableOpacity accessibilityLabel="More options" accessibilityRole="button" hitSlop={10} onPress={() => handleMenu(item)}><Ionicons name="ellipsis-vertical" size={18} color={colors.textMuted} /></TouchableOpacity>}
             </TouchableOpacity>
           )}
         />

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
+import { AppButton } from "@/components/ui";
 
 const TIME_PRESETS = [
   { label: "6:00 AM", hour: 6, minute: 0 },
@@ -117,7 +118,7 @@ export default function BuildConfessionScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Build My Confession</Text>
@@ -128,10 +129,7 @@ export default function BuildConfessionScreen() {
         <Text style={styles.sectionHeading}>Available Lines</Text>
         <View style={styles.libraryGrid}>
           {library.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.libraryChip} onPress={() => addLibraryLine(item)}>
-              <Ionicons name="add-circle-outline" size={14} color={colors.upperRoomAmber} />
-              <Text style={styles.libraryChipText} numberOfLines={1}>{item.title}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${item.title}`} onPress={() => addLibraryLine(item)} variant="secondary" size="sm" icon="add-circle-outline" key={item.id} style={{ maxWidth: "48%" }} />
           ))}
         </View>
 
@@ -143,7 +141,7 @@ export default function BuildConfessionScreen() {
             placeholder="Add your own declaration..."
             placeholderTextColor={colors.upperRoomMuted}
           />
-          <TouchableOpacity style={styles.customAddBtn} onPress={addCustomLine}>
+          <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" hitSlop={10} style={styles.customAddBtn} onPress={addCustomLine}>
             <Ionicons name="add" size={18} color="#100B06" />
           </TouchableOpacity>
         </View>
@@ -159,13 +157,13 @@ export default function BuildConfessionScreen() {
                 {line.scripture_ref ? <Text style={styles.lineRef}>{line.scripture_ref}</Text> : null}
               </View>
               <View style={styles.lineActions}>
-                <TouchableOpacity onPress={() => moveLine(i, -1)} disabled={i === 0}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move up" hitSlop={10} onPress={() => moveLine(i, -1)} disabled={i === 0}>
                   <Ionicons name="arrow-up" size={16} color={i === 0 ? colors.upperRoomBorder : colors.upperRoomMuted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => moveLine(i, 1)} disabled={i === lines.length - 1}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Move down" hitSlop={10} onPress={() => moveLine(i, 1)} disabled={i === lines.length - 1}>
                   <Ionicons name="arrow-down" size={16} color={i === lines.length - 1 ? colors.upperRoomBorder : colors.upperRoomMuted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => removeLine(i)}>
+                <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => removeLine(i)}>
                   <Ionicons name="close-circle" size={18} color="#C0392B" />
                 </TouchableOpacity>
               </View>
@@ -191,7 +189,7 @@ export default function BuildConfessionScreen() {
             {TIME_PRESETS.map((p) => {
               const active = notificationHour === p.hour && notificationMinute === p.minute;
               return (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={p.label}
                   style={[styles.timePresetChip, active && styles.timePresetChipActive]}
                   onPress={() => { setNotificationHour(p.hour); setNotificationMinute(p.minute); }}
@@ -203,9 +201,7 @@ export default function BuildConfessionScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#100B06" size="small" /> : <Text style={styles.saveBtnText}>Save My Confession</Text>}
-        </TouchableOpacity>
+        <AppButton label="Save My Confession" onPress={handleSave} size="lg" disabled={saving} loading={saving} style={{ marginTop: 28 }} />
       </ScrollView>
     </View>
   );
@@ -240,9 +236,5 @@ function makeStyles(c: AppColors) {
     timePresetChipActive: { backgroundColor: c.upperRoomAmber, borderColor: c.upperRoomAmber },
     timePresetText: { fontSize: 12, color: c.upperRoomMuted, fontFamily: "Inter_500Medium" },
     timePresetTextActive: { color: "#100B06", fontWeight: "700" },
-    timeBtn: { marginTop: 10, alignItems: "center" },
-    timeBtnText: { fontSize: 12, color: c.upperRoomAmber, fontFamily: "Inter_500Medium" },
-    saveBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 14, height: 52, alignItems: "center", justifyContent: "center", marginTop: 28 },
-    saveBtnText: { color: "#100B06", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

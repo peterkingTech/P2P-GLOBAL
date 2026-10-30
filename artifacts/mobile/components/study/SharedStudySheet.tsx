@@ -8,6 +8,7 @@ import {
   getStudyDestinations, startSharedStudy, DESTINATION_LABELS, RELATIONSHIP_LABELS,
   type StudyContentType, type StudyPerson, type LedGroup,
 } from "@/lib/studyTogetherApi";
+import { IconButton } from "@/components/ui";
 
 // Study Together (shared, at your own pace): choose WHO — a peer (Peer
 // Guide, disciples, groupmates and P2P connections are one list, so the same
@@ -73,20 +74,16 @@ export default function SharedStudySheet({ visible, onClose, content, onStarted 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close Study Together">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close Study Together">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             {step !== "where" ? (
-              <TouchableOpacity onPress={() => { setStep("where"); setError(null); }} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Back">
-                <Ionicons name="chevron-back" size={22} color={c.textDark} />
-              </TouchableOpacity>
+              <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={() => { setStep("where"); setError(null); }} color={c.textDark} />
             ) : null}
             <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
               {step === "people" ? "Choose who to invite" : step === "group" ? "Start a group study" : "Study Together"}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
           </View>
           <Text style={styles.sub} numberOfLines={2}>"{content.title}" — everyone reads at their own pace and keeps their own progress and private reflections. Only what you choose to post is shared.</Text>
           {error ? (
@@ -166,7 +163,6 @@ function makeStyles(c: AppColors) {
     sheet: { maxHeight: "85%", backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 16, width: "100%", maxWidth: 640, alignSelf: "center" },
     header: { flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingTop: 6 },
     title: { flex: 1, fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular", paddingHorizontal: 16, paddingBottom: 6 },
     errorBox: { paddingHorizontal: 16, paddingBottom: 6, gap: 4 },
     error: { fontSize: 13, color: "#B91C1C", fontFamily: "Inter_500Medium" },

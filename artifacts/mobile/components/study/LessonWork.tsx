@@ -12,6 +12,7 @@ import {
   getMyReflections, getSharedReflections, submitReflection, setReflectionVisibility, getAssignments, createAssignment, assignmentState,
   VISIBILITY_OPTIONS, type WorkScope, type MyReflection, type SharedReflection, type Assignment, type ReflectionVisibility,
 } from "@/lib/lessonWorkApi";
+import { AppButton } from "@/components/ui";
 
 function notify(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -53,7 +54,7 @@ export default function LessonWork({ scope, lessonId, questions }: { scope: Work
     return (
       <View style={styles.block}>
         <Text style={styles.muted}>{error}</Text>
-        <TouchableOpacity onPress={() => { setLoading(true); load(); }} style={styles.linkBtn} accessibilityRole="button"><Text style={styles.link}>Try again</Text></TouchableOpacity>
+        <AppButton label="Try again" onPress={() => { setLoading(true); load(); }} variant="tertiary" style={{ alignSelf: "flex-start" }} />
       </View>
     );
   }
@@ -89,9 +90,7 @@ export default function LessonWork({ scope, lessonId, questions }: { scope: Work
         <View style={styles.rowBetween}>
           <Text style={styles.heading}>Comprehensive Checks</Text>
           {canManage && (
-            <TouchableOpacity onPress={() => setCreating(true)} style={styles.linkBtn} accessibilityRole="button" accessibilityLabel="New Comprehensive Check">
-              <Text style={styles.link}>+ New</Text>
-            </TouchableOpacity>
+            <AppButton label="+ New" onPress={() => setCreating(true)} variant="tertiary" accessibilityLabel="New Comprehensive Check" style={{ alignSelf: "flex-start" }} />
           )}
         </View>
         {assignments.length === 0 ? <Text style={styles.muted}>No Comprehensive Checks for this lesson.</Text> : assignments.map((a) => (
@@ -137,7 +136,7 @@ function ReflectionCard({ scope, lessonId, questionId, question, latest, onSaved
       {latest && !editing ? (
         <>
           <Text style={styles.body}>{latest.content}</Text>
-          <TouchableOpacity onPress={() => setEditing(true)} style={styles.linkBtn} accessibilityRole="button"><Text style={styles.link}>Write an update</Text></TouchableOpacity>
+          <AppButton label="Write an update" onPress={() => setEditing(true)} variant="tertiary" style={{ alignSelf: "flex-start" }} />
         </>
       ) : (
         <>
@@ -235,11 +234,9 @@ function NewAssignmentModal({ visible, onClose, onCreate, styles, c }: {
           <Text style={styles.hint}>Answers are written in the app. Returned work can always be resubmitted.</Text>
           {problem ? <Text style={styles.problem}>{problem}</Text> : null}
           <View style={styles.row}>
-            <TouchableOpacity style={styles.secondary} onPress={onClose} disabled={busy} accessibilityRole="button"><Text style={styles.secondaryText}>Cancel</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.secondary} onPress={() => save("draft")} disabled={busy} accessibilityRole="button"><Text style={styles.secondaryText}>Save draft</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.primary, { flex: 1, marginTop: 0 }]} onPress={() => save("published")} disabled={busy} accessibilityRole="button">
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Publish</Text>}
-            </TouchableOpacity>
+            <AppButton label="Cancel" onPress={onClose} variant="outline" disabled={busy} />
+            <AppButton label="Save draft" onPress={() => save("draft")} variant="outline" disabled={busy} />
+            <AppButton label="Publish" onPress={() => save("published")} disabled={busy} loading={busy} style={{ flex: 1, marginTop: 0 }} />
           </View>
         </View>
       </View>

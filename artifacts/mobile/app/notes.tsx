@@ -7,6 +7,7 @@ import { useData, UserNote } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 export default function Notes() {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
@@ -82,10 +83,8 @@ export default function Notes() {
                     <>
                       <TextInput style={styles.editInput} value={editBody} onChangeText={setEditBody} multiline autoFocus />
                       <View style={styles.editRow}>
-                        <TouchableOpacity onPress={() => setEditingId(null)}><Text style={styles.editCancel}>Cancel</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.editSaveBtn} onPress={() => handleSaveEdit(item.id)}>
-                          <Text style={styles.editSaveText}>Save</Text>
-                        </TouchableOpacity>
+                        <TouchableOpacity accessibilityRole="button" onPress={() => setEditingId(null)}><Text style={styles.editCancel}>Cancel</Text></TouchableOpacity>
+                        <AppButton label="Save" onPress={() => handleSaveEdit(item.id)} size="sm" palette="fixedLight" />
                       </View>
                     </>
                   ) : (
@@ -97,11 +96,11 @@ export default function Notes() {
                         </Text>
                         <View style={styles.footerActions}>
                           {!!item.lessonId && (
-                            <TouchableOpacity onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: item.lessonId! } })}>
+                            <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: item.lessonId! } })}>
                               <Text style={styles.actionLink}>Open Lesson</Text>
                             </TouchableOpacity>
                           )}
-                          <TouchableOpacity onPress={() => { setEditingId(item.id); setEditBody(item.body); }}>
+                          <TouchableOpacity accessibilityRole="button" onPress={() => { setEditingId(item.id); setEditBody(item.body); }}>
                             <Text style={styles.actionLink}>Edit</Text>
                           </TouchableOpacity>
                         </View>
@@ -109,14 +108,14 @@ export default function Notes() {
                     </>
                   )}
                 </View>
-                <TouchableOpacity onPress={async () => { await deleteNote(item.id); load(); }}>
+                <TouchableOpacity accessibilityLabel="Delete" accessibilityRole="button" hitSlop={10} onPress={async () => { await deleteNote(item.id); load(); }}>
                   <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             )}
           />
         )}
-        <TouchableOpacity style={[styles.fab, { bottom: insets.bottom + 24 }]} onPress={() => setModalOpen(true)}>
+        <TouchableOpacity accessibilityLabel="Add" accessibilityRole="button" hitSlop={10} style={[styles.fab, { bottom: insets.bottom + 24 }]} onPress={() => setModalOpen(true)}>
           <Ionicons name="add" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -126,13 +125,11 @@ export default function Notes() {
           <View style={[styles.sheet, sheetWidth, { paddingBottom: insets.bottom + 24 }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>New Note</Text>
-              <TouchableOpacity onPress={() => setModalOpen(false)}><Ionicons name="close" size={20} color={colors.textMid} /></TouchableOpacity>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setModalOpen(false)}><Ionicons name="close" size={20} color={colors.textMid} /></TouchableOpacity>
             </View>
             <TextInput style={styles.input} placeholder="Title (optional)" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
             <TextInput style={[styles.input, styles.textarea]} placeholder="Write your note..." placeholderTextColor={colors.textMuted} value={body} onChangeText={setBody} multiline numberOfLines={5} />
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Note</Text>}
-            </TouchableOpacity>
+            <AppButton label="Save Note" onPress={handleSave} disabled={saving} loading={saving} palette="fixedLight" />
           </View>
         </View>
       </Modal>
@@ -160,7 +157,6 @@ const styles = StyleSheet.create({
   },
   editRow: { flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 6, alignItems: "center" },
   editCancel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium" },
-  editSaveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   editSaveText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", gap: 12, marginTop: 60 },
   emptyText: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_400Regular" },
@@ -178,6 +174,4 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 12, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 12,
   },
   textarea: { minHeight: 100, textAlignVertical: "top" },
-  saveBtn: { backgroundColor: colors.primaryGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center" },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

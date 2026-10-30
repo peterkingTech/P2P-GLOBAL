@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
+import { AppButton } from "@/components/ui";
 
 const REFLECTION_QUESTIONS = [
   "What has this story stirred in you?",
@@ -27,7 +28,7 @@ export default function MissionGoScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Go</Text>
@@ -41,7 +42,7 @@ export default function MissionGoScreen() {
           just stories, Scripture, and questions to sit with.
         </Text>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/(tabs)/prayer" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/(tabs)/prayer" as any)}>
           <Ionicons name="hand-left-outline" size={20} color={c.accentGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Pray</Text>
@@ -50,7 +51,7 @@ export default function MissionGoScreen() {
           <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push("/missions/learn" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/missions/learn" as any)}>
           <Ionicons name="school-outline" size={20} color={c.accentGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Learn</Text>
@@ -67,7 +68,7 @@ export default function MissionGoScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={styles.card}
           onPress={() => router.push("/missions/create" as any)}
         >
@@ -87,10 +88,7 @@ export default function MissionGoScreen() {
           </View>
         ))}
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/prayer/journal?compose=true" as any)}>
-          <Ionicons name="book-outline" size={16} color="#fff" />
-          <Text style={styles.primaryBtnText}>Write in Your Journal</Text>
-        </TouchableOpacity>
+        <AppButton label="Write in Your Journal" onPress={() => router.push("/prayer/journal?compose=true" as any)} icon="book-outline" style={{ marginTop: 16 }} />
       </ScrollView>
     </View>
   );
@@ -110,7 +108,5 @@ function makeStyles(c: AppColors) {
     questionRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
     questionBullet: { color: c.accentGreen, fontSize: 14 },
     questionText: { flex: 1, fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19 },
-    primaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, marginTop: 16 },
-    primaryBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

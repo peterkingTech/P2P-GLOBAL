@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Handles both a bare code typed in by hand and the invite link's trailing
 // segment (…/join/church/lighthouse-x7k2m9) if a user pastes the whole URL.
@@ -39,7 +40,7 @@ export default function JoinChurchScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 24) }]}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
         <Ionicons name="arrow-back" size={22} color={colors.lightGreen} />
       </TouchableOpacity>
       <Text style={styles.title}>Join Your Church on P2P Global</Text>
@@ -63,9 +64,7 @@ export default function JoinChurchScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={[styles.primaryBtn, !code.trim() && styles.btnDisabled]} onPress={handleJoin} disabled={submitting || !code.trim()}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Join Church</Text>}
-      </TouchableOpacity>
+      <AppButton label="Join Church" onPress={handleJoin} size="lg" disabled={submitting || !code.trim()} loading={submitting} style={{ marginTop: 24 }} palette="fixedLight" />
     </View>
   );
 }
@@ -85,10 +84,4 @@ const styles = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: "rgba(185,28,28,0.4)", padding: 12, marginTop: 16,
   },
   errorText: { color: "#FCA5A5", fontSize: 13, flex: 1, fontFamily: "Inter_400Regular" },
-  primaryBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 52,
-    alignItems: "center", justifyContent: "center", marginTop: 24,
-  },
-  btnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

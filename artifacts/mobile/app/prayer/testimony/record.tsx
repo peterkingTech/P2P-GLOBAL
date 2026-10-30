@@ -8,6 +8,7 @@ import type { AppColors } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoRecorder from "@/components/VideoRecorder";
 import { createTestimony, uploadTestimonyVideo, type TestimonyType, type TestimonyVisibility } from "@/lib/prayerTestimonyApi";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -76,7 +77,7 @@ export default function RecordTestimonyScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Share a Testimony</Text>
@@ -86,7 +87,7 @@ export default function RecordTestimonyScreen() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40 }}>
         <Text style={styles.fieldLabel}>What kind of testimony?</Text>
         {TYPES.map((t) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={t.key} style={styles.modeRow}
             onPress={() => setTestimonyType(t.key)}
             disabled={linkedToRequest}
@@ -122,7 +123,7 @@ export default function RecordTestimonyScreen() {
           <View style={styles.videoChosenBox}>
             <Ionicons name="videocam" size={16} color={c.accentGreen} />
             <Text style={styles.videoChosenText}>Video attached ({videoDuration}s)</Text>
-            <TouchableOpacity onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => { setVideoUri(null); setVideoDuration(0); }}>
               <Ionicons name="close-circle" size={18} color={c.textMuted} />
             </TouchableOpacity>
           </View>
@@ -135,11 +136,11 @@ export default function RecordTestimonyScreen() {
 
         <Text style={styles.fieldLabel}>Who can see this?</Text>
         <View style={styles.visRow}>
-          <TouchableOpacity style={[styles.visBtn, visibility === "p2p_network" && styles.visBtnActive]} onPress={() => setVisibility("p2p_network")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.visBtn, visibility === "p2p_network" && styles.visBtnActive]} onPress={() => setVisibility("p2p_network")}>
             <Ionicons name="earth" size={14} color={visibility === "p2p_network" ? c.accentGreen : c.textMuted} />
             <Text style={[styles.visBtnText, visibility === "p2p_network" && styles.visBtnTextActive]}>P2P Network</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.visBtn, visibility === "private" && styles.visBtnActive]} onPress={() => setVisibility("private")}>
+          <TouchableOpacity accessibilityRole="button" style={[styles.visBtn, visibility === "private" && styles.visBtnActive]} onPress={() => setVisibility("private")}>
             <Ionicons name="lock-closed" size={14} color={visibility === "private" ? c.accentGreen : c.textMuted} />
             <Text style={[styles.visBtnText, visibility === "private" && styles.visBtnTextActive]}>Private draft</Text>
           </TouchableOpacity>
@@ -153,9 +154,7 @@ export default function RecordTestimonyScreen() {
           <Switch value={isAnonymous} onValueChange={setIsAnonymous} trackColor={{ false: c.borderBeige, true: c.accentGreen }} thumbColor="#fff" />
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting || !title.trim() || !testimonyText.trim()}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Share Testimony</Text>}
-        </TouchableOpacity>
+        <AppButton label="Share Testimony" onPress={handleSubmit} disabled={submitting || !title.trim() || !testimonyText.trim()} loading={submitting} style={{ marginTop: 24 }} />
       </ScrollView>
     </View>
   );
@@ -197,7 +196,5 @@ function makeStyles(c: AppColors) {
       borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
     },
     anonLabel: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    submitBtn: { backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 24 },
-    submitBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   });
 }

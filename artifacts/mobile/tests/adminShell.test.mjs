@@ -11,6 +11,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -26,6 +27,8 @@ const RN = { View: host("View"), Text: host("Text"), TouchableOpacity: host("Tou
 const Ionicons = host("Ionicons");
 const env = { profile: null, pathname: "/admin" };
 const mocks = {
+  // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+  "@/components/ui": buttonDouble(React, RN),
   react: { ...React, useEffect: () => {}, useRef: (v) => ({ current: v }), useState: (v) => [v, () => {}] },
   "react-native": RN,
   "@expo/vector-icons": { Ionicons },
@@ -121,7 +124,7 @@ for (const [role, tabs] of Object.entries(EXPECTED)) {
   const kids = [].concat(bar.props.children).filter(Boolean);
   ok("top bar: Admin title, scrolling tabs, Exit Admin as three siblings", kids.length === 3 && /Admin/.test(textIn(kids[0])) && kids[1].type === RN.ScrollView && /Exit Admin/.test(textIn(kids[2])));
   ok("top bar: tab row scrolls horizontally", kids[1].props.horizontal === true);
-  ok("top bar: title and Exit never shrink", src.includes("topBarLeft: {\n    flexShrink: 0") && src.includes("exitBtn: {\n    flexShrink: 0"));
+  ok("top bar: title and Exit never shrink", src.includes("topBarLeft: {\n    flexShrink: 0") && /<AppButton label="Exit Admin"[^\n]*style=\{\{ flexShrink: 0 \}\}/.test(src));
   ok("top bar: tab row may shrink below its content (then scrolls)", /topBarNav: \{\s*flex: 1,\s*flexShrink: 1,\s*minWidth: 0,/.test(src));
   const tabs = findAll(kids[1], (n) => n.type === RN.TouchableOpacity);
   ok("tabs: labelled buttons with selected state", tabs.every((t) => t.props.accessibilityRole === "button" && typeof t.props.accessibilityLabel === "string" && "selected" in t.props.accessibilityState));

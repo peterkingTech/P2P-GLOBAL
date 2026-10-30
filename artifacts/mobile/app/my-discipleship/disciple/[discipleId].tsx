@@ -12,6 +12,7 @@ import { authedFetch } from "@/lib/adminFetch";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import { ChooseLessonSheet } from "@/components/study/ChooseLessonSheet";
 import type { StudyLessonMeta } from "@/hooks/useStudySession";
+import { AppButton } from "@/components/ui";
 
 // Disciple Detail — My Discipleship Phase 1's primary workspace for an
 // active discipleship relationship. Single load of the new
@@ -179,7 +180,7 @@ export default function DiscipleDetailScreen() {
     <View style={[s.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{detail?.disciple.name ?? "Disciple"}</Text>
@@ -190,7 +191,7 @@ export default function DiscipleDetailScreen() {
       ) : error || !detail ? (
         <View style={s.centerFill}>
           <Text style={s.errorText}>Unable to load this discipleship profile.</Text>
-          <TouchableOpacity style={s.retryBtn} onPress={load}><Text style={s.retryBtnText}>Retry</Text></TouchableOpacity>
+          <AppButton label="Retry" onPress={load} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
@@ -210,17 +211,9 @@ export default function DiscipleDetailScreen() {
 
           {/* ── Quick Actions ── */}
           <View style={s.actionsRow}>
-            <TouchableOpacity style={s.actionBtn} onPress={handleMessage} disabled={messaging}>
-              {messaging ? <ActivityIndicator size="small" color={colors.accentGreen} /> : (
-                <><Ionicons name="chatbubble-outline" size={16} color={colors.accentGreen} /><Text style={s.actionBtnText}>Message</Text></>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn} onPress={() => startCall(false)} disabled={calling}>
-              {calling ? <ActivityIndicator size="small" color={colors.accentGreen} /> : (
-                <><Ionicons name="call-outline" size={16} color={colors.accentGreen} /><Text style={s.actionBtnText}>Call</Text></>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.actionBtn, s.actionBtnPrimary]} onPress={() => setStudyPromptOpen(true)} disabled={startingStudy}>
+            <AppButton label="Message" onPress={handleMessage} variant="outline" icon="chatbubble-outline" disabled={messaging} loading={messaging} style={{ flex: 1 }} />
+            <AppButton label="Call" onPress={() => startCall(false)} variant="outline" icon="call-outline" disabled={calling} loading={calling} style={{ flex: 1 }} />
+            <TouchableOpacity accessibilityRole="button" style={[s.actionBtn, s.actionBtnPrimary]} onPress={() => setStudyPromptOpen(true)} disabled={startingStudy}>
               {startingStudy ? <ActivityIndicator size="small" color="#fff" /> : (
                 <><Text style={s.actionBtnEmoji}>📖</Text><Text style={[s.actionBtnText, s.actionBtnTextPrimary]}>Study Together</Text></>
               )}
@@ -232,9 +225,7 @@ export default function DiscipleDetailScreen() {
           <View style={s.nextStepCard}>
             <Text style={s.nextStepMessage}>{detail.nextStep.message}</Text>
             {detail.nextStep.action !== "none" && (
-              <TouchableOpacity style={s.nextStepBtn} onPress={handleNextStepAction}>
-                <Text style={s.nextStepBtnText}>{NEXT_STEP_LABEL[detail.nextStep.action]}</Text>
-              </TouchableOpacity>
+              <AppButton label={`${NEXT_STEP_LABEL[detail.nextStep.action]}`} onPress={handleNextStepAction} style={{ alignSelf: "flex-start" }} />
             )}
           </View>
 
@@ -315,24 +306,16 @@ export default function DiscipleDetailScreen() {
               <>
                 <Text style={s.promptTitle}>Continue {detail.disciple.name}'s current lesson?</Text>
                 {detail.progress.currentLessonTitle && <Text style={s.promptSub}>{detail.progress.currentLessonTitle}</Text>}
-                <TouchableOpacity style={s.promptPrimaryBtn} onPress={() => { setStudyPromptOpen(false); startCall(true); }}>
-                  <Text style={s.promptPrimaryBtnText}>Start Study</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.promptSecondaryBtn} onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }}>
-                  <Text style={s.promptSecondaryBtnText}>Choose Another Lesson</Text>
-                </TouchableOpacity>
+                <AppButton label="Start Study" onPress={() => { setStudyPromptOpen(false); startCall(true); }} style={{ marginTop: 4 }} />
+                <AppButton label="Choose Another Lesson" onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }} variant="outline" />
               </>
             ) : (
               <>
                 <Text style={s.promptTitle}>{detail?.disciple.name} hasn't started a Kingdom School lesson yet.</Text>
-                <TouchableOpacity style={s.promptPrimaryBtn} onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }}>
-                  <Text style={s.promptPrimaryBtnText}>Choose a Lesson</Text>
-                </TouchableOpacity>
+                <AppButton label="Choose a Lesson" onPress={() => { setStudyPromptOpen(false); setChooseLessonOpen(true); }} style={{ marginTop: 4 }} />
               </>
             )}
-            <TouchableOpacity style={s.promptCancelBtn} onPress={() => setStudyPromptOpen(false)}>
-              <Text style={s.promptCancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+            <AppButton label="Cancel" onPress={() => setStudyPromptOpen(false)} variant="tertiary" />
           </View>
         </View>
       </Modal>
@@ -359,8 +342,6 @@ function makeStyles(c: AppColors) {
     headerTitle: { fontSize: 18, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", flex: 1 },
     centerFill: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
     errorText: { color: c.textMuted, fontSize: 14, fontFamily: "Inter_400Regular" },
-    retryBtn: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10 },
-    retryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     scroll: { paddingHorizontal: 16, paddingTop: 20 },
 
     profileBlock: { alignItems: "center", marginBottom: 20 },
@@ -388,8 +369,6 @@ function makeStyles(c: AppColors) {
       borderRadius: 16, padding: 16, gap: 12, marginBottom: 24,
     },
     nextStepMessage: { fontSize: 14, color: c.textDark, fontFamily: "Inter_500Medium", lineHeight: 20 },
-    nextStepBtn: { backgroundColor: c.primaryGreen, borderRadius: 10, alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 10 },
-    nextStepBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     emptyCard: { backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 16, marginBottom: 24 },
     emptyCardText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 19 },
@@ -422,11 +401,5 @@ function makeStyles(c: AppColors) {
     promptBox: { backgroundColor: c.card, borderRadius: 18, padding: 20, width: "100%", maxWidth: 360, gap: 10 },
     promptTitle: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
     promptSub: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", marginBottom: 4 },
-    promptPrimaryBtn: { backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 4 },
-    promptPrimaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    promptSecondaryBtn: { borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    promptSecondaryBtnText: { color: c.accentGreen, fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    promptCancelBtn: { alignItems: "center", paddingVertical: 10 },
-    promptCancelBtnText: { color: c.textMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
   });
 }

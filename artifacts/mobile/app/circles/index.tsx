@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
 import { CircleCard } from "@/components/CircleCard";
+import { AppButton } from "@/components/ui";
 
 interface MyCircle {
   id: string;
@@ -63,7 +64,7 @@ export default function MyCirclesScreen() {
     <View style={[styles.root, { paddingTop: topPad }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>My Circles</Text>
@@ -72,14 +73,8 @@ export default function MyCirclesScreen() {
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.primaryActionBtn} onPress={() => router.push("/circles/create" as any)}>
-            <Ionicons name="add-circle-outline" size={16} color="#fff" />
-            <Text style={styles.primaryActionText}>Create Circle</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryActionBtn} onPress={() => router.push("/circles/discover" as any)}>
-            <Ionicons name="search" size={16} color={colors.accentGreen} />
-            <Text style={styles.secondaryActionText}>Find a Circle</Text>
-          </TouchableOpacity>
+          <AppButton label="Create Circle" onPress={() => router.push("/circles/create" as any)} icon="add-circle-outline" style={{ flex: 1 }} />
+          <AppButton label="Find a Circle" onPress={() => router.push("/circles/discover" as any)} variant="outline" icon="search" style={{ flex: 1 }} />
         </View>
 
         {loading ? (
@@ -117,9 +112,7 @@ function makeStyles(c: AppColors) {
     headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
     scroll: { padding: 20 },
     actionsRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-    primaryActionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: c.accentGreen, borderRadius: 14, paddingVertical: 13 },
     primaryActionText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryActionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 14, paddingVertical: 13 },
     secondaryActionText: { color: c.accentGreen, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     emptyState: { alignItems: "center", paddingVertical: 40, gap: 12 },
     emptyStateText: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", paddingHorizontal: 20, lineHeight: 19 },

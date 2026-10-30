@@ -20,6 +20,7 @@ import { authedFetch } from "@/lib/adminFetch";
 import MinistryRolePicker from "@/components/MinistryRolePicker";
 import ReadableText from "@/components/ReadableText";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // The Integration and Onboarding Journey — 5 mandatory steps every new user
 // goes through after registration/profile-setup, before Module 1. Anchored
@@ -357,9 +358,7 @@ export default function JourneyScreen() {
               numberOfLines={3}
             />
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep1Continue} disabled={savingStep1}>
-              {savingStep1 ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Continue</Text>}
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={handleStep1Continue} size="lg" disabled={savingStep1} loading={savingStep1} style={{ marginTop: 16 }} palette="fixedLight" />
           </>
         )}
 
@@ -403,9 +402,7 @@ export default function JourneyScreen() {
 
             <Text style={styles.privacyNote}>All answers are private — only visible to your peer guide.</Text>
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep2Continue} disabled={savingStep2}>
-              {savingStep2 ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Continue</Text>}
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={handleStep2Continue} size="lg" disabled={savingStep2} loading={savingStep2} style={{ marginTop: 16 }} palette="fixedLight" />
           </>
         )}
 
@@ -427,21 +424,19 @@ export default function JourneyScreen() {
             </View>
 
             {!prayed ? (
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => setPrayed(true)}>
-                <Text style={styles.primaryBtnText}>I prayed this</Text>
-              </TouchableOpacity>
+              <AppButton label="I prayed this" onPress={() => setPrayed(true)} size="lg" style={{ marginTop: 16 }} palette="fixedLight" />
             ) : (
               <>
                 <Text style={styles.fieldLabel}>Would you like your peer guide to pray with you?</Text>
                 <View style={styles.yesNoRow}>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.yesNoBtn, wantsPeerPrayer === true && styles.yesNoBtnActive]}
                     onPress={() => handlePeerPrayerChoice(true)}
                     disabled={notifyingPeerGuide}
                   >
                     <Text style={[styles.yesNoBtnText, wantsPeerPrayer === true && styles.yesNoBtnTextActive]}>Yes</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.yesNoBtn, wantsPeerPrayer === false && styles.yesNoBtnActive]}
                     onPress={() => handlePeerPrayerChoice(false)}
                     disabled={notifyingPeerGuide}
@@ -455,9 +450,7 @@ export default function JourneyScreen() {
                   </Text>
                 )}
 
-                <TouchableOpacity style={styles.primaryBtn} onPress={goNext}>
-                  <Text style={styles.primaryBtnText}>Continue</Text>
-                </TouchableOpacity>
+                <AppButton label="Continue" onPress={goNext} size="lg" style={{ marginTop: 16 }} palette="fixedLight" />
               </>
             )}
           </>
@@ -488,9 +481,7 @@ export default function JourneyScreen() {
             />
             <Text style={styles.treeNameNote}>You can always change this later in your profile settings.</Text>
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep4Continue} disabled={savingStep4}>
-              {savingStep4 ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Plant My Tree</Text>}
-            </TouchableOpacity>
+            <AppButton label="Plant My Tree" onPress={handleStep4Continue} size="lg" disabled={savingStep4} loading={savingStep4} style={{ marginTop: 16 }} palette="fixedLight" />
           </>
         )}
 
@@ -510,9 +501,7 @@ export default function JourneyScreen() {
               <Text style={styles.withGuideText}>You will go through this with {peerGuide.fullName}</Text>
             )}
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep5Continue} disabled={beginning}>
-              {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Continue to Home</Text>}
-            </TouchableOpacity>
+            <AppButton label="Continue to Home" onPress={handleStep5Continue} size="lg" disabled={beginning} loading={beginning} style={{ marginTop: 16 }} palette="fixedLight" />
 
             <Text style={styles.footerVerse}>Romans 15:7 — Accept one another, just as Christ accepted you.</Text>
           </>
@@ -532,13 +521,9 @@ export default function JourneyScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleRegisterChurchNow} disabled={beginning}>
-              {beginning ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Register My Church Now →</Text>}
-            </TouchableOpacity>
+            <AppButton label="Register My Church Now" icon="arrow-forward" iconPosition="trailing" onPress={handleRegisterChurchNow} size="lg" disabled={beginning} loading={beginning} style={{ marginTop: 16 }} palette="fixedLight" />
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleChurchLater} disabled={beginning}>
-              <Text style={styles.secondaryBtnText}>I will do this later →</Text>
-            </TouchableOpacity>
+            <AppButton label="I will do this later" icon="arrow-forward" iconPosition="trailing" onPress={handleChurchLater} variant="outline" size="lg" disabled={beginning} style={{ marginTop: 10 }} palette="fixedLight" />
 
             <Text style={styles.footerVerse}>Romans 15:7 — Accept one another, just as Christ accepted you.</Text>
           </>
@@ -625,16 +610,4 @@ const styles = StyleSheet.create({
   moduleCardDesc: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 20 },
   withGuideText: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", marginBottom: 20 },
   footerVerse: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic", textAlign: "center", marginTop: 20 },
-
-  primaryBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
-    alignItems: "center", justifyContent: "center", marginTop: 16,
-  },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
-
-  secondaryBtn: {
-    borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 10,
-    borderWidth: 1, borderColor: colors.borderBeige,
-  },
-  secondaryBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

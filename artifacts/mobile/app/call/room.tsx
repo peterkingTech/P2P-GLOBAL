@@ -15,6 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { getP2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
+import { AppButton } from "@/components/ui";
 
 interface RoomParticipant { userId: string; name: string; country: string | null; joinedAt: string }
 interface RoomDetail {
@@ -334,7 +335,7 @@ export default function BreakRoomScreen() {
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
 
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={leaveRoom} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Collapse" onPress={leaveRoom} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-down" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 8 }}>
@@ -344,11 +345,11 @@ export default function BreakRoomScreen() {
           </Text>
         </View>
         {isHost && (
-          <TouchableOpacity style={styles.flagBtn} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
+          <TouchableOpacity accessibilityRole="button" hitSlop={10} style={styles.flagBtn} onPress={() => setShareOpen(true)} accessibilityLabel="Share Room">
             <Ionicons name="share-outline" size={18} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.flagBtn} onPress={() => setFlagOpen(true)}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Report" hitSlop={10} style={styles.flagBtn} onPress={() => setFlagOpen(true)}>
           <Ionicons name="flag-outline" size={18} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </View>
@@ -396,9 +397,7 @@ export default function BreakRoomScreen() {
               <Text style={styles.listenerName} numberOfLines={1}>{getFlagEmoji(p.country)} {p.name}</Text>
               {raisedHands.has(p.userId) && <Text style={styles.handEmoji}>✋</Text>}
               {isHost && room.speakingMode === "structured" && raisedHands.has(p.userId) && (
-                <TouchableOpacity style={styles.grantBtn} onPress={() => grantFloor(p.userId)}>
-                  <Text style={styles.grantBtnText}>Give floor</Text>
-                </TouchableOpacity>
+                <AppButton label="Give floor" onPress={() => grantFloor(p.userId)} size="sm" style={{ marginTop: 4 }} />
               )}
             </TouchableOpacity>
           ))}
@@ -432,14 +431,12 @@ export default function BreakRoomScreen() {
           <View style={styles.sheetBox}>
             <Text style={styles.sheetTitle}>Report this room</Text>
             {FLAG_REASONS.map((reason) => (
-              <TouchableOpacity key={reason} style={styles.reasonRow} onPress={() => submitFlag(reason)} disabled={flagging}>
+              <TouchableOpacity accessibilityRole="button" key={reason} style={styles.reasonRow} onPress={() => submitFlag(reason)} disabled={flagging}>
                 <Text style={styles.reasonText}>{reason}</Text>
                 <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setFlagOpen(false)}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+            <AppButton label="Cancel" onPress={() => setFlagOpen(false)} variant="tertiary" style={{ marginTop: 4 }} />
           </View>
         </View>
       </Modal>
@@ -476,8 +473,6 @@ function makeStyles(p2p: P2PCallColors) {
   avatarCircleSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: p2p.pillBg, alignItems: "center", justifyContent: "center" },
   listenerName: { color: p2p.textPrimary, fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 6, textAlign: "center" },
   handEmoji: { fontSize: 12, marginTop: 2 },
-  grantBtn: { marginTop: 4, backgroundColor: p2p.accent, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
-  grantBtnText: { color: "#fff", fontSize: 9, fontFamily: "Inter_700Bold" },
 
   controlsRow: { flexDirection: "row", justifyContent: "center", gap: 24, paddingTop: 8 },
   structuredHint: { textAlign: "center", color: p2p.textMuted, fontSize: 11, fontFamily: "Inter_400Regular", paddingBottom: 8 },
@@ -487,7 +482,5 @@ function makeStyles(p2p: P2PCallColors) {
   sheetTitle: { color: p2p.textPrimary, fontSize: 17, fontWeight: "700", fontFamily: "Inter_700Bold", marginBottom: 8 },
   reasonRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: p2p.surfaceBorder },
   reasonText: { color: p2p.textPrimary, fontSize: 14, fontFamily: "Inter_400Regular" },
-  cancelBtn: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
-  cancelBtnText: { color: p2p.textMuted, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   });
 }

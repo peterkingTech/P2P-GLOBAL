@@ -6,6 +6,7 @@ import type { AppColors } from "@/constants/themes";
 import { getLearningHome, getLibrary, getCurriculumOutline, type LearningHome, type Library, type CurriculumOutline, type GroupScope } from "@/lib/groupLearningApi";
 import { getFamilyStudies, getFamilyStudy } from "@/lib/familyStudyApi";
 import { getChurchStudies, getChurchStudy } from "@/lib/churchStudyApi";
+import { IconButton } from "@/components/ui";
 
 // The group's own studies/lessons — same shape for Family and Church.
 interface OwnStudy { id: string; title: string; description: string | null; status: string }
@@ -165,9 +166,7 @@ export default function GatheringLessonPicker({ visible, onClose, scope, groupId
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle} accessibilityRole="header">Choose a Lesson</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" style={styles.closeBtn}>
-            <Ionicons name="close" size={24} color={c.textDark} />
-          </TouchableOpacity>
+          <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} style={{ flexGrow: 0 }} accessibilityRole="tablist">
           {SOURCES.map((s) => (
@@ -191,7 +190,6 @@ function makeStyles(c: AppColors) {
       paddingTop: 56, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.borderBeige,
     },
     headerTitle: { fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
-    closeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
     tabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
     tab: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: c.borderBeige, justifyContent: "center", backgroundColor: c.card },
     tabActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },

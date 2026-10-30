@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { useData } from "@/contexts/DataContext";
+import { AppButton } from "@/components/ui";
 
 export default function BlockedUsersScreen() {
   const insets = useSafeAreaInsets();
@@ -50,24 +51,14 @@ export default function BlockedUsersScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 10 }}
           renderItem={({ item }) => (
             <View style={styles.row}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={{ flex: 1 }}
                 onPress={() => { if (item.username) router.push(`/profile/${item.username}` as any); }}
               >
                 <Text style={styles.rowName}>{item.fullName}</Text>
                 {item.username && <Text style={styles.rowUsername}>@{item.username}</Text>}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.unblockBtn}
-                onPress={() => handleUnblock(item.userId)}
-                disabled={unblockingId === item.userId}
-              >
-                {unblockingId === item.userId ? (
-                  <ActivityIndicator size="small" color={colors.accentGreen} />
-                ) : (
-                  <Text style={styles.unblockBtnText}>Unblock</Text>
-                )}
-              </TouchableOpacity>
+              <AppButton label="Unblock" onPress={() => handleUnblock(item.userId)} variant="outline" size="sm" disabled={unblockingId === item.userId} loading={unblockingId === item.userId} style={{ minWidth: 78 }} />
             </View>
           )}
         />
@@ -88,10 +79,5 @@ function makeStyles(c: AppColors) {
     },
     rowName: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
     rowUsername: { fontSize: 12, color: c.textMuted, marginTop: 2, fontFamily: "Inter_400Regular" },
-    unblockBtn: {
-      borderWidth: 1, borderColor: c.accentGreen, borderRadius: 10,
-      paddingHorizontal: 14, paddingVertical: 8, minWidth: 78, alignItems: "center",
-    },
-    unblockBtnText: { fontSize: 12, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
   });
 }

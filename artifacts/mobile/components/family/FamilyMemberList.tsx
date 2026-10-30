@@ -9,6 +9,7 @@ import {
   canRemoveMember, filterMembers, memberAccessibilityLabel, memberCountLabel, memberProfilePath,
   roleLabel, showSearch, sortMembers,
 } from "@/lib/familyMembersModel";
+import { AppButton, IconButton } from "@/components/ui";
 
 interface Props {
   members: FamilyMember[] | null;
@@ -45,9 +46,7 @@ export function FamilyMemberList({ members, myId, canManage, loading, error, que
       <View style={styles.errorBox} accessibilityRole="alert">
         <Ionicons name="cloud-offline-outline" size={22} color={c.textMuted} />
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry">
-          <Text style={styles.retryText}>Try again</Text>
-        </TouchableOpacity>
+        <AppButton label="Try again" onPress={onRetry} accessibilityLabel="Retry" />
       </View>
     );
   }
@@ -103,28 +102,13 @@ export function FamilyMemberList({ members, myId, canManage, loading, error, que
                   <View style={styles.removeBtn}><ActivityIndicator size="small" color={c.accentGreen} /></View>
                 ) : (
                   <>
-                    <TouchableOpacity
-                      style={styles.removeBtn} onPress={() => onCall(m, "audio")} disabled={!!callingUserId}
-                      accessibilityRole="button" accessibilityLabel={`Voice call ${m.name}`}
-                    >
-                      <Ionicons name="call-outline" size={19} color={c.accentGreen} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.removeBtn} onPress={() => onCall(m, "video")} disabled={!!callingUserId}
-                      accessibilityRole="button" accessibilityLabel={`Video call ${m.name}`}
-                    >
-                      <Ionicons name="videocam-outline" size={20} color={c.accentGreen} />
-                    </TouchableOpacity>
+                    <IconButton icon="call-outline" accessibilityLabel={`Voice call ${m.name}`} onPress={() => onCall(m, "audio")} color={c.accentGreen} disabled={!!callingUserId} />
+                    <IconButton icon="videocam-outline" accessibilityLabel={`Video call ${m.name}`} onPress={() => onCall(m, "video")} color={c.accentGreen} disabled={!!callingUserId} />
                   </>
                 )
               ) : null}
               {canRemoveMember(m, myId, canManage) ? (
-                <TouchableOpacity
-                  style={styles.removeBtn} onPress={() => onRemove(m)}
-                  accessibilityRole="button" accessibilityLabel={`Remove ${m.name}`}
-                >
-                  <Ionicons name="close-circle-outline" size={20} color={c.textMuted} />
-                </TouchableOpacity>
+                <IconButton icon="close-circle-outline" accessibilityLabel={`Remove ${m.name}`} onPress={() => onRemove(m)} color={c.textMuted} />
               ) : null}
             </View>
           );
@@ -153,7 +137,6 @@ function makeStyles(c: AppColors) {
     removeBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
     errorBox: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 20, alignItems: "center", gap: 8 },
     errorText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_400Regular", textAlign: "center" },
-    retryBtn: { minHeight: 44, paddingHorizontal: 18, borderRadius: 10, backgroundColor: c.primaryGreen, justifyContent: "center" },
     retryText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     staleNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 8 },
   });

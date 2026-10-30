@@ -214,7 +214,7 @@ export default function MessagesTab() {
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("tabs.messages")}</Text>
-        <TouchableOpacity style={styles.historyBtn} onPress={() => router.push("/call/history" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call history" style={styles.historyBtn} onPress={() => router.push("/call/history" as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="time-outline" size={20} color={colors.accentGreen} />
         </TouchableOpacity>
       </View>
@@ -229,7 +229,7 @@ export default function MessagesTab() {
           placeholderTextColor={colors.textMuted}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
+          <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setSearch("")}>
             <Ionicons name="close-circle" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         )}
@@ -237,7 +237,7 @@ export default function MessagesTab() {
 
       <View style={styles.tabsRow}>
         {TABS.map((tb) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={tb.key}
             style={[styles.tabChip, tab === tb.key && styles.tabChipActive]}
             onPress={() => setTab(tb.key)}
@@ -247,7 +247,7 @@ export default function MessagesTab() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.contactP2PButton} onPress={() => router.push("/messages/contact-p2p" as any)}>
+      <TouchableOpacity accessibilityRole="button" style={styles.contactP2PButton} onPress={() => router.push("/messages/contact-p2p" as any)}>
         <View style={styles.contactP2PLeft}>
           <View style={styles.contactP2PIcon}>
             <Text style={{ fontSize: 18 }}>✉️</Text>
@@ -259,14 +259,14 @@ export default function MessagesTab() {
         </View>
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.myContactMessagesRow} onPress={() => router.push("/messages/my-contact-messages" as any)}>
+      <TouchableOpacity accessibilityRole="button" style={styles.myContactMessagesRow} onPress={() => router.push("/messages/my-contact-messages" as any)}>
         <Text style={styles.myContactMessagesText}>My Messages to P2P Global</Text>
         <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
       </TouchableOpacity>
       <View style={styles.contactDivider} />
 
       {pendingConnectionRequestCount > 0 && (
-        <TouchableOpacity style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>
           <Text style={styles.requestsBannerText}>Message Requests ({pendingConnectionRequestCount})</Text>
           <Ionicons name="chevron-forward" size={16} color="#B8860B" />
         </TouchableOpacity>
@@ -277,7 +277,7 @@ export default function MessagesTab() {
           successfully, this just makes a real failure visible with a retry
           instead of it looking like the conversations are just gone. */}
       {conversationsLoadError && (
-        <TouchableOpacity style={styles.loadErrorBanner} onPress={() => loadConversations()} activeOpacity={0.8}>
+        <TouchableOpacity accessibilityRole="button" style={styles.loadErrorBanner} onPress={() => loadConversations()} activeOpacity={0.8}>
           <Ionicons name="warning-outline" size={16} color="#B8860B" />
           <Text style={styles.loadErrorBannerText} numberOfLines={2}>{conversationsLoadError}</Text>
           <Text style={styles.loadErrorBannerRetry}>Retry</Text>
@@ -303,7 +303,7 @@ export default function MessagesTab() {
           renderItem={({ item }) => {
             const unread = item.unreadCount > 0;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.row}
                 activeOpacity={0.8}
                 onPress={() => router.push(`/messages/${item.id}` as any)}

@@ -26,6 +26,7 @@ import { getApiUrl } from "@/lib/apiUrl";
 import { getPlanCategoryMeta } from "@/lib/planCategories";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { ResponsiveGrid } from "@/components/ResponsiveGrid";
+import { AppButton } from "@/components/ui";
 
 type PlansTab = "my" | "find" | "saved" | "completed";
 type FindSubTab = "categories" | "az" | "search";
@@ -93,7 +94,7 @@ function PlanListRow({
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[styles.azRow, locked && styles.azRowLocked]}
       activeOpacity={0.85}
       onPress={() => (locked ? alertLocked(unlockMessage ?? "Complete the previous plan first to access this plan.") : onPress())}
@@ -164,7 +165,7 @@ function PlanCard({
   const format = formatBadgeFromTags(plan.tags);
 
   return (
-    <TouchableOpacity style={styles.planCard} activeOpacity={0.88} onPress={onPress}>
+    <TouchableOpacity accessibilityRole="button" style={styles.planCard} activeOpacity={0.88} onPress={onPress}>
       <View style={styles.planCardTop}>
         {plan.coverImageUrl && !imgErr ? (
           <Image source={{ uri: plan.coverImageUrl }} style={styles.planCardImg} resizeMode="cover" onError={() => setImgErr(true)} />
@@ -174,7 +175,7 @@ function PlanCard({
           </View>
         )}
         {onToggleSave && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={isSaved ? "Remove from saved" : "Save"} accessibilityState={{ selected: !!isSaved }}
             style={styles.bookmarkBtn}
             onPress={(e) => { e.stopPropagation?.(); onToggleSave(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -220,14 +221,10 @@ function PlanCard({
 
         <View style={styles.cardActionsRow}>
           {primaryLabel && onPrimary && (
-            <TouchableOpacity style={styles.primaryBtn} onPress={(e) => { e.stopPropagation?.(); onPrimary(); }}>
-              <Text style={styles.primaryBtnText}>{primaryLabel}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${primaryLabel}`} onPress={(e) => { e.stopPropagation?.(); onPrimary(); }} style={{ flex: 1 }} />
           )}
           {secondaryLabel && onSecondary && (
-            <TouchableOpacity style={styles.secondaryBtn} onPress={(e) => { e.stopPropagation?.(); onSecondary(); }}>
-              <Text style={styles.secondaryBtnText}>{secondaryLabel}</Text>
-            </TouchableOpacity>
+            <AppButton label={`${secondaryLabel}`} onPress={(e) => { e.stopPropagation?.(); onSecondary(); }} variant="outline" style={{ flex: 1 }} />
           )}
         </View>
       </View>
@@ -242,9 +239,7 @@ function EmptyState({ colors, icon, text, actionLabel, onAction }: { colors: App
       <Ionicons name={icon} size={36} color={colors.textMuted} />
       <Text style={styles.emptyStateText}>{text}</Text>
       {actionLabel && onAction && (
-        <TouchableOpacity style={styles.emptyStateBtn} onPress={onAction}>
-          <Text style={styles.emptyStateBtnText}>{actionLabel}</Text>
-        </TouchableOpacity>
+        <AppButton label={`${actionLabel}`} onPress={onAction} style={{ marginTop: 4 }} />
       )}
     </View>
   );
@@ -283,7 +278,7 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
   return (
     <Modal visible animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.shareOverlay}>
-        <TouchableOpacity style={styles.shareCloseBtn} onPress={onClose} hitSlop={12}>
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={styles.shareCloseBtn} onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <ViewShot ref={shotRef} options={{ format: "png", quality: 1 }}>
@@ -296,14 +291,7 @@ function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: Comple
             <Text style={styles.shareDate}>{dateLabel}</Text>
           </View>
         </ViewShot>
-        <TouchableOpacity style={styles.shareBtn} onPress={handleShare} disabled={busy} activeOpacity={0.85}>
-          {busy ? <ActivityIndicator color="#0B3A2E" size="small" /> : (
-            <>
-              <Ionicons name="share-outline" size={16} color="#0B3A2E" />
-              <Text style={styles.shareBtnText}>Share</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <AppButton label="Share" onPress={handleShare} icon="share-outline" disabled={busy} loading={busy} style={{ marginTop: 24 }} />
       </View>
     </Modal>
   );
@@ -519,7 +507,7 @@ export default function PlansHubScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerBarTitle}>Plans</Text>
@@ -533,7 +521,7 @@ export default function PlansHubScreen() {
           { key: "saved", label: "Saved" },
           { key: "completed", label: "Completed" },
         ] as { key: PlansTab; label: string }[]).map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
+          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
             <Text style={[styles.tabBtnText, tab === t.key && styles.tabBtnTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -610,7 +598,7 @@ export default function PlansHubScreen() {
               placeholderTextColor={colors.textMuted}
             />
             {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")}>
+              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setSearch("")}>
                 <Ionicons name="close-circle" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             )}
@@ -622,7 +610,7 @@ export default function PlansHubScreen() {
               { key: "az", label: "A-Z" },
               ...(search.trim() ? [{ key: "search", label: "Search Results" }] : []),
             ] as { key: FindSubTab; label: string }[]).map((t) => (
-              <TouchableOpacity key={t.key} style={[styles.findSubTabBtn, findSubTab === t.key && styles.findSubTabBtnActive]} onPress={() => setFindSubTab(t.key)}>
+              <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.findSubTabBtn, findSubTab === t.key && styles.findSubTabBtnActive]} onPress={() => setFindSubTab(t.key)}>
                 <Text style={[styles.findSubTabText, findSubTab === t.key && styles.findSubTabTextActive]}>{t.label}</Text>
               </TouchableOpacity>
             ))}
@@ -704,7 +692,7 @@ export default function PlansHubScreen() {
               </ScrollView>
               <View style={styles.alphabetStrip}>
                 {ALPHABET.map((letter) => (
-                  <TouchableOpacity key={letter} onPress={() => scrollToLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 4, right: 4 }}>
+                  <TouchableOpacity accessibilityRole="button" key={letter} onPress={() => scrollToLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 4, right: 4 }}>
                     <Text style={[styles.alphabetStripLetter, !availableLetters.has(letter) && styles.alphabetStripLetterMuted]}>{letter}</Text>
                   </TouchableOpacity>
                 ))}
@@ -813,8 +801,6 @@ function makeStyles(c: AppColors) {
 
     emptyState: { alignItems: "center", paddingVertical: 28, gap: 10 },
     emptyStateText: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", paddingHorizontal: 20, lineHeight: 19 },
-    emptyStateBtn: { backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, marginTop: 4 },
-    emptyStateBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     planCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, marginBottom: 14, overflow: "hidden" },
     planCardTop: { position: "relative" },
@@ -838,10 +824,6 @@ function makeStyles(c: AppColors) {
     progressPctText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", minWidth: 30 },
 
     cardActionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-    primaryBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 10, paddingVertical: 9, alignItems: "center" },
-    primaryBtnText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, paddingVertical: 9, alignItems: "center" },
-    secondaryBtnText: { color: c.textMid, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 
     searchBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 },
     searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
@@ -901,9 +883,7 @@ function makeStyles(c: AppColors) {
     filterChipText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
     filterChipTextActive: { color: "#fff", fontWeight: "700" },
     filterActionsRow: { flexDirection: "row", gap: 10, marginTop: 20 },
-    filterClearBtn: { flex: 1, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
     filterClearText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    filterApplyBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
     filterApplyText: { fontSize: 14, color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
 
     shareOverlay: { flex: 1, backgroundColor: "rgba(6,17,13,0.94)", alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
@@ -913,7 +893,5 @@ function makeStyles(c: AppColors) {
     shareTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", textAlign: "center" },
     shareSubtitle: { fontSize: 12, color: "#E0A441", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6, marginTop: 6 },
     shareDate: { fontSize: 12, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_400Regular", marginTop: 8 },
-    shareBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#E0A441", borderRadius: 24, paddingVertical: 12, paddingHorizontal: 24, marginTop: 24 },
-    shareBtnText: { fontSize: 14, fontWeight: "700", color: "#0B3A2E", fontFamily: "Inter_700Bold" },
   });
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Guiding questions for a peer reviewing someone's Comprehensive Check:
 // encouraging, specific feedback — not grading or shaming. Tapping one adds it
@@ -26,10 +27,7 @@ export default function ReviewPrompts({ feedback, onChange }: { feedback: string
       <Text style={s.title}>Feedback from you, a fellow peer — be specific and encouraging.</Text>
       <View style={s.row}>
         {REVIEW_PROMPTS.map((p) => (
-          <TouchableOpacity key={p} onPress={() => onChange(addPrompt(feedback, p))} style={s.chip}
-            accessibilityRole="button" accessibilityLabel={`Add prompt: ${p}`}>
-            <Text style={s.chipText}>{p}</Text>
-          </TouchableOpacity>
+          <AppButton label={`${p}`} onPress={() => onChange(addPrompt(feedback, p))} variant="secondary" size="sm" accessibilityLabel={`Add prompt: ${p}`} key={p} palette="fixedLight" />
         ))}
       </View>
     </View>

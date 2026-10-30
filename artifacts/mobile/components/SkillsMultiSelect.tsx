@@ -38,11 +38,11 @@ export default function SkillsMultiSelect({ visible, initialSelected, onClose, o
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity accessibilityRole="button" onPress={onClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Select Skills</Text>
-          <TouchableOpacity onPress={() => onSave(selected)}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => onSave(selected)}>
             <Text style={styles.saveText}>Save</Text>
           </TouchableOpacity>
         </View>
@@ -58,7 +58,7 @@ export default function SkillsMultiSelect({ visible, initialSelected, onClose, o
             autoCorrect={false}
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery("")}>
+            <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setQuery("")}>
               <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -77,7 +77,7 @@ export default function SkillsMultiSelect({ visible, initialSelected, onClose, o
               {group.items.map((item) => {
                 const isSelected = selected.includes(item.key);
                 return (
-                  <TouchableOpacity key={item.key} style={styles.row} onPress={() => toggle(item.key)}>
+                  <TouchableOpacity accessibilityRole="button" key={item.key} style={styles.row} onPress={() => toggle(item.key)}>
                     <Text style={styles.rowLabel}>{item.label}</Text>
                     <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
                       {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}

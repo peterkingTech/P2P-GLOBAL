@@ -14,6 +14,7 @@ import {
 } from "@/lib/familyStudyPlanApi";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
@@ -117,7 +118,7 @@ export default function FamilyStudiesScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Stack.Screen options={{ title: "Study", headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.title}>Study</Text>
@@ -125,7 +126,7 @@ export default function FamilyStudiesScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40 }}>
-        <TouchableOpacity style={styles.p2pCard} onPress={() => router.push("/curriculum" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.p2pCard} onPress={() => router.push("/curriculum" as any)}>
           <View style={styles.p2pIconWrap}><Ionicons name="book" size={20} color="#fff" /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.p2pTitle}>P2P Curriculum & Plans</Text>
@@ -147,17 +148,14 @@ export default function FamilyStudiesScreen() {
         <View style={styles.sectionRow}>
           <Text style={styles.sectionLabel}>CUSTOM STUDY PLANS</Text>
           {canManage && (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreatePlanOpen(true)}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Create Plan</Text>
-            </TouchableOpacity>
+            <AppButton label="Create Plan" onPress={() => setCreatePlanOpen(true)} size="sm" icon="add" />
           )}
         </View>
         {loading ? null : plans.length === 0 ? (
           <Text style={styles.emptyText}>{canManage ? "No Custom Study Plans yet. Create one above." : "No Custom Study Plans have been published yet."}</Text>
         ) : (
           plans.map((p) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={p.id} style={styles.studyCard}
               onPress={() => router.push({ pathname: "/family/study-plans/[planId]", params: { planId: p.id, familyId } } as any)}
             >
@@ -176,10 +174,7 @@ export default function FamilyStudiesScreen() {
         <View style={[styles.sectionRow, { marginTop: 18 }]}>
           <Text style={styles.sectionLabel}>FAMILY STUDIES</Text>
           {canManage && (
-            <TouchableOpacity style={styles.createBtn} onPress={() => setCreateOpen(true)}>
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text style={styles.createBtnText}>Create Study</Text>
-            </TouchableOpacity>
+            <AppButton label="Create Study" onPress={() => setCreateOpen(true)} size="sm" icon="add" />
           )}
         </View>
 
@@ -189,7 +184,7 @@ export default function FamilyStudiesScreen() {
           <Text style={styles.emptyText}>{canManage ? "No Studies yet. Create one above." : "No Studies have been published yet."}</Text>
         ) : (
           studies.map((s) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={s.id} style={styles.studyCard}
               onPress={() => router.push({ pathname: "/family/studies/[studyId]", params: { studyId: s.id, familyId } } as any)}
             >
@@ -215,12 +210,8 @@ export default function FamilyStudiesScreen() {
             <Text style={styles.fieldLabel}>Study Description</Text>
             <TextInput style={[styles.input, { minHeight: 70 }]} value={description} onChangeText={setDescription} multiline placeholder="What is this study about? (optional)" placeholderTextColor={c.textMuted} />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreateOpen(false)} disabled={creating}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCreate} disabled={creating || !title.trim()}>
-                {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Create</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setCreateOpen(false)} variant="outline" disabled={creating} style={{ flex: 1 }} />
+              <AppButton label="Create" onPress={handleCreate} disabled={creating || !title.trim()} loading={creating} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -235,12 +226,8 @@ export default function FamilyStudiesScreen() {
             <Text style={styles.fieldLabel}>Plan Description</Text>
             <TextInput style={[styles.input, { minHeight: 70 }]} value={description} onChangeText={setDescription} multiline placeholder="What is this plan about? (optional)" placeholderTextColor={c.textMuted} />
             <View style={styles.sheetRow}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setCreatePlanOpen(false)} disabled={creating}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleCreatePlan} disabled={creating || !title.trim()}>
-                {creating ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Create</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => setCreatePlanOpen(false)} variant="outline" disabled={creating} style={{ flex: 1 }} />
+              <AppButton label="Create" onPress={handleCreatePlan} disabled={creating || !title.trim()} loading={creating} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -251,14 +238,14 @@ export default function FamilyStudiesScreen() {
           <View style={[styles.sheetBox, sheetWidth, { paddingBottom: insets.bottom + 20 }]}>
             <Text style={styles.sheetTitle}>Study Source</Text>
             <Text style={styles.fieldLabel}>Choose what Study uses for this Family Circle. This does not change what's already been studied.</Text>
-            <TouchableOpacity style={styles.sourceOption} onPress={() => handleChooseSource("p2p_curriculum")}>
+            <TouchableOpacity accessibilityRole="button" style={styles.sourceOption} onPress={() => handleChooseSource("p2p_curriculum")}>
               <Ionicons name={studySource === "p2p_curriculum" ? "radio-button-on" : "radio-button-off"} size={20} color={c.accentGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.sourceOptionTitle}>P2P Curriculum</Text>
                 <Text style={styles.sourceOptionSub}>Official discipleship curriculum · default</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.sourceOption} onPress={() => handleChooseSource("custom_study_plan")}>
+            <TouchableOpacity accessibilityRole="button" style={styles.sourceOption} onPress={() => handleChooseSource("custom_study_plan")}>
               <Ionicons name={studySource === "custom_study_plan" ? "radio-button-on" : "radio-button-off"} size={20} color={c.accentGreen} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.sourceOptionTitle}>Custom Study Plan</Text>
@@ -267,9 +254,7 @@ export default function FamilyStudiesScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setSourceSheetOpen(false)}>
-              <Text style={styles.cancelBtnText}>Done</Text>
-            </TouchableOpacity>
+            <AppButton label="Done" onPress={() => setSourceSheetOpen(false)} variant="outline" style={{ flex: 1 }} />
           </View>
         </View>
       </Modal>
@@ -289,8 +274,6 @@ function makeStyles(c: AppColors) {
     p2pSub: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_400Regular", marginTop: 2 },
     sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
     sectionLabel: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-    createBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: c.accentGreen, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-    createBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
     emptyText: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },
     studyCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, padding: 14, marginBottom: 8 },
     studyTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
@@ -318,9 +301,5 @@ function makeStyles(c: AppColors) {
       paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular",
     },
     sheetRow: { flexDirection: "row", gap: 10, marginTop: 8 },
-    cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    cancelBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
-    saveBtn: { flex: 1, backgroundColor: c.primaryGreen, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-    saveBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

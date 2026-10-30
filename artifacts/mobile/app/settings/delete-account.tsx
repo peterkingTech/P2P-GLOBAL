@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import SettingsSubHeader from "@/components/SettingsSubHeader";
 import { authedFetch } from "@/lib/adminFetch";
+import { AppButton } from "@/components/ui";
 
 // Settings → Account → Account status → Delete account permanently.
 // Three calm steps: a reminder that a break is available, an optional
@@ -93,16 +94,9 @@ export default function DeleteAccountScreen() {
               time away, you don't have to lose what you've built — you can take a break and come back
               whenever you're ready.
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/settings/account-status" as any)}>
-              <Text style={styles.primaryBtnText}>Take a break instead</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/messages/contact-p2p" as any)}>
-              <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.accentGreen} />
-              <Text style={styles.secondaryBtnText}>Talk to someone</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.linkBtn} onPress={() => setStep("reason")}>
-              <Text style={styles.linkText}>Continue to delete my account</Text>
-            </TouchableOpacity>
+            <AppButton label="Take a break instead" onPress={() => router.replace("/settings/account-status" as any)} style={{ marginTop: 4 }} />
+            <AppButton label="Talk to someone" onPress={() => router.push("/messages/contact-p2p" as any)} variant="outline" icon="chatbubble-ellipses-outline" style={{ marginTop: 10 }} />
+            <AppButton label="Continue to delete my account" onPress={() => setStep("reason")} variant="tertiary" style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -126,14 +120,9 @@ export default function DeleteAccountScreen() {
               );
             })}
             {reason === "want_to_talk" && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/messages/contact-p2p" as any)}>
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.accentGreen} />
-                <Text style={styles.secondaryBtnText}>Contact P2P Support</Text>
-              </TouchableOpacity>
+              <AppButton label="Contact P2P Support" onPress={() => router.push("/messages/contact-p2p" as any)} variant="outline" icon="chatbubble-ellipses-outline" style={{ marginTop: 10 }} />
             )}
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep("confirm")}>
-              <Text style={styles.primaryBtnText}>{reason ? "Continue" : "Skip"}</Text>
-            </TouchableOpacity>
+            <AppButton label={reason ? "Continue" : "Skip"} onPress={() => setStep("confirm")} style={{ marginTop: 4 }} />
           </View>
         )}
 
@@ -174,12 +163,8 @@ export default function DeleteAccountScreen() {
                 placeholderTextColor={colors.textMuted}
                 accessibilityLabel={`Type ${CONFIRM_WORD} to confirm`}
               />
-              <TouchableOpacity style={[styles.deleteBtn, !canDelete && styles.disabled]} onPress={submit} disabled={!canDelete}>
-                {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.deleteBtnText}>Delete my account</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.linkBtn} onPress={() => router.replace("/settings/account-status" as any)}>
-                <Text style={styles.linkText}>Take a break instead</Text>
-              </TouchableOpacity>
+              <AppButton label="Delete my account" onPress={submit} variant="destructive" disabled={!canDelete} loading={submitting} />
+              <AppButton label="Take a break instead" onPress={() => router.replace("/settings/account-status" as any)} variant="tertiary" style={{ marginTop: 4 }} />
             </View>
           </>
         )}

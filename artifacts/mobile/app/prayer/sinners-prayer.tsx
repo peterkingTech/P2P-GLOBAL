@@ -7,6 +7,7 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { getApiUrl } from "@/lib/apiUrl";
+import { AppButton } from "@/components/ui";
 
 const PRAYER_LINES = [
   "Lord Jesus, I come to You just as I am.",
@@ -67,7 +68,7 @@ export default function SinnersPrayerScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ width: 22 }} />
@@ -81,9 +82,7 @@ export default function SinnersPrayerScreen() {
             </View>
             <Text style={styles.affirmationTitle}>Welcome to the family of God.</Text>
             <Text style={styles.affirmationSub}>Your journey begins now.</Text>
-            <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-              <Text style={styles.doneBtnText}>Continue</Text>
-            </TouchableOpacity>
+            <AppButton label="Continue" onPress={() => router.back()} size="lg" style={{ marginTop: 32 }} />
           </View>
         ) : (
           <>
@@ -100,21 +99,15 @@ export default function SinnersPrayerScreen() {
             </View>
 
             {!prayed && (
-              <TouchableOpacity style={styles.prayedBtn} onPress={handlePrayed} activeOpacity={0.85}>
-                <Text style={styles.prayedBtnText}>I prayed this prayer</Text>
-              </TouchableOpacity>
+              <AppButton label="I prayed this prayer" onPress={handlePrayed} size="lg" style={{ marginTop: 28, width: "100%" }} />
             )}
 
             {asking && (
               <View style={styles.askCard}>
                 <Text style={styles.askText}>Would you like to tell your peer guide about this moment?</Text>
                 <View style={styles.askRow}>
-                  <TouchableOpacity style={styles.askNoBtn} onPress={() => respondToPeerGuideAsk(false)} disabled={notifying}>
-                    <Text style={styles.askNoText}>No thanks</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.askYesBtn} onPress={() => respondToPeerGuideAsk(true)} disabled={notifying}>
-                    {notifying ? <ActivityIndicator color="#100B06" size="small" /> : <Text style={styles.askYesText}>Yes, tell them</Text>}
-                  </TouchableOpacity>
+                  <AppButton label="No thanks" onPress={() => respondToPeerGuideAsk(false)} variant="outline" disabled={notifying} style={{ flex: 1 }} />
+                  <AppButton label="Yes, tell them" onPress={() => respondToPeerGuideAsk(true)} disabled={notifying} loading={notifying} style={{ flex: 1 }} />
                 </View>
               </View>
             )}
@@ -141,20 +134,14 @@ function makeStyles(c: AppColors) {
       padding: 24, gap: 14, width: "100%",
     },
     prayerLine: { fontSize: 16, color: c.upperRoomCream, fontFamily: "Inter_400Regular", lineHeight: 26, textAlign: "center" },
-    prayedBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 14, height: 54, alignItems: "center", justifyContent: "center", marginTop: 28, width: "100%" },
-    prayedBtnText: { color: "#100B06", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
     askCard: { backgroundColor: c.upperRoomCard, borderRadius: 16, borderWidth: 1, borderColor: c.upperRoomBorder, padding: 20, marginTop: 20, width: "100%" },
     askText: { fontSize: 14, color: c.upperRoomCream, fontFamily: "Inter_500Medium", textAlign: "center", lineHeight: 21, marginBottom: 16 },
     askRow: { flexDirection: "row", gap: 10 },
-    askNoBtn: { flex: 1, borderWidth: 1, borderColor: c.upperRoomBorder, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
     askNoText: { color: c.upperRoomMuted, fontSize: 13, fontFamily: "Inter_500Medium" },
-    askYesBtn: { flex: 1, backgroundColor: c.upperRoomAmber, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
     askYesText: { color: "#100B06", fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     affirmationWrap: { alignItems: "center", paddingTop: 60 },
     doveRing: { width: 80, height: 80, borderRadius: 40, backgroundColor: c.upperRoomAmber, alignItems: "center", justifyContent: "center", marginBottom: 24 },
     affirmationTitle: { fontSize: 22, fontWeight: "700", color: c.upperRoomCream, fontFamily: "Inter_700Bold", textAlign: "center" },
     affirmationSub: { fontSize: 14, color: c.upperRoomMuted, fontFamily: "Inter_400Regular", marginTop: 8, textAlign: "center" },
-    doneBtn: { backgroundColor: c.upperRoomAmber, borderRadius: 14, paddingHorizontal: 32, height: 50, alignItems: "center", justifyContent: "center", marginTop: 32 },
-    doneBtnText: { color: "#100B06", fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

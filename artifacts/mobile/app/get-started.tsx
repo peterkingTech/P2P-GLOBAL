@@ -7,6 +7,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { GET_STARTED_STEPS, type GetStartedStepId } from "@/lib/getStarted";
 import { useGetStartedProgress } from "@/hooks/useGetStartedProgress";
+import { AppButton } from "@/components/ui";
 
 // "How to use P2P". Reachable any time from Home and Profile — not a
 // first-launch-only tutorial.
@@ -30,7 +31,7 @@ export default function GetStartedScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back">
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>How to use P2P</Text>
@@ -80,12 +81,10 @@ export default function GetStartedScreen() {
                   ))}
                   <View style={styles.stepActions}>
                     {step.route && (
-                      <TouchableOpacity style={styles.primaryBtn} onPress={() => { void handleOpen(step.id, step.route as string); }}>
-                        <Text style={styles.primaryBtnText}>{step.actionLabel ?? "Open"}</Text>
-                      </TouchableOpacity>
+                      <AppButton label={`${step.actionLabel ?? "Open"}`} onPress={() => { void handleOpen(step.id, step.route as string); }} style={{ flex: 1 }} />
                     )}
                     {!done && (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         style={step.route ? styles.secondaryBtn : styles.primaryBtn}
                         onPress={() => {
                           void complete(step.id);
@@ -111,6 +110,8 @@ export default function GetStartedScreen() {
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
+    secondaryBtnText: { color: c.textDark, fontWeight: "600", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+    secondaryBtn: { flex: 1, borderRadius: 12, height: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.borderBeige },
     container: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
     backBtn: { padding: 4 },
@@ -138,7 +139,5 @@ function makeStyles(c: AppColors) {
     stepActions: { flexDirection: "row", gap: 10, marginTop: 6 },
     primaryBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 12, height: 42, alignItems: "center", justifyContent: "center" },
     primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flex: 1, borderRadius: 12, height: 42, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.borderBeige },
-    secondaryBtnText: { color: c.textDark, fontWeight: "600", fontSize: 14, fontFamily: "Inter_600SemiBold" },
   });
 }

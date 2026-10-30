@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 export type BadgeSize = "small" | "medium" | "large";
 
 interface VerificationBadgeProps {
@@ -40,7 +41,7 @@ export function VerificationBadge({
 
   return (
     <>
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Confirm"
         onPress={() => setExplainOpen(true)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={[
@@ -56,7 +57,7 @@ export function VerificationBadge({
       </TouchableOpacity>
 
       <Modal visible={explainOpen} animationType="slide" transparent onRequestClose={() => setExplainOpen(false)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={() => setExplainOpen(false)}>
           <TouchableOpacity activeOpacity={1} style={[styles.sheet, sheetWidth]}>
             <View style={styles.sheetHeaderRow}>
               <View style={styles.checkCircle}>
@@ -85,9 +86,7 @@ export function VerificationBadge({
                 Verified {new Date(verifiedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
               </Text>
             )}
-            <TouchableOpacity style={styles.gotItBtn} onPress={() => setExplainOpen(false)}>
-              <Text style={styles.gotItBtnText}>Got it</Text>
-            </TouchableOpacity>
+            <AppButton label="Got it" onPress={() => setExplainOpen(false)} style={{ marginTop: 20 }} />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -116,7 +115,5 @@ function makeStyles(c: AppColors) {
     pointRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
     pointText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular" },
     verifiedSince: { fontSize: 12, color: c.textMuted, marginTop: 8, fontFamily: "Inter_400Regular" },
-    gotItBtn: { backgroundColor: c.accentGreen, borderRadius: 12, height: 46, alignItems: "center", justifyContent: "center", marginTop: 20 },
-    gotItBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
   });
 }

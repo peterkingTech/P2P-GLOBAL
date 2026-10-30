@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { buttonDouble } from "./helpers/buttonDouble.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -39,6 +40,8 @@ const RN = {
 };
 const colors = { primaryGreen: "#0a0", accentGreen: "#0b0", lightCream: "#fff", card: "#fff", borderBeige: "#ddd", textDark: "#111", textMid: "#333", textMuted: "#777" };
 const mocks = {
+  // The shared button system renders as a labelled tappable (tests/helpers/buttonDouble.mjs).
+  "@/components/ui": buttonDouble(React, RN),
   react: reactMock, "react-native": RN,
   "@expo/vector-icons": { Ionicons: host("Ionicons") },
   "@/contexts/ThemeContext": { useTheme: () => ({ colors }) },

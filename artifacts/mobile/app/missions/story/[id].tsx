@@ -13,6 +13,7 @@ import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopi
 import MissionVideoPlayer from "@/components/MissionVideoPlayer";
 import SignedPhotoView from "@/components/SignedPhotoView";
 import { openScripture } from "@/lib/openScripture";
+import { AppButton } from "@/components/ui";
 
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") window.alert(`${title}\n\n${message}`);
@@ -76,11 +77,11 @@ export default function MissionStoryScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
+        <TouchableOpacity hitSlop={10} onPress={() => router.back()} accessibilityLabel="Back" accessibilityRole="button">
           <Ionicons name="arrow-back" size={22} color={c.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerType}>{story.storyType.replace("_", " ").toUpperCase()}</Text>
-        <TouchableOpacity onPress={handleSaveToggle}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? "Remove from saved" : "Save"} accessibilityState={{ selected: !!saved }} hitSlop={10} onPress={handleSaveToggle}>
           <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={c.accentGreen} />
         </TouchableOpacity>
       </View>
@@ -89,7 +90,7 @@ export default function MissionStoryScreen() {
         <Text style={styles.title}>{story.title}</Text>
         <View style={styles.metaRow}>
           {!!story.missionField && (
-            <TouchableOpacity onPress={() => router.push(`/missions/field/${story.missionField!.slug}` as any)}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/missions/field/${story.missionField!.slug}` as any)}>
               <Text style={styles.fieldLink}>{story.missionField.title}, {story.missionField.country}</Text>
             </TouchableOpacity>
           )}
@@ -111,7 +112,7 @@ export default function MissionStoryScreen() {
         <Text style={styles.body}>{story.body}</Text>
 
         {scripture && (
-          <TouchableOpacity style={styles.scriptureRow} onPress={() => openScripture(scripture.referenceDisplay)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.scriptureRow} onPress={() => openScripture(scripture.referenceDisplay)}>
             <Ionicons name="book" size={14} color={c.accentGreen} />
             <Text style={styles.scriptureText}>{scripture.referenceDisplay}</Text>
             <Ionicons name="open-outline" size={13} color={c.accentGreen} />
@@ -131,28 +132,16 @@ export default function MissionStoryScreen() {
         )}
 
         <View style={styles.actionsWrap}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={handlePray}>
-            <Ionicons name="hand-left-outline" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>Pray</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { topicTitle: story.title, missionStoryId: story.id } } as any)}
-          >
-            <Ionicons name="people-outline" size={16} color={c.accentGreen} />
-            <Text style={styles.secondaryBtnText}>Pray With Me</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/curriculum" as any)}>
-            <Ionicons name="school-outline" size={16} color={c.accentGreen} />
-            <Text style={styles.secondaryBtnText}>Study</Text>
-          </TouchableOpacity>
+          <AppButton label="Pray" onPress={handlePray} icon="hand-left-outline" />
+          <AppButton label="Pray With Me" onPress={() => router.push({ pathname: "/prayer/pray-with-me", params: { topicTitle: story.title, missionStoryId: story.id } } as any)} variant="outline" icon="people-outline" />
+          <AppButton label="Study" onPress={() => router.push("/curriculum" as any)} variant="outline" icon="school-outline" />
         </View>
 
         {story.relatedStories.length > 0 && (
           <View style={{ marginTop: 24 }}>
             <Text style={styles.sectionHeading}>Related Stories</Text>
             {story.relatedStories.map((r) => (
-              <TouchableOpacity key={r.id} style={styles.relatedCard} onPress={() => router.push(`/missions/story/${r.id}` as any)}>
+              <TouchableOpacity accessibilityRole="button" key={r.id} style={styles.relatedCard} onPress={() => router.push(`/missions/story/${r.id}` as any)}>
                 <Text style={styles.relatedTitle}>{r.title}</Text>
               </TouchableOpacity>
             ))}
@@ -186,10 +175,6 @@ function makeStyles(c: AppColors) {
     prayerPointTitle: { fontSize: 13, color: c.textDark, fontFamily: "Inter_700Bold" },
     prayerPointDesc: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 17 },
     actionsWrap: { gap: 10, marginTop: 24 },
-    primaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: c.primaryGreen, borderRadius: 12, paddingVertical: 14 },
-    primaryBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
-    secondaryBtn: { flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: c.accentGreen, borderRadius: 12, paddingVertical: 12 },
-    secondaryBtnText: { color: c.accentGreen, fontSize: 14, fontFamily: "Inter_700Bold" },
     relatedCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 10, padding: 12, marginBottom: 8 },
     relatedTitle: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
   });

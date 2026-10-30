@@ -33,6 +33,7 @@ import { getP2PCallColors, P2P_END_CALL_RED } from "@/components/call/p2pCallThe
 import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import type { P2POrbitTile } from "@/components/call/P2PParticipantNode";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AppButton } from "@/components/ui";
 
 // Alert.alert on native is fire-and-forget — it returns immediately rather
 // than waiting for the user to dismiss it. Callers that need cleanup/
@@ -827,13 +828,13 @@ function AudioCallScreen() {
     <View style={styles.studyParticipantStrip}>
       <View style={styles.studyMiniAvatar}><Ionicons name="person" size={16} color="rgba(255,255,255,0.6)" /></View>
       <Text style={styles.studyMiniName} numberOfLines={1}>{studyStripLabel}</Text>
-      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleMute}>
+      <TouchableOpacity hitSlop={10} accessibilityRole="button" accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} accessibilityState={{ selected: muted }} style={styles.studyMiniBtn} onPress={toggleMute}>
         <Ionicons name={muted ? "mic-off" : "mic"} size={16} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.studyMiniBtn} onPress={toggleSpeaker}>
+      <TouchableOpacity hitSlop={10} accessibilityRole="button" accessibilityLabel={speakerOn ? "Turn speaker off" : "Turn speaker on"} accessibilityState={{ selected: speakerOn }} style={styles.studyMiniBtn} onPress={toggleSpeaker}>
         <Ionicons name={speakerOn ? "volume-high" : "volume-medium-outline"} size={16} color="#fff" />
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.studyMiniBtn, styles.endBtn]} onPress={() => handleEndCall()}>
+      <TouchableOpacity hitSlop={10} accessibilityRole="button" accessibilityLabel="End call" style={[styles.studyMiniBtn, styles.endBtn]} onPress={() => handleEndCall()}>
         <Ionicons name="call" size={16} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
       </TouchableOpacity>
     </View>
@@ -877,14 +878,9 @@ function AudioCallScreen() {
           <Text style={styles.noAnswerStatus}>{UNANSWERED_LABEL[unansweredOutcome]}</Text>
         </View>
         <View style={styles.noAnswerActions}>
-          <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={navigateBack} accessibilityRole="button" accessibilityLabel="Cancel">
-            <Text style={styles.noAnswerSecondaryText}>Cancel</Text>
-          </TouchableOpacity>
+          <AppButton label="Cancel" onPress={navigateBack} variant="outline" accessibilityLabel="Cancel" />
           {!!params.conversationId && (
-            <TouchableOpacity style={styles.noAnswerSecondaryBtn} onPress={handleRecordVoice} accessibilityRole="button" accessibilityLabel="Record voice message">
-              <Ionicons name="mic-outline" size={16} color={p2pColors.textPrimary} />
-              <Text style={styles.noAnswerSecondaryText}>Record voice message</Text>
-            </TouchableOpacity>
+            <AppButton label="Record voice message" onPress={handleRecordVoice} variant="outline" icon="mic-outline" accessibilityLabel="Record voice message" />
           )}
           <TouchableOpacity
             style={[styles.noAnswerPrimaryBtn, { backgroundColor: p2pColors.accent }]}
@@ -949,7 +945,7 @@ function AudioCallScreen() {
           nothing to deduplicate against; one is not invented here per
           section 23's "do not invent new call functionality." */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="End call and go back">
+        <TouchableOpacity hitSlop={10} onPress={() => handleEndCall()} accessibilityRole="button" accessibilityLabel="End call and go back">
           <Ionicons name="chevron-back" size={22} color={p2pColors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.callTypePill}>
@@ -1047,12 +1043,8 @@ function AudioCallScreen() {
               {studyStripLabel} {studyOtherParticipants.length > 2 ? "are" : "is"} studying {study.pendingGroupStudy.title || "a lesson"}.
             </Text>
             <View style={styles.autoStudyRow}>
-              <TouchableOpacity style={styles.autoStudyDismiss} onPress={study.dismissPendingGroupStudy}>
-                <Text style={styles.autoStudyDismissText}>Not now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.autoStudyStartBtn} onPress={handleJoinGroupStudy}>
-                <Text style={styles.autoStudyStartText}>Join Study</Text>
-              </TouchableOpacity>
+              <AppButton label="Not now" onPress={study.dismissPendingGroupStudy} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Join Study" onPress={handleJoinGroupStudy} style={{ flex: 1 }} />
             </View>
           </View>
         )}
@@ -1061,21 +1053,14 @@ function AudioCallScreen() {
           <View style={styles.autoStudyCard}>
             <Text style={styles.autoStudyText}>Continue {params.autoStudyLessonTitle || "their current lesson"}?</Text>
             <View style={styles.autoStudyRow}>
-              <TouchableOpacity style={styles.autoStudyDismiss} onPress={() => setAutoStudyDismissed(true)}>
-                <Text style={styles.autoStudyDismissText}>Not now</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.autoStudyStartBtn} onPress={handleStartAutoStudy}>
-                <Text style={styles.autoStudyStartText}>Start Study</Text>
-              </TouchableOpacity>
+              <AppButton label="Not now" onPress={() => setAutoStudyDismissed(true)} variant="outline" style={{ flex: 1 }} />
+              <AppButton label="Start Study" onPress={handleStartAutoStudy} style={{ flex: 1 }} />
             </View>
           </View>
         )}
 
         {callState === "connected" && !study.pendingGroupStudy?.active && (!hasAutoStudy || autoStudyDismissed) && (
-          <TouchableOpacity style={styles.studyBtn} onPress={handleOpenStudy} accessibilityRole="button" accessibilityLabel="Study Together">
-            <Ionicons name="book-outline" size={16} color={p2pColors.accent} />
-            <Text style={styles.studyBtnText}>Study Together</Text>
-          </TouchableOpacity>
+          <AppButton label="Study Together" onPress={handleOpenStudy} icon="book-outline" accessibilityLabel="Study Together" style={{ marginTop: 22 }} />
         )}
       </View>
 
@@ -1122,10 +1107,6 @@ function makeStyles(p2p: P2PCallColors) {
     noAnswerName: { fontSize: 24, fontWeight: "700", color: p2p.textPrimary, fontFamily: "Inter_700Bold" },
     noAnswerStatus: { fontSize: 15, color: p2p.textMuted, fontFamily: "Inter_400Regular", marginTop: 6 },
     noAnswerActions: { width: "100%", paddingHorizontal: 24, gap: 12 },
-    noAnswerSecondaryBtn: {
-      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-      borderWidth: 1, borderColor: p2p.surfaceBorder, borderRadius: 14, paddingVertical: 14,
-    },
     noAnswerSecondaryText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
     noAnswerPrimaryBtn: {
       flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
@@ -1162,12 +1143,6 @@ function makeStyles(p2p: P2PCallColors) {
     timerText: { color: p2p.textPrimary, fontSize: 15, fontFamily: "Inter_600SemiBold" },
     liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: p2p.accent },
     controlsRow: { flexDirection: "row", gap: 24 },
-    studyBtn: {
-      flexDirection: "row", alignItems: "center", gap: 8, marginTop: 22,
-      backgroundColor: p2p.pillBg, borderWidth: 1, borderColor: p2p.accent,
-      borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
-    },
-    studyBtnText: { color: p2p.accent, fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
     studyParticipantStrip: {
       flexDirection: "row", alignItems: "center", gap: 8,
       paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#141F19",
@@ -1184,7 +1159,6 @@ function makeStyles(p2p: P2PCallColors) {
     autoStudyRow: { flexDirection: "row", gap: 8 },
     autoStudyDismiss: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: p2p.surfaceBorder },
     autoStudyDismissText: { color: p2p.textMuted, fontSize: 12, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-    autoStudyStartBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: p2p.accent },
     autoStudyStartText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "Inter_700Bold" },
   });
 }

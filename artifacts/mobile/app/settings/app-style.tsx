@@ -99,7 +99,7 @@ export default function AppStyleScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>App Style</Text>
@@ -108,14 +108,14 @@ export default function AppStyleScreen() {
       <Text style={styles.intro}>Personalize the look and feel of your P2P Global experience.</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.chip, categoryFilter === "all" && styles.chipActive]}
           onPress={() => setCategoryFilter("all")}
         >
           <Text style={[styles.chipText, categoryFilter === "all" && styles.chipTextActive]}>All</Text>
         </TouchableOpacity>
         {CATEGORY_META.map((c) => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={c.id}
             style={[styles.chip, categoryFilter === c.id && styles.chipActive]}
             onPress={() => setCategoryFilter(c.id)}

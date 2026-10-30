@@ -10,6 +10,7 @@ import { MyP2PWidget } from "@/components/myp2p/MyP2PWidgets";
 import {
   DEFAULT_LAYOUT, loadLayout, saveLayout, visibleWidgets, moveWidget, setWidgetVisible, widgetInfo, type Layout,
 } from "@/lib/myP2P";
+import { AppButton, IconButton } from "@/components/ui";
 
 // My P2P dashboard: the person's widgets in their chosen order (Home shows
 // it; /my-p2p shows it with Customize). Widgets refresh whenever the screen
@@ -37,15 +38,9 @@ export default function MyP2PDashboard({ editable = false, onCustomize }: { edit
       <View style={s.headRow}>
         <Text style={s.heading} accessibilityRole="header">My P2P</Text>
         {editable ? (
-          <TouchableOpacity onPress={() => setEditing((e) => !e)} style={s.headBtn} accessibilityRole="button">
-            <Ionicons name={editing ? "checkmark" : "options-outline"} size={16} color={c.accentGreen} />
-            <Text style={s.headBtnText}>{editing ? "Done" : "Customize"}</Text>
-          </TouchableOpacity>
+          <AppButton label={editing ? "Done" : "Customize"} onPress={() => setEditing((e) => !e)} variant="tertiary" icon={editing ? "checkmark" : "options-outline"} />
         ) : (
-          <TouchableOpacity onPress={onCustomize ?? (() => router.push("/my-p2p" as any))} style={s.headBtn} accessibilityRole="button" accessibilityLabel="Customize My P2P">
-            <Ionicons name="options-outline" size={16} color={c.accentGreen} />
-            <Text style={s.headBtnText}>Customize</Text>
-          </TouchableOpacity>
+          <AppButton label="Customize" onPress={onCustomize ?? (() => router.push("/my-p2p" as any))} variant="tertiary" icon="options-outline" accessibilityLabel="Customize My P2P" />
         )}
       </View>
 
@@ -61,19 +56,13 @@ export default function MyP2PDashboard({ editable = false, onCustomize }: { edit
                   <Text style={s.editTitle}>{info.title}{info.required ? " · always shown" : ""}</Text>
                   <Text style={s.meta}>{info.description}</Text>
                 </View>
-                <TouchableOpacity style={s.iconBtn} disabled={i === 0} onPress={() => update(moveWidget(layout, id, -1))} accessibilityRole="button" accessibilityLabel={`Move ${info.title} up`}>
-                  <Ionicons name="arrow-up" size={18} color={i === 0 ? c.borderBeige : c.textMid} />
-                </TouchableOpacity>
-                <TouchableOpacity style={s.iconBtn} disabled={i === layout.order.length - 1} onPress={() => update(moveWidget(layout, id, 1))} accessibilityRole="button" accessibilityLabel={`Move ${info.title} down`}>
-                  <Ionicons name="arrow-down" size={18} color={i === layout.order.length - 1 ? c.borderBeige : c.textMid} />
-                </TouchableOpacity>
+                <IconButton icon="arrow-up" accessibilityLabel={`Move ${info.title} up`} onPress={() => update(moveWidget(layout, id, -1))} color={i === 0 ? c.borderBeige : c.textMid} disabled={i === 0} />
+                <IconButton icon="arrow-down" accessibilityLabel={`Move ${info.title} down`} onPress={() => update(moveWidget(layout, id, 1))} color={i === layout.order.length - 1 ? c.borderBeige : c.textMid} disabled={i === layout.order.length - 1} />
                 <Switch value={on} disabled={!!info.required} onValueChange={(v) => update(setWidgetVisible(layout, id, v))} accessibilityLabel={`Show ${info.title}`} />
               </View>
             );
           })}
-          <TouchableOpacity style={s.restore} onPress={() => update({ ...DEFAULT_LAYOUT, journalPreview: layout.journalPreview })} accessibilityRole="button">
-            <Text style={s.restoreText}>Restore the default layout</Text>
-          </TouchableOpacity>
+          <AppButton label="Restore the default layout" onPress={() => update({ ...DEFAULT_LAYOUT, journalPreview: layout.journalPreview })} variant="tertiary" style={{ alignSelf: "flex-start" }} />
         </View>
       ) : (
         <View style={[s.grid, grid.containerStyle]} onLayout={grid.onLayout}>
@@ -93,14 +82,11 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     heading: { fontSize: 18, color: c.textDark, fontFamily: "Inter_700Bold" },
-    headBtn: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, paddingHorizontal: 6 },
-    headBtnText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     grid: { flexDirection: "row", flexWrap: "wrap", rowGap: 12 },
     meta: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
     editor: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, padding: 14, gap: 6 },
     editRow: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderBeige },
     editTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    iconBtn: { width: 40, height: 44, alignItems: "center", justifyContent: "center" },
     restore: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center" },
     restoreText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
   });

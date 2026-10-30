@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { getRelatedLessons, type RelatedLesson } from "@/lib/bibleReaderApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // Core Foundation and P2P Plan lessons that study this chapter — found from
 // the Scripture references the lessons already carry (p2p_scriptures). Only
@@ -36,21 +37,19 @@ export default function RelatedLessonsSheet({ visible, book, bookName, chapter, 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close related lessons">
+      <TouchableOpacity accessibilityRole="button" style={styles.overlay} activeOpacity={1} onPress={onClose} accessibilityLabel="Close related lessons">
         <TouchableOpacity activeOpacity={1} style={styles.sheet}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} accessibilityRole="header">Lessons on this chapter</Text>
               <Text style={styles.sub}>{bookName} {chapter}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={c.textDark} />
-            </TouchableOpacity>
+            <IconButton icon="close" accessibilityLabel="Close" onPress={onClose} color={c.textDark} style={{ marginTop: -8 }} />
           </View>
           {error ? (
             <View style={styles.center}>
               <Text style={styles.muted}>{error}</Text>
-              <TouchableOpacity onPress={() => setAttempt((n) => n + 1)} style={styles.retry} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+              <AppButton label="Try again" onPress={() => setAttempt((n) => n + 1)} variant="tertiary" />
             </View>
           ) : !lessons ? (
             <View style={styles.center}><ActivityIndicator color={c.accentGreen} /></View>
@@ -86,7 +85,6 @@ function makeStyles(c: AppColors) {
     header: { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingBottom: 6 },
     title: { fontSize: 17, color: c.textDark, fontFamily: "Inter_700Bold" },
     sub: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginTop: -8 },
     center: { padding: 24, alignItems: "center", gap: 10 },
     muted: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center" },
     retry: { minHeight: 44, justifyContent: "center" },

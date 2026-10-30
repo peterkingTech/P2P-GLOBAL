@@ -15,6 +15,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { supabase } from "@/contexts/AuthContext";
 import { useLayout, MAX_CONTENT_WIDTH } from "@/hooks/useLayout";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 // Same minimum this app already enforces everywhere else a password is set
 // (app/(auth)/register.tsx and app/settings/account.tsx both use exactly
@@ -107,9 +108,7 @@ export default function ResetPasswordScreen() {
           </View>
           <Text style={styles.title}>Reset link expired</Text>
           <Text style={styles.subtitle}>This password reset link is no longer valid. Please request a new one.</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/(auth)/forgot-password")} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Request a new reset link</Text>
-          </TouchableOpacity>
+          <AppButton label="Request a new reset link" onPress={() => router.replace("/(auth)/forgot-password")} size="lg" style={{ marginTop: 8 }} palette="fixedLight" />
         </View>
       </View>
     );
@@ -124,9 +123,7 @@ export default function ResetPasswordScreen() {
           </View>
           <Text style={styles.title}>Password updated successfully</Text>
           <Text style={styles.subtitle}>You can now sign in with your new password.</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace("/(auth)/login")} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Back to Sign In</Text>
-          </TouchableOpacity>
+          <AppButton label="Back to Sign In" onPress={() => router.replace("/(auth)/login")} size="lg" style={{ marginTop: 8 }} palette="fixedLight" />
         </View>
       </View>
     );
@@ -166,7 +163,7 @@ export default function ResetPasswordScreen() {
               placeholder={`Min. ${MIN_PASSWORD_LENGTH} characters`}
               placeholderTextColor={colors.textMuted}
             />
-            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword((p) => !p)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} hitSlop={10} style={styles.eyeBtn} onPress={() => setShowPassword((p) => !p)}>
               <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color={colors.lightGreen} />
             </TouchableOpacity>
           </View>
@@ -184,15 +181,13 @@ export default function ResetPasswordScreen() {
               placeholder="Re-enter your new password"
               placeholderTextColor={colors.textMuted}
             />
-            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowConfirmPassword((p) => !p)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"} hitSlop={10} style={styles.eyeBtn} onPress={() => setShowConfirmPassword((p) => !p)}>
               <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={20} color={colors.lightGreen} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleSave} activeOpacity={0.85} disabled={saving}>
-          {saving ? <ActivityIndicator color={colors.cream} /> : <Text style={styles.primaryBtnText}>Save New Password</Text>}
-        </TouchableOpacity>
+        <AppButton label="Save New Password" onPress={handleSave} size="lg" disabled={saving} loading={saving} style={{ marginTop: 8 }} palette="fixedLight" />
       </View>
     </KeyboardAwareScrollView>
   );
@@ -230,9 +225,4 @@ const styles = StyleSheet.create({
   },
   passwordRow: { flexDirection: "row", alignItems: "center" },
   eyeBtn: { position: "absolute", right: 14 },
-  primaryBtn: {
-    backgroundColor: colors.accentGreen, borderRadius: 14, height: 54,
-    alignItems: "center", justifyContent: "center", marginTop: 8,
-  },
-  primaryBtnText: { color: colors.cream, fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

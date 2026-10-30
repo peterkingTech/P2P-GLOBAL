@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useData } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
+import { AppButton } from "@/components/ui";
 
 export default function CreateCohortScreen() {
   const insets = useSafeAreaInsets();
@@ -47,7 +48,7 @@ export default function CreateCohortScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 40, paddingHorizontal: 20 }}>
-      <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
+      <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={{ marginBottom: 16 }}>
         <Ionicons name="arrow-back" size={22} color={colors.textDark} />
       </TouchableOpacity>
       <Text style={styles.title}>Create a Small Group</Text>
@@ -75,9 +76,7 @@ export default function CreateCohortScreen() {
       <Text style={styles.label}>Max members (optional)</Text>
       <TextInput style={styles.input} value={maxMembers} onChangeText={setMaxMembers} placeholder="12" placeholderTextColor={colors.textMuted} keyboardType="number-pad" />
 
-      <TouchableOpacity style={[styles.primaryBtn, !name.trim() && styles.btnDisabled]} onPress={handleCreate} disabled={submitting || !name.trim()}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Small Group</Text>}
-      </TouchableOpacity>
+      <AppButton label="Create Small Group" onPress={handleCreate} size="lg" disabled={submitting || !name.trim()} loading={submitting} style={{ marginTop: 28 }} palette="fixedLight" />
     </ScrollView>
   );
 }
@@ -97,7 +96,4 @@ const styles = StyleSheet.create({
   },
   atPrefix: { fontSize: 14, color: colors.textMuted, fontFamily: "Inter_600SemiBold" },
   searchInput: { flex: 1, paddingVertical: 12, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },
-  primaryBtn: { backgroundColor: colors.accentGreen, borderRadius: 14, height: 50, alignItems: "center", justifyContent: "center", marginTop: 28 },
-  btnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

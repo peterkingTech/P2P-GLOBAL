@@ -60,7 +60,7 @@ export function GrowthVideoModal({
   return (
     <Modal visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.screen}>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button"
           style={[styles.closeBtn, { top: insets.top + 12 }]}
           onPress={onClose}
           hitSlop={12}

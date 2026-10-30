@@ -10,6 +10,7 @@ import { resolveMediaUpload } from "@/lib/mediaUpload";
 import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
+import { AppButton } from "@/components/ui";
 const TYPE_OPTIONS: { value: ChurchAnnouncementType; label: string }[] = [
   { value: "general", label: "General" }, { value: "bible_study", label: "Bible Study" },
   { value: "discipleship", label: "Discipleship" }, { value: "prayer", label: "Prayer" },
@@ -118,7 +119,7 @@ export default function ChurchAnnouncementsManagementScreen() {
     <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 40 : 16) }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" hitSlop={10} onPress={() => router.back()} style={styles.backBtn}><Ionicons name="arrow-back" size={22} color={colors.textDark} /></TouchableOpacity>
         <Text style={styles.headerTitle}>Manage Announcements</Text>
       </View>
 
@@ -126,10 +127,7 @@ export default function ChurchAnnouncementsManagementScreen() {
         <View style={styles.content}><Text style={styles.lockedText}>Only church leadership can manage announcements.</Text></View>
       ) : (
         <>
-          <TouchableOpacity style={styles.createBtn} onPress={() => setComposerOpen(true)}>
-            <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.createBtnText}>New Announcement</Text>
-          </TouchableOpacity>
+          <AppButton label="New Announcement" onPress={() => setComposerOpen(true)} icon="add" style={{ marginHorizontal: 16, marginTop: 16 }} palette="fixedLight" />
 
           {loading ? (
             <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
@@ -151,7 +149,7 @@ export default function ChurchAnnouncementsManagementScreen() {
                     {item.status === "scheduled" && item.publishAt ? `Publishes ${new Date(item.publishAt).toLocaleString()}` : new Date(item.createdAt).toLocaleDateString()}
                   </Text>
                   {item.status !== "archived" && (
-                    <TouchableOpacity onPress={() => handleArchive(item)}><Text style={styles.archiveText}>Archive</Text></TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => handleArchive(item)}><Text style={styles.archiveText}>Archive</Text></TouchableOpacity>
                   )}
                 </View>
               )}
@@ -167,22 +165,12 @@ export default function ChurchAnnouncementsManagementScreen() {
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
             <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
 
-            <TouchableOpacity style={styles.pickerBtn} onPress={() => setTypePickerOpen(true)}>
-              <Text style={styles.pickerBtnText}>{TYPE_OPTIONS.find((t) => t.value === announcementType)?.label}</Text>
-              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
+            <AppButton label={`${TYPE_OPTIONS.find((t) => t.value === announcementType)?.label}`} onPress={() => setTypePickerOpen(true)} variant="secondary" icon="chevron-down" iconPosition="trailing" palette="fixedLight" />
             {announcementType === "other" && (
               <TextInput style={styles.input} value={announcementTypeOther} onChangeText={setAnnouncementTypeOther} placeholder="Example: Weekly Discipleship Challenge" placeholderTextColor={colors.textMuted} />
             )}
 
-            <TouchableOpacity style={styles.mediaBtn} onPress={handlePickMedia} disabled={uploadingMedia}>
-              {uploadingMedia ? <ActivityIndicator color={colors.accentGreen} /> : (
-                <>
-                  <Ionicons name="attach" size={16} color={colors.accentGreen} />
-                  <Text style={styles.mediaBtnText}>{imageUrl || videoUrl ? "Replace media" : "Add Image or Video"}</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <AppButton label={imageUrl || videoUrl ? "Replace media" : "Add Image or Video"} onPress={handlePickMedia} variant="tertiary" size="sm" icon="attach" disabled={uploadingMedia} loading={uploadingMedia} palette="fixedLight" />
             {imageUrl && <Image source={{ uri: imageUrl }} style={styles.mediaPreview} />}
             {videoUrl && <View style={styles.videoAttachedRow}><Ionicons name="videocam" size={16} color={colors.textMid} /><Text style={styles.helperText}>Video attached</Text></View>}
 
@@ -200,23 +188,19 @@ export default function ChurchAnnouncementsManagementScreen() {
             <TextInput style={styles.input} value={expiresAt} onChangeText={setExpiresAt} placeholder="Expires (optional, YYYY-MM-DD)" placeholderTextColor={colors.textMuted} />
 
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setComposerOpen(false); resetForm(); }}>
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalPostBtn} onPress={handlePost} disabled={posting || !title.trim() || !body.trim()}>
-                {posting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalPostBtnText}>{scheduleLater ? "Schedule" : "Publish"}</Text>}
-              </TouchableOpacity>
+              <AppButton label="Cancel" onPress={() => { setComposerOpen(false); resetForm(); }} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
+              <AppButton label={scheduleLater ? "Schedule" : "Publish"} onPress={handlePost} disabled={posting || !title.trim() || !body.trim()} loading={posting} style={{ flex: 1 }} palette="fixedLight" />
             </View>
           </ScrollView>
         </View>
       </Modal>
 
       <Modal visible={typePickerOpen} animationType="slide" transparent onRequestClose={() => setTypePickerOpen(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setTypePickerOpen(false)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.modalOverlay} activeOpacity={1} onPress={() => setTypePickerOpen(false)}>
           <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>Announcement Type</Text>
             <FlatList data={TYPE_OPTIONS} keyExtractor={(o) => o.value} renderItem={({ item }) => (
-              <TouchableOpacity style={styles.optionRow} onPress={() => { setAnnouncementType(item.value); setTypePickerOpen(false); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.optionRow} onPress={() => { setAnnouncementType(item.value); setTypePickerOpen(false); }}>
                 <Text style={styles.optionRowText}>{item.label}</Text>
               </TouchableOpacity>
             )} />
@@ -234,11 +218,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark, fontFamily: "Inter_700Bold" },
   content: { padding: 16, paddingBottom: 60, gap: 10 },
   lockedText: { textAlign: "center", color: colors.textMuted, marginTop: 40, fontFamily: "Inter_400Regular" },
-  createBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    backgroundColor: colors.accentGreen, borderRadius: 10, height: 44, marginHorizontal: 16, marginTop: 16,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 13, fontFamily: "Inter_700Bold" },
   emptyText: { textAlign: "center", color: colors.textMuted, marginTop: 40, lineHeight: 20, fontFamily: "Inter_400Regular" },
   card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 12, padding: 14 },
   cardTopRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
@@ -256,23 +235,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 12, color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular",
   },
   textArea: { minHeight: 80, textAlignVertical: "top" },
-  pickerBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card,
-    borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, padding: 12,
-  },
-  pickerBtnText: { color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },
-  mediaBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
-  mediaBtnText: { color: colors.accentGreen, fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   mediaPreview: { width: "100%", height: 140, borderRadius: 10, backgroundColor: colors.card },
   videoAttachedRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   helperText: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular" },
   toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
   toggleLabel: { fontSize: 13, color: colors.textDark, fontFamily: "Inter_500Medium" },
   modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 10, marginBottom: 20 },
-  modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.borderBeige, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  modalCancelBtnText: { color: colors.textMid, fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  modalPostBtn: { flex: 1, backgroundColor: colors.accentGreen, borderRadius: 10, height: 46, alignItems: "center", justifyContent: "center" },
-  modalPostBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
   optionRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderBeige },
   optionRowText: { color: colors.textDark, fontSize: 14, fontFamily: "Inter_400Regular" },
 });

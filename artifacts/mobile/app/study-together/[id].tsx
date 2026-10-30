@@ -11,6 +11,7 @@ import {
   postStudyResponse, removeStudyResponse, cancelStudyInvite, markStudyOpened, contentRoute, responsesFor, invitationNote,
   DESTINATION_LABELS, type SharedStudy, type StudyResponse,
 } from "@/lib/studyTogetherApi";
+import { AppButton, IconButton } from "@/components/ui";
 
 // One shared study: what we're studying, where the group is (the leader's
 // shared chapter), discussion questions (the chapter's own reflection
@@ -62,7 +63,7 @@ export default function SharedStudyScreen() {
     <View style={[s.screen, s.center]}><Stack.Screen options={{ title: "Study Together" }} />
       <Ionicons name="book-outline" size={32} color={c.textMuted} />
       <Text style={s.body}>{error}</Text>
-      <TouchableOpacity style={s.btnSecondary} onPress={() => router.replace("/study-together" as any)} accessibilityRole="button"><Text style={s.btnSecondaryText}>My studies</Text></TouchableOpacity>
+      <AppButton label="My studies" onPress={() => router.replace("/study-together" as any)} variant="secondary" />
     </View>
   );
   if (!study) return <View style={[s.screen, s.center]}><Stack.Screen options={{ title: "Study Together" }} /><ActivityIndicator color={c.accentGreen} /></View>;
@@ -96,9 +97,7 @@ export default function SharedStudyScreen() {
             <Text style={s.responseMeta}>{r.mine ? "You" : r.name} · {ago(r.createdAt)}</Text>
             <Text style={s.body}>{r.body}</Text>
             {(r.mine || st.me.isLeader) ? (
-              <TouchableOpacity onPress={() => confirm("Remove this response?", "It will no longer be visible to the group.", "Remove", () => act(`rm:${r.id}`, () => removeStudyResponse(st.id, r.id)))} accessibilityRole="button" accessibilityLabel="Remove response" style={s.smallBtn}>
-                <Text style={s.smallBtnText}>Remove</Text>
-              </TouchableOpacity>
+              <AppButton label="Remove" onPress={() => confirm("Remove this response?", "It will no longer be visible to the group.", "Remove", () => act(`rm:${r.id}`, () => removeStudyResponse(st.id, r.id)))} variant="tertiary" size="sm" accessibilityLabel="Remove response" style={{ alignSelf: "flex-start" }} />
             ) : null}
           </View>
         ))}
@@ -135,12 +134,8 @@ export default function SharedStudyScreen() {
           <Text style={s.body}>You'll read at your own pace with your own progress. Your answers and reflections stay private — only responses you choose to post are shared.</Text>
           {invitationNote(st.me) ? <Text style={s.meta}>{invitationNote(st.me)}</Text> : null}
           <View style={s.row}>
-            <TouchableOpacity style={s.btn} onPress={() => act("accept", () => respondToStudy(st.id, "accepted"), "You've joined this study.")} disabled={!!busy} accessibilityRole="button">
-              {busy === "accept" ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Accept</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={s.btnSecondary} onPress={() => act("decline", async () => { await respondToStudy(st.id, "declined"); router.replace("/study-together" as any); })} disabled={!!busy} accessibilityRole="button">
-              <Text style={s.btnSecondaryText}>Decline</Text>
-            </TouchableOpacity>
+            <AppButton label="Accept" onPress={() => act("accept", () => respondToStudy(st.id, "accepted"), "You've joined this study.")} disabled={!!busy} loading={busy === "accept"} />
+            <AppButton label="Decline" onPress={() => act("decline", async () => { await respondToStudy(st.id, "declined"); router.replace("/study-together" as any); })} variant="secondary" disabled={!!busy} />
           </View>
         </View>
       ) : null}
@@ -149,18 +144,14 @@ export default function SharedStudyScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>This study has been concluded</Text>
           <Text style={s.body}>You can still read the responses. Your own progress is unchanged.</Text>
-          {st.me.isLeader ? <TouchableOpacity style={s.btnSecondary} onPress={() => act("reopen", () => reopenStudy(st.id), "The study is open again.")} accessibilityRole="button"><Text style={s.btnSecondaryText}>Continue the study</Text></TouchableOpacity> : null}
+          {st.me.isLeader ? <AppButton label="Continue the study" onPress={() => act("reopen", () => reopenStudy(st.id), "The study is open again.")} variant="secondary" /> : null}
         </View>
       ) : null}
 
       {st.me.canParticipate ? (
         <>
           <View style={s.row}>
-            <TouchableOpacity style={s.btn} disabled={!st.contentAvailable} onPress={() => router.push(contentRoute(st, current?.id) as any)} accessibilityRole="button"
-              accessibilityLabel={current ? `Read chapter ${current.number}` : "Open"}>
-              <Ionicons name="book-outline" size={16} color="#fff" />
-              <Text style={s.btnText}>{current ? `Read Chapter ${current.number}` : st.contentType === "lesson" ? "Open the lesson" : "Open the story"}</Text>
-            </TouchableOpacity>
+            <AppButton label={current ? `Read Chapter ${current.number}` : st.contentType === "lesson" ? "Open the lesson" : "Open the story"} onPress={() => router.push(contentRoute(st, current?.id) as any)} icon="book-outline" disabled={!st.contentAvailable} accessibilityLabel={current ? `Read chapter ${current.number}` : "Open"} />
           </View>
           <Text style={s.meta}>You read with your own progress — studying together doesn't mark anything complete for anyone.</Text>
 
@@ -190,7 +181,7 @@ export default function SharedStudyScreen() {
           {[...sectionPrompts, ...generalPrompts].map((p) => (
             <View key={p.id}>
               {thread({ k: `p:${p.id}`, label: p.body, list: responsesFor(st.responses, { promptId: p.id }), target: { promptId: p.id } })}
-              {st.me.isLeader ? <TouchableOpacity style={s.smallBtn} onPress={() => confirm("Remove this question?", "Its responses are removed too.", "Remove", () => act(`rp:${p.id}`, () => removeStudyPrompt(st.id, p.id)))} accessibilityRole="button"><Text style={s.smallBtnText}>Remove question</Text></TouchableOpacity> : null}
+              {st.me.isLeader ? <AppButton label="Remove question" onPress={() => confirm("Remove this question?", "Its responses are removed too.", "Remove", () => act(`rp:${p.id}`, () => removeStudyPrompt(st.id, p.id)))} variant="tertiary" size="sm" style={{ alignSelf: "flex-start" }} /> : null}
             </View>
           ))}
           {thread({ k: "general", label: "General discussion", list: responsesFor(st.responses, {}), target: {} })}
@@ -220,28 +211,22 @@ export default function SharedStudyScreen() {
                 <Text style={s.meta}>{m.status === "pending" ? "Invited — waiting for a reply" : m.lastOpenedAt ? `Opened ${ago(m.lastOpenedAt)}` : "Joined"}</Text>
               </View>
               {m.status === "pending" && st.me.isHost ? (
-                <TouchableOpacity style={s.smallBtn} onPress={() => act(`c:${m.userId}`, () => cancelStudyInvite(st.id, m.userId), "Invitation cancelled.")} accessibilityRole="button" accessibilityLabel={`Cancel invitation to ${m.name}`}><Text style={s.smallBtnText}>Cancel</Text></TouchableOpacity>
+                <AppButton label="Cancel" onPress={() => act(`c:${m.userId}`, () => cancelStudyInvite(st.id, m.userId), "Invitation cancelled.")} variant="tertiary" size="sm" accessibilityLabel={`Cancel invitation to ${m.name}`} style={{ alignSelf: "flex-start" }} />
               ) : st.destination.type === "peer" && m.status === "accepted" ? (
-                <TouchableOpacity style={s.iconBtn} onPress={() => message(m.userId)} accessibilityRole="button" accessibilityLabel={`Message ${m.name} (calls start from the chat)`}><Ionicons name="chatbubble-ellipses-outline" size={20} color={c.accentGreen} /></TouchableOpacity>
+                <IconButton icon="chatbubble-ellipses-outline" accessibilityLabel={`Message ${m.name} (calls start from the chat)`} onPress={() => message(m.userId)} color={c.accentGreen} />
               ) : null}
             </View>
           ))}
           {groupRoute ? (
-            <TouchableOpacity style={s.btnSecondary} onPress={() => router.push(groupRoute as any)} accessibilityRole="button">
-              <Text style={s.btnSecondaryText}>Open {st.destination.name ?? DESTINATION_LABELS[st.destination.type]} (chat & calls)</Text>
-            </TouchableOpacity>
+            <AppButton label={`Open ${st.destination.name ?? DESTINATION_LABELS[st.destination.type]} (chat & calls)`} onPress={() => router.push(groupRoute as any)} variant="secondary" />
           ) : null}
 
           <View style={[s.row, { marginTop: 12 }]}>
             {st.me.isLeader && active ? (
-              <TouchableOpacity style={s.btnSecondary} onPress={() => confirm("Conclude this study?", "People keep their own progress. Responses stay readable, and you can continue the study later.", "Conclude", () => act("conclude", () => concludeStudy(st.id), "Study concluded."))} accessibilityRole="button">
-                <Text style={s.btnSecondaryText}>Conclude study</Text>
-              </TouchableOpacity>
+              <AppButton label="Conclude study" onPress={() => confirm("Conclude this study?", "People keep their own progress. Responses stay readable, and you can continue the study later.", "Conclude", () => act("conclude", () => concludeStudy(st.id), "Study concluded."))} variant="secondary" />
             ) : null}
             {!st.me.isHost ? (
-              <TouchableOpacity style={s.btnSecondary} onPress={() => confirm("Leave this study?", "You'll stop seeing it. Your own progress is unchanged.", "Leave", () => act("leave", async () => { await leaveStudy(st.id); router.replace("/study-together" as any); }))} accessibilityRole="button">
-                <Text style={[s.btnSecondaryText, { color: "#B91C1C" }]}>Leave study</Text>
-              </TouchableOpacity>
+              <AppButton label="Leave study" onPress={() => confirm("Leave this study?", "You'll stop seeing it. Your own progress is unchanged.", "Leave", () => act("leave", async () => { await leaveStudy(st.id); router.replace("/study-together" as any); }))} variant="destructive" />
             ) : null}
           </View>
         </>
@@ -266,8 +251,6 @@ function makeStyles(c: AppColors) {
     row: { flexDirection: "row", gap: 8, flexWrap: "wrap", alignItems: "center" },
     btn: { flexDirection: "row", gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: 10, backgroundColor: c.primaryGreen, alignItems: "center", justifyContent: "center" },
     btnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
-    btnSecondary: { minHeight: 44, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, alignItems: "center", justifyContent: "center" },
-    btnSecondaryText: { color: c.textDark, fontSize: 14, fontFamily: "Inter_600SemiBold" },
     pill: { minWidth: 44, minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, alignItems: "center", justifyContent: "center", backgroundColor: c.lightCream },
     pillOn: { backgroundColor: c.primaryGreen, borderColor: c.primaryGreen },
     pillText: { color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -279,10 +262,7 @@ function makeStyles(c: AppColors) {
     composer: { flexDirection: "row", gap: 8, alignItems: "flex-end" },
     input: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.lightCream, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular", textAlignVertical: "top" },
     sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryGreen, alignItems: "center", justifyContent: "center" },
-    smallBtn: { alignSelf: "flex-start", minHeight: 32, justifyContent: "center", paddingHorizontal: 4 },
-    smallBtnText: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
     member: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52 },
     name: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   });
 }
