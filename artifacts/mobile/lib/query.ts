@@ -33,6 +33,8 @@ export const qk = {
   plan: (id: string, userId: string | null | undefined) => ["plan", id, userId ?? "anon"] as const,
   curriculumCatalog: (userId: string | null | undefined) => ["curriculum-catalog", userId ?? "anon"] as const,
   bibleTranslations: () => ["bible", "translations"] as const,
+  myStudies: () => ["study-together", "mine"] as const,
+  learningOverview: () => ["learning-centre", "overview"] as const,
 };
 
 /**

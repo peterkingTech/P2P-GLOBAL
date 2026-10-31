@@ -98,6 +98,17 @@ ok("learning centre: loading, empty and failure states", learn.includes("Loading
 ok("learning centre: still the tab (reselect scrolls to top; iPad capsule inset)", learn.includes('useScrollToTopOnTabReselect("learn"') && learn.includes("useTabCapsuleTopInset"));
 const hub = src("components/LearningHub.tsx");
 ok("explore learning: exactly the four destinations", (hub.match(/\{ key: "/g) ?? []).length === 4 && ["/kingdom-school", "/kingdom-stories", "/bible-study", "/study-together"].every((r) => hub.includes(`route: "${r}"`)));
+// Learning Centre redesign (2026-11-01): reusable cards, real data, shared cache.
+const cards = src("components/learning/LearningCards.tsx");
+ok("learning centre: reusable featured, compact, category and progress-stat cards", ["export function FeaturedLearningCard", "export function CompactLearningCard", "export function CategoryCard", "export function ProgressStat", "export function LearningArt"].every((x) => cards.includes(x))
+  && learn.includes("<FeaturedLearningCard") && learn.includes("<CompactLearningCard") && learn.includes("<ProgressStat") && hub.includes("<CategoryCard"));
+ok("learning centre: personal header from the real profile and real counts", learn.includes("profile?.displayName") && learn.includes("overview?.toDo.length") && !/mock|placeholder|lorem/i.test(learn + cards + hub));
+ok("learning centre: stories home is the SAME cached copy Kingdom Stories uses (no second fetch)", learn.includes("loadCached(qk.storiesHome(), () => getDiscoverHome()") && src("app/kingdom-stories/index.tsx").includes("loadCached(qk.storiesHome()"));
+ok("learning centre: studies and Comprehensive Checks show from memory, always refreshed", /loadCached\(qk\.myStudies\(\), \(\) => getMyStudies\(\), \{ fresh: true \}\)/.test(learn) && /loadCached\(qk\.learningOverview\(\), \(\) => getLearningOverview\(\), \{ fresh: true \}\)/.test(learn) && learn.includes("peekCached<LearningOverview>(qk.learningOverview())"));
+ok("learning centre: explore cards make no requests of their own", !/fetch\(|apiRequest|loadCached|get[A-Z]\w+\(\)/.test(hub));
+ok("learning centre: cards are accessible buttons; labels wrap instead of cutting off", (cards.match(/accessibilityRole="button"/g) ?? []).length >= 3 && /categoryTitle[^\n]*numberOfLines=\{2\}/.test(cards) && /statLabel[^\n]*numberOfLines=\{2\}/.test(cards));
+ok("learning centre: theme tokens only (works in every theme and dark mode)", !/#[0-9A-Fa-f]{6}/.test(learn) && (cards.match(/#[0-9A-Fa-f]{6}/g) ?? []).length === 0);
+ok("learning centre: responsive (tablet/web layout) and safe areas kept", learn.includes("columns={wide ? 2 : 1}") && learn.includes("insets.bottom + 100") && learn.includes("useTabCapsuleTopInset"));
 const school = src("app/kingdom-school.tsx");
 ok("kingdom school: its own screen with the same dashboard, splash, Foundations and plans", school.includes("<KingdomSchoolCards") && school.includes("KingdomSchoolSplash") && school.includes("getCurriculumCatalog") && school.includes("recordFoundationCompletion") && school.includes("Back to Learning Centre"));
 ok("kingdom school: links to assigned work and Comprehensive Checks (My Learning)", school.includes('router.push("/learning" as any)') && school.includes("Assigned Work & Comprehensive Checks"));
