@@ -21,6 +21,8 @@ import { sharePlan } from "@/lib/sharing";
 import { useLayout, useCardPhotoWidth, centeredMaxWidth, useFullScreenPhotoHeight } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import ContentImage from "@/components/media/ContentImage";
+import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
+import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 
 const COVER_HEIGHT = 200;
 
@@ -38,6 +40,8 @@ type PlanDetail = {
   teachingCreditLocation: string | null; teachingCreditYoutube: string | null; teachingCreditInstagram: string | null;
   topicNumber: number | null; category: PlanCategoryRef | null;
   modules: PlanModuleDetail[];
+  /** Language the overview is showing in (client-side): "en" until a translation replaces it. */
+  textLanguage?: string;
 };
 type LockedPlanInfo = { locked: true; title: string; unlockMessage: string; previousPlanId: string | null; previousPlanTitle: string | null };
 
@@ -93,6 +97,7 @@ export default function PlanDetailScreen() {
               title: t.title ?? prev.title,
               description: t.description ?? prev.description,
               subtitle: t.subtitle ?? prev.subtitle,
+              textLanguage: t.description || !prev.description ? language : prev.textLanguage,
             } : prev);
           })
           .catch(() => { /* keep English */ });
@@ -125,6 +130,28 @@ export default function PlanDetailScreen() {
   // reflect the new progress percentage immediately, and re-checks lock
   // status in case completing that lesson just unlocked this very plan.
   useFocusEffect(useCallback(() => { loadPlan(); }, [loadPlan]));
+
+  // Listen to the plan's overview (the shared player). Its lessons open the
+  // lesson screen, which has its own Listen; nothing here changes progress.
+  useListenOwner("plan");
+  const listenState = useListenState();
+  const planListenKey = plan ? `plan:${plan.id}:${plan.textLanguage ?? "en"}` : "";
+  const listeningPlan = !!plan && listenState.content?.key === planListenKey && listenState.status !== "idle";
+  const onListenPlan = () => {
+    if (!plan?.description?.trim()) return;
+    if (listeningPlan) return listen.present();
+    void listen.play({
+      key: planListenKey, owner: "plan", kind: "plan", highlight: "sentence", title: plan.title, subtitle: "Overview", language: plan.textLanguage ?? "en",
+      artwork: plan.coverImageUrl ? { uri: plan.coverImageUrl } : null,
+      completionActions: [{ label: "Back to the plan", icon: "list-outline", open: () => {} }],
+      // Announced: the plan's title, then "Overview" (in the text's language), then the overview.
+      sections: [{ id: "overview", title: "Overview", parts: [
+        { key: "title", text: `${plan.title}.${plan.subtitle ? ` ${plan.subtitle}.` : ""}` },
+        ...(() => { const o = spokenLabels(plan.textLanguage ?? "en").overview; return o ? [{ key: "label", text: `${o}.` }] : []; })(),
+        ...plan.description.split(/\n\s*\n/).map((p, i) => ({ key: `d${i}`, text: p })),
+      ] }],
+    }, "saved");
+  };
 
   // Opened from a shared link (cold start) there's no screen to go back to;
   // fall back to Home instead of a back button that does nothing.
@@ -258,6 +285,9 @@ export default function PlanDetailScreen() {
           {plan.description ? (
             <View style={styles.overviewBlock}>
               <Text style={styles.sectionHeading}>Overview</Text>
+              <View style={{ alignItems: "flex-start", marginBottom: 8 }}>
+                <ListenButton onPress={onListenPlan} label={listeningPlan ? "Open Read & Listen" : "Listen to the overview"} />
+              </View>
               <Text style={styles.overviewText}>{plan.description}</Text>
             </View>
           ) : null}
@@ -327,6 +357,7 @@ export default function PlanDetailScreen() {
           )}
         </View>
       </ScrollView>
+      <ListenPlayer owner="plan" bottomInset={insets.bottom} />
     </View>
   );
 }

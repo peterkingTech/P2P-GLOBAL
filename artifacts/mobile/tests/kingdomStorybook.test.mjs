@@ -38,7 +38,8 @@ const bible = load("lib/bibleReaderApi.ts", {
   "@/lib/apiUrl": { getApiUrl: () => "http://api.test/api" },
   "@/lib/bibleBooks": books,
 });
-const SB = load("lib/storybook.ts", { "@/lib/bibleReaderApi": bible });
+const listenLabels = load("lib/listen/labels.ts", {});
+const SB = load("lib/storybook.ts", { "@/lib/bibleReaderApi": bible, "@/lib/listen/labels": listenLabels, "@/lib/listen/lessonContent": load("lib/listen/lessonContent.ts", { "./labels": listenLabels }) });
 const T = load("lib/terminology.ts", {});
 
 // ── A. Scripture → P2P Bible targets ─────────────────────────────────────

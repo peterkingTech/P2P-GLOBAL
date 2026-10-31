@@ -30,6 +30,26 @@ import { LINE_HEIGHT, loadPosition, savePosition, useBibleReadingPrefs } from "@
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppButton, IconButton } from "@/components/ui";
+import { BIBLE_COVER } from "@/constants/artwork";
+import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
+import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent, type ListenSection, type StartAt } from "@/lib/listen";
+
+/**
+ * The spoken heading of a Bible passage, in the translation's language: the
+ * book as the translation names it and "Chapter N" (English selections also
+ * name their verses — lib/listen/pronounce says "chapter 3, verses 16 to 18").
+ * A language without a "chapter" label gets no heading rather than English.
+ */
+function bibleAnnouncement(d: BibleChapter, language: string, part?: { start: number; end: number }): ListenSection[] {
+  const chapter = spokenLabels(language).chapter(d.chapter);
+  if (!chapter) return [];
+  const english = language.toLowerCase().startsWith("en");
+  // "Proverbs Chapter 1." — every chapter, including one the listener moves on to.
+  const text = part && english
+    ? `${d.book.name} ${d.chapter}:${part.start}${part.end > part.start ? `–${part.end}` : ""}.`
+    : `${d.book.name} ${chapter}.`;
+  return [{ id: "heading", title: `${d.book.name} ${d.chapter}`, parts: [{ key: "heading", text }] }];
+}
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -208,6 +228,86 @@ export default function BibleReaderScreen() {
     setSheet(null);
     setLoc((prev) => ({ t: extra?.t ?? prev?.t ?? "", book: bookCode, chapter, v: extra?.v, ve: extra?.ve }));
   }, []);
+
+  // ── Listen (the shared player, read by the phone's own voice) ─────────────
+  // Only the licensed text already on screen is spoken: verse by verse, no
+  // verse numbers, headings or interface words; the displayed text is never
+  // changed. The voice follows the TRANSLATION's language — never a silent
+  // switch to another language (the player explains and lets the reader choose).
+  useListenOwner("bible");
+  const listenState = useListenState();
+  const listening = listenState.content?.owner === "bible" && listenState.status !== "idle" ? listenState : null;
+  const autoListen = useRef<StartAt | null>(null);
+  const chapterListenKey = (d: BibleChapter) => `bible:${d.translation.code}:${d.book.code}.${d.chapter}`;
+  const listenContent = useCallback((d: BibleChapter, part?: { start: number; end: number }): ListenContent | null => {
+    const language = translations?.find((t) => t.code === d.translation.code)?.language;
+    if (!language) return null;
+    const b = bookByCode(d.book.code);
+    const verses = part ? d.verses.filter((v) => v.verse >= part.start && v.verse <= part.end) : d.verses;
+    // Moving on is the listener's choice (a button in the player) — never automatic.
+    const link = (to: { bookCode: string; chapter: number } | null) => to && !part
+      ? { label: formatRef(bookByCode(to.bookCode), to.chapter), open: () => { autoListen.current = "start"; go(to.bookCode, to.chapter); } }
+      : null;
+    return {
+      key: part ? `${chapterListenKey(d)}:${part.start}-${part.end}` : chapterListenKey(d),
+      owner: "bible",
+      kind: "bible",
+      highlight: "part",
+      artwork: BIBLE_COVER,
+      completionActions: [
+        { label: "Return to reading", icon: "book-outline", open: () => {} },
+        { label: "Choose another passage", icon: "list-outline", open: () => setSheet("books") },
+      ],
+      title: formatRef(b, d.chapter, part?.start, part?.end),
+      subtitle: d.translation.name,
+      language,
+      // First, where we are ("John, Chapter 3" / "John 3:16–18", said as chapter
+      // and verses); then the verses, one part each — no verse numbers.
+      sections: [
+        ...bibleAnnouncement(d, language, part),
+        ...verses.map((v) => ({ id: String(v.verse), title: `Verse ${v.verse}`, parts: [{ key: String(v.verse), text: v.text }] })),
+      ],
+      previous: link(d.previous),
+      next: link(d.next),
+      resumeGroup: part ? undefined : "bible",
+      meta: { t: d.translation.code, book: d.book.code, chapter: d.chapter },
+    };
+  }, [translations, go]);
+  const startListening = (d: BibleChapter, at: StartAt, part?: { start: number; end: number }) => {
+    const content = listenContent(d, part);
+    if (!content) return flash("Listening isn't available for this translation yet.");
+    void listen.play(content, at);
+  };
+  // The listener chose another chapter in the player: once it has loaded, listen from its start.
+  useEffect(() => {
+    if (data && autoListen.current) { const at = autoListen.current; autoListen.current = null; startListening(data, at); }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listeningHere = !!listening && !!data && listening.content!.key.startsWith(chapterListenKey(data));
+  const speakingVerse = listeningHere && listening!.partKey ? Number(listening!.partKey) : null;
+  const onListenChapter = () => {
+    if (!data) return;
+    if (listening && listening.content!.key === chapterListenKey(data)) return listen.present();
+    startListening(data, "saved");
+  };
+  // Selected verses: inside the chapter being listened to, continue from there;
+  // otherwise read just the selection.
+  const onListenSelection = () => {
+    if (!data || !sel) return;
+    if (listening && listening.content!.key === chapterListenKey(data)) listen.seekPart(String(sel.start));
+    else startListening(data, "start", sel);
+    setRange(null); anchorRef.current = null;
+  };
+  // "Continue listening" — the last chapter listened to, if it isn't this one.
+  const [lastHeard, setLastHeard] = useState<{ label: string; t: string; book: string; chapter: number; verse: number } | null>(null);
+  useEffect(() => {
+    if (sheet !== "menu") return;
+    listen.lastListened("bible").then((l) => {
+      const b = bookByCode(String(l?.meta.book ?? ""));
+      const ch = Number(l?.meta.chapter);
+      if (!l || !b || !ch) return setLastHeard(null);
+      setLastHeard({ label: `${formatRef(b, ch, Number(l.partKey) || undefined)} (${l.meta.t})`, t: String(l.meta.t), book: b.code, chapter: ch, verse: Number(l.partKey) || 1 });
+    }).catch(() => setLastHeard(null));
+  }, [sheet]);
 
   // ── Verse-level maps ──────────────────────────────────────────────────────
   const hlByVerse = useMemo(() => {
@@ -437,6 +537,10 @@ export default function BibleReaderScreen() {
         accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
         <Ionicons name={compare.length ? "git-compare" : "git-compare-outline"} size={21} color={compare.length ? c.accentGreen : c.textDark} />
       </TouchableOpacity>
+      {!compare.length && data && (
+        <ListenButton compact active={listeningHere && listening!.status === "playing"} onPress={onListenChapter}
+          label={listeningHere ? "Open Read & Listen" : `Listen to ${formatRef(bookByCode(data.book.code), data.chapter)}`} />
+      )}
       <IconButton icon="search" accessibilityLabel="Search the Bible" onPress={() => router.push({ pathname: "/bible/search", params: { t: loc?.t ?? "" } } as any)} color={c.textDark} />
       <IconButton icon="ellipsis-horizontal" accessibilityLabel="More options" onPress={() => setSheet("menu")} color={c.textDark} />
     </View>
@@ -500,6 +604,7 @@ export default function BibleReaderScreen() {
                     accessibilityRole={textMode ? "text" : INLINE_BUTTON_ROLE} accessibilityState={{ selected }}
                     accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
                     {notedVerses.has(v.verse) && <Text style={{ fontSize: Math.round(fontSize * 0.95) }}><Ionicons name="document-text" size={Math.round(fontSize * 0.95)} color={card ? card.ink : c.textMid} />{"\u00A0"}</Text>}
+                    {speakingVerse === v.verse && <Text accessibilityLabel="Being read aloud"><Ionicons name="volume-medium" size={Math.round(fontSize * 0.9)} color={card ? card.ink : c.accentGreen} />{" "}</Text>}
                     {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }, card && { color: card.ink, opacity: 0.75 }]}>{v.verse}{"\u00A0"}</Text>}
                     {runs.map((run) => !textMode
                       ? <Text key={run.start} style={runStyle(run)}>{run.text}</Text>
@@ -552,6 +657,7 @@ export default function BibleReaderScreen() {
       )}
       {loading && data ? <View style={styles.loadingBar}><ActivityIndicator size="small" color={c.accentGreen} /></View> : null}
       <View style={{ flex: 1 }}>{body}</View>
+      {!focus && <ListenPlayer owner="bible" bottomInset={insets.bottom} />}
 
       {focus && (
         <TouchableOpacity style={[styles.exitFocus, { top: insets.top + 8 }]} onPress={() => setFocus(false)} accessibilityRole="button" accessibilityLabel="Exit focus mode">
@@ -613,6 +719,7 @@ export default function BibleReaderScreen() {
           <View style={styles.actions}>
             <Action styles={styles} c={c} icon={selNote ? "create" : "create-outline"} label={selNote ? "Edit note" : "Note"} onPress={() => openNote(selNote)} />
             <Action styles={styles} c={c} icon={selBookmark ? "bookmark" : "bookmark-outline"} label={selBookmark ? "Saved" : "Save"} onPress={onSave} disabled={busy} />
+            <Action styles={styles} c={c} icon="headset-outline" label={listeningHere && listening!.content!.key === (data ? chapterListenKey(data) : "") ? "Listen here" : "Listen"} onPress={onListenSelection} />
             <Action styles={styles} c={c} icon="copy-outline" label="Copy" onPress={onCopy} />
             <Action styles={styles} c={c} icon={Platform.OS === "ios" ? "share-outline" : "share-social-outline"} label="Share" onPress={onShare} />
             <Action styles={styles} c={c} icon="school-outline" label="Lessons" onPress={() => setSheet("related")} />
@@ -622,13 +729,13 @@ export default function BibleReaderScreen() {
       )}
 
       {undo && !sel ? (
-        <View style={[styles.undoBar, { bottom: 24 + insets.bottom }]} accessibilityLiveRegion="polite">
+        <View style={[styles.undoBar, { bottom: 24 + insets.bottom + (listening && !focus ? 64 : 0) }]} accessibilityLiveRegion="polite">
           <Text style={styles.undoText}>{undo.label}</Text>
           <TouchableOpacity onPress={onUndo} disabled={busy} accessibilityRole="button" accessibilityLabel="Undo"><Text style={styles.undoBtn}>Undo</Text></TouchableOpacity>
         </View>
       ) : null}
       {data && !sel && !undo && !focus && mode !== "verse" ? (
-        <TouchableOpacity style={[styles.modePill, { bottom: 24 + insets.bottom }]} onPress={() => setModeSheet(true)} accessibilityRole="button" accessibilityLabel={`Selecting by ${MODES.find((m) => m.key === mode)!.label}. Change`}>
+        <TouchableOpacity style={[styles.modePill, { bottom: 24 + insets.bottom + (listening && !focus ? 64 : 0) }]} onPress={() => setModeSheet(true)} accessibilityRole="button" accessibilityLabel={`Selecting by ${MODES.find((m) => m.key === mode)!.label}. Change`}>
           <Ionicons name="text-outline" size={14} color={c.textDark} />
           <Text style={styles.modePillText}>{MODES.find((m) => m.key === mode)!.label}: {MODES.find((m) => m.key === mode)!.hint.toLowerCase()}</Text>
         </TouchableOpacity>
@@ -647,7 +754,7 @@ export default function BibleReaderScreen() {
       </Modal>
 
       {toast && (
-        <View style={[styles.toast, { bottom: (sel ? 190 : 24) + insets.bottom }]} pointerEvents="none" accessibilityLiveRegion="polite">
+        <View style={[styles.toast, { bottom: (sel ? 190 : 24 + (listening && !focus ? 64 : 0)) + insets.bottom }]} pointerEvents="none" accessibilityLiveRegion="polite">
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       )}
@@ -656,6 +763,13 @@ export default function BibleReaderScreen() {
       <Modal visible={sheet === "menu"} transparent animationType="fade" onRequestClose={() => setSheet(null)}>
         <TouchableOpacity accessibilityRole="button" style={styles.menuOverlay} activeOpacity={1} onPress={() => setSheet(null)} accessibilityLabel="Close menu">
           <View style={[styles.menu, { top: insets.top + 52 }]}>
+            {lastHeard && !(data && lastHeard.book === data.book.code && lastHeard.chapter === data.chapter && lastHeard.t === data.translation.code && listeningHere) && (
+              <MenuItem styles={styles} c={c} icon="headset-outline" label={`Continue listening: ${lastHeard.label}`} onPress={() => {
+                setSheet(null);
+                if (data && lastHeard.book === data.book.code && lastHeard.chapter === data.chapter && lastHeard.t === data.translation.code) startListening(data, "saved");
+                else { autoListen.current = "saved"; go(lastHeard.book, lastHeard.chapter, { t: lastHeard.t, v: lastHeard.verse }); }
+              }} />
+            )}
             <MenuItem styles={styles} c={c} icon="library-outline" label="My notes & highlights" onPress={() => { setSheet(null); router.push("/bible/library" as any); }} />
             <MenuItem styles={styles} c={c} icon="school-outline" label="Lessons on this chapter" onPress={() => setSheet("related")} />
             <MenuItem styles={styles} c={c} icon="git-compare-outline" label={compare.length ? "Compare translations (on)" : "Compare translations"} onPress={() => setSheet("compare")} />

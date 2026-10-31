@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -42,6 +42,9 @@ import ReadableText from "@/components/ReadableText";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import { useActiveGathering } from "@/lib/activeGathering";
 import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
+import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
+import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
+import { lessonListenSections } from "@/lib/listen/lessonContent";
 import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
@@ -53,6 +56,8 @@ interface LessonContent {
   scriptures: { id: string; reference: string; verse: string }[];
   questions: { id: string; question: string }[];
   attribution?: string;
+  /** Language the shown text is in: "en" until a translation replaces it. */
+  language?: string;
 }
 
 // ── Submission type tab selector ──────────────────────────────────────────────
@@ -702,6 +707,7 @@ export default function LessonScreen() {
           questions: ((data.questions ?? []) as Record<string, unknown>[]).map((q) => ({
             id: q.id as string, question: q.question as string,
           })),
+          language: contentLanguage,
         } : prev);
       } catch {
         // Network-level failure — silently keep showing English, no error surfaced.
@@ -713,6 +719,54 @@ export default function LessonScreen() {
 
     return () => { cancelled = true; clearTimeout(bannerTimer); };
   }, [id, contentLanguage]);
+
+  // Listen: the shared player reads the lesson as shown (lib/listen/lessonContent),
+  // in the language the text is actually showing in — including the discussion
+  // and Comprehensive Check QUESTIONS, never anyone's answers. Listening never
+  // completes the lesson: that still takes the normal answers and submissions.
+  useListenOwner("lesson");
+  const listenState = useListenState();
+  const textLanguage = content?.language ?? "en";
+  const listenSections = useMemo(() => content ? lessonListenSections({
+    title: content.title,
+    // A verse is read in full only when its shown wording is in the lesson's language.
+    scriptures: content.scriptures.map((s) => {
+      const fetched = verseTexts.get(s.id)?.text;
+      const text = textLanguage === "en" ? s.verse : fetched ?? null;
+      return { id: s.id, reference: s.reference, text };
+    }),
+    sections: content.sections,
+    // Announced as on screen ("Personal Reflections", "Comprehensive Check",
+    // "Question 1") in the text's language; a check's own English title only for English text.
+    questionGroups: [
+      { id: "discussion", kind: "reflections", title: t("lesson.discussionQuestions"), questions: content.questions },
+      ...(assignment ? [{ id: "check", kind: "check" as const, title: checkTitle(assignment.title), name: textLanguage === "en" ? checkTitle(assignment.title) : null, questions: assignmentQuestions }] : []),
+    ],
+  }, spokenLabels(textLanguage)) : [], [content, verseTexts, textLanguage, assignment, assignmentQuestions, t]);
+  const listenKey = `lesson:${id}:${textLanguage}`;
+  const listeningHere = listenState.content?.key === listenKey && listenState.status !== "idle";
+  const onListen = () => {
+    if (!content || !listenSections.length) return;
+    if (listeningHere) return listen.present();
+    const hasReflections = content.questions.some((q) => q.question?.trim());
+    const hasCheck = !!assignment && assignmentQuestions.length > 0;
+    void listen.play({
+      key: listenKey, owner: "lesson", kind: "lesson", highlight: "sentence", title: content.title, subtitle: "Lesson", language: textLanguage, sections: listenSections,
+      // The lesson's next step on this screen, chosen by the learner — never skipped, never automatic.
+      completionActions: [
+        ...(hasReflections ? [{ label: "Continue to Personal Reflections", icon: "create-outline", open: () => scrollToLessonPart("reflections") }] : []),
+        ...(hasCheck ? [{ label: "Continue to Comprehensive Check", icon: "clipboard-outline", open: () => scrollToLessonPart("check") }] : []),
+        ...(!hasReflections && !hasCheck ? [{ label: "Return to the lesson", icon: "book-outline", open: () => {} }] : []),
+      ],
+    }, "saved");
+  };
+  // Where Personal Reflections / the Comprehensive Check sit, for "Continue to …" after listening.
+  const lessonScrollRef = useRef<ScrollView>(null);
+  const lessonPartY = useRef<{ reflections?: number; check?: number }>({});
+  const scrollToLessonPart = (key: "reflections" | "check") => {
+    const y = lessonPartY.current[key];
+    if (y != null) setTimeout(() => lessonScrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true }), 350);
+  };
 
   // Load assignment + question submissions. Exposed via useCallback so it can
   // also be re-run after a fresh submit (to pick up the real evaluation status
@@ -840,7 +894,7 @@ export default function LessonScreen() {
       {isLoading || !content ? (
         <View style={styles.loadingContainer}><ActivityIndicator color={colors.accentGreen} /></View>
       ) : (
-        <ScrollView
+        <ScrollView ref={lessonScrollRef}
           contentContainerStyle={[
             styles.content,
             { paddingBottom: insets.bottom + 40 },
@@ -856,6 +910,11 @@ export default function LessonScreen() {
           ) : null}
 
           <Text style={styles.lessonTitle}>{content.title}</Text>
+          {listenSections.length > 0 && (
+            <View style={{ alignItems: "flex-start", marginBottom: 12 }}>
+              <ListenButton onPress={onListen} label={listeningHere ? "Open Read & Listen" : "Listen to this lesson"} />
+            </View>
+          )}
 
           {content.scriptures.map((s) => {
             const fetched = verseTexts.get(s.id);
@@ -912,7 +971,7 @@ export default function LessonScreen() {
           ))}
 
           {content.questions.length > 0 && (
-            <View style={styles.questionsCard}>
+            <View style={styles.questionsCard} onLayout={(e) => { lessonPartY.current.reflections = e.nativeEvent.layout.y; }}>
               <View style={styles.questionsHeader}>
                 <Ionicons name="people" size={16} color={colors.accentGreen} />
                 <Text style={styles.questionsTitle}>{t("lesson.discussionQuestions")}</Text>
@@ -930,7 +989,7 @@ export default function LessonScreen() {
           )}
 
           {assignment && assignmentQuestions.length > 0 && (
-            <View style={styles.questionsCard}>
+            <View style={styles.questionsCard} onLayout={(e) => { lessonPartY.current.check = e.nativeEvent.layout.y; }}>
               <View style={styles.questionsHeader}>
                 <Ionicons name="create" size={16} color={colors.accentGreen} />
                 <Text style={styles.questionsTitle}>{checkTitle(assignment.title)}</Text>
@@ -999,6 +1058,7 @@ export default function LessonScreen() {
           ) : null}
         </ScrollView>
       )}
+      <ListenPlayer owner="lesson" bottomInset={insets.bottom} />
 
       <StudyPartnerPicker
         visible={studyPickerOpen}

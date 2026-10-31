@@ -3,6 +3,9 @@
 // book paragraphs, chapter status wording, reading progress.
 import { readerTarget } from "@/lib/bibleReaderApi";
 import type { ChapterState, KingdomStoryChapter, StoryProgress } from "@/lib/kingdomStoriesApi";
+import type { ListenSection } from "@/lib/listen/chunking";
+import { questionSections } from "@/lib/listen/lessonContent";
+import { NO_LABELS, type SpokenLabels } from "@/lib/listen/labels";
 
 export interface ScriptureLink {
   label: string;
@@ -106,6 +109,65 @@ export function storyIntro(body: string): { theme: string | null; scripture: str
     else rest.push(p);
   }
   return { theme, scripture, paragraphs: rest };
+}
+
+// ── Listen (the shared player): the words as shown, nothing added ────────────
+const spokenParagraph = (p: string) => {
+  const pk = paragraphKind(p);
+  return pk.kind === "heading" ? pk.text : pk.kind === "numbered" ? `${pk.number}. ${pk.text}` : pk.kind === "labelled" ? `${pk.label}: ${pk.text}` : pk.text;
+};
+
+/**
+ * A chapter as speakable sections, each announced so a listener knows where
+ * they are: "Chapter 1: <title>", the narrative split at its sub-headings
+ * (each paragraph a part), "Story Lessons" ("Lesson 1. …"), then "Personal
+ * Reflections" and "Comprehensive Check" with each question announced —
+ * QUESTIONS only, never anyone's answers. Hearing them answers nothing; the
+ * chapter finishes only as it does today.
+ */
+export function chapterListenSections(
+  ch: Pick<KingdomStoryChapter, "chapterNumber" | "title" | "narrative" | "lessons">,
+  questions?: { reflections: { id: string; question: string }[]; check: { title: string; questions: { id: string; question: string }[] } | null },
+  labels: SpokenLabels = NO_LABELS,
+  /** The story's name, said first ("Ruth. Chapter 2: …") so every chapter announces where it is. */
+  storyTitle?: string | null,
+): ListenSection[] {
+  const chapterLabel = labels.chapter(ch.chapterNumber);
+  const heading = chapterLabel ? `${chapterLabel}: ${ch.title}.` : `${ch.chapterNumber}. ${ch.title}.`;
+  const out: ListenSection[] = [{ id: "title", title: "Chapter title", parts: [
+    ...(storyTitle?.trim() ? [{ key: "story", text: `${storyTitle.trim().replace(/[.!?]$/, "")}.` }] : []),
+    { key: "title", text: heading },
+  ] }];
+  let current: ListenSection | null = null;
+  paragraphs(ch.narrative).forEach((p, i) => {
+    const pk = paragraphKind(p);
+    if (pk.kind === "heading" || !current) {
+      current = { id: `p${i}`, title: pk.kind === "heading" ? pk.text : "The story", parts: [] };
+      out.push(current);
+    }
+    current.parts.push({ key: `p${i}`, text: spokenParagraph(p) });
+  });
+  const lessons = (ch.lessons ?? []).filter((l) => l && l.trim());
+  if (lessons.length) out.push({ id: "lessons", title: "Story Lessons", parts: [
+    ...(labels.storyLessons ? [{ key: "lessons", text: `${labels.storyLessons}.` }] : []),
+    ...lessons.map((l, i) => ({ key: `lesson${i}`, text: `${labels.lessonItem(i + 1) ?? i + 1}. ${l}` })),
+  ] });
+  out.push(...questionSections([
+    { id: "reflection", kind: "reflections", title: "Personal Reflections", questions: questions?.reflections ?? [] },
+    ...(questions?.check ? [{ id: "check", kind: "check" as const, title: questions.check.title, name: questions.check.title, questions: questions.check.questions }] : []),
+  ], labels));
+  return out;
+}
+
+/** The story's introduction (announced, then title, subtitle, opening paragraphs) — empty when it has none. */
+export function introListenSections(story: { title: string; subtitle: string | null; body: string }, labels: SpokenLabels = NO_LABELS): ListenSection[] {
+  const intro = storyIntro(story.body ?? "");
+  if (!intro.paragraphs.length) return [];
+  return [{ id: "intro", title: "Introduction", parts: [
+    ...(labels.introduction ? [{ key: "label", text: `${labels.introduction}.` }] : []),
+    { key: "title", text: `${story.title}.${story.subtitle ? ` ${story.subtitle}.` : ""}` },
+    ...intro.paragraphs.map((p, i) => ({ key: `p${i}`, text: spokenParagraph(p) })),
+  ] }];
 }
 
 export const STATE_LABEL: Record<ChapterState, string> = {

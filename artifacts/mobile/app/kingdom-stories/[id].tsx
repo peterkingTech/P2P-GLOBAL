@@ -10,7 +10,9 @@ import ShareStorySheet from "@/components/kingdom-stories/ShareStorySheet";
 import SharedStudySheet from "@/components/study/SharedStudySheet";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
-import { storyIntro, progressSummary, STATE_LABEL, lockedMessage } from "@/lib/storybook";
+import { storyIntro, progressSummary, STATE_LABEL, lockedMessage, introListenSections } from "@/lib/storybook";
+import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
+import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips } from "@/components/kingdom-stories/ScriptureLinks";
 import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
@@ -71,6 +73,25 @@ export default function KingdomStoryBookScreen() {
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]));
+
+  // Listen to the introduction (the shared player; the chapters have their own).
+  useListenOwner("story-intro");
+  const listenState = useListenState();
+  const introSections = story ? introListenSections(story, spokenLabels("en")) : [];
+  const introKey = story ? `story-intro:${story.id}` : "";
+  const listeningIntro = !!story && listenState.content?.key === introKey && listenState.status !== "idle";
+  const onListenIntro = () => {
+    if (!story || !introSections.length) return;
+    if (listeningIntro) return listen.present();
+    const first = [...(story.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber).find((x) => x.learning?.state !== "locked");
+    void listen.play({
+      key: introKey, owner: "story-intro", kind: "story-intro", highlight: "sentence", title: story.title, subtitle: "Introduction", language: "en", sections: introSections,
+      // The next learning step, chosen by the reader — never opened automatically.
+      completionActions: first
+        ? [{ label: `Start Chapter ${first.chapterNumber}`, icon: "book-outline", open: () => router.push({ pathname: "/kingdom-stories/chapter", params: { id: story.id, chapter: first.id } } as any) }]
+        : [{ label: "Return to the story", icon: "book-outline", open: () => {} }],
+    }, "saved");
+  };
 
   if (loading) return <View style={[s.screen, s.center]}><Stack.Screen options={{ headerShown: false }} /><ActivityIndicator color={c.accentGreen} /></View>;
   if (!story) return <View style={[s.screen, s.center]}><Stack.Screen options={{ headerShown: false }} /><Text style={s.muted}>This story isn't available.</Text></View>;
@@ -190,6 +211,11 @@ export default function KingdomStoryBookScreen() {
           {(intro.theme || intro.scripture.length > 0 || intro.paragraphs.length > 0) && (
             <View style={s.section}>
               <Text style={s.sectionLabel}>Introduction</Text>
+              {introSections.length > 0 && (
+                <View style={{ alignItems: "flex-start" }}>
+                  <ListenButton onPress={onListenIntro} label={listeningIntro ? "Open Read & Listen" : "Listen to the introduction"} />
+                </View>
+              )}
               {overview ? <StoryImage media={overview} /> : null}
               {!!intro.theme && <Text style={s.theme}>{intro.theme}</Text>}
               {intro.scripture.map((line, i) => <ScriptureChips key={i} line={line} label={i === 0 ? "Primary Scripture" : "Supporting Scripture"} />)}
@@ -307,6 +333,7 @@ export default function KingdomStoryBookScreen() {
           )}
         </View>
       </ScrollView>
+      <ListenPlayer owner="story-intro" bottomInset={insets.bottom} />
       <ShareStorySheet visible={shareOpen} onClose={() => setShareOpen(false)} story={story} />
       <SharedStudySheet visible={studyOpen} onClose={() => setStudyOpen(false)} content={{ type: "kingdom_story", id: story.id, title: story.title }}
         onStarted={(sid) => { setStudyOpen(false); router.push(`/study-together/${sid}` as any); }} />

@@ -559,5 +559,14 @@
     "errorTitle": "Imeshindwa kupakia matokeo",
     "errorBody": "Tafadhali angalia muunganisho wako kisha ujaribu tena.",
     "retry": "Jaribu tena"
+  },
+  "listen": {
+    "chapter": "Sura ya {{n}}",
+    "introduction": "Utangulizi",
+    "scripture": "Maandiko",
+    "storyLessons": "Mafundisho ya Hadithi",
+    "question": "Swali la {{n}}",
+    "lessonItem": "Somo la {{n}}",
+    "personalReflections": "Tafakari Binafsi"
   }
 }

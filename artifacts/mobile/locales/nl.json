@@ -559,5 +559,14 @@
     "errorTitle": "Resultaten konden niet worden geladen",
     "errorBody": "Controleer je verbinding en probeer het opnieuw.",
     "retry": "Opnieuw proberen"
+  },
+  "listen": {
+    "chapter": "Hoofdstuk {{n}}",
+    "introduction": "Inleiding",
+    "scripture": "Schriftgedeelte",
+    "storyLessons": "Lessen uit het verhaal",
+    "question": "Vraag {{n}}",
+    "lessonItem": "Les {{n}}",
+    "personalReflections": "Persoonlijke reflecties"
   }
 }

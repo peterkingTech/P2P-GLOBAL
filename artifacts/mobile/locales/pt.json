@@ -559,5 +559,14 @@
     "errorTitle": "Não foi possível carregar os resultados",
     "errorBody": "Verifique sua conexão e tente novamente.",
     "retry": "Tentar novamente"
+  },
+  "listen": {
+    "chapter": "Capítulo {{n}}",
+    "introduction": "Introdução",
+    "scripture": "Escritura",
+    "storyLessons": "Lições da história",
+    "question": "Pergunta {{n}}",
+    "lessonItem": "Lição {{n}}",
+    "personalReflections": "Reflexões pessoais"
   }
 }

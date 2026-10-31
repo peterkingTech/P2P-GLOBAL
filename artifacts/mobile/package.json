@@ -20,7 +20,7 @@
     "test:button-system": "node tests/buttonSystem.test.mjs",
     "test:consolidation": "node tests/consolidation.test.mjs",
     "test:widgets": "node tests/widgets.test.mjs",
-    "test:release": "npm run -s test:button-system && npm run -s test:consolidation && npm run -s test:widgets && npm run -s test:learning-system && npm run -s test:kingdom-stories-experience && npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts && npm run -s test:studio-ui && npm run -s test:admin-shell && npm run -s test:wins-moderation && npm run -s test:family-members && npm run -s test:notifications && npm run -s test:voice && npm run -s test:qr && npm run -s test:ios-sender-photos && npm run -s test:calls && npm run -s test:family-hub && npm run -s test:focus && npm run -s test:learning && npm run -s test:custom-lessons && npm run -s test:lesson-work && npm run -s test:gathering-learning && npm run -s test:bible && npm run -s test:pack && npm run -s test:kingdom-catalogue && npm run -s test:kingdom-storybook && npm run -s test:kingdom-library && npm run -s test:recycle-bin && npm run -s test:gathering-bible && npm run -s test:bible-compare && npm run -s test:study-together && npm run -s test:page-turn && npm run -s test:my-p2p && npm run -s test:learning-centre && npm run -s test:handwriting",
+    "test:release": "npm run -s test:button-system && npm run -s test:consolidation && npm run -s test:widgets && npm run -s test:learning-system && npm run -s test:kingdom-stories-experience && npm run -s test:profile-privacy && npm run -s test:backend-config && npm run -s test:app-version && npm run -s test:receipts && npm run -s test:studio-ui && npm run -s test:admin-shell && npm run -s test:wins-moderation && npm run -s test:family-members && npm run -s test:notifications && npm run -s test:voice && npm run -s test:qr && npm run -s test:ios-sender-photos && npm run -s test:calls && npm run -s test:family-hub && npm run -s test:focus && npm run -s test:learning && npm run -s test:custom-lessons && npm run -s test:lesson-work && npm run -s test:gathering-learning && npm run -s test:bible && npm run -s test:pack && npm run -s test:kingdom-catalogue && npm run -s test:kingdom-storybook && npm run -s test:kingdom-library && npm run -s test:recycle-bin && npm run -s test:gathering-bible && npm run -s test:bible-compare && npm run -s test:study-together && npm run -s test:page-turn && npm run -s test:my-p2p && npm run -s test:learning-centre && npm run -s test:handwriting && npm run -s test:listen",
     "test:wins-moderation": "node tests/winsModeration.test.mjs",
     "test:family-members": "node tests/familyMembers.test.mjs",
     "test:notifications": "node tests/notifications.test.mjs",
@@ -46,7 +46,8 @@
     "test:page-turn": "node tests/pageTurn.test.mjs",
     "test:my-p2p": "node tests/myP2P.test.mjs",
     "test:learning-centre": "node tests/learningCentre.test.mjs",
-    "test:handwriting": "node tests/handwriting.test.mjs"
+    "test:handwriting": "node tests/handwriting.test.mjs",
+    "test:listen": "node tests/listen.test.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -110,6 +111,7 @@
     "expo-modules-core": "~57.0.19",
     "expo-notifications": "~57.0.21",
     "expo-sharing": "~57.0.22",
+    "expo-speech": "~57.0.3",
     "expo-video": "~57.0.5",
     "i18next": "^26.3.5",
     "react": "19.2.3",

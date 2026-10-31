@@ -569,5 +569,14 @@
     "errorTitle": "Couldn't load peers",
     "errorBody": "Please check your connection and try again.",
     "retry": "Try again"
+  },
+  "listen": {
+    "chapter": "Chapter {{n}}",
+    "introduction": "Introduction",
+    "scripture": "Scripture",
+    "storyLessons": "Story Lessons",
+    "question": "Question {{n}}",
+    "lessonItem": "Lesson {{n}}",
+    "personalReflections": "Personal Reflections"
   }
 }

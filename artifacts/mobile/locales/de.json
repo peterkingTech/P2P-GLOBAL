@@ -559,5 +559,14 @@
     "errorTitle": "Ergebnisse konnten nicht geladen werden",
     "errorBody": "Bitte prüfe deine Verbindung und versuche es erneut.",
     "retry": "Erneut versuchen"
+  },
+  "listen": {
+    "chapter": "Kapitel {{n}}",
+    "introduction": "Einleitung",
+    "scripture": "Bibeltext",
+    "storyLessons": "Lektionen aus der Geschichte",
+    "question": "Frage {{n}}",
+    "lessonItem": "Lektion {{n}}",
+    "personalReflections": "Persönliche Reflexionen"
   }
 }

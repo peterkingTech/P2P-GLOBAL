@@ -90,7 +90,9 @@ for (const [f, s] of all) {
   const hex = (s.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? []).filter((h) => !["#fff", "#FFF", "#DC2626", "#000"].includes(h));
   ok(`${f}: no hardcoded theme colours`, hex.length === 0, hex.join(","));
   ok(`${f}: no Bible light/dark switch`, !/setMode\(|Appearance\.|setColorScheme|darkMode/.test(s));
-  ok(`${f}: no audio`, !/expo-av|expo-audio|expo-speech|Audio\.|playAudio|\baudio\b/i.test(s));
+  // No Bible audio files or audio packages. Listening is only the shared
+  // on-device speech player (lib/listen), reading the licensed text on screen.
+  ok(`${f}: no audio files or audio packages (Listen = shared device speech only)`, !/expo-av|expo-audio|expo-speech|Audio\.|playAudio|\.mp3|audioUrl|\baudio\b/i.test(s));
 }
 const reader = src("app/bible/index.tsx");
 ok("reader: verse text is copied/shared only when the translation allows it", /textCopyAllowed \? `“\$\{selectedText\(\)\}” — \$\{selLabel\}` : selLabel/.test(reader));

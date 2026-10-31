@@ -6,9 +6,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
 import type { AppColors } from "@/constants/themes";
-import { getKingdomStory, finishKingdomStoryChapter, markStoryOpened, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
+import { getKingdomStory, finishKingdomStoryChapter, markStoryOpened, getKingdomStoryMediaSignedUrl, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
-import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL } from "@/lib/storybook";
+import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL, chapterListenSections } from "@/lib/storybook";
+import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
+import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent } from "@/lib/listen";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips, ScriptureText } from "@/components/kingdom-stories/ScriptureLinks";
@@ -122,6 +124,77 @@ export default function KingdomStoryChapterScreen() {
   };
   const toContents = () => (router.canGoBack() ? router.back() : router.replace(`/kingdom-stories/${id}` as any));
 
+  // Listen: the shared player reads the chapter as shown (lib/storybook
+  // chapterListenSections), including the Reflection and Comprehensive Check
+  // questions — never answers. Listening never finishes a chapter: that still
+  // takes the normal submission. Previous / next only offer open chapters.
+  useListenOwner("story");
+  const listenState = useListenState();
+  const autoListen = React.useRef(false);
+  // Where this chapter's Personal Reflections / Comprehensive Check sit, for "Continue to …" after listening.
+  const sectionY = React.useRef<{ reflection?: number; check?: number }>({});
+  const scrollToSection = (key: "reflection" | "check") => {
+    const y = sectionY.current[key];
+    if (y != null) setTimeout(() => position.ref.current?.scrollTo({ y: Math.max(0, y - 12), animated: true }), 350);
+  };
+  // The story's cover as the listening artwork (signed URL, like the story page).
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const cover = (story?.media ?? []).find((m) => m.mediaType === "image" && (m.isCover || m.role === "cover"));
+    if (!cover) { setCoverUrl(null); return; }
+    let live = true;
+    getKingdomStoryMediaSignedUrl(cover.mediaPath).then((u) => { if (live) setCoverUrl(u ?? null); }).catch(() => {});
+    return () => { live = false; };
+  }, [story?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listenContent = (target: KingdomStoryChapter): ListenContent | null => {
+    if (!story || target.learning?.state === "locked") return null;
+    const i = chapters.findIndex((x) => x.id === target.id);
+    // Moving on is the listener's choice (a button in the player) — never automatic.
+    const link = (to: KingdomStoryChapter | undefined) => to && to.learning?.state !== "locked"
+      ? { label: `Chapter ${to.chapterNumber}`, open: () => { autoListen.current = true; go(to); } } : null;
+    const hasReflections = (target.learning?.reflectionQuestions?.length ?? 0) > 0 || target.reflections.length > 0;
+    const hasCheck = !!target.learning?.check || !!target.assignment?.text;
+    return {
+      key: `story:${story.id}:${target.id}`,
+      owner: "story",
+      kind: "story",
+      highlight: "sentence",
+      artwork: coverUrl ? { uri: coverUrl } : null,
+      // The chapter's next learning step — on this screen, chosen by the reader.
+      completionActions: [
+        ...(hasReflections ? [{ label: "Continue to Personal Reflections", icon: "create-outline", open: () => scrollToSection("reflection") }] : []),
+        ...(hasCheck ? [{ label: "Continue to Comprehensive Check", icon: "clipboard-outline", open: () => scrollToSection("check") }] : []),
+        ...(!hasReflections && !hasCheck ? [{ label: "Return to the chapter", icon: "book-outline", open: () => {} }] : []),
+      ],
+      title: story.title,
+      subtitle: `Chapter ${target.chapterNumber}: ${target.title}`,
+      // Kingdom Stories are written in English (no translated stories yet).
+      language: "en",
+      // The questions exactly as the chapter shows them (before activities are prepared: its own text).
+      sections: chapterListenSections(target, {
+        reflections: target.learning?.reflectionQuestions?.length ? target.learning.reflectionQuestions : target.reflections.map((q, k) => ({ id: `r${k}`, question: q })),
+        check: target.learning?.check
+          ? { title: checkTitle(target.learning.check.title), questions: target.learning.check.questions }
+          : target.assignment?.text ? { title: COMPREHENSIVE_CHECK, questions: [{ id: "check", question: target.assignment.text }] } : null,
+      }, spokenLabels("en"), story.title),
+      previous: link(chapters[i - 1]),
+      next: link(chapters[i + 1]),
+    };
+  };
+  useEffect(() => {
+    if (!autoListen.current || !ch) return;
+    autoListen.current = false;
+    const content = listenContent(ch);
+    if (content) void listen.play(content, "start");
+  }, [ch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listeningHere = !!story && !!ch && listenState.content?.key === `story:${story.id}:${ch.id}` && listenState.status !== "idle";
+  const onListen = () => {
+    if (!ch) return;
+    if (listeningHere) return listen.present();
+    const content = listenContent(ch);
+    if (content) void listen.play(content, "saved");
+  };
+
   if (loading && !story) return <View style={[s.screen, s.center]}><Stack.Screen options={{ headerShown: false }} /><ActivityIndicator color={c.accentGreen} /></View>;
   if (error || !story || !ch) {
     return (
@@ -212,6 +285,9 @@ export default function KingdomStoryChapterScreen() {
             <View style={s.statePill} accessible accessibilityLabel={`Status: ${STATE_LABEL[state]}`}>
               <Text style={s.statePillText}>{STATE_LABEL[state]}</Text>
             </View>
+            <View style={{ marginTop: 12, alignItems: "flex-start" }}>
+              <ListenButton onPress={onListen} label={listeningHere ? "Open Read & Listen" : "Listen to this chapter"} />
+            </View>
             {!!ch.scriptureRefs && <View style={{ marginTop: 14 }}><ScriptureChips line={ch.scriptureRefs} /></View>}
             {[ch.dates, ch.places, ch.people].filter(Boolean).map((m, i) => <Text key={i} style={s.meta}>{m}</Text>)}
 
@@ -265,7 +341,7 @@ export default function KingdomStoryChapterScreen() {
             )}
 
             {reflections.length > 0 && (
-              <View style={s.section}>
+              <View style={s.section} onLayout={(e) => { sectionY.current.reflection = e.nativeEvent.layout.y; }}>
                 <Text style={s.sectionTitle} accessibilityRole="header">Reflection</Text>
                 <View style={s.noteRow}>
                   <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
@@ -286,7 +362,7 @@ export default function KingdomStoryChapterScreen() {
             )}
 
             {(check || (preview && (ch.assignment?.text || ch.assignment?.title))) && (
-              <View style={s.section}>
+              <View style={s.section} onLayout={(e) => { sectionY.current.check = e.nativeEvent.layout.y; }}>
                 <Text style={s.sectionTitle} accessibilityRole="header">{COMPREHENSIVE_CHECK}</Text>
                 {check && checkTitle(check.title) !== COMPREHENSIVE_CHECK && <Text style={s.checkTitle}>{checkTitle(check.title)}</Text>}
                 {!check && !!ch.assignment?.title && <Text style={s.checkTitle}>{ch.assignment.title}</Text>}
@@ -341,6 +417,7 @@ export default function KingdomStoryChapterScreen() {
             <AppButton label="Return to Story" onPress={toContents} variant="tertiary" style={{ alignSelf: "center", marginTop: 8 }} />
           </Animated.View>
         </ScrollView>
+        <ListenPlayer owner="story" bottomInset={insets.bottom} />
       </View>
 
       <Modal visible={chaptersOpen} transparent animationType="fade" onRequestClose={() => setChaptersOpen(false)}>
