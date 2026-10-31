@@ -30,26 +30,9 @@ import { LINE_HEIGHT, loadPosition, savePosition, useBibleReadingPrefs } from "@
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppButton, IconButton } from "@/components/ui";
-import { BIBLE_COVER } from "@/constants/artwork";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
-import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent, type ListenSection, type StartAt } from "@/lib/listen";
-
-/**
- * The spoken heading of a Bible passage, in the translation's language: the
- * book as the translation names it and "Chapter N" (English selections also
- * name their verses — lib/listen/pronounce says "chapter 3, verses 16 to 18").
- * A language without a "chapter" label gets no heading rather than English.
- */
-function bibleAnnouncement(d: BibleChapter, language: string, part?: { start: number; end: number }): ListenSection[] {
-  const chapter = spokenLabels(language).chapter(d.chapter);
-  if (!chapter) return [];
-  const english = language.toLowerCase().startsWith("en");
-  // "Proverbs Chapter 1." — every chapter, including one the listener moves on to.
-  const text = part && english
-    ? `${d.book.name} ${d.chapter}:${part.start}${part.end > part.start ? `–${part.end}` : ""}.`
-    : `${d.book.name} ${chapter}.`;
-  return [{ id: "heading", title: `${d.book.name} ${d.chapter}`, parts: [{ key: "heading", text }] }];
-}
+import { listen, useListenOwner, useListenState, type ListenContent, type StartAt } from "@/lib/listen";
+import { bibleListenContent, bibleListenKey } from "@/lib/listen/bibleContent";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -238,50 +221,28 @@ export default function BibleReaderScreen() {
   const listenState = useListenState();
   const listening = listenState.content?.owner === "bible" && listenState.status !== "idle" ? listenState : null;
   const autoListen = useRef<StartAt | null>(null);
-  const chapterListenKey = (d: BibleChapter) => `bible:${d.translation.code}:${d.book.code}.${d.chapter}`;
+  const chapterListenKey = bibleListenKey;
+  // The content itself is built in lib/listen/bibleContent, so moving chapters and
+  // "Continue to next chapter" keep working after the listener leaves the Bible.
   const listenContent = useCallback((d: BibleChapter, part?: { start: number; end: number }): ListenContent | null => {
     const language = translations?.find((t) => t.code === d.translation.code)?.language;
     if (!language) return null;
-    const b = bookByCode(d.book.code);
-    const verses = part ? d.verses.filter((v) => v.verse >= part.start && v.verse <= part.end) : d.verses;
-    // Moving on is the listener's choice (a button in the player) — never automatic.
-    const link = (to: { bookCode: string; chapter: number } | null) => to && !part
-      ? { label: formatRef(bookByCode(to.bookCode), to.chapter), open: () => { autoListen.current = "start"; go(to.bookCode, to.chapter); } }
-      : null;
-    return {
-      key: part ? `${chapterListenKey(d)}:${part.start}-${part.end}` : chapterListenKey(d),
-      owner: "bible",
-      kind: "bible",
-      highlight: "part",
-      artwork: BIBLE_COVER,
-      completionActions: [
-        { label: "Return to reading", icon: "book-outline", open: () => {} },
-        { label: "Choose another passage", icon: "list-outline", open: () => setSheet("books") },
-      ],
-      title: formatRef(b, d.chapter, part?.start, part?.end),
-      subtitle: d.translation.name,
-      language,
-      // First, where we are ("John, Chapter 3" / "John 3:16–18", said as chapter
-      // and verses); then the verses, one part each — no verse numbers.
-      sections: [
-        ...bibleAnnouncement(d, language, part),
-        ...verses.map((v) => ({ id: String(v.verse), title: `Verse ${v.verse}`, parts: [{ key: String(v.verse), text: v.text }] })),
-      ],
-      previous: link(d.previous),
-      next: link(d.next),
-      resumeGroup: part ? undefined : "bible",
-      meta: { t: d.translation.code, book: d.book.code, chapter: d.chapter },
-    };
-  }, [translations, go]);
+    return bibleListenContent(d, language, part, [{ label: "Choose another passage", icon: "list-outline", open: () => setSheet("books") }]);
+  }, [translations]);
   const startListening = (d: BibleChapter, at: StartAt, part?: { start: number; end: number }) => {
     const content = listenContent(d, part);
     if (!content) return flash("Listening isn't available for this translation yet.");
     void listen.play(content, at);
   };
-  // The listener chose another chapter in the player: once it has loaded, listen from its start.
+  // "Continue listening" chose another chapter: once it has loaded, listen from the saved place.
   useEffect(() => {
     if (data && autoListen.current) { const at = autoListen.current; autoListen.current = null; startListening(data, at); }
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Listening went on to another chapter (in the player, or "Continue to next chapter"):
+  // offer to show it here — the page never jumps by itself.
+  const listeningChapter = listening && listening.content?.kind === "bible" && listening.content.meta
+    ? { book: String(listening.content.meta.book), chapter: Number(listening.content.meta.chapter), t: String(listening.content.meta.t), label: listening.content.title } : null;
+  const listeningElsewhere = !!listeningChapter && !!data && (listeningChapter.book !== data.book.code || listeningChapter.chapter !== data.chapter);
   const listeningHere = !!listening && !!data && listening.content!.key.startsWith(chapterListenKey(data));
   const speakingVerse = listeningHere && listening!.partKey ? Number(listening!.partKey) : null;
   const onListenChapter = () => {
@@ -647,6 +608,14 @@ export default function BibleReaderScreen() {
     <View style={styles.screen}>
       {gathering && !focus ? <GatheringReturnBar topInset={insets.top} /> : null}
       {header}
+      {!focus && listeningElsewhere && listeningChapter && (
+        <TouchableOpacity style={styles.groupChip} onPress={() => go(listeningChapter.book, listeningChapter.chapter, { t: listeningChapter.t })}
+          accessibilityRole="button" accessibilityLabel={`Now listening to ${listeningChapter.label}. Show it here`}>
+          <Ionicons name="headset" size={15} color={c.accentGreen} />
+          <Text style={styles.groupChipText} numberOfLines={1}>Now listening: {listeningChapter.label}</Text>
+          <Text style={styles.groupChipGo}>Show</Text>
+        </TouchableOpacity>
+      )}
       {!focus && groupPassage && !groupPassage.here && (
         <TouchableOpacity style={styles.groupChip} onPress={() => go(groupPassage.b.code, groupPassage.p.chapter, { v: groupPassage.p.startVerse, ve: groupPassage.p.endVerse, t: groupPassage.t })}
           accessibilityRole="button" accessibilityLabel={`Go to the group's passage, ${groupPassage.label}`}>

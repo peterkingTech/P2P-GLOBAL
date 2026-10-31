@@ -751,7 +751,7 @@ export default function LessonScreen() {
     const hasReflections = content.questions.some((q) => q.question?.trim());
     const hasCheck = !!assignment && assignmentQuestions.length > 0;
     void listen.play({
-      key: listenKey, owner: "lesson", kind: "lesson", highlight: "sentence", title: content.title, subtitle: "Lesson", language: textLanguage, sections: listenSections,
+      key: listenKey, owner: "lesson", kind: "lesson", route: { pathname: "/lesson/[id]", params: { id: String(id) } }, highlight: "sentence", title: content.title, subtitle: "Lesson", language: textLanguage, sections: listenSections,
       // The lesson's next step on this screen, chosen by the learner — never skipped, never automatic.
       completionActions: [
         ...(hasReflections ? [{ label: "Continue to Personal Reflections", icon: "create-outline", open: () => scrollToLessonPart("reflections") }] : []),

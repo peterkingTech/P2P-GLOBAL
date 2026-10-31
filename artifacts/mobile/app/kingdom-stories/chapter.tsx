@@ -131,6 +131,8 @@ export default function KingdomStoryChapterScreen() {
   useListenOwner("story");
   const listenState = useListenState();
   const autoListen = React.useRef(false);
+  const mounted = React.useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   // Where this chapter's Personal Reflections / Comprehensive Check sit, for "Continue to …" after listening.
   const sectionY = React.useRef<{ reflection?: number; check?: number }>({});
   const scrollToSection = (key: "reflection" | "check") => {
@@ -150,12 +152,18 @@ export default function KingdomStoryChapterScreen() {
     if (!story || target.learning?.state === "locked") return null;
     const i = chapters.findIndex((x) => x.id === target.id);
     // Moving on is the listener's choice (a button in the player) — never automatic.
+    // It plays directly (works after leaving this screen); if the chapter is still open here, the page follows.
     const link = (to: KingdomStoryChapter | undefined) => to && to.learning?.state !== "locked"
-      ? { label: `Chapter ${to.chapterNumber}`, open: () => { autoListen.current = true; go(to); } } : null;
+      ? { label: `Chapter ${to.chapterNumber}`, open: () => {
+          const next = listenContent(to);
+          if (next) void listen.play(next, "start", { present: listen.getState().presented });
+          if (mounted.current) go(to);
+        } } : null;
     const hasReflections = (target.learning?.reflectionQuestions?.length ?? 0) > 0 || target.reflections.length > 0;
     const hasCheck = !!target.learning?.check || !!target.assignment?.text;
     return {
       key: `story:${story.id}:${target.id}`,
+      route: { pathname: "/kingdom-stories/chapter", params: { id: story.id, chapter: target.id } },
       owner: "story",
       kind: "story",
       highlight: "sentence",

@@ -141,7 +141,7 @@ export default function PlanDetailScreen() {
     if (!plan?.description?.trim()) return;
     if (listeningPlan) return listen.present();
     void listen.play({
-      key: planListenKey, owner: "plan", kind: "plan", highlight: "sentence", title: plan.title, subtitle: "Overview", language: plan.textLanguage ?? "en",
+      key: planListenKey, owner: "plan", kind: "plan", route: { pathname: "/plan/[id]", params: { id: plan.id } }, highlight: "sentence", title: plan.title, subtitle: "Overview", language: plan.textLanguage ?? "en",
       artwork: plan.coverImageUrl ? { uri: plan.coverImageUrl } : null,
       completionActions: [{ label: "Back to the plan", icon: "list-outline", open: () => {} }],
       // Announced: the plan's title, then "Overview" (in the text's language), then the overview.

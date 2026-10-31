@@ -28,6 +28,7 @@ import { flushPendingConversationReads } from "@/lib/conversationNotifications";
 import { syncStudyReminders } from "@/lib/studyReminders";
 import { syncDailyReminders } from "@/lib/dailyReminders";
 import WidgetSyncHost from "@/components/widgets/WidgetSyncHost";
+import { ListenHost } from "@/components/listen/ListenPlayer";
 import { createNotificationTapHandler } from "@/lib/notificationTap";
 import {
   callSystemActive, callSystemInstalled, configureCallSystem, flushPendingCallSystemEvents,
@@ -666,6 +667,8 @@ function RootLayoutNav() {
         <MessageBannerHost />
         {/* Keeps the home-screen widgets current (no UI). */}
         <WidgetSyncHost />
+        {/* Listen: one session for the whole app — floating mini player + Read & Listen screen. */}
+        <ListenHost />
         <PushNotificationHost />
         <PresenceHost />
         <ClientBuildReporter />

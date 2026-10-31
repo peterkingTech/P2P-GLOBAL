@@ -30,12 +30,14 @@
 
 import { buildChunks, chunkIndexFor, firstChunkOfSection, resumeOffset, CHUNK_MAX, type Chunk, type ListenSection } from "./chunking";
 import { prepareSpeech } from "./pronounce";
-import { baseLanguage, chooseVoice, voicesFor, type DeviceVoice, type VoiceChoice } from "./voices";
+import { baseLanguage, chooseVoice, narrationVoices, voicesFor, type DeviceVoice, type VoiceChoice } from "./voices";
 
 export type ListenStatus = "idle" | "loading" | "playing" | "paused" | "completed" | "error";
 
 export interface SpeakOptions {
   language: string; voice?: string; rate: number;
+  /** Keep speaking when the app goes to the background (the driver sets up the platform audio session). */
+  background?: boolean;
   onStart?: () => void; onDone?: () => void; onStopped?: () => void;
   onError?: (e: Error) => void; onBoundary?: (e: { charIndex: number }) => void;
 }
@@ -86,10 +88,21 @@ export interface ListenContent {
   /** Shown when listening finishes (e.g. "Continue to Personal Reflections"). */
   completionActions?: ListenAction[];
   artwork?: ArtworkSource | null;
+  /** Where the text lives in the app ("Go to the text" from anywhere). */
+  route?: { pathname: string; params?: Record<string, string> } | null;
+  /**
+   * Bible only: the NEXT chapter of the SAME book (null at the end of a book or
+   * for a selected passage). Used only when the listener chose "Continue to
+   * next chapter", and only within their reading range.
+   */
+  continueTo?: { chapter: number; label: string; load: () => Promise<ListenContent | null> } | null;
   /** Remember "last listened" for a group (e.g. "bible"), with screen-specific details. */
   resumeGroup?: string;
+  /** Bible: { t, book, chapter, lastChapter } — lastChapter = the book's final chapter. */
   meta?: Record<string, string | number>;
 }
+/** Bible: what happens when a chapter finishes (separate from Auto Listen Again). */
+export type BibleContinue = "stop" | "again" | "next";
 export type StartAt = { partKey: string; offset?: number } | { section: number } | "saved" | "start";
 
 export interface ListenError { kind: "empty" | "unavailable_language" | "speech"; message: string }
@@ -113,17 +126,29 @@ export interface ListenState {
   /** Auto Listen Again preference, and whether this session has used its one replay. */
   autoAgain: boolean;
   replayed: boolean;
-  /** Seconds until the automatic replay starts (null when none is pending). */
+  /** Seconds until the automatic replay / next chapter starts (null when none is pending). */
   replayCountdown: number | null;
+  /** What the countdown leads to: the next chapter's name, or null for a replay. */
+  upNext: string | null;
   /** The full Read & Listen screen is open. */
   presented: boolean;
+  /** Bible: stop / listen again / continue — and the chapter range continuing stays within. */
+  bibleContinue: BibleContinue;
+  range: { book: string; end: number } | null;
+  /** A voice being previewed (the narration is paused meanwhile). */
+  previewing: string | null;
+  /** Keep listening when the app goes to the background (where the platform allows). */
+  background: boolean;
+  /** The Listen screen currently in front (its own bar shows; elsewhere a floating mini player). */
+  focusedOwner: string | null;
 }
 
 export const RATES = [0.75, 1, 1.25, 1.5] as const;
 const POS = "p2p.listen.v1.pos:";
 const LAST = "p2p.listen.v1.last:";
 const PREFS = "p2p.listen.v1.prefs";
-interface Prefs { rate: number; voices: Record<string, string>; autoAgain: boolean }
+interface Prefs { rate: number; voices: Record<string, string>; autoAgain: boolean; bibleContinue: BibleContinue; background: boolean }
+const CONTINUE_MODES: BibleContinue[] = ["stop", "again", "next"];
 export interface SavedPosition { partKey: string; offset: number; updatedAt: number }
 export interface LastListened { key: string; partKey: string; meta: Record<string, string | number>; updatedAt: number }
 const DEVICE_SPEECH: NarrationCapabilities = { seekSeconds: false, duration: false, timing: "sentence" };
@@ -133,7 +158,8 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
   let state: ListenState = {
     status: "idle", content: null, section: 0, partKey: null, chunk: 0, chunkCount: 0, chunks: [],
     rate: 1, voice: null, voices: [], allVoices: [], error: null,
-    capabilities: driver.capabilities ?? DEVICE_SPEECH, autoAgain: false, replayed: false, replayCountdown: null, presented: false,
+    capabilities: driver.capabilities ?? DEVICE_SPEECH, autoAgain: false, replayed: false, replayCountdown: null, upNext: null, presented: false,
+    bibleContinue: "stop", range: null, previewing: null, background: true, focusedOwner: null,
   };
   let content: ListenContent | null = null;
   let chunks: Chunk[] = [];
@@ -142,7 +168,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
   let spokenFrom = 0;        // offset in the chunk's text this utterance started at
   let boundary: number | null = null; // last word the engine reported, in chunk text
   let override: string | null = null; // explicit voice for this content
-  let prefs: Prefs = { rate: 1, voices: {}, autoAgain: false };
+  let prefs: Prefs = { rate: 1, voices: {}, autoAgain: false, bibleContinue: "stop", background: true };
   let prefsLoaded: Promise<void> | null = null;
   let voiceCache: DeviceVoice[] = [];
   let replayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,8 +184,11 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
   function loadPrefs() {
     prefsLoaded ??= store.get(PREFS).then((s) => {
       const p = json<Prefs>(s);
-      if (p) prefs = { rate: RATES.includes(p.rate as any) ? p.rate : 1, voices: p.voices && typeof p.voices === "object" ? p.voices : {}, autoAgain: p.autoAgain === true };
-      set({ rate: prefs.rate, autoAgain: prefs.autoAgain });
+      if (p) prefs = {
+        rate: RATES.includes(p.rate as any) ? p.rate : 1, voices: p.voices && typeof p.voices === "object" ? p.voices : {}, autoAgain: p.autoAgain === true,
+        bibleContinue: CONTINUE_MODES.includes(p.bibleContinue) ? p.bibleContinue : "stop", background: p.background !== false,
+      };
+      set({ rate: prefs.rate, autoAgain: prefs.autoAgain, bibleContinue: prefs.bibleContinue, background: prefs.background });
     }).catch(() => {});
     return prefsLoaded;
   }
@@ -193,13 +222,14 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     spokenFrom = Math.max(0, Math.min(offset, c.text.length - 1));
     boundary = null;
     const text = c.text.slice(spokenFrom);
-    set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, error: null, replayCountdown: null });
+    set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, error: null, replayCountdown: null, upNext: null, previewing: null });
     savePosition(c);
     try {
       driver.speak(text, {
         language: state.voice.language,
         voice: state.voice.voice ?? undefined,
         rate: state.rate,
+        background: prefs.background,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
@@ -223,23 +253,48 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     if (next < chunks.length) return speakFrom(next);
     halt();
     const finished = content;
-    if (finished) clearPosition(finished.key);
-    // Auto Listen Again: once per session, after a short visible countdown. Never another item.
-    if (finished && prefs.autoAgain && !state.replayed) {
-      const g = gen;
-      set({ status: "completed", replayCountdown: replayDelay });
-      const tick = () => {
-        if (g !== gen || content !== finished) return; // stopped, replaced or cancelled
-        const left = (state.replayCountdown ?? 0) - 1;
-        if (left > 0) { set({ replayCountdown: left }); replayTimer = setTimeout(tick, 1000); return; }
-        replayTimer = null;
-        set({ replayed: true, replayCountdown: null });
-        fromTheTop();
-      };
-      replayTimer = setTimeout(tick, 1000);
-      return;
+    if (!finished) return;
+    clearPosition(finished.key);
+    // ONE decision when content ends — never two handlers. The Bible has its own
+    // setting (stop / listen again / next chapter within the range, same book
+    // only); everything else uses Auto Listen Again. Each automatic step waits
+    // through a visible countdown that can be cancelled, and happens at most once
+    // per item (a continued chapter is a new item with its own decision).
+    if (finished.kind === "bible") {
+      const mode = prefs.bibleContinue;
+      const nextCh = finished.continueTo;
+      const book = String(finished.meta?.book ?? "");
+      const here = Number(finished.meta?.chapter);
+      const inRange = !!nextCh && !!state.range && state.range.book === book && nextCh.chapter === here + 1 && nextCh.chapter <= state.range.end;
+      if (mode === "next" && inRange) return countdown(finished, nextCh!.label, () => continueTo(finished, nextCh!));
+      if (mode === "again" && !state.replayed) return countdown(finished, null, () => { set({ replayed: true }); fromTheTop(); });
+      return set({ status: "completed", replayCountdown: null, upNext: null });
     }
-    set({ status: "completed", replayCountdown: null });
+    if (prefs.autoAgain && !state.replayed) return countdown(finished, null, () => { set({ replayed: true }); fromTheTop(); });
+    set({ status: "completed", replayCountdown: null, upNext: null });
+  }
+  /** A short visible countdown, then `then()` — dropped if anything else happens first. */
+  function countdown(finished: ListenContent, upNext: string | null, then: () => void) {
+    const g = gen;
+    set({ status: "completed", replayCountdown: replayDelay, upNext });
+    const tick = () => {
+      if (g !== gen || content !== finished) return; // stopped, replaced or cancelled
+      const left = (state.replayCountdown ?? 0) - 1;
+      if (left > 0) { set({ replayCountdown: left }); replayTimer = setTimeout(tick, 1000); return; }
+      replayTimer = null;
+      set({ replayCountdown: null, upNext: null });
+      then();
+    };
+    replayTimer = setTimeout(tick, 1000);
+  }
+  /** Bible "Continue to next chapter": load it (no screen needed) and listen from its start. */
+  async function continueTo(finished: ListenContent, nextCh: NonNullable<ListenContent["continueTo"]>) {
+    const my = request;
+    let next: ListenContent | null = null;
+    try { next = await nextCh.load(); } catch { next = null; }
+    if (my !== request || content !== finished) return; // the listener did something else meanwhile
+    if (!next) return set({ status: "completed", upNext: null, error: null });
+    await play(next, "start", { present: state.presented });
   }
 
   async function play(c: ListenContent, at: StartAt = "saved", how: { present?: boolean } = {}) {
@@ -255,14 +310,15 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
       status: "loading", content: { ...rest, sections, sectionTitles: sections.map((s) => s.title) },
       section: 0, partKey: null, chunk: 0, chunkCount: chunks.length,
       chunks: chunks.map(({ section, part, partKey, start, end }) => ({ section, part, partKey, start, end })),
-      error: null, replayed: false, replayCountdown: null, presented: how.present ?? true,
+      error: null, replayed: false, replayCountdown: null, upNext: null, previewing: null, presented: how.present ?? true,
     });
     if (!chunks.length) return set({ status: "error", error: { kind: "empty", message: "There's no text to read aloud here." } });
     await loadPrefs();
+    set({ range: rangeFor(c) });
     const voices = await loadVoices();
     if (my !== request) return; // replaced while loading
     const choice = chooseVoice(c.language, voices, prefs.voices[baseLanguage(c.language)] ?? null, override);
-    set({ voice: choice, voices: voicesFor(c.language, voices), allVoices: voices, rate: prefs.rate, autoAgain: prefs.autoAgain });
+    set({ voice: choice, voices: voicesFor(c.language, voices), allVoices: narrationVoices(voices), rate: prefs.rate, autoAgain: prefs.autoAgain });
     if (choice.kind === "unavailable") {
       return set({ status: "error", error: { kind: "unavailable_language", message: "This phone has no voice for this language. Choose another voice to listen anyway, or keep reading." } });
     }
@@ -276,6 +332,20 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
       if (index < 0) index = 0;
     }
     speakFrom(index);
+  }
+
+  /**
+   * The Bible reading range for this chapter: kept while continuing within the
+   * same book; otherwise, when "Continue to next chapter" is on, to the end of
+   * this book (the listener can shorten it). Never crosses into another book.
+   */
+  function rangeFor(c: ListenContent): ListenState["range"] {
+    const book = c.kind === "bible" ? String(c.meta?.book ?? "") : "";
+    const ch = Number(c.meta?.chapter);
+    if (!book || !ch || c.continueTo === undefined) return null;
+    const r = state.range;
+    if (r && r.book === book && ch <= r.end) return r;
+    return prefs.bibleContinue === "next" ? { book, end: Math.max(ch, Number(c.meta?.lastChapter) || ch) } : null;
   }
 
   function pause() {
@@ -303,7 +373,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     halt();
     if (content && state.status === "playing") savePosition(chunks[state.chunk]);
     content = null; chunks = []; override = null;
-    set({ status: "idle", content: null, chunk: 0, chunkCount: 0, chunks: [], partKey: null, error: null, replayCountdown: null, replayed: false, presented: false });
+    set({ status: "idle", content: null, chunk: 0, chunkCount: 0, chunks: [], partKey: null, error: null, replayCountdown: null, upNext: null, replayed: false, presented: false, previewing: null, range: null });
   }
   const restartHere = () => { if (state.status === "playing") { const at = resumeOffset(chunks[state.chunk]?.text ?? "", boundary); speakFrom(state.chunk, at); } };
 
@@ -325,13 +395,68 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     present() { if (state.content) set({ presented: true }); },
     dismiss() { set({ presented: false }); },
     /** Don't play the pending automatic replay. */
-    cancelReplay() { cancelReplayTimer(); if (state.replayCountdown != null) set({ replayCountdown: null }); },
+    cancelReplay() { cancelReplayTimer(); if (state.replayCountdown != null) set({ replayCountdown: null, upNext: null }); },
     /** Auto Listen Again on/off — remembered; never restarts anything by itself. */
     setAutoAgain(on: boolean) {
       prefs = { ...prefs, autoAgain: !!on };
       savePrefs();
       set({ autoAgain: prefs.autoAgain });
       if (!on) { cancelReplayTimer(); if (state.replayCountdown != null) set({ replayCountdown: null }); }
+    },
+    /**
+     * Bible: what happens when a chapter ends — remembered; never restarts or
+     * moves what's playing now. Turning "next" on sets the range to the end of
+     * this book (unless one is already set); turning it off cancels a pending step.
+     */
+    setBibleContinue(mode: BibleContinue) {
+      if (!CONTINUE_MODES.includes(mode)) return;
+      prefs = { ...prefs, bibleContinue: mode };
+      savePrefs();
+      set({ bibleContinue: mode });
+      if (content?.kind === "bible") set({ range: mode === "next" ? (state.range ?? rangeFor(content)) : state.range });
+      if (state.replayCountdown != null) { cancelReplayTimer(); set({ replayCountdown: null, upNext: null }); }
+    },
+    /** Bible: continue up to this chapter of the current book (from this chapter to the book's last). */
+    setBibleRange(end: number) {
+      if (content?.kind !== "bible") return;
+      const book = String(content.meta?.book ?? "");
+      const here = Number(content.meta?.chapter), last = Number(content.meta?.lastChapter) || here;
+      if (!book || !here) return;
+      set({ range: { book, end: Math.min(last, Math.max(here, Math.round(end))) } });
+    },
+    /** Keep listening in the background (where the platform allows) — remembered. */
+    setBackground(on: boolean) {
+      prefs = { ...prefs, background: !!on };
+      savePrefs();
+      set({ background: prefs.background });
+    },
+    /** Which Listen screen is in front (its own bar shows; elsewhere the floating mini player). */
+    setFocusedOwner(owner: string | null) { if (state.focusedOwner !== owner) set({ focusedOwner: owner }); },
+    clearFocusedOwner(owner: string) { if (state.focusedOwner === owner) set({ focusedOwner: null }); },
+    /**
+     * Hear a voice before choosing it: the narration pauses (keeping its place),
+     * the current sentence is read in that voice, then the narration carries on
+     * if it was playing. Same single speech session — never two at once.
+     */
+    previewVoice(identifier: string) {
+      if (!content) return;
+      const v = state.allVoices.find((x) => x.identifier === identifier);
+      if (!v) return;
+      const wasPlaying = state.status === "playing";
+      if (wasPlaying) pause();
+      halt();
+      const g = gen;
+      const sample = (chunks[state.chunk] ?? chunks[0])?.text ?? "";
+      if (!sample) return;
+      set({ previewing: identifier, replayCountdown: null, upNext: null });
+      const end = () => {
+        if (g !== gen) return;
+        set({ previewing: null });
+        if (wasPlaying) speakFrom(state.chunk, spokenFrom);
+      };
+      try {
+        driver.speak(sample.slice(0, 220), { language: v.language, voice: v.identifier, rate: state.rate, background: prefs.background, onDone: end, onError: end });
+      } catch { end(); }
     },
     nextSection() {
       if (!content) return;

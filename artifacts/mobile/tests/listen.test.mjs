@@ -383,7 +383,7 @@ ok("story chapter: 'Personal Reflections' and 'Comprehensive Check' announced, q
   === "Personal Reflections.|Question 1. What stood out?|Question 2. How will you respond? / Comprehensive Check.|Question 1. Retell the chapter.");
 ok("story introduction: announced 'Introduction'; overview lines left out; none → nothing", SB.introListenSections({ title: "Ruth", subtitle: null, body: "Central theme: Loyalty\n\nIt began in Moab." }, EN)[0].parts.map((p) => p.text).join("|") === "Introduction.|Ruth.|It began in Moab."
   && SB.introListenSections({ title: "X", subtitle: null, body: "Central theme: Y" }, EN).length === 0);
-const bibleSrc = src("app/bible/index.tsx");
+const bibleSrc = src("app/bible/index.tsx") + src("lib/listen/bibleContent.ts");
 ok("Bible: each passage starts with where it is ('John, Chapter 3' / 'John 3:16–18'), verse text unchanged", /function bibleAnnouncement/.test(bibleSrc) && /\.\.\.bibleAnnouncement\(d, language, part\)/.test(bibleSrc)
   && /`\$\{d\.book\.name\} \$\{chapter\}\.`/.test(bibleSrc) && /if \(!chapter\) return \[\]/.test(bibleSrc));
 ok("Bible: the heading part is not a verse (verse marker unaffected)", /key: "heading"/.test(bibleSrc) && /Number\(listening!\.partKey\)/.test(bibleSrc));
@@ -401,9 +401,13 @@ const engineSrc = src("lib/listen/engine.ts") + src("lib/listen/index.ts") + src
 ok("listening never touches learning progress (no completion/progress calls)", !/markLessonComplete|completeLesson|finishKingdomStoryChapter|handleComplete|DataContext|useData|p2p_lesson_progress|supabase/.test(engineSrc));
 ok("Listen handlers in screens don't complete anything", [src(screens.lesson).match(/const onListen = [\s\S]*?\n  \};/)?.[0] ?? "x", src(screens.story).match(/const onListen = [\s\S]*?\n  \};/)?.[0] ?? "x"].every((h) => !/complete|finish|submit/i.test(h)));
 ok("only lib/listen imports expo-speech", /from "expo-speech"/.test(src("lib/listen/index.ts")));
-ok("pause on leaving the screen / app background; stop on close", /useFocusEffect\([\s\S]*release\(owner, "pause"\)/.test(src("lib/listen/index.ts")) && /AppState\.addEventListener[\s\S]*release\(owner, "pause"\)[\s\S]*release\(owner, "stop"\)/.test(src("lib/listen/index.ts")));
-ok("iOS: system-managed audio session (calls interrupt speech normally)", /useApplicationAudioSession: false/.test(src("lib/listen/index.ts")));
-const bible = src(screens.bible);
+ok("leaving or closing a Listen screen never stops the session; the app going to the background pauses only when Background playback is off",
+  /listen\.setFocusedOwner\(owner\); return \(\) => listen\.clearFocusedOwner\(owner\)/.test(src("lib/listen/index.ts")) && !/release\(owner/.test(src("lib/listen/index.ts"))
+  && /if \(s !== "active" && !listen\.getState\(\)\.background\) listen\.pause\(\)/.test(src("lib/listen/index.ts")));
+ok("iOS: the app's playback session only for Background playback with NO live call; otherwise the system-managed session (calls untouched)",
+  /const appSession = Platform\.OS === "ios" && !!o\.background && !getActiveGathering\(\);/.test(src("lib/listen/index.ts")) && /useApplicationAudioSession: appSession/.test(src("lib/listen/index.ts"))
+  && /setAudioModeAsync\(\{ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: "doNotMix" \}\)/.test(src("lib/listen/index.ts")) && /if \(token !== speakToken\) return;/.test(src("lib/listen/index.ts")));
+const bible = src(screens.bible) + src("lib/listen/bibleContent.ts");
 ok("Bible: voice language from the translation; none known → not offered", /translations\?\.find\(\(t\) => t\.code === d\.translation\.code\)\?\.language/.test(bible) && /if \(!language\) return null/.test(bible));
 ok("Bible: one verse per part (no verse numbers or headings spoken)", /parts: \[\{ key: String\(v\.verse\), text: v\.text \}\]/.test(bible));
 ok("Bible: never moves to the next chapter by itself; Listen from a selected verse", !/continueToNext/.test(bible + src("lib/listen/engine.ts")) && /listen\.seekPart\(String\(sel\.start\)\)/.test(bible));
@@ -419,7 +423,7 @@ ok("branding: reuses the official logo and app icon (no new logo files)", /requi
 ok("branding: background from the person's theme (light/dark), logo as a faint watermark", /useTheme\(\)/.test(player) && /resolvedMode === "dark"/.test(player)
   && /<LinearGradient colors=\{\[c\.lightCream, withAlpha\(c\.accentGreen/.test(player) && /opacity: dark \? 0\.06 : 0\.045/.test(player));
 ok("branding: decorative images hidden from screen readers; controls stay labelled", /accessibilityElementsHidden importantForAccessibility="no-hide-descendants"/.test(player) && /pointerEvents="none"/.test(player) && /accessibilityLabel=\{mainLabel\}/.test(player));
-ok("branding: works in portrait and landscape, safe areas respected", /supportedOrientations=\{\["portrait", "landscape"\]\}/.test(player) && /const landscape = width > height/.test(player) && /insets\.left \+ 18/.test(player));
+ok("branding: works in portrait and landscape, safe areas respected", /supportedOrientations=\{\["portrait", "landscape"\]\}/.test(player) && /const landscapePhone = width > height && height < 600/.test(player) && /insets\.left \+ \(wide \? 24 : 18\)/.test(player));
 ok("branding: no extra animation libraries or loops", !/Animated\.|reanimated|loop\(/.test(player));
 ok("mini player shows the app icon artwork", /<AppArtwork size=\{36\}/.test(player));
 
@@ -440,7 +444,7 @@ ok("text size adjustable; remembered on this phone", /accessibilityLabel="Smalle
 ok("controls: previous/next part, sentence back/forward, big play — no fake ±10 s or times for device speech",
   /accessibilityLabel="Back one sentence"/.test(player) && /accessibilityLabel="Forward one sentence"/.test(player) && /accessibilityLabel="Previous part"/.test(player) && !/10 ?s(ec|econds)?\b|elapsed|remaining/i.test(player.replace(/\/\/.*$/gm, "")));
 ok("Listen Again and Auto Listen Again (with its plain description)", /label="Listen Again"/.test(player) && /Auto Listen Again/.test(player) && /Plays this once more from the beginning when it finishes\./.test(player) && /listen\.setAutoAgain\(v\)/.test(player));
-ok("finished: replay countdown with 'Don't replay', then the next learning step as buttons", /Listening again in \{st\.replayCountdown\}/.test(player) && /listen\.cancelReplay\(\)/.test(player) && /content\.completionActions/.test(player));
+ok("finished: replay countdown with 'Don't replay', then the next learning step as buttons", /Listening again in \$\{st\.replayCountdown\}/.test(player) && /listen\.cancelReplay\(\)/.test(player) && /content\.completionActions/.test(player));
 const lessonSrc = src("app/lesson/[id].tsx"), chapterSrc = src("app/kingdom-stories/chapter.tsx");
 ok("lesson: 'Continue to Personal Reflections' / 'Comprehensive Check' scroll there — nothing submitted or completed",
   /label: "Continue to Personal Reflections"[^\n]*scrollToLessonPart\("reflections"\)/.test(lessonSrc) && /label: "Continue to Comprehensive Check"[^\n]*scrollToLessonPart\("check"\)/.test(lessonSrc)
@@ -449,11 +453,187 @@ ok("story chapter: same next steps; chapter announced with the story's name", /l
   && !/completionActions[\s\S]{0,700}finishKingdomStoryChapter/.test(chapterSrc));
 const storyTitled = SB.chapterListenSections({ chapterNumber: 2, title: "The Call", narrative: "Text.", lessons: [] }, undefined, EN, "Ruth");
 ok("story chapter announcement: 'Ruth. Chapter 2: The Call.'", storyTitled[0].parts.map((p) => p.text).join(" ") === "Ruth. Chapter 2: The Call.");
-ok("Bible: 'Proverbs Chapter 1' for every chapter, including one chosen next in the player", /`\$\{d\.book\.name\} \$\{chapter\}\.`/.test(bibleSrc) && /autoListen\.current = "start"; go\(to\.bookCode, to\.chapter\)/.test(bibleSrc));
+ok("Bible: 'Proverbs Chapter 1' for every chapter, including one chosen next in the player", /`\$\{d\.book\.name\} \$\{chapter\}\.`/.test(bibleSrc) && /playBibleChapter\(to\.bookCode, to\.chapter, t, language, actions\)/.test(bibleSrc));
 ok("Bible: verse-level highlighting, Bible artwork, 'Return to reading' / 'Choose another passage'", /highlight: "part"/.test(bibleSrc) && /artwork: BIBLE_COVER/.test(bibleSrc) && /"Return to reading"/.test(bibleSrc) && /"Choose another passage"/.test(bibleSrc));
 ok("every screen's Listen opens Read & Listen (and reopens it while listening)", ["app/bible/index.tsx", "app/kingdom-stories/chapter.tsx", "app/kingdom-stories/[id].tsx", "app/lesson/[id].tsx", "app/plan/[id].tsx"].every((f) => /return listen\.present\(\)/.test(src(f))));
 ok("narration source is swappable (not tied to expo-speech) and honest about its abilities", /capabilities\?: NarrationCapabilities/.test(src("lib/listen/engine.ts")) && !/expo-speech/.test(src("lib/listen/engine.ts").replace(/\/\/.*$/gm, "")));
 ok("numbers are left for the voice to read", say("The 12 tribes and 3 days, 40 years.") === "The 12 tribes and 3 days, 40 years.");
+
+// ── Professional voices ────────────────────────────────────────────────────
+{
+  // Real iOS identifiers for the voices the owner saw, plus enhanced/premium and other languages.
+  const ios = [
+    { identifier: "com.apple.speech.synthesis.voice.Albert", name: "Albert", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.BadNews", name: "Bad News", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.Bahh", name: "Bahh", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.Bells", name: "Bells", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.Boing", name: "Boing", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.Bubbles", name: "Bubbles", language: "en-US" },
+    { identifier: "com.apple.speech.synthesis.voice.Cellos", name: "Cellos", language: "en-US" },
+    { identifier: "com.apple.eloquence.en-US.Eddy", name: "Eddy", language: "en-US" },
+    { identifier: "com.apple.voice.compact.en-GB.Arthur", name: "Arthur", language: "en-GB", quality: "Default" },
+    { identifier: "com.apple.voice.compact.en-AU.Catherine", name: "Catherine", language: "en-AU", quality: "Default" },
+    { identifier: "com.apple.voice.enhanced.en-GB.Daniel", name: "Daniel", language: "en-GB", quality: "Enhanced" },
+    { identifier: "com.apple.voice.premium.en-US.Ava", name: "Ava (Premium)", language: "en-US", quality: "Enhanced" },
+    { identifier: "com.apple.voice.compact.de-DE.Anna", name: "Anna", language: "de-DE", quality: "Default" },
+    { identifier: "com.apple.eloquence.de-DE.Grandpa", name: "Grandpa", language: "de-DE" },
+    { identifier: "com.apple.voice.compact.fr-FR.Thomas", name: "Thomas", language: "fr-FR", quality: "Default" },
+  ];
+  const en = V.voicesFor("en-US", ios).map((v) => v.name);
+  ok("novelty / sound-effect voices never offered (Albert, Bad News, Bahh, Bells, Boing, Bubbles, Cellos)", !en.some((n) => /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos/.test(n)) && !V.narrationVoices(ios).some((v) => v.name === "Bells"));
+  ok("recognised by the system identifier, not just the name", V.voiceTier({ identifier: "com.apple.speech.synthesis.voice.Zarvox", name: "Unknown", language: "en-US" }) === "novelty"
+    && V.voiceTier({ identifier: "com.apple.voice.compact.en-GB.Albert", name: "Albert", language: "en-GB" }) !== "robotic");
+  ok("robotic Eloquence voices (Eddy) hidden when better voices exist; real named voices kept (Arthur, Catherine, Daniel)", !en.includes("Eddy") && ["Arthur", "Catherine", "Daniel"].every((n) => en.includes(n)));
+  ok("best first: premium, then enhanced, then standard", en[0] === "Ava (Premium)" && en[1] === "Daniel");
+  ok("default voice = the best professional voice for the language", V.chooseVoice("en", ios, null, null).voice === "com.apple.voice.premium.en-US.Ava");
+  ok("German content → German voices only; robotic only if nothing better", V.voicesFor("de", ios).map((v) => v.name).join() === "Anna" && V.voicesFor("de", ios.filter((v) => v.name !== "Anna")).map((v) => v.name).join() === "Grandpa");
+  ok("no matching voice → explained, never another language silently", V.chooseVoice("sw", ios, null, null).kind === "unavailable");
+  ok("a saved novelty voice is never used (falls back to the best)", V.chooseVoice("en", ios, "com.apple.speech.synthesis.voice.Bells", null).voice === "com.apple.voice.premium.en-US.Ava"
+    && V.chooseVoice("en", ios, null, "com.apple.speech.synthesis.voice.Bells").voice === "com.apple.voice.premium.en-US.Ava");
+  ok("browser voices: 'Natural'/'Neural' count as enhanced", V.voiceTier({ identifier: "Microsoft Aria Online (Natural) - English (United States)", name: "Microsoft Aria Online (Natural) - English (United States)", language: "en-US" }) === "enhanced");
+
+  const r = rig(ios);
+  await r.eng.play(content({ key: "voices", sections: [secs[0], secs[2]] }), "start"); await flush();
+  const st = r.eng.getState();
+  ok("the player lists only narration voices (state.voices / allVoices)", !st.voices.some((v) => /Bells|Bubbles|Eddy/.test(v.name)) && !st.allVoices.some((v) => v.name === "Boing"));
+  const before = r.said.length;
+  r.eng.previewVoice("com.apple.voice.compact.en-GB.Arthur");
+  const pv = r.last();
+  ok("preview: narration paused (place kept), the current sentence read in that voice — one session", r.eng.getState().status === "paused" && r.eng.getState().previewing === "com.apple.voice.compact.en-GB.Arthur" && r.said.length === before + 1 && pv.o.voice === "com.apple.voice.compact.en-GB.Arthur");
+  pv.o.onDone();
+  ok("…then narration carries on where it was, in the chosen voice (not the previewed one)", r.eng.getState().status === "playing" && r.eng.getState().previewing === null && r.last().o.voice === "com.apple.voice.premium.en-US.Ava");
+  r.eng.pause();
+  r.eng.previewVoice("com.apple.voice.enhanced.en-GB.Daniel");
+  r.last().o.onDone();
+  ok("preview while paused stays paused afterwards", r.eng.getState().status === "paused");
+  r.eng.previewVoice("com.apple.voice.enhanced.en-GB.Daniel");
+  const stale = r.last();
+  r.eng.resume();
+  stale.o.onDone();
+  ok("pressing play during a preview stops the preview; its late 'done' changes nothing", r.eng.getState().status === "playing" && r.eng.getState().previewing === null);
+  r.eng.setVoice("com.apple.voice.enhanced.en-GB.Daniel");
+  ok("chosen voice remembered for the language", JSON.parse(r.store.get("p2p.listen.v1.prefs")).voices.en === "com.apple.voice.enhanced.en-GB.Daniel");
+}
+
+// ── Bible: when this chapter ends ──────────────────────────────────────────
+{
+  const chapter = (n, last = 3, book = "JHN", next = true) => ({
+    key: `bible:BSB:${book}.${n}`, owner: "bible", kind: "bible", title: `John ${n}`, language: "en",
+    sections: [{ id: "v", title: "", parts: [{ key: "1", text: `Chapter ${n} text.` }] }],
+    meta: { t: "BSB", book, bookName: "John", chapter: n, lastChapter: last },
+    continueTo: next && n < last ? { chapter: n + 1, label: `John ${n + 1}`, load: async () => { loads++; return chapter(n + 1, last, book, next); } } : null,
+  });
+  let loads = 0;
+  const finish = async (r) => { r.last().o.onDone(); };
+  const wait = () => new Promise((res) => setTimeout(res, 1150));
+
+  let r = rig();
+  await r.eng.play(chapter(1), "start"); await flush();
+  ok("default: Stop after this chapter", r.eng.getState().bibleContinue === "stop");
+  await finish(r); await wait();
+  ok("stop: finishes, stays on this chapter, player kept open", r.eng.getState().status === "completed" && r.eng.getState().content.key === "bible:BSB:JHN.1" && loads === 0 && r.eng.getState().presented === true);
+
+  r = rig();
+  await r.eng.play(chapter(1), "start"); await flush();
+  r.eng.setBibleContinue("again");
+  await finish(r); await wait();
+  ok("listen again: this chapter once more from the start (no next chapter)", r.eng.getState().status === "playing" && r.eng.getState().content.key === "bible:BSB:JHN.1" && r.eng.getState().chunk === 0 && loads === 0);
+  await finish(r); await wait();
+  ok("…and then stops (no loop)", r.eng.getState().status === "completed" && r.eng.getState().content.key === "bible:BSB:JHN.1");
+
+  r = rig(); loads = 0;
+  await r.eng.play(chapter(1, 3), "start"); await flush();
+  const n0 = r.said.length;
+  r.eng.setBibleContinue("next");
+  ok("choosing 'Next chapter' doesn't restart what's playing; range defaults to the end of the book", r.said.length === n0 && JSON.stringify(r.eng.getState().range) === JSON.stringify({ book: "JHN", end: 3 }));
+  r.eng.setBibleRange(2);
+  ok("the range can be shortened (John 1–2)", r.eng.getState().range.end === 2);
+  r.eng.setBibleRange(99); r.eng.setBibleRange(2);
+  ok("range never beyond the book", (r.eng.setBibleRange(99), r.eng.getState().range.end === 3) && (r.eng.setBibleRange(2), true));
+  await finish(r);
+  ok("next: a visible countdown naming the next chapter", r.eng.getState().replayCountdown === 1 && r.eng.getState().upNext === "John 2");
+  await wait(); await flush();
+  ok("…then John 2 plays from its start, same voice and speed, Read & Listen still open", r.eng.getState().content.key === "bible:BSB:JHN.2" && r.eng.getState().status === "playing" && r.eng.getState().chunk === 0 && r.eng.getState().presented === true && loads === 1);
+  await finish(r); await wait(); await flush();
+  ok("stops at the end of the chosen range (John 2) — no John 3", r.eng.getState().status === "completed" && r.eng.getState().content.key === "bible:BSB:JHN.2" && loads === 1);
+
+  r = rig(); loads = 0;
+  r.eng.setBibleContinue("next");
+  await r.eng.play(chapter(3, 3), "start"); await flush();
+  await finish(r); await wait();
+  ok("end of the book: stops; never jumps into another book", r.eng.getState().status === "completed" && r.eng.getState().content.key === "bible:BSB:JHN.3" && loads === 0);
+
+  r = rig(); loads = 0;
+  r.eng.setBibleContinue("next");
+  r.eng.setAutoAgain(true);
+  await r.eng.play(chapter(1, 2), "start"); await flush();
+  await finish(r);
+  ok("Bible setting takes priority over Auto Listen Again (one handler: the next chapter, not a replay)", r.eng.getState().upNext === "John 2");
+  r.eng.cancelReplay();
+  await wait();
+  ok("'Stop here' cancels the next chapter", r.eng.getState().status === "completed" && r.eng.getState().content.key === "bible:BSB:JHN.1" && loads === 0);
+
+  r = rig(); loads = 0;
+  r.eng.setBibleContinue("next");
+  await r.eng.play(chapter(1, 3), "start"); await flush();
+  await finish(r);
+  r.eng.stop();
+  await wait(); await flush();
+  ok("stop during the countdown: nothing loads or plays later", r.eng.getState().status === "idle" && loads === 0);
+
+  r = rig(); loads = 0;
+  r.eng.setBibleContinue("next");
+  await r.eng.play(chapter(1, 3), "start"); await flush();
+  await finish(r);
+  r.eng.setBibleContinue("stop");
+  await wait();
+  ok("changing the setting cancels a pending step (no surprise playback)", r.eng.getState().status === "completed" && loads === 0);
+
+  r = rig(); loads = 0;
+  r.eng.setBibleContinue("next");
+  await r.eng.play(chapter(1, 3), "start"); await flush();
+  await r.eng.play({ ...chapter(1, 3), key: "bible:BSB:JHN.1:3-4", continueTo: null }, "start"); await flush();
+  await finish(r); await wait();
+  ok("a selected passage never continues", r.eng.getState().status === "completed" && loads === 0);
+  r.eng.setBibleContinue("again");
+  ok("the setting is remembered", JSON.parse(r.store.get("p2p.listen.v1.prefs")).bibleContinue === "again");
+}
+
+// ── One session for the whole app ──────────────────────────────────────────
+{
+  const r = rig();
+  await r.eng.play(content({ key: "nav", owner: "lesson", sections: [secs[0], secs[2]] }), "start"); await flush();
+  r.eng.setFocusedOwner("lesson");
+  r.eng.clearFocusedOwner("lesson");
+  ok("leaving the screen: still playing; the floating mini player takes over", r.eng.getState().status === "playing" && r.eng.getState().focusedOwner === null);
+  r.eng.setFocusedOwner("bible");
+  r.eng.clearFocusedOwner("lesson");
+  ok("another Listen screen in front doesn't touch this session", r.eng.getState().focusedOwner === "bible" && r.eng.getState().content.owner === "lesson" && r.eng.getState().status === "playing");
+  ok("Background playback is on by default and remembered when changed", r.eng.getState().background === true && (r.eng.setBackground(false), JSON.parse(r.store.get("p2p.listen.v1.prefs")).background === false));
+  ok("speech is told when it should keep going in the background", (r.eng.setBackground(true), r.eng.listenAgain(), r.last().o.background === true));
+}
+const host = src("components/listen/ListenPlayer.tsx");
+ok("one host at the app root: floating mini player + the one Read & Listen screen", /<ListenHost \/>/.test(src("app/_layout.tsx")) && (src("app/_layout.tsx").match(/<ListenHost \/>/g) ?? []).length === 1
+  && /st\.focusedOwner !== st\.content\.owner && !st\.presented && <MiniBar/.test(host) && (host.match(/<Modal /g) ?? []).length === 1);
+ok("floating mini player sits above the tab bar on tab screens", /segments\[0\] === "\(tabs\)"/.test(host) && /Platform\.OS === "web" \? 50 : 54/.test(host));
+ok("mini player: title, status, progress, play/pause, open, stop", /floatTrack/.test(host) && /Open Read and Listen/.test(host) && /accessibilityLabel="Stop listening" onPress=\{\(\) => listen\.stop\(\)\}/.test(host));
+ok("'Go to the text' from anywhere (content routes)", /label="Go to the text"/.test(host) && /router\.navigate\(content\.route as any\)/.test(host)
+  && ["app/kingdom-stories/chapter.tsx", "app/kingdom-stories/[id].tsx", "app/lesson/[id].tsx", "app/plan/[id].tsx"].every((f) => /route: \{ pathname: "\//.test(src(f))) && /const route = bibleRoute\(/.test(src("lib/listen/bibleContent.ts")));
+ok("Bible: switching chapters and continuing work after leaving the Bible (built outside the screen)", /export async function playBibleChapter/.test(src("lib/listen/bibleContent.ts")) && /bibleListenContent\(d, language, part, \[/.test(src("app/bible/index.tsx"))
+  && /Now listening: \{listeningChapter\.label\}/.test(src("app/bible/index.tsx")));
+ok("story chapter links play directly (no dependency on the screen still being open)", /if \(next\) void listen\.play\(next, "start"/.test(src("app/kingdom-stories/chapter.tsx")) && /if \(mounted\.current\) go\(to\)/.test(src("app/kingdom-stories/chapter.tsx")));
+ok("voice rows: name, quality, preview button, selection", /accessibilityLabel=\{`Preview \$\{v\.name\}`\}/.test(host) && /listen\.previewVoice\(v\.identifier\)/.test(host) && /TIER_LABEL\[voiceTier\(v\)\]/.test(host));
+ok("Bible: 'When this chapter ends' (Stop / Listen again / Next chapter) with a range, in place of Auto Listen Again", /accessibilityLabel="When this chapter ends"/.test(host) && /Continue through \{bookName\}/.test(host) && /bible && bibleChapter \?/.test(host) && /: !bible \? \(/.test(host));
+ok("Background playback setting with its plain description and honest limits", /Continue listening while using other apps or when your screen is locked\./.test(host) && /Lock-screen controls aren't available for device voices yet\./.test(host));
+
+// ── Responsive layout ──────────────────────────────────────────────────────
+ok("desktop / large tablet / phone landscape: text beside a controls panel", /const wide = width >= LARGE_TABLET_BREAKPOINT \|\| landscapePhone/.test(host) && /s\.wideRow/.test(host) && /width: sidePanel/.test(host));
+ok("tablet: a wider layout from the app's own breakpoint", /const tablet = !wide && width >= TABLET_BREAKPOINT/.test(host) && /maxWidth: wide \? undefined : tablet \? 900 : 760/.test(host));
+ok("the reading column never stretches past a readable width", /maxWidth: wide \|\| tablet \? 720 : undefined/.test(host));
+ok("large text: text size control + the reading area scrolls (controls never overlap it)", /accessibilityLabel="Larger text"/.test(host) && /readArea: \{ flex: 1, minHeight: 160 \}/.test(host));
+
+// ── Study Together: investigated, deliberately unchanged ───────────────────
+ok("Study Together / call screens untouched by Listen (no shared narration over calls yet)", ["app/study-together/[id].tsx", "components/study/StudyLessonTab.tsx", "app/call/video.tsx", "app/call/audio.tsx"].every((f) => !/lib\/listen|ListenPlayer|expo-speech/.test(src(f))));
 
 console.log(`${pass} passed, ${fail} failed`);
 if (fail) process.exitCode = 1;

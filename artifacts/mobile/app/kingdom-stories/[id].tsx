@@ -85,7 +85,7 @@ export default function KingdomStoryBookScreen() {
     if (listeningIntro) return listen.present();
     const first = [...(story.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber).find((x) => x.learning?.state !== "locked");
     void listen.play({
-      key: introKey, owner: "story-intro", kind: "story-intro", highlight: "sentence", title: story.title, subtitle: "Introduction", language: "en", sections: introSections,
+      key: introKey, owner: "story-intro", kind: "story-intro", route: { pathname: "/kingdom-stories/[id]", params: { id: story.id } }, highlight: "sentence", title: story.title, subtitle: "Introduction", language: "en", sections: introSections,
       // The next learning step, chosen by the reader — never opened automatically.
       completionActions: first
         ? [{ label: `Start Chapter ${first.chapterNumber}`, icon: "book-outline", open: () => router.push({ pathname: "/kingdom-stories/chapter", params: { id: story.id, chapter: first.id } } as any) }]
