@@ -1,3 +1,5 @@
+// Content-loading measurements (development / measurement builds only) — first, so it sees every request.
+import "@/lib/perf";
 import {
   Inter_400Regular,
   Inter_500Medium,

@@ -10,6 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import type { MarkReadResult } from "@/lib/notificationTap";
 import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "./AuthContext";
+import { usePerfVisit } from "@/lib/perf";
 import { deliveryAcker } from "@/lib/receiptSession";
 import {
   applyReceipts, deriveOutgoingStatus, isReceiptEligible, receiptFromRow,
@@ -468,6 +469,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
   const [pendingEvaluations, setPendingEvaluations] = useState<PendingEvaluation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  usePerfVisit("startup", "Startup: app data ready", profile?.id, !isLoading);
   const [toastEvent, setToastEvent] = useState<GrowthEvent | null>(null);
   const [celebrationEvent, setCelebrationEvent] = useState<GrowthEvent | null>(null);
 

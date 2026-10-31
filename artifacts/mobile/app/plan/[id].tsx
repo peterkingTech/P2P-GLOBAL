@@ -23,6 +23,7 @@ import { AppButton } from "@/components/ui";
 import ContentImage from "@/components/media/ContentImage";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
+import { usePerfVisit } from "@/lib/perf";
 
 const COVER_HEIGHT = 200;
 
@@ -59,6 +60,7 @@ export default function PlanDetailScreen() {
   const styles = makeStyles(colors);
 
   const [plan, setPlan] = useState<PlanDetail | null>(null);
+  usePerfVisit("plan", "Plan overview", id, !!plan && plan.id === id);
   const [lockedInfo, setLockedInfo] = useState<LockedPlanInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgErr, setImgErr] = useState(false);

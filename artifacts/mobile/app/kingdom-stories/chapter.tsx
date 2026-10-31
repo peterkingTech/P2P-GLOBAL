@@ -11,6 +11,7 @@ import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL, chapterListenSections } from "@/lib/storybook";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent } from "@/lib/listen";
+import { usePerfVisit } from "@/lib/perf";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips, ScriptureText } from "@/components/kingdom-stories/ScriptureLinks";
@@ -110,6 +111,7 @@ export default function KingdomStoryChapterScreen() {
   const chapters = useMemo(() => [...(story?.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber), [story]);
   const index = chapters.findIndex((x) => x.id === chapterId);
   const ch: KingdomStoryChapter | undefined = chapters[index];
+  usePerfVisit("story.chapter", "Story chapter", chapterId, !!ch);
   const prev = index > 0 ? chapters[index - 1] : null;
   const next = index >= 0 && index < chapters.length - 1 ? chapters[index + 1] : null;
 

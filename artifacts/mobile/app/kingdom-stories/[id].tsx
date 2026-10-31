@@ -13,6 +13,7 @@ import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { storyIntro, progressSummary, STATE_LABEL, lockedMessage, introListenSections } from "@/lib/storybook";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
+import { usePerfVisit } from "@/lib/perf";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips } from "@/components/kingdom-stories/ScriptureLinks";
 import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
@@ -46,6 +47,7 @@ export default function KingdomStoryBookScreen() {
   const autoOpened = useRef(false);
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState<KingdomStory | null>(null);
+  usePerfVisit("story", "Kingdom Story page", id, !!story && story.id === id);
   const [scripture, setScripture] = useState<ScriptureReference | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [studyOpen, setStudyOpen] = useState(false);

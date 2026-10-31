@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePerfVisit } from "@/lib/perf";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, useWindowDimensions, RefreshControl, FlatList, Platform, AccessibilityInfo, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,7 @@ export default function KingdomStoriesDiscoverScreen() {
   const { width } = useWindowDimensions();
   const { T, s: styles } = useStoryStyles(makeStyles);
   const [home, setHome] = useState<DiscoverHome | null>(null);
+  usePerfVisit("stories.home", "Kingdom Stories home", "home", !!home);
   const [categories, setCategories] = useState<CatalogueCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { usePerfVisit } from "@/lib/perf";
 import {
   View,
   Text,
@@ -364,6 +365,8 @@ export default function KingdomSchoolScreen() {
   // does the on-demand translation fetch itself (parallel, English fallback
   // always), so there's nothing left for this screen to fetch.
   const { modules, plans, getCurriculumCatalog } = useData();
+  const [catalogReady, setCatalogReady] = useState(false);
+  usePerfVisit("school", "Kingdom School", "school", catalogReady && modules.length > 0);
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
@@ -387,6 +390,7 @@ export default function KingdomSchoolScreen() {
       const catalog = await getCurriculumCatalog();
       if (!cancelled) {
         setFoundationsCatalog(catalog);
+        setCatalogReady(true);
         setFoundationsLoading(false);
       }
     })();

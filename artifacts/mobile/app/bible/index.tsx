@@ -33,6 +33,7 @@ import { AppButton, IconButton } from "@/components/ui";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, useListenOwner, useListenState, type ListenContent, type StartAt } from "@/lib/listen";
 import { bibleListenContent, bibleListenKey } from "@/lib/listen/bibleContent";
+import { usePerfVisit } from "@/lib/perf";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -300,6 +301,8 @@ export default function BibleReaderScreen() {
     });
     return out;
   }, [data, prefs.layout, my.highlights]);
+  usePerfVisit("bible", "Bible chapter", loc ? `${loc.t}:${loc.book}.${loc.chapter}` : null,
+    !!data && blocks.length > 0 && data.book.code === loc?.book && data.chapter === loc?.chapter && data.translation.code === loc?.t);
 
   // Scroll to the requested verse once its block has been laid out.
   // Blocks remount per navigation so onLayout fires even for a cached chapter.

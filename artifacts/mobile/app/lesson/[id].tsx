@@ -45,6 +45,7 @@ import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 import { lessonListenSections } from "@/lib/listen/lessonContent";
+import { usePerfVisit } from "@/lib/perf";
 import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
@@ -504,6 +505,7 @@ export default function LessonScreen() {
 
   const [content, setContent] = useState<LessonContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  usePerfVisit("lesson", "Lesson", id, !!content && !isLoading);
   const [completing, setCompleting] = useState(false);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [assignmentQuestions, setAssignmentQuestions] = useState<{ id: string; question: string }[]>([]);
