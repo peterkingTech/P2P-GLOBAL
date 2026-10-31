@@ -5,7 +5,7 @@
 // compiled here (no Xcode / Android SDK on this machine) — an EAS build does.
 // Run: node tests/widgets.test.mjs
 import { createRequire } from "node:module";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -133,6 +133,15 @@ ok("plugin registered for every build (without touching app.json)", read("app.co
 ok("app and widgets read the same App Group key", read("modules/p2p-widgets/ios/P2PWidgetsModule.swift").includes('"p2p.widgets.snapshot"') && swift.includes('"p2p.widgets.snapshot"') && read("plugins/p2p-widgets/P2PWidgets-Info.plist").includes("P2PAppGroup"));
 ok("sync host mounted once, writes only on change, clears on sign-out", (read("app/_layout.tsx").match(/<WidgetSyncHost \/>/g) ?? []).length === 1 && /prev === key/.test(read("lib/widgetSync.ts")) && /clearWidgetSnapshot\(\)/.test(read("components/widgets/WidgetSyncHost.tsx")));
 ok("settings: Widgets & Offline screen in Settings (not a new tab)", existsSync(path.join(root, "app/settings/widgets.tsx")) && read("app/settings/index.tsx").includes('route: "/settings/widgets"'));
+// iOS build 2026-10-31 failed with "cannot find 'P2PWidgetsModule' in scope": the bridge pod and the
+// WidgetKit extension target were both named P2PWidgets, so the app's `import P2PWidgets` found the
+// extension's module. The pod (= the Swift module the app imports) must never share the target's name.
+{
+  const target = plugin.match(/const TARGET = "([^"]+)"/)?.[1];
+  const podspecs = readdirSync(path.join(root, "modules/p2p-widgets/ios")).filter((f) => f.endsWith(".podspec"));
+  const podName = podspecs.length === 1 ? read(`modules/p2p-widgets/ios/${podspecs[0]}`).match(/s\.name\s*=\s*'([^']+)'/)?.[1] : null;
+  ok("iOS: bridge pod name differs from the widget extension target (no Swift module clash)", !!target && !!podName && podName !== target && podspecs[0] === `${podName}.podspec`, `${podName} vs ${target}`);
+}
 
 console.log(`widgets: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

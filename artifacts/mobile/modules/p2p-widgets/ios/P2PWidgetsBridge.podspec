@@ -1,5 +1,5 @@
 Pod::Spec.new do |s|
-  s.name           = 'P2PWidgets'
+  s.name           = 'P2PWidgetsBridge'
   s.version        = '1.0.0'
   s.summary        = 'Home-screen widget data bridge for P2P Global'
   s.description    = 'Local Expo module: stores the widget snapshot in the shared App Group and reloads WidgetKit timelines.'
