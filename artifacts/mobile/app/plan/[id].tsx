@@ -24,6 +24,7 @@ import ContentImage from "@/components/media/ContentImage";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 import { usePerfVisit } from "@/lib/perf";
+import { loadCached, peekCached, qk } from "@/lib/query";
 
 const COVER_HEIGHT = 200;
 
@@ -59,28 +60,36 @@ export default function PlanDetailScreen() {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
-  const [plan, setPlan] = useState<PlanDetail | null>(null);
+  type PlanLoad = { kind: "ok"; data: PlanDetail } | { kind: "locked"; body: LockedPlanInfo } | { kind: "missing" };
+  const cachedPlan = id ? peekCached<PlanLoad>(qk.plan(id, profile?.id)) : undefined;
+  const [plan, setPlan] = useState<PlanDetail | null>(cachedPlan?.kind === "ok" ? cachedPlan.data : null);
   usePerfVisit("plan", "Plan overview", id, !!plan && plan.id === id);
   const [lockedInfo, setLockedInfo] = useState<LockedPlanInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cachedPlan?.kind !== "ok");
   const [imgErr, setImgErr] = useState(false);
 
   const loadPlan = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    if (!peekCached(qk.plan(id, profile?.id))) setLoading(true);
     setLockedInfo(null);
     try {
       const apiUrl = getApiUrl();
       const params = profile?.id ? `?userId=${profile.id}` : "";
-      const res = await fetch(`${apiUrl}/plans/${id}${params}`);
-      if (res.status === 403) {
-        const body = (await res.json()) as LockedPlanInfo;
-        setLockedInfo(body);
+      // Reused for 30 s (coming back from a lesson within that time shows it at once; after
+      // that it refreshes, so a newly unlocked plan or new progress shows straight away).
+      const loaded = await loadCached<PlanLoad>(qk.plan(id, profile?.id), async () => {
+        const res = await fetch(`${apiUrl}/plans/${id}${params}`);
+        if (res.status === 403) return { kind: "locked", body: (await res.json()) as LockedPlanInfo };
+        if (!res.ok) return { kind: "missing" };
+        return { kind: "ok", data: (await res.json()) as PlanDetail };
+      }, { maxAgeMs: 30_000 });
+      if (loaded.kind === "locked") {
+        setLockedInfo(loaded.body);
         setPlan(null);
         return;
       }
-      if (!res.ok) { setPlan(null); return; }
-      const data = (await res.json()) as PlanDetail;
+      if (loaded.kind === "missing") { setPlan(null); return; }
+      const data = loaded.data;
       setPlan(data);
       if (data.category) void checkCategoryCompletion(data.category.id);
 
@@ -90,8 +99,7 @@ export default function PlanDetailScreen() {
       // church/location are proper nouns / fixed English labels).
       const language = profile?.contentLanguage;
       if (language && language !== "en") {
-        fetch(`${apiUrl}/translations/curriculum/${data.id}?language=${language}`)
-          .then((r) => r.json())
+        loadCached(["plan-translation", data.id, language], () => fetch(`${apiUrl}/translations/curriculum/${data.id}?language=${language}`).then((r) => r.json()), { maxAgeMs: 10 * 60_000 })
           .then((t) => {
             if (!t?.translation_available) return;
             setPlan((prev) => prev ? {
@@ -106,8 +114,7 @@ export default function PlanDetailScreen() {
 
         Promise.all(
           data.modules.map((m) =>
-            fetch(`${apiUrl}/translations/module/${m.id}?language=${language}`)
-              .then((r) => r.json())
+            loadCached(["module-translation", m.id, language], () => fetch(`${apiUrl}/translations/module/${m.id}?language=${language}`).then((r) => r.json()), { maxAgeMs: 10 * 60_000 })
               .then((t) => ({ moduleId: m.id, t }))
               .catch(() => null)
           )

@@ -12,6 +12,7 @@ import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABE
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent } from "@/lib/listen";
 import { usePerfVisit } from "@/lib/perf";
+import { loadCached, peekCached, qk } from "@/lib/query";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips, ScriptureText } from "@/components/kingdom-stories/ScriptureLinks";
@@ -61,8 +62,9 @@ export default function KingdomStoryChapterScreen() {
   const reading = useReadingScale();
   const s = useMemo(() => makeStyles(c, reading.scale), [c, reading.scale]);
 
-  const [story, setStory] = useState<KingdomStory | null>(null);
-  const [loading, setLoading] = useState(true);
+  // The story is shared with the story page (lib/query): opening a chapter from it shows at once.
+  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id)) ?? null : null));
+  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id))));
   const [error, setError] = useState<string | null>(null);
   const [reflSubs, setReflSubs] = useState<Map<string, Sub>>(new Map());
   const [checkSubs, setCheckSubs] = useState<Map<string, Sub>>(new Map());
@@ -73,10 +75,12 @@ export default function KingdomStoryChapterScreen() {
   // finishing a chapter; NOT on every page turn.
   const chapterRef = React.useRef(chapterId);
   chapterRef.current = chapterId;
-  const load = useCallback(async () => {
+  // fresh: after finishing a chapter or answering (the learning states changed); otherwise
+  // reuse a copy under 30 s old (coming back from the Bible, page turns, the story page).
+  const load = useCallback(async (fresh = false) => {
     if (!id) return;
     try {
-      const st = await getKingdomStory(id);
+      const st = await loadCached(qk.story(id), () => getKingdomStory(id), { maxAgeMs: 30_000, fresh });
       setStory(st);
       setError(null);
       const cur = chapterRef.current;
@@ -104,7 +108,7 @@ export default function KingdomStoryChapterScreen() {
   useEffect(() => {
     if (story && loadedCh && story.status === "published" && loadedCh.learning?.state !== "locked") markStoryOpened(story.id, loadedCh.id);
   }, [story?.id, story?.status, loadedCh?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const reloadAll = useCallback(async () => { await load(); await loadAnswers().catch(() => {}); }, [load, loadAnswers]);
+  const reloadAll = useCallback(async () => { await load(true); await loadAnswers().catch(() => {}); }, [load, loadAnswers]);
   const pageTurn = usePageTurn();
   const [chaptersOpen, setChaptersOpen] = useState(false);
 

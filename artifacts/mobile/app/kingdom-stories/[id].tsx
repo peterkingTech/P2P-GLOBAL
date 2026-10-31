@@ -14,6 +14,7 @@ import { storyIntro, progressSummary, STATE_LABEL, lockedMessage, introListenSec
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 import { usePerfVisit } from "@/lib/perf";
+import { invalidateCached, loadCached, peekCached, setCached, qk } from "@/lib/query";
 import StoryImage from "@/components/kingdom-stories/StoryImage";
 import { ScriptureChips } from "@/components/kingdom-stories/ScriptureLinks";
 import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
@@ -45,8 +46,9 @@ export default function KingdomStoryBookScreen() {
   // chapter the reader is up to (once; the book stays underneath for Back).
   const { id, open } = useLocalSearchParams<{ id: string; open?: string }>();
   const autoOpened = useRef(false);
-  const [loading, setLoading] = useState(true);
-  const [story, setStory] = useState<KingdomStory | null>(null);
+  // Shared with the chapters (lib/query): coming back from a chapter shows the book at once.
+  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id))));
+  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id)) ?? null : null));
   usePerfVisit("story", "Kingdom Story page", id, !!story && story.id === id);
   const [scripture, setScripture] = useState<ScriptureReference | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -58,7 +60,8 @@ export default function KingdomStoryBookScreen() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     let live = true;
-    getKingdomStory(id).then((st) => {
+    // A copy under 30 s old is reused; finishing a chapter refreshes it (chapter screen), so progress stays current.
+    loadCached(qk.story(id), () => getKingdomStory(id), { maxAgeMs: 30_000 }).then((st) => {
       if (!live) return;
       setStory(st);
       if (st.mine) setMine(st.mine);
@@ -125,7 +128,13 @@ export default function KingdomStoryBookScreen() {
   async function toggleSave(kind: "favourite" | "later") {
     const on = !mine[kind];
     setMine((m) => ({ ...m, [kind]: on }));
-    try { await (on ? saveStory(story!.id, kind) : unsaveStory(story!.id, kind)); }
+    try {
+      await (on ? saveStory(story!.id, kind) : unsaveStory(story!.id, kind));
+      // Keep the shared copy in step, so reopening shows the new Favourite / Saved state.
+      const cached = peekCached<KingdomStory>(qk.story(story!.id));
+      if (cached) setCached(qk.story(story!.id), { ...cached, mine: { ...(cached.mine ?? { favourite: false, later: false }), [kind]: on } });
+      invalidateCached(qk.storiesHome());
+    }
     catch (e: any) { setMine((m) => ({ ...m, [kind]: !on })); showAlert("Couldn't update your library", e?.message ?? "Please try again."); }
   }
 

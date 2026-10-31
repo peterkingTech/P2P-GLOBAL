@@ -19,6 +19,7 @@ import { ResponsiveGrid } from "@/components/ResponsiveGrid";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, supabase } from "@/contexts/AuthContext";
+import { loadCached, peekCached, qk } from "@/lib/query";
 import {
   useData,
   KingdomSchoolStatus,
@@ -382,12 +383,14 @@ export default function KingdomSchoolScreen() {
   // the same database-driven way app/curriculum.tsx does. Kingdom School ->
   // Foundations is now the only in-app entry point to this browsing
   // experience; Home no longer links to it directly.
-  const [foundationsCatalog, setFoundationsCatalog] = useState<CurriculumCatalogItem[]>([]);
-  const [foundationsLoading, setFoundationsLoading] = useState(true);
+  // Shared cache: reopening Kingdom School shows the catalogue at once (refreshed when older than a minute).
+  const catalogKey = qk.curriculumCatalog(profile?.id);
+  const [foundationsCatalog, setFoundationsCatalog] = useState<CurriculumCatalogItem[]>(() => peekCached<CurriculumCatalogItem[]>(catalogKey) ?? []);
+  const [foundationsLoading, setFoundationsLoading] = useState(() => !peekCached(catalogKey));
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const catalog = await getCurriculumCatalog();
+      const catalog = await loadCached(catalogKey, () => getCurriculumCatalog());
       if (!cancelled) {
         setFoundationsCatalog(catalog);
         setCatalogReady(true);
@@ -395,7 +398,7 @@ export default function KingdomSchoolScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [getCurriculumCatalog]);
+  }, [getCurriculumCatalog, profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!profile?.id) return;

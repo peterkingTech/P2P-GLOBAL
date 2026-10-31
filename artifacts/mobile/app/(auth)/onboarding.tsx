@@ -18,7 +18,7 @@ import i18next from "i18next";
 import colors from "@/constants/colors";
 import { useLayout, MAX_CONTENT_WIDTH, useSheetWidth } from "@/hooks/useLayout";
 import { isSmallPhone, fs } from "@/lib/responsive";
-import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY } from "@/lib/i18n";
+import { SUPPORTED_LANGUAGES, LANGUAGE_DISPLAY, setAppLanguage } from "@/lib/i18n";
 import ReadableText from "@/components/ReadableText";
 import { READABLE_WIDTH } from "@/lib/typography";
 import { AppButton } from "@/components/ui";
@@ -92,7 +92,7 @@ export default function OnboardingScreen() {
     setLangPickerOpen(false);
     try {
       await AsyncStorage.setItem("@p2p/appLanguage", lang.code);
-      await i18next.changeLanguage(lang.code);
+      await setAppLanguage(lang.code);
     } catch {}
   }
 

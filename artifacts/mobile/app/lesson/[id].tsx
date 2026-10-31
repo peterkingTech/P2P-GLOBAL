@@ -45,6 +45,7 @@ import { bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
 import { lessonListenSections } from "@/lib/listen/lessonContent";
+import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
 import { checkTitle } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
@@ -503,8 +504,10 @@ export default function LessonScreen() {
   } = useData();
   const contentLanguage = authProfile?.contentLanguage ?? "en";
 
-  const [content, setContent] = useState<LessonContent | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // The lesson's own content (sections, Scripture, questions — never answers or progress)
+  // is shared (lib/query): reopening a lesson shows it at once, refreshed after a minute.
+  const [content, setContent] = useState<LessonContent | null>(() => (id ? peekCached<LessonContent>(qk.lessonContent(id)) ?? null : null));
+  const [isLoading, setIsLoading] = useState(() => !(id && peekCached(qk.lessonContent(id))));
   usePerfVisit("lesson", "Lesson", id, !!content && !isLoading);
   const [completing, setCompleting] = useState(false);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
@@ -644,26 +647,29 @@ export default function LessonScreen() {
     let cancelled = false;
     async function load() {
       if (!id) return;
-      setIsLoading(true);
+      setIsLoading(!peekCached(qk.lessonContent(id)));
       try {
-        const [{ data: lesson }, { data: sections }, { data: scriptures }, { data: questions }] =
+        const loaded = await loadCached<LessonContent>(qk.lessonContent(id), async () => {
+        const [{ data: lesson, error: lessonError }, { data: sections }, { data: scriptures }, { data: questions }] =
           await Promise.all([
             supabase.from("p2p_lessons").select("id,title,module_id,p2p_modules(attribution_text)").eq("id", id).maybeSingle(),
             supabase.from("p2p_lesson_sections").select("id,title,content,section_order").eq("lesson_id", id).order("section_order", { ascending: true }),
             supabase.from("p2p_scriptures").select("id,reference,verse,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
             supabase.from("p2p_reflection_questions").select("id,question,display_order").eq("lesson_id", id).order("display_order", { ascending: true }),
           ]);
-        if (!cancelled) {
+          if (lessonError) throw lessonError; // never cache a failed load
           const mod = lesson?.p2p_modules as unknown as Record<string, unknown> | null;
           const attribution = (mod?.attribution_text as string) ?? undefined;
-          setContent({
+          return {
             title: (lesson?.title as string) ?? lessonMeta?.title ?? "Lesson",
             sections: ((sections ?? []) as Record<string, unknown>[]).map((s) => ({ id: s.id as string, title: (s.title as string) ?? "", content: (s.content as string) ?? "" })),
             scriptures: ((scriptures ?? []) as Record<string, unknown>[]).map((s) => ({ id: s.id as string, reference: s.reference as string, verse: s.verse as string })),
             questions: ((questions ?? []) as Record<string, unknown>[]).map((q) => ({ id: q.id as string, question: q.question as string })),
             attribution,
-          });
-        }
+          };
+        });
+        // A translation (below) may already have replaced the English on screen: keep it.
+        if (!cancelled) setContent((prev) => (prev?.language && prev.language !== "en" ? prev : loaded));
       } catch {
         if (!cancelled) setContent({ title: lessonMeta?.title ?? "Lesson", sections: [], scriptures: [], questions: [] });
       } finally {

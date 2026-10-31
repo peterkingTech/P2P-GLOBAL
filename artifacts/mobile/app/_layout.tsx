@@ -7,7 +7,8 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient, clearContentCache } from "@/lib/query";
 import { Stack, useRouter, useSegments, usePathname, useGlobalSearchParams } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
@@ -56,12 +57,11 @@ import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { PageFrame } from "@/components/PageFrame";
 import { getStageFromPoints } from "@/constants/stages";
-import i18n, { SUPPORTED_LANGUAGES } from "@/lib/i18n";
+import i18n, { SUPPORTED_LANGUAGES, loadLocale, setAppLanguage } from "@/lib/i18n";
 import { usePresenceHeartbeat } from "@/lib/presence";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
 
 // Screens inside (auth) that authenticated users are allowed to stay on
 // (post-signup setup flows). "goals-onboarding" and "journey" were missing
@@ -99,12 +99,15 @@ function AuthGate() {
 
   const RTL_LANGUAGES = new Set(["ar", "he", "fa", "ur"]);
 
+  // The content language’s strings too (Listen’s spoken signposts use them), loaded on demand.
+  useEffect(() => { if (profile?.contentLanguage) void loadLocale(profile.contentLanguage); }, [profile?.contentLanguage]);
+
   useEffect(() => {
     const lang = profile?.appLanguage;
     if (!lang) return;
 
     if (SUPPORTED_LANGUAGES.includes(lang as any) && i18n.language !== lang) {
-      i18n.changeLanguage(lang);
+      void setAppLanguage(lang);
     }
 
     // RTL layout — requires an app reload to take effect in React Native.
@@ -655,6 +658,19 @@ function PresenceHost() {
   return null;
 }
 
+// Private content (progress, answers, saves) lives in the shared cache only for
+// the person it was loaded for: a different user or signing out clears it all.
+function ContentCacheGuard() {
+  const { user } = useAuth();
+  const last = React.useRef<string | null | undefined>(undefined);
+  React.useEffect(() => {
+    const id = user?.id ?? null;
+    if (last.current !== undefined && last.current !== id) clearContentCache();
+    last.current = id;
+  }, [user?.id]);
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <AuthProvider>
@@ -669,6 +685,8 @@ function RootLayoutNav() {
         <MessageBannerHost />
         {/* Keeps the home-screen widgets current (no UI). */}
         <WidgetSyncHost />
+        {/* Shared content cache: forgotten when the signed-in person changes or signs out. */}
+        <ContentCacheGuard />
         {/* Listen: one session for the whole app — floating mini player + Read & Listen screen. */}
         <ListenHost />
         <PushNotificationHost />
@@ -697,7 +715,7 @@ export default function RootLayout() {
   useEffect(() => {
     AsyncStorage.getItem("@p2p/appLanguage").then((saved) => {
       if (saved && SUPPORTED_LANGUAGES.includes(saved as any) && i18n.language !== saved) {
-        i18n.changeLanguage(saved);
+        void setAppLanguage(saved);
       }
     }).catch(() => {});
   }, []);

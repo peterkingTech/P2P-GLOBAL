@@ -1,41 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "@/locales/en.json";
-import de from "@/locales/de.json";
-import es from "@/locales/es.json";
-import fr from "@/locales/fr.json";
-import pt from "@/locales/pt.json";
-import zh from "@/locales/zh.json";
-import zhTW from "@/locales/zh-TW.json";
-import ar from "@/locales/ar.json";
-import hi from "@/locales/hi.json";
-import sw from "@/locales/sw.json";
-import it from "@/locales/it.json";
-import nl from "@/locales/nl.json";
-import pl from "@/locales/pl.json";
-import ro from "@/locales/ro.json";
-import el from "@/locales/el.json";
-import ru from "@/locales/ru.json";
-import uk from "@/locales/uk.json";
-import tr from "@/locales/tr.json";
-import he from "@/locales/he.json";
-import fa from "@/locales/fa.json";
-import bn from "@/locales/bn.json";
-import ur from "@/locales/ur.json";
-import ta from "@/locales/ta.json";
-import te from "@/locales/te.json";
-import ja from "@/locales/ja.json";
-import ko from "@/locales/ko.json";
-import th from "@/locales/th.json";
-import vi from "@/locales/vi.json";
-import id from "@/locales/id.json";
-import ms from "@/locales/ms.json";
-import ha from "@/locales/ha.json";
-import yo from "@/locales/yo.json";
-import ig from "@/locales/ig.json";
-import tl from "@/locales/tl.json";
-import zu from "@/locales/zu.json";
-import tw from "@/locales/tw.json";
 
 // Multilingual Expansion Stage 2 — reconciliation. Display metadata (native
 // name, RTL) lives here alongside the resource map itself so the two can
@@ -139,45 +104,75 @@ i18n.use(initReactI18next).init({
   compatibilityJSON: "v4",
   resources: {
     en: { translation: en },
-    de: { translation: de },
-    es: { translation: es },
-    fr: { translation: fr },
-    pt: { translation: pt },
-    it: { translation: it },
-    nl: { translation: nl },
-    pl: { translation: pl },
-    ro: { translation: ro },
-    el: { translation: el },
-    ru: { translation: ru },
-    uk: { translation: uk },
-    tr: { translation: tr },
-    zh: { translation: zh },
-    "zh-TW": { translation: zhTW },
-    ar: { translation: ar },
-    he: { translation: he },
-    fa: { translation: fa },
-    hi: { translation: hi },
-    bn: { translation: bn },
-    ur: { translation: ur },
-    ta: { translation: ta },
-    te: { translation: te },
-    ja: { translation: ja },
-    ko: { translation: ko },
-    th: { translation: th },
-    vi: { translation: vi },
-    id: { translation: id },
-    ms: { translation: ms },
-    sw: { translation: sw },
-    ha: { translation: ha },
-    yo: { translation: yo },
-    ig: { translation: ig },
-    tl: { translation: tl },
-    zu: { translation: zu },
-    tw: { translation: tw },
   },
+  partialBundledLanguages: true,
   lng: "en",
   fallbackLng: "en",
   interpolation: { escapeValue: false },
 });
+
+// Every other language is loaded only when someone uses it (it used to be: all
+// 36 files — about 1.2 MB — parsed at every launch). English stays built in as
+// the fallback, so text is never missing while a language arrives.
+const LOADERS: Record<string, () => Promise<any>> = {
+  de: () => import("@/locales/de.json"),
+  es: () => import("@/locales/es.json"),
+  fr: () => import("@/locales/fr.json"),
+  pt: () => import("@/locales/pt.json"),
+  it: () => import("@/locales/it.json"),
+  nl: () => import("@/locales/nl.json"),
+  pl: () => import("@/locales/pl.json"),
+  ro: () => import("@/locales/ro.json"),
+  el: () => import("@/locales/el.json"),
+  ru: () => import("@/locales/ru.json"),
+  uk: () => import("@/locales/uk.json"),
+  tr: () => import("@/locales/tr.json"),
+  zh: () => import("@/locales/zh.json"),
+  "zh-TW": () => import("@/locales/zh-TW.json"),
+  ar: () => import("@/locales/ar.json"),
+  he: () => import("@/locales/he.json"),
+  fa: () => import("@/locales/fa.json"),
+  hi: () => import("@/locales/hi.json"),
+  bn: () => import("@/locales/bn.json"),
+  ur: () => import("@/locales/ur.json"),
+  ta: () => import("@/locales/ta.json"),
+  te: () => import("@/locales/te.json"),
+  ja: () => import("@/locales/ja.json"),
+  ko: () => import("@/locales/ko.json"),
+  th: () => import("@/locales/th.json"),
+  vi: () => import("@/locales/vi.json"),
+  id: () => import("@/locales/id.json"),
+  ms: () => import("@/locales/ms.json"),
+  sw: () => import("@/locales/sw.json"),
+  ha: () => import("@/locales/ha.json"),
+  yo: () => import("@/locales/yo.json"),
+  ig: () => import("@/locales/ig.json"),
+  tl: () => import("@/locales/tl.json"),
+  zu: () => import("@/locales/zu.json"),
+  tw: () => import("@/locales/tw.json"),
+};
+const loading = new Map<string, Promise<boolean>>();
+
+/** Load a language's strings (once). Resolves false for a language without a file. */
+export function loadLocale(lng: string | null | undefined): Promise<boolean> {
+  const code = String(lng ?? "");
+  if (!code || code === "en" || i18n.hasResourceBundle(code, "translation")) return Promise.resolve(true);
+  const load = LOADERS[code];
+  if (!load) return Promise.resolve(false);
+  let p = loading.get(code);
+  if (!p) {
+    p = load()
+      .then((m) => { i18n.addResourceBundle(code, "translation", m?.default ?? m, true, true); return true; })
+      .catch(() => { loading.delete(code); return false; });
+    loading.set(code, p);
+  }
+  return p;
+}
+
+/** Switch the app's language, loading it first (so nothing flashes untranslated keys). */
+export async function setAppLanguage(lng: string) {
+  await loadLocale(lng);
+  return i18n.changeLanguage(lng);
+}
 
 export default i18n;

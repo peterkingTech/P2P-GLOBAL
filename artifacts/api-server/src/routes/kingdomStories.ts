@@ -226,14 +226,23 @@ type SequenceLink = { id: string; title: string; topicNumber: number | null };
 router.get("/:id", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
-  const { data: story } = await db.from("p2p_kingdom_stories").select("*").eq("id", req.params.id).maybeSingle();
+  // Independent lookups run together (each database round trip costs real time):
+  // the story, whether the caller is an editor, and the caller's own saves. The
+  // access rule is unchanged: nothing is returned before the published/editor check.
+  const [{ data: story }, editor, saves] = await Promise.all([
+    db.from("p2p_kingdom_stories").select("*").eq("id", req.params.id).maybeSingle(),
+    isEditor(userId),
+    savesFor(userId, [req.params.id]),
+  ]);
   if (!story) return err(res, "Story not found", 404);
-  const editor = await isEditor(userId);
   if (story.status !== "published" && !editor) return err(res, "Story not found", 404);
 
-  const [{ data: category }, media, sources, related] = await Promise.all([
+  const [{ data: category }, media, sources, related, siblingsRes] = await Promise.all([
     db.from("p2p_kingdom_story_categories").select("id,slug,title").eq("id", story.category_id).maybeSingle(),
     loadMedia(story.id as string), loadSources(story.id as string), loadRelated(story as Record<string, unknown>),
+    story.status === "published"
+      ? db.from("p2p_kingdom_stories").select("id,title,topic_number,published_at").eq("category_id", story.category_id).eq("status", "published")
+      : Promise.resolve({ data: [] as any[] }),
   ]);
   const loaded = await loadChapters(story.id as string, sources);
   // Storybook (migration 212): each chapter's state for this reader. Editors
@@ -245,12 +254,11 @@ router.get("/:id", async (req, res) => {
     const visible = learning.state === "locked" && !editor ? lockChapter(ch) : ch;
     return { ...visible, learning: learning.state === "locked" && !editor ? { ...learning, reflectionQuestions: [], check: null } : learning };
   });
-  const mine = (await savesFor(userId, [story.id as string])).get(story.id as string) ?? { favourite: false, later: false };
+  const mine = saves.get(story.id as string) ?? { favourite: false, later: false };
   // The published stories just before and after this one in its category's order.
   let sequence: { previous: SequenceLink | null; next: SequenceLink | null } = { previous: null, next: null };
   if (story.status === "published") {
-    const { data: siblings } = await db.from("p2p_kingdom_stories").select("id,title,topic_number,published_at").eq("category_id", story.category_id).eq("status", "published");
-    const list = (siblings ?? []) as any[];
+    const list = (siblingsRes.data ?? []) as any[];
     const n = neighbours([{ id: story.category_id as string, title: "", displayOrder: 0 }],
       list.map((x) => ({ id: x.id, categoryId: story.category_id as string, topicNumber: x.topic_number ?? null, publishedAt: x.published_at ?? null, relatedStoryId: null })), story.id as string);
     const link = (id: string | null): SequenceLink | null => { const x = id ? list.find((r) => r.id === id) : null; return x ? { id: x.id, title: x.title, topicNumber: x.topic_number ?? null } : null; };

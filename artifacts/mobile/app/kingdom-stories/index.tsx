@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePerfVisit } from "@/lib/perf";
+import { invalidateCached, loadCached, peekCached, qk } from "@/lib/query";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, useWindowDimensions, RefreshControl, FlatList, Platform, AccessibilityInfo, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,10 +43,11 @@ export default function KingdomStoriesDiscoverScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { T, s: styles } = useStoryStyles(makeStyles);
-  const [home, setHome] = useState<DiscoverHome | null>(null);
+  // Shared cache (lib/query): coming back to Kingdom Stories shows it at once, refreshed after a minute.
+  const [home, setHome] = useState<DiscoverHome | null>(() => peekCached<DiscoverHome>(qk.storiesHome()) ?? null);
   usePerfVisit("stories.home", "Kingdom Stories home", "home", !!home);
-  const [categories, setCategories] = useState<CatalogueCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<CatalogueCategory[]>(() => peekCached<CatalogueCategory[]>(qk.storyCategories()) ?? []);
+  const [loading, setLoading] = useState(() => !peekCached(qk.storiesHome()));
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
@@ -59,9 +61,12 @@ export default function KingdomStoriesDiscoverScreen() {
   const searchSeq = useRef(0);
   const loaded = useRef(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     try {
-      const [h, cats] = await Promise.all([getDiscoverHome(), getCatalogueCategories().then((r) => r.categories).catch(() => [] as CatalogueCategory[])]);
+      const [h, cats] = await Promise.all([
+        loadCached(qk.storiesHome(), () => getDiscoverHome(), { maxAgeMs: 60_000, fresh }),
+        loadCached(qk.storyCategories(), () => getCatalogueCategories().then((r) => r.categories), { maxAgeMs: 10 * 60_000, fresh }).catch(() => [] as CatalogueCategory[]),
+      ]);
       setHome(h); setCategories(cats); setFailed(false); loaded.current = true;
       const all = [...(h.heroSlides ?? []), ...(h.hero ? [h.hero] : []), ...(h.featured ? [h.featured] : [])];
       setFavs(Object.fromEntries(all.map((x) => [x.id, !!x.mine?.favourite])));
@@ -96,7 +101,11 @@ export default function KingdomStoriesDiscoverScreen() {
     if (!hero) return;
     const id = hero.id, on = !favs[id];
     setFavs((f) => ({ ...f, [id]: on }));
-    try { await (on ? saveStory(id, "favourite") : unsaveStory(id, "favourite")); } catch { setFavs((f) => ({ ...f, [id]: !on })); }
+    try {
+      await (on ? saveStory(id, "favourite") : unsaveStory(id, "favourite"));
+      // The cached home and story now hold an old Favourite flag: refresh them on the next visit.
+      invalidateCached(qk.storiesHome()); invalidateCached(qk.story(id));
+    } catch { setFavs((f) => ({ ...f, [id]: !on })); }
   }
   const onSlideEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => setSlide(Math.max(0, Math.min(slides.length - 1, Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width)))));
   const goToSlide = (i: number) => { setSlide(i); slidesRef.current?.scrollToIndex({ index: i, animated: !reduceMotion }); };
@@ -113,7 +122,7 @@ export default function KingdomStoriesDiscoverScreen() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={T.textSecondary} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={T.textSecondary} />}>
         {/* Hero artwork (or a calm title band when there is no story yet) */}
         <View style={{ height: hero ? heroH : insets.top + 120 }}>
           {slides.length ? (
@@ -189,7 +198,7 @@ export default function KingdomStoriesDiscoverScreen() {
             <View style={styles.empty}>
               <Ionicons name="cloud-offline-outline" size={30} color={T.textTertiary} />
               <Text style={styles.emptyText}>Kingdom Stories couldn't load. Check your connection.</Text>
-              <AppButton label="Try again" onPress={() => { setLoading(true); load(); }} variant="tertiary" />
+              <AppButton label="Try again" onPress={() => { setLoading(true); load(true); }} variant="tertiary" />
             </View>
           ) : results !== null || searching ? (
             <View style={styles.resultsGrid}>

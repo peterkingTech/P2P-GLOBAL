@@ -6,6 +6,7 @@
 import { router } from "expo-router";
 import { BIBLE_COVER } from "@/constants/artwork";
 import { bibleRoute, bookByCode, formatRef, getChapter, type BibleChapter } from "@/lib/bibleReaderApi";
+import { loadLocale } from "@/lib/i18n";
 import { listen, spokenLabels, type ListenAction, type ListenContent, type ListenSection } from "@/lib/listen";
 
 export const bibleListenKey = (d: Pick<BibleChapter, "translation" | "book" | "chapter">) => `bible:${d.translation.code}:${d.book.code}.${d.chapter}`;
@@ -27,7 +28,7 @@ export function bibleAnnouncement(d: BibleChapter, language: string, part?: { st
 
 /** Listen to another chapter (the listener's choice): load it and play from its start. */
 export async function playBibleChapter(bookCode: string, chapter: number, translation: string, language: string, actions: ListenAction[] = []) {
-  const d = await getChapter(bookCode, chapter, translation);
+  const [d] = await Promise.all([getChapter(bookCode, chapter, translation), loadLocale(language)]);
   await listen.play(bibleListenContent(d, language, undefined, actions), "start", { present: listen.getState().presented });
 }
 

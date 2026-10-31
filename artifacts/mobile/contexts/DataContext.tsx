@@ -1100,20 +1100,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const curriculums = (curriculumsRaw ?? []) as Record<string, unknown>[];
       if (!curriculums.length) return [];
 
-      const lockState = await getKingdomSchoolLockState(userId);
-
+      // The lock state and the modules/lessons don’t depend on each other: fetch them together.
       const curriculumIds = curriculums.map((c) => c.id as string);
-      const { data: modulesRaw } = await supabase
-        .from("p2p_modules")
-        .select("id,curriculum_id")
-        .in("curriculum_id", curriculumIds);
-      const modules = (modulesRaw ?? []) as Record<string, unknown>[];
-      const moduleIds = modules.map((m) => m.id as string);
-
-      const { data: lessonsRaw } = moduleIds.length
-        ? await supabase.from("p2p_lessons").select("id,module_id,estimated_minutes").in("module_id", moduleIds)
-        : { data: [] as Record<string, unknown>[] };
-      const lessons = (lessonsRaw ?? []) as Record<string, unknown>[];
+      const modulesAndLessons = (async () => {
+        const { data: modulesRaw } = await supabase
+          .from("p2p_modules")
+          .select("id,curriculum_id")
+          .in("curriculum_id", curriculumIds);
+        const modules = (modulesRaw ?? []) as Record<string, unknown>[];
+        const moduleIds = modules.map((m) => m.id as string);
+        const { data: lessonsRaw } = moduleIds.length
+          ? await supabase.from("p2p_lessons").select("id,module_id,estimated_minutes").in("module_id", moduleIds)
+          : { data: [] as Record<string, unknown>[] };
+        return { modules, lessons: (lessonsRaw ?? []) as Record<string, unknown>[] };
+      })();
+      const [lockState, { modules, lessons }] = await Promise.all([getKingdomSchoolLockState(userId), modulesAndLessons]);
 
       const moduleCurriculumById = new Map(modules.map((m) => [m.id as string, m.curriculum_id as string]));
 
@@ -1709,8 +1710,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const lastLoadedUserId = useRef<string | null>(null);
 
+  // The startup loader re-runs only when the signed-in person or their content
+  // language changes — not whenever the profile object is replaced (token
+  // refreshes, settings edits), which used to reload everything each time.
+  const profileId = profile?.id ?? null;
+  const contentLang = profile?.contentLanguage ?? "en";
+  const startupLatest = useRef<any>({});
   const loadData = useCallback(async () => {
     if (authLoading) return;
+    const { profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork, loadTreeData, checkCurriculumCompletion, checkGrowthEvents } = startupLatest.current;
     if (!isAuthenticated || !profile?.id) {
       resetAllState();
       lastLoadedUserId.current = null;
@@ -1725,6 +1733,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       const dayIdx = new Date().getDate() % DAILY_VERSES.length;
       setDailyVerse(DAILY_VERSES[dayIdx]);
+      // Essentials, together: the home feed, Kingdom School and Learning Plans.
+      const loadHome = async () => {
       const [prayersRes, sessionsRes] = await Promise.all([
         supabase.from("p2p_prayer_requests").select("*").order("created_at", { ascending: false }).limit(30),
         supabase.from("p2p_sessions").select("*").order("scheduled_time", { ascending: true }).limit(10),
@@ -1758,15 +1768,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           { id: "s2", title: "Romans Deep Dive", description: "Justification by faith", scheduledAt: new Date(now.getTime() + 86400000).toISOString(), durationMinutes: 60, participantCount: 2, isLive: false, hostName: "Sister Ruth" },
         ]);
       }
+      };
       await Promise.all([
+        loadHome(),
         loadCurriculum(profile?.id, profile?.contentLanguage ?? "en"),
         loadPlans(profile?.id, profile?.contentLanguage ?? "en"),
       ]);
-      if (profile?.id) {
-        await refreshPendingEvaluations(profile.id);
-        await checkGrowthEvents(profile.id);
-      }
-      {
+      // Screens can show their content now; everything below loads alongside, not before it.
+      setIsLoading(false);
+      const loadFruitCatalog = async () => {
         // Catalog is public (RLS: any authenticated user) so it loads
         // regardless of whether profile is set yet.
         const { data: catalogData } = await supabase
@@ -1789,7 +1799,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           isHidden: Boolean(f.is_hidden),
           displayOrder: (f.display_order as number) ?? null,
         })));
-      }
+      };
+      const loadFruitsAndMissions = async () => {
       if (profile?.id) {
         const [{ data: fruitsData }, { data: progressData }] = await Promise.all([
           supabase
@@ -1829,6 +1840,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           religion: (m.religion as string) ?? "",
         })));
       }
+      };
+      const loadNetwork = async () => {
       if (profile) {
         await loadForestNetwork(profile.id, {
           id: profile.id, name: profile.displayName, role: profile.role,
@@ -1843,13 +1856,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         // what actually catches it.
         await checkCurriculumCompletion(profile.id);
       }
+      };
+      await Promise.allSettled([
+        profile?.id ? refreshPendingEvaluations(profile.id).then(() => checkGrowthEvents(profile.id)) : Promise.resolve(),
+        loadFruitCatalog(),
+        loadFruitsAndMissions(),
+        loadNetwork(),
+      ]);
     } catch {
       setDailyVerse(DAILY_VERSES[0]);
       setModules(FALLBACK_MODULES);
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, isAuthenticated, profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork, loadTreeData, checkCurriculumCompletion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, profileId, contentLang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -4863,6 +4883,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [profile, loadTreeData]);
 
   const dismissPendingCompletionMoment = useCallback(() => setPendingCompletionMoment(false), []);
+
+  startupLatest.current = { profile, loadCurriculum, loadPlans, refreshPendingEvaluations, loadForestNetwork, loadTreeData, checkCurriculumCompletion, checkGrowthEvents };
 
   return (
     <DataContext.Provider value={{

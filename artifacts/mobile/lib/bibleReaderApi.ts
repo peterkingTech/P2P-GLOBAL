@@ -64,16 +64,42 @@ export interface BibleChapter {
   copyright: string | null;
   previous: { bookCode: string; chapter: number } | null; next: { bookCode: string; chapter: number } | null;
 }
-export const getTranslations = () => call<{ translations: BibleTranslation[] }>("/bible/reader/translations");
+// The licensed-translations list changes rarely: one request every 10 minutes at most
+// (a failed request isn’t remembered, so the next visit tries again).
+let translationsCache: { at: number; p: Promise<{ translations: BibleTranslation[] }> } | null = null;
+export const getTranslations = () => {
+  if (translationsCache && Date.now() - translationsCache.at < 10 * 60_000) return translationsCache.p;
+  const p = call<{ translations: BibleTranslation[] }>("/bible/reader/translations");
+  translationsCache = { at: Date.now(), p };
+  p.catch(() => { if (translationsCache?.p === p) translationsCache = null; });
+  return p;
+};
+// Chapters read this session stay in memory only (never stored — licensed text); a chapter
+// already being fetched is shared, so a prefetch and the reader never download it twice.
 const chapterCache = new Map<string, BibleChapter>();
+const chapterPending = new Map<string, Promise<BibleChapter>>();
 export async function getChapter(book: string, chapter: number, t: string, signal?: AbortSignal): Promise<BibleChapter> {
   const key = `${t}:${book}.${chapter}`;
   const hit = chapterCache.get(key);
   if (hit) return hit;
-  const c = await call<BibleChapter>(`/bible/reader/chapter?book=${encodeURIComponent(book)}&chapter=${chapter}&t=${encodeURIComponent(t)}`, { signal });
-  if (chapterCache.size > 60) chapterCache.delete(chapterCache.keys().next().value as string);
-  chapterCache.set(key, c);
-  return c;
+  const pending = chapterPending.get(key);
+  if (pending) return pending;
+  // Not tied to one screen’s signal: a shared request finishes for whoever is still waiting.
+  void signal;
+  const p = call<BibleChapter>(`/bible/reader/chapter?book=${encodeURIComponent(book)}&chapter=${chapter}&t=${encodeURIComponent(t)}`)
+    .then((c) => {
+      if (chapterCache.size > 60) chapterCache.delete(chapterCache.keys().next().value as string);
+      chapterCache.set(key, c);
+      return c;
+    })
+    .finally(() => chapterPending.delete(key));
+  chapterPending.set(key, p);
+  return p;
+}
+/** Start loading a chapter early (e.g. while the translations list loads); errors are ignored here. */
+export function prefetchChapter(book: string, chapter: number, t: string) {
+  if (!book || !chapter || !t) return;
+  getChapter(book, chapter, t).catch(() => {});
 }
 export interface SearchResult { bookCode: string; chapter: number; verse: number; reference: string; text: string }
 export const searchBible = (q: string, t: string, offset: number, signal?: AbortSignal) =>

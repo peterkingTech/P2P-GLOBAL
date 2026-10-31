@@ -18,7 +18,7 @@ import { loadCompare, saveCompare, sanitizeCompare } from "@/lib/bibleCompare";
 import { useActiveGathering } from "@/lib/activeGathering";
 import {
   BibleApiError, HIGHLIGHT_COLORS, SCRIPTURE_FONT, addHighlight, addNote, bookByCode, bookByName, deleteNote, formatRef, getChapter,
-  getMyChapter, getTranslations, highlightPalette, removeBookmark, saveBookmark, updateNote, eraseHighlight, restoreHighlights,
+  getMyChapter, getTranslations, highlightPalette, prefetchChapter, removeBookmark, saveBookmark, updateNote, eraseHighlight, restoreHighlights,
   type BibleChapter, type BibleNote, type BibleTranslation, type Bookmark, type Highlight, type HighlightColor, type NewRef, type Offsets,
 } from "@/lib/bibleReaderApi";
 import {
@@ -34,6 +34,7 @@ import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, useListenOwner, useListenState, type ListenContent, type StartAt } from "@/lib/listen";
 import { bibleListenContent, bibleListenKey } from "@/lib/listen/bibleContent";
 import { usePerfVisit } from "@/lib/perf";
+import { loadLocale } from "@/lib/i18n";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -111,6 +112,19 @@ export default function BibleReaderScreen() {
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // Start the chapter the reader will most likely open (the link followed, else where
+  // they left off) at the same time as the translations list, instead of after it.
+  // The reader then picks it up from the shared request (lib/bibleReaderApi getChapter).
+  useEffect(() => {
+    loadPosition().then((saved) => {
+      const pBook = bookByCode(params.book);
+      const book = pBook ? pBook.code : saved?.book;
+      const chapter = pBook ? Number(params.chapter) : saved?.chapter;
+      const t = params.t || saved?.translation;
+      if (book && chapter && t) prefetchChapter(book, chapter, t);
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Translations (only licensed ones are ever listed) ────────────────────
   useEffect(() => {
@@ -230,7 +244,9 @@ export default function BibleReaderScreen() {
     if (!language) return null;
     return bibleListenContent(d, language, part, [{ label: "Choose another passage", icon: "list-outline", open: () => setSheet("books") }]);
   }, [translations]);
-  const startListening = (d: BibleChapter, at: StartAt, part?: { start: number; end: number }) => {
+  const startListening = async (d: BibleChapter, at: StartAt, part?: { start: number; end: number }) => {
+    // The translation’s language strings (spoken signposts) load on demand.
+    await loadLocale(translations?.find((t) => t.code === d.translation.code)?.language);
     const content = listenContent(d, part);
     if (!content) return flash("Listening isn't available for this translation yet.");
     void listen.play(content, at);
