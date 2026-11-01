@@ -418,6 +418,8 @@ ok("player: says plainly it's the phone's own voice (no narrator persona)", /Rea
 
 // ── Branded listening screen ──────────────────────────────────────────────
 const player = src("components/listen/ListenPlayer.tsx");
+ok("artwork: always the small cover, so it never covers the background logo (every screen, every mode)", /const ART = 96;/.test(player) && !/big \? art/.test(player)
+  && player.includes('{mode === "audio" ? null : readingArea}') && /justifyContent: "space-between"/.test(player));
 ok("branding: reuses the official logo and app icon (no new logo files)", /require\("@\/assets\/images\/logo\.png"\)/.test(player) && /require\("@\/assets\/images\/icon\.png"\)/.test(player)
   && !/require\("@\/assets\/(?!images\/(logo|icon)\.png)/.test(player));
 ok("branding: background from the person's theme (light/dark), logo as a faint watermark", /useTheme\(\)/.test(player) && /resolvedMode === "dark"/.test(player)

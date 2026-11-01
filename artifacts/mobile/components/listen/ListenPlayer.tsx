@@ -162,7 +162,6 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const wide = width >= LARGE_TABLET_BREAKPOINT || landscapePhone;   // text beside a controls panel
   const tablet = !wide && width >= TABLET_BREAKPOINT;
   const sidePanel = wide ? Math.min(420, Math.max(300, width * 0.36)) : 0;
-  const art = Math.round(wide ? Math.min(sidePanel - 80, height * 0.38, 260) : Math.min(width * 0.62, height * 0.36, 280));
   const watermark = Math.min(width, height) * 0.95;
   const artwork = content.artwork ?? null;
 
@@ -320,14 +319,17 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
     </View>
   );
 
-  const artBlock = (big: boolean) => (
+  // The cover is always small (as in the large-screen side panel), on every
+  // screen and in every mode, so it never covers the background logo.
+  const ART = 96;
+  const artBlock = (bigTitle: boolean) => (
     <View style={s.artBlock}>
-      <View style={[s.artFrame, { width: big ? art : 96, height: big ? art : 96, borderRadius: (big ? art : 96) * 0.12 }]}>
+      <View style={[s.artFrame, { width: ART, height: ART, borderRadius: ART * 0.12 }]}>
         {artwork
-          ? <Image source={artwork as any} style={[ARTWORK_FILL, { borderRadius: (big ? art : 96) * 0.12 }]} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
-          : <AppArtwork size={big ? art : 96} radius={(big ? art : 96) * 0.12} />}
+          ? <Image source={artwork as any} style={[ARTWORK_FILL, { borderRadius: ART * 0.12 }]} resizeMode="contain" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+          : <AppArtwork size={ART} radius={ART * 0.12} />}
       </View>
-      <Text style={big ? s.fullTitle : s.readTitle} numberOfLines={3}>{content.title}</Text>
+      <Text style={bigTitle ? s.fullTitle : s.readTitle} numberOfLines={3}>{content.title}</Text>
       {!!content.subtitle && <Text style={s.fullSub} numberOfLines={2}>{content.subtitle}</Text>}
       <Text style={[s.where, err && s.errText]}>{text}</Text>
     </View>
@@ -402,14 +404,16 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
           {wide ? (
             // Desktop / web / large tablet / phone landscape: text (or artwork) beside a controls panel.
             <View style={s.wideRow}>
-              <View style={{ flex: 1 }}>{mode === "audio" ? <View style={[s.center, { flex: 1 }]}>{artBlock(true)}</View> : readingArea}</View>
+              {/* Audio Only: the space beside the panel stays open, showing the background logo. */}
+              <View style={{ flex: 1 }}>{mode === "audio" ? null : readingArea}</View>
               <ScrollView style={[s.sidePanel, { width: sidePanel }]} contentContainerStyle={{ gap: 14, paddingBottom: 12 }} showsVerticalScrollIndicator={false}>
-                {mode !== "audio" && artBlock(false)}
+                {artBlock(false)}
                 {fullControls}
               </ScrollView>
             </View>
           ) : mode === "audio" ? (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
+            // Phone Audio Only: what's playing at the top, controls at the bottom, the logo between.
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", gap: 16, paddingVertical: 8 }} showsVerticalScrollIndicator={false}>
               {artBlock(true)}
               <View style={{ gap: 14 }}>{fullControls}</View>
             </ScrollView>

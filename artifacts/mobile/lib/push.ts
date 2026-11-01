@@ -246,6 +246,8 @@ export function pathForNotification(
   // declined / group study started → that study (the screen re-checks access).
   const studyId = typeof data?.studyId === "string" && /^[0-9a-f-]{36}$/i.test(data.studyId) ? data.studyId : null;
   if (notificationType?.startsWith("shared_study_") && studyId) return `/study-together/${studyId}`;
+  const collectionId = typeof data?.collectionId === "string" && /^[0-9a-f-]{36}$/i.test(data.collectionId) ? data.collectionId : null;
+  if (notificationType === "scripture_collection_shared") return collectionId ? `/scripture-collections/${collectionId}` : "/scripture-collections";
   // Missed call — the thread holds the missed-call card (tap to call back);
   // history covers a call with no conversation.
   if (notificationType === "missed_call") {

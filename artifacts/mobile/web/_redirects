@@ -8,3 +8,5 @@
 # just by existing in the git repo. See lib/sharing.ts's EFFECTIVE_INVITE_BASE
 # and profiles.ts's INVITE_BASE_URL for where this URL is referenced.
 /join/*   /share-landing.html   200
+# Scripture collection links (/c/CODE): a view-only preview, then the app.
+/c/*      /share-landing.html   200

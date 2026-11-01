@@ -3,7 +3,7 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import {
   CONTENT_TYPES, DESTINATIONS, GROUP_DESTINATIONS, INVITE_DAYS, MAX_PEER_INVITES, StudyError, isUuid,
   invitablePeers, isBlockedEitherWay, isDestinationMember, canLeadDestination, destinationMemberIds,
-  groupsUserLeads, destinationName, loadContent, notify, displayName,
+  groupsUserLeads, destinationName, loadContent, notify, displayName, myGroupIds, profilesById,
   type ContentType, type Destination,
 } from "../lib/sharedStudy";
 
@@ -80,14 +80,6 @@ const requireLeader = (a: Access) => { if (!a.isLeader) throw new StudyError(403
 const requireParticipant = (a: Access) => { if (!a.canParticipate) throw new StudyError(403, "Accept the invitation first."); };
 const requireActive = (a: Access) => { if (a.study.status !== "active") throw new StudyError(409, "This study has been concluded."); };
 const touch = (id: string) => db.from("p2p_shared_studies").update({ updated_at: new Date().toISOString() }).eq("id", id);
-
-async function profilesById(ids: string[]) {
-  const unique = Array.from(new Set(ids.filter(Boolean)));
-  if (!unique.length) return new Map<string, { name: string; photoUrl: string | null }>();
-  const { data } = await db.from("p2p_profiles").select("id,full_name,photo_url").in("id", unique);
-  return new Map(((data ?? []) as { id: string; full_name: string | null; photo_url: string | null }[])
-    .map((p) => [p.id, { name: p.full_name || "Someone", photoUrl: p.photo_url ?? null }]));
-}
 
 /** Peers who already share an active study of this content with the host (pending or accepted). */
 async function alreadyStudyingWith(hostId: string, type: ContentType, contentId: string, inviteeIds: string[]): Promise<{ userId: string; studyId: string } | null> {
@@ -225,23 +217,6 @@ router.post("/", async (req, res) => {
 });
 
 // ── My studies ───────────────────────────────────────────────────────────────
-
-async function myGroupIds(userId: string): Promise<Record<string, string[]>> {
-  const [{ data: fam }, { data: ch }, { data: circ }, { data: led }, { data: grp }, { data: grpLed }] = await Promise.all([
-    db.from("p2p_family_members").select("family_id").eq("user_id", userId).eq("status", "active"),
-    db.from("p2p_church_members").select("church_id").eq("user_id", userId).eq("is_active", true),
-    db.from("p2p_peer_circle_members").select("circle_id").eq("user_id", userId).eq("status", "active"),
-    db.from("p2p_peer_circles").select("id").eq("leader_id", userId),
-    db.from("p2p_group_members").select("group_id").eq("user_id", userId),
-    db.from("p2p_groups").select("id").eq("peer_guide_id", userId),
-  ]);
-  return {
-    family: (fam ?? []).map((r) => r.family_id as string),
-    church: (ch ?? []).map((r) => r.church_id as string),
-    circle: [...(circ ?? []).map((r) => r.circle_id as string), ...(led ?? []).map((r) => r.id as string)],
-    group: [...(grp ?? []).map((r) => r.group_id as string), ...(grpLed ?? []).map((r) => r.id as string)],
-  };
-}
 
 // The hub also lists the custom studies a Family Circle or Church has
 // published, for groups the caller is an ACTIVE member of (the same rule as

@@ -10,6 +10,7 @@ import {
   type BibleNote, type Bookmark, type Highlight,
 } from "@/lib/bibleReaderApi";
 import { AppButton, IconButton } from "@/components/ui";
+import AddToCollectionSheet from "@/components/scripture/AddToCollectionSheet";
 
 // The reader's own Bible library: notes, highlights and saved passages.
 // Private to the signed-in person (owner-only RLS); never shown to leaders.
@@ -35,6 +36,8 @@ export default function BibleLibraryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [adding, setAdding] = useState<Item | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
   const reqId = useRef(0);
 
   const load = useCallback(async (k: Kind, offset: number, mode: "replace" | "append" | "refresh" = "replace") => {
@@ -91,6 +94,7 @@ export default function BibleLibraryScreen() {
           {note?.title ? <Text style={styles.noteTitle} numberOfLines={1}>{note.title}</Text> : null}
           {note ? <Text style={styles.noteBody} numberOfLines={3}>{note.body}</Text> : null}
         </TouchableOpacity>
+        {!note && !confirming ? <IconButton icon="albums-outline" accessibilityLabel={`Add ${item.reference} to a collection`} onPress={() => setAdding(item)} color={c.textMuted} /> : null}
         {confirming ? (
           <AppButton label="Remove" onPress={() => remove(item)} variant="destructive" size="sm" accessibilityLabel={`Confirm remove ${item.reference}`} />
         ) : (
@@ -124,6 +128,9 @@ export default function BibleLibraryScreen() {
         ))}
       </View>
       {error ? <Text style={styles.error} accessibilityLiveRegion="polite">{error}</Text> : null}
+      {added ? <Text style={styles.muted} accessibilityLiveRegion="polite">{added}</Text> : null}
+      <AddToCollectionSheet visible={!!adding} label={adding?.reference ?? ""} onClose={() => setAdding(null)} onDone={(m) => { setAdding(null); setAdded(m); }}
+        refs={adding ? [{ translationCode: adding.translationCode, bookCode: adding.bookCode, chapter: adding.chapter, startVerse: adding.startVerse, endVerse: adding.endVerse }] : []} />
       {!available ? (
         <View style={styles.center}><Text style={styles.muted}>Notes, highlights and saved passages are coming soon.</Text></View>
       ) : (

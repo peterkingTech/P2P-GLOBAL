@@ -194,8 +194,13 @@ export async function loadContent(type: ContentType, id: string): Promise<StudyC
 // ── Notifications (in-app row; push goes out now, the cron retries) ─────────
 
 export async function notify(userIds: string[], n: { title: string; message: string; type: string; studyId: string }) {
+  return notifyWith(userIds, { title: n.title, message: n.message, type: n.type, data: { studyId: n.studyId } });
+}
+
+/** The same in-app row + immediate push, with the caller's own data (e.g. { collectionId }). */
+export async function notifyWith(userIds: string[], n: { title: string; message: string; type: string; data: Record<string, string> }) {
   const rows = userIds.slice(0, MAX_GROUP_NOTIFY).map((user_id) => ({
-    user_id, title: n.title, message: n.message, notification_type: n.type, data: { studyId: n.studyId },
+    user_id, title: n.title, message: n.message, notification_type: n.type, data: n.data,
   }));
   if (!rows.length) return;
   const { data } = await db.from("p2p_notifications").insert(rows).select("id");
@@ -205,4 +210,33 @@ export async function notify(userIds: string[], n: { title: string; message: str
 export async function displayName(userId: string): Promise<string> {
   const { data } = await db.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
   return (data?.full_name as string) || "Someone";
+}
+
+// ── Shared by Study Together and Scripture collections ───────────────────────
+
+/** Every group the user belongs to (active member, or its leader), by type. */
+export async function myGroupIds(userId: string): Promise<Record<string, string[]>> {
+  const [{ data: fam }, { data: ch }, { data: circ }, { data: led }, { data: grp }, { data: grpLed }] = await Promise.all([
+    db.from("p2p_family_members").select("family_id").eq("user_id", userId).eq("status", "active"),
+    db.from("p2p_church_members").select("church_id").eq("user_id", userId).eq("is_active", true),
+    db.from("p2p_peer_circle_members").select("circle_id").eq("user_id", userId).eq("status", "active"),
+    db.from("p2p_peer_circles").select("id").eq("leader_id", userId),
+    db.from("p2p_group_members").select("group_id").eq("user_id", userId),
+    db.from("p2p_groups").select("id").eq("peer_guide_id", userId),
+  ]);
+  return {
+    family: (fam ?? []).map((r) => r.family_id as string),
+    church: (ch ?? []).map((r) => r.church_id as string),
+    circle: [...(circ ?? []).map((r) => r.circle_id as string), ...(led ?? []).map((r) => r.id as string)],
+    group: [...(grp ?? []).map((r) => r.group_id as string), ...(grpLed ?? []).map((r) => r.id as string)],
+  };
+}
+
+/** Names and photos for a set of profile ids. */
+export async function profilesById(ids: string[]) {
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  if (!unique.length) return new Map<string, { name: string; photoUrl: string | null }>();
+  const { data } = await db.from("p2p_profiles").select("id,full_name,photo_url").in("id", unique);
+  return new Map(((data ?? []) as { id: string; full_name: string | null; photo_url: string | null }[])
+    .map((p) => [p.id, { name: p.full_name || "Someone", photoUrl: p.photo_url ?? null }]));
 }

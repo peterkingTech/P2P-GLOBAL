@@ -124,8 +124,9 @@ export default function NotificationsScreen() {
       router.push(pathForNotification("missed_call", n.data) as any);
       return;
     }
-    // Study Together shared study (migration 216) — same destination as the push.
-    if ((n.notificationType ?? "").startsWith("shared_study_")) {
+    // Study Together shared study (migration 216) and shared Scripture
+    // collections (220) — same destination as the push.
+    if ((n.notificationType ?? "").startsWith("shared_study_") || n.notificationType === "scripture_collection_shared") {
       const path = pathForNotification(n.notificationType, n.data);
       if (path !== "/notifications") router.push(path as any);
       return;

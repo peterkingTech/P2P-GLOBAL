@@ -3,274 +3,202 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Peer to Peer Global Discipleship Network</title>
+  <meta name="robots" content="noindex">
+  <title>P2P Global</title>
   <style>
-    body {
-      background: #0D1117; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; margin: 0; padding: 20px;
+    :root { --bg: #07120D; --card: #0D2218; --line: #1C3A2C; --text: #EDE8DE; --muted: #A7B3AB; --green: #1D9E75; --gold: #F7C948; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex; justify-content: center; padding: 28px 16px 40px; }
+    .wrap { width: 100%; max-width: 460px; }
+    .brand { display: flex; align-items: center; gap: 8px; justify-content: center; color: var(--muted); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 22px; }
+    .brand span { font-size: 22px; }
+    .kicker { color: var(--gold); font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; margin: 0 0 6px; }
+    h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.3px; }
+    .lead { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 0 0 18px; }
+    .card { background: var(--card); border-radius: 18px; padding: 16px; margin: 0 0 18px; }
+    .avatar { width: 72px; height: 72px; border-radius: 36px; display: block; margin: 0 auto 14px; object-fit: cover; border: 2px solid var(--green); }
+    .avatar-fallback { width: 72px; height: 72px; border-radius: 36px; margin: 0 auto 14px; background: rgba(29,158,117,0.16); color: var(--green); font-size: 28px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; }
+    .refs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+    .refs li { background: rgba(29,158,117,0.14); color: var(--text); border-radius: 999px; padding: 5px 10px; font-size: 13px; }
+    .passage-ref { font-weight: 700; margin: 0 0 8px; }
+    .passage { font-family: Georgia, "Times New Roman", serif; font-size: 17px; line-height: 1.6; margin: 0; }
+    .passage sup { color: var(--green); font-family: -apple-system, sans-serif; font-size: 11px; margin-right: 3px; }
+    .copyright { color: var(--muted); font-size: 11px; margin: 10px 0 0; }
+    .btn { display: block; width: 100%; text-align: center; text-decoration: none; border: none; cursor: pointer; border-radius: 14px; font-size: 16px; font-weight: 700; padding: 16px; margin: 0 0 10px; }
+    .btn-primary { background: var(--green); color: #fff; }
+    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .note { color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; margin: 6px 0 0; }
+    .lock { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
+    blockquote { color: var(--muted); font-size: 13px; font-style: italic; margin: 0 0 18px; padding: 12px; background: var(--card); border-radius: 12px; }
+    .hidden { display: none; }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #FBF7EE; --card: #F4EFE4; --line: #E2D9C6; --text: #2D2416; --muted: #6E6250; --gold: #BA7517; }
     }
-    .card { max-width: 400px; text-align: center; }
-    .logo { font-size: 48px; margin-bottom: 16px; }
-    h1 { color: #B8860B; margin-bottom: 8px; font-size: 22px; }
-    .tagline { color: #aaa; margin: 0 0 8px; }
-    .content-preview {
-      background: #1A2332; border-radius: 12px;
-      padding: 16px; margin: 24px 0; text-align: left;
-    }
-    .content-preview small { color: #888; }
-    .content-preview h3 { margin: 8px 0; color: #fff; }
-    .content-preview p { margin: 0; color: #aaa; font-size: 14px; }
-    .download-btn {
-      background: #1D9E75; color: #fff; border: none;
-      padding: 16px 32px; border-radius: 8px; font-size: 16px; font-weight: 600;
-      cursor: pointer; width: 100%; margin-bottom: 12px;
-    }
-    .subtitle { color: #888; font-size: 13px; }
-    .invite-avatar {
-      width: 72px; height: 72px; border-radius: 36px; margin: 0 auto 12px;
-      display: block; object-fit: cover; border: 2px solid #1D9E75;
-    }
-    .invite-avatar-fallback {
-      width: 72px; height: 72px; border-radius: 36px; margin: 0 auto 12px;
-      background: rgba(29,158,117,0.15); color: #1D9E75; font-size: 28px; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .invite-name { color: #aaa; font-size: 13px; margin: 0 0 12px; }
-    .invite-progress { color: #ccc; font-size: 13px; margin: 0 0 12px; }
-    blockquote {
-      color: #888; font-size: 13px; font-style: italic; margin: 16px 0;
-      padding: 12px; background: #1A2332; border-radius: 10px; border: none;
-    }
-    .grain-note { color: #888; font-size: 12px; margin-top: 8px; }
   </style>
 </head>
 <body>
-  <div class="card" id="staticCard">
-    <div class="logo">🌳</div>
-    <h1>Peer to Peer Global Discipleship Network</h1>
-    <p class="tagline">Someone shared this with you</p>
+  <!--
+    Every shared P2P Global link lands here (lessons, plans, categories,
+    profiles, rooms, Circles, Family Circles, churches, personal invites and
+    Scripture collections). Anyone can VIEW a preview; to take part —
+    listen, save, join, reply — they get the app and sign in. The page never
+    redirects on its own: "Get the app" goes to the P2P Global website, and
+    "Open in the app" is for people who already have it.
+  -->
+  <main class="wrap">
+    <div class="brand"><span>🌳</span> P2P Global</div>
+    <p class="kicker" id="kicker">Shared with you</p>
+    <div id="avatarWrap"></div>
+    <h1 id="title">Someone shared this with you</h1>
+    <p class="lead" id="lead">Peer to Peer Global Discipleship Network — going through the Bible together, free, for every nation.</p>
 
-    <div class="content-preview" id="preview"></div>
+    <div class="card hidden" id="refsCard">
+      <p class="kicker" id="refsLabel">Passages</p>
+      <ul class="refs" id="refs"></ul>
+    </div>
+    <div class="card hidden" id="passageCard">
+      <p class="passage-ref" id="passageRef"></p>
+      <p class="passage" id="passage"></p>
+      <p class="copyright" id="copyright"></p>
+    </div>
+    <blockquote class="hidden" id="verse"></blockquote>
 
-    <button class="download-btn" id="downloadBtn">📱 Open in App</button>
-    <p class="subtitle">Free on Android &middot; This content will open automatically if you have the app</p>
-  </div>
+    <div class="lock" id="lock"><span>🔒</span><span id="lockText">You can view this here. To take part, get the free P2P Global app and sign in — then open this link again.</span></div>
 
-  <div class="card" id="inviteCard" style="display:none">
-    <div id="inviteAvatarWrap"></div>
-    <h1 id="inviteTitle"></h1>
-    <p class="invite-name" id="inviteName"></p>
-    <p class="invite-progress" id="inviteProgress"></p>
-    <p class="tagline" id="inviteDesc"></p>
-    <blockquote>"Go and make disciples of all nations." — Matthew 28:19</blockquote>
-    <button class="download-btn" id="inviteDownloadBtn">📱 Open in P2P Global</button>
-    <p class="grain-note" id="grainNote"></p>
-  </div>
-
-  <div class="card" id="churchCard" style="display:none">
-    <div id="churchAvatarWrap"></div>
-    <h1 id="churchTitle"></h1>
-    <p class="invite-name" id="churchLocation"></p>
-    <p class="invite-progress" id="churchMemberCount"></p>
-    <p class="tagline" id="churchDesc"></p>
-    <blockquote>"Accept one another, just as Christ accepted you." — Romans 15:7</blockquote>
-    <button class="download-btn" id="churchDownloadBtn">📱 Open in P2P Global</button>
-    <p class="grain-note">Completely free — no subscription, no payment, no tiers.</p>
-  </div>
-
-  <p id="installNote" style="display:none; max-width: 420px; margin: 16px auto 0; padding: 0 20px; text-align: center; color: #9AA4AE; font-size: 14px; line-height: 1.5;">
-    If P2P Global didn't open, make sure the app is installed on this phone, then tap the button again.
-  </p>
+    <a class="btn btn-primary" id="getApp" href="/">Get the P2P Global app</a>
+    <button class="btn btn-secondary hidden" id="openApp" type="button">Already have the app? Open it</button>
+    <p class="note hidden" id="openNote">If the app didn't open, it may not be installed on this device yet.</p>
+  </main>
   <script>
-    var params = new URLSearchParams(window.location.search);
-    // Confirmed against app.json's android.package — not the
-    // "com.amentech.p2pglobal" id that was floated at one point, which
-    // doesn't match what's actually configured to build/publish.
-    // Store listings: intentionally empty until the real production URLs are
-    // confirmed. The previous Play URL used the OLD package id
-    // (com.amentech.p2pglobalbiblestudy); the app is now
-    // com.amentech.p2pglobaldiscipleshipnetwork, and no App Store URL exists
-    // yet. With no URL, the page never redirects to a wrong listing — it
-    // shows a short note instead (see showInstallNote).
-    var PLAY_STORE_URL = "";
-    var APP_STORE_URL = "";
-    function storeUrl() {
-      var ua = navigator.userAgent || "";
-      return /iPhone|iPad|iPod/i.test(ua) ? APP_STORE_URL : PLAY_STORE_URL;
-    }
-    function showInstallNote() {
-      var note = document.getElementById("installNote");
-      if (note) note.style.display = "block";
-    }
-    // After trying the app link: go to the store if one is configured,
-    // otherwise explain what to do. Never an invented or outdated listing.
-    function afterAppAttempt() {
-      var url = storeUrl();
-      if (url) window.location = url; else showInstallNote();
-    }
-    // Real, deployed production API — same URL every mobile build points at
-    // (see EXPO_PUBLIC_API_URL in eas.json). Not a placeholder.
+    // Production API (same URL the app builds use — eas.json EXPO_PUBLIC_API_URL).
     var API_BASE = "https://workspaceapi-server-production-6d56.up.railway.app/api";
+    var SCHEME = "p2pglobalbiblestudy://";
+    var params = new URLSearchParams(window.location.search);
+    var path = window.location.pathname;
+    var $ = function (id) { return document.getElementById(id); };
+    var show = function (id) { $(id).classList.remove("hidden"); };
+    var setText = function (id, t) { $(id).textContent = t || ""; };
 
-    // Invite links are path-based — https://.../join/@username (see
-    // EFFECTIVE_INVITE_BASE in lib/sharing.ts and INVITE_BASE_URL in
-    // profiles.ts) — not the query-string form the other share types use,
-    // so detect + parse them from the path, not `type=`. Requires Netlify
-    // to rewrite /join/* to this file (see web/_redirects) so the path
-    // survives to be read here.
-    // Church invites use an extra path segment — /join/church/CODE — set by
-    // buildChurchInviteLink() in churches.ts, to stay disambiguated from the
-    // personal /join/@username path below. Checked first since its pattern
-    // is more specific (would otherwise also loosely match the invite regex).
-    var churchMatch = window.location.pathname.match(/\/join\/church\/([^/]+)/);
-    var pathMatch = window.location.pathname.match(/\/join\/@?([^/]+)/);
-    var type = churchMatch ? "church" : pathMatch ? "invite" : params.get("type");
+    // "Get the app": the P2P Global website (store listings once they're live).
+    $("getApp").href = "/";
 
-    if (type === "church") {
-      // ── Church invite landing (dynamic — fetches the live church) ──
-      document.getElementById("staticCard").style.display = "none";
-      var churchCard = document.getElementById("churchCard");
-      churchCard.style.display = "block";
+    // "Open it": only ever the app's own scheme — a crafted link can't run
+    // script here or send anyone elsewhere.
+    function offerOpen(link) {
+      if (!/^p2pglobalbiblestudy:\/\/[A-Za-z0-9\-._~\/?=&%@]*$/.test(link || "")) return;
+      show("openApp");
+      $("openApp").addEventListener("click", function () {
+        window.location = link;
+        setTimeout(function () { show("openNote"); }, 1500);
+      });
+    }
+    function avatar(url, letter) {
+      var wrap = $("avatarWrap");
+      if (url) { var img = document.createElement("img"); img.className = "avatar"; img.alt = ""; img.src = url; wrap.appendChild(img); }
+      else if (letter) { var d = document.createElement("div"); d.className = "avatar-fallback"; d.textContent = letter; wrap.appendChild(d); }
+    }
 
-      var inviteCode = decodeURIComponent(churchMatch[1]);
-      var churchDeepLink = "p2pglobalbiblestudy://church/join?code=" + encodeURIComponent(inviteCode);
+    var collectionMatch = path.match(/^\/c\/([A-Za-z0-9_-]{32})\/?$/);
+    var churchMatch = path.match(/\/join\/church\/([^/]+)/);
+    var inviteMatch = !churchMatch && path.match(/\/join\/@?([^/]+)/);
 
-      function goToChurchApp() {
-        window.location = churchDeepLink;
-        setTimeout(afterAppAttempt, 1500);
-      }
-      document.getElementById("churchDownloadBtn").addEventListener("click", goToChurchApp);
-
-      fetch(API_BASE + "/churches/by-code/" + encodeURIComponent(inviteCode))
+    if (collectionMatch) {
+      // ── Scripture collection / playlist: a live, view-only preview ──────────
+      var token = collectionMatch[1];
+      setText("kicker", "Scripture collection");
+      setText("title", "Loading…");
+      setText("lead", "");
+      setText("lockText", "This is a preview. To listen, save a copy or add these passages to your own collections, get the free P2P Global app and sign in — then open this link again.");
+      offerOpen(SCHEME + "collections/link/" + token);
+      fetch(API_BASE + "/scripture-collections/links/" + token + "/preview")
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (body) {
-          var c = body && body.church;
+        .then(function (c) {
           if (!c) {
-            document.getElementById("churchTitle").textContent = "You've been invited to join a church";
-            document.getElementById("churchDesc").textContent = "Join Kingdom School — free, for every nation.";
+            setText("title", "This link is no longer available");
+            setText("lead", "It may have expired or been turned off. Ask the person who shared it for a new link.");
+            $("openApp").classList.add("hidden");
             return;
           }
-          var avatarWrap = document.getElementById("churchAvatarWrap");
-          if (c.logoUrl) {
-            var img = document.createElement("img");
-            img.className = "invite-avatar";
-            img.src = c.logoUrl;
-            avatarWrap.appendChild(img);
-          } else {
-            var fallback = document.createElement("div");
-            fallback.className = "invite-avatar-fallback";
-            fallback.textContent = "⛪";
-            avatarWrap.appendChild(fallback);
+          var kind = c.kind === "playlist" ? "Scripture playlist" : "Scripture collection";
+          setText("kicker", (c.ownerName ? c.ownerName + " shared a " : "A shared ") + kind.toLowerCase());
+          setText("title", c.title);
+          setText("lead", (c.description ? c.description + " · " : "") + c.passageCount + (c.passageCount === 1 ? " passage" : " passages"));
+          if (c.references && c.references.length) {
+            var ul = $("refs");
+            c.references.forEach(function (ref) { var li = document.createElement("li"); li.textContent = ref; ul.appendChild(li); });
+            if (c.passageCount > c.references.length) { var more = document.createElement("li"); more.textContent = "+" + (c.passageCount - c.references.length) + " more"; ul.appendChild(more); }
+            show("refsCard");
           }
-          document.getElementById("churchTitle").textContent = c.name;
-          var locationLine = [c.city, c.country].filter(Boolean).join(" · ");
-          document.getElementById("churchLocation").textContent = locationLine;
-          document.getElementById("churchMemberCount").textContent =
-            c.memberCount + " member" + (c.memberCount === 1 ? "" : "s") + " on Kingdom School";
-          document.getElementById("churchDesc").textContent =
-            c.name + " is using P2P Global Kingdom School for discipleship. Join them — free, for every nation.";
+          var p = c.firstPassage;
+          if (p && p.verses && p.verses.length) {
+            setText("passageRef", p.reference + " · " + p.translation);
+            var box = $("passage");
+            p.verses.forEach(function (v) {
+              var sup = document.createElement("sup"); sup.textContent = v.verse;
+              box.appendChild(sup); box.appendChild(document.createTextNode(v.text + " "));
+            });
+            setText("copyright", p.copyright || "");
+            show("passageCard");
+          }
         })
-        .catch(function () {
-          document.getElementById("churchTitle").textContent = "You've been invited to join a church";
-        });
-
-      goToChurchApp();
-    } else if (type === "invite") {
-      // ── Personalised Grain invite landing (dynamic — fetches the live profile) ──
-      document.getElementById("staticCard").style.display = "none";
-      var inviteCard = document.getElementById("inviteCard");
-      inviteCard.style.display = "block";
-
-      var username = pathMatch ? decodeURIComponent(pathMatch[1]) : (params.get("username") || "");
-      var deepLink = "p2pglobalbiblestudy://join/" + encodeURIComponent(username);
-
-      function goToApp() {
-        window.location = deepLink;
-        setTimeout(afterAppAttempt, 1500);
-      }
-      document.getElementById("inviteDownloadBtn").addEventListener("click", goToApp);
-
-      if (username) {
-        fetch(API_BASE + "/profiles/username/" + encodeURIComponent(username))
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (p) {
-            if (!p) {
-              document.getElementById("inviteTitle").textContent = "You've been invited to P2P Global";
-              document.getElementById("inviteDesc").textContent = "Join Kingdom School — free, for every nation.";
-              return;
-            }
-            var avatarWrap = document.getElementById("inviteAvatarWrap");
-            if (p.photoUrl) {
-              var img = document.createElement("img");
-              img.className = "invite-avatar";
-              img.src = p.photoUrl;
-              avatarWrap.appendChild(img);
-            } else {
-              var fallback = document.createElement("div");
-              fallback.className = "invite-avatar-fallback";
-              fallback.textContent = (p.fullName || p.username || "?").charAt(0).toUpperCase();
-              avatarWrap.appendChild(fallback);
-            }
-            document.getElementById("inviteTitle").textContent = "@" + p.username + " invited you";
-            var nameLine = [p.fullName, p.country].filter(Boolean).join(" · ");
-            document.getElementById("inviteName").textContent = nameLine;
-            if (p.showProgressPublicly && p.modulesCompleted != null) {
-              document.getElementById("inviteProgress").textContent =
-                "🌳 Module " + p.modulesCompleted + " · " + (p.fruitCount || 0) + " Fruits earned";
-            }
-            document.getElementById("inviteDesc").textContent =
-              (p.fullName || "@" + p.username) + " is going through the Bible with a peer guide on P2P Global Kingdom School. Join them — free, for every nation.";
-            document.getElementById("grainNote").textContent =
-              "When you register, " + (p.fullName || "@" + p.username) + " will earn Grain for planting this seed.";
-          })
-          .catch(function () {
-            document.getElementById("inviteTitle").textContent = "You've been invited to P2P Global";
-          });
-      }
-
-      // Attempt the deep link immediately in case the app is already installed.
-      goToApp();
+        .catch(function () { setText("title", "This preview couldn't load"); setText("lead", "Check your connection and try again."); });
+    } else if (churchMatch) {
+      // ── Church invite ─────────────────────────────────────────────────────
+      var code = decodeURIComponent(churchMatch[1]);
+      setText("kicker", "Church invitation");
+      setText("title", "You've been invited to join a church");
+      setText("lockText", "To join, get the free P2P Global app and sign in — then open this link again.");
+      offerOpen(SCHEME + "church/join?code=" + encodeURIComponent(code));
+      $("verse").textContent = "“Accept one another, just as Christ accepted you.” — Romans 15:7"; show("verse");
+      fetch(API_BASE + "/churches/by-code/" + encodeURIComponent(code))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (body) {
+          var ch = body && body.church;
+          if (!ch) return;
+          avatar(ch.logoUrl, "⛪");
+          setText("title", ch.name);
+          setText("lead", [[ch.city, ch.country].filter(Boolean).join(" · "), ch.memberCount + (ch.memberCount === 1 ? " member" : " members") + " on Kingdom School"].filter(Boolean).join(" — "));
+        })
+        .catch(function () {});
+    } else if (inviteMatch) {
+      // ── Personal invite (/join/@username) ───────────────────────────────────
+      var username = decodeURIComponent(inviteMatch[1]);
+      setText("kicker", "Invitation");
+      setText("title", "You've been invited to P2P Global");
+      setText("lockText", "To join, get the free P2P Global app and sign up — then open this link again.");
+      offerOpen(SCHEME + "join/" + encodeURIComponent(username));
+      $("verse").textContent = "“Go and make disciples of all nations.” — Matthew 28:19"; show("verse");
+      fetch(API_BASE + "/profiles/username/" + encodeURIComponent(username))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (p) {
+          if (!p) return;
+          avatar(p.photoUrl, (p.fullName || p.username || "?").charAt(0).toUpperCase());
+          setText("title", "@" + p.username + " invited you");
+          setText("lead", (p.fullName || "@" + p.username) + " is going through the Bible with a peer guide on P2P Global Kingdom School. Join them — free, for every nation."
+            + (p.showProgressPublicly && p.modulesCompleted != null ? " 🌳 Module " + p.modulesCompleted + " · " + (p.fruitCount || 0) + " Fruits earned." : ""));
+        })
+        .catch(function () {});
     } else {
-      // ── Static content preview (lesson / plan / category / profile) ──
-      var title = params.get("title") || "";
-      var desc = params.get("desc") || "";
-      // Only ever open the app's own scheme. Without this, a crafted share
-      // URL (link=javascript:… or link=https://elsewhere) would run script on
-      // this page or redirect the visitor anywhere.
-      var rawLink = params.get("link") || "";
-      var deepLink = /^p2pglobalbiblestudy:\/\/[A-Za-z0-9\-._~\/?=&%]*$/.test(rawLink) ? rawLink : "";
-
-      var typeLabel = type === "lesson" ? "📖 Lesson" : type === "plan" ? "🎯 Plan" : type === "category" ? "📂 Category" : type === "room" ? "🔗 Room Invitation" : "";
-      var preview = document.getElementById("preview");
-      if (title) {
-        preview.innerHTML =
-          "<small>" + typeLabel + "</small>" +
-          "<h3></h3>" +
-          "<p></p>";
-        preview.querySelector("h3").textContent = title;
-        preview.querySelector("p").textContent = desc;
-      } else {
-        preview.style.display = "none";
-      }
-
-      document.getElementById("downloadBtn").addEventListener("click", function () {
-        if (deepLink) {
-          window.location = deepLink;
-          // If the app isn't installed, the custom-scheme navigation above is a
-          // no-op and the page stays put — fall back to the Play Store after a
-          // short delay so an installed app gets a chance to intercept first.
-          setTimeout(afterAppAttempt, 1500);
-        } else {
-          afterAppAttempt();
-        }
-      });
-
-      // Also attempt the deep link immediately on load, in case the app is
-      // installed — the button above stays as a manual fallback either way.
-      if (deepLink) {
-        window.location = deepLink;
-      }
+      // ── Lessons, plans, categories, profiles, rooms, Circles, Family Circles ─
+      var type = params.get("type") || "";
+      var LABELS = {
+        lesson: ["Kingdom School lesson", "To study this lesson, get the free P2P Global app and sign in — then open this link again."],
+        plan: ["Learning plan", "To start this plan, get the free P2P Global app and sign in — then open this link again."],
+        category: ["Learning plans", "To explore these plans, get the free P2P Global app and sign in — then open this link again."],
+        profile: ["P2P Global profile", "To connect, get the free P2P Global app and sign in — then open this link again."],
+        room: ["Room invitation", "To join the room, get the free P2P Global app and sign in — then open this link again."],
+        circle: ["Circle", "To ask to join this Circle, get the free P2P Global app and sign in — then open this link again."],
+        family: ["Family Circle invitation", "To ask to join this Family Circle, get the free P2P Global app and sign in — then open this link again."],
+      };
+      var label = LABELS[type];
+      if (label) { setText("kicker", label[0]); setText("lockText", label[1]); }
+      var title = params.get("title");
+      var desc = params.get("desc");
+      if (title) setText("title", title);
+      if (desc) setText("lead", desc);
+      offerOpen(params.get("link") || "");
     }
   </script>
 </body>

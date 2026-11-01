@@ -105,7 +105,7 @@ ok("qrLinks.ts: no store URL", !/play\.google\.com|apps\.apple\.com/.test(src("l
 
 // ── Landing page compatibility: the page will open the app links we encode ──
 const landing = src("web/share-landing.html");
-const lm = landing.match(/var deepLink = (\/\^p2pglobalbiblestudy.*?\$\/)\.test\(rawLink\)/);
+const lm = landing.match(/if \(!(\/\^p2pglobalbiblestudy.*?\$\/)\.test\(link \|\| ""\)\) return;/);
 ok("landing page: allow-list regex found", !!lm);
 if (lm) {
   const re = vm.runInNewContext(lm[1]);
