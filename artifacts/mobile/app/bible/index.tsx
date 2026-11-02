@@ -98,6 +98,10 @@ export default function BibleReaderScreen() {
   const [compareRaw, setCompareRaw] = useState<string[]>([]);
   useEffect(() => { loadCompare().then(setCompareRaw); }, []);
   const { width: screenWidth } = useWindowDimensions();
+  // The text fills the screen at every size (no narrow column); only the side
+  // margins grow with the screen, plus any landscape safe-area insets.
+  const sidePad = screenWidth >= 1024 ? 48 : screenWidth >= 768 ? 36 : 22;
+  const fullWidth = { paddingLeft: sidePad + insets.left, paddingRight: sidePad + insets.right };
   const [noteEdit, setNoteEdit] = useState<{ ref: NewRef; label: string; note: BibleNote | null } | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -549,11 +553,11 @@ export default function BibleReaderScreen() {
   if (data && compare.length && !trError && !(error && !data) && loc) {
     // Bible Compare: the same chapter in up to four licensed translations, verse by verse.
     body = (
-      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         <CompareView bookCode={loc.book} chapter={loc.chapter} primary={data} others={compare} translations={translations ?? []}
-          width={Math.min(screenWidth, 1200) - 40} fontSize={fontSize} lineHeight={lineHeight} verseNumbers={prefs.verseNumbers}
+          width={screenWidth - 2 * sidePad - insets.left - insets.right} fontSize={fontSize} lineHeight={lineHeight} verseNumbers={prefs.verseNumbers}
           selected={sel} onTapVerse={tapVerse} />
         {footerEl}
       </ScrollView>
@@ -568,7 +572,7 @@ export default function BibleReaderScreen() {
     body = <View style={styles.center}><ActivityIndicator color={c.accentGreen} accessibilityLabel="Loading" /></View>;
   } else {
     body = (
-      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         {blocks.map((blk) => {
@@ -851,7 +855,7 @@ function makeStyles(c: AppColors) {
     stateBtn: { marginTop: 6, minHeight: 44, paddingHorizontal: 22, borderRadius: 22, backgroundColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
     stateBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
     inlineError: { color: "#DC2626", fontSize: 13, fontFamily: "Inter_500Medium", marginBottom: 8 },
-    scroll: { paddingHorizontal: 22, maxWidth: 720, width: "100%", alignSelf: "center" },
+    scroll: { width: "100%" },
     chapterTitle: { fontSize: 28, color: c.textDark, fontFamily: SCRIPTURE_FONT, marginTop: 12, marginBottom: 14 },
     heading: { fontSize: 14, color: c.textMid, fontFamily: "Inter_600SemiBold", marginTop: 14, marginBottom: 6, letterSpacing: 0.2 },
     para: { color: c.textDark, fontFamily: SCRIPTURE_FONT, marginBottom: 12 },

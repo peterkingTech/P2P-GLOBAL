@@ -79,5 +79,9 @@ ok("Bible title: one line, shrinks then shortens — never breaks mid-word; chap
   bible.includes('numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{book ? book.name : "Bible"}</Text>') && bible.includes("{book ? <Text style={styles.refText} numberOfLines={1}>{` ${loc?.chapter}`}</Text> : null}")
   && !bible.includes("<AppButton label={book ? `${book.name} ${loc?.chapter}` : \"Bible\"}"));
 
+ok("Bible text fills the screen at every size (no narrow column); margins grow with the screen; compare uses the full width",
+  !/scroll: \{[^}]*maxWidth/.test(bible) && bible.includes("const sidePad = screenWidth >= 1024 ? 48 : screenWidth >= 768 ? 36 : 22;")
+  && (bible.match(/contentContainerStyle=\{\[styles\.scroll, fullWidth,/g) ?? []).length === 2 && bible.includes("width={screenWidth - 2 * sidePad - insets.left - insets.right}"));
+
 console.log(`journalReflections: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
