@@ -16,7 +16,8 @@
     "test:wins": "node tests/winsModeration.test.mjs",
     "test:notifications": "node tests/notificationActors.test.mjs && node tests/notificationPrivacy.test.mjs && node tests/notificationPreview.test.mjs && node tests/notificationCategories.test.mjs",
     "test:minors": "node tests/minorSafeguards.test.mjs",
-    "test:scripture-collections": "node tests/scriptureCollections.test.mjs"
+    "test:scripture-collections": "node tests/scriptureCollections.test.mjs",
+    "test:bible-parser": "node tests/bibleParser.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

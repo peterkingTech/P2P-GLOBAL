@@ -80,7 +80,8 @@ async function providerGet(path: string): Promise<{ data: any; meta?: any }> {
 }
 
 // ── Chapters ────────────────────────────────────────────────────────────────
-export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean }
+/** `through`: the last verse this text covers, when a translation joins verses (The Message: "1–2"). */
+export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
 export interface Chapter {
   translation: { code: string; name: string; textCopyAllowed: boolean };
   book: { code: string; name: string; chapters: number };
@@ -94,6 +95,8 @@ export interface Chapter {
 const HEADING_STYLES = /^(s\d?|ms\d?|mr|r|d|sp|cl)$/;
 // KJV source text carries "¶" paragraph marks; the reader shows paragraphs itself.
 const PILCROW = /¶\s*/g;
+// Verse ids: BOOK.CHAPTER.VERSE[letter], optionally "-BOOK.CHAPTER.VERSE[letter]" for joined verses.
+const VERSE_ID = /^[1-3A-Z][A-Z0-9]{2}\.\d+\.(\d+)[a-z]?(?:-[1-3A-Z][A-Z0-9]{2}\.\d+\.(\d+)[a-z]?)?$/;
 
 /** Turn API.Bible's JSON chapter content into verses + headings (no other formatting). */
 export function parseChapterContent(content: unknown[]): { verses: ChapterVerse[]; headings: { beforeVerse: number; text: string }[] } {
@@ -118,13 +121,19 @@ export function parseChapterContent(content: unknown[]): { verses: ChapterVerse[
     }
     paragraph++;
     walkText(para, (t, verseId) => {
-      const n = verseId ? Number(String(verseId).split(".")[2]) : NaN;
+      // "JHN.3.16", "JHN.3.29a", or a joined range "JHN.3.1-JHN.3.2" (paraphrases such as The Message).
+      const id = verseId ? VERSE_ID.exec(String(verseId)) : null;
+      const n = id ? Number(id[1]) : NaN;
       if (!Number.isInteger(n) || n < 1) return;
+      const end = id?.[2] ? Number(id[2]) : n;
       const existing = verses.get(n);
       if (!existing) {
         if (pendingHeading.length) { headings.push({ beforeVerse: n, text: pendingHeading.join(" — ") }); pendingHeading = []; }
-        verses.set(n, { verse: n, text: t, paragraph, poetry: /^q/.test(style) });
-      } else existing.text += (existing.paragraph !== paragraph && /^q/.test(style) ? "\n" : "") + t;
+        verses.set(n, { verse: n, text: t, paragraph, poetry: /^q/.test(style), ...(end > n ? { through: end } : {}) });
+      } else {
+        existing.text += (existing.paragraph !== paragraph && /^q/.test(style) ? "\n" : "") + t;
+        if (end > (existing.through ?? existing.verse)) existing.through = end;
+      }
     });
   }
   return {

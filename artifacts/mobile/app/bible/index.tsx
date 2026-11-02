@@ -594,10 +594,10 @@ export default function BibleReaderScreen() {
                     // would put every verse on its own line; spans keep the text flowing
                     // as it does on phones (where nested Text is always inline).
                     accessibilityRole={textMode ? "text" : INLINE_BUTTON_ROLE} accessibilityState={{ selected }}
-                    accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
+                    accessibilityLabel={textMode ? undefined : `Verse ${v.verse}${v.through ? ` to ${v.through}` : ""}${h ? `, highlighted ${(palette[h.color] ?? palette.gold).label}` : ""}${notedVerses.has(v.verse) ? ", has a note" : ""}`}>
                     {notedVerses.has(v.verse) && <Text style={{ fontSize: Math.round(fontSize * 0.95) }}><Ionicons name="document-text" size={Math.round(fontSize * 0.95)} color={card ? card.ink : c.textMid} />{"\u00A0"}</Text>}
                     {speakingVerse === v.verse && <Text accessibilityLabel="Being read aloud"><Ionicons name="volume-medium" size={Math.round(fontSize * 0.9)} color={card ? card.ink : c.accentGreen} />{" "}</Text>}
-                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }, card && { color: card.ink, opacity: 0.75 }]}>{v.verse}{"\u00A0"}</Text>}
+                    {prefs.verseNumbers && <Text style={[styles.verseNum, { fontSize: Math.round(fontSize * 0.62) }, card && { color: card.ink, opacity: 0.75 }]}>{v.through ? `${v.verse}\u2013${v.through}` : v.verse}{"\u00A0"}</Text>}
                     {runs.map((run) => !textMode
                       ? <Text key={run.start} style={runStyle(run)}>{run.text}</Text>
                       : toks.filter((t) => t.end > run.start && t.start < run.end).map((t) => (

@@ -56,7 +56,8 @@ export const SCRIPTURE_FONT = Platform.select({ ios: "Georgia", android: "serif"
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 export interface BibleTranslation { code: string; name: string; language: string; isDefault: boolean; textCopyAllowed: boolean }
-export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean }
+/** `through`: the last verse this text covers when a translation joins verses (The Message: "1–2"). */
+export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
 export interface BibleChapter {
   translation: { code: string; name: string; textCopyAllowed: boolean };
   book: { code: string; name: string; chapters: number };
