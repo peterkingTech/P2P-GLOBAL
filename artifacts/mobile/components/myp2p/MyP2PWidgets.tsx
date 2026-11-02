@@ -112,7 +112,7 @@ function JournalWidget({ refreshKey, showPreview, onTogglePreview }: { refreshKe
   const { getJournalTimeline } = useData();
   const { data, loading, error } = useLoad(() => getJournalTimeline(), refreshKey);
   const latest = useMemo(() => [...(data ?? [])].sort((a, b) => b.at.localeCompare(a.at))[0] ?? null, [data]);
-  const kind = latest ? ({ note: "Note", highlight: "Highlight", prayer: "Prayer", reflection: "Reflection" } as const)[latest.type] : null;
+  const kind = latest ? ({ note: "Note", highlight: "Highlight", prayer: "Prayer", reflection: "Reflection", lesson_reflection: latest.label ? `${latest.label} reflection` : "Personal Reflection" })[latest.type] : null;
   const continueRoute = latest?.type === "reflection" ? `/my-discipleship/journal/reflection/${latest.id}` : "/my-discipleship/journal";
   return (
     <Card icon="journal-outline" title="My Discipleship Journal" s={s} c={c} onTitle={() => router.push("/my-discipleship/journal" as any)}>

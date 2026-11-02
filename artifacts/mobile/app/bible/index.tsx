@@ -512,7 +512,14 @@ export default function BibleReaderScreen() {
   const header = !focus && (
     <View style={[styles.header, { paddingTop: gathering ? 4 : insets.top + 4 }]}>
       <IconButton icon="chevron-back" accessibilityLabel="Back" onPress={goBack} color={c.textDark} />
-      <AppButton label={book ? `${book.name} ${loc?.chapter}` : "Bible"} onPress={() => setSheet("books")} variant="tertiary" icon="chevron-down" iconPosition="trailing" disabled={!loc} accessibilityLabel={book ? `${book.name} chapter ${loc?.chapter}. Choose book and chapter` : "Choose book and chapter"} style={{ flex: 1 }} />
+      {/* Book and chapter on ONE line at any width: the name shrinks a little, then
+          shortens with "…" — never breaks mid-word — and the chapter always shows. */}
+      <TouchableOpacity onPress={() => setSheet("books")} disabled={!loc} style={styles.refBtn} accessibilityRole="button"
+        accessibilityLabel={book ? `${book.name} chapter ${loc?.chapter}. Choose book and chapter` : "Choose book and chapter"}>
+        <Text style={[styles.refText, { flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{book ? book.name : "Bible"}</Text>
+        {book ? <Text style={styles.refText} numberOfLines={1}>{` ${loc?.chapter}`}</Text> : null}
+        <Ionicons name="chevron-down" size={16} color={c.accentGreen} style={{ marginLeft: 4 }} />
+      </TouchableOpacity>
       <AppButton label={`${loc?.t ?? "—"}`} onPress={() => setSheet("translations")} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
       <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
         accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
@@ -827,6 +834,8 @@ function makeStyles(c: AppColors) {
     screen: { flex: 1, backgroundColor: c.lightCream },
     header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingBottom: 6, gap: 2, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderBeige },
     iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+    refBtn: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
+    refText: { fontSize: 16, color: c.accentGreen, fontFamily: "Inter_700Bold" },
     iconBtnSm: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
     titleBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4, minHeight: 44, paddingHorizontal: 6 },
     titleText: { fontSize: 18, color: c.textDark, fontFamily: "Inter_700Bold", flexShrink: 1 },

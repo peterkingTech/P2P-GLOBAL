@@ -526,11 +526,18 @@ export interface AppNotification {
 }
 
 export interface JournalTimelineEntry {
-  type: "note" | "highlight" | "prayer" | "reflection";
+  /** lesson_reflection: a Personal Reflection answered in a Kingdom School lesson or a Kingdom Stories chapter. */
+  type: "note" | "highlight" | "prayer" | "reflection" | "lesson_reflection";
   id: string;
   title: string;
   preview: string;
   at: string;
+  /** Where it was written, shown instead of the type label ("Kingdom Stories", "Kingdom School"). */
+  label?: string;
+  /** The question that was answered. */
+  prompt?: string;
+  /** Opens the lesson or chapter it was written in. */
+  route?: { pathname: string; params?: Record<string, string> };
 }
 
 export interface StudySession {

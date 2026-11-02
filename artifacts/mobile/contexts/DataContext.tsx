@@ -10,6 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import type { MarkReadResult } from "@/lib/notificationTap";
 import { supabase, useAuth, type OfficialAccountType, type DiscipleRole } from "./AuthContext";
+import { getLessonReflectionEntries } from "@/lib/journalReflections";
 import { usePerfVisit } from "@/lib/perf";
 import { deliveryAcker } from "@/lib/receiptSession";
 import {
@@ -3368,7 +3369,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       type: "reflection", id: r.rootId, title: r.prompt ?? "Reflection", preview: r.content, at: r.createdAt,
     }));
 
-    return [...noteEntries, ...highlightEntries, ...prayerEntries, ...reflectionEntries]
+    // Personal Reflections answered in Kingdom School lessons and Kingdom Stories chapters.
+    const lessonReflectionEntries = await getLessonReflectionEntries(supabase, profile.id).catch(() => [] as JournalTimelineEntry[]);
+
+    return [...noteEntries, ...highlightEntries, ...prayerEntries, ...reflectionEntries, ...lessonReflectionEntries]
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }, [profile, getMyNotes, getMyHighlights, getMyReflections]);
 

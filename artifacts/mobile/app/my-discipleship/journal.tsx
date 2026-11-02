@@ -23,15 +23,18 @@ import { AppButton } from "@/components/ui";
 const REVISIT_DAYS = 30;
 
 const TYPE_ICON: Record<JournalTimelineEntry["type"], string> = {
-  reflection: "💭", prayer: "🙏", highlight: "⭐", note: "📝",
+  reflection: "💭", prayer: "🙏", highlight: "⭐", note: "📝", lesson_reflection: "📖",
 };
 const TYPE_LABEL: Record<JournalTimelineEntry["type"], string> = {
-  reflection: "Reflection", prayer: "Prayer Request", highlight: "Highlight", note: "Personal Note",
+  reflection: "Reflection", prayer: "Prayer Request", highlight: "Highlight", note: "Personal Note", lesson_reflection: "Personal Reflection",
 };
 
-type Filter = "all" | "reflection" | "prayer" | "highlight" | "note";
+// "Reflections" shows every reflection — written here, in Family / Church lessons,
+// and the Personal Reflections answered in Kingdom School lessons and Kingdom
+// Stories chapters; "Lessons & Stories" shows just those answers.
+type Filter = "all" | "reflection" | "lesson_reflection" | "prayer" | "highlight" | "note";
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" }, { key: "reflection", label: "Reflections" },
+  { key: "all", label: "All" }, { key: "reflection", label: "Reflections" }, { key: "lesson_reflection", label: "Lessons & Stories" },
   { key: "prayer", label: "Prayers" }, { key: "highlight", label: "Highlights" }, { key: "note", label: "Notes" },
 ];
 
@@ -83,9 +86,12 @@ export default function MyDiscipleshipJournalScreen() {
     .filter((r) => Date.now() - new Date(r.createdAt).getTime() >= REVISIT_DAYS * 24 * 60 * 60 * 1000)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
 
-  const filtered = filter === "all" ? timeline : timeline.filter((e) => e.type === filter);
+  const filtered = filter === "all" ? timeline
+    : filter === "reflection" ? timeline.filter((e) => e.type === "reflection" || e.type === "lesson_reflection")
+      : timeline.filter((e) => e.type === filter);
 
   function openEntry(entry: JournalTimelineEntry) {
+    if (entry.route) { router.push(entry.route as any); return; }
     switch (entry.type) {
       case "note": router.push("/notes" as any); break;
       case "highlight": router.push("/highlights" as any); break;
@@ -156,21 +162,23 @@ export default function MyDiscipleshipJournalScreen() {
                 </>
               ) : (
                 <Text style={s.emptyCardText}>
-                  {filter === "reflection" ? "No reflections yet." : filter === "prayer" ? "No active prayer requests." : filter === "highlight" ? "No highlights yet." : "No notes yet."}
+                  {filter === "reflection" ? "No reflections yet." : filter === "lesson_reflection" ? "Your answers to Personal Reflections in Kingdom School and Kingdom Stories will appear here." : filter === "prayer" ? "No active prayer requests." : filter === "highlight" ? "No highlights yet." : "No notes yet."}
                 </Text>
               )}
             </View>
           ) : (
             <View style={{ gap: 8 }}>
               {filtered.map((entry) => (
-                <TouchableOpacity accessibilityRole="button" key={`${entry.type}_${entry.id}`} style={s.entryCard} activeOpacity={0.85} onPress={() => openEntry(entry)}>
+                <TouchableOpacity accessibilityRole="button" key={`${entry.type}_${entry.id}`} style={s.entryCard} activeOpacity={0.85} onPress={() => openEntry(entry)}
+                  accessibilityLabel={`${entry.label ?? TYPE_LABEL[entry.type]}. ${entry.title}. ${entry.prompt ? `${entry.prompt} ` : ""}${entry.preview}`}>
                   <Text style={s.entryIcon}>{TYPE_ICON[entry.type]}</Text>
                   <View style={{ flex: 1 }}>
                     <View style={s.entryTopRow}>
-                      <Text style={s.entryType}>{TYPE_LABEL[entry.type]}</Text>
+                      <Text style={s.entryType}>{entry.label ? `${entry.label} · ${TYPE_LABEL[entry.type]}` : TYPE_LABEL[entry.type]}</Text>
                       <Text style={s.entryDate}>{formatEntryDate(entry.at)}</Text>
                     </View>
                     <Text style={s.entryTitle} numberOfLines={1}>{entry.title}</Text>
+                    {entry.prompt ? <Text style={s.entryPrompt} numberOfLines={2}>{entry.prompt}</Text> : null}
                     <Text style={s.entryPreview} numberOfLines={2}>{entry.preview}</Text>
                   </View>
                 </TouchableOpacity>
@@ -249,6 +257,7 @@ function makeStyles(c: AppColors) {
     entryDate: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
     entryTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold", marginTop: 3 },
     entryPreview: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 17 },
+    entryPrompt: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_500Medium", fontStyle: "italic", marginTop: 2, lineHeight: 17 },
 
     chooserOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     chooserSheet: { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 8, width: "100%", alignSelf: "center" },
