@@ -55,10 +55,16 @@ const body = screen.slice(screen.indexOf("export function bookOf"));
 const m = { exports: {} };
 new Function("module", "exports", ts.transpileModule(body, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(m, m.exports);
 const bookOf = m.exports.bookOf;
-const b6 = bookOf("Book 6 · Baptism and Identification With Christ — This book explains baptism.");
-ok("bookOf reads number, title and description", b6 && b6.number === 6 && b6.title === "Baptism and Identification With Christ" && b6.about === "This book explains baptism.");
+const b6 = bookOf("Part 6 · Baptism and Identification With Christ — This part explains baptism.");
+ok("bookOf reads the word, number, title and description", b6 && b6.word === "Part" && b6.number === 6 && b6.title === "Baptism and Identification With Christ" && b6.about === "This part explains baptism.");
+ok("older 'Book N' descriptions still read (installed data before 222)", bookOf("Book 2 · Jesus Christ — x")?.word === "Book");
+ok("heading shows the description's own word (Part)", screen.includes("{`${book!.word} ${book!.number}`}"));
+const sql222 = readFileSync(path.join(repo, "migrations/222_gospel_salvation_full_content.sql"), "utf8");
+ok("222 renames every module and lesson to 'Part N' (and no 'About this book')", (sql222.match(/^update public\.p2p_modules set description = \$gs\$Part \d · /gm) ?? []).length === 28
+  && (sql222.match(/^update public\.p2p_lessons set subtitle = \$gs\$Part \d · Lesson \d\.\d\$gs\$/gm) ?? []).length === 84 && !sql222.includes("About this book") && sql222.includes("$gs$About this part$gs$"));
+ok("222 deletes nothing", !/^\s*(delete|drop|truncate)\b/im.test(sql222));
 ok("bookOf leaves ordinary descriptions alone", bookOf("Learn to pray every day") === null && bookOf(null) === null && bookOf("Booklet 2 · x") === null);
-ok("every new module description is recognised", data.books.every((b) => !!bookOf(`Book ${b.number} · ${b.title} — ${b.description}`)));
+ok("every module description is recognised", data.books.every((b) => !!bookOf(`Part ${b.number} · ${b.title} — ${b.description}`) && !!bookOf(`Book ${b.number} · ${b.title} — ${b.description}`)));
 ok("screen: heading only when the book changes; card hides the repeated book text",
   screen.includes("const newBook = !!book && book.key !== prevBook?.key;") && screen.includes("{!!m.description && !book && <Text style={styles.moduleDesc}"));
 

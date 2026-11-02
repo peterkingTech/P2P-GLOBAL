@@ -111,9 +111,9 @@ export default function CurriculumDetailScreen() {
 
           <Text style={styles.sectionLabel}>MODULES</Text>
           {detail.modules.map((m, mi) => {
-            // Courses organised in books (e.g. The Gospel & Salvation: 7 books × 4
+            // Courses organised in parts (e.g. The Gospel & Salvation: 7 parts × 4
             // modules) say so at the start of each module's description:
-            // "Book N · Title — what the book covers". Show one heading per book.
+            // "Part N · Title — what the part covers". Show one heading per part.
             const book = bookOf(m.description);
             const prevBook = mi > 0 ? bookOf(detail.modules[mi - 1].description) : null;
             const newBook = !!book && book.key !== prevBook?.key;
@@ -124,7 +124,7 @@ export default function CurriculumDetailScreen() {
               <React.Fragment key={m.id}>
               {newBook ? (
                 <View style={styles.bookHeader} accessibilityRole="header">
-                  <Text style={styles.bookLabel}>{`Book ${book!.number}`}</Text>
+                  <Text style={styles.bookLabel}>{`${book!.word} ${book!.number}`}</Text>
                   <Text style={styles.bookTitle}>{book!.title}</Text>
                   {!!book!.about && <Text style={styles.moduleDesc}>{book!.about}</Text>}
                 </View>
@@ -251,8 +251,8 @@ const styles = StyleSheet.create({
   progressText: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" },
 });
 
-/** "Book 3 · The Gospel — what it covers" → the book (null for ordinary module descriptions). */
-export function bookOf(description: string | null | undefined): { key: string; number: number; title: string; about: string } | null {
-  const m = /^Book (\d+) · (.+?)(?: — ([\s\S]*))?$/.exec((description ?? "").trim());
-  return m ? { key: m[1], number: Number(m[1]), title: m[2].trim(), about: (m[3] ?? "").trim() } : null;
+/** "Part 3 · The Gospel — what it covers" (or "Book 3 · …") → the part (null for ordinary module descriptions). */
+export function bookOf(description: string | null | undefined): { key: string; word: string; number: number; title: string; about: string } | null {
+  const m = /^(Part|Book) (\d+) · (.+?)(?: — ([\s\S]*))?$/.exec((description ?? "").trim());
+  return m ? { key: m[2], word: m[1], number: Number(m[2]), title: m[3].trim(), about: (m[4] ?? "").trim() } : null;
 }
