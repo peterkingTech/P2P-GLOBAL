@@ -110,13 +110,26 @@ export default function CurriculumDetailScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>MODULES</Text>
-          {detail.modules.map((m) => {
+          {detail.modules.map((m, mi) => {
+            // Courses organised in books (e.g. The Gospel & Salvation: 7 books × 4
+            // modules) say so at the start of each module's description:
+            // "Book N · Title — what the book covers". Show one heading per book.
+            const book = bookOf(m.description);
+            const prevBook = mi > 0 ? bookOf(detail.modules[mi - 1].description) : null;
+            const newBook = !!book && book.key !== prevBook?.key;
             const pct = m.lessonCount > 0 ? Math.round((m.completedLessons / m.lessonCount) * 100) : 0;
             const stateLabel = m.isLocked ? "Locked" : m.lessonCount === 0 ? null : m.completedLessons === 0 ? "Not started" : m.completedLessons === m.lessonCount ? "Completed" : "In progress";
             const countsLabel = `${m.lessonCount} ${m.lessonCount === 1 ? "lesson" : "lessons"}`;
             return (
+              <React.Fragment key={m.id}>
+              {newBook ? (
+                <View style={styles.bookHeader} accessibilityRole="header">
+                  <Text style={styles.bookLabel}>{`Book ${book!.number}`}</Text>
+                  <Text style={styles.bookTitle}>{book!.title}</Text>
+                  {!!book!.about && <Text style={styles.moduleDesc}>{book!.about}</Text>}
+                </View>
+              ) : null}
               <TouchableOpacity
-                key={m.id}
                 style={[styles.moduleCard, m.isLocked && styles.moduleCardLocked]}
                 onPress={() => {
                   if (m.isLocked) { setLockFor(m); return; }
@@ -128,7 +141,7 @@ export default function CurriculumDetailScreen() {
               >
                 <View style={styles.moduleCardBody}>
                   <Text style={styles.moduleTitle} numberOfLines={2}>{m.title}</Text>
-                  {!!m.description && <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>}
+                  {!!m.description && !book && <Text style={styles.moduleDesc} numberOfLines={2}>{m.description}</Text>}
                   <View style={styles.moduleCardFooterRow}>
                     {m.isLocked ? (
                       <Text style={styles.progressText}>Complete the previous lesson to continue</Text>
@@ -161,6 +174,7 @@ export default function CurriculumDetailScreen() {
                   )}
                 </View>
               </TouchableOpacity>
+              </React.Fragment>
             );
           })}
           </View>
@@ -197,6 +211,9 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 22, fontWeight: "700", color: colors.accentGreen, fontFamily: "Inter_700Bold" },
   statLabel: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_500Medium", marginTop: 2 },
+  bookHeader: { marginTop: 10, marginBottom: 10, gap: 2 },
+  bookLabel: { fontSize: 11, color: colors.amber, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase" },
+  bookTitle: { fontSize: 18, lineHeight: 23, color: colors.textDark, fontFamily: "Inter_700Bold" },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, marginBottom: 12 },
   moduleCard: {
     // Fixed, not minHeight — the photo column's height:"100%" needs a
@@ -233,3 +250,9 @@ const styles = StyleSheet.create({
   progressFill: { height: 4, backgroundColor: colors.progressFill, borderRadius: 2 },
   progressText: { fontSize: 10, color: colors.textMuted, fontFamily: "Inter_400Regular" },
 });
+
+/** "Book 3 · The Gospel — what it covers" → the book (null for ordinary module descriptions). */
+export function bookOf(description: string | null | undefined): { key: string; number: number; title: string; about: string } | null {
+  const m = /^Book (\d+) · (.+?)(?: — ([\s\S]*))?$/.exec((description ?? "").trim());
+  return m ? { key: m[1], number: Number(m[1]), title: m[2].trim(), about: (m[3] ?? "").trim() } : null;
+}
