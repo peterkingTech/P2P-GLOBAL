@@ -25,7 +25,9 @@ const mocks = {
 const load = (rel) => {
   const js = ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => { if (m in mocks) return mocks[m]; throw new Error(`unexpected require ${m}`); }, URLSearchParams, JSON });
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => { if (m in mocks) return mocks[m]; throw new Error(`unexpected require ${m}`); }, URLSearchParams, JSON, Object, Error,
+    // Photo uploads: reading the picked file, then the PUT to the one-off upload link.
+    fetch: async (url, init = {}) => { sent.push({ path: url, method: init.method ?? "GET", body: init.method === "PUT" ? "<photo bytes>" : undefined }); return url.startsWith("file:") ? { blob: async () => ({ size: 123456 }) } : { ok: true, status: 200 }; } });
   return mod.exports;
 };
 const last = () => sent[sent.length - 1];
@@ -68,6 +70,20 @@ ok("cover + tags with the current revision", last().path === "/scripture-collect
 const api = src("lib/scriptureLibraryApi.ts");
 ok("client: never sends Bible text — references only", !/text\s*:/.test(api.replace(/\/\/.*$/gm, "")));
 ok("client: older servers keep working (new collection fields optional)", /cover\?: CollectionCover \| null; tags\?: string\[\];/.test(src("lib/scriptureCollectionsApi.ts")));
+
+// Your own photos (migration 228).
+mocks["@/lib/apiClient"].apiRequest = async (p, init = {}) => { sent.push({ path: p, method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined }); return p.endsWith("/photos") ? { uploadUrl: "https://upload.invalid/x", path: "owner/cover-p1-abc.jpg" } : { revision: 5 }; };
+const C2 = load("lib/scriptureCollectionsApi.ts");
+sent.length = 0;
+await C2.uploadPhoto("p1", "header", { uri: "file:///photo.jpg", mimeType: "image/jpeg" });
+ok("photo upload: the real size is sent, the bytes go to the one-off link, then the server checks it",
+  sent[1]?.path === "/scripture-collections/p1/photos" && sent[1].body.slot === "header" && sent[1].body.sizeBytes === 123456 && sent[1].body.mimeType === "image/jpeg"
+  && sent[2]?.path === "https://upload.invalid/x" && sent[2].method === "PUT" && sent[3]?.path === "/scripture-collections/p1/photos/complete" && sent[3].body.path === "owner/cover-p1-abc.jpg", JSON.stringify(sent));
+await C2.removePhoto("p1", "cover");
+ok("photo remove", sent.at(-1).path === "/scripture-collections/p1/photos/cover" && sent.at(-1).method === "DELETE");
+const page = src("app/scripture-collections/[id].tsx"), picker = src("components/library/CoverPicker.tsx");
+ok("playlist page: the header photo fills the top, fades into the page, title on it", page.includes("{d.header ? (") && page.includes("<Image source={{ uri: d.header.url }}") && page.includes("<LinearGradient") && page.includes("s.heroTitle"));
+ok("cover picker: square cover photo and wide (16:9) header photo, each removable", picker.includes('aspect: slot === "cover" ? [1, 1] : [16, 9]') && picker.includes('dropPhoto("cover")') && picker.includes('dropPhoto("header")'));
 
 console.log(`scriptureLibrary (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

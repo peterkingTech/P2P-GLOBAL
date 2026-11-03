@@ -20,7 +20,7 @@ export const PERMISSION_HELP: Record<Permission, string> = {
 export const TARGET_LABEL: Record<TargetType, string> = { peer: "Person", family: "Family Circle", church: "Church", circle: "Circle", group: "Group", study: "Study Together" };
 
 /** A playlist/collection cover (migration 227): built-in artwork or a theme colour by name, or the owner's own image. null = default. */
-export interface CollectionCover { kind: "artwork" | "colour" | "image"; ref: string }
+export interface CollectionCover { kind: "artwork" | "colour" | "image"; ref: string; /** Your own photo: a short-lived link (migration 228). */ url?: string }
 
 export interface CollectionCard {
   id: string; kind: CollectionKind; title: string; description: string | null; itemCount: number; updatedAt: string;
@@ -39,6 +39,8 @@ export interface CollectionLink { id: string; permission: Permission; maxUses: n
 export interface CollectionDetail {
   id: string; kind: CollectionKind; title: string; description: string | null; revision: number; updatedAt: string;
   createdAt?: string; cover?: CollectionCover | null; tags?: string[];
+  /** The wide photo across the top of the page (migration 228). */
+  header?: { url: string } | null;
   owner: { id: string; name: string; photoUrl: string | null };
   /** original = I made it · copy = my personal copy · shared = someone shared it with me */
   status: "original" | "copy" | "shared";
@@ -68,6 +70,23 @@ export const deleteCollection = (id: string) => call<{ deleted: true }>(`/${id}`
 /** Appends passages. One that's already there is skipped (`skipped`) unless `allowRepeat` — the person's explicit choice. */
 export const addToCollection = (id: string, refs: NewRef[], sharedNote?: string, allowRepeat = false) =>
   call<{ revision: number; added?: number; skipped?: number }>(`/${id}/items`, json("POST", { refs, sharedNote, allowRepeat }));
+export type PhotoSlot = "cover" | "header";
+/**
+ * Your own photo (owner only): the server gives a one-off upload link to a
+ * path it chooses, the photo is uploaded, then the server checks it arrived
+ * (and its size) before using it. Photos are private: people see them only
+ * while they can see the playlist.
+ */
+export async function uploadPhoto(id: string, slot: PhotoSlot, photo: { uri: string; mimeType: string }) {
+  const blob = await (await fetch(photo.uri)).blob();
+  const start = await call<{ uploadUrl: string; path: string }>(`/${id}/photos`, json("POST", { slot, mimeType: photo.mimeType, sizeBytes: blob.size }));
+  const res = await fetch(start.uploadUrl, { method: "PUT", headers: { "Content-Type": photo.mimeType, "x-upsert": "false" }, body: blob });
+  if (!res.ok) throw Object.assign(new Error("The upload failed — check your connection and try again."), { status: res.status });
+  return call<{ revision: number }>(`/${id}/photos/complete`, json("POST", { slot, path: start.path }));
+}
+/** Remove your own cover or header photo (back to the default). */
+export const removePhoto = (id: string, slot: PhotoSlot) => call<{ revision: number }>(`/${id}/photos/${slot}`, { method: "DELETE" });
+
 /** Cover and tags (owner). `cover: null` restores the default cover. */
 export const updateCollectionLook = (id: string, revision: number, look: { cover?: CollectionCover | null; tags?: string[] }) =>
   call<{ revision: number }>(`/${id}`, json("PATCH", { ...look, revision }));

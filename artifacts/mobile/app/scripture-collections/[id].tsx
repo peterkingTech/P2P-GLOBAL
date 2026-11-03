@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TextInput, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TextInput, Alert, Platform, Image, useWindowDimensions } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -31,6 +32,7 @@ export default function CollectionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors: c } = useTheme();
+  const { width } = useWindowDimensions();
   const s = useMemo(() => makeStyles(c), [c]);
   const [d, setD] = useState<CollectionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,12 +95,22 @@ export default function CollectionScreen() {
   };
   const listen = (from?: string, shuffle = false) => act(shuffle ? "shuffle" : from ? `listen:${from}` : "listen", () => playSavedCollection(d.id, { startKey: from ?? null, shuffle }));
   const minutes = estimateMinutes(d.items);
+  // The owner's wide header photo across the top (edge to edge), fading into the page, with the title on it.
+  const heroHeight = Math.round(Math.min(440, Math.max(240, width * 0.72)));
   void language;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
       <Stack.Screen options={{ title: d.kind === "playlist" ? "Playlist" : "Collection" }} />
+
+      {d.header ? (
+        <View style={[s.banner2, { height: heroHeight }]} accessibilityRole="header" accessibilityLabel={d.title}>
+          <Image source={{ uri: d.header.url }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+          <LinearGradient colors={["transparent", "rgba(0,0,0,0.15)", c.lightCream]} locations={[0.35, 0.7, 1]} style={StyleSheet.absoluteFill} />
+          <Text style={s.heroTitle} numberOfLines={3}>{d.title}</Text>
+        </View>
+      ) : null}
 
       {/* Header */}
       <View style={s.hero}>
@@ -119,7 +131,7 @@ export default function CollectionScreen() {
             <AppButton label="Cancel" size="sm" variant="tertiary" onPress={() => setRenaming(null)} />
           </View>
         </View>
-      ) : <Text style={s.title} accessibilityRole="header">{d.title}</Text>}
+      ) : d.header ? null : <Text style={s.title} accessibilityRole="header">{d.title}</Text>}
       <Text style={s.status}>{status}</Text>
       <Text style={s.muted}>{d.items.length} {d.items.length === 1 ? "passage" : "passages"}{minutes ? ` · about ${minutes} min` : ""}{d.tags?.length ? ` · ${d.tags.join(", ")}` : ""}</Text>
       {d.status === "shared" ? <Text style={s.muted}>Owner: {d.owner.name}</Text> : null}
@@ -227,6 +239,7 @@ export default function CollectionScreen() {
       </View>
 
       <CoverPicker visible={lookOpen} kind={d.kind} cover={d.cover ?? null} tags={d.tags ?? []} onClose={() => setLookOpen(false)}
+        collectionId={d.id} header={d.header ?? null} onPhotosChanged={load}
         onSave={async (look) => { await updateCollectionLook(d.id, d.revision, look); await load(); }} />
       <PassagePicker visible={picking} onClose={() => setPicking(false)} title={`Add to “${d.title}”`}
         onChoose={(refs: NewRef[]) => { setPicking(false); act("add", () => addToCollection(d.id, refs), `Added ${refs.length} ${refs.length === 1 ? "passage" : "passages"}.`); }} />
@@ -240,6 +253,10 @@ function makeStyles(c: AppColors) {
     center: { alignItems: "center", justifyContent: "center", padding: 24 },
     content: { padding: 16, paddingBottom: 56 },
     hero: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 16, marginBottom: 4 },
+    // Full-bleed header photo: cancels the page padding, the title sits on the photo.
+    banner2: { marginTop: -16, marginHorizontal: -16, marginBottom: 12, justifyContent: "flex-end", overflow: "hidden", backgroundColor: c.card },
+    heroTitle: { color: "#fff", fontSize: 38, lineHeight: 42, fontFamily: "Inter_700Bold", letterSpacing: -1, paddingHorizontal: 16, paddingBottom: 18,
+      textShadowColor: "rgba(0,0,0,0.55)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
     pos: { width: 22, fontSize: 13, color: c.textMuted, fontFamily: "Inter_700Bold", textAlign: "center", marginTop: 2 },
     badgeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
     badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: `${c.accentGreen}1A` },

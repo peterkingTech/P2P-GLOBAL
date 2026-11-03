@@ -12,11 +12,20 @@ import { darken, withAlpha } from "@/lib/colorUtils";
  * is what screen readers announce.
  */
 export default function CoverArt({ cover, kind, size, radius }: {
-  cover: { kind: string; ref: string } | null | undefined; kind: "collection" | "playlist"; size: number; radius?: number;
+  cover: { kind: string; ref: string; url?: string } | null | undefined; kind: "collection" | "playlist"; size: number; radius?: number;
 }) {
   const { colors: c } = useTheme();
   const r = resolveCover(cover, kind, c);
   const rad = radius ?? Math.round(size * 0.14);
+  const photo = cover?.kind === "image" && "url" in cover && typeof cover.url === "string" ? cover.url : null;
+  if (photo) {
+    // The owner's own photo (a short-lived private link from the server).
+    return (
+      <View style={[styles.box, { width: size, height: size, borderRadius: rad, backgroundColor: c.card, borderColor: withAlpha(c.textMuted, 0.25) }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Image source={{ uri: photo }} style={ARTWORK_FILL} resizeMode="cover" />
+      </View>
+    );
+  }
   return (
     <View style={[styles.box, { width: size, height: size, borderRadius: rad, backgroundColor: r.background, borderColor: withAlpha(c.textMuted, 0.25) }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {r.image ? <Image source={r.image} style={ARTWORK_FILL} resizeMode="cover" /> : (

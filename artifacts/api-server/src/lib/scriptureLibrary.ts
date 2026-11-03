@@ -141,3 +141,31 @@ export function cleanResume(raw: unknown, itemIds: string[]): ResumeState | stri
 /** A favourite target: a playlist/collection id, or a complete passage reference. */
 export type FavouriteTarget = { kind: "collection"; collectionId: string } | { kind: "passage"; ref: ItemRef };
 export const favouriteKey = (t: FavouriteTarget) => (t.kind === "collection" ? `c:${t.collectionId}` : `p:${refKey(t.ref)}`);
+
+// ── Your own photos (migration 228) ─────────────────────────────────────────
+/** Private bucket; every view is a short-lived signed link for someone who can see the playlist. */
+export const PHOTO_BUCKET = "scripture-library-images";
+export const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+export const PHOTO_VIEW_SECONDS = 60 * 60;
+export const PHOTO_SLOTS = ["cover", "header"] as const;
+export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
+const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
+
+/** Is this upload allowed? Returns a message when it isn't. */
+export function photoProblem(slot: unknown, mimeType: unknown, sizeBytes: unknown): string | null {
+  if (!(PHOTO_SLOTS as readonly unknown[]).includes(slot)) return "Choose the cover or the header photo.";
+  if (typeof mimeType !== "string" || !PHOTO_TYPES[mimeType]) return "Choose a photo (JPEG, PNG, WebP or HEIC).";
+  const n = Number(sizeBytes);
+  if (!Number.isFinite(n) || n <= 0) return "That photo couldn't be read.";
+  if (n > PHOTO_MAX_BYTES) return "Photos can be up to 8 MB.";
+  return null;
+}
+/** Server-generated object path: <owner>/<slot>-<collection>-<random>.<ext> (fits the 227/228 path checks). */
+export const photoPath = (ownerId: string, slot: PhotoSlot, collectionId: string, mimeType: string, random: string) =>
+  `${ownerId}/${slot}-${collectionId}-${random.replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}.${PHOTO_TYPES[mimeType]}`;
+/** Does this path belong to this owner's photo for this playlist and slot? (No guessing other paths.) */
+export function photoPathBelongs(path: unknown, ownerId: string, slot: PhotoSlot, collectionId: string): boolean {
+  if (typeof path !== "string" || path.length > 200) return false;
+  const prefix = `${ownerId}/${slot}-${collectionId}-`;
+  return path.startsWith(prefix) && /^[A-Za-z0-9]{1,24}\.(jpg|png|webp|heic)$/.test(path.slice(prefix.length));
+}

@@ -95,6 +95,14 @@ function makeDb() {
   } };
 }
 globalThis.__sc = { db: makeDb(), children: new Set(), partners: {}, leaders: new Set() };
+// In-memory private storage bucket (migration 228 photos): objects by path → size.
+const objects = new Map();
+globalThis.__sc.db.storage = { from: (bucket) => ({
+  createSignedUploadUrl: async (p) => ({ data: { signedUrl: `https://upload.invalid/${bucket}/${p}` }, error: null }),
+  list: async (dir, o) => ({ data: [...objects.keys()].filter((k) => k.startsWith(`${dir}/`) && k.slice(dir.length + 1).includes(o?.search ?? "")).map((k) => ({ name: k.slice(dir.length + 1), metadata: { size: objects.get(k) } })), error: null }),
+  remove: async (paths) => { for (const p of paths) objects.delete(p); return { data: [], error: null }; },
+  createSignedUrls: async (paths) => ({ data: paths.map((p) => ({ path: p, signedUrl: objects.has(p) ? `https://signed.invalid/${p}?ttl` : null })), error: null }),
+}) };
 
 // People: A owner · B, G peers of A/B · C stranger · D and E in A's Family · K a child.
 const [A, B, C, D, E, G, K] = Array.from({ length: 7 }, () => randomUUID());
@@ -251,6 +259,41 @@ try {
   ok("…a second change soon after doesn't notify again", (T.p2p_notifications ?? []).slice(notes0).filter((n) => n.notification_type === "scripture_collection_updated").length === 1);
   ok("…and the bookkeeping never shows in the activity history", !(await call("GET", `/c/${co}`, A)).body.activity.some((x) => x.action === "update_notified"));
   ok("a private playlist the owner edits notifies nobody", (await (async () => { const n0 = (T.p2p_notifications ?? []).length; const own = (await call("POST", "/c", A, { title: "Private", kind: "playlist" })).body.id; await call("POST", `/c/${own}/items`, A, { refs: [ref("GEN", 1, 1)] }); return (T.p2p_notifications ?? []).length === n0; })()));
+
+  // Your own photos (migration 228): a square cover and a wide header photo.
+  ok("photo rules: images only, up to 8 MB, cover or header", L.photoProblem("cover", "image/jpeg", 1000) === null && typeof L.photoProblem("cover", "image/gif", 1000) === "string"
+    && typeof L.photoProblem("cover", "image/png", 9 * 1024 * 1024) === "string" && typeof L.photoProblem("banner", "image/png", 10) === "string");
+  const ph = (await call("POST", "/c", A, { kind: "playlist", title: "Photo playlist", refs: [ref("JHN", 3, 16)] })).body.id;
+  ok("only the owner can add photos", (await call("POST", `/c/${ph}/photos`, B, { slot: "cover", mimeType: "image/jpeg", sizeBytes: 1000 })).status === 404
+    && (await call("POST", `/c/${ph}/photos`, A, { slot: "cover", mimeType: "image/gif", sizeBytes: 1000 })).status === 400);
+  const up = await call("POST", `/c/${ph}/photos`, A, { slot: "cover", mimeType: "image/jpeg", sizeBytes: 200_000 });
+  ok("owner gets a one-off upload link to a server-chosen path in their own folder", up.status === 200 && up.body.uploadUrl.startsWith("https://upload.invalid/scripture-library-images/") && up.body.path.startsWith(`${A}/cover-${ph}-`) && up.body.path.endsWith(".jpg"));
+  ok("completing before the upload arrived is refused", (await call("POST", `/c/${ph}/photos/complete`, A, { slot: "cover", path: up.body.path })).status === 409);
+  objects.set(up.body.path, 200_000);
+  ok("a path for another playlist or person is refused", (await call("POST", `/c/${ph}/photos/complete`, A, { slot: "cover", path: up.body.path.replace(ph, pl) })).status === 400
+    && (await call("POST", `/c/${ph}/photos/complete`, A, { slot: "header", path: up.body.path })).status === 400);
+  ok("cover photo set", (await call("POST", `/c/${ph}/photos/complete`, A, { slot: "cover", path: up.body.path })).status === 200);
+  const hd = await call("POST", `/c/${ph}/photos`, A, { slot: "header", mimeType: "image/png", sizeBytes: 900_000 });
+  objects.set(hd.body.path, 900_000);
+  await call("POST", `/c/${ph}/photos/complete`, A, { slot: "header", path: hd.body.path });
+  let phd = await call("GET", `/c/${ph}`, A);
+  ok("the playlist shows the cover photo and the wide header photo (short-lived links)", phd.body.cover?.kind === "image" && phd.body.cover.url.startsWith("https://signed.invalid/") && phd.body.header?.url.includes(hd.body.path));
+  ok("the library list shows the cover photo too", (await call("GET", "/c", A)).body.mine.find((m) => m.id === ph).cover.url.includes(up.body.path));
+  ok("a photo can't be set by naming a path in PATCH", (await call("PATCH", `/c/${ph}`, A, { cover: { kind: "image", ref: `${A}/cover-${ph}-x.jpg` }, revision: phd.body.revision })).status === 400);
+  ok("stranger: no playlist, no photo links", (await call("GET", `/c/${ph}`, C)).status === 404);
+  await call("POST", `/c/${ph}/shares`, A, { targets: [{ type: "peer", id: B }], permission: "view" });
+  ok("someone it's shared with sees the photos", (await call("GET", `/c/${ph}`, B)).body.header?.url.includes(hd.body.path));
+  const big = await call("POST", `/c/${ph}/photos`, A, { slot: "header", mimeType: "image/png", sizeBytes: 1000 });
+  objects.set(big.body.path, 20 * 1024 * 1024);
+  ok("an upload bigger than 8 MB is refused and deleted", (await call("POST", `/c/${ph}/photos/complete`, A, { slot: "header", path: big.body.path })).status === 400 && !objects.has(big.body.path));
+  phd = await call("GET", `/c/${ph}`, A);
+  ok("choosing built-in artwork deletes the old cover photo", (await call("PATCH", `/c/${ph}`, A, { cover: { kind: "artwork", ref: "dawn-hills" }, revision: phd.body.revision })).status === 200 && !objects.has(up.body.path));
+  ok("removing the header photo deletes it", (await call("DELETE", `/c/${ph}/photos/header`, A)).status === 200 && !objects.has(hd.body.path) && (await call("GET", `/c/${ph}`, A)).body.header === null);
+  const up2 = await call("POST", `/c/${ph}/photos`, A, { slot: "cover", mimeType: "image/webp", sizeBytes: 1000 });
+  objects.set(up2.body.path, 1000);
+  await call("POST", `/c/${ph}/photos/complete`, A, { slot: "cover", path: up2.body.path });
+  await call("DELETE", `/c/${ph}`, A);
+  ok("deleting the playlist deletes its photos", !objects.has(up2.body.path));
 
   // Deleting a playlist: it leaves Recently played and favourites; history stays (unnamed).
   await call("PUT", "/l/favourites", A, { collectionId: pl });

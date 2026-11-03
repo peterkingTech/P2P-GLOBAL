@@ -7,7 +7,7 @@ import {
   SOURCES, cleanResume, cleanTags, cleanTitle, listenedSeconds, memorisation, reuseHistoryRow,
   type Source,
 } from "../lib/scriptureLibrary";
-import { CollError, access, addToCollection, collectionFail as fail, readRefs } from "./scriptureCollections";
+import { CollError, access, addToCollection, collectionFail as fail, coverOut, photoUrls, readRefs } from "./scriptureCollections";
 
 // Scripture Listening Library (migration 227), mounted at /scripture-library.
 // Personal, owner-only data around the existing Saved Scriptures (bookmarks),
@@ -282,14 +282,16 @@ router.get("/recent", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
   try {
     const rows = (must(await db.from("p2p_scripture_listening_state").select("*").eq("user_id", userId).order("updated_at", { ascending: false }).limit(20)) ?? []) as StateRow[];
-    const out = [];
+    const seen = [];
     for (const s of rows) {
       const v = await visible(userId, s.collection_id);
       if (!v) continue;
-      out.push({ id: v.coll.id, kind: v.coll.kind, title: v.coll.title, cover: v.coll.cover_kind && v.coll.cover_ref ? { kind: v.coll.cover_kind, ref: v.coll.cover_ref } : null, state: stateOut(s) });
-      if (out.length === 10) break;
+      seen.push({ coll: v.coll, s });
+      if (seen.length === 10) break;
     }
-    return res.json({ items: out });
+    // Your own cover photos: short-lived links, only for playlists you can still see.
+    const urls = await photoUrls(seen.map((x) => x.coll));
+    return res.json({ items: seen.map(({ coll, s }) => ({ id: coll.id, kind: coll.kind, title: coll.title, cover: coverOut(coll, urls), state: stateOut(s) })) });
   } catch (e) { return fail(res, e); }
 });
 

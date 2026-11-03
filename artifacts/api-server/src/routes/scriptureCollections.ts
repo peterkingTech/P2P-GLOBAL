@@ -12,7 +12,11 @@ import {
   revisionMatches, shareApplies, validReorder,
   type Access, type MemberSets, type Permission, type ShareRow, type TargetType,
 } from "../lib/scriptureAccess";
-import { cleanCover, cleanTags, planAdd } from "../lib/scriptureLibrary";
+import { randomUUID } from "node:crypto";
+import {
+  PHOTO_BUCKET, PHOTO_MAX_BYTES, PHOTO_VIEW_SECONDS, cleanCover, cleanTags, photoPath, photoPathBelongs, photoProblem, planAdd,
+  type PhotoSlot,
+} from "../lib/scriptureLibrary";
 
 // Scripture collections and listening playlists (migration 220), mounted at
 // /scripture-collections. Every rule lives in lib/scriptureAccess.ts; this
@@ -25,6 +29,9 @@ import { cleanCover, cleanTags, planAdd } from "../lib/scriptureLibrary";
 //   PATCH  /:id                       { title?, description?, cover?, tags?, revision } owner
 //   DELETE /:id                       owner (copies others made stay theirs)
 //   POST   /:id/items                 { refs, sharedNote?, allowRepeat? } owner / collaborators — appends (skips passages already there unless allowRepeat)
+//   POST   /:id/photos                { slot: cover|header, mimeType, sizeBytes } owner — a signed upload link (migration 228)
+//   POST   /:id/photos/complete       { slot, path } owner — checks the upload, then uses it
+//   DELETE /:id/photos/:slot          owner — back to the default
 //   DELETE /:id/items/:itemId         { revision } owner / collaborators
 //   PUT    /:id/order                 { itemIds, revision } owner / collaborators
 //   PUT    /:id/items/:itemId/note    { sharedNote } owner — the ONLY note that is ever shared
@@ -57,7 +64,7 @@ function fail(res: Response, e: unknown) {
   return res.status(500).json({ error: "Something went wrong. Please try again." });
 }
 const gone = () => new CollError(404, "This collection isn't available.");
-export { CollError, fail as collectionFail };
+export { CollError, fail as collectionFail, photoUrls, coverOut };
 const must = <T>(r: { data: T | null; error: unknown }): T => { if (r.error) throw r.error; return r.data as T; };
 
 interface Coll {
@@ -66,8 +73,31 @@ interface Coll {
   revision: number; created_at: string; updated_at: string; deleted_at: string | null;
   /** Migration 227 (absent before it). */
   cover_kind?: string | null; cover_ref?: string | null; tags?: string[] | null;
+  /** Migration 228: the wide header photo (a path in the private bucket). */
+  header_ref?: string | null;
 }
-const coverOut = (c: Coll) => (c.cover_kind && c.cover_ref ? { kind: c.cover_kind, ref: c.cover_ref } : null);
+type PhotoUrls = Map<string, string>;
+/** Short-lived links for your own photos — only ever made for playlists the caller may see. */
+async function photoUrls(colls: Coll[]): Promise<PhotoUrls> {
+  const paths = Array.from(new Set(colls.flatMap((c) => [c.cover_kind === "image" ? c.cover_ref : null, c.header_ref]).filter((p): p is string => !!p)));
+  const out: PhotoUrls = new Map();
+  if (!paths.length) return out;
+  try {
+    const { data } = await db.storage.from(PHOTO_BUCKET).createSignedUrls(paths, PHOTO_VIEW_SECONDS);
+    for (const r of (data ?? []) as { path: string | null; signedUrl: string | null }[]) if (r.path && r.signedUrl) out.set(r.path, r.signedUrl);
+  } catch { /* photos are optional — the default cover shows instead */ }
+  return out;
+}
+const coverOut = (c: Coll, urls?: PhotoUrls) => {
+  if (!c.cover_kind || !c.cover_ref) return null;
+  if (c.cover_kind !== "image") return { kind: c.cover_kind, ref: c.cover_ref };
+  const url = urls?.get(c.cover_ref);
+  return url ? { kind: "image", ref: c.cover_ref, url } : null;
+};
+const headerOut = (c: Coll, urls?: PhotoUrls) => (c.header_ref && urls?.get(c.header_ref) ? { url: urls.get(c.header_ref)! } : null);
+async function removePhoto(path: string | null | undefined) {
+  if (path) { try { await db.storage.from(PHOTO_BUCKET).remove([path]); } catch { /* already gone */ } }
+}
 interface Item {
   id: string; collection_id: string; translation_code: string; book_code: string; chapter: number;
   start_verse: number; end_verse: number; position: number; shared_note: string | null; added_by: string | null; created_at: string;
@@ -202,8 +232,9 @@ router.get("/", async (req, res) => {
     const shareCounts = new Map<string, number>();
     if (mine?.length) for (const r of (must(await db.from("p2p_scripture_collection_shares").select("collection_id").in("collection_id", (mine as Coll[]).map((c) => c.id)).eq("status", "active")) ?? []) as { collection_id: string }[]) shareCounts.set(r.collection_id, (shareCounts.get(r.collection_id) ?? 0) + 1);
     const people = await profilesById([...visibleShared.map((c) => c.owner_id), ...((mine ?? []) as Coll[]).map((c) => c.origin_owner_id ?? ""), ...applicable.map((s) => s.shared_by ?? "")]);
+    const urls = await photoUrls(all);
     const card = (c: Coll) => ({
-      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, updatedAt: c.updated_at, cover: coverOut(c), tags: c.tags ?? [],
+      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, updatedAt: c.updated_at, cover: coverOut(c, urls), tags: c.tags ?? [],
       isCopy: !!c.copied_at, originOwnerName: c.origin_owner_id ? people.get(c.origin_owner_id)?.name ?? null : null,
     });
     return res.json({
@@ -370,8 +401,10 @@ router.get("/:id", async (req, res) => {
       }
       origin = { id: oid, title, ownerName: c.origin_owner_id ? people.get(c.origin_owner_id)?.name ?? "Someone" : "Someone", available, changed };
     }
+    const urls = await photoUrls([c]);
     return res.json({
-      id: c.id, kind: c.kind, title: c.title, description: c.description, revision: c.revision, updatedAt: c.updated_at, createdAt: c.created_at, cover: coverOut(c), tags: c.tags ?? [],
+      id: c.id, kind: c.kind, title: c.title, description: c.description, revision: c.revision, updatedAt: c.updated_at, createdAt: c.created_at,
+      cover: coverOut(c, urls), header: headerOut(c, urls), tags: c.tags ?? [],
       owner: { id: c.owner_id, name: people.get(c.owner_id)?.name ?? "Someone", photoUrl: people.get(c.owner_id)?.photoUrl ?? null },
       status: isOwner ? (c.copied_at ? "copy" : "original") : "shared",
       access: { role: a.role, permission: a.permission, canReshare: a.canReshare },
@@ -404,6 +437,9 @@ router.patch("/:id", async (req, res) => {
     if (b.cover !== undefined) {
       const cover = cleanCover(b.cover, userId);
       if (typeof cover === "string") throw new CollError(400, cover);
+      // An uploaded photo is set only through /photos (which checks the upload).
+      if (cover?.kind === "image" && cover.ref !== c.cover_ref) throw new CollError(400, "Upload the photo first.");
+      if (c.cover_kind === "image" && cover?.ref !== c.cover_ref) await removePhoto(c.cover_ref);
       patch.cover_kind = cover?.kind ?? null; patch.cover_ref = cover?.ref ?? null;
     }
     if (b.tags !== undefined) {
@@ -424,6 +460,8 @@ router.delete("/:id", async (req, res) => {
     const { coll: c, access: a } = await access(userId, req.params.id);
     if (a.role !== "owner") throw new CollError(403, "Only the owner can delete this.");
     must(await db.from("p2p_scripture_collections").update({ deleted_at: new Date().toISOString() }).eq("id", c.id).select("id"));
+    // Its own photos go with it (copies others saved keep their own covers).
+    await removePhoto(c.cover_kind === "image" ? c.cover_ref : null); await removePhoto(c.header_ref);
     // Links stop working at once; copies other people saved are theirs and stay.
     await db.from("p2p_scripture_collection_links").update({ revoked_at: new Date().toISOString() }).eq("collection_id", c.id).is("revoked_at", null);
     await log(c.id, userId, "deleted");
@@ -464,6 +502,63 @@ async function notifyUpdate(c: Coll, actorId: string, references: string[]) {
   const refs = references.length > 2 ? `${references.slice(0, 2).join(", ")} and ${references.length - 2} more` : references.join(" and ");
   await notifyWith(recipients, { title: c.kind === "playlist" ? "Playlist updated" : "Collection updated", message: `${name} added ${refs} to "${c.title}".`, type: "scripture_collection_updated", data: { collectionId: c.id } });
 }
+
+// ── Your own photos (migration 228): owner only, private bucket, checked uploads ──
+
+router.post("/:id/photos", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  const b = (req.body ?? {}) as { slot?: unknown; mimeType?: unknown; sizeBytes?: unknown };
+  try {
+    const { coll: c, access: a } = await access(userId, req.params.id);
+    if (a.role !== "owner") throw new CollError(403, "Only the owner can change the photos.");
+    const problem = photoProblem(b.slot, b.mimeType, b.sizeBytes);
+    if (problem) throw new CollError(400, problem);
+    const path = photoPath(userId, b.slot as PhotoSlot, c.id, String(b.mimeType), randomUUID());
+    const { data, error } = await db.storage.from(PHOTO_BUCKET).createSignedUploadUrl(path);
+    if (error || !data) throw new CollError(503, "Photos aren't available yet.");
+    return res.json({ uploadUrl: data.signedUrl, path });
+  } catch (e) { return fail(res, e); }
+});
+
+router.post("/:id/photos/complete", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  const b = (req.body ?? {}) as { slot?: unknown; path?: unknown };
+  try {
+    const { coll: c, access: a } = await access(userId, req.params.id);
+    if (a.role !== "owner") throw new CollError(403, "Only the owner can change the photos.");
+    const slot = b.slot === "header" ? "header" : b.slot === "cover" ? "cover" : null;
+    if (!slot || !photoPathBelongs(b.path, userId, slot, c.id)) throw new CollError(400, "That photo can't be used here.");
+    const path = String(b.path);
+    // The upload must really be there, and not too big.
+    const dir = path.slice(0, path.lastIndexOf("/"));
+    const { data: listed } = await db.storage.from(PHOTO_BUCKET).list(dir, { search: path.slice(path.lastIndexOf("/") + 1) });
+    const obj = ((listed ?? []) as { name?: string; metadata?: { size?: number } }[]).find((o) => o.name === path.slice(path.lastIndexOf("/") + 1));
+    if (!obj) throw new CollError(409, "The upload didn't finish. Please try again.");
+    if (Number(obj.metadata?.size ?? 0) > PHOTO_MAX_BYTES) { await removePhoto(path); throw new CollError(400, "Photos can be up to 8 MB."); }
+    const previous = slot === "cover" ? (c.cover_kind === "image" ? c.cover_ref : null) : c.header_ref;
+    must(await db.from("p2p_scripture_collections").update(slot === "cover" ? { cover_kind: "image", cover_ref: path } : { header_ref: path }).eq("id", c.id).select("id"));
+    if (previous && previous !== path) await removePhoto(previous);
+    const revision = await bump(c);
+    await log(c.id, userId, slot === "cover" ? "cover_photo_changed" : "header_photo_changed");
+    return res.json({ revision });
+  } catch (e) { return fail(res, e); }
+});
+
+router.delete("/:id/photos/:slot", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  try {
+    const { coll: c, access: a } = await access(userId, req.params.id);
+    if (a.role !== "owner") throw new CollError(403, "Only the owner can change the photos.");
+    const slot = req.params.slot === "header" ? "header" : req.params.slot === "cover" ? "cover" : null;
+    if (!slot) throw new CollError(404, "Not found.");
+    if (slot === "cover") {
+      if (c.cover_kind === "image") { must(await db.from("p2p_scripture_collections").update({ cover_kind: null, cover_ref: null }).eq("id", c.id).select("id")); await removePhoto(c.cover_ref); }
+    } else if (c.header_ref) {
+      must(await db.from("p2p_scripture_collections").update({ header_ref: null }).eq("id", c.id).select("id")); await removePhoto(c.header_ref);
+    }
+    return res.json({ revision: await bump(c) });
+  } catch (e) { return fail(res, e); }
+});
 
 /**
  * Append passages to a playlist/collection the caller may edit. A passage

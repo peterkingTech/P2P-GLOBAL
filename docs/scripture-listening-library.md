@@ -80,5 +80,13 @@ This needs a native build to test; Expo Go and the web can't show it.
 - **Android lock screen:** play, pause and seek only. `expo-audio`'s media session removes next and previous, and adding them needs a patch to `expo-audio`.
 - **Lock-screen progress bar:** shows the current sentence's audio file, not the whole passage.
 - **Exact phrases:** checked only among the provider's top results. AO Lab translations have no word search at all.
-- **Covers:** your own uploaded image isn't offered yet. The server accepts only a path inside your own folder.
 - **Shared playlists:** update notifications go out only when passages are added, at most once every 6 hours per playlist.
+
+## Your own photos (migration 228)
+
+- **What the owner can add:** a square **cover photo** and a wide (16:9) **header photo**. The header photo fills the top of the playlist page and fades into it, with the title on it.
+- **Storage:** a private bucket, `scripture-library-images`, with no client access. The upload works like this:
+  1. `POST /scripture-collections/:id/photos` gives a one-off upload link to a path the server chooses (`<owner>/<slot>-<collection>-<random>.<ext>`).
+  2. `POST …/photos/complete` checks that the file arrived and is no bigger than 8 MB, then uses it.
+- **Who sees a photo:** only people who can see the playlist at that moment, through 1-hour signed links. Unsharing a playlist stops them at once.
+- **Clean-up:** replacing, removing (`DELETE …/photos/:slot`), choosing built-in artwork, or deleting the playlist removes the old file.
