@@ -792,7 +792,7 @@ export default function BibleReaderScreen() {
       </Modal>
 
       <BookChapterPicker visible={sheet === "books"} onClose={() => setSheet(null)} currentBook={loc?.book ?? "JHN"} currentChapter={loc?.chapter ?? 1}
-        onSelect={(b, ch) => go(b, ch)} />
+        onSelect={(b, ch) => go(b, ch)} testaments={translation?.coverage === "nt" ? ["NT"] : translation?.coverage === "ot" ? ["OT"] : undefined} />
       <TranslationPicker visible={sheet === "translations"} onClose={() => setSheet(null)} translations={translations ?? []} current={loc?.t ?? ""}
         error={trError} onRetry={() => setTrAttempt((n) => n + 1)}
         onSelect={(t) => { setSheet(null); if (loc && t !== loc.t) setLoc({ ...loc, t, v: sel?.start, ve: sel?.end }); }} />

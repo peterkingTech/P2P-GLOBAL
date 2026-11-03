@@ -38,7 +38,7 @@ const mocks = {
   "@react-native-async-storage/async-storage": { __esModule: true, default: { getItem: async (k) => store.get(k) ?? null, setItem: async (k, v) => { store.set(k, v); } } },
   "@/contexts/ThemeContext": { useTheme: () => ({ colors: new Proxy({}, { get: () => "#000" }), resolvedMode: "light" }) },
   "@/lib/bibleReaderApi": { BibleApiError: class extends Error {}, SCRIPTURE_FONT: "Georgia", getChapter: async () => { throw new Error("not in test"); } },
-  "@/lib/colorUtils": { withAlpha: () => "#0000" },
+  "@/lib/colorUtils": { withAlpha: () => "#0000", darken: (h, a) => `dark(${h},${a})` },
   "@/lib/languageNames": { getLanguageName: (c) => ({ fr: "French", de: "German" })[c] ?? c },
 };
 const cache = new Map();
@@ -94,7 +94,19 @@ const View = load("components/bible/CompareView.tsx").default;
 const props = (o) => ({ bookCode: "JHN", chapter: 3, primary: ch("KJV", 2), others: ["JND"], translations: L, fontSize: 18, lineHeight: 30, verseNumbers: true, selected: { start: 2, end: 2 }, onTapVerse: () => {}, ...o });
 env.state = { JND: { status: "ok", chapter: ch("JND", 2, [2]) } };
 let t = expand(React.createElement(View, props({ width: 700 })));
-ok("view: wide screen → translations side by side", /KJV 1/.test(textOf(t)) && /JND 1/.test(textOf(t)) && /Not in this translation/.test(textOf(t)) && /reading/.test(textOf(t)));
+ok("view: wide screen → translations side by side", /KJV 1/.test(textOf(t)) && /JND 1/.test(textOf(t)) && /Not in this translation/.test(textOf(t)) && /Reading/.test(textOf(t)) && /Comparing/.test(textOf(t)));
+{
+  const V = load("components/bible/CompareView.tsx");
+  const colours = [0, 1, 2, 3].map((i) => V.compareColour(i, { accentGreen: "#1D9E75", amber: "#BA7517" }));
+  ok("view: each compared translation has its own colour (the one being read keeps the app green)", colours[0] === "#1D9E75" && new Set(colours).size === 4);
+  const viewSrc = src("components/bible/CompareView.tsx");
+  ok("view: the colour marks the key badge AND every verse cell (edge + tint); phones repeat the badge per line; RTL per translation",
+    viewSrc.includes("styles.badge, { backgroundColor: colour(code) }") && (viewSrc.match(/borderLeftColor: colour\(cell\.code\), backgroundColor: tint\(cell\.code\)/g) ?? []).length === 2
+    && viewSrc.includes("styles.badgeSmall, { backgroundColor: colour(cell.code) }") && viewSrc.includes("rtl(cell.code) && styles.rtl"));
+  // Regression (phone web): a flex basis of 0 on stacked lines collapsed them to zero height, so the translations drew on top of each other.
+  ok("view: stacked phone lines size to their text (only side-by-side columns flex)",
+    /cell: { borderLeftWidth/.test(viewSrc) && viewSrc.includes("col: { flex: 1 }") && !/flex: 0/.test(viewSrc) && viewSrc.includes("styles.cell, styles.col,"));
+}
 const rowsOn = findAll(t, (n) => n.type === RN.TouchableOpacity && /^Verse \d+ in 2 translations$/.test(n.props.accessibilityLabel ?? ""));
 ok("view: every verse row selectable; the selected one marked", rowsOn.length === 2 && rowsOn[1].props.accessibilityState.selected === true && rowsOn[0].props.accessibilityState.selected === false);
 t = expand(React.createElement(View, props({ width: 360 })));

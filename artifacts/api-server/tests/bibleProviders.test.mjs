@@ -144,7 +144,30 @@ try {
   ok("preview (local machine): listed, marked as not yet approved, RTL, Arabic", pv && pv.preview && /licence not yet approved/.test(pv.name) && pv.textDirection === "rtl" && pv.language === "ar");
   process.env.RAILWAY_PROJECT_ID = "d3dbf174"; R.clearTranslationCache();
   ok("preview: ignored on the deployed server even if the variable is set", !(await R.licensedTranslations()).some((r) => r.preview));
-  delete process.env.RAILWAY_PROJECT_ID; delete process.env.HELLOAO_PREVIEW;
+  delete process.env.RAILWAY_PROJECT_ID;
+
+  // ── The curated library (helloaoRegistry.ts, generated from evidence) ────
+  const REG = await bundle("src/lib/bibleProviders/helloaoRegistry.ts", "registry.mjs");
+  const C = REG.CURATED_TRANSLATIONS;
+  const appr = C.filter((x) => x.status === "approved");
+  ok("registry: curated entries with reasons; approved ones have a confirmed licence and a source page", C.length >= 50 && appr.length >= 40 && appr.every((x) => x.licence && x.source && x.rationale && x.type));
+  ok("registry: no non-commercial licence is ever approved", !C.some((x) => x.status === "approved" && /NON-COMMERCIAL|NC/.test(x.licence ?? "")));
+  ok("registry: only open licences or public domain are approved", appr.every((x) => ["Public domain", "CC BY 4.0", "CC BY-SA 4.0", "CC BY-ND 4.0"].includes(x.licence)));
+  ok("registry: completeness comes from each Bible's own book list; New Testament-only is never called complete",
+    appr.every((x) => x.coverage && x.coverageLabel) && appr.filter((x) => x.coverage === "nt").every((x) => x.coverageLabel === "New Testament only") && appr.filter((x) => x.coverage === "bible").every((x) => x.books === 66));
+  ok("registry: entries the publisher's page couldn't confirm stay out (review, with the reason)", C.filter((x) => x.status === "review").every((x) => !!x.reason));
+  ok("registry: English and German have a real range; African languages across West/East/Central/Southern Africa",
+    appr.filter((x) => x.lang === "en").length >= 5 && appr.filter((x) => x.lang === "de").length >= 2
+    && ["ha", "ee", "om", "rn", "lg", "ki", "luo", "ln", "sn", "nd", "ny", "tn", "sw"].every((l) => appr.some((x) => x.lang === l)));
+  ok("registry: licences that require attribution carry it (copyright + licence); Arabic is right-to-left",
+    appr.filter((x) => x.licence !== "Public domain").every((x) => x.attribution && x.attribution.includes(x.licence)) && appr.find((x) => x.id === "arb_vdv")?.textDirection === "rtl");
+  process.env.HELLOAO_PREVIEW = "curated"; R.clearTranslationCache();
+  const lib = (await R.licensedTranslations()).map(R.publicTranslation);
+  const tsn = lib.find((t) => t.code === "AO-tsn_bib"), schl = lib.find((t) => t.code === "AO-deu_sch");
+  ok("preview (curated): the approved library is listed with coverage, language names and credits",
+    lib.filter((t) => t.provider === "helloao" && t.preview).length === appr.length && tsn?.coverage === "nt" && tsn.coverageLabel === "New Testament only"
+    && schl?.attribution?.includes("Genfer Bibelgeschellschaft") && lib.find((t) => t.code === "AO-gaz_bib")?.language === "om");
+  delete process.env.HELLOAO_PREVIEW;
 } catch (e) { fail++; console.log("FAIL crashed", e?.stack ?? e); }
 finally { rmSync(tmp, { recursive: true, force: true }); }
 console.log(`bibleProviders: ${pass} passed, ${fail} failed`);

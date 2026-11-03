@@ -31,7 +31,7 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 export function filterTranslations(list: BibleTranslation[], query: string, language: string | null): BibleTranslation[] {
   const q = norm(query.trim());
   return list.filter((t) => (!language || t.language === language)
-    && (!q || [t.name, t.abbreviation ?? "", t.code, langName(t.language), t.language].some((x) => norm(x).includes(q))));
+    && (!q || [t.name, t.abbreviation ?? "", t.code, t.languageName ?? "", langName(t.language), t.language].some((x) => norm(x).includes(q))));
 }
 
 /** Names (or abbreviations) offered by more than one source — those rows say where they come from. */
@@ -49,15 +49,20 @@ export default function TranslationPicker({ visible, onClose, translations, curr
   const styles = useMemo(() => makeStyles(c), [c]);
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState<string | null>(null);
-  const languages = useMemo(() => [...new Set(translations.map((t) => t.language))].sort((a, b) => langName(a).localeCompare(langName(b))), [translations]);
+  // The server names languages the app has no name for (e.g. Oromo, Lingala).
+  const nameOf = useMemo(() => {
+    const m = new Map(translations.filter((t) => t.languageName).map((t) => [t.language, t.languageName as string]));
+    return (code: string) => m.get(code) ?? langName(code);
+  }, [translations]);
+  const languages = useMemo(() => [...new Set(translations.map((t) => t.language))].sort((a, b) => nameOf(a).localeCompare(nameOf(b))), [translations, nameOf]);
   const shared = useMemo(() => sharedAcrossProviders(translations), [translations]);
   const groups = useMemo(() => {
     const m = new Map<string, BibleTranslation[]>();
     for (const t of filterTranslations(translations, query, language)) m.set(t.language, [...(m.get(t.language) ?? []), t]);
     // The language being read first, then the others by name.
     const currentLang = translations.find((t) => t.code === current)?.language;
-    return [...m.entries()].sort(([a], [b]) => (a === currentLang ? -1 : b === currentLang ? 1 : langName(a).localeCompare(langName(b))));
-  }, [translations, current, query, language]);
+    return [...m.entries()].sort(([a], [b]) => (a === currentLang ? -1 : b === currentLang ? 1 : nameOf(a).localeCompare(nameOf(b))));
+  }, [translations, current, query, language, nameOf]);
   const many = translations.length > 8;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -84,7 +89,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                   </View>
                   <ChipRow accessibilityLabel="Filter by language">
                     <FilterChip label="All languages" selected={!language} onPress={() => setLanguage(null)} />
-                    {languages.map((l) => <FilterChip key={l} label={langName(l)} selected={language === l} onPress={() => setLanguage(language === l ? null : l)} />)}
+                    {languages.map((l) => <FilterChip key={l} label={nameOf(l)} selected={language === l} onPress={() => setLanguage(language === l ? null : l)} />)}
                   </ChipRow>
                 </View>
               ) : null}
@@ -92,7 +97,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                 {!groups.length ? <Text style={[styles.muted, { padding: 16 }]}>No translation matches “{query}”.</Text> : null}
                 {groups.map(([lang, list]) => (
                   <View key={lang}>
-                    <Text style={styles.group}>{langName(lang)}</Text>
+                    <Text style={styles.group}>{nameOf(lang)}</Text>
                     {list.map((t) => {
                       const selected = t.code === current;
                       const showSource = shared.has(`${t.language}:${norm(t.abbreviation ?? t.code)}`) || t.provider === "helloao";
@@ -103,6 +108,7 @@ export default function TranslationPicker({ visible, onClose, translations, curr
                           <View style={styles.abbr}><Text style={styles.abbrText}>{t.abbreviation ?? t.code}</Text></View>
                           <View style={{ flex: 1, gap: 2 }}>
                             <Text style={[styles.name, t.textDirection === "rtl" && { writingDirection: "rtl" }]} numberOfLines={2}>{t.name}</Text>
+                            {t.coverage && t.coverage !== "bible" && t.coverageLabel ? <Text style={styles.coverage}>{t.coverageLabel}</Text> : null}
                             {showSource && t.providerName ? <Text style={styles.source}>{t.providerName}{t.preview ? " · preview, licence not yet approved" : ""}</Text> : null}
                             {selected && t.attribution ? <Text style={styles.attribution} numberOfLines={3}>{t.attribution}</Text> : null}
                           </View>
@@ -137,6 +143,7 @@ function makeStyles(c: AppColors) {
     abbrText: { fontSize: 12, color: c.textDark, fontFamily: "Inter_700Bold" },
     name: { fontSize: 15, color: c.textDark, fontFamily: "Inter_500Medium" },
     source: { fontSize: 11.5, color: c.textMuted, fontFamily: "Inter_500Medium" },
+    coverage: { fontSize: 11.5, color: c.amber, fontFamily: "Inter_600SemiBold" },
     attribution: { fontSize: 11.5, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16 },
     muted: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular" },
     foot: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular", paddingHorizontal: 16, paddingTop: 16 },

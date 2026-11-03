@@ -64,6 +64,10 @@ export interface BibleTranslation {
   code: string; name: string; language: string; isDefault: boolean; textCopyAllowed: boolean;
   provider?: "api.bible" | "helloao"; providerName?: string; abbreviation?: string;
   textDirection?: "ltr" | "rtl"; attribution?: string | null; licenceUrl?: string | null; preview?: boolean;
+  /** The language's name from the server (for languages the app has no name for). */
+  languageName?: string | null;
+  /** bible | bible_plus | nt | ot | nt_plus | partial — and how to say it. Null = not recorded (API.Bible: complete). */
+  coverage?: string | null; coverageLabel?: string | null;
 }
 /** `through`: the last verse this text covers when a translation joins verses (The Message: "1–2"). */
 export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }

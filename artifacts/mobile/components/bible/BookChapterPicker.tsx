@@ -17,9 +17,11 @@ interface Props {
   currentBook: string;
   currentChapter: number;
   onSelect: (bookCode: string, chapter: number) => void;
+  /** The testaments this translation has (a New Testament-only translation shows only those books). */
+  testaments?: ("OT" | "NT")[];
 }
 
-export default function BookChapterPicker({ visible, onClose, currentBook, currentChapter, onSelect }: Props) {
+export default function BookChapterPicker({ visible, onClose, currentBook, currentChapter, onSelect, testaments = ["OT", "NT"] }: Props) {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -31,14 +33,16 @@ export default function BookChapterPicker({ visible, onClose, currentBook, curre
     if (!visible) return;
     setQuery("");
     setOpenBook(currentBook);
-    setTestament(CANON.find((b) => b.code === currentBook)?.testament ?? "OT");
-  }, [visible, currentBook]);
+    const t = CANON.find((b) => b.code === currentBook)?.testament ?? "OT";
+    setTestament(testaments.includes(t) ? t : testaments[0] ?? "NT");
+  }, [visible, currentBook, testaments.join(",")]);
 
   const books = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q) return CANON.filter((b) => b.name.toLowerCase().includes(q) || b.code.toLowerCase().startsWith(q));
-    return CANON.filter((b) => b.testament === testament);
-  }, [query, testament]);
+    const inTranslation = CANON.filter((b) => testaments.includes(b.testament));
+    if (q) return inTranslation.filter((b) => b.name.toLowerCase().includes(q) || b.code.toLowerCase().startsWith(q));
+    return inTranslation.filter((b) => b.testament === testament);
+  }, [query, testament, testaments.join(",")]);
 
   const renderBook = ({ item: b }: { item: CanonBook }) => {
     const open = openBook === b.code;
@@ -82,7 +86,7 @@ export default function BookChapterPicker({ visible, onClose, currentBook, curre
           <TextInput style={styles.searchInput} placeholder="Find a book" placeholderTextColor={c.textMuted} value={query} onChangeText={setQuery}
             autoCorrect={false} accessibilityLabel="Find a book" returnKeyType="search" />
         </View>
-        {!query && (
+        {!query && testaments.length > 1 && (
           <View style={styles.tabs} accessibilityRole="tablist">
             {(["OT", "NT"] as const).map((t) => (
               <TouchableOpacity key={t} style={[styles.tab, testament === t && styles.tabActive]} onPress={() => setTestament(t)}

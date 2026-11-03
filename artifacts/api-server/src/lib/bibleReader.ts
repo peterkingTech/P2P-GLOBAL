@@ -2,6 +2,7 @@ import { supabaseServiceRole as db } from "./supabase";
 import { BOOK_CODES } from "./bibleService";
 import { attributionOf, canCache, canPlayRecordedAudio, isServable, providerOf, textCopyAllowed as licenceTextCopyAllowed, type TranslationRow } from "./bibleLicence";
 import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, type HelloAoTranslation } from "./bibleProviders/helloao";
+import { CURATED_TRANSLATIONS } from "./bibleProviders/helloaoRegistry";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -64,7 +65,11 @@ export async function licensedTranslations(): Promise<TRow[]> {
     .select("*").eq("is_licensed_confirmed", true).order("language").order("translation_code");
   if (error) throw new Error("Couldn't load translations");
   const rows = ((data ?? []) as TRow[]).filter(isServable);
-  tCache = { at: Date.now(), rows: [...rows, ...(await previewRows(rows))] };
+  // Language names for every language a translation uses (the app knows only its own interface languages).
+  const { data: langs } = await db.from("p2p_languages").select("code,name_en");
+  const names = new Map(((langs ?? []) as { code: string; name_en: string | null }[]).map((l) => [l.code, l.name_en]));
+  const all = [...rows, ...(await previewRows(rows))];
+  tCache = { at: Date.now(), rows: all.map((r) => ({ ...r, language_name: r.language_name ?? names.get(r.language) ?? null })) };
   return tCache.rows;
 }
 export const clearTranslationCache = () => { tCache = null; };
@@ -77,8 +82,18 @@ const onDeployedServer = () => !!(process.env.RAILWAY_PROJECT_ID || process.env.
 async function previewRows(existing: TRow[]): Promise<TRow[]> {
   const ids = (process.env.HELLOAO_PREVIEW ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   if (!ids.length || onDeployedServer()) return [];
-  const catalogue = await getHelloAoCatalogue().catch(() => [] as HelloAoTranslation[]);
   const have = new Set(existing.map((r) => r.provider_translation_id).filter(Boolean));
+  // HELLOAO_PREVIEW=curated: the whole APPROVED curated library (helloaoRegistry.ts) with its recorded licence details.
+  if (ids.includes("curated")) {
+    return CURATED_TRANSLATIONS.filter((c) => c.status === "approved" && !have.has(c.id)).map((c) => ({
+      translation_code: `AO-${c.id}`.slice(0, 40), translation_name: c.name, language: c.lang, is_default_for_language: false,
+      license_notes: c.licence, api_bible_id: null, provider: "helloao", provider_translation_id: c.id, abbreviation: c.abbreviation,
+      text_direction: c.textDirection, copyright_notice: c.copyright, licence_name: c.licence, licence_url: c.licenceUrl, attribution: c.attribution,
+      source_url: c.source, description: c.coverageLabel, coverage: c.coverage, is_curated: true, selection_rationale: c.rationale,
+      permits_sharing: c.licence === "Public domain", language_name: c.languageName, preview: true,
+    }));
+  }
+  const catalogue = await getHelloAoCatalogue().catch(() => [] as HelloAoTranslation[]);
   return catalogue.filter((t) => ids.includes(t.id) && !have.has(t.id)).map((t) => ({
     translation_code: `AO-${t.id}`.slice(0, 40), translation_name: `${t.englishName} (preview — licence not yet approved)`,
     language: languageForPreview(t.language), is_default_for_language: false, license_notes: null, api_bible_id: null,
@@ -102,6 +117,10 @@ export const publicTranslation = (r: TRow) => ({
   attribution: attributionOf(r),
   licenceUrl: providerOf(r) === "helloao" ? r.licence_url ?? null : null,
   preview: r.preview === true,
+  languageName: r.language_name ?? null,
+  // How much Scripture it has (recorded for AO Lab translations; API.Bible ones are complete Bibles).
+  coverage: r.coverage ?? null,
+  coverageLabel: r.coverage ? r.description ?? null : null,
 });
 
 export class BibleError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }

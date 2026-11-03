@@ -27,6 +27,10 @@ export interface TranslationRow {
   permits_commercial?: boolean | null; permits_display?: boolean | null; permits_caching?: boolean | null; permits_offline?: boolean | null;
   permits_audio?: boolean | null; permits_sharing?: boolean | null;
   licence_status?: string | null; licence_questions?: string | null; reviewed_by?: string | null; reviewed_at?: string | null;
+  /** Migration 226: bible | bible_plus | nt | ot | nt_plus | partial; curated library membership and why. */
+  coverage?: string | null; is_curated?: boolean | null; selection_rationale?: string | null;
+  /** Filled by the reader from p2p_languages (or the registry, in preview). */
+  language_name?: string | null;
   /** Local development preview only (never in production): a catalogue entry shown before review. */
   preview?: boolean;
 }
