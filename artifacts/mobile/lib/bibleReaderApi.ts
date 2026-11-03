@@ -55,15 +55,26 @@ export function bibleRoute(t: { book: string; chapter: number; v?: number; ve?: 
 export const SCRIPTURE_FONT = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" });
 
 // ── Reading ─────────────────────────────────────────────────────────────────
-export interface BibleTranslation { code: string; name: string; language: string; isDefault: boolean; textCopyAllowed: boolean }
+/**
+ * A translation the server allows (API.Bible, or an AO Lab "Free Use Bible API"
+ * translation whose licence has been approved). The optional fields come from
+ * newer servers; `code` is unique across providers.
+ */
+export interface BibleTranslation {
+  code: string; name: string; language: string; isDefault: boolean; textCopyAllowed: boolean;
+  provider?: "api.bible" | "helloao"; providerName?: string; abbreviation?: string;
+  textDirection?: "ltr" | "rtl"; attribution?: string | null; licenceUrl?: string | null; preview?: boolean;
+}
 /** `through`: the last verse this text covers when a translation joins verses (The Message: "1–2"). */
 export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
 export interface BibleChapter {
-  translation: { code: string; name: string; textCopyAllowed: boolean };
+  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl" };
   book: { code: string; name: string; chapters: number };
   chapter: number; verses: ChapterVerse[]; headings: { beforeVerse: number; text: string }[];
   copyright: string | null;
   previous: { bookCode: string; chapter: number } | null; next: { bookCode: string; chapter: number } | null;
+  /** AO Lab translations: the source's footnotes. */
+  footnotes?: { verse: number | null; caller: string | null; text: string }[];
 }
 // The licensed-translations list changes rarely: one request every 10 minutes at most
 // (a failed request isn’t remembered, so the next visit tries again).

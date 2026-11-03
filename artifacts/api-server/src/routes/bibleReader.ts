@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import {
-  CANON, bookByCode, getChapter, searchBible, relatedLessons, licensedTranslations, publicTranslation, BibleError,
+  CANON, bookByCode, getChapter, searchBible, relatedLessons, licensedTranslations, publicTranslation, BibleError, booksFor,
   subtractRange, rangesOverlap, type HlRange,
 } from "../lib/bibleReader";
 
@@ -72,7 +72,9 @@ router.get("/reader/translations", async (req, res) => {
 });
 router.get("/reader/books", async (req, res) => {
   if (!(await caller(req, res))) return;
-  return ok(res, { books: CANON });
+  // ?t=CODE: only the books that translation has (AO Lab ones may be incomplete).
+  const t = typeof req.query.t === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(req.query.t) ? req.query.t : "";
+  try { return ok(res, { books: t ? await booksFor(t) : CANON }); } catch (e) { return fail(res, e); }
 });
 router.get("/reader/chapter", async (req, res) => {
   if (!(await caller(req, res))) return;

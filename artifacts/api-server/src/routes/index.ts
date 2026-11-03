@@ -20,6 +20,7 @@ import sessionsRouter from "./sessions";
 import discipleshipRouter from "./discipleship";
 import notificationsRouter from "./notifications";
 import adminRouter from "./admin";
+import bibleTranslationsAdminRouter from "./bibleTranslationsAdmin";
 import recycleBinRouter from "./recycleBin";
 import studyTogetherRouter from "./studyTogether";
 import scriptureCollectionsRouter from "./scriptureCollections";
@@ -77,6 +78,7 @@ router.use("/sessions", sessionsRouter);
 router.use("/discipleship", discipleshipRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/admin/recycle-bin", recycleBinRouter); // Admin Recycle Bin (migration 214) — before /admin so its own role rules apply
+router.use("/admin/bible-translations", bibleTranslationsAdminRouter); // Bible licence review (super admin; AO Lab provider, migration 225)
 router.use("/admin", adminRouter);
 router.use("/admin/evaluations", evaluationsRouter);
 router.use("/registration", registrationRouter);

@@ -213,6 +213,8 @@ export default function BibleReaderScreen() {
 
   const book = bookByCode(loc?.book);
   const translation = translations?.find((t) => t.code === loc?.t);
+  // Right-to-left scripts (Arabic, Persian, Urdu, Hebrew): from the translation (or language for older servers).
+  const rtl = (translation?.textDirection ?? data?.translation.textDirection) === "rtl" || ["ar", "fa", "ur", "he"].includes(translation?.language ?? "");
   const compare = useMemo(() => (loc && translations ? sanitizeCompare(loc.t, compareRaw, translations) : []), [loc?.t, compareRaw, translations]);
   // ?compare=1 (My P2P "Compare translations" shortcut): open the chooser once the chapter is ready.
   const compareAsked = useRef(false);
@@ -545,6 +547,14 @@ export default function BibleReaderScreen() {
         <AppButton label={`${data.previous ? formatRef(bookByCode(data.previous.bookCode), data.previous.chapter) : "Start"}`} onPress={() => data.previous && go(data.previous.bookCode, data.previous.chapter)} variant="secondary" icon="chevron-back" disabled={!data.previous} accessibilityLabel={data.previous ? `Previous chapter, ${formatRef(bookByCode(data.previous.bookCode), data.previous.chapter)}` : "No previous chapter"} style={{ flex: 1 }} />
         <AppButton label={`${data.next ? formatRef(bookByCode(data.next.bookCode), data.next.chapter) : "End"}`} onPress={() => data.next && go(data.next.bookCode, data.next.chapter)} variant="secondary" icon="chevron-forward" iconPosition="trailing" disabled={!data.next} accessibilityLabel={data.next ? `Next chapter, ${formatRef(bookByCode(data.next.bookCode), data.next.chapter)}` : "No next chapter"} style={{ flex: 1 }} />
       </View>
+      {data.footnotes?.length ? (
+        <View style={styles.footnotes} accessibilityLabel="Footnotes">
+          <Text style={styles.footnotesTitle}>Footnotes</Text>
+          {data.footnotes.map((f, i) => (
+            <Text key={i} style={[styles.footnote, rtl && styles.rtl]}>{f.verse ? `${data.chapter}:${f.verse}  ` : ""}{f.text}</Text>
+          ))}
+        </View>
+      ) : null}
       <Text style={styles.copyright}>{data.translation.name}{data.copyright ? `\n${data.copyright}` : ""}</Text>
     </View>
   ) : null;
@@ -581,7 +591,7 @@ export default function BibleReaderScreen() {
           <View key={`${renderKey}-${blk.key}-${prefs.layout}`} onLayout={(e) => onBlockLayout(blk.verses[0].verse, blk.verses[blk.verses.length - 1].verse, e.nativeEvent.layout.y)}>
             {blk.headings.map((h, i) => <Text key={i} style={styles.heading} accessibilityRole="header">{h}</Text>)}
             <View style={card ? [styles.hlCard, { backgroundColor: card.wash }] : null}>
-            <Text style={[styles.para, { fontSize, lineHeight }, blk.poetry && styles.poetry, card && { color: card.ink, marginBottom: 0 }]}>
+            <Text style={[styles.para, { fontSize, lineHeight }, blk.poetry && styles.poetry, rtl && styles.rtl, card && { color: card.ink, marginBottom: 0 }]}>
               {blk.verses.map((v) => {
                 const h = hlByVerse.get(v.verse);
                 const selected = !!sel && v.verse >= sel.start && v.verse <= sel.end;
@@ -877,6 +887,10 @@ function makeStyles(c: AppColors) {
     navBtnOff: { opacity: 0.4 },
     navText: { flexShrink: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     copyright: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 16 },
+    rtl: { writingDirection: "rtl", textAlign: "right" },
+    footnotes: { marginBottom: 14, gap: 4 },
+    footnotesTitle: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },
+    footnote: { fontSize: 13, lineHeight: 19, color: c.textMid, fontFamily: "Inter_400Regular" },
     exitFocus: { position: "absolute", alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     exitFocusText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     actionBar: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: c.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14, paddingTop: 8, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: -2 }, elevation: 10 },

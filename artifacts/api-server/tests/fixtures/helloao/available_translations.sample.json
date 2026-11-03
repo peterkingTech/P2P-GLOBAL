@@ -1,0 +1,289 @@
+{
+ "translations": [
+  {
+   "id": "BSB",
+   "name": "Berean Standard Bible",
+   "website": "https://berean.bible/",
+   "licenseUrl": "https://berean.bible/",
+   "license": {
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": true
+   },
+   "shortName": "BSB",
+   "englishName": "Berean Standard Bible",
+   "language": "eng",
+   "textDirection": "ltr",
+   "sha256": "788081b7dabf8ec026509b367254d8f2ba112314f2e8eaaeec8d96fa23a00fc9",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/BSB/books.json",
+   "completeTranslationApiLink": "/api/BSB/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/BSB/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31086,
+   "languageName": "English",
+   "languageEnglishName": "English"
+  },
+  {
+   "id": "ENGWEBP",
+   "name": "World English Bible",
+   "website": "https://ebible.org/Scriptures/details.php?id=engwebp",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=engwebp",
+   "license": {
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": true
+   },
+   "shortName": "WEB",
+   "englishName": "World English Bible",
+   "language": "eng",
+   "textDirection": "ltr",
+   "sha256": "e3530ae4b4eeb56143ea9199cf487416041a2cd9564cdbdb145e81bf0619c1bc",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/ENGWEBP/books.json",
+   "completeTranslationApiLink": "/api/ENGWEBP/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/ENGWEBP/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31103,
+   "languageName": "English",
+   "languageEnglishName": "English"
+  },
+  {
+   "id": "arb_vdv",
+   "name": "الكتاب المقدس باللغة العربية، فان دايك",
+   "website": "https://ebible.org/Scriptures/details.php?id=arb-vd",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=arb-vd",
+   "license": {
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": true
+   },
+   "shortName": "VDV",
+   "englishName": "Arabic Van Dyck Bible",
+   "language": "arb",
+   "textDirection": "rtl",
+   "sha256": "0a0286365a3f8afa17f41c8104451b2349dd0b38df053ba02c2bdfb2274e0f10",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/arb_vdv/books.json",
+   "completeTranslationApiLink": "/api/arb_vdv/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/arb_vdv/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31104,
+   "languageName": "العربية",
+   "languageEnglishName": "Arabic"
+  },
+  {
+   "id": "deu_sch",
+   "name": "Die Schlachter-Bibel 1951",
+   "website": "https://ebible.org/Scriptures/details.php?id=deu1951",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=deu1951",
+   "license": {
+    "attribution": "required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": false
+   },
+   "shortName": "SCH",
+   "englishName": "German Schlachter Bible 1951",
+   "language": "deu",
+   "textDirection": "ltr",
+   "sha256": "f8625f42dde60d4ece482aafce2cb929b7e1fc24d7dfe357fd5b29c3241b1117",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/deu_sch/books.json",
+   "completeTranslationApiLink": "/api/deu_sch/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/deu_sch/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31102,
+   "languageName": "Deutsch",
+   "languageEnglishName": "German"
+  },
+  {
+   "id": "fra_lsg",
+   "name": "Louis Segond 1910",
+   "website": "https://ebible.org/Scriptures/details.php?id=fraLSG",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=fraLSG",
+   "license": {
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": true
+   },
+   "shortName": "LSG",
+   "englishName": "French Louis Segond 1910 Bible",
+   "language": "fra",
+   "textDirection": "ltr",
+   "sha256": "1e4b0ad9eb5bfd1ba08f73d6551bf4317a1c8fca3c4b9013398518f1df0ba47a",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/fra_lsg/books.json",
+   "completeTranslationApiLink": "/api/fra_lsg/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/fra_lsg/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31170,
+   "languageName": "français",
+   "languageEnglishName": "French"
+  },
+  {
+   "id": "ita_dio",
+   "name": "Diodati Bibbia 1885",
+   "website": "https://ebible.org/Scriptures/details.php?id=ita1885",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=ita1885",
+   "license": {
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false,
+    "publicDomain": true
+   },
+   "shortName": "DIO",
+   "englishName": "Italian Diodati Bible",
+   "language": "ita",
+   "textDirection": "ltr",
+   "sha256": "32a86864a461430bb661aabf25cc6e319fa541c54b1447910f0a4e52ebeca46a",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/ita_dio/books.json",
+   "completeTranslationApiLink": "/api/ita_dio/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/ita_dio/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31095,
+   "languageName": "italiano",
+   "languageEnglishName": "Italian"
+  },
+  {
+   "id": "jpn_kou",
+   "name": "口語訳",
+   "website": "https://github.com/seven1m/open-bibles/blob/3ca49fb73163f42297a32b7b1b1c40cf3dafd84b/jpn-kougo.osis.xml",
+   "licenseUrl": "https://github.com/seven1m/open-bibles/blob/3ca49fb73163f42297a32b7b1b1c40cf3dafd84b/jpn-kougo.osis.xml",
+   "licenseNotice": "The public domain Japan Bible Society 口語訳 edition, published in 1954 (New Testament) and 1955 (Old Testament), is taken from open-bibles commit 3ca49fb73163f42297a32b7b1b1c40cf3dafd84b with furigana removed.",
+   "license": {
+    "publicDomain": true,
+    "attribution": "not-required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": false
+   },
+   "shortName": "口語訳",
+   "englishName": "Japanese Kougo-yaku (1955)",
+   "language": "jpn",
+   "textDirection": "ltr",
+   "sha256": "4622b11cd3a7b5a58bfb9b77ddae474ba942e5e61966436ae613bd80668c3061",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/jpn_kou/books.json",
+   "completeTranslationApiLink": "/api/jpn_kou/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/jpn_kou/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31087,
+   "languageName": "日本語",
+   "languageEnglishName": "Japanese"
+  },
+  {
+   "id": "twi_aka",
+   "name": "Biblica® Wonhia ɛho kwamma nhoma Akuapem Twi Nkwa Asɛm",
+   "website": "https://ebible.org/Scriptures/details.php?id=twi",
+   "licenseUrl": "https://ebible.org/Scriptures/details.php?id=twi",
+   "license": {
+    "attribution": "required",
+    "commercialUse": "allowed",
+    "derivatives": "allowed",
+    "copyleft": true,
+    "publicDomain": false
+   },
+   "shortName": "AKA",
+   "englishName": "Akuapem Twi Bible",
+   "language": "twi",
+   "textDirection": "ltr",
+   "sha256": "24decabdfbb8c8f69aa1ce6c17f4ea5ef1251be87cf7b93cb65a733ae039ea70",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/twi_aka/books.json",
+   "completeTranslationApiLink": "/api/twi_aka/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/twi_aka/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31100,
+   "languageName": "Akan",
+   "languageEnglishName": "Akan"
+  },
+  {
+   "id": "GHT",
+   "name": "Garth's Hyper-literal Translation",
+   "website": "https://www.wiebefamily.org/GHT.htm",
+   "licenseUrl": "https://www.wiebefamily.org/GHT.htm",
+   "shortName": "GHT",
+   "englishName": "Garth's Hyper-literal Translation",
+   "language": "eng",
+   "textDirection": "ltr",
+   "sha256": "6ffbdeab2300f92d107fa4ec50e3e60ccd073a5a095a200507bb21a280fc58c8",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/GHT/books.json",
+   "completeTranslationApiLink": "/api/GHT/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/GHT/complete.simple.json",
+   "numberOfBooks": 27,
+   "totalNumberOfChapters": 260,
+   "totalNumberOfVerses": 7956,
+   "languageName": "English",
+   "languageEnglishName": "English"
+  },
+  {
+   "id": "arb_gna",
+   "name": "الترجمة العربية المشتركة",
+   "website": "https://app.library.bible/content/fd5704b4b8ddef79",
+   "licenseUrl": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+   "licenseNotice": "Bible Society in Lebanon",
+   "license": {
+    "attribution": "required",
+    "commercialUse": "not-allowed",
+    "derivatives": "not-allowed",
+    "copyleft": false,
+    "publicDomain": false
+   },
+   "shortName": "GNA2025",
+   "englishName": "Good News Arabic 2025",
+   "language": "arb",
+   "textDirection": "rtl",
+   "sha256": "5f42c59e6c8645b6ab933f398205038597ef868ed2028099d598d52ba5484db0",
+   "availableFormats": [
+    "json"
+   ],
+   "listOfBooksApiLink": "/api/arb_gna/books.json",
+   "completeTranslationApiLink": "/api/arb_gna/complete.json",
+   "simpleCompleteTranslationApiLink": "/api/arb_gna/complete.simple.json",
+   "numberOfBooks": 66,
+   "totalNumberOfChapters": 1189,
+   "totalNumberOfVerses": 31070,
+   "languageName": "العربية",
+   "languageEnglishName": "Arabic"
+  }
+ ]
+}

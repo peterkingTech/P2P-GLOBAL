@@ -1,5 +1,7 @@
 import { supabaseServiceRole as db } from "./supabase";
 import { BOOK_CODES } from "./bibleService";
+import { attributionOf, canCache, canPlayRecordedAudio, isServable, providerOf, textCopyAllowed as licenceTextCopyAllowed, type TranslationRow } from "./bibleLicence";
+import { getHelloAoBooks, getHelloAoCatalogue, getHelloAoChapter, HelloAoError, type HelloAoTranslation } from "./bibleProviders/helloao";
 
 // The Bible reader (full chapters, translations, search, related lessons).
 // Scripture text comes ONLY from API.Bible for translations marked
@@ -50,21 +52,56 @@ export function parseReference(raw: string): { bookCode: string; chapter: number
 }
 
 // ── Translations (licence-gated) ────────────────────────────────────────────
-type TRow = { translation_code: string; translation_name: string; language: string; is_default_for_language: boolean; license_notes: string | null; api_bible_id: string | null };
+// Two providers: API.Bible (existing rows) and AO Lab's Free Use Bible API
+// (only after a person has approved the translation's own licence). Every rule
+// is in lib/bibleLicence.ts. `select("*")` so this works before and after
+// migration 225 adds the licence columns.
+type TRow = TranslationRow;
 let tCache: { at: number; rows: TRow[] } | null = null;
 export async function licensedTranslations(): Promise<TRow[]> {
   if (tCache && Date.now() - tCache.at < 5 * 60_000) return tCache.rows;
   const { data, error } = await db.from("p2p_bible_translations")
-    .select("translation_code,translation_name,language,is_default_for_language,license_notes,api_bible_id")
-    .eq("is_licensed_confirmed", true).order("language").order("translation_code");
+    .select("*").eq("is_licensed_confirmed", true).order("language").order("translation_code");
   if (error) throw new Error("Couldn't load translations");
-  tCache = { at: Date.now(), rows: ((data ?? []) as TRow[]).filter((r) => r.api_bible_id) };
+  const rows = ((data ?? []) as TRow[]).filter(isServable);
+  tCache = { at: Date.now(), rows: [...rows, ...(await previewRows(rows))] };
   return tCache.rows;
 }
-/** Copying verse text is offered only for public-domain translations (licence notes say so). */
-export const textCopyAllowed = (r: Pick<TRow, "license_notes">) => /public domain/i.test(r.license_notes ?? "");
+export const clearTranslationCache = () => { tCache = null; };
+
+// Local machine only: HELLOAO_PREVIEW=BSB,arb_vdv shows those AO Lab
+// translations BEFORE review so the integration can be tried. Ignored on the
+// deployed server (Railway always sets its project variables) — real use needs
+// an approved licence row.
+const onDeployedServer = () => !!(process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_SERVICE_ID);
+async function previewRows(existing: TRow[]): Promise<TRow[]> {
+  const ids = (process.env.HELLOAO_PREVIEW ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!ids.length || onDeployedServer()) return [];
+  const catalogue = await getHelloAoCatalogue().catch(() => [] as HelloAoTranslation[]);
+  const have = new Set(existing.map((r) => r.provider_translation_id).filter(Boolean));
+  return catalogue.filter((t) => ids.includes(t.id) && !have.has(t.id)).map((t) => ({
+    translation_code: `AO-${t.id}`.slice(0, 40), translation_name: `${t.englishName} (preview — licence not yet approved)`,
+    language: languageForPreview(t.language), is_default_for_language: false, license_notes: null, api_bible_id: null,
+    provider: "helloao", provider_translation_id: t.id, abbreviation: t.shortName, text_direction: t.textDirection,
+    licence_url: t.licenseUrl, source_url: t.website, attribution: null, licence_name: null, preview: true,
+  }));
+}
+// Preview only: AO Lab uses ISO 639-3 codes; map the app's languages, else keep the code.
+const ISO3: Record<string, string> = { eng: "en", deu: "de", fra: "fr", spa: "es", por: "pt", swh: "sw", ita: "it", nld: "nl", arb: "ar", hin: "hi", cmn: "zh", rus: "ru", pol: "pl", tur: "tr", ukr: "uk", vie: "vi", ind: "id", kor: "ko", jpn: "ja", pes: "fa", urd: "ur", ben: "bn", tam: "ta", tel: "te", tha: "th", heb: "he", yor: "yo", ibo: "ig", hau: "ha", zul: "zu", ron: "ro", tgl: "tl", twi: "tw" };
+const languageForPreview = (iso3: string) => ISO3[iso3] ?? iso3;
+
+/** Copying verse text: API.Bible public-domain translations, or AO Lab ones whose licence permits sharing. */
+export const textCopyAllowed = (r: TRow) => licenceTextCopyAllowed(r);
 export const publicTranslation = (r: TRow) => ({
   code: r.translation_code, name: r.translation_name, language: r.language, isDefault: r.is_default_for_language, textCopyAllowed: textCopyAllowed(r),
+  // Additions (older app versions ignore them):
+  provider: providerOf(r) === "helloao" ? "helloao" : "api.bible",
+  providerName: providerOf(r) === "helloao" ? "Free Use Bible API (AO Lab)" : "API.Bible",
+  abbreviation: r.abbreviation ?? r.translation_code,
+  textDirection: r.text_direction === "rtl" ? "rtl" : "ltr",
+  attribution: attributionOf(r),
+  licenceUrl: providerOf(r) === "helloao" ? r.licence_url ?? null : null,
+  preview: r.preview === true,
 });
 
 export class BibleError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }
@@ -83,7 +120,7 @@ async function providerGet(path: string): Promise<{ data: any; meta?: any }> {
 /** `through`: the last verse this text covers, when a translation joins verses (The Message: "1–2"). */
 export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }
 export interface Chapter {
-  translation: { code: string; name: string; textCopyAllowed: boolean };
+  translation: { code: string; name: string; textCopyAllowed: boolean; provider?: string; textDirection?: "ltr" | "rtl" };
   book: { code: string; name: string; chapters: number };
   chapter: number;
   verses: ChapterVerse[];
@@ -91,6 +128,10 @@ export interface Chapter {
   copyright: string | null;
   previous: { bookCode: string; chapter: number } | null;
   next: { bookCode: string; chapter: number } | null;
+  /** AO Lab: the source's footnotes (API.Bible chapters are requested without notes). */
+  footnotes?: { verse: number | null; caller: string | null; text: string }[];
+  /** AO Lab: recorded audio — present ONLY when its licence was reviewed and permits it. */
+  audio?: { reader: string; url: string; timings: number[] | null }[];
 }
 const HEADING_STYLES = /^(s\d?|ms\d?|mr|r|d|sp|cl)$/;
 // KJV source text carries "¶" paragraph marks; the reader shows paragraphs itself.
@@ -145,6 +186,40 @@ export function parseChapterContent(content: unknown[]): { verses: ChapterVerse[
 const chapterCache = new Map<string, { at: number; value: Chapter }>();
 const CHAPTER_TTL = 6 * 60 * 60_000;
 const CHAPTER_MAX = 400;
+const helloAoPending = new Map<string, Promise<Chapter>>();
+
+/** An AO Lab chapter in the reader's model; provider failures become BibleErrors (the user's choice is never switched). */
+async function helloAoChapter(t: TRow, book: { code: string; name: string; chapters: number }, chapter: number): Promise<Chapter> {
+  try {
+    const c = await getHelloAoChapter(String(t.provider_translation_id), book.code, chapter);
+    return {
+      translation: { code: t.translation_code, name: t.translation_name, textCopyAllowed: textCopyAllowed(t), provider: "helloao", textDirection: t.text_direction === "rtl" ? "rtl" : "ltr" },
+      book: { code: book.code, name: book.name, chapters: book.chapters }, chapter,
+      verses: c.verses.map(({ wordsOfJesus: _w, ...v }) => v), headings: c.headings,
+      copyright: attributionOf(t),
+      previous: c.previous && bookByCode(c.previous.bookCode) ? c.previous : null,
+      next: c.next && bookByCode(c.next.bookCode) ? c.next : null,
+      footnotes: c.footnotes,
+      ...(canPlayRecordedAudio(t) && c.audio.length ? { audio: c.audio } : {}),
+    };
+  } catch (e) {
+    if (e instanceof HelloAoError) throw new BibleError(e.message, e.status);
+    throw new BibleError("The Bible couldn't be loaded. Please try again.", 502);
+  }
+}
+
+/** The books a translation actually has (AO Lab translations may be incomplete); API.Bible: the full canon. */
+export async function booksFor(translationCode: string) {
+  const t = translationCode ? (await licensedTranslations()).find((r) => r.translation_code === translationCode) : null;
+  if (!t || providerOf(t) !== "helloao") return CANON;
+  try {
+    const have = new Map((await getHelloAoBooks(String(t.provider_translation_id))).map((b) => [b.id, b.numberOfChapters]));
+    return CANON.filter((b) => have.has(b.code));
+  } catch (e) {
+    if (e instanceof HelloAoError) throw new BibleError(e.message, e.status);
+    throw e;
+  }
+}
 
 export async function getChapter(bookCode: string, chapter: number, translationCode: string): Promise<Chapter> {
   const book = bookByCode(bookCode);
@@ -152,9 +227,23 @@ export async function getChapter(bookCode: string, chapter: number, translationC
   if (!Number.isInteger(chapter) || chapter < 1 || chapter > book.chapters) throw new BibleError(`${book.name} has ${book.chapters} chapter${book.chapters === 1 ? "" : "s"}`, 400);
   const t = (await licensedTranslations()).find((r) => r.translation_code === translationCode);
   if (!t) throw new BibleError("That translation isn't available", 404);
-  const key = `${t.translation_code}:${book.code}.${chapter}`;
+  // Cache keys carry the provider, so the two providers never share entries.
+  const key = `${providerOf(t)}:${t.translation_code}:${book.code}.${chapter}`;
   const hit = chapterCache.get(key);
   if (hit && Date.now() - hit.at < CHAPTER_TTL) return hit.value;
+  if (providerOf(t) === "helloao") {
+    const pending = helloAoPending.get(key);
+    if (pending) return pending;   // identical requests at the same time share one provider call
+    const p = helloAoChapter(t, book, chapter).finally(() => helloAoPending.delete(key));
+    helloAoPending.set(key, p);
+    const value = await p;
+    // Kept in memory only if this translation's licence permits caching.
+    if (canCache(t)) {
+      if (chapterCache.size >= CHAPTER_MAX) chapterCache.delete(chapterCache.keys().next().value as string);
+      chapterCache.set(key, { at: Date.now(), value });
+    }
+    return value;
+  }
 
   const params = new URLSearchParams({ "content-type": "json", "include-notes": "false", "include-titles": "true",
     "include-chapter-numbers": "false", "include-verse-numbers": "false", "include-verse-spans": "false" });
@@ -187,6 +276,8 @@ export async function searchBible(q: string, translationCode: string, offset: nu
   if (ref) return { kind: "reference" as const, reference: ref, results: [], total: 0 };
   const t = (await licensedTranslations()).find((r) => r.translation_code === translationCode);
   if (!t) throw new BibleError("That translation isn't available", 404);
+  // AO Lab offers no search; references (above) still work in every translation.
+  if (providerOf(t) === "helloao") throw new BibleError("Word search isn't available for this translation yet. Search by reference (e.g. John 3:16), or switch translation to search words.", 400);
   const params = new URLSearchParams({ query, limit: "20", offset: String(Math.max(0, Math.min(1000, offset | 0))), sort: "relevance" });
   const json = await providerGet(`/bibles/${t.api_bible_id}/search?${params}`);
   const verses = (json.data?.verses ?? []) as { id?: string; bookId?: string; reference?: string; text?: string }[];
