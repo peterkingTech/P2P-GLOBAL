@@ -14,6 +14,7 @@ import { withAlpha } from "@/lib/colorUtils";
 import { ARTWORK_FILL } from "@/constants/artwork";
 import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
+import PlaylistControls from "./PlaylistControls";
 
 // P2P GLOBAL — READ & LISTEN. One shared player for every Listen button:
 //   • the Listen screen in front shows its own slim bar (<ListenPlayer owner=…>);
@@ -152,6 +153,8 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const reading = mode !== "audio";
   const progress = st.chunkCount ? (st.chunk + (finished ? 1 : 0)) / st.chunkCount : 0;
   const bible = content.kind === "bible";
+  const playlist = content.kind === "playlist";
+  const partWord = playlist ? "passage" : "part";
   // A whole chapter (not a selected passage) — only chapters continue.
   const bibleChapter = bible && !/:\d+-\d+$/.test(content.key);
   const bookName = String(content.meta?.bookName ?? "this book");
@@ -193,11 +196,11 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
 
   const transport = (compact: boolean) => (
     <View style={[s.controls, compact && { gap: 10 }]}>
-      {!compact && <IconButton icon="play-skip-back" accessibilityLabel="Previous part" onPress={() => listen.previousSection()} disabled={!!err || !many} />}
+      {!compact && <IconButton icon="play-skip-back" accessibilityLabel={`Previous ${partWord}`} onPress={() => listen.previousSection()} disabled={!!err || !many} />}
       <IconButton icon="play-back" accessibilityLabel="Back one sentence" onPress={() => listen.previousSentence()} disabled={!!err || st.chunkCount === 0} />
       {compact ? smallMain : bigPlay}
       <IconButton icon="play-forward" accessibilityLabel="Forward one sentence" onPress={() => listen.nextSentence()} disabled={!!err || st.chunk >= st.chunkCount - 1} />
-      {!compact && <IconButton icon="play-skip-forward" accessibilityLabel="Next part" onPress={() => listen.nextSection()} disabled={!!err || !many || st.section >= content.sectionTitles.length - 1} />}
+      {!compact && <IconButton icon="play-skip-forward" accessibilityLabel={`Next ${partWord}`} onPress={() => listen.nextSection()} disabled={!!err || !many || st.section >= content.sectionTitles.length - 1} />}
       {compact && <IconButton icon="refresh" accessibilityLabel="Listen again from the beginning" onPress={() => listen.listenAgain()} disabled={!!err} />}
       {compact && <IconButton icon="options-outline" accessibilityLabel="Listening settings" onPress={() => setSettingsOpen((o) => !o)} selected={settingsOpen} />}
     </View>
@@ -223,6 +226,8 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
             </View>
           )}
         </View>
+      ) : playlist ? (
+        <PlaylistControls st={st} />
       ) : !bible ? (
         <View style={s.autoRow}>
           <View style={{ flexShrink: 1 }}>

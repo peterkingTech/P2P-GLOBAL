@@ -1,0 +1,84 @@
+# Scripture Listening Library
+
+A music-style library for Scripture: playlists, collections, saved passages, favourites, listening history and resume. It is built on what already exists:
+- Scripture Collections (migration 220);
+- Saved passages (migration 207);
+- the one shared Listen player (`lib/listen`, see [listen.md](listen.md)).
+
+## Data (migration 227)
+
+| What | Where | Who can see it |
+|---|---|---|
+| Playlists and collections | `p2p_scripture_collections` (`kind`), with `cover_kind`, `cover_ref` and `tags` added in 227 | The owner, plus whoever it's shared with (220's permissions) |
+| Passages in them | `p2p_scripture_collection_items` | The same people |
+| Saved Scriptures | `p2p_bible_bookmarks`, with `title`, `tags`, `memorisation_status` and `updated_at` added in 227 | The owner only |
+| Favourites (passages, playlists, collections) | `p2p_scripture_favourites` | The owner only |
+| Listening history | `p2p_scripture_listening_history` | The owner only |
+| Where I am in each playlist | `p2p_scripture_listening_state` | The owner only (per person, even for a shared playlist) |
+
+- **A passage is its reference:** translation, book, chapter and verses (`refKey`). Saving one passage, favouriting it and adding it to several playlists never copies it into a separate record.
+- **Only references are stored.** Bible text and audio always come from the licensed provider when someone reads or listens.
+- **Duplicates:** a playlist skips a passage it already holds, unless the person explicitly chooses to add a repeat (`allowRepeat`).
+- **History:** one row per passage listened. Starting the same passage again within 10 minutes continues the open row. Nothing is recorded per progress tick.
+- **Resume:** each person has one row per playlist. It holds the current item and place, a shuffled order (the saved order never changes), the repeat mode and the speed. The app never starts playing by itself after a restart; it offers "Continue listening".
+- **Deleting a playlist:** its favourites and resume rows go. History rows stay, no longer linked to it.
+- **Clearing history:** removes history only.
+
+## Security
+
+- **The three new tables follow 220's pattern:** RLS on, no client policies and no client grants. Every read and write goes through the API (`routes/scriptureLibrary.ts`), which:
+  - identifies the caller from their token;
+  - checks the caller's access to any playlist named, using the same rule as `/scripture-collections`;
+  - drops a revoked share, a left group or a block at once.
+- **Saved passages keep their existing owner-only policy.**
+- **Private notes, highlights, reflections and prayers are never read** by any of this. Sharing a playlist shares the playlist only, never the owner's library, favourites, history or resume place.
+
+## API
+
+- **`/scripture-library`:**
+  - Saved Scriptures: `GET /saved`, `PATCH /saved/:id`.
+  - One passage to several places: `POST /save`.
+  - Favourites: `GET/PUT /favourites`, `DELETE /favourites/:id`.
+  - History: `GET/POST/DELETE /history`, `POST /history/:id/complete`.
+  - Resume: `GET /recent`, `GET/PUT /state/:collectionId`.
+- **`/scripture-collections`** (220) gains `cover` and `tags` on `PATCH /:id`, and `allowRepeat` on `POST /:id/items`.
+
+Rules are plain functions in `lib/scriptureLibrary.ts`. The app clients are `lib/scriptureLibraryApi.ts` and `lib/scriptureCollectionsApi.ts`.
+
+## Lock screen (later phase)
+
+The owner approved the following:
+- **Audio:** each passage becomes an audio file made on the phone with the phone's own voice, played through `expo-audio` with lock-screen controls.
+- **Next and previous:** on iOS, the app's own module adds these buttons, with no patch to `expo-audio`. On Android they would need an `expo-audio` patch, which isn't done yet (see Known limits).
+- **Artwork:** the Listen player's artwork, `assets/images/icon.png`, used unchanged.
+
+This needs a native build to test; Expo Go and the web can't show it.
+
+## Screens (app)
+
+| Screen | File |
+|---|---|
+| My Scripture Library: Continue listening, sections, Recently played, filters and sort, Shared with me, history | `app/library/index.tsx` (opened from Bible Study → My Scripture Library) |
+| Playlist / collection: cover, Play all, Shuffle, favourite, Add Scripture, Cover & tags, Duplicate | `app/scripture-collections/[id].tsx` |
+| Saved Scriptures: search, filters, sort, select several, title / tags / memorisation | `app/library/saved.tsx` |
+| Favourites, Listening history, Memorise, Reminders | `app/library/favourites.tsx`, `history.tsx`, `memorise.tsx`, `reminders.tsx` |
+| Find / Add Scripture: references, words, exact phrases, select several | `app/library/add.tsx` |
+| Save to several places at once | `components/library/SaveScriptureSheet.tsx`; the reader's "Add to…" action |
+
+## Playback
+
+- **One player.** `lib/listen/playlistSession.ts` only decides the listening order (shuffle, queue), and records history and resume. It plays through `listen`.
+- **Engine.** Content of kind `"playlist"` plays on from passage to passage. Repeat can be off, this passage, or everything. Previous within the first 2 sentences of a passage goes to the passage before; later, it restarts the passage. Other content behaves exactly as before.
+- **Lock screen.** `lib/listen/fileSpeech.ts` and `modules/p2p-speech-audio` (iOS and Android) handle it:
+  - the phone's own voice is written to temporary files and played through `expo-audio` with lock-screen controls;
+  - the artwork is `assets/images/icon.png`;
+  - next and previous use iOS remote commands.
+  It's active only in a native build that includes the module. Expo Go, the web and older builds keep plain device speech, and so do calls and Background playback off.
+
+## Known limits
+
+- **Android lock screen:** play, pause and seek only. `expo-audio`'s media session removes next and previous, and adding them needs a patch to `expo-audio`.
+- **Lock-screen progress bar:** shows the current sentence's audio file, not the whole passage.
+- **Exact phrases:** checked only among the provider's top results. AO Lab translations have no word search at all.
+- **Covers:** your own uploaded image isn't offered yet. The server accepts only a path inside your own folder.
+- **Shared playlists:** update notifications go out only when passages are added, at most once every 6 hours per playlist.

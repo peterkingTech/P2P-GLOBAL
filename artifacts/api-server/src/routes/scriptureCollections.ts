@@ -12,6 +12,7 @@ import {
   revisionMatches, shareApplies, validReorder,
   type Access, type MemberSets, type Permission, type ShareRow, type TargetType,
 } from "../lib/scriptureAccess";
+import { cleanCover, cleanTags, planAdd } from "../lib/scriptureLibrary";
 
 // Scripture collections and listening playlists (migration 220), mounted at
 // /scripture-collections. Every rule lives in lib/scriptureAccess.ts; this
@@ -21,9 +22,9 @@ import {
 //   POST   /                          { kind, title, description?, refs? } create
 //   GET    /share-targets             people, groups and studies I may share with
 //   GET    /:id                       one collection (authorized viewers only)
-//   PATCH  /:id                       { title?, description?, revision } owner
+//   PATCH  /:id                       { title?, description?, cover?, tags?, revision } owner
 //   DELETE /:id                       owner (copies others made stay theirs)
-//   POST   /:id/items                 { refs, sharedNote? } owner / collaborators — appends
+//   POST   /:id/items                 { refs, sharedNote?, allowRepeat? } owner / collaborators — appends (skips passages already there unless allowRepeat)
 //   DELETE /:id/items/:itemId         { revision } owner / collaborators
 //   PUT    /:id/order                 { itemIds, revision } owner / collaborators
 //   PUT    /:id/items/:itemId/note    { sharedNote } owner — the ONLY note that is ever shared
@@ -56,13 +57,17 @@ function fail(res: Response, e: unknown) {
   return res.status(500).json({ error: "Something went wrong. Please try again." });
 }
 const gone = () => new CollError(404, "This collection isn't available.");
+export { CollError, fail as collectionFail };
 const must = <T>(r: { data: T | null; error: unknown }): T => { if (r.error) throw r.error; return r.data as T; };
 
 interface Coll {
   id: string; owner_id: string; kind: "collection" | "playlist"; title: string; description: string | null;
   origin_collection_id: string | null; origin_owner_id: string | null; copied_at: string | null;
   revision: number; created_at: string; updated_at: string; deleted_at: string | null;
+  /** Migration 227 (absent before it). */
+  cover_kind?: string | null; cover_ref?: string | null; tags?: string[] | null;
 }
+const coverOut = (c: Coll) => (c.cover_kind && c.cover_ref ? { kind: c.cover_kind, ref: c.cover_ref } : null);
 interface Item {
   id: string; collection_id: string; translation_code: string; book_code: string; chapter: number;
   start_verse: number; end_verse: number; position: number; shared_note: string | null; added_by: string | null; created_at: string;
@@ -118,7 +123,7 @@ async function sharesOf(collectionId: string): Promise<ShareRow[]> {
 }
 
 /** The caller's access to a collection — or 404 if they have none (never revealing it exists). */
-async function access(userId: string, id: string, members?: MemberSets): Promise<{ coll: Coll; access: Access; shares: ShareRow[] }> {
+export async function access(userId: string, id: string, members?: MemberSets): Promise<{ coll: Coll; access: Access; shares: ShareRow[] }> {
   const coll = await loadCollection(id);
   if (coll.owner_id === userId) return { coll, access: resolveAccess({ userId, ownerId: coll.owner_id, deleted: false, shares: [], members: {}, blockedWithOwner: false }), shares: await sharesOf(id) };
   const [shares, sets, blocked] = await Promise.all([sharesOf(id), members ? Promise.resolve(members) : memberSets(userId), blockedWith(userId, [coll.owner_id])]);
@@ -147,7 +152,7 @@ async function items(collectionId: string): Promise<Item[]> {
 }
 
 /** Validates passage references against the canon and the licensed translations. */
-async function readRefs(raw: unknown): Promise<Omit<Item, "id" | "collection_id" | "position" | "shared_note" | "added_by" | "created_at">[]> {
+export async function readRefs(raw: unknown): Promise<Omit<Item, "id" | "collection_id" | "position" | "shared_note" | "added_by" | "created_at">[]> {
   if (!Array.isArray(raw) || !raw.length) throw new CollError(400, "Choose at least one passage.");
   if (raw.length > MAX_ITEMS) throw new CollError(400, `A collection can hold up to ${MAX_ITEMS} passages.`);
   const licensed = new Set((await licensedTranslations()).map((r) => r.translation_code));
@@ -198,7 +203,7 @@ router.get("/", async (req, res) => {
     if (mine?.length) for (const r of (must(await db.from("p2p_scripture_collection_shares").select("collection_id").in("collection_id", (mine as Coll[]).map((c) => c.id)).eq("status", "active")) ?? []) as { collection_id: string }[]) shareCounts.set(r.collection_id, (shareCounts.get(r.collection_id) ?? 0) + 1);
     const people = await profilesById([...visibleShared.map((c) => c.owner_id), ...((mine ?? []) as Coll[]).map((c) => c.origin_owner_id ?? ""), ...applicable.map((s) => s.shared_by ?? "")]);
     const card = (c: Coll) => ({
-      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, updatedAt: c.updated_at,
+      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, updatedAt: c.updated_at, cover: coverOut(c), tags: c.tags ?? [],
       isCopy: !!c.copied_at, originOwnerName: c.origin_owner_id ? people.get(c.origin_owner_id)?.name ?? null : null,
     });
     return res.json({
@@ -366,7 +371,7 @@ router.get("/:id", async (req, res) => {
       origin = { id: oid, title, ownerName: c.origin_owner_id ? people.get(c.origin_owner_id)?.name ?? "Someone" : "Someone", available, changed };
     }
     return res.json({
-      id: c.id, kind: c.kind, title: c.title, description: c.description, revision: c.revision, updatedAt: c.updated_at,
+      id: c.id, kind: c.kind, title: c.title, description: c.description, revision: c.revision, updatedAt: c.updated_at, createdAt: c.created_at, cover: coverOut(c), tags: c.tags ?? [],
       owner: { id: c.owner_id, name: people.get(c.owner_id)?.name ?? "Someone", photoUrl: people.get(c.owner_id)?.photoUrl ?? null },
       status: isOwner ? (c.copied_at ? "copy" : "original") : "shared",
       access: { role: a.role, permission: a.permission, canReshare: a.canReshare },
@@ -381,14 +386,14 @@ router.get("/:id", async (req, res) => {
       })),
       links: links.map((l) => ({ id: l.id, permission: l.permission, maxUses: l.max_uses, uses: l.uses, expiresAt: l.expires_at, createdAt: l.created_at,
         state: linkState(l as { revoked_at: string | null; expires_at: string | null; max_uses: number | null; uses: number }) })),
-      activity: activity.map((x) => ({ actorName: x.actor_id ? people.get(x.actor_id)?.name ?? "Someone" : "Someone", action: x.action, detail: x.detail, at: x.created_at })),
+      activity: activity.filter((x) => x.action !== "update_notified").map((x) => ({ actorName: x.actor_id ? people.get(x.actor_id)?.name ?? "Someone" : "Someone", action: x.action, detail: x.detail, at: x.created_at })),
     });
   } catch (e) { return fail(res, e); }
 });
 
 router.patch("/:id", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
-  const b = (req.body ?? {}) as { title?: string; description?: string; revision?: number };
+  const b = (req.body ?? {}) as { title?: string; description?: string; cover?: unknown; tags?: unknown; revision?: number };
   try {
     const { coll: c, access: a } = await access(userId, req.params.id);
     if (a.role !== "owner") throw new CollError(403, "Only the owner can rename this.");
@@ -396,9 +401,19 @@ router.patch("/:id", async (req, res) => {
     const patch: Record<string, unknown> = {};
     if (b.title !== undefined) patch.title = cleanTitle(b.title);
     if (b.description !== undefined) patch.description = cleanText(b.description, 500);
+    if (b.cover !== undefined) {
+      const cover = cleanCover(b.cover, userId);
+      if (typeof cover === "string") throw new CollError(400, cover);
+      patch.cover_kind = cover?.kind ?? null; patch.cover_ref = cover?.ref ?? null;
+    }
+    if (b.tags !== undefined) {
+      const tags = cleanTags(b.tags);
+      if (!tags) throw new CollError(400, "Tags must be a list.");
+      patch.tags = tags;
+    }
     if (Object.keys(patch).length) must(await db.from("p2p_scripture_collections").update(patch).eq("id", c.id).select("id"));
     const revision = await bump(c);
-    await log(c.id, userId, "renamed", { title: patch.title ?? null });
+    await log(c.id, userId, patch.title !== undefined || patch.description !== undefined ? "renamed" : "edited", { title: patch.title ?? null });
     return res.json({ revision });
   } catch (e) { return fail(res, e); }
 });
@@ -418,22 +433,67 @@ router.delete("/:id", async (req, res) => {
 
 // ── Items ────────────────────────────────────────────────────────────────────
 
+/** At most one "updated" notification per collection in this window (never noisy). */
+export const UPDATE_NOTIFY_WINDOW_MS = 6 * 60 * 60_000;
+/**
+ * Tell the people who share a playlist that passages were added: the owner
+ * (when a collaborator added them) and everyone it's shared with, minus the
+ * person who added, minus blocks — once per collection per window.
+ */
+async function notifyUpdate(c: Coll, actorId: string, references: string[]) {
+  const recent = (must(await db.from("p2p_scripture_collection_activity").select("created_at").eq("collection_id", c.id).eq("action", "update_notified").order("created_at", { ascending: false }).limit(1)) ?? []) as { created_at: string }[];
+  if (recent[0] && Date.now() - Date.parse(recent[0].created_at) < UPDATE_NOTIFY_WINDOW_MS) return;
+  const ids = new Set<string>([c.owner_id]);
+  for (const s of await sharesOf(c.id)) {
+    if (s.target_type === "peer" && s.user_id) ids.add(s.user_id);
+    else if (s.target_type === "study" && s.target_id) {
+      const [{ data: host }, { data: members }] = await Promise.all([
+        db.from("p2p_shared_studies").select("host_id").eq("id", s.target_id).maybeSingle(),
+        db.from("p2p_shared_study_members").select("user_id").eq("study_id", s.target_id).eq("status", "accepted"),
+      ]);
+      if (host?.host_id) ids.add(host.host_id as string);
+      for (const m of members ?? []) ids.add(m.user_id as string);
+    } else if (s.target_id) for (const u of await destinationMemberIds(s.target_type as Destination, s.target_id)) ids.add(u);
+  }
+  ids.delete(actorId);
+  const blocked = await blockedWith(actorId, Array.from(ids));
+  const recipients = Array.from(ids).filter((u) => !blocked.has(u));
+  if (!recipients.length) return;
+  await log(c.id, actorId, "update_notified", { count: recipients.length });
+  const name = await displayName(actorId);
+  const refs = references.length > 2 ? `${references.slice(0, 2).join(", ")} and ${references.length - 2} more` : references.join(" and ");
+  await notifyWith(recipients, { title: c.kind === "playlist" ? "Playlist updated" : "Collection updated", message: `${name} added ${refs} to "${c.title}".`, type: "scripture_collection_updated", data: { collectionId: c.id } });
+}
+
+/**
+ * Append passages to a playlist/collection the caller may edit. A passage
+ * that's already there is skipped unless `allowRepeat` (an explicit choice).
+ * Shared with the Library's multi-destination save (routes/scriptureLibrary.ts).
+ */
+export async function addToCollection(userId: string, collectionId: string, rawRefs: unknown, o: { sharedNote?: unknown; allowRepeat?: boolean } = {}) {
+  const { coll: c, access: a } = await access(userId, collectionId);
+  need(a, "collaborate", "You can view this collection but not change it.");
+  const refs = await readRefs(rawRefs);
+  const list = await items(c.id);
+  const { add, skipped } = planAdd(list, refs, o.allowRepeat === true);
+  if (!add.length) return { revision: c.revision, added: 0, skipped: skipped.length };
+  if (list.length + add.length > MAX_ITEMS) throw new CollError(400, `A collection can hold up to ${MAX_ITEMS} passages.`);
+  // Only the owner may attach a note for sharing.
+  const note = a.role === "owner" ? cleanText(o.sharedNote, 1000) : null;
+  const start = list.reduce((m, i) => Math.max(m, i.position), -1) + 1;
+  must(await db.from("p2p_scripture_collection_items").insert(add.map((r, i) => ({ ...r, collection_id: c.id, position: start + i, added_by: userId, shared_note: note }))).select("id"));
+  const revision = await bump(c);
+  await log(c.id, userId, "added", { references: add.map(reference) });
+  // Shared or collaborative: let the others know (throttled). Never blocks the add itself.
+  if (a.role !== "owner" || (await sharesOf(c.id)).length) await notifyUpdate(c, userId, add.map(reference)).catch(() => {});
+  return { revision, added: add.length, skipped: skipped.length };
+}
+
 router.post("/:id/items", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;
-  const b = (req.body ?? {}) as { refs?: unknown; sharedNote?: unknown };
+  const b = (req.body ?? {}) as { refs?: unknown; sharedNote?: unknown; allowRepeat?: unknown };
   try {
-    const { coll: c, access: a } = await access(userId, req.params.id);
-    need(a, "collaborate", "You can view this collection but not change it.");
-    const refs = await readRefs(b.refs);
-    const list = await items(c.id);
-    if (list.length + refs.length > MAX_ITEMS) throw new CollError(400, `A collection can hold up to ${MAX_ITEMS} passages.`);
-    // Only the owner may attach a note for sharing.
-    const note = a.role === "owner" ? cleanText(b.sharedNote, 1000) : null;
-    const start = list.reduce((m, i) => Math.max(m, i.position), -1) + 1;
-    must(await db.from("p2p_scripture_collection_items").insert(refs.map((r, i) => ({ ...r, collection_id: c.id, position: start + i, added_by: userId, shared_note: note }))).select("id"));
-    const revision = await bump(c);
-    await log(c.id, userId, "added", { references: refs.map(reference) });
-    return res.json({ revision });
+    return res.json(await addToCollection(userId, req.params.id, b.refs, { sharedNote: b.sharedNote, allowRepeat: b.allowRepeat === true }));
   } catch (e) { return fail(res, e); }
 });
 

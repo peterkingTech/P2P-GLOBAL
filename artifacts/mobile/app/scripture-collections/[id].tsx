@@ -7,18 +7,25 @@ import type { AppColors } from "@/constants/themes";
 import { AppButton, IconButton } from "@/components/ui";
 import PassagePicker from "@/components/scripture/PassagePicker";
 import { bibleRoute, getTranslations, type NewRef } from "@/lib/bibleReaderApi";
-import { playCollection } from "@/lib/listen/collectionContent";
+import { playSavedCollection } from "@/lib/listen/playlistSession";
 import {
   activityLine, addToCollection, copyCollection, deleteCollection, getCollection, leaveCollection, originChanges, removeFromCollection,
-  renameCollection, reorderCollection, setSharedNote, PERMISSION_LABEL,
+  renameCollection, reorderCollection, setSharedNote, updateCollectionLook, PERMISSION_LABEL,
   type CollectionDetail, type CollectionItem,
 } from "@/lib/scriptureCollectionsApi";
+import { favouriteCollection, listFavourites, removeFavourite } from "@/lib/scriptureLibraryApi";
+import { estimateMinutes } from "@/lib/libraryRules";
+import CoverArt from "@/components/library/CoverArt";
+import CoverPicker from "@/components/library/CoverPicker";
 
 // One Scripture collection or playlist. What the reader can do comes from the
 // server's answer (access.permission): View and Listen · Save a Copy ·
 // Collaborative Editing; the owner manages sharing, links and shared notes.
 // A copy is the reader's own and never changes when the original does — a
 // note offers "See what's new" so they can choose what to add.
+// Scripture Listening Library: a cover and tags, Play all / Shuffle through
+// the one shared player (a collection is never a queue until I press Play),
+// favourite, and an estimated listening time ("about N min" — never exact).
 
 export default function CollectionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,11 +42,14 @@ export default function CollectionScreen() {
   const [noteFor, setNoteFor] = useState<{ id: string; text: string } | null>(null);
   const [whatsNew, setWhatsNew] = useState<CollectionItem[] | null>(null);
   const [languages, setLanguages] = useState<Record<string, string>>({});
+  const [favId, setFavId] = useState<string | null>(null);
+  const [lookOpen, setLookOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
     try { setD(await getCollection(id)); setError(null); }
     catch (e: any) { setError(e?.message ?? "Couldn't load this collection."); }
+    listFavourites().then((f) => setFavId([...f.playlists, ...f.collections].find((x) => x.collectionId === id)?.id ?? null)).catch(() => {});
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   useEffect(() => { getTranslations().then((r) => setLanguages(Object.fromEntries(r.translations.map((t) => [t.code, t.language])))).catch(() => {}); }, []);
@@ -81,7 +91,9 @@ export default function CollectionScreen() {
     ids.splice(index + by, 0, x);
     act(`move:${x}`, () => reorderCollection(d.id, ids, d.revision));
   };
-  const listen = (from?: string) => act("listen", () => playCollection({ id: d.id, title: d.title, kind: d.kind, items: d.items }, language, from));
+  const listen = (from?: string, shuffle = false) => act(shuffle ? "shuffle" : from ? `listen:${from}` : "listen", () => playSavedCollection(d.id, { startKey: from ?? null, shuffle }));
+  const minutes = estimateMinutes(d.items);
+  void language;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled"
@@ -89,6 +101,9 @@ export default function CollectionScreen() {
       <Stack.Screen options={{ title: d.kind === "playlist" ? "Playlist" : "Collection" }} />
 
       {/* Header */}
+      <View style={s.hero}>
+        <CoverArt cover={d.cover} kind={d.kind} size={132} />
+        <View style={{ flex: 1, minWidth: 180, gap: 4 }}>
       <View style={s.badgeRow}>
         <View style={[s.badge, d.status === "shared" && { backgroundColor: `${c.amber}22` }]}>
           <Ionicons name={d.status === "original" ? "star-outline" : d.status === "copy" ? "copy-outline" : "people-outline"} size={13} color={d.status === "shared" ? c.amber : c.accentGreen} />
@@ -106,7 +121,10 @@ export default function CollectionScreen() {
         </View>
       ) : <Text style={s.title} accessibilityRole="header">{d.title}</Text>}
       <Text style={s.status}>{status}</Text>
+      <Text style={s.muted}>{d.items.length} {d.items.length === 1 ? "passage" : "passages"}{minutes ? ` · about ${minutes} min` : ""}{d.tags?.length ? ` · ${d.tags.join(", ")}` : ""}</Text>
       {d.status === "shared" ? <Text style={s.muted}>Owner: {d.owner.name}</Text> : null}
+        </View>
+      </View>
       {d.description ? <Text style={s.desc}>{d.description}</Text> : null}
 
       {d.origin?.changed && d.origin.available ? (
@@ -132,7 +150,12 @@ export default function CollectionScreen() {
 
       {/* Actions */}
       <View style={s.actions}>
-        <AppButton label="Listen" icon="headset-outline" onPress={() => listen()} disabled={!d.items.length} loading={busy === "listen"} />
+        <AppButton label="Play all" icon="play" onPress={() => listen()} disabled={!d.items.length} loading={busy === "listen"} />
+        <AppButton label="Shuffle" icon="shuffle" variant="secondary" onPress={() => listen(undefined, true)} disabled={d.items.length < 2} loading={busy === "shuffle"} />
+        <IconButton icon={favId ? "heart" : "heart-outline"} color={favId ? c.accentGreen : undefined} accessibilityLabel={favId ? "Remove from favourites" : "Add to favourites"} selected={!!favId}
+          onPress={() => act("fav", async () => { if (favId) { await removeFavourite(favId); setFavId(null); } else setFavId((await favouriteCollection(d.id)).id); })} />
+        {canEdit ? <AppButton label="Add Scripture" icon="search-outline" variant="tertiary" onPress={() => router.push({ pathname: "/library/add", params: { to: d.id } } as any)} /> : null}
+        {owner ? <AppButton label="Cover & tags" icon="color-palette-outline" variant="tertiary" onPress={() => setLookOpen(true)} /> : null}
         {canShare ? <AppButton label="Share" icon="share-social-outline" variant="secondary" onPress={() => router.push({ pathname: "/scripture-collections/share", params: { id: d.id } } as any)} /> : null}
         {!owner && canCopy ? <AppButton label="Save a copy" icon="copy-outline" variant="secondary" loading={busy === "copy"}
           onPress={() => act("copy", async () => { const r = await copyCollection(d.id); router.push({ pathname: "/scripture-collections/[id]", params: { id: r.id } } as any); })} /> : null}
@@ -149,6 +172,7 @@ export default function CollectionScreen() {
       {!d.items.length ? <Text style={s.muted}>{canEdit ? "Add passages from your saved passages, or use “Add to collection” when you select verses in the Bible reader." : "No passages yet."}</Text> : null}
       {d.items.map((i, index) => (
         <View key={i.id} style={s.item}>
+          <Text style={s.pos} accessibilityElementsHidden>{index + 1}</Text>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={s.ref}>{i.reference} <Text style={s.trans}>{i.translationCode}</Text></Text>
             {i.sharedNote ? <Text style={s.note}>“{i.sharedNote}”{d.status !== "original" ? ` — ${d.owner.name}` : ""}</Text> : null}
@@ -166,7 +190,7 @@ export default function CollectionScreen() {
             <View style={s.itemActions}>
               <AppButton label="Read" size="sm" variant="tertiary" icon="book-outline"
                 onPress={() => router.push(bibleRoute({ book: i.bookCode, chapter: i.chapter, v: i.startVerse, ve: i.endVerse, translation: i.translationCode }) as any)} accessibilityLabel={`Read ${i.reference}`} />
-              <AppButton label="Listen from here" size="sm" variant="tertiary" icon="play-outline" onPress={() => listen(i.id)} accessibilityLabel={`Listen from ${i.reference}`} />
+              <AppButton label="Play from here" size="sm" variant="tertiary" icon="play-outline" loading={busy === `listen:${i.id}`} onPress={() => listen(i.id)} accessibilityLabel={`Play from ${i.reference}`} />
               {owner && noteFor?.id !== i.id ? <AppButton label={i.sharedNote ? "Edit note" : "Add note"} size="sm" variant="tertiary" icon="create-outline" onPress={() => setNoteFor({ id: i.id, text: i.sharedNote ?? "" })} /> : null}
             </View>
           </View>
@@ -194,12 +218,16 @@ export default function CollectionScreen() {
       {/* Manage */}
       <View style={[s.row, { marginTop: 18 }]}>
         {owner ? <AppButton label="Rename" size="sm" variant="tertiary" icon="pencil-outline" onPress={() => setRenaming(d.title)} /> : null}
+        {owner ? <AppButton label="Duplicate" size="sm" variant="tertiary" icon="copy-outline" loading={busy === "dup"}
+          onPress={() => act("dup", async () => { const r = await copyCollection(d.id, { title: `${d.title} (copy)` }); router.push({ pathname: "/scripture-collections/[id]", params: { id: r.id } } as any); })} /> : null}
         {owner ? <AppButton label={`Delete ${kindWord}`} size="sm" variant="destructive" icon="trash-outline"
           onPress={() => confirm("Delete", `Delete “${d.title}”? People you shared it with lose access. Copies they saved stay theirs.`, () => act("delete", async () => { await deleteCollection(d.id); router.back(); }))} /> : null}
         {!owner ? <AppButton label="Remove from my list" size="sm" variant="tertiary" icon="exit-outline"
           onPress={() => confirm("Remove", "You'll no longer see this unless it's shared with you again.", () => act("leave", async () => { await leaveCollection(d.id); router.back(); }))} /> : null}
       </View>
 
+      <CoverPicker visible={lookOpen} kind={d.kind} cover={d.cover ?? null} tags={d.tags ?? []} onClose={() => setLookOpen(false)}
+        onSave={async (look) => { await updateCollectionLook(d.id, d.revision, look); await load(); }} />
       <PassagePicker visible={picking} onClose={() => setPicking(false)} title={`Add to “${d.title}”`}
         onChoose={(refs: NewRef[]) => { setPicking(false); act("add", () => addToCollection(d.id, refs), `Added ${refs.length} ${refs.length === 1 ? "passage" : "passages"}.`); }} />
     </ScrollView>
@@ -211,6 +239,8 @@ function makeStyles(c: AppColors) {
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", padding: 24 },
     content: { padding: 16, paddingBottom: 56 },
+    hero: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 16, marginBottom: 4 },
+    pos: { width: 22, fontSize: 13, color: c.textMuted, fontFamily: "Inter_700Bold", textAlign: "center", marginTop: 2 },
     badgeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
     badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: `${c.accentGreen}1A` },
     badgeText: { fontSize: 11.5, color: c.accentGreen, fontFamily: "Inter_700Bold" },

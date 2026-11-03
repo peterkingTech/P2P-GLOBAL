@@ -73,6 +73,7 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   shared_study_declined: "community",
   shared_study_started: "community",
   scripture_collection_shared: "community", // routes/scriptureCollections.ts (migration 220)
+  scripture_collection_updated: "community", // passages added to a shared playlist / collection (throttled)
   circle_member_added: "community",
   circle_member_removed: "community",
   circle_leader_transfer: "community",

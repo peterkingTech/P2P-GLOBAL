@@ -1,0 +1,11 @@
+{
+  "name": "p2p-speech-audio",
+  "version": "1.0.0",
+  "description": "Local Expo native module — turns the phone's own text-to-speech voice into temporary audio files (iOS AVSpeechSynthesizer.write, Android TextToSpeech.synthesizeToFile) so the shared Listen player can play Scripture through expo-audio with real background playback and lock-screen controls; plus iOS next/previous track commands.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "expo-modules-core": "~57.0.19"
+  }
+}

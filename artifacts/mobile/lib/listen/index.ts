@@ -10,6 +10,7 @@ import { createListenEngine, type ListenState, type SpeechDriver } from "./engin
 import { labelsFrom, type SpokenLabels } from "./labels";
 import { baseLanguage } from "./voices";
 import { createUiPrefs, type ListenUiPrefs } from "./uiPrefs";
+import { createFileSpeechDriver } from "./fileSpeech";
 
 /** Spoken signposts in the TEXT's language (no fallback to another language). */
 export function spokenLabels(language: string): SpokenLabels {
@@ -19,7 +20,7 @@ export function spokenLabels(language: string): SpokenLabels {
 }
 export type { SpokenLabels } from "./labels";
 
-export type { ListenContent, ListenState, ListenStatus, StartAt, ChunkPosition, ListenAction, ArtworkSource, NarrationCapabilities, BibleContinue } from "./engine";
+export type { ListenContent, ListenState, ListenStatus, StartAt, ChunkPosition, ListenAction, ArtworkSource, NarrationCapabilities, BibleContinue, RepeatMode, NowPlaying, RemoteControls } from "./engine";
 export type { ListenSection, ListenPart } from "./chunking";
 export { RATES } from "./engine";
 
@@ -63,8 +64,13 @@ const deviceSpeech: SpeechDriver = {
   getVoices: async () => (await Speech.getAvailableVoicesAsync()).map((v) => ({ identifier: v.identifier, name: v.name, language: v.language, quality: String(v.quality) })),
 };
 
-/** The one shared player. */
-export const listen = createListenEngine(deviceSpeech, {
+/**
+ * The one shared player. In a native build with the speech-audio module the
+ * phone's voice is played as audio files (real background playback and
+ * lock-screen controls — lib/listen/fileSpeech.ts); otherwise, and always
+ * during a call, it speaks directly as before.
+ */
+export const listen = createListenEngine(createFileSpeechDriver(deviceSpeech, { inCall: () => !!getActiveGathering() }), {
   get: (k) => AsyncStorage.getItem(k),
   set: (k, v) => AsyncStorage.setItem(k, v),
   remove: (k) => AsyncStorage.removeItem(k),

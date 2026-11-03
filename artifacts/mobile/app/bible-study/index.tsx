@@ -47,7 +47,7 @@ export default function BibleStudyScreen() {
     { icon: "search-outline", title: "Search Scripture", sub: "Words, phrases or a reference", route: "/bible/search" },
     { icon: "document-text-outline", title: "Notes", sub: "Your private notes", route: "/notes" },
     { icon: "bookmark-outline", title: "Highlights", sub: "Saved passages and quotes", route: "/highlights" },
-    { icon: "albums-outline", title: "Scripture Collections", sub: "Collections and listening playlists to share", route: "/scripture-collections" },
+    { icon: "musical-notes-outline", title: "My Scripture Library", sub: "Playlists, collections, saved Scriptures and favourites", route: "/library" },
     { icon: "people-outline", title: "Study Together", sub: "Shared studies with your people", route: "/study-together" },
   ] as const;
 

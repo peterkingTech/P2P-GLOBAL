@@ -57,7 +57,9 @@ ok("existing links still parse", Q.parseP2PCode(`p2pglobalbiblestudy://lesson/ab
 const push = load("lib/push.ts");
 const CID = "0b3e6c7a-1d2f-4a5b-8c9d-0e1f2a3b4c5d";
 ok("push opens the shared collection", push.pathForNotification("scripture_collection_shared", { collectionId: CID }) === `/scripture-collections/${CID}`);
-ok("push: a bad id falls back to the list", push.pathForNotification("scripture_collection_shared", { collectionId: "../admin" }) === "/scripture-collections");
+ok("push: a bad id falls back to My Scripture Library", push.pathForNotification("scripture_collection_shared", { collectionId: "../admin" }) === "/library");
+ok("push: 'playlist updated' opens that playlist; a bad id → the Library", push.pathForNotification("scripture_collection_updated", { collectionId: CID }) === `/scripture-collections/${CID}` && push.pathForNotification("scripture_collection_updated", { collectionId: "x" }) === "/library");
+ok("push: a listening reminder opens only approved places", push.pathForNotification("listening_reminder", { route: "/library/memorise" }) === "/library/memorise" && push.pathForNotification("listening_reminder", { route: "/admin" }) === "/library");
 ok("in-app list routes it the same way", src("app/notifications/index.tsx").includes('n.notificationType === "scripture_collection_shared"'));
 ok("shows in P2P Updates", src("lib/myP2P.ts").includes('"scripture_collection_shared"'));
 ok("server categorises the type (community)", src("../api-server/src/lib/notificationCategories.ts").includes('scripture_collection_shared: "community"'));
@@ -98,9 +100,9 @@ for (const f of ["app/scripture-collections/index.tsx", "app/scripture-collectio
   ok(`exists: ${f}`, existsSync(path.join(root, f)));
 }
 const bible = src("app/bible/index.tsx");
-ok("Bible reader: 'Collection' beside Save adds the selected verses", bible.includes('label="Collection" onPress={() => setSheet("collection")}') && bible.includes("<AddToCollectionSheet visible={sheet === \"collection\" && !!selRef} refs={selRef ? [selRef] : []}"));
+ok("Bible reader: 'Add to…' beside Save puts the selected verses into playlists / collections (Save Scripture sheet)", bible.includes('label="Add to…" onPress={() => setSheet("collection")}') && bible.includes("<SaveScriptureSheet visible={sheet === \"collection\" && !!selRef} targets={selRef ? [{ ref: selRef,"));
 ok("saved passages / highlights: add to a collection (not notes)", src("app/bible/library.tsx").includes("{!note && !confirming ? <IconButton icon=\"albums-outline\""));
-ok("Bible Study lists Scripture Collections", src("app/bible-study/index.tsx").includes('route: "/scripture-collections"'));
+ok("Bible Study lists My Scripture Library (collections and playlists live there)", src("app/bible-study/index.tsx").includes('route: "/library"'));
 const detail = src("app/scripture-collections/[id].tsx");
 ok("screen: actions follow the server's permission", detail.includes('const canEdit = d.access.permission === "collaborate";') && detail.includes("const canShare = owner || d.access.canReshare;") && /\{canEdit \? \(\s*<View style=\{s\.reorder\}>/.test(detail));
 ok("screen: shows original / personal copy / shared with you, owner and shared-by", detail.includes('"Original"') && detail.includes('"Personal copy"') && detail.includes('"Shared with you"') && detail.includes("Shared with you by ${d.sharedByName ?? d.owner.name}"));
@@ -112,8 +114,9 @@ ok("share: links are the owner's, view or copy only, and can remove who joined",
 const all = ["app/scripture-collections/index.tsx", "app/scripture-collections/[id].tsx", "app/scripture-collections/share.tsx", "components/scripture/AddToCollectionSheet.tsx", "components/scripture/PassagePicker.tsx", "lib/scriptureCollectionsApi.ts", "lib/listen/collectionContent.ts"].map(src).join("\n");
 ok("private notes / highlights are never sent with a collection", !/addNote|getMyChapter|p2p_user_notes|highlights:/.test(all) && src("components/scripture/PassagePicker.tsx").includes('getLibrary("saved"'));
 const listenSrc = src("lib/listen/collectionContent.ts");
-ok("listening: text fetched live per chapter (once), nothing stored", listenSrc.includes("getChapter(i.bookCode, i.chapter, i.translationCode)") && !/AsyncStorage|setItem|SecureStore/.test(listenSrc));
-ok("listening: each passage is announced", listenSrc.includes("bibleAnnouncement(d, language, part)"));
+ok("listening: text fetched live per chapter (once), nothing stored", listenSrc.includes("getChapter(r.bookCode, r.chapter, r.translationCode)") && !/AsyncStorage|setItem|SecureStore/.test(listenSrc));
+ok("listening: each passage is announced", listenSrc.includes("bibleAnnouncement(d, language, { start: e.ref.startVerse, end: e.ref.endVerse })"));
+ok("listening: a passage that can't be loaded is reported, never dropped silently", listenSrc.includes("unavailable.push(e)"));
 
 console.log(`scriptureCollections (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

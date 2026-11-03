@@ -114,7 +114,7 @@ export function previewText(text: string | null | undefined, max = 90): string {
 
 /** Notification types shown in P2P Updates (others stay in the Notification Center). */
 export const UPDATE_TYPES = new Set([
-  "shared_study_invite", "shared_study_accepted", "shared_study_declined", "shared_study_started", "scripture_collection_shared",
+  "shared_study_invite", "shared_study_accepted", "shared_study_declined", "shared_study_started", "scripture_collection_shared", "scripture_collection_updated",
   "study_invitation_received", "family_invitation", "family_join_approved", "family_worship_invite", "church_announcement",
   "circle_member_added", "assignment_reviewed", "evaluation_resolved", "lesson_completed", "fruit_awarded",
 ]);

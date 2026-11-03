@@ -203,6 +203,12 @@ export function pathForNotification(
     const route = typeof data?.route === "string" ? data.route : "";
     return ["/bible", "/plans", "/(tabs)/learn"].includes(route) ? route : "/(tabs)/learn";
   }
+  // Scripture listening / memorisation reminder (lib/listeningReminders) — only to the
+  // Library, a playlist or the memorisation list; opening it never starts playback.
+  if (notificationType === "listening_reminder") {
+    const route = typeof data?.route === "string" ? data.route : "";
+    return /^\/(library|library\/memorise|scripture-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(route) ? route : "/library";
+  }
   // Daily prayer / journal reminder (lib/dailyReminders) — only to an approved route.
   if (notificationType === "daily_reminder") {
     const route = typeof data?.route === "string" ? data.route : "";
@@ -247,7 +253,7 @@ export function pathForNotification(
   const studyId = typeof data?.studyId === "string" && /^[0-9a-f-]{36}$/i.test(data.studyId) ? data.studyId : null;
   if (notificationType?.startsWith("shared_study_") && studyId) return `/study-together/${studyId}`;
   const collectionId = typeof data?.collectionId === "string" && /^[0-9a-f-]{36}$/i.test(data.collectionId) ? data.collectionId : null;
-  if (notificationType === "scripture_collection_shared") return collectionId ? `/scripture-collections/${collectionId}` : "/scripture-collections";
+  if (notificationType === "scripture_collection_shared" || notificationType === "scripture_collection_updated") return collectionId ? `/scripture-collections/${collectionId}` : "/library";
   // Missed call — the thread holds the missed-call card (tap to call back);
   // history covers a call with no conversation.
   if (notificationType === "missed_call") {

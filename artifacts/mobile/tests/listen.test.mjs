@@ -412,7 +412,7 @@ ok("Bible: voice language from the translation; none known → not offered", /tr
 ok("Bible: one verse per part (no verse numbers or headings spoken)", /parts: \[\{ key: String\(v\.verse\), text: v\.text \}\]/.test(bible));
 ok("Bible: never moves to the next chapter by itself; Listen from a selected verse", !/continueToNext/.test(bible + src("lib/listen/engine.ts")) && /listen\.seekPart\(String\(sel\.start\)\)/.test(bible));
 ok("Bible: the verse being read is marked at verse level only (no word timing)", /speakingVerse === v\.verse/.test(bible) && !/onBoundary/.test(bible));
-ok("player: speed, voice, sections, stop, accessible labels", /Speaking speed/.test(engineSrc) && /setVoice/.test(engineSrc) && /accessibilityLabel="Stop listening"/.test(engineSrc) && /Previous part/.test(engineSrc));
+ok("player: speed, voice, sections, stop, accessible labels", /Speaking speed/.test(engineSrc) && /setVoice/.test(engineSrc) && /accessibilityLabel="Stop listening"/.test(engineSrc) && engineSrc.includes("accessibilityLabel={`Previous ${partWord}`}") && engineSrc.includes('const partWord = playlist ? "passage" : "part";'));
 ok("player: says plainly it's the phone's own voice (no narrator persona)", /Read aloud by your phone's own voice/.test(engineSrc)
   && !/\bAI\b|narrator|teacher|mentor/i.test(src("components/listen/ListenPlayer.tsx").replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")));
 
@@ -444,7 +444,7 @@ ok("reading view: tap a sentence/verse to listen from it", /onPress=\{\(\) => li
 ok("reading view: shows the content's own words (never the spoken copy), Bible verse numbers", /p\.text\.slice\(start, end\)/.test(reader) && !/prepareSpeech/.test(reader) && /s\.verseNum/.test(reader));
 ok("text size adjustable; remembered on this phone", /accessibilityLabel="Smaller text"/.test(player) && /accessibilityLabel="Larger text"/.test(player) && /textScale/.test(src("lib/listen/uiPrefs.ts")));
 ok("controls: previous/next part, sentence back/forward, big play — no fake ±10 s or times for device speech",
-  /accessibilityLabel="Back one sentence"/.test(player) && /accessibilityLabel="Forward one sentence"/.test(player) && /accessibilityLabel="Previous part"/.test(player) && !/10 ?s(ec|econds)?\b|elapsed|remaining/i.test(player.replace(/\/\/.*$/gm, "")));
+  /accessibilityLabel="Back one sentence"/.test(player) && /accessibilityLabel="Forward one sentence"/.test(player) && player.includes("accessibilityLabel={`Previous ${partWord}`}") && player.includes("accessibilityLabel={`Next ${partWord}`}") && !/10 ?s(ec|econds)?\b|elapsed|remaining/i.test(player.replace(/\/\/.*$/gm, "")));
 ok("Listen Again and Auto Listen Again (with its plain description)", /label="Listen Again"/.test(player) && /Auto Listen Again/.test(player) && /Plays this once more from the beginning when it finishes\./.test(player) && /listen\.setAutoAgain\(v\)/.test(player));
 ok("finished: replay countdown with 'Don't replay', then the next learning step as buttons", /Listening again in \$\{st\.replayCountdown\}/.test(player) && /listen\.cancelReplay\(\)/.test(player) && /content\.completionActions/.test(player));
 const lessonSrc = src("app/lesson/[id].tsx"), chapterSrc = src("app/kingdom-stories/chapter.tsx");

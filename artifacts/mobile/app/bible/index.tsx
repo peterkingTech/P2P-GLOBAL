@@ -10,7 +10,7 @@ import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import BookChapterPicker from "@/components/bible/BookChapterPicker";
 import TranslationPicker from "@/components/bible/TranslationPicker";
 import BibleNoteSheet from "@/components/bible/BibleNoteSheet";
-import AddToCollectionSheet from "@/components/scripture/AddToCollectionSheet";
+import SaveScriptureSheet from "@/components/library/SaveScriptureSheet";
 import ReadingPrefsSheet from "@/components/bible/ReadingPrefsSheet";
 import RelatedLessonsSheet from "@/components/bible/RelatedLessonsSheet";
 import CompareView from "@/components/bible/CompareView";
@@ -729,7 +729,7 @@ export default function BibleReaderScreen() {
           <View style={styles.actions}>
             <Action styles={styles} c={c} icon={selNote ? "create" : "create-outline"} label={selNote ? "Edit note" : "Note"} onPress={() => openNote(selNote)} />
             <Action styles={styles} c={c} icon={selBookmark ? "bookmark" : "bookmark-outline"} label={selBookmark ? "Saved" : "Save"} onPress={onSave} disabled={busy} />
-            <Action styles={styles} c={c} icon="albums-outline" label="Collection" onPress={() => setSheet("collection")} disabled={!selRef} />
+            <Action styles={styles} c={c} icon="add-circle-outline" label="Add to…" onPress={() => setSheet("collection")} disabled={!selRef} />
             <Action styles={styles} c={c} icon="headset-outline" label={listeningHere && listening!.content!.key === (data ? chapterListenKey(data) : "") ? "Listen here" : "Listen"} onPress={onListenSelection} />
             <Action styles={styles} c={c} icon="copy-outline" label="Copy" onPress={onCopy} />
             <Action styles={styles} c={c} icon={Platform.OS === "ios" ? "share-outline" : "share-social-outline"} label="Share" onPress={onShare} />
@@ -802,7 +802,8 @@ export default function BibleReaderScreen() {
         <RelatedLessonsSheet visible={sheet === "related"} book={book.code} bookName={book.name} chapter={loc.chapter} onClose={() => setSheet(null)}
           onOpenLesson={(id) => { setSheet(null); router.push({ pathname: "/lesson/[id]", params: { id } } as any); }} />
       )}
-      <AddToCollectionSheet visible={sheet === "collection" && !!selRef} refs={selRef ? [selRef] : []} label={selLabel.replace(/ · selected words$/, "")}
+      {/* Save Scripture: Saved, Favourites, playlists and collections — several at once. */}
+      <SaveScriptureSheet visible={sheet === "collection" && !!selRef} targets={selRef ? [{ ref: selRef, reference: selLabel.replace(/ · selected words$/, "") }] : []}
         onClose={() => setSheet(null)} onDone={(m) => { setSheet(null); flash(m); }} />
       <BibleNoteSheet visible={!!noteEdit} reference={noteEdit?.label ?? ""} initial={noteEdit?.note ? { title: noteEdit.note.title, body: noteEdit.note.body } : null}
         saving={noteSaving} error={noteError} onClose={() => setNoteEdit(null)} onSave={saveNote} onDelete={noteEdit?.note ? removeNote : undefined} />

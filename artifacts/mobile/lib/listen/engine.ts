@@ -18,7 +18,10 @@
 //    is NOT learning progress: nothing here completes a lesson or chapter,
 //    and nothing here moves on to another chapter, lesson or story by itself;
 //  • "Listen Again" restarts the current content; "Auto Listen Again" plays it
-//    ONCE more after a short, visible countdown — never a loop.
+//    ONCE more after a short, visible countdown — never a loop;
+//  • a Scripture PLAYLIST (kind "playlist") is the one exception the listener
+//    chose: it plays on from passage to passage, and Repeat (off / this
+//    passage / the whole queue) is their explicit setting for that session.
 //
 // Narration sources: the engine talks to a `SpeechDriver` (device speech
 // today — lib/listen/index.ts). Its `capabilities` say honestly what it can
@@ -50,11 +53,24 @@ export interface NarrationCapabilities {
   /** Finest reliable position: per utterance (sentence) for device speech; verse/word timing only from real metadata. */
   timing: "sentence" | "verse" | "word";
 }
+/** What the phone's lock screen / Now Playing shows (drivers that publish it). */
+export interface NowPlaying { title: string; album: string; artist: string; artwork: ArtworkSource | null }
+/** Lock-screen, headphone and Bluetooth buttons, routed into the ONE engine. */
+export interface RemoteControls { play(): void; pause(): void; next(): void; previous(): void }
 export interface SpeechDriver {
   speak(text: string, opts: SpeakOptions): void;
+  /** Pause / interrupt the current utterance (the session may continue). */
   stop(): void | Promise<void>;
   getVoices(): Promise<DeviceVoice[]>;
   capabilities?: NarrationCapabilities;
+  /** Optional (native audio-file driver): get the next utterance ready so there's no gap. */
+  prepare?(text: string, opts: Pick<SpeakOptions, "language" | "voice" | "rate">): void;
+  /** Optional: publish what's playing to the lock screen / Now Playing. */
+  nowPlaying?(info: NowPlaying): void;
+  /** Optional: the listening session ended (Stop) — release audio and lock-screen controls. */
+  release?(): void;
+  /** Optional: receive lock-screen / headphone buttons. */
+  setRemote?(controls: RemoteControls): void;
 }
 export interface ListenStore {
   get(key: string): Promise<string | null>;
@@ -65,7 +81,10 @@ export interface ListenStore {
 export interface ListenLink { label: string; open: () => void }
 /** After listening: the next learning step on the same screen (never automatic). */
 export interface ListenAction { label: string; icon?: string; open: () => void }
-export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan";
+/** "playlist": a Scripture playlist / collection — one section per passage; plays on through them (Repeat applies). */
+export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan" | "playlist";
+/** Playlists only: off · the current passage again · the whole queue again. */
+export type RepeatMode = "off" | "one" | "all";
 export type ArtworkSource = number | { uri: string };
 
 /** A content adapter: what a screen hands the shared player. */
@@ -141,6 +160,8 @@ export interface ListenState {
   background: boolean;
   /** The Listen screen currently in front (its own bar shows; elsewhere a floating mini player). */
   focusedOwner: string | null;
+  /** Playlists: Repeat off / this passage / the whole queue (this listening session only). */
+  repeat: RepeatMode;
 }
 
 export const RATES = [0.75, 1, 1.25, 1.5] as const;
@@ -152,6 +173,8 @@ const CONTINUE_MODES: BibleContinue[] = ["stop", "again", "next"];
 export interface SavedPosition { partKey: string; offset: number; updatedAt: number }
 export interface LastListened { key: string; partKey: string; meta: Record<string, string | number>; updatedAt: number }
 const DEVICE_SPEECH: NarrationCapabilities = { seekSeconds: false, duration: false, timing: "sentence" };
+/** Previous in a playlist: before this many sentences of a passage, go to the passage before; after, restart it. */
+export const PREVIOUS_RESTART_AFTER = 2;
 
 export function createListenEngine(driver: SpeechDriver, store: ListenStore, now: () => number = Date.now, opts: { replayDelaySeconds?: number } = {}) {
   const replayDelay = opts.replayDelaySeconds ?? 3;
@@ -159,8 +182,9 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     status: "idle", content: null, section: 0, partKey: null, chunk: 0, chunkCount: 0, chunks: [],
     rate: 1, voice: null, voices: [], allVoices: [], error: null,
     capabilities: driver.capabilities ?? DEVICE_SPEECH, autoAgain: false, replayed: false, replayCountdown: null, upNext: null, presented: false,
-    bibleContinue: "stop", range: null, previewing: null, background: true, focusedOwner: null,
+    bibleContinue: "stop", range: null, previewing: null, background: true, focusedOwner: null, repeat: "off",
   };
+  let shownOnLockScreen = "";  // what was last published to Now Playing (published again only when it changes)
   let content: ListenContent | null = null;
   let chunks: Chunk[] = [];
   let gen = 0;               // current utterance; older callbacks are ignored
@@ -224,6 +248,7 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     const text = c.text.slice(spokenFrom);
     set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, error: null, replayCountdown: null, upNext: null, previewing: null });
     savePosition(c);
+    publishNowPlaying();
     try {
       driver.speak(text, {
         language: state.voice.language,
@@ -234,6 +259,9 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
       });
+      // A driver that turns speech into audio files gets the next sentence ready now (no gap between them).
+      const upcoming = chunks[nextIndex(index)];
+      if (upcoming && driver.prepare && state.voice) driver.prepare(upcoming.text, { language: state.voice.language, voice: state.voice.voice ?? undefined, rate: state.rate });
     } catch (e: any) {
       fail("speech", `Listening couldn't start: ${e?.message || "the speech engine isn't available"}.`);
     }
@@ -248,9 +276,32 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     clearPosition(content.key);
     speakFrom(0);
   }
+  /** Which chunk plays after this one (a playlist on "Repeat this passage" loops within its passage). */
+  function nextIndex(i: number): number {
+    const here = chunks[i];
+    if (content?.kind === "playlist" && state.repeat === "one" && here && chunks[i + 1]?.section !== here.section) return firstChunkOfSection(chunks, here.section);
+    return i + 1;
+  }
+  /** Tell the lock screen / Now Playing what's playing (drivers that support it), only when it changes. */
+  function publishNowPlaying() {
+    if (!content || !driver.nowPlaying) return;
+    const playlist = content.kind === "playlist";
+    const info = {
+      title: playlist ? state.content?.sectionTitles[state.section] || content.title : content.title,
+      album: playlist ? content.title : content.subtitle ?? "",
+      artist: "P2P Global",
+      artwork: content.artwork ?? null,
+    };
+    const sig = JSON.stringify([info.title, info.album]);
+    if (sig === shownOnLockScreen) return;
+    shownOnLockScreen = sig;
+    try { driver.nowPlaying(info); } catch { /* the lock screen is optional */ }
+  }
   function advance() {
-    const next = state.chunk + 1;
+    const next = nextIndex(state.chunk);
     if (next < chunks.length) return speakFrom(next);
+    // A playlist on "Repeat all" starts again from its first passage — the listener's explicit choice.
+    if (content?.kind === "playlist" && state.repeat === "all") { clearPosition(content.key); return speakFrom(0); }
     halt();
     const finished = content;
     if (!finished) return;
@@ -372,12 +423,13 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     request++;
     halt();
     if (content && state.status === "playing") savePosition(chunks[state.chunk]);
-    content = null; chunks = []; override = null;
+    content = null; chunks = []; override = null; shownOnLockScreen = "";
+    try { driver.release?.(); } catch { /* nothing to release */ }
     set({ status: "idle", content: null, chunk: 0, chunkCount: 0, chunks: [], partKey: null, error: null, replayCountdown: null, upNext: null, replayed: false, presented: false, previewing: null, range: null });
   }
   const restartHere = () => { if (state.status === "playing") { const at = resumeOffset(chunks[state.chunk]?.text ?? "", boundary); speakFrom(state.chunk, at); } };
 
-  return {
+  const engine = {
     getState: () => state,
     subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; },
     play,
@@ -430,6 +482,8 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
       savePrefs();
       set({ background: prefs.background });
     },
+    /** Playlists: Repeat off / this passage / the whole queue. Takes effect at the next passage boundary. */
+    setRepeat(mode: RepeatMode) { if (mode === "off" || mode === "one" || mode === "all") set({ repeat: mode }); },
     /** Which Listen screen is in front (its own bar shows; elsewhere the floating mini player). */
     setFocusedOwner(owner: string | null) { if (state.focusedOwner !== owner) set({ focusedOwner: owner }); },
     clearFocusedOwner(owner: string) { if (state.focusedOwner === owner) set({ focusedOwner: null }); },
@@ -468,7 +522,10 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
       if (!content) return;
       const startOfThis = firstChunkOfSection(chunks, state.section);
       let target = startOfThis;
-      if (state.chunk === startOfThis && spokenFrom === 0) {
+      // Playlists: within the first couple of sentences of a passage, Previous goes to the passage
+      // before; later on it starts this passage again. Elsewhere: only at the very start.
+      const goBack = content.kind === "playlist" ? state.chunk - startOfThis < PREVIOUS_RESTART_AFTER : state.chunk === startOfThis && spokenFrom === 0;
+      if (goBack) {
         for (let s = state.section - 1; s >= 0; s--) { const f = firstChunkOfSection(chunks, s); if (f >= 0) { target = f; break; } }
       }
       speakFrom(Math.max(0, target));
@@ -510,5 +567,13 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     async savedPosition(key: string): Promise<SavedPosition | null> { return json<SavedPosition>(await store.get(POS + key).catch(() => null)); },
     async lastListened(group: string): Promise<LastListened | null> { return json<LastListened>(await store.get(LAST + group).catch(() => null)); },
   };
+  // Lock-screen, headphone and Bluetooth buttons (drivers that receive them) act on this same session.
+  driver.setRemote?.({
+    play: () => engine.resume(),
+    pause: () => engine.pause(),
+    next: () => engine.nextSection(),
+    previous: () => engine.previousSection(),
+  });
+  return engine;
 }
 export type ListenEngine = ReturnType<typeof createListenEngine>;

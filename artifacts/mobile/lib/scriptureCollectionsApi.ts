@@ -19,11 +19,16 @@ export const PERMISSION_HELP: Record<Permission, string> = {
 };
 export const TARGET_LABEL: Record<TargetType, string> = { peer: "Person", family: "Family Circle", church: "Church", circle: "Circle", group: "Group", study: "Study Together" };
 
+/** A playlist/collection cover (migration 227): built-in artwork or a theme colour by name, or the owner's own image. null = default. */
+export interface CollectionCover { kind: "artwork" | "colour" | "image"; ref: string }
+
 export interface CollectionCard {
   id: string; kind: CollectionKind; title: string; description: string | null; itemCount: number; updatedAt: string;
   isCopy: boolean; originOwnerName: string | null;
   shareCount?: number;
   ownerName?: string; sharedByName?: string; permission?: Permission | null;
+  /** Migration 227 — absent from older servers. */
+  cover?: CollectionCover | null; tags?: string[];
 }
 export interface CollectionItem {
   id: string; translationCode: string; bookCode: string; bookName: string; chapter: number; startVerse: number; endVerse: number;
@@ -33,6 +38,7 @@ export interface CollectionShare { id: string; targetType: TargetType; permissio
 export interface CollectionLink { id: string; permission: Permission; maxUses: number | null; uses: number; expiresAt: string | null; createdAt: string; state: "ok" | "revoked" | "expired" | "full" }
 export interface CollectionDetail {
   id: string; kind: CollectionKind; title: string; description: string | null; revision: number; updatedAt: string;
+  createdAt?: string; cover?: CollectionCover | null; tags?: string[];
   owner: { id: string; name: string; photoUrl: string | null };
   /** original = I made it · copy = my personal copy · shared = someone shared it with me */
   status: "original" | "copy" | "shared";
@@ -59,7 +65,12 @@ export const createCollection = (kind: CollectionKind, title: string, refs: NewR
 export const getCollection = (id: string) => call<CollectionDetail>(`/${id}`);
 export const renameCollection = (id: string, title: string, revision: number, description?: string | null) => call<{ revision: number }>(`/${id}`, json("PATCH", { title, description, revision }));
 export const deleteCollection = (id: string) => call<{ deleted: true }>(`/${id}`, { method: "DELETE" });
-export const addToCollection = (id: string, refs: NewRef[], sharedNote?: string) => call<{ revision: number }>(`/${id}/items`, json("POST", { refs, sharedNote }));
+/** Appends passages. One that's already there is skipped (`skipped`) unless `allowRepeat` — the person's explicit choice. */
+export const addToCollection = (id: string, refs: NewRef[], sharedNote?: string, allowRepeat = false) =>
+  call<{ revision: number; added?: number; skipped?: number }>(`/${id}/items`, json("POST", { refs, sharedNote, allowRepeat }));
+/** Cover and tags (owner). `cover: null` restores the default cover. */
+export const updateCollectionLook = (id: string, revision: number, look: { cover?: CollectionCover | null; tags?: string[] }) =>
+  call<{ revision: number }>(`/${id}`, json("PATCH", { ...look, revision }));
 export const removeFromCollection = (id: string, itemId: string, revision: number) => call<{ revision: number }>(`/${id}/items/${itemId}`, json("DELETE", { revision }));
 export const reorderCollection = (id: string, itemIds: string[], revision: number) => call<{ revision: number }>(`/${id}/order`, json("PUT", { itemIds, revision }));
 export const setSharedNote = (id: string, itemId: string, sharedNote: string | null) => call<{ revision: number }>(`/${id}/items/${itemId}/note`, json("PUT", { sharedNote }));
