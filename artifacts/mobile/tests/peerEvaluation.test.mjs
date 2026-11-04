@@ -99,5 +99,19 @@ for (const f of screens.filter((x) => x.startsWith("app/"))) {
   ok(`${f}: accessibility labels`, (s.match(/accessibilityLabel=/g) ?? []).length >= 1 || (s.match(/accessibilityRole=/g) ?? []).length >= 2);
 }
 
+// No duplicates: each review and each result lives in exactly one place.
+const dc = src("contexts/DataContext.tsx");
+ok("direct review list excludes engine evaluations (no review in two places)", dc.includes(`.eq("evaluator_id", uid).eq("status", "pending").is("engine_state", null)`));
+const old = src("app/evaluations.tsx");
+ok("Review submissions screen: directly assigned reviews only — no learner tabs, no Circle reviews",
+  !old.includes("getMySubmissions") && !old.includes("CircleEvaluationCard") && !old.includes("/circles/") && !old.includes("Recently Approved") && old.includes("My Evaluations"));
+const home = src("app/(tabs)/index.tsx");
+ok("Home: Peer review link and the waiting badge open My Evaluations", !home.includes(`go("/evaluations")`) && !home.includes(`router.push("/evaluations")`)
+  && home.includes(`onPress={go("/evaluation")}`) && home.includes(`pathname: "/evaluation", params: { tab: "serving" }`));
+const mine = src("app/evaluation/index.tsx");
+ok("My Evaluations: opens on Evaluating from Home; directly assigned reviews counted and linked", mine.includes(`params.tab === "serving"`) && mine.includes("pendingEvaluations.length") && mine.includes(`router.push("/evaluations" as any)`));
+const m231 = readFileSync(path.join(root, "../../migrations/231_combine_evaluation_waiting_notices.sql"), "utf8");
+ok("231: waiting notices combine per evaluator within 10 minutes; engine rows untouched", m231.includes("interval '10 minutes'") && m231.includes("if new.engine_state is not null then") && m231.includes("lesson evaluations waiting") && !/\bdelete\b|\bdrop\b|\btruncate\b/i.test(m231.replace(/--.*$/gm, "")));
+
 console.log(`peerEvaluation (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, AppState } from "react-native";
-import { Stack, useFocusEffect, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, SegmentedControl } from "@/components/ui";
 import Countdown from "@/components/evaluation/Countdown";
@@ -29,8 +30,11 @@ export default function MyEvaluations() {
   const router = useRouter();
   const { colors: c } = useTheme();
   const { profile } = useAuth();
+  // Evaluations assigned directly (the original path, used while the engine is off) are reviewed on the Review screen.
+  const { pendingEvaluations } = useData();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const s = useMemo(() => makeStyles(c), [c]);
-  const [tab, setTab] = useState<Tab>("mine");
+  const [tab, setTab] = useState<Tab>(params.tab === "serving" ? "serving" : "mine");
   const [mine, setMine] = useState<MyEvaluation[] | null>(null);
   const [serving, setServing] = useState<{ invitations: ReviewCard[]; inProgress: ReviewCard[]; history: ReviewCard[] } | null>(null);
   const [me, setMe] = useState<EvaluatorProfile | null>(null);
@@ -49,7 +53,7 @@ export default function MyEvaluations() {
   // Refresh when the app returns to the front (server time and states).
   useEffect(() => { const sub = AppState.addEventListener("change", (st) => { if (st === "active") load(); }); return () => sub.remove(); }, [load]);
 
-  const invites = serving?.invitations.length ?? 0;
+  const invites = (serving?.invitations.length ?? 0) + pendingEvaluations.length;
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
@@ -97,6 +101,18 @@ export default function MyEvaluations() {
               <View style={{ flex: 1 }}>
                 <Text style={s.title}>{me.standing === "restricted" ? "Evaluating is paused" : me.available ? "Available for evaluations" : "Not taking new evaluations"}</Text>
                 <Text style={s.meta}>Up to {me.capacity} at a time · {me.record.completed} completed{me.recognitions.length ? ` · ${me.recognitions.map((r) => r.title).join(", ")}` : ""}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            </Pressable>
+          ) : null}
+
+          {pendingEvaluations.length ? (
+            <Pressable style={s.card} onPress={() => router.push("/evaluations" as any)} accessibilityRole="button"
+              accessibilityLabel={`${pendingEvaluations.length} submissions assigned to you to review`}>
+              <Ionicons name="people-circle" size={20} color={c.amber} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={s.title}>{pendingEvaluations.length === 1 ? "1 submission assigned to you" : `${pendingEvaluations.length} submissions assigned to you`}</Text>
+                <Text style={s.meta}>Review and give feedback</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
             </Pressable>

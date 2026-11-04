@@ -838,7 +838,7 @@ export default function HomeTab() {
           style={styles.evalCard}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/evaluations");
+            router.push({ pathname: "/evaluation", params: { tab: "serving" } } as any);
           }}
           activeOpacity={0.85}
         >
@@ -928,7 +928,7 @@ export default function HomeTab() {
       {/* Previously only reachable from the old "More" list — kept here as
           small links so nothing disappears. Admin keeps its role gate. */}
       <View style={styles.toolLinksRow}>
-        <TouchableOpacity style={styles.toolLink} onPress={go("/evaluations")} accessibilityRole="button" accessibilityLabel={`${t("home.peerReview")}. ${t("home.peerReviewSub")}`}>
+        <TouchableOpacity style={styles.toolLink} onPress={go("/evaluation")} accessibilityRole="button" accessibilityLabel={`${t("home.peerReview")}. ${t("home.peerReviewSub")}`}>
           <Ionicons name="checkmark-done-outline" size={14} color={colors.accentGreen} />
           <Text style={styles.toolLinkText}>{t("home.peerReview")}</Text>
         </TouchableOpacity>

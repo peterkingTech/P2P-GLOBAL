@@ -143,7 +143,7 @@ ok("draft wording no longer says 'on this device' only", !src("app/lesson/[id].t
 const RP = load("components/ReviewPrompts.tsx", { react: { default: { createElement: () => null } }, "react-native": { StyleSheet: { create: (x) => x }, View: "View", Text: "Text", TouchableOpacity: "TouchableOpacity" }, "@/constants/colors": { default: {} }, "@/components/ui": { AppButton: "AppButton" } });
 ok("reviewer prompts: encouraging questions, not grades", RP.REVIEW_PROMPTS.length === 4 && RP.REVIEW_PROMPTS.every((p) => !/score|grade|wrong|fail/i.test(p)));
 ok("reviewer prompt added once, on its own line", RP.addPrompt("Good work.", RP.REVIEW_PROMPTS[0]) === `Good work.\n${RP.REVIEW_PROMPTS[0]} ` && RP.addPrompt(`x ${RP.REVIEW_PROMPTS[0]}`, RP.REVIEW_PROMPTS[0]) === `x ${RP.REVIEW_PROMPTS[0]}`);
-ok("reviewer prompts on both review cards", (src("app/evaluations.tsx").match(/<ReviewPrompts feedback=\{feedback\} onChange=\{setFeedback\} \/>/g) ?? []).length === 2);
+ok("reviewer prompts on the review card", (src("app/evaluations.tsx").match(/<ReviewPrompts feedback=\{feedback\} onChange=\{setFeedback\} \/>/g) ?? []).length === 1);
 const pos = src("components/kingdom-stories/useReadingPosition.ts");
 ok("reading position: saved per chapter, restored after layout, storage errors ignored", pos.includes("kingdomStories:position:") && pos.includes("onContentSizeChange") && pos.includes(".catch(() => {})") && chapter.includes("ref={position.ref} onScroll={position.onScroll}"));
 const m213 = readFileSync(path.join(repo, "migrations/213_answer_drafts_and_chapter_notifications.sql"), "utf8");

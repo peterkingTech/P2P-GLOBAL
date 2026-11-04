@@ -1442,9 +1442,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const uid = userId ?? profile?.id;
     if (!uid) return;
     try {
+      // Only evaluations assigned directly (the original path). Engine
+      // evaluations (engine_state set) are reviewed in My Evaluations, so
+      // they never appear in two places.
       const { data: evalRows } = await supabase.from("p2p_lesson_evaluations")
         .select("id,submission_id,lesson_id,submitter_id,assigned_at")
-        .eq("evaluator_id", uid).eq("status", "pending").order("assigned_at", { ascending: true });
+        .eq("evaluator_id", uid).eq("status", "pending").is("engine_state", null).order("assigned_at", { ascending: true });
       const rows = (evalRows ?? []) as Record<string, unknown>[];
       if (rows.length === 0) {
         setPendingEvaluations([]); return;
