@@ -126,10 +126,15 @@ const F = load("lib/listen/fileSpeech.ts", {
   "expo-asset": { Asset: { fromModule: () => ({ downloadAsync: async () => ({ localUri: "file:///bundle/icon.png" }) }) } },
   "@/assets/images/icon.png": 1,
 });
-function fileRig({ inCall = false, synthFails = false } = {}) {
+function fileRig({ inCall = false, synthFails = false, synthHangs = false } = {}) {
   const log = []; let n = 0; let remoteCb = null;
+  const hung = [];
   const native = {
-    synthesize: async (text, language, voice, rate) => { log.push(["synth", text, language, voice, rate]); if (synthFails) throw new Error("no"); return { uri: `file:///cache/p2p-speech/${++n}.caf`, durationMs: 900 }; },
+    synthesize: async (text, language, voice, rate) => {
+      log.push(["synth", text, language, voice, rate]); if (synthFails) throw new Error("no");
+      if (synthHangs) return new Promise((res) => hung.push(() => res({ uri: `file:///cache/p2p-speech/late${++n}.caf`, durationMs: 900 })));
+      return { uri: `file:///cache/p2p-speech/${++n}.caf`, durationMs: 900 };
+    },
     remove: (uri) => log.push(["remove", uri]), clearAll: () => log.push(["clearAll"]),
     setTrackCommands: (on) => log.push(["trackCommands", on]), trackCommandsSupported: () => true,
     addListener: (_e, cb) => { remoteCb = cb; return { remove() {} }; },
@@ -144,10 +149,15 @@ function fileRig({ inCall = false, synthFails = false } = {}) {
   };
   const fallbackSaid = [];
   const fallback = { speak: (t, o) => fallbackSaid.push(t), stop: () => log.push(["fallbackStop"]), getVoices: async () => voices, capabilities: { seekSeconds: false, duration: false, timing: "sentence" } };
-  const d = F.createFileSpeechDriver(fallback, { native, createPlayer: () => player, setAudioMode: async (m) => log.push(["mode", m]), artwork: async () => "file:///bundle/icon.png", inCall: () => inCall });
+  // Fake timers: `tick()` runs every timer that is due by then.
+  let now = 0; const timers = new Map(); let tid = 0;
+  const setTimer = (fn, ms) => { timers.set(++tid, { fn, at: now + ms }); return tid; };
+  const clearTimer = (t) => timers.delete(t);
+  const tick = (ms) => { now += ms; for (const [id, t] of [...timers]) if (t.at <= now && timers.has(id)) { timers.delete(id); t.fn(); } };
+  const d = F.createFileSpeechDriver(fallback, { native, createPlayer: () => player, setAudioMode: async (m) => log.push(["mode", m]), artwork: async () => "file:///bundle/icon.png", inCall: () => inCall, setTimer, clearTimer });
   const remote = { calls: [], play() { this.calls.push("play"); }, pause() { this.calls.push("pause"); }, next() { this.calls.push("next"); }, previous() { this.calls.push("previous"); } };
   d.setRemote(remote);
-  return { d, log, player, fallbackSaid, remote, fire: (c) => remoteCb?.({ command: c }) };
+  return { d, log, player, fallbackSaid, remote, fire: (c) => remoteCb?.({ command: c }), tick, timers, hung };
 }
 {
   ok("no native module (Expo Go / web / older build) → plain device speech, unchanged", F.createFileSpeechDriver({ speak() {}, stop() {}, getVoices: async () => [] }, { native: null }).prepare === undefined);
@@ -168,6 +178,9 @@ function fileRig({ inCall = false, synthFails = false } = {}) {
   // Lock-screen pause / play, headphones, a phone call.
   f.d.speak("He gave his only Son.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
   await flush();
+  f.player.emit({ playing: false });
+  ok("switching to the next file (briefly not playing yet) is NOT taken as a pause — the playlist carries on", !f.remote.calls.includes("pause"));
+  f.player.emit({ playing: true });
   f.player.playing = false; f.player.emit({ playing: false });
   ok("paused from the lock screen / headphones unplugged / a call → the engine pauses", f.remote.calls.at(-1) === "pause");
   f.player.emit({ playing: true });
@@ -197,6 +210,45 @@ function fileRig({ inCall = false, synthFails = false } = {}) {
   h.d.speak("No file.", { language: "en", rate: 1, background: true });
   await flush();
   ok("a file that can't be made → spoken directly instead (never silent)", h.fallbackSaid[0] === "No file.");
+}
+// The iPhone bug (build 83): a sentence's file never finished, so the playlist stopped after the passage heading.
+{
+  const f = fileRig({ synthHangs: true });
+  const text = "For God so loved the world, that he gave his one and only Son.";
+  f.d.speak(text, { language: "en-US", rate: 1, background: true });
+  await flush();
+  f.tick(F.synthLimitMs(text, 1) - 1); await flush();
+  ok("a sentence still being prepared is waited for (up to its limit)", f.fallbackSaid.length === 0);
+  f.tick(1); await flush();
+  ok("…past the limit it is spoken directly instead — listening never stalls", f.fallbackSaid[0] === text);
+  f.hung.forEach((r) => r()); await flush();
+  ok("…and the late file is deleted, never played", f.log.some((x) => x[0] === "remove" && x[1].includes("late")) && !f.log.some((x) => x[0] === "replace"));
+  const swift = src("modules/p2p-speech-audio/ios/P2PSpeechAudioModule.swift");
+  ok("iOS: sentences written one at a time, each with its own synthesizer; ends on the empty buffer, the 'finished' callback or a time limit",
+    swift.includes("private var pending: [SpeechJob]") && swift.includes("guard running == nil") && /final class SpeechJob[^{]*AVSpeechSynthesizerDelegate/.test(swift)
+    && swift.includes("private let synthesizer = AVSpeechSynthesizer()") && swift.includes("didFinish utterance") && swift.includes("asyncAfter(deadline: .now() + timeout)")
+    && !/public class P2PSpeechAudioModule[\s\S]*private let synthesizer = AVSpeechSynthesizer\(\)[\s\S]*\nprivate final class SpeechJob/.test(swift.split("private final class SpeechJob")[0] + "\nprivate final class SpeechJob"));
+  ok("limit grows with the sentence and slower speeds", F.synthLimitMs("x".repeat(360), 0.5) > F.synthLimitMs("x".repeat(360), 1) && F.synthLimitMs("x".repeat(360), 1) > F.synthLimitMs("x", 1));
+}
+{
+  const f = fileRig();
+  let done = 0;
+  f.d.speak("A file that never reports its end.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
+  await flush();
+  f.player.emit({ playing: true });
+  f.tick(900 + F.FINISH_GRACE_MS - 1);
+  ok("no 'finished' event: waits for the file's length plus a grace", done === 0);
+  f.tick(1);
+  ok("…still playing (a slow start): keeps waiting", done === 0);
+  f.player.playing = false;
+  f.tick(2_000);
+  ok("…then moves on to the next sentence, once", done === 1);
+  f.player.emit({ didJustFinish: true }); f.tick(10_000);
+  ok("…a late 'finished' event never advances twice", done === 1);
+  f.d.speak("Paused by the engine.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
+  await flush();
+  f.d.stop(); f.player.playing = false; f.tick(60_000);
+  ok("engine pause / stop: nothing advances while paused", done === 1 && f.timers.size === 0);
 }
 
 // ── Library rules ───────────────────────────────────────────────────────────
