@@ -53,24 +53,12 @@ export interface NarrationCapabilities {
   /** Finest reliable position: per utterance (sentence) for device speech; verse/word timing only from real metadata. */
   timing: "sentence" | "verse" | "word";
 }
-/** What the phone's lock screen / Now Playing shows (drivers that publish it). */
-export interface NowPlaying { title: string; album: string; artist: string; artwork: ArtworkSource | null }
-/** Lock-screen, headphone and Bluetooth buttons, routed into the ONE engine. */
-export interface RemoteControls { play(): void; pause(): void; next(): void; previous(): void }
 export interface SpeechDriver {
   speak(text: string, opts: SpeakOptions): void;
   /** Pause / interrupt the current utterance (the session may continue). */
   stop(): void | Promise<void>;
   getVoices(): Promise<DeviceVoice[]>;
   capabilities?: NarrationCapabilities;
-  /** Optional (native audio-file driver): get the next utterance ready so there's no gap. */
-  prepare?(text: string, opts: Pick<SpeakOptions, "language" | "voice" | "rate">): void;
-  /** Optional: publish what's playing to the lock screen / Now Playing. */
-  nowPlaying?(info: NowPlaying): void;
-  /** Optional: the listening session ended (Stop) — release audio and lock-screen controls. */
-  release?(): void;
-  /** Optional: receive lock-screen / headphone buttons. */
-  setRemote?(controls: RemoteControls): void;
 }
 export interface ListenStore {
   get(key: string): Promise<string | null>;
@@ -184,7 +172,6 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     capabilities: driver.capabilities ?? DEVICE_SPEECH, autoAgain: false, replayed: false, replayCountdown: null, upNext: null, presented: false,
     bibleContinue: "stop", range: null, previewing: null, background: true, focusedOwner: null, repeat: "off",
   };
-  let shownOnLockScreen = "";  // what was last published to Now Playing (published again only when it changes)
   let content: ListenContent | null = null;
   let chunks: Chunk[] = [];
   let gen = 0;               // current utterance; older callbacks are ignored
@@ -248,7 +235,6 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     const text = c.text.slice(spokenFrom);
     set({ status: "playing", chunk: index, section: c.section, partKey: c.partKey, error: null, replayCountdown: null, upNext: null, previewing: null });
     savePosition(c);
-    publishNowPlaying();
     try {
       driver.speak(text, {
         language: state.voice.language,
@@ -259,9 +245,6 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },
       });
-      // A driver that turns speech into audio files gets the next sentence ready now (no gap between them).
-      const upcoming = chunks[nextIndex(index)];
-      if (upcoming && driver.prepare && state.voice) driver.prepare(upcoming.text, { language: state.voice.language, voice: state.voice.voice ?? undefined, rate: state.rate });
     } catch (e: any) {
       fail("speech", `Listening couldn't start: ${e?.message || "the speech engine isn't available"}.`);
     }
@@ -281,21 +264,6 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     const here = chunks[i];
     if (content?.kind === "playlist" && state.repeat === "one" && here && chunks[i + 1]?.section !== here.section) return firstChunkOfSection(chunks, here.section);
     return i + 1;
-  }
-  /** Tell the lock screen / Now Playing what's playing (drivers that support it), only when it changes. */
-  function publishNowPlaying() {
-    if (!content || !driver.nowPlaying) return;
-    const playlist = content.kind === "playlist";
-    const info = {
-      title: playlist ? state.content?.sectionTitles[state.section] || content.title : content.title,
-      album: playlist ? content.title : content.subtitle ?? "",
-      artist: "P2P Global",
-      artwork: content.artwork ?? null,
-    };
-    const sig = JSON.stringify([info.title, info.album]);
-    if (sig === shownOnLockScreen) return;
-    shownOnLockScreen = sig;
-    try { driver.nowPlaying(info); } catch { /* the lock screen is optional */ }
   }
   function advance() {
     const next = nextIndex(state.chunk);
@@ -423,13 +391,12 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     request++;
     halt();
     if (content && state.status === "playing") savePosition(chunks[state.chunk]);
-    content = null; chunks = []; override = null; shownOnLockScreen = "";
-    try { driver.release?.(); } catch { /* nothing to release */ }
+    content = null; chunks = []; override = null;
     set({ status: "idle", content: null, chunk: 0, chunkCount: 0, chunks: [], partKey: null, error: null, replayCountdown: null, upNext: null, replayed: false, presented: false, previewing: null, range: null });
   }
   const restartHere = () => { if (state.status === "playing") { const at = resumeOffset(chunks[state.chunk]?.text ?? "", boundary); speakFrom(state.chunk, at); } };
 
-  const engine = {
+  return {
     getState: () => state,
     subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; },
     play,
@@ -567,13 +534,5 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
     async savedPosition(key: string): Promise<SavedPosition | null> { return json<SavedPosition>(await store.get(POS + key).catch(() => null)); },
     async lastListened(group: string): Promise<LastListened | null> { return json<LastListened>(await store.get(LAST + group).catch(() => null)); },
   };
-  // Lock-screen, headphone and Bluetooth buttons (drivers that receive them) act on this same session.
-  driver.setRemote?.({
-    play: () => engine.resume(),
-    pause: () => engine.pause(),
-    next: () => engine.nextSection(),
-    previous: () => engine.previousSection(),
-  });
-  return engine;
 }
 export type ListenEngine = ReturnType<typeof createListenEngine>;

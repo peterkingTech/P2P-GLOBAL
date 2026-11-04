@@ -45,14 +45,13 @@ A music-style library for Scripture: playlists, collections, saved passages, fav
 
 Rules are plain functions in `lib/scriptureLibrary.ts`. The app clients are `lib/scriptureLibraryApi.ts` and `lib/scriptureCollectionsApi.ts`.
 
-## Lock screen (later phase)
+## Lock screen: removed (2026-11-04)
 
-The owner approved the following:
-- **Audio:** each passage becomes an audio file made on the phone with the phone's own voice, played through `expo-audio` with lock-screen controls.
-- **Next and previous:** on iOS, the app's own module adds these buttons, with no patch to `expo-audio`. On Android they would need an `expo-audio` patch, which isn't done yet (see Known limits).
-- **Artwork:** the Listen player's artwork, `assets/images/icon.png`, used unchanged.
+Builds 82–84 turned each sentence into an audio file on the phone (`lib/listen/fileSpeech.ts` and the `modules/p2p-speech-audio` native module) so that playlists could show lock-screen controls. On an iPhone this made listening slow and unnatural: each sentence had to be written to a file before it could be heard. In build 83, listening also stopped after the passage heading.
 
-This needs a native build to test; Expo Go and the web can't show it.
+The owner chose natural speech over lock-screen controls, so the pipeline was removed. All listening (playlists included) is now the device's own voice speaking straight from the text through `expo-speech`, exactly as before. See `docs/listen.md` for what that means with the screen locked.
+
+Recorded Bible audio from a licensed provider would be a separate, future experience, not part of P2P Listen.
 
 ## Screens (app)
 
@@ -69,16 +68,11 @@ This needs a native build to test; Expo Go and the web can't show it.
 
 - **One player.** `lib/listen/playlistSession.ts` only decides the listening order (shuffle, queue), and records history and resume. It plays through `listen`.
 - **Engine.** Content of kind `"playlist"` plays on from passage to passage. Repeat can be off, this passage, or everything. Previous within the first 2 sentences of a passage goes to the passage before; later, it restarts the passage. Other content behaves exactly as before.
-- **Lock screen.** `lib/listen/fileSpeech.ts` and `modules/p2p-speech-audio` (iOS and Android) handle it:
-  - the phone's own voice is written to temporary files and played through `expo-audio` with lock-screen controls;
-  - the artwork is `assets/images/icon.png`;
-  - next and previous use iOS remote commands.
-  It's active only in a native build that includes the module. Expo Go, the web and older builds keep plain device speech, and so do calls and Background playback off.
+- **Voice.** The shared device-speech driver in `lib/listen/index.ts` speaks each sentence straight from the text, with no audio files, no preparation and no downloads. There are no lock-screen controls.
 
 ## Known limits
 
-- **Android lock screen:** play, pause and seek only. `expo-audio`'s media session removes next and previous, and adding them needs a patch to `expo-audio`.
-- **Lock-screen progress bar:** shows the current sentence's audio file, not the whole passage.
+- **No lock-screen controls** for playlists, as for all P2P Listen content. The background limits are in `docs/listen.md`.
 - **Exact phrases:** checked only among the provider's top results. AO Lab translations have no word search at all.
 - **Shared playlists:** update notifications go out only when passages are added, at most once every 6 hours per playlist.
 

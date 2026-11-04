@@ -1,16 +1,13 @@
 // Scripture Listening Library — playback and the app's own rules (Phases 2–8):
 //   • the ONE shared engine (lib/listen/engine) with a playlist: plays on from
-//     passage to passage, Repeat this passage / all, the Previous rule, the
-//     lock-screen hooks (now playing, prepare the next sentence, release on
-//     Stop, remote buttons) — and nothing changes for other content;
-//   • the audio-file driver (lib/listen/fileSpeech) with fake native module and
-//     player: speak → file → play → done, lock screen with the OFFICIAL artwork,
-//     lock-screen / headphone pause and play, iOS next/previous, calls and
-//     Background playback off fall back to device speech, files deleted;
+//     passage to passage, Repeat this passage / all, the Previous rule — and
+//     nothing changes for other content;
+//   • direct device speech: each sentence is spoken straight from the text
+//     (no audio files, no preparation, no downloads);
 //   • library rules (filters, sort, estimate, search kinds, exact phrase,
 //     shuffle, queue changes) and listening reminders (nothing personal,
 //     approved routes only);
-//   • source checks: one player, official artwork, reader actions kept.
+//   • source checks: one player speaking directly, reader actions kept.
 // Run: node tests/scriptureListening.test.mjs
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -42,9 +39,7 @@ const voices = [{ identifier: "en1", name: "Ava", language: "en-US", quality: "E
 function rig(extra = {}) {
   const said = []; let stops = 0; const events = [];
   const driver = {
-    speak: (text, o) => said.push({ text, o }), stop: () => { stops++; }, getVoices: async () => voices,
-    prepare: (text) => events.push(["prepare", text]), nowPlaying: (info) => events.push(["now", info]), release: () => events.push(["release"]),
-    setRemote: (c) => events.push(["remote", c]), ...extra,
+    speak: (text, o) => said.push({ text, o }), stop: () => { stops++; }, getVoices: async () => voices, ...extra,
   };
   const store = new Map();
   const st = { get: async (k) => store.get(k) ?? null, set: async (k, v) => { store.set(k, v); }, remove: async (k) => { store.delete(k); } };
@@ -65,16 +60,13 @@ const finish = async (r) => { r.last().o.onDone(); await flush(); };
 // ── Engine: playlists ───────────────────────────────────────────────────────
 {
   const r = rig();
-  const remote = r.events.find((e) => e[0] === "remote")?.[1];
-  ok("engine: lock-screen / headphone buttons are wired into the same engine", !!remote && ["play", "pause", "next", "previous"].every((k) => typeof remote[k] === "function"));
   await r.eng.play(playlist(), "start"); await flush();
-  const now = r.events.filter((e) => e[0] === "now");
-  ok("now playing: passage as title, playlist as album, P2P Global as artist", now.length === 1 && now[0][1].title === "John 3:16" && now[0][1].album === "Morning with God" && now[0][1].artist === "P2P Global");
-  ok("the next sentence is prepared while this one plays (no gap)", r.events.some((e) => e[0] === "prepare" && e[1].startsWith("For God")));
+  ok("Listen starts speaking at once: the heading straight from the text, no preparation", r.said.length === 1 && r.said[0].text.startsWith("John 3, verse 16") && r.eng.getState().status === "playing");
+  await finish(r);
+  ok("each sentence follows the moment the one before finishes (one utterance at a time)", r.said.length === 2 && r.said[1].text.startsWith("For God so loved the world"));
   const aChunks = chunksOf(r.eng, 0);
   while (r.eng.getState().section === 0) await finish(r);
   ok("a playlist plays on into the next passage by itself", r.eng.getState().section === 1 && r.eng.getState().status === "playing");
-  ok("now playing follows the passage", r.events.filter((e) => e[0] === "now").pop()[1].title === "Psalms 23:1");
   // Previous: early in a passage → the one before; later → restart this one.
   r.eng.previousSection(); await flush();
   ok("Previous at the start of a passage goes to the passage before", r.eng.getState().section === 0 && r.eng.getState().chunk === aChunks[0]);
@@ -97,7 +89,7 @@ const finish = async (r) => { r.last().o.onDone(); await flush(); };
   r.eng.setRepeat("bogus");
   ok("repeat accepts only off / one / all", r.eng.getState().repeat === "off");
   r.eng.stop();
-  ok("Stop releases the audio and lock screen", r.events.some((e) => e[0] === "release") && r.eng.getState().status === "idle");
+  ok("Stop ends the session", r.eng.getState().status === "idle" && r.stops > 0);
 }
 {
   // Other content is unchanged: never moves on by itself, Repeat ignored.
@@ -106,149 +98,30 @@ const finish = async (r) => { r.last().o.onDone(); await flush(); };
   r.eng.setRepeat("all");
   while (r.eng.getState().status === "playing") await finish(r);
   ok("non-playlist content still finishes and stops (Repeat doesn't apply)", r.eng.getState().status === "completed");
-  ok("non-playlist lock screen: content title + subtitle", r.events.find((e) => e[0] === "now")[1].title === "Morning with God");
 }
 {
-  // A driver without the optional hooks keeps working exactly as before.
+  // The plain device-speech driver shape (speak / stop / voices) is all the engine needs.
   const said = [];
   const eng = E.createListenEngine({ speak: (t, o) => said.push({ t, o }), stop() {}, getVoices: async () => voices }, { get: async () => null, set: async () => {}, remove: async () => {} });
   await eng.play(playlist(), "start"); await flush();
   said[said.length - 1].o.onDone(); await flush();
-  ok("device speech (no lock-screen hooks) still plays playlists", eng.getState().status === "playing" && said.length === 2);
+  ok("device speech plays playlists", eng.getState().status === "playing" && said.length === 2);
   eng.stop();
 }
 
-// ── Audio-file driver ───────────────────────────────────────────────────────
-const F = load("lib/listen/fileSpeech.ts", {
-  "react-native": { Platform: { OS: "ios" } },
-  "expo-modules-core": { requireOptionalNativeModule: () => null },
-  "expo-audio": { createAudioPlayer: () => { throw new Error("not in tests"); }, setAudioModeAsync: async () => {} },
-  "expo-asset": { Asset: { fromModule: () => ({ downloadAsync: async () => ({ localUri: "file:///bundle/icon.png" }) }) } },
-  "@/assets/images/icon.png": 1,
-});
-function fileRig({ inCall = false, synthFails = false, synthHangs = false } = {}) {
-  const log = []; let n = 0; let remoteCb = null;
-  const hung = [];
-  const native = {
-    synthesize: async (text, language, voice, rate) => {
-      log.push(["synth", text, language, voice, rate]); if (synthFails) throw new Error("no");
-      if (synthHangs) return new Promise((res) => hung.push(() => res({ uri: `file:///cache/p2p-speech/late${++n}.caf`, durationMs: 900 })));
-      return { uri: `file:///cache/p2p-speech/${++n}.caf`, durationMs: 900 };
-    },
-    remove: (uri) => log.push(["remove", uri]), clearAll: () => log.push(["clearAll"]),
-    setTrackCommands: (on) => log.push(["trackCommands", on]), trackCommandsSupported: () => true,
-    addListener: (_e, cb) => { remoteCb = cb; return { remove() {} }; },
-  };
-  const listeners = [];
-  const player = {
-    playing: false,
-    addListener: (_e, cb) => listeners.push(cb),
-    replace: (s) => log.push(["replace", s.uri]), play() { this.playing = true; log.push(["play"]); }, pause() { this.playing = false; log.push(["pause"]); },
-    setActiveForLockScreen: (a, m, o) => log.push(["lockScreen", a, m, o]), updateLockScreenMetadata: (m) => log.push(["lockMeta", m]), clearLockScreenControls: () => log.push(["clearLock"]),
-    emit: (st) => listeners.forEach((l) => l({ isLoaded: true, playbackState: "ready", didJustFinish: false, playing: false, ...st })),
-  };
-  const fallbackSaid = [];
-  const fallback = { speak: (t, o) => fallbackSaid.push(t), stop: () => log.push(["fallbackStop"]), getVoices: async () => voices, capabilities: { seekSeconds: false, duration: false, timing: "sentence" } };
-  // Fake timers: `tick()` runs every timer that is due by then.
-  let now = 0; const timers = new Map(); let tid = 0;
-  const setTimer = (fn, ms) => { timers.set(++tid, { fn, at: now + ms }); return tid; };
-  const clearTimer = (t) => timers.delete(t);
-  const tick = (ms) => { now += ms; for (const [id, t] of [...timers]) if (t.at <= now && timers.has(id)) { timers.delete(id); t.fn(); } };
-  const d = F.createFileSpeechDriver(fallback, { native, createPlayer: () => player, setAudioMode: async (m) => log.push(["mode", m]), artwork: async () => "file:///bundle/icon.png", inCall: () => inCall, setTimer, clearTimer });
-  const remote = { calls: [], play() { this.calls.push("play"); }, pause() { this.calls.push("pause"); }, next() { this.calls.push("next"); }, previous() { this.calls.push("previous"); } };
-  d.setRemote(remote);
-  return { d, log, player, fallbackSaid, remote, fire: (c) => remoteCb?.({ command: c }), tick, timers, hung };
-}
 {
-  ok("no native module (Expo Go / web / older build) → plain device speech, unchanged", F.createFileSpeechDriver({ speak() {}, stop() {}, getVoices: async () => [] }, { native: null }).prepare === undefined);
-  const f = fileRig();
-  let done = 0, started = 0;
-  f.d.nowPlaying({ title: "John 3:16", album: "Morning with God", artist: "P2P Global", artwork: 99 });
-  f.d.speak("For God so loved the world.", { language: "en-US", voice: "en1", rate: 1.25, background: true, onDone: () => done++, onStart: () => started++ });
-  await flush();
-  ok("speak: the phone's voice → an audio file (language, voice, speed kept)", JSON.stringify(f.log.find((x) => x[0] === "synth")) === JSON.stringify(["synth", "For God so loved the world.", "en-US", "en1", 1.25]));
-  ok("…played through one player in the background session (no mixing)", f.log.some((x) => x[0] === "mode" && x[1].shouldPlayInBackground && x[1].interruptionMode === "doNotMix") && f.log.some((x) => x[0] === "replace") && f.log.some((x) => x[0] === "play") && started === 1);
-  const lock = f.log.find((x) => x[0] === "lockScreen");
-  ok("lock screen: passage title, playlist as album, P2P Global, the OFFICIAL artwork file (not the content's picture)", !!lock && lock[1] === true && lock[2].title === "John 3:16" && lock[2].albumTitle === "Morning with God" && lock[2].artist === "P2P Global" && lock[2].artworkUrl === "file:///bundle/icon.png");
-  ok("lock screen: no ±10 s buttons (Scripture moves by passage); next/previous switched on", lock[3].showSeekForward === false && lock[3].showSeekBackward === false && f.log.some((x) => x[0] === "trackCommands" && x[1] === true));
-  f.player.emit({ didJustFinish: true });
-  ok("finished file → the engine is told (and the file deleted)", done === 1 && f.log.some((x) => x[0] === "remove" && x[1].endsWith("/1.caf")));
-  f.player.emit({ didJustFinish: true });
-  ok("a repeated finish event never advances twice", done === 1);
-  // Lock-screen pause / play, headphones, a phone call.
-  f.d.speak("He gave his only Son.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
-  await flush();
-  f.player.emit({ playing: false });
-  ok("switching to the next file (briefly not playing yet) is NOT taken as a pause — the playlist carries on", !f.remote.calls.includes("pause"));
-  f.player.emit({ playing: true });
-  f.player.playing = false; f.player.emit({ playing: false });
-  ok("paused from the lock screen / headphones unplugged / a call → the engine pauses", f.remote.calls.at(-1) === "pause");
-  f.player.emit({ playing: true });
-  ok("play from the lock screen → the engine resumes", f.remote.calls.at(-1) === "play");
-  f.fire("next"); f.fire("previous");
-  ok("next / previous (iOS) → the engine's next / previous passage", f.remote.calls.slice(-2).join() === "next,previous");
-  f.d.stop();
-  ok("engine pause → player paused (the lock screen stays, with Play)", f.log.at(-1)[0] === "pause" && !f.log.some((x) => x[0] === "clearLock"));
-  const n0 = f.log.filter((x) => x[0] === "synth").length;
-  f.d.prepare("Next sentence.", { language: "en-US", rate: 1 });
-  f.d.speak("Next sentence.", { language: "en-US", rate: 1, background: true });
-  await flush();
-  ok("a prepared sentence isn't made twice", f.log.filter((x) => x[0] === "synth").length === n0 + 1);
-  f.d.release();
-  ok("Stop: lock screen cleared, track buttons off, every file deleted", f.log.some((x) => x[0] === "clearLock") && f.log.some((x) => x[0] === "trackCommands" && x[1] === false) && f.log.some((x) => x[0] === "clearAll"));
-}
-{
-  const f = fileRig({ inCall: true });
-  f.d.speak("During a call.", { language: "en", rate: 1, background: true });
-  await flush();
-  ok("during a call: device speech, the audio session untouched", f.fallbackSaid[0] === "During a call." && !f.log.some((x) => x[0] === "mode" || x[0] === "synth"));
-  const g = fileRig();
-  g.d.speak("Background off.", { language: "en", rate: 1, background: false });
-  await flush();
-  ok("Background playback off: device speech", g.fallbackSaid[0] === "Background off." && !g.log.some((x) => x[0] === "synth"));
-  const h = fileRig({ synthFails: true });
-  h.d.speak("No file.", { language: "en", rate: 1, background: true });
-  await flush();
-  ok("a file that can't be made → spoken directly instead (never silent)", h.fallbackSaid[0] === "No file.");
-}
-// The iPhone bug (build 83): a sentence's file never finished, so the playlist stopped after the passage heading.
-{
-  const f = fileRig({ synthHangs: true });
-  const text = "For God so loved the world, that he gave his one and only Son.";
-  f.d.speak(text, { language: "en-US", rate: 1, background: true });
-  await flush();
-  f.tick(F.synthLimitMs(text, 1) - 1); await flush();
-  ok("a sentence still being prepared is waited for (up to its limit)", f.fallbackSaid.length === 0);
-  f.tick(1); await flush();
-  ok("…past the limit it is spoken directly instead — listening never stalls", f.fallbackSaid[0] === text);
-  f.hung.forEach((r) => r()); await flush();
-  ok("…and the late file is deleted, never played", f.log.some((x) => x[0] === "remove" && x[1].includes("late")) && !f.log.some((x) => x[0] === "replace"));
-  const swift = src("modules/p2p-speech-audio/ios/P2PSpeechAudioModule.swift");
-  ok("iOS: sentences written one at a time, each with its own synthesizer; ends on the empty buffer, the 'finished' callback or a time limit",
-    swift.includes("private var pending: [SpeechJob]") && swift.includes("guard running == nil") && /final class SpeechJob[^{]*AVSpeechSynthesizerDelegate/.test(swift)
-    && swift.includes("private let synthesizer = AVSpeechSynthesizer()") && swift.includes("didFinish utterance") && swift.includes("asyncAfter(deadline: .now() + timeout)")
-    && !/public class P2PSpeechAudioModule[\s\S]*private let synthesizer = AVSpeechSynthesizer\(\)[\s\S]*\nprivate final class SpeechJob/.test(swift.split("private final class SpeechJob")[0] + "\nprivate final class SpeechJob"));
-  ok("limit grows with the sentence and slower speeds", F.synthLimitMs("x".repeat(360), 0.5) > F.synthLimitMs("x".repeat(360), 1) && F.synthLimitMs("x".repeat(360), 1) > F.synthLimitMs("x", 1));
-}
-{
-  const f = fileRig();
-  let done = 0;
-  f.d.speak("A file that never reports its end.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
-  await flush();
-  f.player.emit({ playing: true });
-  f.tick(900 + F.FINISH_GRACE_MS - 1);
-  ok("no 'finished' event: waits for the file's length plus a grace", done === 0);
-  f.tick(1);
-  ok("…still playing (a slow start): keeps waiting", done === 0);
-  f.player.playing = false;
-  f.tick(2_000);
-  ok("…then moves on to the next sentence, once", done === 1);
-  f.player.emit({ didJustFinish: true }); f.tick(10_000);
-  ok("…a late 'finished' event never advances twice", done === 1);
-  f.d.speak("Paused by the engine.", { language: "en-US", rate: 1, background: true, onDone: () => done++ });
-  await flush();
-  f.d.stop(); f.player.playing = false; f.tick(60_000);
-  ok("engine pause / stop: nothing advances while paused", done === 1 && f.timers.size === 0);
+  const r = rig();
+  await r.eng.play(playlist(), "start"); await flush();
+  const first = r.said[0];
+  r.eng.nextSection(); await flush();
+  const n = r.said.length;
+  first.o.onDone(); first.o.onDone(); await flush();
+  ok("an interrupted sentence's late 'done' never advances or speaks twice", r.said.length === n && r.eng.getState().section === 1);
+  r.eng.pause(); await flush();
+  ok("pause stops the voice (no speech left running)", r.eng.getState().status === "paused" && r.stops > 0);
+  r.eng.resume(); await flush();
+  ok("resume speaks again from the same passage", r.said.length === n + 1 && r.eng.getState().section === 1 && r.eng.getState().status === "playing");
+  r.eng.stop();
 }
 
 // ── Library rules ───────────────────────────────────────────────────────────
@@ -292,11 +165,11 @@ ok("a reminder tap goes only to approved places (the real regex from lib/push.ts
   && !allowed.test("/scripture-collections/x") && !allowed.test("/admin") && !allowed.test("https://evil.example") && !allowed.test("/library/../admin"));
 
 // ── Source checks ───────────────────────────────────────────────────────────
-const fileSpeech = src("lib/listen/fileSpeech.ts"), index = src("lib/listen/index.ts"), session = src("lib/listen/playlistSession.ts");
-ok("one player: the shared engine gets the file driver; nothing else creates a speech engine", index.includes("createListenEngine(createFileSpeechDriver(deviceSpeech,") && !/createListenEngine\(/.test(session) && !/createAudioPlayer/.test(session));
-ok("lock-screen artwork is the Listen player's official artwork file, unchanged", fileSpeech.includes('const OFFICIAL_ARTWORK = require("@/assets/images/icon.png");') && src("components/listen/ListenPlayer.tsx").includes('const APP_ICON = require("@/assets/images/icon.png");'));
-ok("files are temporary and removed; licensed text never stored", fileSpeech.includes("mod.clearAll()") && !/AsyncStorage|FileSystem\.write/.test(fileSpeech));
-ok("native module: iOS + Android, linked from modules/", ["modules/p2p-speech-audio/expo-module.config.json", "modules/p2p-speech-audio/ios/P2PSpeechAudioModule.swift", "modules/p2p-speech-audio/android/src/main/java/expo/modules/p2pspeechaudio/P2PSpeechAudioModule.kt"].every((f) => existsSync(path.join(root, f))));
+const index = src("lib/listen/index.ts"), session = src("lib/listen/playlistSession.ts"), engineSrc = src("lib/listen/engine.ts");
+ok("one player: the shared engine speaks with the device voice directly; nothing else creates a speech engine", index.includes("export const listen = createListenEngine(deviceSpeech, {") && !/createListenEngine\(/.test(session) && !/createAudioPlayer/.test(session));
+ok("device speech speaks straight from the text (expo-speech), never via audio files", /Speech\.speak\(text, \{/.test(index) && !/synthesize|\.caf\b|FileSystem|createAudioPlayer|fileSpeech/.test(index));
+ok("the audio-file pipeline is gone: no file driver, no speech-to-file native module", !existsSync(path.join(root, "lib/listen/fileSpeech.ts")) && !existsSync(path.join(root, "modules/p2p-speech-audio")));
+ok("the engine has no sentence preparation, Now Playing or lock-screen button hooks (no misleading controls)", !/prepare\?\(|nowPlaying|setRemote|RemoteControls|publishNowPlaying/.test(engineSrc));
 ok("nothing auto-plays after a restart: resume is only ever a tap", !/AppState|useEffect\([^)]*resumePlaylist/.test(session) && src("app/library/index.tsx").includes("onPress={() => resume(continueItem.id)}"));
 const reader = src("app/bible/index.tsx");
 ok("Bible reader keeps every action (Note, Save, Listen, Copy, Share, Lessons) and adds Add to…", ['label={selNote ? "Edit note" : "Note"}', 'label={selBookmark ? "Saved" : "Save"}', 'label="Add to…"', 'label="Copy"', 'label="Share"', 'label="Lessons"'].every((x) => reader.includes(x)));

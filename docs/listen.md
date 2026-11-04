@@ -53,16 +53,11 @@ lib/listen/uiPrefs.ts                 mode, text size, Read Along switches (this
 - **Android background:** lasting background playback (beyond about 3 minutes with the screen off) needs that lock-screen session and its foreground service.
 - **No fakes:** showing controls on a silent track would be fake controls, so none are shown.
 
-**What's needed (a new native module and a native build):** turn each passage into an audio file on the phone, then play it with `expo-audio`.
-- **iOS:** `AVSpeechSynthesizer.write(_:toBufferCallback:)`.
-- **Android:** `TextToSpeech.synthesizeToFile`.
+**Tried and removed (builds 82–84, November 2026):** each sentence was turned into an audio file on the phone and played through `expo-audio`. On iOS this used `AVSpeechSynthesizer.write`, and on Android `TextToSpeech.synthesizeToFile`. It gave lock-screen controls, but listening became slow and unnatural, because every sentence had to be written to a file first. The owner chose natural, immediate speech over lock-screen controls, and the pipeline was removed. Don't bring it back for device speech.
 
-That one change gives:
-- real length, time and seeking;
-- lock-screen and Control Center controls on iOS, and a media notification with background playback on Android;
-- a file that can be shared in Study Together (below).
-
-The engine is already separated from `expo-speech` through `SpeechDriver`, which reports its `capabilities`. A file-based driver, or licensed recorded Bible audio with verse timing, can slot in later without changing the screens.
+- **The design stays separate:** `SpeechDriver`, with the `capabilities` it reports, keeps device speech apart from the screens.
+- **Recorded Bible audio, later:** audio from an authorised provider, with real length and verse timing, would be its own driver, and could have proper lock-screen controls.
+- **P2P Listen doesn't depend on it:** device speech never waits for, or relies on, any audio provider.
 
 ## Voices
 

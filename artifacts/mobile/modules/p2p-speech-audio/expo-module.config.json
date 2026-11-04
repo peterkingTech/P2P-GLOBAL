@@ -1,9 +1,0 @@
-{
-  "platforms": ["apple", "android"],
-  "apple": {
-    "modules": ["P2PSpeechAudioModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.p2pspeechaudio.P2PSpeechAudioModule"]
-  }
-}
