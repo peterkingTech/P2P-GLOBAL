@@ -894,7 +894,7 @@ export interface SubmitContentParams {
   attachmentIds?: string[];
 }
 
-export type GrowthEventType = "lesson_completed" | "module_completed" | "disciple_gained";
+export type GrowthEventType = "lesson_completed" | "module_completed" | "disciple_gained" | "stage_reached";
 
 export interface GrowthEvent {
   id: string;

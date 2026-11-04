@@ -1,5 +1,6 @@
 import { supabase } from "@/contexts/AuthContext";
 import { getApiUrl } from "@/lib/apiUrl";
+import { adminSessionEnded, adminSessionHeader } from "@/lib/adminSessionStore";
 
 // The app's one way to call the P2P API server. Every feature's *Api.ts file
 // used to carry its own copy of this (token lookup, headers, JSON parsing,
@@ -23,7 +24,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   const token = await accessToken();
   return fetch(`${getApiUrl()}${path}`, {
     ...init,
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...((init.headers as Record<string, string>) ?? {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...adminSessionHeader(), ...((init.headers as Record<string, string>) ?? {}) },
   });
 }
 
@@ -52,6 +53,8 @@ export async function apiRequest<T = any>(path: string, init: RequestInit = {}, 
       headers: {
         ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // The Admin Centre session (migration 238), while one is open.
+        ...adminSessionHeader(),
         ...((init.headers as Record<string, string>) ?? {}),
       },
     });
@@ -62,6 +65,7 @@ export async function apiRequest<T = any>(path: string, init: RequestInit = {}, 
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const b = (body ?? {}) as Record<string, unknown>;
+    if (b.adminSessionEnded) adminSessionEnded();
     throw makeError(typeof b.error === "string" && b.error ? b.error : opts.fallbackError ?? "Request failed", res.status, b);
   }
   return body as T;

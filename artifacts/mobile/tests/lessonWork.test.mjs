@@ -20,7 +20,7 @@ const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL $
 const calls = [];
 const compile = (rel) => ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 const fakeFetch = async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ({}) }; };
-const requireFor = (n) => n === "@/contexts/AuthContext" ? { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "TOKEN" } } }) } } } : n === "@/lib/apiUrl" ? { getApiUrl: () => "https://api.test/api" } : n === "@/lib/apiClient" ? run("lib/apiClient.ts") : {};
+const requireFor = (n) => n === "@/contexts/AuthContext" ? { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "TOKEN" } } }) } } } : n === "@/lib/apiUrl" ? { getApiUrl: () => "https://api.test/api" } : n === "@/lib/adminSessionStore" ? run("lib/adminSessionStore.ts") : n === "@/lib/apiClient" ? run("lib/apiClient.ts") : {};
 function run(rel) { const m = { exports: {} }; vm.runInNewContext(compile(rel), { module: m, exports: m.exports, JSON, Object, Error, Promise, fetch: fakeFetch, require: requireFor }); return m.exports; }
 const mod = { exports: run("lib/lessonWorkApi.ts") };
 const W = mod.exports;

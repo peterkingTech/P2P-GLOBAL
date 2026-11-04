@@ -247,7 +247,7 @@ function Phase2Letter({ learnerId, learnerName, onContinue }: { learnerId: strin
       // go through the service-role /discipleship/notify-user endpoint
       // rather than a direct client insert.
       try {
-        const { data: link } = await supabase.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", learnerId).eq("active", true).maybeSingle();
+        const { data: link } = await supabase.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", learnerId).eq("active", true).eq("is_primary", true).maybeSingle();
         if (link?.mentor_id) {
           await apiFetch("/discipleship/notify-user", {
             method: "POST",

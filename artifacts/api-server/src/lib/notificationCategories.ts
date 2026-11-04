@@ -98,6 +98,7 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   peer_guide_request: "peer_guide",
   peer_guide_request_accepted: "peer_guide",
   peer_guide_request_declined: "peer_guide",
+  peer_guide_relationship_changed: "peer_guide", // migration 233: ended / paused / resumed
   pastoral_alert: "peer_guide",
   peer_guide_update: "peer_guide",
   peer_guide_match: "peer_guide",
@@ -124,6 +125,7 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   // Awards
   grain_earned: "fruit",
   fruit_awarded: "fruit", // migration 196 (p2p_award_fruit)
+  growth_stage_reached: "fruit", // migration 236: the growth engine (a new personal stage — the same "growth & fruit" preference)
 
   // Pastoral care nudges (lib/pastoralCare.ts)
   pastoral_gentle_word: "encouragement",

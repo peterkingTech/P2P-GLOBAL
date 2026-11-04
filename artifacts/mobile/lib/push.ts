@@ -213,6 +213,9 @@ export function pathForNotification(
   const evaluationId = typeof data?.evaluationId === "string" && /^[0-9a-f-]{36}$/i.test(data.evaluationId) ? data.evaluationId : null;
   const evalAssignmentId = typeof data?.assignmentId === "string" && /^[0-9a-f-]{36}$/i.test(data.assignmentId) ? data.assignmentId : null;
   if (notificationType === "evaluation_invitation") return evalAssignmentId ? `/evaluation/invitation/${evalAssignmentId}` : "/evaluation";
+  // A new personal growth stage (the growth engine) → the growth journey; a Peer Guide relationship change → My relationships.
+  if (notificationType === "growth_stage_reached") return "/stages";
+  if (notificationType === "peer_guide_relationship_changed") return "/relationships";
   if (notificationType === "evaluation_unassigned" || notificationType === "evaluation_escalation") return "/evaluation/admin";
   if (notificationType === "evaluation_reminder" || notificationType === "evaluation_missed_deadline") return evaluationId ? `/evaluation/review/${evaluationId}` : "/evaluation";
   if (notificationType && notificationType.startsWith("evaluation_") && notificationType !== "evaluation_waiting" && notificationType !== "evaluation_resolved") return evaluationId ? `/evaluation/${evaluationId}` : "/evaluation";

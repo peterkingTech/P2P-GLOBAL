@@ -56,7 +56,7 @@ import { ClientBuildReporter } from "@/components/ClientBuildReporter";
 import { DataProvider, useData } from "@/contexts/DataContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { PageFrame } from "@/components/PageFrame";
-import { getStageFromPoints } from "@/constants/stages";
+import { getStageFromPoints, stageByName } from "@/constants/stages";
 import i18n, { SUPPORTED_LANGUAGES, loadLocale, setAppLanguage } from "@/lib/i18n";
 import { usePresenceHeartbeat } from "@/lib/presence";
 
@@ -249,9 +249,12 @@ function GrowthCelebrationHost() {
       {celebrationEvent && (
         <ModuleCelebrationModal
           label={celebrationEvent.label.replace(/ completed$/i, "")}
+          stage={celebrationEvent.eventType === "stage_reached" ? stageByName(celebrationEvent.label) : undefined}
           onWatchGrowth={() => {
-            const prevStage = getStageFromPoints(celebrationEvent.scoreBefore);
             dismissCelebrationEvent();
+            // A new growth stage opens the growth journey; a module opens the Living Tree.
+            if (celebrationEvent.eventType === "stage_reached") { router.push("/stages" as any); return; }
+            const prevStage = getStageFromPoints(celebrationEvent.scoreBefore);
             router.push({
               pathname: "/living-tree",
               params: { prevStage: String(prevStage) },

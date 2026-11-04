@@ -75,9 +75,17 @@ export const STAGES: Stage[] = [
   },
 ];
 
+// Five PERSONAL stages (indexes 0–4, Dormant Seed → Forest Builder). Forest of
+// Nations (index 5) is the COLLECTIVE multiplication of disciples — what P2P
+// Global's disciples become together — never a person's own stage. The stage
+// itself is calculated on the server (migrations 235–237; GET /growth/me).
+export const PERSONAL_STAGE_COUNT = 5;
+export const COLLECTIVE_STAGE_INDEX = 5;
+
+/** A person's stage from their growth points: never Forest of Nations (collective), so at most Forest Builder. */
 export function getStageFromPoints(points: number): number {
   let idx = 0;
-  for (let i = STAGES.length - 1; i >= 0; i--) {
+  for (let i = PERSONAL_STAGE_COUNT - 1; i >= 0; i--) {
     if (points >= STAGES[i].unlockPoints) {
       idx = i;
       break;
@@ -85,3 +93,5 @@ export function getStageFromPoints(points: number): number {
   }
   return idx;
 }
+
+export const stageByName = (name: string): Stage | undefined => STAGES.find((s) => s.name === name);

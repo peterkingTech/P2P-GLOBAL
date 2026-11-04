@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useAuth, supabase } from "@/contexts/AuthContext";
+import { startAdminSession } from "@/lib/adminSession";
 import colors from "@/constants/colors";
 
 const LOGO = require("@/assets/images/logo.png");
@@ -100,6 +101,16 @@ export default function AdminLoginScreen() {
       setRoleError(true);
       return;
     }
+
+    // Step 3: open the Admin Centre's own session (migration 238): it needs this fresh
+    // sign-in, and two-step verification where the admin account requires it.
+    const started = await startAdminSession();
+    if (!started.ok && (started.reason === "mfa" || started.reason === "fresh")) {
+      setError(started.message);
+      await supabase.auth.signOut();
+      return;
+    }
+    // (No admin account yet: until admin sessions are required, access continues as it is today.)
 
     // Admin confirmed → go to dashboard
     router.replace("/admin/curriculum");

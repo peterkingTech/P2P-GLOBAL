@@ -108,7 +108,7 @@ export default function JourneyScreen() {
         .from("p2p_discipleship_links")
         .select("mentor_id")
         .eq("disciple_id", profile.id)
-        .eq("active", true)
+        .eq("active", true).eq("is_primary", true)
         .maybeSingle();
       if (link?.mentor_id && !cancelled) {
         const { data: mentor } = await supabase

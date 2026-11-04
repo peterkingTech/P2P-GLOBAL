@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData, AdminActivityEntry, ContactDepartment, ContactDeptStats } from "@/contexts/DataContext";
 import { apiFetch } from "@/lib/apiClient";
+import PlatformOverview from "@/components/admin/PlatformOverview";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
 
@@ -211,6 +212,7 @@ function SupervisorDashboard() {
   return (
     <View style={styles.container}>
       <DashboardHeader role="admin_supervisor" />
+      <PlatformOverview compact />
       <View style={styles.observerBanner}>
         <Ionicons name="eye-outline" size={16} color={colors.textMid} />
         <Text style={styles.observerText}>Observer mode — you can see all admin activity but cannot take actions.</Text>
@@ -242,7 +244,7 @@ const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
 
 function SuperAdminDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<"activity" | "monitor" | "stats" | "management">("activity");
+  const [tab, setTab] = useState<"overview" | "activity" | "monitor" | "stats" | "management">("overview");
   const [feed, setFeed] = useState<AdminActivityEntry[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [deptStats, setDeptStats] = useState<Record<ContactDepartment, ContactDeptStats> | null>(null);
@@ -266,8 +268,8 @@ function SuperAdminDashboard() {
       {/* Scrolls sideways when the four tabs are wider than the screen (phones),
           instead of widening the page. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsRow} accessibilityRole="tablist">
-        {(["activity", "monitor", "stats", "management"] as const).map((tb) => {
-          const label = tb === "activity" ? "Live Activity" : tb === "monitor" ? "Admin Monitor" : tb === "stats" ? "Platform Stats" : "Management";
+        {(["overview", "activity", "monitor", "stats", "management"] as const).map((tb) => {
+          const label = tb === "overview" ? "Overview" : tb === "activity" ? "Live Activity" : tb === "monitor" ? "Admin Monitor" : tb === "stats" ? "Platform Stats" : "Management";
           return (
             <TouchableOpacity
               key={tb}
@@ -286,7 +288,7 @@ function SuperAdminDashboard() {
         })}
       </ScrollView>
 
-      {loading ? <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} /> : (
+      {tab === "overview" ? <PlatformOverview /> : loading ? <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} /> : (
         <>
           {tab === "activity" && (
             <FlatList

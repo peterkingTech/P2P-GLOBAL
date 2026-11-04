@@ -528,8 +528,11 @@ const STAGE_THRESHOLDS = [
   { key: "young_tree", unlockPoints: 12 },
   { key: "fruitful_tree", unlockPoints: 28 },
   { key: "forest_builder", unlockPoints: 60 },
-  { key: "forest_of_nations", unlockPoints: 110 },
 ];
+// A person's own stage tops out at Forest Builder: Forest of Nations is the
+// collective multiplication of disciples, never a personal stage (migrations
+// 235–237). The grove keeps its "forest_of_nations" count key (always 0) so
+// existing clients still read the response.
 function stageKeyForPoints(points: number): string {
   let key = STAGE_THRESHOLDS[0].key;
   for (const s of STAGE_THRESHOLDS) if (points >= s.unlockPoints) key = s.key;
@@ -760,7 +763,7 @@ router.get("/churches/:churchId/members/:userId", async (req, res) => {
   if (!profile) return err(res, "Member not found", 404);
 
   const [{ data: guideLink }, { data: guidingLinks }, { data: fruits }, { data: cohortLinks }] = await Promise.all([
-    db.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", userId).eq("active", true).maybeSingle(),
+    db.from("p2p_discipleship_links").select("mentor_id").eq("disciple_id", userId).eq("active", true).eq("is_primary", true).maybeSingle(),
     db.from("p2p_discipleship_links").select("disciple_id").eq("mentor_id", userId).eq("active", true),
     db.from("p2p_user_fruits").select("fruit_key,awarded_at").eq("user_id", userId).order("awarded_at", { ascending: false }),
     db.from("p2p_church_cohort_members").select("cohort_id, status, p2p_church_cohorts(name)").eq("user_id", userId),

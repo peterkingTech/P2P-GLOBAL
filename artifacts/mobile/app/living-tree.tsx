@@ -19,8 +19,8 @@ import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { STAGES, getStageFromPoints } from "@/constants/stages";
-import { getTreeStage, getTreeStageProgress } from "@/constants/treeStages";
+import { STAGES, PERSONAL_STAGE_COUNT, getStageFromPoints } from "@/constants/stages";
+import { getTreeStage } from "@/constants/treeStages";
 import { readTreeEnvironment } from "@/lib/hemisphereSeason";
 import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VIDEO_STAGE_INDEX } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
@@ -135,8 +135,8 @@ export default function LivingTreeScreen() {
   const treeEnvironment = readTreeEnvironment({ latitude: profile?.latitude ?? null, countryCode: profile?.countryCode ?? null });
   const environmentSetting: EnvironmentSetting =
     environmentOverride ?? (treeData?.treeEnvironmentPreference as EnvironmentSetting | undefined) ?? "auto";
+  // The tree's drawing still grows with its own score; its NAME is the one official personal stage.
   const newTreeStage = getTreeStage(treeData?.treeGrowthScore ?? 0);
-  const newTreeStageProgress = getTreeStageProgress(treeData?.treeGrowthScore ?? 0);
 
   async function handleEnvironmentChange(setting: EnvironmentSetting) {
     setEnvironmentOverride(setting);
@@ -149,7 +149,8 @@ export default function LivingTreeScreen() {
   const growthPoints = profile?.growthLevel ?? 0;
   const stageIndex = getStageFromPoints(growthPoints);
   const stage = STAGES[stageIndex];
-  const nextStage = STAGES[stageIndex + 1] ?? null;
+  // Forest Builder is the highest personal stage (Forest of Nations is collective).
+  const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;
 
   const prevPoints = stage.unlockPoints;
   const nextPoints = nextStage?.unlockPoints ?? prevPoints;
@@ -321,11 +322,11 @@ export default function LivingTreeScreen() {
           {/* The interactive tree — real fruit, real growth, explorable */}
           {treeData && (
             <View style={styles.treeSceneCard}>
-              <Text style={styles.treeStageName}>{newTreeStage.name}</Text>
-              <Text style={styles.treeStageDesc}>{newTreeStage.description}</Text>
-              <View style={styles.treeStageProgressBg}>
-                <View style={[styles.treeStageProgressFill, { width: `${Math.round(newTreeStageProgress * 100)}%` }]} />
-              </View>
+              <Text style={styles.treeStageName}>{stage.emoji} {stage.name}</Text>
+              <Text style={styles.treeStageDesc}>{stage.description}</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Your growth journey: what the next stage asks for" onPress={() => router.push("/stages")} style={{ alignSelf: "flex-start", paddingVertical: 6 }}>
+                <Text style={{ color: colors.accentGreen, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Your growth journey →</Text>
+              </TouchableOpacity>
 
               {!showAccessibleSummary ? (
                 <View style={styles.treeSceneWrap}>
@@ -343,7 +344,7 @@ export default function LivingTreeScreen() {
                   />
                 </View>
               ) : (
-                <TreeAccessibleSummary stage={newTreeStage} earnedFruits={userFruits} fruitCatalog={fruitCatalog} />
+                <TreeAccessibleSummary stage={{ ...newTreeStage, name: stage.name, description: stage.description }} earnedFruits={userFruits} fruitCatalog={fruitCatalog} />
               )}
 
               <TouchableOpacity
@@ -460,7 +461,7 @@ export default function LivingTreeScreen() {
 
           <AppButton label="View My Forest" onPress={() => setTab("forest")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
 
-          <AppButton label="The Six Stages of Growth" onPress={() => router.push("/stages")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
+          <AppButton label="Your growth journey" onPress={() => router.push("/stages")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
@@ -501,6 +502,7 @@ export default function LivingTreeScreen() {
                 <NodeCard key={node.id} node={node} depth={0} />
               ))}
               <AppButton label="View Full Forest" onPress={() => router.push("/forest" as any)} icon="chevron-forward" iconPosition="trailing" style={{ marginTop: 8 }} palette="fixedLight" />
+              <AppButton label="My discipleship lineage" onPress={() => router.push("/lineage" as any)} variant="secondary" icon="git-network-outline" style={{ marginTop: 8 }} palette="fixedLight" />
             </ScrollView>
           )}
         </View>

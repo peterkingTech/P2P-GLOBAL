@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
-import { supabaseServiceRole as supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase, verifyCaller } from "../lib/supabase";
 import { validateUsername, formatUsername } from "../lib/username";
 import { withoutChildren } from "../lib/minors";
 
@@ -794,7 +794,7 @@ async function loadAncestry(userId: string, maxGenerations: number) {
       .from("p2p_discipleship_links")
       .select("mentor_id")
       .eq("disciple_id", currentId)
-      .eq("active", true)
+      .eq("active", true).eq("is_primary", true)
       .maybeSingle();
     const mentorId = (link as { mentor_id: string } | null)?.mentor_id;
     if (!mentorId) break;
@@ -824,8 +824,17 @@ router.get("/:userId/grain", async (req, res) => {
 
 const FOREST_FORWARD_GENERATIONS = 3;
 
+// A lineage holds other people's names, photos, countries and activity: only
+// the signed-in person may see their own (super admins may look at anyone's).
+// It used to answer anyone, signed in or not, for any id.
 router.get("/:userId/forest", async (req, res) => {
   const { userId } = req.params;
+  const caller = await verifyCaller(req);
+  if (!caller) return res.status(401).json({ error: "Please sign in." });
+  if (caller !== userId) {
+    const { data: me } = await supabaseRead.from("p2p_profiles").select("role").eq("id", caller).maybeSingle();
+    if ((me?.role as string | undefined) !== "super_admin") return res.status(403).json({ error: "You can only see your own discipleship forest." });
+  }
 
   const { data: rootProfile, error: rootErr } = await supabaseRead
     .from("p2p_profiles")

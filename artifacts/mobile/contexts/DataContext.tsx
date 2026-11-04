@@ -1591,7 +1591,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const loadForestData = useCallback(async (userId: string) => {
     setForestDataLoading(true);
     try {
-      const res = await fetch(`${getApiUrl()}/profiles/${userId}/forest`);
+      // Signed in: the server only shows a person their own lineage.
+      const res = await apiFetch(`/profiles/${userId}/forest`);
       if (!res.ok) { setForestData(null); return; }
       const data = (await res.json()) as GenerationalForestData;
       setForestData(data);
@@ -2270,10 +2271,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         createdAt: r.created_at as string,
       });
 
+      // A new growth stage (the growth engine, migration 236) is celebrated first.
+      const stageEvent = unseen.find((r) => r.event_type === "stage_reached");
       const moduleEvent = unseen.find((r) => r.event_type === "module_completed");
       const lessonEvent = unseen.find((r) => r.event_type === "lesson_completed");
 
-      if (moduleEvent) {
+      if (stageEvent) {
+        setCelebrationEvent(toEvent(stageEvent));
+      } else if (moduleEvent) {
         setCelebrationEvent(toEvent(moduleEvent));
       } else if (lessonEvent) {
         setToastEvent(toEvent(lessonEvent));

@@ -14,6 +14,7 @@ import colors from "@/constants/colors";
 import { STUDIO_VIEW_ROLES } from "@/lib/studioModel";
 import { IMPACT_REVIEWER_ROLES } from "@/lib/winsModerationModel";
 import { AppButton } from "@/components/ui";
+import { endAdminSession } from "@/lib/adminSession";
 
 const ADMIN_ROLES = new Set([
   "peer_guide",
@@ -38,25 +39,33 @@ const ADMIN_ROLES = new Set([
 ]);
 
 const NAV_ITEMS = [
-  { label: "Dashboard", path: "/admin", icon: "grid" as const, roles: Array.from(ADMIN_ROLES) },
-  { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
-  { label: "Kingdom Stories", path: "/admin/kingdom-stories", icon: "book" as const, roles: ["super_admin", "admin_content"] },
+  { label: "Dashboard", path: "/admin", icon: "grid" as const, roles: Array.from(ADMIN_ROLES), section: "Overview" },
+  { label: "Content", path: "/admin/content", icon: "library" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"], section: "Content" },
+  { label: "Kingdom Stories", path: "/admin/kingdom-stories", icon: "book" as const, roles: ["super_admin", "admin_content"], section: "Content" },
   // Publishing Studio — same role list as the API's STUDIO_VIEW_ROLES (display only; /api/studio enforces it).
-  { label: "Publishing Studio", path: "/admin/studio", icon: "megaphone" as const, roles: STUDIO_VIEW_ROLES },
-  { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"] },
-  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin", "admin_help"] },
-  { label: "P2P Official Mail", path: "/admin/email-inbox", icon: "mail" as const, roles: ["admin_help", "admin_marketing", "super_admin"] },
-  { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_moderation"] },
+  { label: "Publishing Studio", path: "/admin/studio", icon: "megaphone" as const, roles: STUDIO_VIEW_ROLES, section: "Content" },
+  { label: "Registrations", path: "/admin/registrations", icon: "people" as const, roles: ["church_leader", "regional_admin", "super_admin"], section: "People & Communities" },
+  { label: "Help Requests", path: "/admin/help-requests", icon: "medkit" as const, roles: ["peer_guide", "church_leader", "regional_admin", "moderator", "super_admin", "admin_help"], section: "Help & Support" },
+  { label: "P2P Official Mail", path: "/admin/email-inbox", icon: "mail" as const, roles: ["admin_help", "admin_marketing", "super_admin"], section: "Help & Support" },
+  { label: "Moderation", path: "/admin/moderation", icon: "flag" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_moderation"], section: "People & Communities" },
   // Kingdom Wins review (held posts, P2P Impact, posting restrictions) — the API's IMPACT_REVIEWER_ROLES (display only; enforced server-side).
-  { label: "Kingdom Wins", path: "/admin/kingdom-wins-review", icon: "sparkles" as const, roles: IMPACT_REVIEWER_ROLES },
-  { label: "Usernames", path: "/admin/usernames", icon: "at" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_username"] },
-  { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"] },
-  { label: "Translations", path: "/admin/translations", icon: "language" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_translation"] },
-  { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin", "admin_supervisor"] },
+  { label: "Kingdom Wins", path: "/admin/kingdom-wins-review", icon: "sparkles" as const, roles: IMPACT_REVIEWER_ROLES, section: "People & Communities" },
+  { label: "Usernames", path: "/admin/usernames", icon: "at" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_username"], section: "People & Communities" },
+  { label: "Verification", path: "/admin/verification", icon: "shield-checkmark" as const, roles: ["moderator", "church_leader", "regional_admin", "super_admin", "admin_verification"], section: "People & Communities" },
+  { label: "Translations", path: "/admin/translations", icon: "language" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_translation"], section: "Content" },
+  // Discipleship & Learning: the growth milestones, relationship corrections, and Peer Evaluation oversight (all checked on the server).
+  { label: "Discipleship & Growth", path: "/admin/discipleship", icon: "leaf" as const, roles: ["super_admin", "admin_supervisor", "regional_admin", "admin_zone", "admin_national"], section: "Discipleship & Learning" },
+  { label: "Peer Evaluations", path: "/evaluation/admin", icon: "checkmark-done" as const, roles: ["super_admin", "admin_supervisor"], section: "Discipleship & Learning" },
+  // Platform: administrators, sessions, permissions and the append-only audit (migration 238).
+  { label: "Access & Audit", path: "/admin/access", icon: "key" as const, roles: ["super_admin", "admin_supervisor"], section: "Platform" },
+  { label: "Team", path: "/admin/team", icon: "people-circle" as const, roles: ["super_admin", "admin_supervisor"], section: "Platform" },
   // Admin Recycle Bin (migration 214) — the roles whose admin screens delete content (Kingdom School,
   // Kingdom Stories). The API lists only the types each role may restore and enforces it.
-  { label: "Recycle Bin", path: "/admin/recycle-bin", icon: "trash" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"] },
+  { label: "Recycle Bin", path: "/admin/recycle-bin", icon: "trash" as const, roles: ["peer_guide", "church_leader", "regional_admin", "super_admin", "admin_content"], section: "Content" },
 ];
+
+// The six areas of the Admin Centre, in order. Groupings only — each screen keeps its own server-side checks.
+const SECTIONS = ["Overview", "People & Communities", "Discipleship & Learning", "Content", "Platform", "Help & Support"];
 
 export default function AdminLayout() {
   const { profile, isLoading, isAuthenticated } = useAuth();
@@ -110,7 +119,8 @@ export default function AdminLayout() {
 
   // ── Admin shell ───────────────────────────────────────────────────────────
 
-  const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(profile.role));
+  const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(profile.role))
+    .sort((a, b) => SECTIONS.indexOf(a.section) - SECTIONS.indexOf(b.section));
   // The most specific tab matching the current page ("/admin" matches every page).
   activeTabPath.current = visibleNav
     .filter((item) => pathname.startsWith(item.path))
@@ -135,11 +145,13 @@ export default function AdminLayout() {
           style={styles.topBarNav}
           contentContainerStyle={styles.topBarNavContent}
         >
-          {visibleNav.map((item) => {
+          {visibleNav.map((item, i) => {
             const active = pathname.startsWith(item.path);
+            const firstOfSection = i === 0 || visibleNav[i - 1].section !== item.section;
             return (
+              <React.Fragment key={item.path}>
+              {firstOfSection ? <Text style={styles.navSection} accessibilityRole="header">{item.section}</Text> : null}
               <TouchableOpacity
-                key={item.path}
                 style={[styles.navTab, active && styles.navTabActive]}
                 onPress={() => router.push(item.path as any)}
                 onLayout={(e) => {
@@ -160,12 +172,13 @@ export default function AdminLayout() {
                   {item.label}
                 </Text>
               </TouchableOpacity>
+              </React.Fragment>
             );
           })}
         </ScrollView>
 
         {/* Right: Exit Admin */}
-        <AppButton label="Exit Admin" onPress={() => router.replace("/(tabs)")} variant="outline" icon="exit-outline" style={{ flexShrink: 0 }} palette="fixedLight" />
+        <AppButton label="Exit Admin" onPress={async () => { await endAdminSession(); router.replace("/(tabs)"); }} variant="outline" icon="exit-outline" style={{ flexShrink: 0 }} palette="fixedLight" />
       </View>
 
       {/* Page content */}
@@ -178,6 +191,7 @@ export default function AdminLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.lightCream },
+  navSection: { alignSelf: "center", fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: "rgba(255,255,255,0.55)", fontFamily: "Inter_600SemiBold", marginLeft: 10, marginRight: 2 },
 
   topBar: {
     flexDirection: "row",

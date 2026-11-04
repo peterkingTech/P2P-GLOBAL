@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,137 +7,149 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  ActivityIndicator,
 } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
-import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
+import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX, getStageFromPoints } from "@/constants/stages";
 import ReadableText from "@/components/ReadableText";
+import { AppButton } from "@/components/ui";
+import { getGrowthJourney, progressText, timeInStage, type GrowthJourney } from "@/lib/growthApi";
+
+// YOUR GROWTH JOURNEY. One personal stage, calculated on the server from real,
+// dated activity across four dimensions (consistency over time, learning,
+// spiritual fruit, discipleship — migrations 235–237). This screen explains
+// where you are and what the next stage asks for, as a checklist (never "8 more
+// points" or a percentage). Forest Builder is the highest personal stage;
+// Forest of Nations is what P2P Global's disciples become TOGETHER.
 
 export default function StagesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const growthPoints = profile?.growthLevel ?? 0;
-  const currentStage = getStageFromPoints(growthPoints);
+  const [journey, setJourney] = useState<GrowthJourney | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    getGrowthJourney().then((j) => { if (live) { setJourney(j); setError(null); } }).catch((e: Error) => { if (live) setError(e.message); });
+    return () => { live = false; };
+  }, []));
+
+  // Until the journey loads (or offline): the stage from the profile, never Forest of Nations.
+  const stageIndex = journey ? journey.stage.stage - 1 : getStageFromPoints(profile?.growthLevel ?? 0);
+  const collective = STAGES[COLLECTIVE_STAGE_INDEX];
 
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: topPad + 12, paddingBottom: insets.bottom + 120 },
-      ]}
+      contentContainerStyle={[styles.content, { paddingTop: topPad + 12, paddingBottom: insets.bottom + 120 }]}
       showsVerticalScrollIndicator={false}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      {/* Back */}
-      <TouchableOpacity accessibilityRole="button" style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to the Living Tree" style={styles.back} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={20} color={colors.primaryGreen} />
         <Text style={styles.backLabel}>Living Tree</Text>
       </TouchableOpacity>
 
-      {/* Heading */}
-      <Text style={styles.sectionLabel}>THE SIX STAGES OF GROWTH</Text>
-      <Text style={styles.pageTitle}>From a Dormant Seed to a Forest of Nations</Text>
+      <Text style={styles.sectionLabel}>YOUR GROWTH JOURNEY</Text>
+      <Text style={styles.pageTitle} accessibilityRole="header">From a Dormant Seed to a Forest Builder</Text>
       <Text style={styles.pageDesc}>
-        Every disciple walks the same path. Your activity in the network moves you from one stage to
-        the next — and each stage shelters more life than the last.
+        Your stage grows from what you actually do over time — learning, time in Scripture and prayer, serving others and
+        helping others take root. Together, P2P Global&apos;s disciples become a Forest of Nations.
       </Text>
 
-      {/* Stage cards */}
+      {/* Where you are */}
+      <View style={[styles.stageRow, styles.stageRowCurrent]}>
+        <Image source={STAGE_IMAGES[stageIndex]} style={styles.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <View style={styles.stageInfo}>
+          <View style={styles.stageNameRow}>
+            <Text style={styles.stageEmoji}>{STAGES[stageIndex].emoji}</Text>
+            <Text style={styles.stageName}>{STAGES[stageIndex].name}</Text>
+            <View style={[styles.badge, styles.badgeCurrent]}><Text style={[styles.badgeText, styles.badgeCurrentText]}>You are here</Text></View>
+          </View>
+          <Text style={styles.desc}>{STAGES[stageIndex].description}</Text>
+          <ReadableText style={styles.verse}>{STAGES[stageIndex].verse} — {STAGES[stageIndex].verseRef}</ReadableText>
+          {journey ? <Text style={styles.meta}>In this stage for {timeInStage(journey.stage.since)}</Text> : null}
+          {journey?.stage.verification === "legacy_unverified" ? (
+            <Text style={styles.meta}>Recognised from your growth before this journey began. It stays yours; the milestones confirm it as you continue.</Text>
+          ) : null}
+        </View>
+      </View>
+
+      {!journey && !error ? <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 18 }} accessibilityLabel="Loading your growth journey" /> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {/* What the next stage asks for */}
+      {journey?.next ? (
+        <View style={styles.nextCard}>
+          <Text style={styles.nextTitle} accessibilityRole="header">Growing toward {journey.next.emoji} {journey.next.name}</Text>
+          {journey.milestones === "draft" ? (
+            <Text style={styles.meta}>These milestones are being finalised by P2P Global. Everything you do is already counted.</Text>
+          ) : null}
+          {journey.next.dimensions.map((d) => (
+            <View key={d.dimension} style={styles.dimension}>
+              <View style={styles.dimensionHead}>
+                <Ionicons name={!d.required ? "remove-circle-outline" : d.met ? "checkmark-circle" : "ellipse-outline"} size={18} color={d.required && d.met ? colors.accentGreen : colors.textMuted} />
+                <Text style={styles.dimensionName}>{d.label}</Text>
+              </View>
+              {!d.required ? (
+                <Text style={styles.itemText}>Not needed yet for this stage</Text>
+              ) : d.items.map((i) => (
+                <View key={i.label} style={styles.item} accessible accessibilityLabel={`${i.label}: ${i.met ? "done" : progressText(i)}`}>
+                  <Ionicons name={i.met ? "checkmark" : "time-outline"} size={15} color={i.met ? colors.accentGreen : colors.amber} />
+                  <Text style={[styles.itemText, { flex: 1 }]}>{i.label}</Text>
+                  <Text style={[styles.itemCount, i.met && { color: colors.accentGreen }]}>{progressText(i)}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      ) : journey ? (
+        <View style={styles.nextCard}>
+          <Text style={styles.nextTitle}>You are a Forest Builder</Text>
+          <Text style={styles.desc}>The highest personal stage: you are helping others take root. Keep walking with the disciples in your shade.</Text>
+        </View>
+      ) : null}
+
+      {/* The whole journey */}
+      <Text style={styles.listHeader} accessibilityRole="header">The five stages of personal growth</Text>
       <View style={styles.list}>
-        {STAGES.map((stage, i) => {
-          const isReached = i < currentStage;
-          const isCurrent = i === currentStage;
-          const isLocked = i > currentStage;
-
+        {STAGES.slice(0, PERSONAL_STAGE_COUNT).map((stage, i) => {
+          const reached = i < stageIndex, current = i === stageIndex, ahead = i > stageIndex;
+          const when = journey?.history.find((h) => h.stage === i + 1);
           return (
-            <View
-              key={i}
-              style={[
-                styles.stageRow,
-                isCurrent && styles.stageRowCurrent,
-                isLocked && styles.stageRowLocked,
-              ]}
-            >
-              {/* Thumbnail */}
-              <Image
-                source={STAGE_IMAGES[i]}
-                style={[styles.thumb, isLocked && styles.thumbLocked]}
-                resizeMode="cover"
-              />
-
-              {/* Info */}
+            <View key={stage.name} style={[styles.stageRow, current && styles.stageRowCurrent, ahead && styles.stageRowLocked]}>
+              <Image source={STAGE_IMAGES[i]} style={[styles.thumbSmall, ahead && styles.thumbLocked]} resizeMode="cover" accessibilityIgnoresInvertColors />
               <View style={styles.stageInfo}>
                 <View style={styles.stageNameRow}>
                   <Text style={styles.stageEmoji}>{stage.emoji}</Text>
-                  <Text style={[styles.stageName, isLocked && styles.stageNameLocked]}>
-                    {stage.name}
-                  </Text>
-                  {isReached && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>Reached</Text>
-                    </View>
-                  )}
-                  {isCurrent && (
-                    <View style={[styles.badge, styles.badgeCurrent]}>
-                      <Text style={[styles.badgeText, styles.badgeCurrentText]}>You are here</Text>
-                    </View>
-                  )}
-                  {isLocked && (
-                    <View style={[styles.badge, styles.badgeLocked]}>
-                      <Text style={[styles.badgeText, styles.badgeLockedText]}>Locked</Text>
-                    </View>
-                  )}
+                  <Text style={[styles.stageName, ahead && styles.stageNameLocked]}>{stage.name}</Text>
+                  {reached ? <View style={styles.badge}><Text style={styles.badgeText}>Reached</Text></View> : null}
+                  {current ? <View style={[styles.badge, styles.badgeCurrent]}><Text style={[styles.badgeText, styles.badgeCurrentText]}>You are here</Text></View> : null}
                 </View>
-
-                <Text style={[styles.desc, isLocked && styles.descLocked]} numberOfLines={3}>
-                  {stage.description}
-                </Text>
-
-                <ReadableText style={styles.verse}>
-                  {stage.verse} — {stage.verseRef}
-                </ReadableText>
-
-                {isCurrent && (
-                  <View style={styles.currentProgressWrap}>
-                    <View style={styles.progressBarBg}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            width: `${Math.round(
-                              ((growthPoints - stage.unlockPoints) /
-                                ((STAGES[i + 1]?.unlockPoints ?? stage.unlockPoints) -
-                                  stage.unlockPoints)) *
-                                100
-                            )}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                    {STAGES[i + 1] && (
-                      <Text style={styles.pointsNeeded}>
-                        {STAGES[i + 1].unlockPoints - growthPoints} more growth points to
-                        reach {STAGES[i + 1].emoji} {STAGES[i + 1].name}
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {isLocked && (
-                  <Text style={styles.unlockNote}>
-                    Unlocks at {stage.unlockPoints} growth points
-                  </Text>
-                )}
+                <Text style={[styles.desc, ahead && styles.descLocked]} numberOfLines={3}>{stage.description}</Text>
+                <ReadableText style={styles.verse}>{stage.verse} — {stage.verseRef}</ReadableText>
+                {when ? <Text style={styles.meta}>Reached {new Date(when.achievedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}{when.kind === "legacy_import" ? " (recognised from your earlier growth)" : ""}</Text> : null}
               </View>
             </View>
           );
         })}
+      </View>
+
+      {/* Together: Forest of Nations */}
+      <View style={styles.collectiveCard}>
+        <Image source={STAGE_IMAGES[COLLECTIVE_STAGE_INDEX]} style={styles.collectiveImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <Text style={styles.collectiveLabel}>TOGETHER</Text>
+        <Text style={styles.collectiveTitle} accessibilityRole="header">{collective.emoji} {collective.name}</Text>
+        <Text style={styles.desc}>{collective.description}</Text>
+        <ReadableText style={styles.verse}>{collective.verse} — {collective.verseRef}</ReadableText>
+        <Text style={styles.meta}>Not a personal stage: it is what P2P Global&apos;s disciples become together, generation after generation.</Text>
+        <AppButton label="My discipleship lineage" onPress={() => router.push("/lineage" as any)} variant="secondary" icon="git-network-outline" style={{ marginTop: 10 }} palette="fixedLight" />
       </View>
     </ScrollView>
   );
@@ -183,10 +195,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 28,
+    marginBottom: 20,
   },
 
   list: { gap: 12 },
+  listHeader: { fontSize: 16, fontFamily: "Inter_700Bold", color: colors.textDark, marginTop: 24, marginBottom: 10 },
 
   stageRow: {
     backgroundColor: colors.card,
@@ -206,14 +219,9 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 
-  thumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-  },
-  thumbLocked: {
-    opacity: 0.6,
-  },
+  thumb: { width: 88, height: 88, borderRadius: 14 },
+  thumbSmall: { width: 64, height: 64, borderRadius: 12 },
+  thumbLocked: { opacity: 0.6 },
 
   stageInfo: { flex: 1, gap: 6 },
   stageNameRow: {
@@ -244,8 +252,6 @@ const styles = StyleSheet.create({
   },
   badgeCurrent: { backgroundColor: colors.accentGreen },
   badgeCurrentText: { color: "#fff" },
-  badgeLocked: { backgroundColor: colors.borderBeige },
-  badgeLockedText: { color: colors.textMuted },
 
   desc: {
     fontSize: 13,
@@ -254,25 +260,26 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   descLocked: { color: colors.textMuted },
-
   verse: {
     fontSize: 12,
     color: colors.accentGreen,
     fontStyle: "italic",
     fontFamily: "Inter_400Regular",
   },
+  meta: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  errorText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", marginTop: 14 },
 
-  currentProgressWrap: { gap: 4 },
-  progressBarBg: { height: 4, backgroundColor: colors.progressTrack, borderRadius: 2 },
-  progressBarFill: { height: 4, backgroundColor: colors.progressFill, borderRadius: 2 },
-  pointsNeeded: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontFamily: "Inter_400Regular",
-  },
-  unlockNote: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontFamily: "Inter_400Regular",
-  },
+  nextCard: { marginTop: 16, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 14, gap: 10 },
+  nextTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: colors.primaryGreen },
+  dimension: { gap: 6, paddingTop: 4 },
+  dimensionHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dimensionName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.textDark },
+  item: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 26 },
+  itemText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 19, paddingLeft: 0 },
+  itemCount: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_600SemiBold" },
+
+  collectiveCard: { marginTop: 24, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 14, gap: 6 },
+  collectiveImage: { width: "100%", aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 6 },
+  collectiveLabel: { fontSize: 10, letterSpacing: 1.5, color: colors.amber, fontFamily: "Inter_600SemiBold" },
+  collectiveTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: colors.primaryGreen },
 });

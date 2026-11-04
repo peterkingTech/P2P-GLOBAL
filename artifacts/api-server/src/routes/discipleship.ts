@@ -59,7 +59,7 @@ router.get("/my-peer-guide/:userId", async (req, res) => {
     .from("p2p_discipleship_links")
     .select("mentor_id")
     .eq("disciple_id", userId)
-    .eq("active", true)
+    .eq("active", true).eq("is_primary", true)
     .maybeSingle();
   if (!link?.mentor_id) return res.json({ peerGuideId: null, peerGuideName: null });
 
@@ -362,41 +362,99 @@ router.get("/:mentorId/disciple/:discipleId", async (req, res) => {
   });
 });
 
-// POST /discipleship — no current client caller found (the app's real
-// relationship-creation path is POST /request + PUT /request/:id/respond,
-// which goes through consent). Left in place rather than removed (minimal
-// fix, not a restructure) but was previously reachable by any authenticated
-// user to silently link two ARBITRARY other people with no consent from
-// either — now at minimum requires the caller to be one of the two parties.
-// Recommend deprecating this route in favor of the request/respond flow;
-// not done here since removing a route is a bigger behavior change than
-// closing the open authorization hole.
-router.post("/", async (req, res) => {
+// POST /discipleship — retired. It created an ACTIVE relationship straight
+// away, without the other person agreeing (and so gave the mentor growth
+// credit and the mentor-only disciple view). No app version calls it. A
+// relationship now only begins through consent: POST /request, then the
+// other person's PUT /request/:id/respond.
+router.post("/", async (_req, res) => {
+  return res.status(410).json({ error: "A Peer Guide relationship begins with a request the other person accepts (POST /discipleship/request)." });
+});
+
+// ── My relationships (migration 233) ─────────────────────────────────────────
+// The signed-in person's mentors and disciples: current, paused, asked and
+// ended (history is never removed). Either person may pause, resume or end a
+// relationship; only the disciple chooses their primary mentor. The database
+// enforces the rules (no self, duplicate or cycle; ended stays ended) and
+// records who did what in p2p_discipleship_link_events.
+type LinkRow = { id: string; mentor_id: string; disciple_id: string; status: string; is_primary: boolean; started_at: string | null; paused_at: string | null; ended_at: string | null; end_reason: string | null; created_at: string };
+const LINK_COLS = "id,mentor_id,disciple_id,status,is_primary,started_at,paused_at,ended_at,end_reason,created_at";
+
+router.get("/relationships/me", async (req, res) => {
   const caller = await verifyCaller(req);
   if (!caller) return err(res, "Unauthorized", 401);
-  const { mentorId, discipleId } = req.body as {
-    mentorId: string;
-    discipleId: string;
+  const { data, error } = await supabaseWrite.from("p2p_discipleship_links").select(LINK_COLS)
+    .or(`mentor_id.eq.${caller},disciple_id.eq.${caller}`)
+    .in("status", ["pending", "active", "paused", "ended"])
+    .order("created_at", { ascending: false }).limit(200);
+  if (error) return err(res, error.message, 500);
+  const rows = (data ?? []) as LinkRow[];
+  const otherIds = [...new Set(rows.map((r) => (r.mentor_id === caller ? r.disciple_id : r.mentor_id)))];
+  const { data: people } = otherIds.length
+    ? await supabaseWrite.from("p2p_profiles").select("id,full_name,username,photo_url").in("id", otherIds)
+    : { data: [] };
+  const byId = new Map(((people ?? []) as { id: string; full_name: string | null; username: string | null; photo_url: string | null }[]).map((p) => [p.id, p]));
+  const card = (r: LinkRow) => {
+    const otherId = r.mentor_id === caller ? r.disciple_id : r.mentor_id;
+    const p = byId.get(otherId);
+    return {
+      linkId: r.id, status: r.status, isPrimary: r.is_primary, startedAt: r.started_at, pausedAt: r.paused_at, endedAt: r.ended_at, endReason: r.end_reason, requestedAt: r.created_at,
+      person: { id: otherId, name: p?.full_name ?? "A fellow disciple", username: p?.username ?? null, photoUrl: p?.photo_url ?? null },
+    };
   };
-  if (!mentorId || !discipleId) return err(res, "mentorId and discipleId are required", 400);
-  if (caller !== mentorId && caller !== discipleId) return err(res, "Not authorized", 403);
+  return res.json({
+    mentors: rows.filter((r) => r.disciple_id === caller).map(card),
+    disciples: rows.filter((r) => r.mentor_id === caller).map(card),
+  });
+});
 
-  const { data, error } = await supabaseWrite
-    .from("p2p_discipleship_links")
-    .insert({
-      mentor_id: mentorId,
-      disciple_id: discipleId,
-      active: true,
-      status: "active",
-      created_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+/** The relationship, if the caller is one of its two people. */
+async function myLink(linkId: string, caller: string): Promise<LinkRow | null> {
+  const { data } = await supabaseWrite.from("p2p_discipleship_links").select(LINK_COLS).eq("id", linkId).maybeSingle();
+  const l = data as LinkRow | null;
+  return l && (l.mentor_id === caller || l.disciple_id === caller) ? l : null;
+}
+/** The database's own refusals (P2P_LINK…) become plain 409 answers. */
+function linkError(res: import("express").Response, e: { message?: string } | null) {
+  const m = String(e?.message ?? "");
+  const text = m.replace(/^P2P_LINK[A-Z_]*:\s*/, "");
+  return m.startsWith("P2P_LINK") ? err(res, text.charAt(0).toUpperCase() + text.slice(1) + ".", 409) : err(res, "Couldn't update the relationship.", 500);
+}
 
-  if (error || !data) {
-    return res.status(500).json({ error: error?.message ?? "Insert failed" });
-  }
-  return res.status(201).json(mapLink(data as Record<string, unknown>));
+const CHANGES = { end: { status: "ended", word: "ended" }, pause: { status: "paused", word: "paused" }, resume: { status: "active", word: "resumed" } } as const;
+for (const action of Object.keys(CHANGES) as (keyof typeof CHANGES)[]) {
+  router.put(`/relationships/:linkId/${action}`, async (req, res) => {
+    const caller = await verifyCaller(req);
+    if (!caller) return err(res, "Unauthorized", 401);
+    const link = await myLink(String(req.params.linkId), caller);
+    if (!link) return err(res, "Relationship not found", 404);
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) || null : null;
+    const { data, error } = await supabaseWrite.rpc("p2p_link_set_status", { p_link: link.id, p_actor: caller, p_status: CHANGES[action].status, p_reason: reason });
+    if (error) return linkError(res, error);
+    if (data !== link.status) {
+      // The other person hears about it (never the reason, which may be personal).
+      const otherId = link.mentor_id === caller ? link.disciple_id : link.mentor_id;
+      const { data: me } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", caller).maybeSingle();
+      const name = (me as { full_name?: string } | null)?.full_name ?? "Your Peer Guide partner";
+      await supabaseWrite.from("p2p_notifications").insert({
+        user_id: otherId, title: `Peer Guide relationship ${CHANGES[action].word}`,
+        message: `${name} has ${CHANGES[action].word} your Peer Guide relationship.`,
+        notification_type: "peer_guide_relationship_changed", data: { linkId: link.id, status: data },
+      });
+    }
+    return res.json({ status: data });
+  });
+}
+
+router.put("/relationships/:linkId/primary", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return err(res, "Unauthorized", 401);
+  const link = await myLink(String(req.params.linkId), caller);
+  if (!link) return err(res, "Relationship not found", 404);
+  if (link.disciple_id !== caller) return err(res, "Only the disciple chooses their primary mentor", 403);
+  const { error } = await supabaseWrite.rpc("p2p_link_set_primary", { p_link: link.id, p_actor: caller });
+  if (error) return linkError(res, error);
+  return res.json({ isPrimary: true });
 });
 
 // POST /discipleship/notify-peer-guide — notify the caller's ACTIVE peer
@@ -415,7 +473,7 @@ router.post("/notify-peer-guide", async (req, res) => {
     .from("p2p_discipleship_links")
     .select("mentor_id")
     .eq("disciple_id", userId)
-    .eq("active", true)
+    .eq("active", true).eq("is_primary", true)
     .maybeSingle();
   if (!link?.mentor_id) return res.json({ notified: false, reason: "No peer guide on record" });
 

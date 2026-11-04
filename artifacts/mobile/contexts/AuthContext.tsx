@@ -648,7 +648,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (updates.gifts !== undefined) dbUpdates.gifts = updates.gifts;
     if (updates.skills !== undefined) dbUpdates.skills = updates.skills;
     if (updates.role !== undefined) dbUpdates.role = updates.role;
-    if (updates.growthLevel !== undefined) dbUpdates.growth_level = updates.growthLevel;
+    // growth_level is never written from the app: only P2P's own growth calculation sets it (migration 232).
     if (updates.isPraying !== undefined) dbUpdates.is_praying = updates.isPraying;
     if (updates.avatarUrl !== undefined) dbUpdates.photo_url = updates.avatarUrl;
     if (updates.city !== undefined) dbUpdates.city = updates.city;

@@ -69,7 +69,7 @@ export async function getActivePeerGuideId(userId: string): Promise<string | nul
     .from("p2p_discipleship_links")
     .select("mentor_id")
     .eq("disciple_id", userId)
-    .eq("active", true)
+    .eq("active", true).eq("is_primary", true)
     .maybeSingle();
   return (data as Record<string, unknown> | null)?.mentor_id as string | undefined ?? null;
 }

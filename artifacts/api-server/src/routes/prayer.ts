@@ -29,7 +29,7 @@ router.post("/sinners-prayer/notify-peer-guide", async (req, res) => {
     .from("p2p_discipleship_links")
     .select("mentor_id")
     .eq("disciple_id", userId)
-    .eq("active", true)
+    .eq("active", true).eq("is_primary", true)
     .maybeSingle();
   if (!link?.mentor_id) return res.json({ notified: false, reason: "No peer guide on record" });
 

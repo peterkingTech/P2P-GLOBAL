@@ -9,9 +9,11 @@ interface ModuleCelebrationModalProps {
   label: string;
   onWatchGrowth: () => void;
   onDismiss: () => void;
+  /** A new personal growth stage (the growth engine) instead of a completed module. */
+  stage?: { name: string; emoji: string; verse: string; verseRef: string };
 }
 
-export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss }: ModuleCelebrationModalProps) {
+export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss, stage }: ModuleCelebrationModalProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -26,14 +28,21 @@ export function ModuleCelebrationModal({ label, onWatchGrowth, onDismiss }: Modu
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <Text style={styles.emoji}>🌳</Text>
+          <Text style={styles.emoji}>{stage ? stage.emoji : "🌳"}</Text>
           <Text style={styles.congrats}>Congratulations!</Text>
-          <Text style={styles.message}>
-            You&apos;ve completed <Text style={styles.moduleLabel}>{label}</Text>
-            {"\n"}— check your Living Tree
-          </Text>
+          {stage ? (
+            <Text style={styles.message} accessibilityRole="header">
+              You have grown into a <Text style={styles.moduleLabel}>{stage.name}</Text>
+              {"\n\n"}“{stage.verse}”{"\n"}— {stage.verseRef}
+            </Text>
+          ) : (
+            <Text style={styles.message}>
+              You&apos;ve completed <Text style={styles.moduleLabel}>{label}</Text>
+              {"\n"}— check your Living Tree
+            </Text>
+          )}
 
-          <AppButton label="Watch your growth" onPress={onWatchGrowth} icon="play" style={{ marginBottom: 14 }} palette="fixedLight" />
+          <AppButton label={stage ? "See your growth journey" : "Watch your growth"} onPress={onWatchGrowth} icon={stage ? "leaf" : "play"} style={{ marginBottom: 14 }} palette="fixedLight" />
 
           <AppButton label="Maybe later" onPress={onDismiss} variant="tertiary" size="sm" palette="fixedLight" />
         </View>

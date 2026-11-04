@@ -26,6 +26,10 @@ import studyTogetherRouter from "./studyTogether";
 import scriptureCollectionsRouter from "./scriptureCollections";
 import scriptureLibraryRouter from "./scriptureLibrary";
 import peerEvaluationRouter from "./peerEvaluation";
+import growthRouter from "./growth";
+import genealogyRouter from "./genealogy";
+import adminIdentityRouter from "./adminIdentity";
+import adminCentreRouter from "./adminCentre";
 import registrationRouter from "./registration";
 import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
@@ -75,6 +79,10 @@ router.use("/study-together", studyTogetherRouter); // Study Together shared (as
 router.use("/scripture-collections", scriptureCollectionsRouter); // Scripture collections + playlists: private by default, shared with peers / groups / studies (migration 220)
 router.use("/scripture-library", scriptureLibraryRouter); // Scripture Listening Library: owner-only favourites, listening history, resume, multi-destination save (migration 227)
 router.use("/evaluation", peerEvaluationRouter); // Peer Evaluation Engine: invitations, 48-hour deadline, automatic reassignment, oversight (migration 229)
+router.use("/admin-centre", adminCentreRouter); // Admin Centre overview (real totals), growth matrix approval, relationship corrections — permission-gated + audited
+router.use("/admin-identity", adminIdentityRouter); // Admin Centre identity: admin sessions (fresh sign-in, expiry, revocation), accounts, least-privilege permissions, append-only audit (migration 238)
+router.use("/genealogy", genealogyRouter); // Discipleship genealogy: my lineage by generation, branches, search, Forest of Nations totals (migrations 233–234)
+router.use("/growth", growthRouter); // Your growth journey: one personal stage, milestone checklist, history (migrations 235–237); own data only
 router.use("/studio", studioRouter); // Publishing Studio — review + scheduled publishing over existing content via adapters (migration 188); every route admin + Studio-role gated
 router.use("/search", searchRouter); // P2P Global Search — bounded, parallel, multi-domain search extending the existing Discover search field; reuses each domain's own visibility rules, never bypasses RLS
 router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareable invitation links over Break Rooms/Church Calls/Family Worship; resolves safe preview info only, actual join always goes through each room's existing, unmodified join endpoint
