@@ -20,6 +20,6 @@ export default function MyP2PScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, width: "100%", maxWidth: 1000, alignSelf: "center" },
+  content: { padding: 16, gap: 12 },
   sub: { fontSize: 13, fontFamily: "Inter_400Regular" },
 });

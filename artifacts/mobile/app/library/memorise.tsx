@@ -102,7 +102,7 @@ export default function MemoriseScreen() {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 10, paddingBottom: 120, maxWidth: 820, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 10, paddingBottom: 120 },
     hint: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular" },
     card: { padding: 14, borderRadius: 16, backgroundColor: c.card, gap: 8 },
     title: { fontSize: 15.5, lineHeight: 21, color: c.textDark, fontFamily: "Inter_700Bold" },

@@ -95,7 +95,7 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", padding: 24 },
-    content: { padding: 16, gap: 12, paddingBottom: 120, maxWidth: 760, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 12, paddingBottom: 120 },
     kicker: { fontSize: 11, color: c.accentGreen, fontFamily: "Inter_700Bold", letterSpacing: 0.8, textTransform: "uppercase" },
     h1: { fontSize: 22, lineHeight: 28, color: c.textDark, fontFamily: "Inter_700Bold" },
     title: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },

@@ -147,7 +147,7 @@ function lastActive(iso: string): string {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 10, paddingBottom: 48, width: "100%", maxWidth: 760, alignSelf: "center" },
+    content: { padding: 16, gap: 10, paddingBottom: 48 },
     title: { fontSize: 22, color: c.textDark, fontFamily: "Inter_700Bold" },
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 14 },
     meta: { fontSize: 13, color: c.textMuted, fontFamily: "Inter_400Regular" },

@@ -233,7 +233,7 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
-    content: { padding: 16, gap: 10, paddingBottom: 48, width: "100%", maxWidth: 760, alignSelf: "center" },
+    content: { padding: 16, gap: 10, paddingBottom: 48 },
     kicker: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5 },
     title: { fontSize: 22, color: c.textDark, fontFamily: "Inter_700Bold" },
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 10 },

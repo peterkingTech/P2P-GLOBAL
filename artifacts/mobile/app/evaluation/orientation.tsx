@@ -113,7 +113,7 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", padding: 24 },
-    content: { padding: 16, gap: 12, paddingBottom: 120, maxWidth: 760, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 12, paddingBottom: 120 },
     h1: { fontSize: 24, lineHeight: 30, color: c.textDark, fontFamily: "Inter_700Bold" },
     lead: { fontSize: 16, lineHeight: 24, color: c.textDark, fontFamily: "Inter_500Medium" },
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },

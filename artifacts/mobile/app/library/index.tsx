@@ -300,7 +300,7 @@ type Styles = ReturnType<typeof makeStyles>;
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, paddingBottom: 120, maxWidth: 1100, width: "100%", alignSelf: "center" },
+    content: { padding: 16, paddingBottom: 120 },
     searchRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
     search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 46, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.card },
     searchInput: { flex: 1, minHeight: 44, color: c.textDark, fontFamily: "Inter_400Regular", fontSize: 15 },

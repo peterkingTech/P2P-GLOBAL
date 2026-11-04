@@ -77,7 +77,7 @@ export default function HistoryScreen() {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 8, paddingBottom: 120, maxWidth: 820, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 8, paddingBottom: 120 },
     hint: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular" },
     notice: { fontSize: 13, lineHeight: 18, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     day: { fontSize: 13, color: c.textMid, fontFamily: "Inter_700Bold", marginTop: 12, marginBottom: 4 },

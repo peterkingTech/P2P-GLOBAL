@@ -142,7 +142,7 @@ function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", padding: 24 },
-    content: { padding: 16, gap: 12, paddingBottom: 120, maxWidth: 960, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 12, paddingBottom: 120 },
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },
     title: { fontSize: 14.5, color: c.textDark, fontFamily: "Inter_700Bold" },
     body: { fontSize: 14, lineHeight: 20, color: c.textDark, fontFamily: "Inter_400Regular" },

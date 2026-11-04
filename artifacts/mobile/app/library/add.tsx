@@ -158,7 +158,7 @@ export default function AddScripture() {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, maxWidth: 820, width: "100%", alignSelf: "center" },
+    content: { padding: 16 },
     search: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.card },
     input: { flex: 1, minHeight: 46, color: c.textDark, fontFamily: "Inter_400Regular", fontSize: 15 },
     row: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" },

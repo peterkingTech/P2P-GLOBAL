@@ -91,7 +91,7 @@ export default function RemindersScreen() {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 12, paddingBottom: 120, maxWidth: 720, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 12, paddingBottom: 120 },
     hint: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular" },
     notice: { fontSize: 13, lineHeight: 18, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     card: { padding: 14, borderRadius: 16, backgroundColor: c.card, gap: 10 },

@@ -79,7 +79,7 @@ function Empty({ s, c, text }: { s: ReturnType<typeof makeStyles>; c: AppColors;
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 10, paddingBottom: 120, maxWidth: 820, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 10, paddingBottom: 120 },
     hint: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular" },
     row: { flexDirection: "row", alignItems: "center", gap: 4, padding: 10, borderRadius: 16, backgroundColor: c.card, minHeight: 60 },
     title: { fontSize: 15, lineHeight: 20, color: c.textDark, fontFamily: "Inter_700Bold" },

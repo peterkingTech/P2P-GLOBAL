@@ -146,7 +146,7 @@ export default function MyEvaluations() {
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.lightCream },
-    content: { padding: 16, gap: 12, paddingBottom: 120, maxWidth: 820, width: "100%", alignSelf: "center" },
+    content: { padding: 16, gap: 12, paddingBottom: 120 },
     error: { color: "#C0392B", fontFamily: "Inter_500Medium", fontSize: 13 },
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
     card: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, backgroundColor: c.card, minHeight: 64 },
