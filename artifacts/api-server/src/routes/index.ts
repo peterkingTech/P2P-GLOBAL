@@ -25,6 +25,7 @@ import recycleBinRouter from "./recycleBin";
 import studyTogetherRouter from "./studyTogether";
 import scriptureCollectionsRouter from "./scriptureCollections";
 import scriptureLibraryRouter from "./scriptureLibrary";
+import peerEvaluationRouter from "./peerEvaluation";
 import registrationRouter from "./registration";
 import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
@@ -73,6 +74,7 @@ router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P
 router.use("/study-together", studyTogetherRouter); // Study Together shared (async) studies (migration 216); the live in-call study stays in calls.ts
 router.use("/scripture-collections", scriptureCollectionsRouter); // Scripture collections + playlists: private by default, shared with peers / groups / studies (migration 220)
 router.use("/scripture-library", scriptureLibraryRouter); // Scripture Listening Library: owner-only favourites, listening history, resume, multi-destination save (migration 227)
+router.use("/evaluation", peerEvaluationRouter); // Peer Evaluation Engine: invitations, 48-hour deadline, automatic reassignment, oversight (migration 229)
 router.use("/studio", studioRouter); // Publishing Studio — review + scheduled publishing over existing content via adapters (migration 188); every route admin + Studio-role gated
 router.use("/search", searchRouter); // P2P Global Search — bounded, parallel, multi-domain search extending the existing Discover search field; reuses each domain's own visibility rules, never bypasses RLS
 router.use("/room-invitations", roomInvitationsRouter); // P2P Rooms — shareable invitation links over Break Rooms/Church Calls/Family Worship; resolves safe preview info only, actual join always goes through each room's existing, unmodified join endpoint

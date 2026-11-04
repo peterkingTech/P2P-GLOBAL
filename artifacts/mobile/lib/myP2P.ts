@@ -116,5 +116,5 @@ export function previewText(text: string | null | undefined, max = 90): string {
 export const UPDATE_TYPES = new Set([
   "shared_study_invite", "shared_study_accepted", "shared_study_declined", "shared_study_started", "scripture_collection_shared", "scripture_collection_updated",
   "study_invitation_received", "family_invitation", "family_join_approved", "family_worship_invite", "church_announcement",
-  "circle_member_added", "assignment_reviewed", "evaluation_resolved", "lesson_completed", "fruit_awarded",
+  "circle_member_added", "assignment_reviewed", "evaluation_resolved", "evaluation_accepted", "evaluation_reassigned", "evaluation_feedback_ready", "evaluation_arranging", "evaluation_invitation", "lesson_completed", "fruit_awarded",
 ]);

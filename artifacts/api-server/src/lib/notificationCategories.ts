@@ -107,6 +107,17 @@ const TYPE_CATEGORY: Record<string, PushCategory> = {
   lesson_completed: "peer_guide",
   evaluation_waiting: "peer_guide",
   evaluation_resolved: "peer_guide",
+  // migration 229 — Peer Evaluation Engine (evaluatee + evaluator)
+  evaluation_arranging: "peer_guide",
+  evaluation_invitation: "peer_guide",
+  evaluation_accepted: "peer_guide",
+  evaluation_reassigned: "peer_guide",
+  evaluation_feedback_ready: "peer_guide",
+  evaluation_reminder: "peer_guide",
+  evaluation_missed_deadline: "peer_guide",
+  // migration 229 — coordinators
+  evaluation_unassigned: "admin_overdue",
+  evaluation_escalation: "admin_overdue",
   encouragement_confirmation_request: "peer_guide",
   peer_confirmation_confirmed: "peer_guide",
 

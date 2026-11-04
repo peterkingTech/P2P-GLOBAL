@@ -1,0 +1,103 @@
+// Peer Evaluation Engine (migration 229) on the app side:
+//   • the server clock: countdowns follow the SERVER's time on a monotonic
+//     clock — changing the phone's clock or time zone doesn't move them;
+//     offline it falls back to the last known offset;
+//   • days / hours / minutes / seconds and overdue;
+//   • notification taps open the right evaluation screen (ids checked);
+//   • the client calls the right routes and never sends a replacement,
+//     a deadline or an extension;
+//   • screens: no transfer / choose-replacement / extension anywhere; identity
+//     and privacy wording; the Learning tab entry.
+// Run: node tests/peerEvaluation.test.mjs
+import { createRequire } from "node:module";
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import vm from "node:vm";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(path.join(root, "package.json"));
+const ts = require("typescript");
+let pass = 0, fail = 0;
+const ok = (n, c, d = "") => { if (c) pass++; else { fail++; console.log(`FAIL ${n} ${d}`); } };
+const src = (p) => readFileSync(path.join(root, p), "utf8");
+const store = new Map();
+const load = (rel, mocks, extra = {}) => {
+  const js = ts.transpileModule(src(rel), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: (m) => { if (m in mocks) return mocks[m]; throw new Error(`unexpected require ${m} in ${rel}`); }, JSON, Date, Math, Number, String, Object, Array, Promise, ...extra });
+  return mod.exports;
+};
+const asyncStorage = { __esModule: true, default: { getItem: async (k) => store.get(k) ?? null, setItem: async (k, v) => { store.set(k, v); } } };
+
+// ── Server clock ──────────────────────────────────────────────────────────
+const C = load("lib/serverClock.ts", { "@react-native-async-storage/async-storage": asyncStorage }, { globalThis: { performance: { now: () => 0 } } });
+const server = Date.parse("2026-11-03T12:00:00Z");
+C.syncServerTime(new Date(server).toISOString(), 1000, Date.parse("2026-11-03T09:00:00Z")); // phone 3 h behind
+ok("clock: right after a response, server time is the server's", C.serverNowMs(1000, Date.parse("2026-11-03T09:00:00Z")) === server);
+ok("clock: counts forward on the monotonic clock", C.serverNowMs(61_000, 0) === server + 60_000);
+ok("clock: changing the phone's clock (or time zone) changes nothing", C.serverNowMs(61_000, Date.parse("2030-01-01T00:00:00Z")) === server + 60_000);
+ok("clock: the offset is remembered for offline use / restarts", store.get("p2p.serverClock.offsetMs") === String(3 * 3600_000));
+C._resetServerClock();
+ok("clock: before any response, the phone clock is used (with the remembered offset when known)", C.serverNowMs(0, 5000) === 5000);
+const sd = C.splitDuration(2 * 86400_000 + 3 * 3600_000 + 4 * 60_000 + 5000);
+ok("countdown: days / hours / minutes / seconds", sd.days === 2 && sd.hours === 3 && sd.minutes === 4 && sd.seconds === 5 && !sd.overdue);
+const od = C.splitDuration(-(90 * 60_000));
+ok("countdown: after the deadline it shows time overdue", od.overdue && od.hours === 1 && od.minutes === 30);
+ok("countdown: exactly 48 h shows 2 days 0:00:00", JSON.stringify(C.splitDuration(48 * 3600_000)) === JSON.stringify({ overdue: false, days: 2, hours: 0, minutes: 0, seconds: 0 }));
+const countdown = src("components/evaluation/Countdown.tsx");
+ok("countdown component uses the server clock, never the phone's alone", countdown.includes("Date.parse(deadlineAt) - serverNowMs()") && !/new Date\(\)\.getTime\(\)|Date\.now\(\)/.test(countdown));
+
+// ── Notification taps ─────────────────────────────────────────────────────
+const push = src("lib/push.ts");
+const block = push.slice(push.indexOf("// Peer Evaluation Engine (migration 229)"), push.indexOf("// Daily prayer / journal reminder"));
+const route = new Function("notificationType", "data", `${block}; return null;`);
+const E = "0e7b6c1a-1234-4abc-9def-0123456789ab";
+ok("push: invitation → the invitation screen", route("evaluation_invitation", { assignmentId: E }) === `/evaluation/invitation/${E}`);
+ok("push: reassigned / accepted / feedback ready → the evaluation", ["evaluation_reassigned", "evaluation_accepted", "evaluation_feedback_ready", "evaluation_arranging"].every((t) => route(t, { evaluationId: E }) === `/evaluation/${E}`));
+ok("push: reminders → the workspace; coordinators → oversight", route("evaluation_reminder", { evaluationId: E }) === `/evaluation/review/${E}` && route("evaluation_escalation", {}) === "/evaluation/admin");
+ok("push: a bad id never builds a path", route("evaluation_reassigned", { evaluationId: "../admin" }) === "/evaluation" && route("evaluation_invitation", { assignmentId: "x/y" }) === "/evaluation");
+ok("push: the older types keep their old routes", route("evaluation_waiting", {}) === null && route("evaluation_resolved", {}) === null);
+
+// ── Client ────────────────────────────────────────────────────────────────
+const sent = [];
+const A = load("lib/peerEvaluationApi.ts", {
+  "@/lib/apiClient": { apiRequest: async (p, init = {}) => { sent.push({ path: p, method: init.method ?? "GET", body: init.body ? JSON.parse(init.body) : undefined }); return { serverNow: "2026-11-03T12:00:00Z" }; } },
+  "@/lib/serverClock": { syncServerTime: (iso) => sent.push({ synced: iso }) },
+});
+await A.acceptInvitation("a1");
+ok("client: accept sends nothing but the request (no time, no deadline) and syncs the server clock", sent[0].path === "/evaluation/invitations/a1/accept" && sent[0].body === undefined && sent[1].synced === "2026-11-03T12:00:00Z");
+await A.reportUnable("a1", "family", "note");
+ok("client: report inability → category + note only", sent.at(-2).path === "/evaluation/assignments/a1/unable" && JSON.stringify(Object.keys(sent.at(-2).body).sort()) === JSON.stringify(["category", "note"]));
+await A.adminReassign("e1", "Needs a new evaluator");
+ok("client: admin reassign → a reason only (the system picks who is next)", JSON.stringify(Object.keys(sent.at(-2).body)) === JSON.stringify(["reason"]));
+await A.submitEvaluation("e1", "passed", { encouragement: "x" });
+ok("client: submit → outcome + feedback", sent.at(-2).path === "/evaluation/e1/submit" && sent.at(-2).body.outcome === "passed");
+
+// ── Screens ───────────────────────────────────────────────────────────────
+const screens = ["app/evaluation/index.tsx", "app/evaluation/[id].tsx", "app/evaluation/invitation/[assignmentId].tsx", "app/evaluation/review/[id].tsx", "app/evaluation/orientation.tsx", "app/evaluation/admin.tsx", "lib/peerEvaluationApi.ts"];
+ok("all evaluation screens exist", screens.every((f) => existsSync(path.join(root, f))));
+const all = screens.map(src).join("\n");
+// Only ever mentioned as what ISN'T possible — never offered as an action or a route.
+const actions = (all.match(/label=\{?["'`][^"'`]*["'`]/g) ?? []).join("\n") + "\n" + (all.match(/call<[^>]*>\(`[^`]*`/g) ?? []).join("\n");
+ok("no transfer, choose-replacement or extension action anywhere in the UI or client", !/transfer|replacement|extension|extend/i.test(actions), actions.match(/.*(transfer|replacement|extension|extend).*/i)?.[0]);
+ok("the UI states plainly there are no extensions and no transfers", /no extensions/i.test(all) && /can't choose or transfer/i.test(src("constants/evaluationGuidance.ts")));
+ok("no 72-hour deadline anywhere", !/72[- ]?h/i.test(all));
+const review = src("app/evaluation/review/[id].tsx");
+ok("workspace: Report inability to complete (category required), confirmed submit, autosaved draft", review.includes("Report inability to complete") && review.includes("disabled={!unable.category}") && review.includes("Submit feedback") && review.includes("saveDraft("));
+ok("workspace: fairness guidance and the responsibility reminder with Scripture", review.includes("FAIRNESS_GUIDE") && review.includes("RESPONSIBILITY_REMINDER") && review.includes("SERVICE_SCRIPTURES[2]"));
+const detail = src("app/evaluation/[id].tsx");
+ok("evaluatee: reassignment message reassures that the submission is safe; never asks to resubmit for an evaluator's failure", detail.includes("Your original submission and progress are safe") && !/resubmit because|submit again because/i.test(detail));
+const guide = src("constants/evaluationGuidance.ts");
+ok("orientation: the five Scriptures and the orientation message", ["1 Peter 4:10", "Galatians 6:2", "Colossians 3:23–24", "Matthew 20:26–28", "2 Timothy 2:2"].every((r) => guide.includes(r)) && guide.includes("You are not merely reviewing an assignment."));
+const noComments = (s) => s.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+ok("orientation: no guilt or pressure language", !/you must|shame|guilt|you are failing|disappoint/i.test(noComments(guide + src("app/evaluation/orientation.tsx"))));
+ok("Learning tab: My Evaluations entry (no new main tab)", src("app/(tabs)/learn.tsx").includes('router.push("/evaluation" as any)') && !existsSync(path.join(root, "app/(tabs)/evaluation.tsx")));
+for (const f of screens.filter((x) => x.startsWith("app/"))) {
+  const s = src(f);
+  ok(`${f}: theme colours only`, !(s.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? []).some((h) => !["#fff", "#FFF", "#C0392B"].includes(h)));
+  ok(`${f}: accessibility labels`, (s.match(/accessibilityLabel=/g) ?? []).length >= 1 || (s.match(/accessibilityRole=/g) ?? []).length >= 2);
+}
+
+console.log(`peerEvaluation (app): ${pass} passed, ${fail} failed`);
+if (fail) process.exit(1);

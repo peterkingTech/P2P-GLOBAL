@@ -209,6 +209,13 @@ export function pathForNotification(
     const route = typeof data?.route === "string" ? data.route : "";
     return /^\/(library|library\/memorise|scripture-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(route) ? route : "/library";
   }
+  // Peer Evaluation Engine (migration 229): straight to the evaluation (ids checked).
+  const evaluationId = typeof data?.evaluationId === "string" && /^[0-9a-f-]{36}$/i.test(data.evaluationId) ? data.evaluationId : null;
+  const evalAssignmentId = typeof data?.assignmentId === "string" && /^[0-9a-f-]{36}$/i.test(data.assignmentId) ? data.assignmentId : null;
+  if (notificationType === "evaluation_invitation") return evalAssignmentId ? `/evaluation/invitation/${evalAssignmentId}` : "/evaluation";
+  if (notificationType === "evaluation_unassigned" || notificationType === "evaluation_escalation") return "/evaluation/admin";
+  if (notificationType === "evaluation_reminder" || notificationType === "evaluation_missed_deadline") return evaluationId ? `/evaluation/review/${evaluationId}` : "/evaluation";
+  if (notificationType && notificationType.startsWith("evaluation_") && notificationType !== "evaluation_waiting" && notificationType !== "evaluation_resolved") return evaluationId ? `/evaluation/${evaluationId}` : "/evaluation";
   // Daily prayer / journal reminder (lib/dailyReminders) — only to an approved route.
   if (notificationType === "daily_reminder") {
     const route = typeof data?.route === "string" ? data.route : "";

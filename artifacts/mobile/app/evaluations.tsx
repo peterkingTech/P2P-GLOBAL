@@ -403,6 +403,12 @@ export default function EvaluationsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Peer Review</Text>
       </View>
+      {/* The Peer Evaluation Engine (invitations, 48-hour countdowns, feedback, discussions) lives in My Evaluations. */}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open My Evaluations" onPress={() => router.push("/evaluation" as any)}
+        style={{ marginHorizontal: 16, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Ionicons name="albums-outline" size={16} color={colors.accentGreen} />
+        <Text style={{ color: colors.accentGreen, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>My Evaluations — invitations, countdowns and feedback</Text>
+      </TouchableOpacity>
 
       <View style={styles.tabRow}>
         <TouchableOpacity accessibilityRole="button"

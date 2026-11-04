@@ -184,6 +184,14 @@ export default function LearnTab() {
             : <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 12 }} />}
           <Text style={[s.meta, { marginTop: 12 }]}>From Kingdom School, Kingdom Stories, Family Circle and Church</Text>
         </Pressable>
+
+        {/* My Evaluations — feedback on my checks, and serving others as an evaluator (Peer Evaluation Engine) */}
+        <SectionHeading s={s} title="My Evaluations"
+          action={<AppButton label="Open" onPress={() => router.push("/evaluation" as any)} variant="tertiary" icon="chevron-forward" iconPosition="trailing" accessibilityLabel="Open My Evaluations" />} />
+        <Pressable style={({ pressed }) => [s.journey, wide && { padding: 20 }, pressed && { opacity: 0.94 }]} onPress={() => router.push("/evaluation" as any)} accessibilityRole="button"
+          accessibilityLabel="My Evaluations: feedback on your checks, and serving others as an evaluator">
+          <Text style={s.meta}>Follow each check from submission to feedback, discuss it with your evaluator, and — when you are ready — serve a fellow disciple as an evaluator.</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
