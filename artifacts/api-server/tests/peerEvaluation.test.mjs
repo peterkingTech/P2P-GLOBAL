@@ -46,20 +46,22 @@ let rpcResult = { ok: true };
 function makeDb() {
   return {
     from(table) {
-      const q = { op: "select", f: [], payload: null, single: false, lim: null, orders: [] };
+      const q = { op: "select", f: [], payload: null, single: false, lim: null, orders: [], head: false };
       const rows = () => (T[table] ??= []);
-      const match = (r) => q.f.every(([op, k, v]) => op === "eq" ? r[k] === v : op === "in" ? v.includes(r[k]) : true);
+      const match = (r) => q.f.every(([op, k, v]) => op === "eq" ? r[k] === v : op === "in" ? v.includes(r[k]) : op === "is" ? (r[k] ?? null) === v : op === "neq" ? r[k] !== v : true);
       const exec = () => {
         let data;
         if (q.op === "insert") { const list = (Array.isArray(q.payload) ? q.payload : [q.payload]).map((p) => ({ id: randomUUID(), created_at: new Date().toISOString(), ...p })); rows().push(...list); data = list; }
         else if (q.op === "update") { const hit = rows().filter(match); hit.forEach((r) => Object.assign(r, q.payload)); data = hit; }
         else { data = rows().filter(match); for (const [k, asc] of [...q.orders].reverse()) data = [...data].sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * (asc ? 1 : -1)); if (q.lim) data = data.slice(0, q.lim); }
         data = data.map((r) => ({ ...r }));
+        if (q.head) return { data: null, count: data.length, error: null };
         return { data: q.single ? data[0] ?? null : data, error: null };
       };
       const c = {
-        select() { return c; }, insert(p) { q.op = "insert"; q.payload = p; return c; }, update(p) { q.op = "update"; q.payload = p; return c; },
+        select(_c, o) { if (o?.head) q.head = true; return c; }, insert(p) { q.op = "insert"; q.payload = p; return c; }, update(p) { q.op = "update"; q.payload = p; return c; },
         eq(k, v) { q.f.push(["eq", k, v]); return c; }, in(k, v) { q.f.push(["in", k, v]); return c; },
+        is(k, v) { q.f.push(["is", k, v]); return c; }, neq(k, v) { q.f.push(["neq", k, v]); return c; },
         order(k, o) { q.orders.push([k, o?.ascending !== false]); return c; }, limit(n) { q.lim = n; return c; },
         maybeSingle() { q.single = true; return c; }, single() { q.single = true; return c; },
         then(res, rej) { try { res(exec()); } catch (e) { rej(e); } },
@@ -88,9 +90,9 @@ T.p2p_submissions = [
 ];
 T.p2p_notes = [{ id: randomUUID(), user_id: L, body: "PRIVATE JOURNAL" }];
 const EV = randomUUID(), A1 = randomUUID();
-T.p2p_lesson_evaluations = [{ id: EV, submission_id: SUB, lesson_id: LESSON, submitter_id: L, evaluator_id: null, status: "pending", feedback: null, assigned_at: t0, created_at: t0, resolved_at: null, self_approved: false,
+T.p2p_lesson_evaluations = [{ id: EV, submission_id: SUB, lesson_id: LESSON, resource_kind: "lesson", resource_id: LESSON, context: "kingdom_school", group_submission_id: null, submitter_id: L, evaluator_id: null, status: "pending", feedback: null, assigned_at: t0, created_at: t0, resolved_at: null, self_approved: false,
   engine_state: "invited", current_assignment_id: A1, accepted_at: null, deadline_at: null, outcome: null, feedback_detail: null, queued_since: t0 }];
-T.p2p_evaluation_assignments = [{ id: A1, evaluation_id: EV, evaluator_id: E1, attempt: 1, status: "invited", invited_at: t0, invite_expires_at: new Date(Date.now() + 3600_000).toISOString(), accepted_at: null, deadline_at: null, ended_at: null, end_reason: null, draft: null }];
+T.p2p_evaluation_assignments = [{ id: A1, evaluation_id: EV, evaluator_id: E1, attempt: 1, status: "invited", match_detail: { basis: "passed_this_resource", language: "same_content_language" }, invited_at: t0, invite_expires_at: new Date(Date.now() + 3600_000).toISOString(), accepted_at: null, deadline_at: null, ended_at: null, end_reason: null, draft: null }];
 T.p2p_evaluation_events = [{ evaluation_id: EV, event_type: "submitted", created_at: t0 }, { evaluation_id: EV, event_type: "invited", created_at: t0, actor_id: E1 }];
 T.p2p_evaluation_settings = [{ id: true, engine_enabled: true, invitation_window_minutes: 180, default_capacity: 2, orientation_version: 1 }];
 
@@ -138,12 +140,16 @@ try {
   ok("signed out → 401", (await call("GET", "/e/mine")).status === 401);
   // While only INVITED.
   const mine = await call("GET", "/e/mine", L);
+  ok("evaluatee list: a plain status label from the lifecycle (Assigned — waiting to accept)", mine.body.items[0].statusLabel === "Assigned — waiting for the evaluator to accept");
   ok("evaluatee list: stage 'invitation pending', NO evaluator named while only invited; server time included", mine.body.items[0].stage === "invitation_pending" && mine.body.items[0].evaluator === null && !mine.text.includes("Esi") && !!mine.body.serverNow);
   const detail = await call("GET", `/e/${EV}`, L);
   ok("evaluatee detail: no invited identity, friendly history, no feedback yet", detail.body.role === "evaluatee" && detail.body.evaluator === null && !detail.text.includes("Esi") && detail.body.feedback === null && detail.body.history.length === 2);
   const inv = await call("GET", `/e/invitations/${A1}`, E1);
   ok("invitation: lesson, kind, expected work, 48-hour policy — no evaluatee name or answers", inv.status === 200 && inv.body.lessonTitle === "Grace" && inv.body.questionCount === 2 && /48 hours/.test(inv.body.deadlinePolicy)
     && !inv.text.includes("Lena") && !inv.text.includes("Unearned") && !inv.text.includes("PRIVATE"));
+  ok("invitation: says why — the exact lesson they passed independently — and the commitments agreed on acceptance (no separate orientation)",
+    /passed this exact lesson through an independent evaluation/.test(inv.body.competence) && inv.body.commitments.length === 6);
+  ok("invitation: never reveals the matching reasons (language, proximity) to anyone", !/same_content_language|proximity/.test(inv.text));
   ok("invitation: only the invited person can open it", (await call("GET", `/e/invitations/${A1}`, E2)).status === 404 && (await call("GET", `/e/invitations/${A1}`, L)).status === 404);
   ok("an invited evaluator has no workspace before accepting", (await call("GET", `/e/${EV}`, E1)).status === 404);
   ok("strangers see nothing", (await call("GET", `/e/${EV}`, X)).status === 404);
@@ -192,7 +198,32 @@ try {
   const self = await call("PUT", "/e/me/evaluator", X, { available: false, capacity: 3, standing: "good" });
   ok("availability is self-service; standing (restriction) is not", self.status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === X).available === false && T.p2p_evaluator_profiles.find((p) => p.user_id === X).standing === undefined);
   const prof = await call("GET", "/e/me/evaluator", X);
-  ok("my evaluator profile: oriented, commitments, 48 hours, private record", prof.body.oriented === true && prof.body.deadlineHours === 48 && prof.body.commitments.length === 6 && prof.body.record.completed === 0);
+  ok("my evaluator profile: no orientation gate (older builds see oriented), commitments, 48 hours, private record", prof.body.oriented === true && prof.body.deadlineHours === 48 && prof.body.commitments.length === 6 && prof.body.record.completed === 0);
+  T.p2p_growth_evidence = [{ id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_passed", verification: "verified", voided_at: null }, { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_attempted", verification: "verified", voided_at: null }];
+  T.p2p_group_assignment_submissions = [{ id: randomUUID(), user_id: E2, status: "reviewed", reviewed_by: ADMIN }, { id: randomUUID(), user_id: E2, status: "reviewed", reviewed_by: E2 }];
+  const p2 = await call("GET", "/e/me/evaluator", E2);
+  ok("my evaluator profile: how invitations work, and how many exact resources I've passed independently (self-reviews never count)", p2.body.qualifiedResources === 2 && /that same one/.test(p2.body.howInvited));
+  const noSignup = await call("PUT", "/e/me/evaluator", L, { available: false });
+  ok("availability needs no sign-up: a first change simply creates the profile", noSignup.status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === L).available === false);
+
+  // A Family / Church group assignment through the same engine.
+  const GA = randomUUID(), GS = randomUUID(), GEV = randomUUID(), GA1 = randomUUID();
+  T.p2p_group_assignments = [{ id: GA, title: "Serve a neighbour", instructions: "Do it, then tell us how.", family_id: randomUUID(), church_id: null }];
+  T.p2p_group_assignment_submissions.push({ id: GS, assignment_id: GA, user_id: L, content: "I helped my neighbour carry shopping.", submitted_at: t0, status: "submitted" });
+  T.p2p_lesson_evaluations.push({ id: GEV, submission_id: null, lesson_id: null, resource_kind: "group_assignment", resource_id: GA, group_submission_id: GS, context: "family", submitter_id: L, evaluator_id: null, status: "pending",
+    feedback: null, assigned_at: t0, created_at: t0, resolved_at: null, self_approved: false, engine_state: "invited", current_assignment_id: GA1, accepted_at: null, deadline_at: null, outcome: null, feedback_detail: null, queued_since: t0 });
+  T.p2p_evaluation_assignments.push({ id: GA1, evaluation_id: GEV, evaluator_id: E2, attempt: 1, status: "invited", invited_at: t0, invite_expires_at: new Date(Date.now() + 3600_000).toISOString(), match_detail: { basis: "passed_this_resource" } });
+  const gi = await call("GET", `/e/invitations/${GA1}`, E2);
+  ok("group assignment invitation: the assignment, its kind, why (same group, same assignment) — no name or work", gi.status === 200 && gi.body.kind === "Group assignment" && gi.body.lessonTitle === "Serve a neighbour"
+    && /same assignment/.test(gi.body.competence) && !gi.text.includes("Lena") && !gi.text.includes("shopping"));
+  Object.assign(T.p2p_lesson_evaluations.at(-1), { engine_state: "in_progress", evaluator_id: E2, accepted_at: new Date().toISOString(), deadline_at: new Date(Date.now() + 48 * 3600_000).toISOString() });
+  const gw = await call("GET", `/e/${GEV}`, E2);
+  ok("group assignment workspace: the instructions and that one piece of work", gw.body.role === "evaluator" && gw.body.resourceKind === "group_assignment" && gw.body.instructions === "Do it, then tell us how."
+    && gw.body.overallAnswer[0].text.includes("shopping") && gw.body.questions.length === 0 && !gw.text.includes("PRIVATE"));
+  await call("POST", `/e/${GEV}/submit`, E2, { outcome: "passed", feedback: { understoodWell: "You served well", encouragement: "Keep going" } });
+  ok("group assignment submit: reaches the same engine", rpcCalls.at(-1).fn === "p2p_eval_submit" && rpcCalls.at(-1).args.p_eval === GEV);
+  const gm = await call("GET", "/e/mine", L);
+  ok("the learner's list names each resource correctly, lesson or group assignment", gm.body.items.some((i) => i.lessonTitle === "Serve a neighbour" && i.resourceKind === "group_assignment") && gm.body.items.some((i) => i.lessonTitle === "Grace"));
 
   // Oversight.
   ok("admin routes: everyone else gets 403", (await call("GET", "/e/admin/overview", E1)).status === 403 && (await call("POST", `/e/admin/evaluations/${EV}/reassign`, L, { reason: "x" })).status === 403 && (await call("PUT", "/e/admin/settings", E1, { engineEnabled: false })).status === 403);
@@ -204,6 +235,43 @@ try {
   ok("settings: there is no deadline setting (72 h is ignored)", !("deadline_hours" in T.p2p_evaluation_settings[0]) && T.p2p_evaluation_settings[0].engine_enabled === false);
   ok("restriction needs a clear reason", (await call("PUT", `/e/admin/evaluators/${X}`, ADMIN, { standing: "restricted" })).status === 400
     && (await call("PUT", `/e/admin/evaluators/${X}`, ADMIN, { standing: "restricted", reason: "Repeated concerns, reviewed with them" })).status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === X).standing === "restricted");
+  T.p2p_eval_coverage = [{ resource_kind: "lesson", resource_id: LESSON, context: "kingdom_school", title: "Grace", waiting: 3, waiting_since: t0, has_qualified_people: false }];
+  ok("coverage: admins only", (await call("GET", "/e/admin/coverage", E1)).status === 403);
+  const cov = await call("GET", "/e/admin/coverage", ADMIN);
+  ok("coverage: resources waiting with nobody qualified yet", cov.status === 200 && cov.body.items[0].title === "Grace" && cov.body.items[0].hasQualifiedPeople === false && cov.body.items[0].waiting === 3);
+  ok("settings: bootstrap roles only from the list", (await call("PUT", "/e/admin/settings", ADMIN, { bootstrapRoles: ["student"] })).status === 400);
+  await call("PUT", "/e/admin/settings", ADMIN, { bootstrapRoles: ["peer_guide"], groupAssignmentsEnabled: true });
+  ok("settings: cold-start roles and group assignments are owner switches", JSON.stringify(T.p2p_evaluation_settings[0].bootstrap_roles) === '["peer_guide"]' && T.p2p_evaluation_settings[0].group_assignments_enabled === true);
+  rpcResult = (fn) => (fn === "p2p_eval_candidates" ? [{ user_id: E2, score: 6, basis: "passed_this_resource", reasons: { language: "same_content_language", proximity: "same_country" } }] : { ok: true });
+  const adm = await call("GET", `/e/admin/evaluations/${EV}`, ADMIN);
+  ok("admin evaluation view: who the engine would invite next and why (reasons only, never a place)", adm.body.nextCandidates[0].name === "Eli Second" && adm.body.nextCandidates[0].reasons.proximity === "same_country" && !/GH|Ghana|Accra/.test(adm.text));
+  rpcResult = { ok: true };
+
+  // Lifecycle: an evaluation whose invitation expired and was handed on reads "Reassigned".
+  const REV = randomUUID();
+  T.p2p_lesson_evaluations.push({ id: REV, submission_id: SUB, lesson_id: LESSON, resource_kind: "lesson", resource_id: LESSON, submitter_id: L, evaluator_id: null, status: "pending", self_approved: false,
+    engine_state: "invited", created_at: t0, assigned_at: t0, deadline_at: null, outcome: null });
+  T.p2p_evaluation_assignments.push({ id: randomUUID(), evaluation_id: REV, evaluator_id: E1, attempt: 1, status: "expired", invited_at: t0, invite_expires_at: t0 });
+  const mineR = await call("GET", "/e/mine", L);
+  ok("lifecycle: an expired-and-handed-on evaluation reads 'Reassigned'", mineR.body.items.find((i) => i.id === REV)?.statusLabel === "Reassigned to another qualified evaluator" && mineR.body.items.find((i) => i.id === REV)?.stage === "reassigned");
+
+  // Operations, integrity reviews and material revisions (administrators only).
+  rpcResult = (fn) => (fn === "p2p_eval_operations" ? { qualifiedEvaluators: 4, pending: 3, unassigned: 1, workload: [{ activeEvaluations: 1, people: 2 }], reciprocalPairs: 1 } : fn === "p2p_assessment_record_revision" ? 2 : { ok: true });
+  ok("operations: administrators only", (await call("GET", "/e/admin/operations", E1)).status === 403);
+  const ops = await call("GET", "/e/admin/operations", ADMIN);
+  ok("operations: qualified evaluators, pending, unassigned, workload, reciprocal pairs", ops.body.qualifiedEvaluators === 4 && ops.body.workload[0].people === 2);
+  const PK = "0123456789abcdef0123456789abcdef";
+  T.p2p_eval_reciprocal_pairs = [{ pair_key: PK, person_a: E1, person_b: E2, a_approved_b: 2, b_approved_a: 3, last_at: t0 }];
+  const integ = await call("GET", "/e/admin/integrity", ADMIN);
+  ok("integrity: reciprocal approval pairs listed for review, by name, awaiting a decision", integ.body.items[0].people.includes("Esi Evaluator") && integ.body.items[0].needsReview === true && integ.body.items[0].approvals.join() === "2,3");
+  ok("integrity: a decision needs an explanation", (await call("POST", `/e/admin/integrity/${PK}/review`, ADMIN, { decision: "no_concern" })).status === 400);
+  await call("POST", `/e/admin/integrity/${PK}/review`, ADMIN, { decision: "no_concern", note: "Same Family; reviewed both evaluations" });
+  ok("integrity: the review is recorded (append-only table) with who decided", T.p2p_eval_integrity_reviews?.[0]?.actor_id === ADMIN && T.p2p_eval_integrity_reviews[0].decision === "no_concern");
+  ok("revision: administrators only, with a description", (await call("POST", "/e/admin/resources/revision", E1, { kind: "lesson", resourceId: LESSON, reason: "New questions" })).status === 403
+    && (await call("POST", "/e/admin/resources/revision", ADMIN, { kind: "lesson", resourceId: LESSON })).status === 400);
+  const rv = await call("POST", "/e/admin/resources/revision", ADMIN, { kind: "lesson", resourceId: LESSON, reason: "Questions rewritten for the new edition" });
+  ok("revision: recorded through the database; the new assessment version comes back", rv.body.version === 2 && rpcCalls.at(-1).fn === "p2p_assessment_record_revision" && rpcCalls.at(-1).args.p_actor === ADMIN);
+  rpcResult = { ok: true };
   const routeSrc = readFileSync(path.join(root, "src/routes/peerEvaluation.ts"), "utf8");
   ok("no transfer / choose-replacement / extension route exists", !/router\.(post|put)\([^)]*(transfer|replacement|extension|choose)/i.test(routeSrc));
 } catch (e) {

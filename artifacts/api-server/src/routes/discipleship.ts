@@ -572,6 +572,19 @@ interface PeerGuideCandidate {
   isVerified: boolean;
 }
 
+// The designated Peer Guide must be at a strictly higher verified stage than the
+// participant (migration 239; enforced by the database when switched on). Smart
+// Match only offers people who may actually be designated.
+async function higherStageGuides(learnerId: string, guideIds: string[]): Promise<Set<string> | null> {
+  const { data: settings } = await supabaseWrite.from("p2p_growth_settings").select("enforce_guide_stage").maybeSingle();
+  if (!(settings as { enforce_guide_stage?: boolean } | null)?.enforce_guide_stage) return null;   // rule off: no filter
+  const ids = [learnerId, ...guideIds];
+  const { data } = await supabaseWrite.from("p2p_growth_status").select("user_id,stage").in("user_id", ids);
+  const stage = new Map(((data ?? []) as { user_id: string; stage: number }[]).map((r) => [r.user_id, r.stage]));
+  const mine = stage.get(learnerId) ?? 1;
+  return new Set(guideIds.filter((g) => (stage.get(g) ?? 1) > mine));
+}
+
 async function getEligibleCandidates(requesterId: string, excludeCandidateIds: string[] = []): Promise<PeerGuideCandidate[]> {
   const { data: candidateProfiles } = await supabaseWrite
     .from("p2p_profiles")
@@ -593,6 +606,9 @@ async function getEligibleCandidates(requesterId: string, excludeCandidateIds: s
     .in("mentor_id", candidateIds);
   const alreadyLinked = new Set((existingLinks ?? []).map((l: Record<string, unknown>) => l.mentor_id as string));
   candidates = candidates.filter((c) => !alreadyLinked.has(c.id as string));
+  if (candidates.length === 0) return [];
+  const higher = await higherStageGuides(requesterId, candidates.map((c) => c.id as string));
+  if (higher) candidates = candidates.filter((c) => higher.has(c.id as string));
   if (candidates.length === 0) return [];
 
   // Active mentee counts (current mentor load) for the "fewer than max_mentees" filter.
@@ -875,6 +891,10 @@ router.post("/request", async (req, res) => {
     .or(`and(mentor_id.eq.${peerGuideId},disciple_id.eq.${learnerId}),and(mentor_id.eq.${learnerId},disciple_id.eq.${peerGuideId})`)
     .maybeSingle();
   if (activeLink) return res.status(409).json({ error: "You already have an active Peer Guide relationship with this person." });
+  const higher = await higherStageGuides(learnerId, [peerGuideId]);
+  if (higher && !higher.has(peerGuideId)) {
+    return res.status(409).json({ error: "A Peer Guide needs to be at a later growth milestone than you. Please choose someone further along." });
+  }
 
   // Already a pending request in this exact direction.
   const { data: pendingLink } = await supabaseWrite
@@ -1002,7 +1022,11 @@ router.put("/request/:linkId/respond", async (req, res) => {
       .from("p2p_discipleship_links")
       .update({ status: "active", active: true, responded_at: new Date().toISOString() })
       .eq("id", linkId);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // The database refuses a designated Guide who isn't at a later milestone (the stages may have changed since the request).
+      if (/P2P_GUIDE_STAGE/.test(error.message)) return res.status(409).json({ error: "This request can't be accepted: a Peer Guide needs to be at a later growth milestone than the person they guide." });
+      return res.status(500).json({ error: error.message });
+    }
 
     const { data: guideProfile } = await supabaseWrite.from("p2p_profiles").select("full_name").eq("id", userId).maybeSingle();
     const guideName = (guideProfile as Record<string, unknown> | null)?.full_name ?? "Your peer guide";

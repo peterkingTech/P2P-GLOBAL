@@ -23,6 +23,7 @@ import { usePageTurn } from "@/components/kingdom-stories/usePageTurn";
 // submission and peer-review status — reused, not re-implemented.
 import { QuestionResponseCard } from "@/app/lesson/[id]";
 import { AppButton, IconButton } from "@/components/ui";
+import SharedStudySheet from "@/components/study/SharedStudySheet";
 import { showAlert } from "@/lib/alerts";
 
 // One chapter of a Kingdom Story, read like a page of an illustrated book.
@@ -58,6 +59,7 @@ export default function KingdomStoryChapterScreen() {
   // Opened by chapter id (from the book) or by its lesson id (from generic learning screens).
   const { id, chapter: chapterParam, lesson: lessonParam } = useLocalSearchParams<{ id: string; chapter?: string; lesson?: string }>();
   const [chapterId, setChapterId] = useState<string | undefined>(chapterParam);
+  const [studyOpen, setStudyOpen] = useState(false);
   useEffect(() => { setChapterId(chapterParam); }, [chapterParam]);
   const reading = useReadingScale();
   const s = useMemo(() => makeStyles(c, reading.scale), [c, reading.scale]);
@@ -301,6 +303,13 @@ export default function KingdomStoryChapterScreen() {
             </View>
             <View style={{ marginTop: 12, alignItems: "flex-start" }}>
               <ListenButton onPress={onListen} label={listeningHere ? "Open Read & Listen" : "Listen to this chapter"} />
+              <TouchableOpacity onPress={() => setStudyOpen(true)} accessibilityRole="button" accessibilityLabel={`Study chapter ${ch.chapterNumber} together`} style={s.studyLink}>
+                <Ionicons name="people-outline" size={16} color={c.accentGreen} />
+                <Text style={s.studyLinkText}>Study this chapter together</Text>
+              </TouchableOpacity>
+              <SharedStudySheet visible={studyOpen} onClose={() => setStudyOpen(false)}
+                content={{ type: "kingdom_story", id: story.id, title: `${story.title} — Chapter ${ch.chapterNumber}`, sectionId: ch.id }}
+                onStarted={(sid) => { setStudyOpen(false); router.push(`/study-together/${sid}` as any); }} />
             </View>
             {!!ch.scriptureRefs && <View style={{ marginTop: 14 }}><ScriptureChips line={ch.scriptureRefs} /></View>}
             {[ch.dates, ch.places, ch.people].filter(Boolean).map((m, i) => <Text key={i} style={s.meta}>{m}</Text>)}
@@ -468,6 +477,8 @@ export default function KingdomStoryChapterScreen() {
 
 function makeStyles(c: AppColors, k: number) {
   return StyleSheet.create({
+    studyLink: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, alignSelf: "flex-start", paddingVertical: 6 },
+    studyLinkText: { fontSize: 14 * k, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center" },
     muted: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_400Regular" },

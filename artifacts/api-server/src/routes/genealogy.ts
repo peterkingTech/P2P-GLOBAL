@@ -13,7 +13,16 @@ import { stageInfo } from "../lib/growthStages";
 //     (expanding a branch); anyone else's → 404;
 //   • GET /genealogy/me/generation/:n — one generation below me, 50 at a time;
 //   • GET /genealogy/me/search?q= — find someone within my own lineage only;
-//   • GET /genealogy/collective — Forest of Nations: totals only, no names.
+//   • GET /genealogy/collective — Forest of Nations: totals only, no names;
+//   • GET /genealogy/history/:personId ("me" for myself) — a development history:
+//     every designated Peer Guide relationship (current and previous) with both
+//     people's stage at its start and at each checkpoint (never reconstructed;
+//     "not recorded" where unknown), the verified contributions inside each
+//     relationship, everyone else who verifiably helped (Pastors, Shepherds and
+//     others only through real evidence), and onward generations. Only for me,
+//     my own relationships and my lineage (above and below); names follow each
+//     person's own privacy settings. Counts and dates only — never answers,
+//     messages, journals or reflections.
 // Privacy: people I'm directly in a relationship with appear by name; anyone
 // further away follows their own settings (a private profile is "A disciple",
 // the real name only if they show it, their stage only if they share their
@@ -169,6 +178,61 @@ router.get("/me/search", async (req, res) => {
   }
 });
 
+type Checkpoint = { kind: string; at: string; participantStage: number | null; guideStage: number | null; source: string; changed: string | null; corrects: string | null; id: string; note: string | null };
+const stageLabel = (n: number | null) => (n ? stageInfo(n).name : null);
+const cpView = (c: Checkpoint) => ({ kind: c.kind, at: c.at, participantStage: stageLabel(c.participantStage), guideStage: stageLabel(c.guideStage),
+  recorded: c.source !== "unavailable", correction: c.kind === "correction", changed: c.changed, note: c.note });
+
+router.get("/history/:personId", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return res.status(401).json({ error: "Please sign in." });
+  const target = req.params.personId === "me" ? caller : String(req.params.personId);
+  try {
+    // Who may open whose history: myself, anyone I'm directly in a relationship with, and my lineage above and below.
+    if (target !== caller) {
+      const { data: direct } = await db.from("p2p_discipleship_links").select("id")
+        .or(`and(mentor_id.eq.${caller},disciple_id.eq.${target}),and(mentor_id.eq.${target},disciple_id.eq.${caller})`).limit(1);
+      let allowed = !!(direct as unknown[] | null)?.length;
+      if (!allowed) allowed = (await descendants(caller)).some((d) => d.person_id === target);
+      if (!allowed) {
+        const { data: up } = await db.rpc("p2p_lineage_ancestors", { p_person: caller, p_max_depth: 200 });
+        allowed = ((up ?? []) as { person_id?: string; mentor_id?: string }[]).some((a) => a.person_id === target || a.mentor_id === target);
+      }
+      if (!allowed) return res.status(404).json({ error: "Not found." });
+    }
+    const { data, error } = await db.rpc("p2p_development_history", { p_person: target });
+    if (error) throw error;
+    const h = (data ?? {}) as { stage?: { stage: number; verification: string; since: string } | null;
+      guides: { linkId: string; guideId: string; status: string; isPrimary: boolean; startedAt: string; endedAt: string | null; checkpoints: Checkpoint[]; contributions: number; contributionsByType: Record<string, number> }[];
+      guiding: { linkId: string; participantId: string; status: string; isPrimary: boolean; startedAt: string; endedAt: string | null; checkpoints: Checkpoint[]; contributions: number }[];
+      contributors: { personId: string; contributions: number; firstAt: string; lastAt: string; kinds: Record<string, boolean>; wasDesignatedGuide: boolean }[];
+      helped: { personId: string; contributions: number; helpsOthers: boolean }[] };
+    const ids = [target, ...h.guides.map((g) => g.guideId), ...h.guiding.map((g) => g.participantId), ...h.contributors.map((x) => x.personId), ...h.helped.map((x) => x.personId)].filter(Boolean);
+    const [ps, ss] = await Promise.all([people(ids), stages(ids)]);
+    // "Direct" for privacy = the viewer themself or someone the viewer is directly related to; the target's own circle is shown by their settings.
+    const directToViewer = new Set<string>([caller]);
+    const { data: mine } = await db.from("p2p_discipleship_links").select("mentor_id,disciple_id").or(`mentor_id.eq.${caller},disciple_id.eq.${caller}`).limit(500);
+    for (const l of (mine ?? []) as { mentor_id: string; disciple_id: string }[]) { directToViewer.add(l.mentor_id); directToViewer.add(l.disciple_id); }
+    // In my own history everyone listed helped me or was helped by me, so they are named; in someone
+    // else's, people are named only if I'm directly related to them — otherwise their own settings apply.
+    const named = (id: string) => card(id, ps.get(id), ss.get(id), target === caller || directToViewer.has(id));
+    return res.json({
+      person: named(target),
+      currentStage: h.stage ? { name: stageInfo(h.stage.stage).name, since: h.stage.since, verification: h.stage.verification } : null,
+      guides: h.guides.map((g) => ({ linkId: g.linkId, guide: named(g.guideId), status: g.status, isPrimary: g.isPrimary, startedAt: g.startedAt, endedAt: g.endedAt,
+        checkpoints: g.checkpoints.map(cpView), verifiedContributions: g.contributions })),
+      guiding: h.guiding.map((g) => ({ linkId: g.linkId, participant: named(g.participantId), status: g.status, isPrimary: g.isPrimary, startedAt: g.startedAt, endedAt: g.endedAt,
+        checkpoints: g.checkpoints.map(cpView), verifiedContributions: g.contributions })),
+      contributors: h.contributors.map((x) => ({ person: named(x.personId), verifiedContributions: x.contributions, firstAt: x.firstAt, lastAt: x.lastAt,
+        designatedGuide: x.wasDesignatedGuide, kinds: Object.keys(x.kinds ?? {}) })),
+      helped: h.helped.map((x) => ({ person: named(x.personId), verifiedContributions: x.contributions, nowHelpingOthers: x.helpsOthers })),
+      note: "Stages are shown as they were at each moment, recorded when it happened. \"Not recorded\" means the relationship began before stages were recorded.",
+    });
+  } catch {
+    return res.status(500).json({ error: "Couldn't load this development history." });
+  }
+});
+
 // Forest of Nations: what P2P Global's disciples are together. Totals only.
 router.get("/collective", async (req, res) => {
   const caller = await verifyCaller(req);
@@ -192,21 +256,24 @@ router.get("/collective", async (req, res) => {
       }
       deepest = Math.max(deepest, depth);
     }
-    const everyone = [...new Set([...mentors, ...disciples])];
-    const countries = new Set<string>();
-    for (let i = 0; i < everyone.length; i += 200) {
-      const { data } = await db.from("p2p_profiles").select("country").in("id", everyone.slice(i, i + 200));
-      for (const p of (data ?? []) as { country: string | null }[]) if (p.country) countries.add(p.country.trim().toLowerCase());
-    }
-    const { data: st } = await db.from("p2p_growth_status").select("stage");
-    const byStage = [1, 2, 3, 4, 5].map((n) => ({ stage: n, name: stageInfo(n).name, people: ((st ?? []) as { stage: number }[]).filter((s) => s.stage === n).length }));
+    // Milestones, participation and countries come from the server's collective view
+    // (239): small groups are suppressed, and countries count only people who opted in.
+    const { data: col } = await db.rpc("p2p_growth_collective");
+    const collective = (col ?? {}) as { minimumGroup?: number; stages?: { stage: number; people: number | null; suppressed: boolean }[]; months?: unknown[]; countries?: number };
+    const k = collective.minimumGroup ?? 5;
+    const byStage = [1, 2, 3, 4, 5].map((n) => {
+      const s = collective.stages?.find((x) => x.stage === n);
+      return { stage: n, name: stageInfo(n).name, people: s?.people ?? null, fewerThan: s?.suppressed ? k : null };
+    });
     const byMonth = new Map<string, number>();
     for (const r of rows) if (r.started_at) { const m = r.started_at.slice(0, 7); byMonth.set(m, (byMonth.get(m) ?? 0) + 1); }
     return res.json({
       activeRelationships: rows.length, peopleBeingDiscipled: disciples.size, peopleDiscipling: mentors.size,
       // Generations as levels of people: the first mentor is generation 1, their disciples generation 2, …
-      generations: rows.length ? deepest + 1 : 0, countries: countries.size, stages: byStage,
-      relationshipsBegun: [...byMonth.entries()].sort().slice(-12).map(([month, n]) => ({ month, relationships: n })),
+      generations: rows.length ? deepest + 1 : 0, countries: collective.countries ?? 0, stages: byStage,
+      relationshipsBegun: [...byMonth.entries()].sort().slice(-12).map(([month, n]) => (n >= k ? { month, relationships: n } : { month, relationships: null, fewerThan: k })),
+      participation: collective.months ?? [],
+      minimumGroup: k,
     });
   } catch {
     return res.status(500).json({ error: "Couldn't load the Forest of Nations." });

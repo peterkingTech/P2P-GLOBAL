@@ -78,6 +78,8 @@ export default function LineageScreen() {
               {data.me.stage ? <Text style={s.meta}>{data.me.stage.emoji} {data.me.stage.name}</Text> : null}
             </View>
           </View>
+          <AppButton label="My development history" icon="time-outline" variant="secondary" size="sm"
+            onPress={() => router.push("/development-history" as any)} accessibilityLabel="My development history: Peer Guides with stages at each step, contributors and generations" />
 
           <Text style={s.section} accessibilityRole="header">Below me</Text>
           {data.generations.length ? (

@@ -113,5 +113,22 @@ ok("My Evaluations: opens on Evaluating from Home; directly assigned reviews cou
 const m231 = readFileSync(path.join(root, "../../migrations/231_combine_evaluation_waiting_notices.sql"), "utf8");
 ok("231: waiting notices combine per evaluator within 10 minutes; engine rows untouched", m231.includes("interval '10 minutes'") && m231.includes("if new.engine_state is not null then") && m231.includes("lesson evaluations waiting") && !/\bdelete\b|\bdrop\b|\btruncate\b/i.test(m231.replace(/--.*$/gm, "")));
 
+// ── 240: one universal engine, exact-resource qualification, no sign-up ──
+const m240 = readFileSync(path.join(root, "../../migrations/240_universal_peer_evaluation.sql"), "utf8");
+const m240code = m240.replace(/--.*$/gm, "");
+ok("240: qualification is the exact resource passed independently (ledger), never lesson_progress, roles or categories",
+  m240code.includes("g.unit_key = 'lesson:' || p_resource") && !/lesson_progress/.test(m240code.slice(m240code.indexOf("p2p_eval_can_evaluate"), m240code.indexOf("p2p_eval_tz_offset_hours"))) && !/categories|reviewer_roles|orientation_acknowledged_at is null/.test(m240code.slice(m240code.indexOf("create or replace function public.p2p_eval_can_evaluate"), m240code.indexOf("-- ── Matching"))));
+ok("240: matching weighs language, stage, proximity, workload and variety — and records reasons without locations",
+  ["lang_pts", "stage_pts", "near_pts", "2 * r.active", "r.invited_week", "r.missed", "r.last_invited is null", "recently_paired", "r.reciprocal", "p2p_eval_distance_km"].every((k) => m240code.includes(k)) && m240code.includes("'proximity', case when"));
+ok("240: accepted work is checked for safety only; open invitations for full eligibility", m240code.includes("a.status = 'accepted' and not p2p_eval_can_continue"));
+ok("240: cold-start roles default OFF and step aside once anyone qualifies; group assignments default OFF",
+  m240code.includes("bootstrap_roles           text[]  not null default '{}'") && m240code.includes("group_assignments_enabled boolean not null default false") && m240code.includes("p2p_eval_resource_has_qualified(p_eval)"));
+ok("240: the migration sends no notifications and deletes nothing", !/insert into (public\.)?p2p_notifications|delete from|drop table|truncate/i.test(m240code.slice(m240code.indexOf("update public.p2p_lesson_evaluations set next_attempt_at = now() where engine_state = 'queued'"))) && !/drop table|truncate/i.test(m240code));
+const serveHome = src("app/evaluation/index.tsx");
+ok("app: no orientation gate — the Serve panel explains how invitations work", !serveHome.includes("Start orientation") && serveHome.includes("How you're invited to evaluate") && serveHome.includes("No sign-up is needed"));
+ok("app: the invitation shows the commitments agreed by accepting", src("app/evaluation/invitation/[assignmentId].tsx").includes("By accepting, you agree:"));
+const oversight = src("app/evaluation/admin.tsx");
+ok("app oversight: who can evaluate what (coverage), next in line, and the two owner switches", ["adminCoverage()", "Who can evaluate what", "nextCandidates", "groupAssignmentsEnabled", "bootstrapRoles"].every((k) => oversight.includes(k)));
+
 console.log(`peerEvaluation (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

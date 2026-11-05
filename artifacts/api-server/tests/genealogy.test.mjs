@@ -61,6 +61,10 @@ const db = {
       select() { return q; }, order() { return q; }, limit(n) { lim = n; return q; },
       eq(c, v) { f.push((r) => r[c] === v); return q; },
       in(c, vs) { f.push((r) => vs.includes(r[c])); return q; },
+      or(expr) { const pairs = [...expr.matchAll(/(mentor_id|disciple_id)\.eq\.([\w-]+)/g)].map(([, c, v]) => [c, v]);
+        // "and(a,b),and(c,d)" → either pair matches; "x.eq.1,y.eq.1" → any.
+        const ands = [...expr.matchAll(/and\(([^)]*)\)/g)].map((m) => [...m[1].matchAll(/(mentor_id|disciple_id)\.eq\.([\w-]+)/g)].map(([, c, v]) => [c, v]));
+        f.push((r) => (ands.length ? ands.some((g) => g.every(([c, v]) => r[c] === v)) : pairs.some(([c, v]) => r[c] === v))); return q; },
       then(res) { return Promise.resolve({ data: (T[name] ?? []).filter((x) => f.every((p) => p(x))).slice(0, lim).map((x) => ({ ...x })), error: null }).then(res); },
     };
     return q;
@@ -68,6 +72,17 @@ const db = {
   async rpc(fn, a) {
     if (fn === "p2p_lineage_descendants") return { data: descendants(a.p_root), error: null };
     if (fn === "p2p_lineage_ancestors") return { data: ancestors(a.p_person), error: null };
+    if (fn === "p2p_development_history") return { data: {
+      stage: { stage: 2, verification: "verified", since: "2026-09-01" },
+      guides: [{ linkId: "l1", guideId: "mum", status: "active", isPrimary: true, startedAt: "2026-02-01", endedAt: null, contributions: 3, contributionsByType: {},
+        checkpoints: [{ id: "c1", kind: "start", at: "2026-02-01", participantStage: null, guideStage: null, source: "unavailable", changed: null, corrects: null, note: null },
+                      { id: "c2", kind: "stage_change", at: "2026-09-01", participantStage: 2, guideStage: 4, source: "recorded", changed: "participant", corrects: null, note: null }] }],
+      guiding: [{ linkId: "l3", participantId: "kid1", status: "active", isPrimary: true, startedAt: "2026-04-01", endedAt: null, contributions: 1, checkpoints: [] }],
+      contributors: [{ personId: "gk1", contributions: 2, firstAt: "2026-05-01", lastAt: "2026-06-01", kinds: { "service.learning_feedback": true }, wasDesignatedGuide: false }],
+      helped: [{ personId: "kid1", contributions: 1, helpsOthers: true }] }, error: null };
+    // The server's collective view (239): small groups already suppressed there.
+    if (fn === "p2p_growth_collective") return { data: { minimumGroup: 5, countries: 2, months: [{ month: "2026-10", participants: 9, learningUnitsPassed: 30, practicalActions: 4, contributions: 12 }, { month: "2026-11", suppressed: true }],
+      stages: [{ stage: 1, people: 40, suppressed: false }, { stage: 2, people: 23, suppressed: false }, { stage: 3, people: null, suppressed: true }, { stage: 4, people: null, suppressed: true }, { stage: 5, people: null, suppressed: false }] }, error: null };
     return { data: null, error: { message: "?" } };
   },
 };
@@ -117,9 +132,30 @@ try {
   ({ j } = await get("/me/search?q=stranger"));
   ok("search never reaches outside my lineage", j.people.length === 0);
 
+  // Development history.
+  ({ j } = await get("/history/me"));
+  ok("history (mine): Guides with checkpoints — stages by name as they were, 'not recorded' where unknown", j.guides[0].guide.name === "MUM" && j.guides[0].checkpoints[0].recorded === false
+    && j.guides[0].checkpoints[0].participantStage === null && j.guides[0].checkpoints[1].participantStage === "Sprout" && j.guides[0].checkpoints[1].guideStage === "Fruitful Tree" && j.guides[0].verifiedContributions === 3);
+  ok("history (mine): the people I guide, everyone who verifiably helped me, and those I helped who now help others",
+    j.guiding[0].participant.name === "KID1" && j.contributors[0].designatedGuide === false && j.contributors[0].kinds[0] === "service.learning_feedback" && j.helped[0].nowHelpingOthers === true);
+  ok("history: counts, stages and dates only — never answers, messages, journals or reflections", !/answer|message|journal|reflection/i.test(JSON.stringify(j).replace(/"note":"[^"]*"/, "")));
+  r = await get("/history/stranger");
+  ok("history: someone outside my relationships and lineage → 404", r.status === 404);
+  r = await get("/history/kid1");
+  ok("history: someone in my lineage (my disciple) can be opened", r.status === 200);
+  r = await get("/history/gran");
+  ok("history: my line above can be opened too", r.status === 200);
+  r = await get("/history/ggk");
+  ok("history: in someone else's history, a private person I'm not related to is just 'A disciple'", r.status === 200 && r.j.contributors[0].person.name === "A disciple" && r.j.contributors[0].person.id === null);
+  ok("history: signed out → 401", (await get("/history/me", null)).status === 401);
+
   ({ j } = await get("/collective"));
   ok("Forest of Nations: totals (relationships, people, generations, countries, stages, months)", j.activeRelationships === links.length && j.peopleBeingDiscipled === 68 && j.generations === 6 && j.countries === 2 && j.stages.length === 5, JSON.stringify({ g: j.generations, p: j.peopleBeingDiscipled }));
-  ok("…with no names and no ids", !/"(id|name|username|photoUrl)"/.test(JSON.stringify(j).replace(/"name":"(Dormant Seed|Sprout|Young Tree|Fruitful Tree|Forest Builder)"/g, "")));
+  ok("…with no names and no ids", !/"(id|name|username|photoUrl)"/.test(JSON.stringify(j).replace(/"name":"(Seed|Sprout|Young Tree|Fruitful Tree|Forest Builder)"/g, "")));
+  ok("…milestone counts below the minimum group are suppressed (fewer than 5), never shown", j.stages[2].people === null && j.stages[2].fewerThan === 5 && j.stages[0].people === 40 && j.stages[4].fewerThan === null);
+  ok("…countries only from the server's opt-in, small-group-safe count", j.countries === 2 && j.minimumGroup === 5);
+  ok("…months with fewer than 5 new relationships are suppressed", j.relationshipsBegun.every((m) => m.relationships === null ? m.fewerThan === 5 : m.relationships >= 5));
+  ok("…participation totals by month, with small months suppressed", j.participation.length === 2 && j.participation[1].suppressed === true);
   server.close();
 } finally {
   rmSync(tmpDir, { recursive: true, force: true });

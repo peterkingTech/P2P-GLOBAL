@@ -404,10 +404,14 @@
     "emptyState": "You haven't saved any highlights yet.",
     "sharedFrom": "Shared from lessons"
   },
+  "growthMilestones": {
+    "explanation": "Growth milestones celebrate how you take part in P2P Global: how consistently you participate, what you learn, how you put learning into practice, and how you help others learn. They are a record of participation and contribution on P2P Global — nothing more.",
+    "disclaimer": "These milestones do not measure your relationship with God, your faith, or your worth. Only God knows the heart. They simply recognise the activity you've chosen to record here."
+  },
   "stages": {
     "backLabel": "Living Tree",
-    "sectionLabel": "THE SIX STAGES OF GROWTH",
-    "pageTitle": "From a Dormant Seed to a Forest of Nations",
+    "sectionLabel": "YOUR GROWTH MILESTONES",
+    "pageTitle": "From a Seed to a Forest Builder",
     "reached": "Reached",
     "current": "You are here",
     "locked": "Locked"

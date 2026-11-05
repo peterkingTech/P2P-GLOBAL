@@ -20,10 +20,10 @@ export interface Stage {
 
 export const STAGES: Stage[] = [
   {
-    name: "Dormant Seed",
+    name: "Seed",
     emoji: "🌰",
     description:
-      "The journey begins in stillness. A seed rests in the soil, holding the promise of everything to come.",
+      "The starting point. Everyone begins here, with all of P2P Global open to explore.",
     verse: "Unless a seed falls to the ground and dies…",
     verseRef: "John 12:24",
     unlockPoints: 0,
@@ -32,7 +32,7 @@ export const STAGES: Stage[] = [
     name: "Sprout",
     emoji: "🌱",
     description:
-      "First light. Tender shoots break the surface as new habits of prayer and Scripture take hold.",
+      "First steady steps: a rhythm of taking part, passing assessed learning, putting it into practice and helping others.",
     verse: "He is like a tree planted by streams of water.",
     verseRef: "Psalm 1:3",
     unlockPoints: 4,
@@ -41,7 +41,7 @@ export const STAGES: Stage[] = [
     name: "Young Tree",
     emoji: "🌿",
     description:
-      "A trunk forms and branches reach outward. Consistency is turning belief into a settled root system.",
+      "A consistent rhythm over months, with more learning passed, more practice and more help given to others.",
     verse: "Rooted and built up in Him.",
     verseRef: "Colossians 2:7",
     unlockPoints: 12,
@@ -50,7 +50,7 @@ export const STAGES: Stage[] = [
     name: "Fruitful Tree",
     emoji: "🌳",
     description:
-      "The canopy fills and fruit appears — the visible overflow of a life abiding and bearing witness.",
+      "Sustained participation, and helping at least one learner develop who is now helping someone else.",
     verse: "By their fruit you will recognize them.",
     verseRef: "Matthew 7:20",
     unlockPoints: 28,
@@ -59,7 +59,7 @@ export const STAGES: Stage[] = [
     name: "Forest Builder",
     emoji: "🌲",
     description:
-      "Saplings rise in your shade. You are no longer only growing — you are helping others take root.",
+      "The whole Core Curriculum passed, and a long record of helping others learn that those you helped carry on.",
     verse: "Go and make disciples of all nations.",
     verseRef: "Matthew 28:19",
     unlockPoints: 60,
@@ -68,17 +68,18 @@ export const STAGES: Stage[] = [
     name: "Forest of Nations",
     emoji: "🌍",
     description:
-      "A whole grove flourishes. Generations of disciples now shelter, feed, and multiply one another.",
+      "What P2P Global's participants build together, generation after generation — shown only as shared totals.",
     verse: "The nations will walk by its light.",
     verseRef: "Revelation 21:24",
     unlockPoints: 110,
   },
 ];
 
-// Five PERSONAL stages (indexes 0–4, Dormant Seed → Forest Builder). Forest of
-// Nations (index 5) is the COLLECTIVE multiplication of disciples — what P2P
-// Global's disciples become together — never a person's own stage. The stage
-// itself is calculated on the server (migrations 235–237; GET /growth/me).
+// Five PERSONAL milestones (indexes 0–4, Seed → Forest Builder). Forest of
+// Nations (index 5) is COLLECTIVE — what P2P Global's participants build
+// together — never a person's own stage. The milestone itself is calculated on
+// the server from verified evidence (migrations 235–239; GET /growth/me). The
+// points below are only the older ladder that earlier app builds read.
 export const PERSONAL_STAGE_COUNT = 5;
 export const COLLECTIVE_STAGE_INDEX = 5;
 

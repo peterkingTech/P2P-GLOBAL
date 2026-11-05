@@ -6,19 +6,21 @@ import { syncServerTime } from "@/lib/serverClock";
 // acceptance time and the 48-hour deadline, and reassigns. Every response
 // carries the server's time, which keeps countdowns honest (lib/serverClock).
 
-export type Stage = "arranging" | "invitation_pending" | "in_progress" | "overdue_reassigning" | "feedback_ready" | "revision_required" | "completed";
+export type Stage = "arranging" | "invitation_pending" | "in_progress" | "overdue_reassigning" | "reassigned" | "feedback_ready" | "revision_required" | "completed";
 export type Outcome = "passed" | "passed_with_recommendations" | "revision_required" | "further_discussion" | "clarification_required";
 export type QuestionStatus = "well_understood" | "partially_understood" | "needs_clarification" | "not_yet_understood";
 export type DifferenceKind = "clear_misunderstanding" | "unsupported_conclusion" | "incomplete_explanation" | "reasonable_difference";
 export type UnableCategory = "health" | "family" | "time" | "competence" | "conflict" | "technical" | "other";
 
+// The learner-facing lifecycle (the server sends the same wording as statusLabel).
 export const STAGE_LABEL: Record<Stage, string> = {
-  arranging: "Evaluator being arranged",
-  invitation_pending: "Evaluator invitation pending",
-  in_progress: "Evaluation in progress",
-  overdue_reassigning: "Being reassigned",
-  feedback_ready: "Feedback available",
-  revision_required: "Revision requested",
+  arranging: "Searching for a qualified evaluator",
+  invitation_pending: "Assigned — waiting for the evaluator to accept",
+  in_progress: "Under evaluation",
+  overdue_reassigning: "Reassigned — the evaluator's time ran out",
+  reassigned: "Reassigned to another qualified evaluator",
+  feedback_ready: "Approved — feedback ready",
+  revision_required: "Returned for correction",
   completed: "Completed",
 };
 export const OUTCOME_LABEL: Record<Outcome, string> = {
@@ -64,9 +66,12 @@ export interface WorkspaceView {
 export interface Invitation {
   assignmentId: string; status: string; inviteExpiresAt: string; lessonTitle: string; curriculum: string | null; kind: string; checkTitle: string | null; questionCount: number;
   answerFormat: string; expectedWork: string; competence: string; deadlinePolicy: string; safeguarding: string;
+  /** Agreed by accepting (240: there is no separate orientation or sign-up). */
+  commitments?: string[];
 }
 export interface EvaluatorProfile {
-  oriented: boolean; available: boolean; unavailableUntil: string | null; capacity: number; categories: string[]; standing: "good" | "under_review" | "restricted"; restrictionReason: string | null;
+  /** Always true since 240 (no orientation gate); kept for older builds. */
+  oriented: boolean; guideRead?: boolean; qualifiedResources?: number; howInvited?: string; available: boolean; unavailableUntil: string | null; capacity: number; categories: string[]; standing: "good" | "under_review" | "restricted"; restrictionReason: string | null;
   commitments: { id: string; text: string }[]; deadlineHours: number; invitationWindowMinutes: number; engineEnabled: boolean;
   record: { invited: number; accepted: number; completed: number; onTime: number; onTimeRate: number | null; missedDeadlines: number; declined: number; expired: number; unableReports: number; ratings: number; helpedUnderstandRate: number | null };
   recognitions: { id: string; title: string; reason: string }[];
@@ -105,5 +110,13 @@ export const adminEvaluators = () => call<{ items: Record<string, any>[] }>("/ad
 export const adminSetStanding = (userId: string, p: { standing?: "good" | "under_review" | "restricted"; reason?: string; available?: boolean }) => call<{ saved: true }>(`/admin/evaluators/${userId}`, json("PUT", p));
 export const adminConcerns = () => call<{ items: Record<string, any>[] }>("/admin/concerns");
 export const adminReviewConcern = (evaluationId: string, substantiated: boolean, note?: string) => call<{ saved: true }>(`/admin/concerns/${evaluationId}`, json("PUT", { substantiated, note }));
-export const adminSettings = (p: { engineEnabled?: boolean; invitationWindowMinutes?: number; defaultCapacity?: number }) => call<{ saved: true }>("/admin/settings", json("PUT", p));
+export const adminSettings = (p: { engineEnabled?: boolean; invitationWindowMinutes?: number; defaultCapacity?: number; bootstrapRoles?: string[]; groupAssignmentsEnabled?: boolean }) => call<{ saved: true }>("/admin/settings", json("PUT", p));
+/** Resources waiting for an evaluator, and whether anyone has passed them independently yet. */
+export const adminCoverage = () => call<{ items: { resourceKind: string; resourceId: string; context: string | null; title: string; waiting: number; waitingSince: string | null; hasQualifiedPeople: boolean }[] }>("/admin/coverage");
 export const adminSweep = () => call<Record<string, number>>("/admin/sweep", { method: "POST" });
+export const adminOperations = () => call<{ qualifiedEvaluators: number; resourcesWithQualifiedPeople: number; pending: number; unassigned: number; expired30d: number; reassigned30d: number;
+  medianHoursToAccept: number | null; medianHoursToComplete: number | null; workload: { activeEvaluations: number; people: number }[]; reciprocalPairs: number }>("/admin/operations");
+export const adminIntegrity = () => call<{ items: { pairKey: string; people: string[]; approvals: number[]; lastAt: string; review: { decision: string; note: string; at: string } | null; needsReview: boolean }[] }>("/admin/integrity");
+export const adminIntegrityReview = (pairKey: string, decision: "no_concern" | "concern_raised" | "evidence_voided", note: string) => call<{ saved: true }>(`/admin/integrity/${pairKey}/review`, json("POST", { decision, note }));
+/** A MATERIAL revision of an assessment: earlier passes keep their credit but no longer qualify evaluators for the new version. */
+export const adminRecordRevision = (kind: "lesson" | "group_assignment", resourceId: string, reason: string) => call<{ version: number }>("/admin/resources/revision", json("POST", { kind, resourceId, reason }));

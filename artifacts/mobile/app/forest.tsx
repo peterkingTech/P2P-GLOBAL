@@ -249,9 +249,10 @@ function GlobalForest({ collective, failed, mine }: { collective: Collective | n
   const lit = new Set(myCountries.map((c) => getContinent(c)).filter((c): c is Continent => !!c));
   const home = getContinent(mine?.self.country ?? null);
   const homePin = CONTINENTS.find((z) => z.key === home)?.pin;
-  const total = collective ? collective.stages.reduce((n, x) => n + x.people, 0) : 0;
+  const total = collective ? collective.stages.reduce((n, x) => n + (x.people ?? 0), 0) : 0;
   const months = collective?.relationshipsBegun ?? [];
-  const peak = Math.max(1, ...months.map((m) => m.relationships));
+  const peak = Math.max(1, ...months.map((m) => m.relationships ?? 0));
+  const few = (n: number | null | undefined) => `fewer than ${n ?? 5}`;
 
   return (
     <>
@@ -273,14 +274,14 @@ function GlobalForest({ collective, failed, mine }: { collective: Collective | n
 
           {total > 0 ? (
             <View style={s.card}>
-              <Text style={s.cardTitle} accessibilityRole="header">Where disciples are growing</Text>
-              <Text style={s.meta}>Personal growth stages across P2P Global.</Text>
+              <Text style={s.cardTitle} accessibilityRole="header">Milestones across P2P Global</Text>
+              <Text style={s.meta}>Totals only. Groups smaller than {collective.minimumGroup ?? 5} are not shown, so no one can be identified.</Text>
               {collective.stages.map((st) => (
-                <View key={st.stage} style={s.barRow} accessible accessibilityLabel={`${st.name}: ${st.people} people`}>
+                <View key={st.stage} style={s.barRow} accessible accessibilityLabel={`${st.name}: ${st.people == null ? (st.fewerThan ? few(st.fewerThan) : "none") : st.people} people`}>
                   <Text style={s.barEmoji}>{STAGES[st.stage - 1]?.emoji}</Text>
                   <Text style={s.barLabel} numberOfLines={1}>{st.name}</Text>
-                  <View style={s.barTrack}><View style={[s.barFill, { flex: st.people / total }]} /><View style={{ flex: 1 - st.people / total }} /></View>
-                  <Text style={s.barN}>{st.people}</Text>
+                  <View style={s.barTrack}><View style={[s.barFill, { flex: (st.people ?? 0) / total }]} /><View style={{ flex: 1 - (st.people ?? 0) / total }} /></View>
+                  <Text style={s.barN}>{st.people ?? (st.fewerThan ? `<${st.fewerThan}` : 0)}</Text>
                 </View>
               ))}
             </View>
@@ -290,10 +291,10 @@ function GlobalForest({ collective, failed, mine }: { collective: Collective | n
             <View style={s.card}>
               <Text style={s.cardTitle} accessibilityRole="header">Walks begun</Text>
               <Text style={s.meta}>New discipleship relationships each month.</Text>
-              <View style={s.spark} accessible accessibilityLabel={months.map((m) => `${m.month}: ${m.relationships}`).join(", ")}>
+              <View style={s.spark} accessible accessibilityLabel={months.map((m) => `${m.month}: ${m.relationships ?? few(m.fewerThan)}`).join(", ")}>
                 {months.map((m) => (
                   <View key={m.month} style={s.sparkCol}>
-                    <View style={[s.sparkBar, { height: 8 + (m.relationships / peak) * 64 }]} />
+                    <View style={[s.sparkBar, { height: 8 + ((m.relationships ?? 0) / peak) * 64 }]} />
                     <Text style={s.sparkLabel}>{new Date(m.month + "-01T00:00:00Z").toLocaleDateString(undefined, { month: "short" })}</Text>
                   </View>
                 ))}

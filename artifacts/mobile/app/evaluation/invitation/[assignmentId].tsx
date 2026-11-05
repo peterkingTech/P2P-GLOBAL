@@ -53,6 +53,13 @@ export default function InvitationScreen() {
         <Row s={s} label="Privacy" value={inv.safeguarding} />
       </View>
 
+      {inv.commitments?.length ? (
+        <View style={s.panel} accessible accessibilityLabel={`By accepting you agree: ${inv.commitments.join(" ")}`}>
+          <Text style={s.title}>By accepting, you agree:</Text>
+          {inv.commitments.map((t) => <Text key={t} style={s.body}>• {t}</Text>)}
+        </View>
+      ) : null}
+
       <View style={s.verse}>
         <Text style={s.body}>{RESPONSIBILITY_REMINDER}</Text>
         <Text style={s.quote}>“{SERVICE_SCRIPTURES[0].text}” — {SERVICE_SCRIPTURES[0].ref}</Text>

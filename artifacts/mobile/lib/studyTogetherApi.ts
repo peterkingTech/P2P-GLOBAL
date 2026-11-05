@@ -48,7 +48,8 @@ export interface SharedStudy {
 }
 
 export const getStudyDestinations = (): Promise<{ people: StudyPerson[]; groups: LedGroup[]; maxPeople: number }> => authedFetch("/destinations");
-export const startSharedStudy = (input: { contentType: StudyContentType; contentId: string; destination: StudyDestination; groupId?: string; userIds?: string[]; prompt?: string }): Promise<{ id: string; existing?: boolean; invited?: number }> => post("", input);
+/** `sectionId` starts at an exact part of the resource (a Kingdom Stories chapter). */
+export const startSharedStudy = (input: { contentType: StudyContentType; contentId: string; destination: StudyDestination; groupId?: string; userIds?: string[]; prompt?: string; sectionId?: string }): Promise<{ id: string; existing?: boolean; invited?: number }> => post("", input);
 /** A Family Circle / Church custom study the reader's group has published (opens the group's own study screen). */
 export interface GroupLessonCard { id: string; kind: "family" | "church"; title: string; description: string | null; groupId: string; groupName: string | null; updatedAt: string }
 export interface MyStudies { invitations: StudyCard[]; active: StudyCard[]; concluded: StudyCard[]; groupLessons?: GroupLessonCard[] }

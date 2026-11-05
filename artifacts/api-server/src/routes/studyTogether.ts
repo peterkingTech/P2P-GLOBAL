@@ -150,12 +150,31 @@ router.get("/destinations", async (req, res) => {
   } catch (e) { return fail(res, e); }
 });
 
+// The exact resource a study is about: the feature, the lesson (a Kingdom Stories chapter is its own lesson), never a title match.
+async function resourceIdentity(s: Study): Promise<Record<string, unknown>> {
+  if (s.content_type === "kingdom_story") {
+    const { data: ch } = s.current_section_id ? await db.from("p2p_kingdom_story_chapters").select("id,lesson_id,chapter_number").eq("id", s.current_section_id).maybeSingle() : { data: null };
+    const c = ch as { id: string; lesson_id: string | null; chapter_number: number } | null;
+    return { feature: "kingdom_stories", storyId: s.content_id, chapterId: c?.id ?? null, chapterNumber: c?.chapter_number ?? null, lessonId: c?.lesson_id ?? null };
+  }
+  if (s.content_type === "lesson") {
+    const { data: l } = await db.from("p2p_lessons").select("id,version,module_id").eq("id", s.content_id).maybeSingle();
+    const lesson = l as { id: string; version: number | null; module_id: string | null } | null;
+    const { data: m } = lesson?.module_id ? await db.from("p2p_modules").select("curriculum_id").eq("id", lesson.module_id).maybeSingle() : { data: null };
+    const curriculumId = (m as { curriculum_id?: string } | null)?.curriculum_id ?? null;
+    const { data: c } = curriculumId ? await db.from("p2p_curriculums").select("type").eq("id", curriculumId).maybeSingle() : { data: null };
+    const type = (c as { type?: string } | null)?.type;
+    return { feature: type === "core" ? "kingdom_school" : type === "plan" ? "bible_study_plan" : type === "kingdom_story" ? "kingdom_stories" : "learning", lessonId: s.content_id, curriculumId, version: lesson?.version ?? null };
+  }
+  return { feature: "bible_study", passageId: s.content_id };
+}
+
 // ── Start ────────────────────────────────────────────────────────────────────
 
 router.post("/", async (req, res) => {
   const userId = await caller(req, res);
   if (!userId) return;
-  const b = (req.body ?? {}) as { contentType?: string; contentId?: string; destination?: string; groupId?: string; userIds?: string[]; prompt?: string };
+  const b = (req.body ?? {}) as { contentType?: string; contentId?: string; destination?: string; groupId?: string; userIds?: string[]; prompt?: string; sectionId?: string };
   try {
     if (!CONTENT_TYPES.includes(b.contentType as ContentType)) throw new StudyError(400, "Choose a story or lesson to study.");
     if (!DESTINATIONS.includes(b.destination as Destination)) throw new StudyError(400, "Choose who to study with.");
@@ -163,6 +182,9 @@ router.post("/", async (req, res) => {
     const content = await loadContent(type, String(b.contentId ?? ""));
     if (!content) throw new StudyError(404, "This story or lesson isn't available.");
     const prompt = typeof b.prompt === "string" ? b.prompt.trim().slice(0, 1000) : "";
+    // Start at an exact part of the resource (e.g. one Kingdom Stories chapter), if given — only a real part of it.
+    if (b.sectionId !== undefined && b.sectionId !== null && !content.sections.some((x) => x.id === b.sectionId)) throw new StudyError(400, "That chapter isn't part of this story.");
+    const startSection = (b.sectionId as string | undefined) ?? content.sections[0]?.id ?? null;
 
     if (dest === "peer") {
       const userIds = Array.isArray(b.userIds) ? b.userIds.map(String) : [];
@@ -176,7 +198,7 @@ router.post("/", async (req, res) => {
       await refuseIfDeclinedRecently(userId, userIds);
       const { data: study, error } = await db.from("p2p_shared_studies").insert({
         content_type: type, content_id: content.id, title: content.title, host_id: userId, destination_type: "peer", destination_id: null,
-        current_section_id: content.sections[0]?.id ?? null,
+        current_section_id: startSection,
       }).select("*").single();
       if (error) throw error;
       await db.from("p2p_shared_study_members").insert({ study_id: study.id, user_id: userId, role: "host", status: "accepted", responded_at: new Date().toISOString(), last_opened_at: new Date().toISOString() });
@@ -193,7 +215,7 @@ router.post("/", async (req, res) => {
     if (existing) return res.json({ id: existing.id, existing: true });
     const { data: study, error } = await db.from("p2p_shared_studies").insert({
       content_type: type, content_id: content.id, title: content.title, host_id: userId, destination_type: dest, destination_id: groupId,
-      current_section_id: content.sections[0]?.id ?? null,
+      current_section_id: startSection,
     }).select("*").single();
     if (error) {
       if ((error as { code?: string }).code === "23505") {
@@ -303,6 +325,10 @@ router.get("/:id", async (req, res) => {
       host: { id: s.host_id, name: host.get(s.host_id)?.name ?? "Someone", photoUrl: host.get(s.host_id)?.photoUrl ?? null },
       me: { isHost: a.isHost, isLeader: a.isLeader, canParticipate: a.canParticipate, invited: a.invited, status: a.member?.status ?? (a.isGroupMember ? "group" : null), expiresAt: a.member?.expires_at ?? null },
       createdAt: s.created_at, updatedAt: s.updated_at, concludedAt: s.concluded_at,
+      // The exact learning resource being studied (stable ids), and a reminder that studying together
+      // never completes anyone's assessment: each person passes their own.
+      resource: await resourceIdentity(s),
+      individualAssessment: "Studying together never completes anyone's assessment — each person answers and is evaluated individually.",
     };
     // An invitee sees what they're invited to — not the discussion or who else is in it.
     if (!a.canParticipate) return res.json({ ...base, sections: [], currentSectionId: null, prompts: [], responses: [], members: [] });

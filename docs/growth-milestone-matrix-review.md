@@ -1,5 +1,7 @@
 # P2P Global — Growth Milestone Matrix Review
 
+> **Superseded.** This earlier review framed a "spiritual fruit" dimension. The implemented design (four dimensions: Consistency, Learning, Application, Service & Contribution) is in [growth-milestone-matrix.md](growth-milestone-matrix.md) and migration 239.
+
 *Design and inspection only (2026-11-05). Nothing in the application, database or thresholds has been changed. Promotions stay **off**.*
 
 ---

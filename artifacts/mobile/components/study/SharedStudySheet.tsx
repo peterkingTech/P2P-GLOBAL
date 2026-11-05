@@ -20,7 +20,8 @@ import { IconButton } from "@/components/ui";
 interface Props {
   visible: boolean;
   onClose: () => void;
-  content: { type: StudyContentType; id: string; title: string };
+  /** `sectionId`: start at this exact chapter of a Kingdom Story. */
+  content: { type: StudyContentType; id: string; title: string; sectionId?: string };
   onStarted: (studyId: string) => void;
 }
 type Step = "where" | "people" | "group";
@@ -61,8 +62,8 @@ export default function SharedStudySheet({ visible, onClose, content, onStarted 
     setBusy(true); setError(null); setExistingId(null);
     try {
       const r = await startSharedStudy(step === "group" && group
-        ? { contentType: content.type, contentId: content.id, destination: group.type, groupId: group.id, prompt: note.trim() || undefined }
-        : { contentType: content.type, contentId: content.id, destination: "peer", userIds: picked, prompt: note.trim() || undefined });
+        ? { contentType: content.type, contentId: content.id, destination: group.type, groupId: group.id, prompt: note.trim() || undefined, sectionId: content.sectionId }
+        : { contentType: content.type, contentId: content.id, destination: "peer", userIds: picked, prompt: note.trim() || undefined, sectionId: content.sectionId });
       onStarted(r.id);
     } catch (e: any) {
       setError(e?.message ?? "That didn't send. Please try again.");

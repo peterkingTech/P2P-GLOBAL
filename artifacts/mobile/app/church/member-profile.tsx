@@ -9,7 +9,7 @@ import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
 
 const STAGE_LABELS: Record<string, string> = {
-  dormant_seed: "Dormant Seed", sprout: "Sprout", young_tree: "Young Tree",
+  dormant_seed: "Seed", sprout: "Sprout", young_tree: "Young Tree",
   fruitful_tree: "Fruitful Tree", forest_builder: "Forest Builder", forest_of_nations: "Forest of Nations",
 };
 

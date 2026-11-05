@@ -11,9 +11,12 @@ import { acknowledgeOrientation, getEvaluatorProfile, updateAvailability, type E
 // Evaluator orientation, commitment and availability. Serving as an evaluator
 // is an invitation, never an obligation: the orientation explains the purpose
 // (with Scripture), how to give fair and encouraging feedback, privacy, the
-// 48-hour responsibility and automatic reassignment. Each commitment is
-// acknowledged before P2P Global may invite you. Availability, pauses and how
-// many at a time are always yours to set. The service record is private.
+// 48-hour responsibility and automatic reassignment. Since 240 this guide is
+// optional: nobody signs up — people are invited only for a resource they
+// passed independently, and the commitments are agreed when accepting an
+// invitation (the commitment panel shows only for older server versions).
+// Availability, pauses and how many at a time are always yours to set. The
+// service record is private.
 
 export default function Orientation() {
   const { colors: c } = useTheme();

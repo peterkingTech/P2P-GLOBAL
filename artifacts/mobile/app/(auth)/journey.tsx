@@ -457,8 +457,8 @@ export default function JourneyScreen() {
             <Text style={styles.subtitle}>Every forest begins with one seed</Text>
 
             <Text style={styles.explanationText}>
-              In P2P Global, your spiritual growth is shown as a living tree. As you complete lessons, your roots
-              grow deeper. As you guide others, branches spread. As you bear fruit, the forest grows.
+              In P2P Global, your participation is shown as a living tree. As you pass lessons, your roots
+              grow deeper. As you help others learn, branches spread. Together, the forest grows.
             </Text>
 
             <Animated.View style={[styles.seedWrap, { opacity: seedOpacity, transform: [{ scale: seedScale }] }]}>

@@ -17,7 +17,11 @@ export interface MyLineage {
 }
 export interface Collective {
   activeRelationships: number; peopleBeingDiscipled: number; peopleDiscipling: number; generations: number; countries: number;
-  stages: { stage: number; name: string; people: number }[]; relationshipsBegun: { month: string; relationships: number }[];
+  // Small groups are suppressed on the server (239): `people`/`relationships` is null and `fewerThan` says the minimum.
+  stages: { stage: number; name: string; people: number | null; fewerThan?: number | null }[];
+  relationshipsBegun: { month: string; relationships: number | null; fewerThan?: number | null }[];
+  participation?: ({ month: string; participants: number; learningUnitsPassed: number; practicalActions: number; contributions: number } | { month: string; suppressed: true })[];
+  minimumGroup?: number;
 }
 export interface RelationshipCard {
   linkId: string; status: "pending" | "active" | "paused" | "ended"; isPrimary: boolean; startedAt: string | null; pausedAt: string | null; endedAt: string | null; endReason: string | null; requestedAt: string;

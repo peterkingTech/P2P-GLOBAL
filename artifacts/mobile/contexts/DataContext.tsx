@@ -982,6 +982,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // approved question rather than the last one.
       const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
       const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
+      const freshStartLessons = new Set<string>();
       if (userId) {
         const { data: progressRows } = await supabase
           .from("p2p_lesson_progress")
@@ -997,11 +998,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         // "needs revision" as a state distinct from both not-started and done.
         const { data: myEvals } = await supabase
           .from("p2p_lesson_evaluations")
-          .select("lesson_id,status")
+          .select("lesson_id,status,engine_state")
           .eq("submitter_id", userId)
           .in("status", ["pending", "needs_revision"]);
         for (const e of (myEvals ?? []) as Record<string, unknown>[]) {
           const lessonId = e.lesson_id as string;
+          // Closed at the fresh start (migration 240): not waiting any more — answer again.
+          if (e.engine_state === "cancelled") { freshStartLessons.add(lessonId); continue; }
           const status = e.status as "pending" | "needs_revision";
           // needs_revision takes priority over pending if a lesson somehow has both.
           if (status === "needs_revision" || !evalStatusByLesson.has(lessonId)) {
@@ -1052,7 +1055,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             ? undefined
             : evalStatusByLesson.get(l.id as string) === "needs_revision"
               ? "needs_revision"
-              : lessonStatus === "submitted" ? "pending" : undefined;
+              : lessonStatus === "submitted" && !(freshStartLessons.has(l.id as string) && !evalStatusByLesson.has(l.id as string)) ? "pending" : undefined;
           // Layer 1 (submission gate): the next lesson unlocks once every
           // question in this one has been submitted — approval isn't required.
           const passedForUnlock = isCompleted || lessonStatus === "submitted";
@@ -1184,11 +1187,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const progressByLesson = new Map<string, boolean>();
       const statusByLesson = new Map<string, "not_started" | "submitted" | "completed">();
       const evalStatusByLesson = new Map<string, "pending" | "needs_revision">();
+      const freshStartLessons = new Set<string>();
       if (userId && moduleLessons.length) {
         const lessonIds = moduleLessons.map((l) => l.id as string);
         const [{ data: progressRows }, { data: myEvals }] = await Promise.all([
           supabase.from("p2p_lesson_progress").select("lesson_id,completed,status").eq("user_id", userId).in("lesson_id", lessonIds),
-          supabase.from("p2p_lesson_evaluations").select("lesson_id,status").eq("submitter_id", userId).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
+          supabase.from("p2p_lesson_evaluations").select("lesson_id,status,engine_state").eq("submitter_id", userId).in("status", ["pending", "needs_revision"]).in("lesson_id", lessonIds),
         ]);
         for (const p of (progressRows ?? []) as Record<string, unknown>[]) {
           progressByLesson.set(p.lesson_id as string, Boolean(p.completed));
@@ -1196,6 +1200,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
         for (const e of (myEvals ?? []) as Record<string, unknown>[]) {
           const lessonId = e.lesson_id as string;
+          if (e.engine_state === "cancelled") { freshStartLessons.add(lessonId); continue; }
           const status = e.status as "pending" | "needs_revision";
           if (status === "needs_revision" || !evalStatusByLesson.has(lessonId)) evalStatusByLesson.set(lessonId, status);
         }
@@ -1225,7 +1230,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           ? undefined
           : evalStatusByLesson.get(l.id as string) === "needs_revision"
             ? "needs_revision"
-            : lessonStatus === "submitted" ? "pending" : undefined;
+            : lessonStatus === "submitted" && !(freshStartLessons.has(l.id as string) && !evalStatusByLesson.has(l.id as string)) ? "pending" : undefined;
         const passedForUnlock = isCompleted || lessonStatus === "submitted";
         const isReviewLesson = (l.order_index as number) >= 999;
         const isThisLocked = thisModuleLocked || (
@@ -3452,9 +3457,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (subError || !sub) return null;
       const { data: evaluation } = await supabase
         .from("p2p_lesson_evaluations")
-        .select("status,feedback,self_approved")
+        .select("status,feedback,self_approved,engine_state")
         .eq("submission_id", sub.id)
         .maybeSingle();
+      // Closed at the fresh start: the check is open to be answered again.
+      if ((evaluation as Record<string, unknown> | null)?.engine_state === "cancelled") return null;
       return {
         submissionId: sub.id as string,
         submissionType: (sub.submission_type as SubmissionType) ?? "text",
@@ -3544,14 +3551,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (submissionIds.length > 0) {
         const { data: evals } = await supabase
           .from("p2p_lesson_evaluations")
-          .select("submission_id,status,feedback,self_approved")
+          .select("submission_id,status,feedback,self_approved,engine_state")
           .in("submission_id", submissionIds);
         for (const e of (evals ?? []) as Record<string, unknown>[]) {
           evalBySubmission.set(e.submission_id as string, e);
         }
       }
 
-      return deduped.map((r) => {
+      // Fresh start (migration 240): a question whose latest answer's evaluation was closed is
+      // shown unanswered, so the learner answers it again and it is evaluated from scratch.
+      return deduped.filter((r) => evalBySubmission.get(r.id as string)?.engine_state !== "cancelled").map((r) => {
         const ev = evalBySubmission.get(r.id as string);
         return {
           id: r.id as string,

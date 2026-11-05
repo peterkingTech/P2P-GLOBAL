@@ -67,3 +67,123 @@ Migration 229 starts with `engine_enabled = false`, so nothing changes. To switc
 3. Turn the engine on in Evaluation oversight → Settings.
 
 Legacy pending rows keep the old 72-hour sweep. Moving them into the engine is a separate, explicit step that hasn't been built yet.
+
+## Universal engine and exact-resource qualification (migration 240, written 2026-11-05, not applied)
+
+One engine now evaluates every independently assessed resource:
+
+- **Lesson-backed resources:** Kingdom School lessons, Kingdom Stories chapters (any category) and Bible Study Plan sessions, wherever they are studied: alone, in the Learning Centre, in Study Together, in a Family or a Church. Each participant's answers remain their own submission, evaluation and credit. There is never a group grade.
+- **Family and Church custom-lesson assignments:** only when *group assignments* is switched on (default **off**, because it changes a family-private workflow). They are evaluated only by current members of that same Family or Church. The leader's own review keeps working and closes the engine evaluation. A resubmission replaces an attempt that is still waiting.
+
+### Who is invited
+
+- **Qualification:** a person may evaluate a resource only if they passed **that exact resource** through an independent evaluation.
+  - **Lessons:** the Growth Matrix ledger's `learning.assessment_passed` for that lesson. That means peer-approved, never self-approved, never by the learner, and never from an evaluation with a substantiated concern.
+  - **Group assignments:** their own submission to that assignment, reviewed by someone else.
+- **No cross-qualification:** passing lesson A never qualifies anyone for lesson B, another chapter, plan or feature.
+- **No sign-up:** there is no registration, orientation gate or volunteer list.
+  - The commitments are shown on the invitation and recorded on acceptance.
+  - The orientation screen remains an optional guide and the place to set availability.
+- **Retired routes:** reviewer roles with chosen subjects, and `lesson_progress.completed` (which a client can write), no longer qualify anyone.
+- **Safeguarding (unchanged):** never the submitter; active accounts only; no blocks either way; the minor-contact rules; not restricted; available and under capacity; never someone already tried for that evaluation.
+
+### Matching (`p2p_eval_candidates`)
+
+Qualification has one definition, `p2p_eval_qualified_pool(kind, resource)`, which everything reads.
+
+Among the qualified, the score combines these factors, in priority order:
+
+| Priority | Factor | Points |
+|---|---|---|
+| 1 | Language: same content language | +8 |
+| 1 | Language: same app language | +4 |
+| 2 | Geography: nearby (≤ 50 km, from voluntarily shared coordinates) | +4 |
+| 2 | Geography: same city | +3.5 |
+| 2 | Geography: same region | +3 |
+| 2 | Geography: same country | +2 |
+| 2 | Geography: a time zone within 3 hours | +1 |
+| 2 | Geography: anywhere else in the world | 0 (still eligible) |
+| 3 | Stage: 1–2 stages ahead | +1.5 |
+| 3 | Stage: further ahead | +0.75 |
+| 3 | Stage: same stage | +0.25 |
+| 4 | Workload: each open evaluation | −2 |
+| 4 | Workload: each invitation this week | −1 |
+| 4 | Workload: each completion in the last 30 days | −0.5 |
+| 4 | Performance: each missed deadline in the last 90 days | −2 |
+| 4 | Performance: each expired invitation in the last 30 days | −0.5 |
+| 4 | Fairness: never invited before | +0.5 |
+| 5 | Variety: evaluated this learner in the last 90 days | −1 |
+| 5 | Integrity: a reciprocal partner (the learner recently approved this person's work) | −3 |
+
+- **Stage is a preference only, never a condition.** Peer Guides get no priority.
+- **Capacity and availability are hard limits.**
+- **Reasons are recorded as labels only**, e.g. `same_city`, never the city itself.
+
+### Assessment versions
+
+- **Recording a revision:** an administrator records a **material** revision of an assessment (`p2p_assessment_revisions`, append-only, with a reason). Evaluation oversight → an evaluation's history → "This assessment was materially revised".
+- **Effect:** earlier passes keep their learning credit, but only a pass of the revised version qualifies someone to evaluate it.
+- **Duplicates:** passing again never creates a second qualification.
+
+### Integrity
+
+- **Reciprocal pairs:** `p2p_eval_reciprocal_pairs` lists pairs who approved each other's work in the last 180 days.
+- **Review:** a coordinator records a decision with a note in `p2p_eval_integrity_reviews`, which is append-only. Nothing happens automatically.
+- **Matching:** reciprocal partners are avoided.
+
+### Operations
+
+`p2p_eval_operations()` (Evaluation oversight) reports:
+- qualified evaluators, and the resources they cover;
+- pending and unassigned evaluations;
+- expiries and reassignments in the last 30 days;
+- median hours to accept and to complete;
+- workload distribution;
+- reciprocal pairs awaiting review.
+
+### Learner-facing statuses
+
+| Status | When |
+|---|---|
+| Searching for a qualified evaluator | Queued |
+| Assigned — waiting for the evaluator to accept | Invited |
+| Under evaluation | Accepted |
+| Approved — feedback ready | Passed |
+| Returned for correction | Revision required |
+| Reassigned | An invitation expired or was declined, or the evaluator stepped away or ran out of time |
+
+The server sends the label as `statusLabel`.
+
+### Cold start
+
+When nobody has independently passed a resource yet, its evaluations stay queued and are listed under **Who can evaluate what** in Evaluation oversight.
+
+- **Optional bootstrap (owner decision; it departs from the strict "only someone who passed it" rule):** the owner may set *cold-start reviewers* (`bootstrap_roles`, default empty). Those roles may then be invited **only** for resources nobody has passed independently. These invitations are labelled `bootstrap`.
+- **Stepping aside:** once anyone qualifies, bootstrap reviewers are no longer invited for that resource.
+- **No early re-checks are lost:** when someone newly passes a resource, waiting evaluations of it are re-tried at the next sweep.
+
+### Fresh start for pending evaluations (owner decision, 2026-11-05)
+
+Migration 240 closes every evaluation still **waiting** when it runs (queued or invited) as `cancelled`, with the reason `fresh_start`. In the 2026-11-04 backup that is 86 in the engine, plus 1 older row: Peer-to-Peer Orientation and one Kingdom Stories chapter, from 5 learners.
+
+- **Kept:**
+  - Nothing is deleted. Each evaluation keeps its history and gains a `cancelled` event.
+  - The learners' answers and lesson progress are untouched.
+  - Nobody is notified.
+  - Work an evaluator had already accepted would not be touched (there was none).
+- **In the app (new build):**
+  - A question whose answer's evaluation was closed shows as unanswered, so the learner answers it again and the engine evaluates the new answer from scratch.
+  - The lesson no longer shows "awaiting review".
+  - Foundations progress shows "Answer the check again for a fresh evaluation".
+- **Older builds** keep showing "waiting" for those lessons until they update.
+
+### Safety of the change
+
+- Accepted work is never taken away by the rule change. The sweep checks accepted evaluations for safety only, and open invitations for full eligibility.
+- The migration sends no notifications and deletes nothing.
+
+### Tests
+
+- `migrations/tests/240_universal_peer_evaluation.db.test.mjs`: 54 checks on a restored copy.
+- API: `peerEvaluation.test.mjs`.
+- App: `peerEvaluation.test.mjs`.

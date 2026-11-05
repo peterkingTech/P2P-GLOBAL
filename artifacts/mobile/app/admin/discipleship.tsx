@@ -6,16 +6,29 @@ import { apiRequest } from "@/lib/apiClient";
 import { confirmAction } from "@/lib/alerts";
 
 // ADMIN — DISCIPLESHIP & GROWTH. The milestone matrix behind the personal
-// growth stages (migration 235), approving it and switching promotions on —
+// growth stages (migrations 235/239), why a person qualifies or not, evidence
+// review, the learning-unit/Core Curriculum audit, approving the matrix and switching promotions on —
 // each with a written reason, recorded in the audit — and controlled
 // corrections to discipleship relationships (ended with a reason, never
 // deleted). Every action is checked on the server (growth.view,
 // growth.approve_matrix, genealogy.view_named, genealogy.correct).
 
-interface Req { stage: number; stageName: string; dimension: string; label: string; min_value: number; data_source: string }
-interface Growth { settings: { thresholds_status: string; promotions_enabled: boolean; approved_at: string | null } | null; requirements: Req[] }
+interface Req { stage: number; stageName: string; dimension: string; fact_key: string; label: string; min_value: number; param: number | null; data_source: string; explanation?: string }
+interface Growth { settings: { thresholds_status: string; promotions_enabled: boolean; approved_at: string | null; calc_version?: number; legacy_formula_frozen?: boolean } | null; requirements: Req[] }
 interface Rel { id: string; mentorName?: string; discipleName?: string; status: string; is_primary: boolean; started_at: string | null; ended_at: string | null; end_reason: string | null }
-const DIM: Record<string, string> = { consistency: "Consistency", learning: "Learning", fruit: "Spiritual fruit", discipleship: "Discipleship" };
+interface Item { label: string; met: boolean; have: number; need: number; missing: string | null }
+interface Explain {
+  person: { name: string };
+  status: { stageName: string; verification: string; eligible_stage: number; evaluated_at: string | null; next: { dimension: string; label: string; items: Item[] }[] | null;
+            verified: { learningUnits: number; practicalActions: number; contributions: number; activeWeeks: number; coreLessons: { passed: number; total: number } } } | null;
+  provenance: Record<string, { counted: number; pending: number; rejected: number; withdrawn: number }>;
+  guideHistory: { status: string; is_primary: boolean; started_at: string | null; ended_at: string | null }[];
+  contributionNetwork: { support_months: number; developed: boolean; onward_months: number; learnerStillActive: boolean }[];
+}
+interface Pending { id: string; participant?: string; evidence_type: string; local_date: string; source_resource: string }
+interface Units { core: { publishedLessons: number; expected: number; withAssessment: number }; byResource: Record<string, { units: number; withoutAssessment: number; practicalQuestions: number }> }
+// The four independent dimensions (migration 239).
+const DIM: Record<string, string> = { consistency: "Consistency", learning: "Learning", application: "Application", service: "Service & Contribution" };
 
 export default function AdminDiscipleship() {
   const [growth, setGrowth] = useState<Growth | null>(null);
@@ -26,10 +39,31 @@ export default function AdminDiscipleship() {
   const [username, setUsername] = useState("");
   const [rels, setRels] = useState<{ person: { name: string }; relationships: Rel[] } | null>(null);
   const [fixReason, setFixReason] = useState("");
+  const [who, setWho] = useState("");
+  const [explain, setExplain] = useState<Explain | null>(null);
+  const [pending, setPending] = useState<Pending[] | null>(null);
+  const [reviewReason, setReviewReason] = useState("");
+  const [units, setUnits] = useState<Units | null>(null);
 
   const load = useCallback(async () => {
     try { setGrowth(await apiRequest<Growth>("/admin-centre/growth")); setError(null); } catch (e) { setError((e as Error).message); }
+    // Each panel below needs its own permission; a panel this account can't use simply stays hidden.
+    apiRequest<{ evidence: Pending[] }>("/admin-centre/growth/evidence/review").then((r) => setPending(r.evidence)).catch(() => setPending(null));
+    apiRequest<Units>("/admin-centre/growth/learning-units").then(setUnits).catch(() => setUnits(null));
   }, []);
+  const lookupWhy = async () => {
+    setNotice(null); setExplain(null);
+    try { setExplain(await apiRequest<Explain>(`/admin-centre/growth/person?username=${encodeURIComponent(who.trim())}`)); } catch (e) { setNotice((e as Error).message); }
+  };
+  const review = async (id: string, action: "approve" | "reject") => {
+    if (reviewReason.trim().length < 5) { setNotice("Write the reason first — it is kept with the evidence."); return; }
+    try { await apiRequest(`/admin-centre/growth/evidence/${id}/review`, { method: "POST", body: JSON.stringify({ action, reason: reviewReason.trim() }) }); setNotice(action === "approve" ? "Approved." : "Rejected."); setReviewReason(""); await load(); }
+    catch (e) { setNotice((e as Error).message); }
+  };
+  const reconcile = () => confirmAction("Re-check legacy stages?", "Trusted history is recorded and everyone with a recognised (not yet verified) stage is re-checked. Nobody is raised or lowered.", async () => {
+    try { const r = await apiRequest<{ result: { checked: number; still_unverified: number } }>("/admin-centre/growth/reconcile-legacy", { method: "POST" }); setNotice(`Re-checked ${r.result.checked}; ${r.result.still_unverified} still recognised but not yet verified.`); }
+    catch (e) { setNotice((e as Error).message); }
+  });
   useEffect(() => { load(); }, [load]);
 
   const change = async (body: Record<string, unknown>, done: string) => {
@@ -58,15 +92,15 @@ export default function AdminDiscipleship() {
       {growth ? (
         <View style={s.card}>
           <Text style={s.h2} accessibilityRole="header">Growth milestones</Text>
-          <Text style={s.meta}>Matrix: {st?.thresholds_status === "approved" ? `approved${st.approved_at ? ` ${new Date(st.approved_at).toLocaleDateString()}` : ""}` : "DRAFT"} · Promotions: {st?.promotions_enabled ? "ON" : "off"}</Text>
-          <Text style={s.meta}>Forest Builder is the highest personal stage. Every requirement of a stage must be met; one dimension never makes up for another.</Text>
+          <Text style={s.meta}>Matrix (calculation v{st?.calc_version ?? 2}): {st?.thresholds_status === "approved" ? `approved${st.approved_at ? ` ${new Date(st.approved_at).toLocaleDateString()}` : ""}` : "DRAFT"} · Promotions: {st?.promotions_enabled ? "ON" : "off"} · Previous formulas: {st?.legacy_formula_frozen === false ? "active" : "frozen"}</Text>
+          <Text style={s.meta}>Forest Builder is the highest personal stage. Every requirement of all four dimensions must be met; one dimension never makes up for another. Milestones record participation and contribution — never a person's relationship with God.</Text>
           {[2, 3, 4, 5].map((n) => {
             const rows = growth.requirements.filter((r) => r.stage === n);
             return (
               <View key={n} style={s.stage}>
                 <Text style={s.stageName}>{rows[0]?.stageName ?? `Stage ${n}`}</Text>
                 {rows.map((r) => (
-                  <Text key={r.label} style={s.req}>• {DIM[r.dimension] ?? r.dimension}: {r.label} <Text style={s.src}>({r.data_source})</Text></Text>
+                  <Text key={r.fact_key ?? r.label} style={s.req}>• {DIM[r.dimension] ?? r.dimension}: {r.label} <Text style={s.src}>({r.explanation ?? r.data_source})</Text></Text>
                 ))}
               </View>
             );
@@ -83,6 +117,61 @@ export default function AdminDiscipleship() {
                 onPress={() => confirmAction("Switch promotions on?", "Everyone is re-checked; people who meet a stage's milestones move up and are celebrated. Nobody is ever lowered.", () => change({ promotionsEnabled: true }, "Promotions on. Everyone is being re-checked."))} />
             )}
           </View>
+        </View>
+      ) : null}
+
+      <View style={s.card}>
+        <Text style={s.h2} accessibilityRole="header">Why someone qualifies — or not yet</Text>
+        <Text style={s.meta}>Counts, kinds and dates of verified evidence only — never reflections, journals, messages or answers. Looking someone up is recorded in the audit.</Text>
+        <View style={s.row}>
+          <TextInput style={[s.input, { flex: 1 }]} value={who} onChangeText={setWho} placeholder="@username" autoCapitalize="none" placeholderTextColor={colors.textMuted} accessibilityLabel="Username to explain" onSubmitEditing={lookupWhy} />
+          <AppButton label="Explain" size="sm" variant="secondary" onPress={lookupWhy} disabled={!who.trim()} />
+        </View>
+        {explain?.status ? (
+          <>
+            <Text style={s.sub}>{explain.person.name} · {explain.status.stageName} ({explain.status.verification.replace("_", " ")})</Text>
+            <Text style={s.meta}>Verified: {explain.status.verified.learningUnits} learning units · {explain.status.verified.practicalActions} practical actions · {explain.status.verified.contributions} contributions · {explain.status.verified.activeWeeks} active weeks · Core {explain.status.verified.coreLessons.passed}/{explain.status.verified.coreLessons.total}</Text>
+            {(explain.status.next ?? []).map((d) => (
+              <View key={d.dimension} style={s.stage}>
+                <Text style={s.stageName}>{d.label}</Text>
+                {d.items.map((i) => <Text key={i.label} style={s.req}>{i.met ? "✓" : "○"} {i.label}: {i.have} of {i.need}{i.missing ? ` — ${i.missing}` : ""}</Text>)}
+              </View>
+            ))}
+            <Text style={s.sub}>Evidence by kind</Text>
+            {Object.entries(explain.provenance).map(([k, v]) => <Text key={k} style={s.meta}>{k}: {v.counted} counted{v.pending ? ` · ${v.pending} awaiting review` : ""}{v.rejected ? ` · ${v.rejected} rejected` : ""}{v.withdrawn ? ` · ${v.withdrawn} withdrawn` : ""}</Text>)}
+            <Text style={s.sub}>Guide relationships ({explain.guideHistory.length})</Text>
+            {explain.guideHistory.slice(0, 10).map((g, i) => <Text key={i} style={s.meta}>{g.status}{g.is_primary ? " · primary" : ""}{g.started_at ? ` · from ${new Date(g.started_at).toLocaleDateString()}` : ""}{g.ended_at ? ` · to ${new Date(g.ended_at).toLocaleDateString()}` : ""}</Text>)}
+            <Text style={s.sub}>People they helped (pseudonymous)</Text>
+            {explain.contributionNetwork.length ? explain.contributionNetwork.map((n, i) => (
+              <Text key={i} style={s.meta}>Learner {i + 1}: supported in {n.support_months} month{n.support_months === 1 ? "" : "s"} · {n.developed ? "developed afterwards" : "no development evidence yet"} · helping others in {n.onward_months} month{n.onward_months === 1 ? "" : "s"}{n.learnerStillActive ? "" : " · has left (last verified level kept)"}</Text>
+            )) : <Text style={s.meta}>None recorded yet.</Text>}
+          </>
+        ) : null}
+      </View>
+
+      {pending ? (
+        <View style={s.card}>
+          <Text style={s.h2} accessibilityRole="header">Evidence awaiting review ({pending.length})</Text>
+          <Text style={s.meta}>Only kinds of evidence set to need a review appear here. Approve or reject with a reason; nobody can review their own.</Text>
+          {pending.length ? <TextInput style={s.input} value={reviewReason} onChangeText={setReviewReason} placeholder="Reason (kept with the evidence)" placeholderTextColor={colors.textMuted} accessibilityLabel="Reason for the review" /> : null}
+          {pending.slice(0, 30).map((p) => (
+            <View key={p.id} style={s.rel}>
+              <Text style={s.req}>{p.participant ?? "A participant"} · {p.evidence_type} · {p.local_date}</Text>
+              <View style={s.row}>
+                <AppButton label="Approve" size="sm" variant="secondary" onPress={() => review(p.id, "approve")} />
+                <AppButton label="Reject" size="sm" variant="tertiary" onPress={() => review(p.id, "reject")} />
+              </View>
+            </View>
+          ))}
+          <AppButton label="Re-check legacy stages" size="sm" variant="secondary" onPress={reconcile} />
+        </View>
+      ) : null}
+
+      {units ? (
+        <View style={s.card}>
+          <Text style={s.h2} accessibilityRole="header">Learning units and assessments</Text>
+          <Text style={s.meta}>A unit counts only when its assessment is passed and peer-reviewed. Core Curriculum: {units.core.publishedLessons} published lessons (expected {units.core.expected}), {units.core.withAssessment} with an assessment.</Text>
+          {Object.entries(units.byResource).map(([k, v]) => <Text key={k} style={s.req}>• {k.replace(/_/g, " ")}: {v.units} units · {v.withoutAssessment} without an assessment · {v.practicalQuestions} practical questions</Text>)}
         </View>
       ) : null}
 

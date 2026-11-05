@@ -5,14 +5,16 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, SegmentedControl } from "@/components/ui";
 import {
-  adminConcerns, adminEvaluators, adminHistory, adminOverview, adminReassign, adminReviewConcern, adminSetStanding, adminSettings, adminSweep,
+  adminConcerns, adminCoverage, adminEvaluators, adminHistory, adminIntegrity, adminIntegrityReview, adminOperations, adminOverview, adminReassign, adminRecordRevision,
+  adminReviewConcern, adminSetStanding, adminSettings, adminSweep,
 } from "@/lib/peerEvaluationApi";
 
 // Evaluation oversight (super admins / supervisors only — the server checks).
 // See what's waiting, due, overdue, reassigned or without an evaluator; the
-// sweep's health; evaluators' records (human review, never automatic
-// punishment); concerns raised by evaluatees; and the engine switch. A
-// reassignment here still lets the SYSTEM choose who is next.
+// sweep's health; which resources have nobody qualified yet (240: only people
+// who passed THAT resource independently are invited); evaluators' records
+// (human review, never automatic punishment); concerns raised by evaluatees;
+// and the owner's switches. A reassignment here still lets the SYSTEM choose who is next.
 
 type Tab = "overview" | "evaluators" | "concerns" | "settings";
 
@@ -23,6 +25,9 @@ export default function EvaluationAdmin() {
   const [ov, setOv] = useState<Record<string, any> | null>(null);
   const [evs, setEvs] = useState<Record<string, any>[] | null>(null);
   const [concerns, setConcerns] = useState<Record<string, any>[] | null>(null);
+  const [coverage, setCoverage] = useState<{ title: string; context: string | null; waiting: number; hasQualifiedPeople: boolean }[] | null>(null);
+  const [ops, setOps] = useState<Awaited<ReturnType<typeof adminOperations>> | null>(null);
+  const [pairs, setPairs] = useState<Awaited<ReturnType<typeof adminIntegrity>>["items"] | null>(null);
   const [history, setHistory] = useState<Record<string, any> | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +35,9 @@ export default function EvaluationAdmin() {
 
   const load = useCallback(async () => {
     try {
-      const [o, e, cc] = await Promise.all([adminOverview(), adminEvaluators(), adminConcerns()]);
-      setOv(o); setEvs(e.items); setConcerns(cc.items); setError(null);
+      const [o, e, cc, cv, op, ip] = await Promise.all([adminOverview(), adminEvaluators(), adminConcerns(), adminCoverage().catch(() => ({ items: [] })),
+        adminOperations().catch(() => null), adminIntegrity().catch(() => ({ items: [] }))]);
+      setOv(o); setEvs(e.items); setConcerns(cc.items); setCoverage(cv.items); setOps(op); setPairs(ip.items); setError(null);
     } catch (e: any) { setError(e?.message ?? "Couldn't load."); }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -73,16 +79,56 @@ export default function EvaluationAdmin() {
             {ov.health?.stuck?.length ? <><Text style={s.title}>Stuck</Text>{ov.health.stuck.map(item)}</> : <Text style={s.meta}>Nothing stuck.</Text>}
             <AppButton label="Run the sweep now" size="sm" variant="secondary" onPress={() => act(adminSweep, "Sweep run.")} />
           </View>
+          {ops ? (
+            <View style={s.panel}>
+              <Text style={s.section}>Evaluator operations</Text>
+              <Text style={s.body}>{ops.qualifiedEvaluators} qualified evaluator{ops.qualifiedEvaluators === 1 ? "" : "s"} across {ops.resourcesWithQualifiedPeople} resource{ops.resourcesWithQualifiedPeople === 1 ? "" : "s"} · {ops.pending} pending · {ops.unassigned} without an evaluator</Text>
+              <Text style={s.meta}>Last 30 days: {ops.expired30d} invitations expired · {ops.reassigned30d} reassigned · median {ops.medianHoursToAccept ?? "—"} h to accept, {ops.medianHoursToComplete ?? "—"} h to complete</Text>
+              <Text style={s.meta}>Workload now: {ops.workload.length ? ops.workload.map((w) => `${w.people} with ${w.activeEvaluations}`).join(" · ") : "nobody has an open evaluation"}</Text>
+            </View>
+          ) : null}
+          {pairs?.length ? (
+            <View style={[s.panel, pairs.some((p) => p.needsReview) && { borderLeftWidth: 4, borderLeftColor: c.amber }]}>
+              <Text style={s.section}>Approval patterns to review</Text>
+              <Text style={s.meta}>People who approved each other's work. A human decides — nothing happens automatically. Every decision is kept.</Text>
+              {pairs.map((p) => (
+                <View key={p.pairKey} style={s.item}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.title}>{p.people.join(" ↔ ")}</Text>
+                    <Text style={s.meta}>{p.approvals[0]} and {p.approvals[1]} approvals · latest {new Date(p.lastAt).toLocaleDateString()}{p.review ? ` · reviewed: ${p.review.decision.replace(/_/g, " ")}` : ""}</Text>
+                  </View>
+                  {p.needsReview ? <AppButton label="No concern" size="sm" variant="tertiary" disabled={reason.trim().length < 5}
+                    onPress={() => act(() => adminIntegrityReview(p.pairKey, "no_concern", reason.trim()), "Recorded.")} /> : null}
+                  {p.needsReview ? <AppButton label="Concern" size="sm" variant="secondary" disabled={reason.trim().length < 5}
+                    onPress={() => act(() => adminIntegrityReview(p.pairKey, "concern_raised", reason.trim()), "Recorded.")} /> : null}
+                </View>
+              ))}
+              <TextInput style={s.input} value={reason} onChangeText={setReason} placeholder="Note for your decision (required)" placeholderTextColor={c.textMuted} accessibilityLabel="Note for the review decision" />
+            </View>
+          ) : null}
+          <View style={s.panel}>
+            <Text style={s.section}>Who can evaluate what</Text>
+            <Text style={s.meta}>Only people who passed a resource through an independent evaluation are invited for that same resource. These are waiting:</Text>
+            {coverage?.length ? coverage.map((r, i) => (
+              <Text key={i} style={s.body}>{r.hasQualifiedPeople ? "●" : "○"} {r.title}{r.context ? ` · ${r.context.replace(/_/g, " ")}` : ""} — {r.waiting} waiting{r.hasQualifiedPeople ? "" : " · nobody has passed it yet"}</Text>
+            )) : <Text style={s.meta}>Nothing waiting.</Text>}
+          </View>
           <View style={s.panel}><Text style={s.section}>No evaluator available</Text>{ov.noEvaluator?.length ? ov.noEvaluator.map(item) : <Text style={s.meta}>None.</Text>}</View>
           <View style={s.panel}><Text style={s.section}>Due soon / overdue</Text>{ov.dueSoon?.length ? ov.dueSoon.map(item) : <Text style={s.meta}>None.</Text>}</View>
           <View style={s.panel}><Text style={s.section}>Recently reassigned</Text>{ov.recentlyReassigned?.length ? ov.recentlyReassigned.map((r: any, i: number) => <Text key={i} style={s.meta}>{r.reason} · {new Date(r.at).toLocaleString()}</Text>) : <Text style={s.meta}>None.</Text>}</View>
           {history ? (
             <View style={s.panel}>
               <Text style={s.section}>{history.lessonTitle} — {history.evaluatee}</Text>
-              {history.assignments.map((a: any) => <Text key={a.id} style={s.body}>#{a.attempt} {a.evaluatorName}: {a.status}{a.end_reason ? ` (${a.end_reason})` : ""}{a.actor_type === "admin" ? " · by an administrator" : ""}</Text>)}
+              {history.assignments.map((a: any) => <Text key={a.id} style={s.body}>#{a.attempt} {a.evaluatorName}: {a.status}{a.end_reason ? ` (${a.end_reason})` : ""}{a.actor_type === "admin" ? " · by an administrator" : ""}{a.match_detail?.basis === "bootstrap" ? " · cold-start reviewer" : ""}</Text>)}
+              {history.nextCandidates?.length ? <Text style={s.meta}>Next in line: {history.nextCandidates.map((x: any) => `${x.name} (${x.reasons?.language === "same_content_language" ? "same language" : "other language"}${x.reasons?.stagesAhead > 0 ? `, ${x.reasons.stagesAhead} stage${x.reasons.stagesAhead === 1 ? "" : "s"} ahead` : ""}, ${x.reasons?.activeEvaluations ?? 0} active)`).join(" · ")}</Text> : <Text style={s.meta}>Nobody else qualifies yet.</Text>}
               <TextInput style={s.input} value={reason} onChangeText={setReason} placeholder="Reason for reassigning (required)" placeholderTextColor={c.textMuted} accessibilityLabel="Reason for reassigning" />
               <AppButton label="Reassign (the system chooses who is next)" size="sm" variant="secondary" disabled={reason.trim().length < 3}
                 onPress={() => confirm("Reassign", "End the current assignment and let P2P Global choose the next evaluator?", () => act(() => adminReassign(history.id, reason.trim()), "Reassigned by the system."))} />
+              {history.resourceKind ? (
+                <AppButton label="This assessment was materially revised" size="sm" variant="tertiary" disabled={reason.trim().length < 5}
+                  onPress={() => confirm("Record a material revision", "Earlier passes keep their learning credit, but only people who pass the revised assessment will be invited to evaluate it. Use the reason box to describe what changed.",
+                    () => act(async () => { const r = await adminRecordRevision(history.resourceKind, history.resourceId ?? history.lessonId, reason.trim()); setNotice(`Now version ${r.version}.`); }, "Revision recorded."))} />
+              ) : null}
               <AppButton label="Close" size="sm" variant="tertiary" onPress={() => setHistory(null)} />
             </View>
           ) : null}
@@ -91,7 +137,7 @@ export default function EvaluationAdmin() {
 
       {tab === "evaluators" ? (evs ?? []).map((e) => (
         <View key={e.userId} style={[s.panel, e.needsReview && { borderLeftWidth: 4, borderLeftColor: c.amber }]}>
-          <Text style={s.title}>{e.name} · {e.standing}{e.available ? "" : " · unavailable"}{e.oriented ? "" : " · not oriented"}</Text>
+          <Text style={s.title}>{e.name} · {e.standing}{e.available ? "" : " · unavailable"}</Text>
           <Text style={s.meta}>{e.record.completed} completed · {e.record.onTime} on time · {e.record.missedDeadlines} missed · {e.record.declined} declined · {e.record.unableReports} unable · {e.record.ratings} ratings{e.record.substantiatedConcerns ? ` · ${e.record.substantiatedConcerns} substantiated concerns` : ""}</Text>
           {e.needsReview ? <Text style={s.meta}>Suggested: a private, human review of this record.</Text> : null}
           <TextInput style={s.input} value={reason} onChangeText={setReason} placeholder="Reason (required for any change of standing)" placeholderTextColor={c.textMuted} accessibilityLabel={`Reason for ${e.name}`} />
@@ -124,11 +170,25 @@ export default function EvaluationAdmin() {
           <View style={s.row}>
             <Text style={[s.body, { flex: 1 }]}>Engine on (new submissions are invited, accepted, 48-hour deadline, automatic reassignment)</Text>
             <Switch value={!!ov.settings?.engine_enabled} accessibilityLabel="Peer Evaluation Engine on"
-              onValueChange={(v) => confirm(v ? "Turn the engine on" : "Turn the engine off", v ? "New submissions will wait for an oriented evaluator to accept. Make sure evaluators have completed the orientation first." : "New submissions will use the previous direct assignment. Evaluations already in the engine continue.",
+              onValueChange={(v) => confirm(v ? "Turn the engine on" : "Turn the engine off", v ? "New submissions wait for someone who passed that same resource independently to accept." : "New submissions will use the previous direct assignment. Evaluations already in the engine continue.",
                 () => act(() => adminSettings({ engineEnabled: v }), v ? "Engine on." : "Engine off."))}
               trackColor={{ true: c.accentGreen, false: c.borderBeige }} thumbColor="#fff" />
           </View>
           <Text style={s.meta}>Invitation window: {ov.settings?.invitation_window_minutes} minutes · default capacity: {ov.settings?.default_capacity} · deadline: always 48 hours (no extensions)</Text>
+          <View style={s.row}>
+            <Text style={[s.body, { flex: 1 }]}>Family and Church assignments evaluated by members of the same group who passed the same assignment (the leader can still review)</Text>
+            <Switch value={!!ov.settings?.group_assignments_enabled} accessibilityLabel="Group assignments in the engine"
+              onValueChange={(v) => confirm(v ? "Include group assignments" : "Leader review only", v ? "New Family and Church assignment submissions will be offered to qualified members of the same group. The leader's own review still works and closes it." : "New group submissions will be reviewed by the leader only.",
+                () => act(() => adminSettings({ groupAssignmentsEnabled: v }), "Saved."))}
+              trackColor={{ true: c.accentGreen, false: c.borderBeige }} thumbColor="#fff" />
+          </View>
+          <View style={s.row}>
+            <Text style={[s.body, { flex: 1 }]}>Cold start: Peer Guides may evaluate a resource that NOBODY has passed independently yet (they step aside once someone has)</Text>
+            <Switch value={(ov.settings?.bootstrap_roles ?? []).includes("peer_guide")} accessibilityLabel="Cold-start reviewers"
+              onValueChange={(v) => confirm(v ? "Allow cold-start reviewers" : "Stop cold-start reviewers", v ? "Peer Guides may be invited only for resources nobody has passed independently yet. Recorded as cold-start reviews." : "Only people who passed a resource independently will be invited.",
+                () => act(() => adminSettings({ bootstrapRoles: v ? ["peer_guide"] : [] }), "Saved."))}
+              trackColor={{ true: c.accentGreen, false: c.borderBeige }} thumbColor="#fff" />
+          </View>
           <View style={s.row}>
             {[60, 180, 360].map((m) => <AppButton key={m} label={`${m / 60} h window`} size="sm" variant={ov.settings?.invitation_window_minutes === m ? "secondary" : "tertiary"} onPress={() => act(() => adminSettings({ invitationWindowMinutes: m }), "Saved.")} />)}
           </View>

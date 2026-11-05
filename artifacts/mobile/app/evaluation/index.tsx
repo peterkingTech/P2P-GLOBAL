@@ -89,14 +89,15 @@ export default function MyEvaluations() {
         })
       ) : (
         <>
-          {me && !me.oriented ? (
+          {me ? (
             <View style={s.panel}>
-              <Text style={s.title}>Serve as an evaluator</Text>
-              <Text style={s.meta}>Helping a fellow disciple understand and apply God's Word is an act of service. A short orientation prepares you first.</Text>
-              <AppButton label="Start orientation" icon="book-outline" onPress={() => router.push("/evaluation/orientation" as any)} />
+              <Text style={s.title}>How you're invited to evaluate</Text>
+              <Text style={s.meta}>{me.howInvited ?? "When you pass a lesson, story chapter or plan session through an independent evaluation, P2P Global may invite you to evaluate that same one."}</Text>
+              <Text style={s.meta}>{me.qualifiedResources ? `You can currently be invited for ${me.qualifiedResources} ${me.qualifiedResources === 1 ? "lesson or assignment" : "lessons and assignments"} you passed.` : "Nothing yet — pass a lesson through its evaluation first."} No sign-up is needed.</Text>
             </View>
-          ) : me ? (
-            <Pressable style={s.card} onPress={() => router.push("/evaluation/orientation" as any)} accessibilityRole="button" accessibilityLabel="Your availability and service record">
+          ) : null}
+          {me ? (
+            <Pressable style={s.card} onPress={() => router.push("/evaluation/orientation" as any)} accessibilityRole="button" accessibilityLabel="Evaluator guide, your availability and service record">
               <Ionicons name={me.available ? "checkmark-circle" : "pause-circle"} size={20} color={me.available ? c.accentGreen : c.amber} />
               <View style={{ flex: 1 }}>
                 <Text style={s.title}>{me.standing === "restricted" ? "Evaluating is paused" : me.available ? "Available for evaluations" : "Not taking new evaluations"}</Text>
