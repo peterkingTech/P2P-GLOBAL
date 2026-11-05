@@ -7,10 +7,8 @@ import {
   TouchableOpacity,
   Platform,
   RefreshControl,
-  ActivityIndicator,
   Image,
 } from "react-native";
-import type { ViewStyle } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
@@ -18,28 +16,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useAuth, supabase } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   useData,
   KingdomSchoolStatus,
   KINGDOM_SCHOOL_STATUS_LABELS,
   getModuleProgressCounts,
   getKingdomSchoolStatus,
-  Church,
-  GroveData,
-  ChurchAnnouncement,
 } from "@/contexts/DataContext";
 import { getApiUrl } from "@/lib/apiUrl";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
-import { STAGES, STAGE_IMAGES, getStageFromPoints } from "@/constants/stages";
-import MyP2PDashboard from "@/components/myp2p/MyP2PDashboard";
-import { useLayout, centeredMaxWidth, useAdaptiveTiles } from "@/hooks/useLayout";
+import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { useTranslation } from "react-i18next";
-import LivingTree from "@/components/LivingTree";
 import { Avatar } from "@/components/Avatar";
-import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
-import { GetStartedCard } from "@/components/GetStartedCard";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { currentModule as currentModuleOf } from "@/lib/learningHome";
@@ -150,76 +140,6 @@ function ContinueJourneyCard({ module, status, onOpenModule, onExplore, styles, 
   );
 }
 
-// The five journey features, as tiles rather than the old vertical list.
-// Subtitles are descriptive text — no counts are fetched just to decorate.
-function JourneyTile({ icon, tint, title, sub, onPress, styles, wide, tileStyle }: {
-  icon: keyof typeof Ionicons.glyphMap; tint: string; title: string; sub: string;
-  onPress: () => void; styles: ReturnType<typeof makeStyles>; wide?: boolean;
-  // Tablet-only measured width (null on phones, which keep the 48.4% tiles).
-  tileStyle?: ViewStyle | null;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.journeyTile, tileStyle, wide && styles.journeyTileWide]}
-      activeOpacity={0.85}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${title}. ${sub}`}
-    >
-      <View style={[styles.journeyIcon, { backgroundColor: `${tint}26` }]}>
-        <Ionicons name={icon} size={22} color={tint} />
-      </View>
-      <View style={wide ? { flex: 1 } : undefined}>
-        <Text style={styles.journeyTitle} numberOfLines={1}>{title}</Text>
-        <Text style={styles.journeySub} numberOfLines={2}>{sub}</Text>
-      </View>
-      {wide && <Ionicons name="chevron-forward" size={18} color={tint} />}
-    </TouchableOpacity>
-  );
-}
-
-interface FirstRecommendation {
-  id: string;
-  title: string;
-  coverImageUrl: string | null;
-  colorTheme: string;
-}
-
-// "Recommended for You" — the existing goals-based recommendation
-// (GET /plans/recommended), with its existing dismissal flag: once the user
-// starts it or closes it, it is not shown again. Tapping the card starts it.
-function RecommendedCard({ rec, onStart, onDismiss, colors, t }: {
-  rec: FirstRecommendation; onStart: () => void; onDismiss: () => void; colors: AppColors;
-  t: (k: string) => string;
-}) {
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity style={styles.recCard} activeOpacity={0.9} onPress={onStart} accessibilityRole="button" accessibilityLabel={`${rec.title}. ${t("home.recommendedBasedOnGoals")}`}>
-      {rec.coverImageUrl ? (
-        <Image source={{ uri: rec.coverImageUrl }} style={styles.recImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.recImage, { backgroundColor: `${rec.colorTheme}26`, alignItems: "center", justifyContent: "center" }]}>
-          <Ionicons name="book-outline" size={28} color={rec.colorTheme} />
-        </View>
-      )}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.recTitle} numberOfLines={2}>{rec.title}</Text>
-        <Text style={styles.recEyebrow}>{t("home.recommendedBasedOnGoals")}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      <TouchableOpacity
-        style={styles.recDismissBtn}
-        onPress={onDismiss}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss recommendation"
-      >
-        <Ionicons name="close" size={16} color={colors.textMuted} />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-}
-
 // Surfaces an unresponded Elijah Protocol pastoral-care message (see
 // GET /pastoral-care/pending/:userId). This app has no push-notification
 // tap-routing infrastructure, so this Home-screen card — not a notification
@@ -259,22 +179,6 @@ function PeerGuideAlertCard({ count, onPress, colors }: { count: number; onPress
   );
 }
 
-function UnreadMessagesCard({ count, preview, onPress, colors }: { count: number; preview: string | null; onPress: () => void; colors: any }) {
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity accessibilityRole="button" style={styles.elijahCard} activeOpacity={0.9} onPress={onPress}>
-      <View style={styles.elijahIconWrap}>
-        <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accentGreen} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.elijahTitle}>{count} unread {count === 1 ? "message" : "messages"}</Text>
-        {preview && <Text style={styles.elijahSub} numberOfLines={1}>{preview}</Text>}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.accentGreen} />
-    </TouchableOpacity>
-  );
-}
-
 function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void; onDismiss: () => void; colors: any }) {
   const styles = makeStyles(colors);
   return (
@@ -286,74 +190,6 @@ function GuideInvitationCard({ onFind, onDismiss, colors }: { onFind: () => void
       <Text style={styles.guideInviteSub}>Ready to meet them?</Text>
       <AppButton label="Find Someone to Guide" onPress={onFind} style={{ alignSelf: "flex-start", marginTop: 14 }} />
     </View>
-  );
-}
-
-// Leader with a joined church — full grove summary.
-function GroveHomeCard({ church, grove, memberCount, onPress, colors }: {
-  church: Church; grove: GroveData | null; memberCount: number; onPress: () => void; colors: AppColors;
-}) {
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity accessibilityRole="button" style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
-      <View style={styles.churchCardTopRow}>
-        <Text style={{ fontSize: 20 }}>⛪</Text>
-        <Text style={styles.churchCardName} numberOfLines={1}>{church.name}</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      </View>
-      <Text style={styles.churchCardLocation}>
-        {[church.city, church.country].filter(Boolean).join(" · ")}{memberCount ? ` · ${memberCount} members` : ""}
-      </Text>
-      {grove && (
-        <View style={styles.groveStatsRow}>
-          <Text style={styles.groveStatText}>🟢 {grove.activeLearners} active</Text>
-          <Text style={styles.groveStatText}>📖 {grove.lessonsThisWeek} this week</Text>
-        </View>
-      )}
-      {grove && grove.inactiveMembers > 0 && (
-        <Text style={styles.groveAttentionText}>⚠️ {grove.inactiveMembers} need attention</Text>
-      )}
-      <Text style={styles.churchCardCta}>Dashboard →</Text>
-    </TouchableOpacity>
-  );
-}
-
-// Ministry leader without a church yet — compact registration prompt.
-function RegisterChurchPromptCard({ onPress, colors }: { onPress: () => void; colors: AppColors }) {
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity accessibilityRole="button" style={styles.churchCard} activeOpacity={0.9} onPress={onPress}>
-      <View style={styles.churchCardTopRow}>
-        <Text style={{ fontSize: 20 }}>⛪</Text>
-        <Text style={styles.churchCardName}>Register your church</Text>
-      </View>
-      <Text style={styles.churchCardLocation}>
-        Bring your congregation onto P2P Global — completely free.
-      </Text>
-      <Text style={styles.churchCardCta}>Register →</Text>
-    </TouchableOpacity>
-  );
-}
-
-// Regular member who has joined a church — light, less prominent card.
-function MemberChurchCard({ church, announcement, onPress, colors }: {
-  church: Church; announcement: ChurchAnnouncement | null; onPress: () => void; colors: AppColors;
-}) {
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity accessibilityRole="button" style={styles.churchCardCompact} activeOpacity={0.9} onPress={onPress}>
-      <View style={styles.churchCardTopRow}>
-        <Text style={{ fontSize: 16 }}>⛪</Text>
-        <Text style={styles.churchCardNameCompact} numberOfLines={1}>{church.name}</Text>
-        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-      </View>
-      <Text style={styles.churchCardLocationCompact}>
-        {[church.city, church.country].filter(Boolean).join(", ")}
-      </Text>
-      {announcement && (
-        <Text style={styles.churchCardAnnouncement} numberOfLines={1}>📌 {announcement.title}</Text>
-      )}
-    </TouchableOpacity>
   );
 }
 
@@ -372,69 +208,8 @@ function makeStyles(c: AppColors) {
     heroVerseText: { fontSize: 15, lineHeight: 23, color: "rgba(255,255,255,0.92)", fontFamily: "Inter_400Regular" },
     heroVerseRef: { fontSize: 13, color: "rgba(242,201,120,0.95)", marginTop: 8, fontFamily: "Inter_600SemiBold" },
 
-    // Growth stage: image on top, progress in the same card underneath.
-    growthCard: {
-      borderRadius: 22, overflow: "hidden", marginBottom: 20,
-      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
-    },
-    treeCard: { aspectRatio: 16 / 9, width: "100%", position: "relative" },
-    treePhoto: { width: "100%", height: "100%" },
-    treeShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "60%" },
-    growthBody: { padding: 16, gap: 6 },
-    treePhotoFallback: {
-      width: "100%", height: "100%", alignItems: "center", justifyContent: "center", backgroundColor: c.card,
-    },
-    stageOverlay: {
-      position: "absolute",
-      bottom: 14,
-      left: 14,
-      backgroundColor: "rgba(0,0,0,0.45)",
-      borderRadius: 14,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-    },
-    stageOverlayText: {
-      color: "#fff",
-      fontSize: 18,
-      fontFamily: "Inter_700Bold",
-    },
-    stageOfText: {
-      color: "rgba(255,255,255,0.75)",
-      fontSize: 11,
-      fontFamily: "Inter_400Regular",
-      marginTop: 1,
-    },
-    arrowOverlay: {
-      position: "absolute",
-      top: 14,
-      right: 14,
-      backgroundColor: "rgba(0,0,0,0.35)",
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-
-    progressLabelRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    progressToward: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    progressPct: { fontSize: 14, color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    progressBarBg: { height: 8, backgroundColor: c.progressTrack, borderRadius: 4, overflow: "hidden" },
-    progressBarFill: { height: 8, backgroundColor: c.progressFill, borderRadius: 4 },
-    progressHint: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    forestLinkRow: {
-      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-      marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.borderBeige,
-    },
-    forestLinkText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold", flex: 1 },
-
     sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10, marginTop: 4 },
     sectionHeading: { flex: 1, fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    seeAll: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold", paddingVertical: 6, paddingLeft: 10 },
 
     // Continue Your Kingdom School Journey
     ksContinueCard: {
@@ -454,53 +229,8 @@ function makeStyles(c: AppColors) {
     },
     ksExploreText: { fontSize: 13, marginTop: 8, fontFamily: "Inter_700Bold" },
 
-    // Your Journey tiles
-    journeyGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 12, marginBottom: 12 },
-    journeyTile: {
-      width: "48.4%", minHeight: 112, backgroundColor: c.card, borderRadius: 18,
-      borderWidth: 1, borderColor: c.borderBeige, padding: 14, gap: 10,
-    },
-    journeyTileWide: { width: "100%", minHeight: 0, flexDirection: "row", alignItems: "center", gap: 14 },
-    journeyIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-    journeyTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    journeySub: { fontSize: 12, color: c.textMuted, marginTop: 2, lineHeight: 17, fontFamily: "Inter_400Regular" },
-    toolLinksRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 22 },
-    toolLink: {
-      flexDirection: "row", alignItems: "center", gap: 6, minHeight: 36,
-      borderRadius: 18, borderWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 12, paddingVertical: 7,
-    },
-    toolLinkText: { fontSize: 12, color: c.textDark, fontFamily: "Inter_600SemiBold" },
-
-    churchCard: {
-      backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige,
-      padding: 16, marginBottom: 16, gap: 6,
-    },
-    churchCardTopRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    churchCardName: { flex: 1, fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    churchCardLocation: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    groveStatsRow: { flexDirection: "row", gap: 14, marginTop: 2 },
-    groveStatText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
-    groveAttentionText: { fontSize: 12, color: c.amber, fontFamily: "Inter_500Medium" },
-    churchCardCta: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_700Bold", alignSelf: "flex-end", marginTop: 2 },
-
-    churchCardCompact: {
-      backgroundColor: c.cardBeige, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige,
-      padding: 14, marginBottom: 16, gap: 4,
-    },
-    churchCardNameCompact: { flex: 1, fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    churchCardLocationCompact: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-    churchCardAnnouncement: { fontSize: 12, color: c.textMid, fontFamily: "Inter_400Regular", marginTop: 2 },
-
-    // Recommended for You
-    recCard: {
-      flexDirection: "row", alignItems: "center", gap: 14,
-      backgroundColor: c.card, borderRadius: 20, borderWidth: 1, borderColor: c.borderBeige,
-      padding: 12, paddingRight: 34, marginBottom: 22, position: "relative",
-    },
-    recImage: { width: 84, height: 84, borderRadius: 14 },
+    // Close button on the guide invitation
     recDismissBtn: { position: "absolute", top: 8, right: 8, padding: 4 },
-    recTitle: { fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    recEyebrow: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold", marginTop: 6 },
 
     elijahCard: {
       flexDirection: "row", alignItems: "center", gap: 12,
@@ -538,6 +268,13 @@ function makeStyles(c: AppColors) {
   });
 }
 
+// Home is a calm starting point: the greeting with the Daily Word, the
+// updates that need this person (shown only when present), and one next
+// step. Everything that used to sit here as a dashboard widget lives in its
+// own place now: growth, journey and My P2P in Profile (My growth / My
+// space), families and church in Discover's community entry, the
+// recommended plans on the Plans screen, messages in the Messages tab. Native home-screen widgets are
+// separate (WidgetSyncHost in app/_layout.tsx) and unchanged.
 export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
@@ -545,14 +282,11 @@ export default function HomeTab() {
   useScrollToTopOnTabReselect("index", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, treeData, forestStats, totalUnreadCount, mostRecentUnread, userChurch, isChurchLeader, churchMemberCount, getGroveData, getAnnouncements } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
-  const { isTablet, contentMaxWidth, screenWidth, screenHeight } = useLayout();
-  // Four journey tiles: 2 or 4 per row on tablets (never a lone orphan),
-  // then the wide Family tile; phones keep the two-column percentage grid.
-  const journeyTiles = useAdaptiveTiles({ minItemWidth: 250, maxColumns: 4, gap: 12, columnChoices: [1, 2, 4] });
+  const { contentMaxWidth } = useLayout();
   const { t } = useTranslation();
 
   const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
@@ -561,29 +295,9 @@ export default function HomeTab() {
   // system is built.
   const kingdomSchoolStatus = getKingdomSchoolStatus(modulesStarted, modulesCompleted, totalModules, false);
 
-  const [firstRecommendation, setFirstRecommendation] = useState<FirstRecommendation | null>(null);
   const [pendingElijahCheckIn, setPendingElijahCheckIn] = useState(false);
   const [pendingGuideAlertCount, setPendingGuideAlertCount] = useState(0);
   const [showGuideInvitation, setShowGuideInvitation] = useState(false);
-  const [treePhotoFailed, setTreePhotoFailed] = useState(false);
-  const [homeGroveData, setHomeGroveData] = useState<GroveData | null>(null);
-  const [homeChurchAnnouncement, setHomeChurchAnnouncement] = useState<ChurchAnnouncement | null>(null);
-
-  // Case 1 (leader with a joined church) needs grove stats for the summary card.
-  useEffect(() => {
-    if (!isChurchLeader || !userChurch) { setHomeGroveData(null); return; }
-    let cancelled = false;
-    getGroveData(userChurch.id).then((data) => { if (!cancelled) setHomeGroveData(data); });
-    return () => { cancelled = true; };
-  }, [isChurchLeader, userChurch, getGroveData]);
-
-  // Case 3 (regular member in a church) needs the latest announcement.
-  useEffect(() => {
-    if (isChurchLeader || !userChurch) { setHomeChurchAnnouncement(null); return; }
-    let cancelled = false;
-    getAnnouncements(userChurch.id).then((list) => { if (!cancelled) setHomeChurchAnnouncement(list[0] ?? null); });
-    return () => { cancelled = true; };
-  }, [isChurchLeader, userChurch, getAnnouncements]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -632,41 +346,6 @@ export default function HomeTab() {
     return () => { cancelled = true; };
   }, [profile?.id]);
 
-  useEffect(() => {
-    if (!profile?.id) return;
-    let cancelled = false;
-    (async () => {
-      const dismissedKey = `firstRecommendationDismissed:${profile.id}`;
-      const dismissed = await AsyncStorage.getItem(dismissedKey);
-      if (dismissed || cancelled) return;
-      try {
-        const res = await fetch(`${getApiUrl()}/plans/recommended/${profile.id}`);
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setFirstRecommendation({ id: data[0].id, title: data[0].title, coverImageUrl: data[0].coverImageUrl ?? null, colorTheme: data[0].colorTheme ?? "#1D9E75" });
-        }
-      } catch {
-        // No recommendation available yet — not an error state, just nothing to show.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [profile?.id]);
-
-  const dismissRecommendation = useCallback(async () => {
-    setFirstRecommendation(null);
-    if (profile?.id) await AsyncStorage.setItem(`firstRecommendationDismissed:${profile.id}`, "true");
-  }, [profile?.id]);
-
-  const startRecommendation = useCallback(async () => {
-    if (!firstRecommendation) return;
-    const planId = firstRecommendation.id;
-    await dismissRecommendation();
-    if (!profile?.id) { router.push(`/plan/${planId}` as any); return; }
-    const { data } = await supabase.from("p2p_plan_enrollments").select("id").eq("user_id", profile.id).eq("plan_id", planId).maybeSingle();
-    if (data) router.push(`/plan/${planId}` as any);
-    else router.push(`/plans/pre-plan-questions?planId=${planId}` as any);
-  }, [firstRecommendation, profile?.id, router, dismissRecommendation]);
-
   const firstName = profile?.displayName?.split(" ")[0] ?? "";
   // Same thresholds as before, evaluated on the device's local clock.
   const hour = new Date().getHours();
@@ -678,18 +357,6 @@ export default function HomeTab() {
   const currentModule = currentModuleOf(modules);
   const goToKingdomSchool = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/kingdom-school" as any); };
   const go = (route: string) => () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as any); };
-
-  const growthPoints = profile?.growthLevel ?? 0;
-  const stageIndex = getStageFromPoints(growthPoints);
-  const stage = STAGES[stageIndex];
-  const nextStage = STAGES[stageIndex + 1] ?? null;
-  const progressPct = nextStage
-    ? Math.round(
-        ((growthPoints - stage.unlockPoints) /
-          (nextStage.unlockPoints - stage.unlockPoints)) *
-          100
-      )
-    : 100;
 
   const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
 
@@ -718,71 +385,6 @@ export default function HomeTab() {
         styles={styles}
       />
 
-      {/* 2. Current growth stage — same calculation as before, new card. The
-          photo falls back to the SVG tree if it fails to load (e.g. offline). */}
-      <View style={styles.growthCard}>
-        <TouchableOpacity
-          // Tablets: a 21:9 band, made wider (shorter) when that would take
-          // more than ~42% of the window height — in landscape the photo
-          // otherwise fills most of the screen.
-          style={[styles.treeCard, isTablet && { aspectRatio: Math.max(21 / 9, ((contentMaxWidth ?? screenWidth) - 40) / (screenHeight * 0.42)) }]}
-          onPress={go("/living-tree")}
-          activeOpacity={0.9}
-          accessibilityRole="button"
-          accessibilityLabel={`${stage.name}, ${t("home.stageOf", { stage: stageIndex + 1 })}. ${t("home.livingTree")}`}
-        >
-          {!treePhotoFailed ? (
-            <Image
-              source={STAGE_IMAGES[stageIndex]}
-              style={styles.treePhoto}
-              resizeMode="cover"
-              onError={() => setTreePhotoFailed(true)}
-            />
-          ) : treeData ? (
-            <View style={styles.treePhotoFallback}>
-              <LivingTree treeData={treeData} userId={profile?.id} compact />
-            </View>
-          ) : (
-            <ActivityIndicator color={colors.accentGreen} />
-          )}
-          <LinearGradient colors={["transparent", "rgba(0,0,0,0.55)"]} style={styles.treeShade} pointerEvents="none" />
-          <View style={styles.stageOverlay}>
-            <Text style={styles.stageOverlayText}>{stage.emoji} {stage.name}</Text>
-            <Text style={styles.stageOfText}>{t("home.stageOf", { stage: stageIndex + 1 })}</Text>
-          </View>
-          <View style={styles.arrowOverlay}>
-            <Ionicons name="chevron-forward" size={16} color="#fff" />
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.growthBody}>
-          <View style={styles.progressLabelRow}>
-            {nextStage ? (
-              <Text style={styles.progressToward} numberOfLines={2}>
-                {t("home.growingToward")} {nextStage.emoji} {nextStage.name}
-              </Text>
-            ) : (
-              <Text style={styles.progressToward}>{t("home.forestReached")}</Text>
-            )}
-            <Text style={styles.progressPct}>{progressPct}%</Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progressPct}%` as any }]} />
-          </View>
-          {nextStage && (
-            <Text style={styles.progressHint}>
-              {t("home.morePoints", { points: nextStage.unlockPoints - growthPoints, name: nextStage.name })}
-            </Text>
-          )}
-          <TouchableOpacity style={styles.forestLinkRow} onPress={go("/forest")} activeOpacity={0.85} accessibilityRole="button">
-            <Text style={styles.forestLinkText}>
-              🌳 View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
-            </Text>
-            <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Elijah Protocol check-in, if pastoral care has flagged one */}
       {pendingElijahCheckIn && (
         <ElijahCheckInCard
@@ -790,19 +392,6 @@ export default function HomeTab() {
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/elijah-response" as any);
-          }}
-        />
-      )}
-
-      {/* Unread messages preview */}
-      {totalUnreadCount > 0 && (
-        <UnreadMessagesCard
-          count={totalUnreadCount}
-          preview={mostRecentUnread?.lastMessage ?? null}
-          colors={colors}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/(tabs)/messages" as any);
           }}
         />
       )}
@@ -858,7 +447,7 @@ export default function HomeTab() {
         </TouchableOpacity>
       )}
 
-      {/* 3. Continue Your Kingdom School Journey */}
+      {/* 2. Continue — the one next step in the Kingdom School journey */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.continueJourney")}</Text>
       </View>
@@ -871,101 +460,6 @@ export default function HomeTab() {
         colors={colors}
         t={t}
       />
-
-      {/* "How to use P2P" guide entry — hides itself once every step is done. */}
-      <GetStartedCard />
-
-      {/* My Community — the families and churches this person belongs to.
-          The church card and My Family tile moved here unchanged (same
-          conditions, routes and data); Family Circle and Church keep their
-          own screens, permissions and gatherings (opened from those screens). */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeading} accessibilityRole="header">My Community</Text>
-      </View>
-      {/* Church Discipleship Portal — completely free, no tiers. Only shown
-          when relevant: leaders get a prominent dashboard/register prompt,
-          regular members in a church get a light card, everyone else sees
-          nothing (church tools aren't relevant to them). */}
-      {isChurchLeader && userChurch && (
-        <GroveHomeCard
-          church={userChurch}
-          grove={homeGroveData}
-          memberCount={churchMemberCount}
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/grove" as any); }}
-        />
-      )}
-      {profile?.isMinistryLeader && !userChurch && (
-        <RegisterChurchPromptCard
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church/register" as any); }}
-        />
-      )}
-      {!profile?.isMinistryLeader && userChurch && (
-        <MemberChurchCard
-          church={userChurch}
-          announcement={homeChurchAnnouncement}
-          colors={colors}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/church" as any); }}
-        />
-      )}
-
-      <View style={styles.journeyGrid}>
-        {/* One way into everything community: families, church, gatherings and learning. */}
-        <JourneyTile icon="home" tint="#E8873A" title="My Community" sub="Your Family Circles, church, gatherings and learning" onPress={go("/community")} styles={styles} wide />
-      </View>
-
-      {/* 4. Your Journey — tiles instead of the old vertical list. No "See
-          All": every journey feature is already here and no overview
-          screen exists. */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.yourJourney")}</Text>
-      </View>
-      <View style={[styles.journeyGrid, journeyTiles.containerStyle]} onLayout={journeyTiles.onLayout}>
-        <JourneyTile icon="stats-chart" tint="#2FA4A9" title={t("home.myProgress")} sub={t("home.myProgressSub")} onPress={go("/progress")} styles={styles} tileStyle={journeyTiles.tileStyle} />
-        <JourneyTile icon="people-circle" tint="#E0A441" title={t("home.myDiscipleship")} sub={t("home.myDiscipleshipSub")} onPress={go("/my-discipleship")} styles={styles} tileStyle={journeyTiles.tileStyle} />
-      </View>
-      {/* Previously only reachable from the old "More" list — kept here as
-          small links so nothing disappears. Admin keeps its role gate. */}
-      <View style={styles.toolLinksRow}>
-        <TouchableOpacity style={styles.toolLink} onPress={go("/evaluation")} accessibilityRole="button" accessibilityLabel={`${t("home.peerReview")}. ${t("home.peerReviewSub")}`}>
-          <Ionicons name="checkmark-done-outline" size={14} color={colors.accentGreen} />
-          <Text style={styles.toolLinkText}>{t("home.peerReview")}</Text>
-        </TouchableOpacity>
-        {profile?.role && profile.role !== "student" && (
-          <TouchableOpacity style={styles.toolLink} onPress={go("/admin/curriculum")} accessibilityRole="button" accessibilityLabel={`${t("home.admin")}. ${t("home.adminSub")}`}>
-            <Ionicons name="settings-outline" size={14} color={colors.accentGreen} />
-            <Text style={styles.toolLinkText}>{t("home.admin")}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* My P2P — the person's widgets (Journey, Journal, learning, Bible,
-          stories, Study Together, communities…), customizable at /my-p2p. */}
-      <MyP2PDashboard />
-
-      {/* 5. Recommended for You — the existing goals-based recommendation */}
-      {firstRecommendation && (
-        <>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.recommendedForYou")}</Text>
-            <TouchableOpacity onPress={() => { void dismissRecommendation(); router.push("/plans?tab=find" as any); }} accessibilityRole="button">
-              <Text style={styles.seeAll}>{t("home.seeAll")}</Text>
-            </TouchableOpacity>
-          </View>
-          <RecommendedCard
-            rec={firstRecommendation}
-            onStart={startRecommendation}
-            onDismiss={dismissRecommendation}
-            colors={colors}
-            t={t}
-          />
-        </>
-      )}
-
-      {/* 6. Be an Electronic Evangelist — stage-aware wording, real
-          Remind Me Later snooze (see lib/inviteEncouragement.ts). */}
-      <InviteEncouragementCard modulesCompleted={modulesCompleted} />
     </ScrollView>
   );
 }

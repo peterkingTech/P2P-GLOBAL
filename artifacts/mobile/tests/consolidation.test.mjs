@@ -195,7 +195,7 @@ ok("no screen keeps its own 'current module' rule", x.length === 0, show(x));
 
 for (const f of ["app/kingdom-school.tsx", "app/kingdom-stories/index.tsx", "app/community.tsx"]) ok(`Study Together reachable from ${f}`, read(f).includes("<StudyTogetherLink"));
 ok("Study Together reachable from Bible Study, Family and Church hubs", read("app/bible-study/index.tsx").includes('route: "/study-together"') && read("app/family/[familyId].tsx").includes('router.push("/study-together"') && read("app/church/index.tsx").includes('router.push("/study-together"'));
-ok("Home: one My Community entry that opens the overview", read("app/(tabs)/index.tsx").includes('title="My Community"') && read("app/(tabs)/index.tsx").includes('go("/community")'));
+ok("Discover: one My Community entry that opens the overview (moved from Home)", (read("app/(tabs)/discover.tsx").match(/router\.push\("\/community" as any\)/g) ?? []).length === 1 && !read("app/(tabs)/index.tsx").includes("/community"));
 const conn = read("app/connect/index.tsx");
 ok("old /connect hub redirects to Discover; Discover has every people path", conn.includes("<Redirect") && conn.includes('"/(tabs)/discover"') && ["/connect/discover", "/connect/groups", "/connect/smart-match", "/connect/by-username?type=peer_guide", "/connect/invite", "/connect/by-username", "/connections"].every((r) => read("app/(tabs)/discover.tsx").includes(`route: "${r}"`)));
 for (const f of ["app/call/audio.tsx", "app/call/video.tsx"]) ok(`${f}: shared "No answer" view, own handlers`, read(f).includes("<CallNoAnswerView") && !/UNANSWERED_LABEL: Record/.test(read(f)) && read(f).includes("onCallAgain={handleCallAgain}"));
@@ -208,7 +208,7 @@ const disc = read("app/(tabs)/discover.tsx"), homeSrc = read("app/(tabs)/index.t
 ok("Discover: no Kingdom Stories card (it lives in Learning)", !/route: "\/kingdom-stories"/.test(disc));
 ok("Discover: no Prayer Wall card (Prayer is a tab) and no unused prayer-wall request", !/route: "\/\(tabs\)\/prayer"/.test(disc) && !disc.includes("getPrayerWallPosts"));
 ok("Discover: your own church is not repeated (join / register stay)", !disc.includes(">My Church</Text>") && disc.includes('router.push("/church/join"'));
-ok("Home: no Living Tree tile (the tree card opens it) and no tile that only opens the Discover tab", (homeSrc.match(/go\("\/living-tree"\)/g) ?? []).length === 1 && !homeSrc.includes('go("/(tabs)/discover")'));
+ok("Home: no Living Tree link (it lives in Profile → My growth) and no tile that only opens the Discover tab", !homeSrc.includes("/living-tree") && read("app/(tabs)/profile.tsx").includes('route: "/living-tree"') && !homeSrc.includes('go("/(tabs)/discover")'));
 
 console.log(`consolidation: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -169,7 +169,9 @@ export default function DiscoverTab() {
   const loadLiveRooms = useCallback(async () => {
     try {
       const res = await fetch(`${getApiUrl()}/calls/rooms`);
-      setLiveRooms(await res.json());
+      const data = await res.json();
+      // An error reply (401/500 with a JSON body) must not crash the tab.
+      setLiveRooms(Array.isArray(data) ? data : []);
     } catch {
       setLiveRooms([]);
     }
@@ -292,6 +294,19 @@ export default function DiscoverTab() {
         </View>
       ) : (
         <ScrollView ref={tabScrollRef} contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+          {/* My Community — one way into the person's Family Circles, church,
+              gatherings and community learning (moved here from Home). */}
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="My Community. Your Family Circles, church, gatherings and learning" style={[styles.card, { marginBottom: 16 }]} activeOpacity={0.85} onPress={() => router.push("/community" as any)}>
+            <View style={[styles.iconWrap, { backgroundColor: "rgba(232,135,58,0.15)" }]}>
+              <Ionicons name="home" size={22} color="#E8873A" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>My Community</Text>
+              <Text style={styles.cardSub}>Your Family Circles, church, gatherings and learning</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+          </TouchableOpacity>
+
           <View style={styles.liveSectionHeaderRow}>
             <Text style={styles.liveSectionHeading}>🔴 LIVE NOW</Text>
             <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/call/create-room" as any)}>

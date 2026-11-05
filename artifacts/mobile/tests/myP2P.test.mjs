@@ -3,7 +3,7 @@
 //     appended, the two discipleship widgets can never be hidden), reorder,
 //     Journal preview hidden by default, Journey milestones from the real
 //     activity timeline (never marked by the app), stage progress, previews.
-//  2. Source checks — Home shows the dashboard, every widget reads existing
+//  2. Source checks — Profile → My space opens the dashboard, every widget reads existing
 //     services, nothing writes progress, no fabricated Audio Bible or
 //     scheduled sessions, private previews only on request.
 // Run: node tests/myP2P.test.mjs
@@ -63,8 +63,7 @@ const long = m.previewText("a  b\n c".repeat(40), 20);
 ok("preview: trimmed to one short line", long.length <= 20 && long.endsWith("…") && !long.includes("\n") && m.previewText(" hi ") === "hi");
 
 // 2. source checks
-const home = src("app/(tabs)/index.tsx");
-ok("home shows My P2P", home.includes("<MyP2PDashboard />"));
+ok("My P2P: opened from Profile → My space; the dashboard screen keeps it", src("app/(tabs)/profile.tsx").includes('route: "/my-p2p"') && src("app/my-p2p.tsx").includes("MyP2PDashboard") && !src("app/(tabs)/index.tsx").includes("MyP2PDashboard"));
 const w = src("components/myp2p/MyP2PWidgets.tsx");
 ok("journey: existing activity timeline + growth stage", w.includes('"p2p_get_activity_timeline"') && w.includes("getStageFromPoints"));
 ok("journey: continue + view full journey", w.includes("Continue Journey") && w.includes("View Full Journey") && w.includes('"/my-discipleship/journey"'));

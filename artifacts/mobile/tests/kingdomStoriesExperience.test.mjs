@@ -10,7 +10,7 @@
 //  4. Source checks — the API serves published stories only, never writes
 //     progress from browsing; the screen's sections and states; the story
 //     page's before/after links; six tabs with "Learning"; the Learning hub;
-//     Home's My Community holds the moved church card and My Family tile once.
+//     My Community is entered once, from Discover (Home no longer holds it).
 // Run: node tests/kingdomStoriesExperience.test.mjs
 import { createRequire } from "node:module";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
@@ -195,16 +195,13 @@ for (const r of ["/kingdom-school", "/kingdom-stories", "/bible-study", "/study-
   const file = [path.join(root, "app", r.slice(1), "index.tsx"), path.join(root, "app", `${r.slice(1)}.tsx`)].find(existsSync);
   ok(`learning: hub opens the existing ${r} screen`, hub.includes(`route: "${r}"`) && !!file);
 }
-const homeTab = src("app/(tabs)/index.tsx");
-const community = homeTab.indexOf("My Community</Text>");
-ok("home: My Community section exists", community > 0);
-for (const w of ["<GroveHomeCard", "<RegisterChurchPromptCard", "<MemberChurchCard", 'title="My Community"']) {
-  ok(`home: ${w} appears once, inside My Community`, homeTab.split(w).length === 2 && homeTab.indexOf(w) > community && homeTab.indexOf(w) < homeTab.indexOf("4. Your Journey"));
-}
-ok("home: church cards keep their conditions and routes; the community tile opens My Community", homeTab.includes('{isChurchLeader && userChurch && (') && homeTab.includes('{!profile?.isMinistryLeader && userChurch && (') && homeTab.includes('router.push("/church/grove" as any)') && homeTab.includes('go("/community")'));
+const homeTab = src("app/(tabs)/index.tsx"), discoverTab = src("app/(tabs)/discover.tsx");
+ok("home: no My Community section or church cards (moved off the Home dashboard)", !/My Community|GroveHomeCard|RegisterChurchPromptCard|MemberChurchCard/.test(homeTab));
+ok("discover: My Community entry opens the overview", discoverTab.includes(">My Community</Text>") && discoverTab.includes('router.push("/community" as any)'));
+ok("church: leader dashboard, register and own church still reachable", src("app/church/index.tsx").includes('router.push("/church/grove" as any)') && discoverTab.includes('{profile?.isMinistryLeader && !userChurch && (') && discoverTab.includes('router.push("/church/register" as any)'));
 const myCommunity = readFileSync(path.join(root, "app/community.tsx"), "utf8");
 ok("My Community: families, church, gatherings and community learning — linking to the existing screens", ["My Families", "My Church", "Community Learning", "getMyFamilies()", '"/family/[familyId]"', '"/church/calls"', '"/learning/[scope]/[groupId]"', "<StudyTogetherLink"].every((x) => myCommunity.includes(x)));
-ok("home: Messages / Prayer / Discover / Profile tabs untouched by this work", !/LearningHub|My Community/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/discover.tsx") + src("app/(tabs)/profile.tsx")));
+ok("home: Messages / Prayer / Discover / Profile tabs untouched by this work", !/LearningHub/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/discover.tsx") + src("app/(tabs)/profile.tsx")) && !/My Community/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/profile.tsx")));
 
 console.log(`kingdomStoriesExperience: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -106,8 +106,8 @@ const old = src("app/evaluations.tsx");
 ok("Review submissions screen: directly assigned reviews only — no learner tabs, no Circle reviews",
   !old.includes("getMySubmissions") && !old.includes("CircleEvaluationCard") && !old.includes("/circles/") && !old.includes("Recently Approved") && old.includes("My Evaluations"));
 const home = src("app/(tabs)/index.tsx");
-ok("Home: Peer review link and the waiting badge open My Evaluations", !home.includes(`go("/evaluations")`) && !home.includes(`router.push("/evaluations")`)
-  && home.includes(`onPress={go("/evaluation")}`) && home.includes(`pathname: "/evaluation", params: { tab: "serving" }`));
+ok("Home: the waiting badge opens My Evaluations; the general entry lives in Learning", !home.includes(`go("/evaluations")`) && !home.includes(`router.push("/evaluations")`)
+  && src("app/(tabs)/learn.tsx").includes(`router.push("/evaluation" as any)`) && home.includes(`pathname: "/evaluation", params: { tab: "serving" }`));
 const mine = src("app/evaluation/index.tsx");
 ok("My Evaluations: opens on Evaluating from Home; directly assigned reviews counted and linked", mine.includes(`params.tab === "serving"`) && mine.includes("pendingEvaluations.length") && mine.includes(`router.push("/evaluations" as any)`));
 const m231 = readFileSync(path.join(root, "../../migrations/231_combine_evaluation_waiting_notices.sql"), "utf8");

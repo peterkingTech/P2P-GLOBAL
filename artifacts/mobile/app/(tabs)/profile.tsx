@@ -17,7 +17,7 @@ import { useLayout, MAX_CONTENT_WIDTH, centeredMaxWidth, useSheetWidth } from "@
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth, SpiritualGift } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
+import { useData, getModuleProgressCounts } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AppColors } from "@/constants/themes";
 import { HelpButton } from "@/components/HelpButton";
@@ -32,6 +32,8 @@ import LivingTree, { stageLabel } from "@/components/LivingTree";
 import "@/lib/i18n";
 import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
 import { AppButton } from "@/components/ui";
+import { GetStartedCard } from "@/components/GetStartedCard";
+import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
 import { showAlert, confirmAction } from "@/lib/alerts";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
@@ -242,7 +244,8 @@ export default function ProfileScreen() {
   useScrollToTopOnTabReselect("profile", tabScrollRef);
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, treeData, getMyInviteLink } = useData();
+  const { submitHelpRequest, treeData, getMyInviteLink, modules } = useData();
+  const { modulesCompleted } = getModuleProgressCounts(modules);
   const { t } = useTranslation();
   const { colors, style } = useTheme();
   const styles = makeStyles(colors);
@@ -492,6 +495,51 @@ export default function ProfileScreen() {
           <AppButton label={t("profile.add")} onPress={() => setSkillsOpen(true)} variant="outline" size="sm" icon="add" />
         </View>
 
+        {/* My growth — personal growth and discipleship (moved here from the
+            Home dashboard: growth card, Your Journey tiles and My P2P). */}
+        <Text style={styles.sectionTitle}>My growth</Text>
+        <View style={styles.settingsList}>
+          {[
+            { icon: "leaf-outline", label: "Growth journey", route: "/stages" },
+            { icon: "git-network-outline", label: "My Generational Forest", route: "/forest" },
+            { icon: "flower-outline", label: "My Living Tree", route: "/living-tree" },
+            { icon: "people-circle-outline", label: t("home.myDiscipleship"), route: "/my-discipleship" },
+            { icon: "people-outline", label: "My relationships", route: "/relationships" },
+            { icon: "git-branch-outline", label: "My discipleship lineage", route: "/lineage" },
+            { icon: "stats-chart-outline", label: t("home.myProgress"), route: "/progress" },
+          ].map((item) => (
+            <TouchableOpacity accessibilityRole="button" key={item.route} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
+              <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
+              <Text style={styles.settingsLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Be an Electronic Evangelist — stage-aware, with its own snooze (moved from Home). */}
+        <InviteEncouragementCard modulesCompleted={modulesCompleted} />
+
+        {/* My space — personal tools and saved things. */}
+        <Text style={styles.sectionTitle}>My space</Text>
+        <View style={styles.settingsList}>
+          {[
+            { icon: "grid-outline", label: "My P2P", route: "/my-p2p" },
+            { icon: "journal-outline", label: "My Journal", route: "/my-discipleship/journal" },
+            { icon: "headset-outline", label: "My Scripture Library", route: "/library" },
+            { icon: "document-text-outline", label: "My notes", route: "/notes" },
+            { icon: "color-wand-outline", label: "My highlights", route: "/highlights" },
+          ].map((item) => (
+            <TouchableOpacity accessibilityRole="button" key={item.route} style={styles.settingsRow} activeOpacity={0.8} onPress={() => router.push(item.route as any)}>
+              <Ionicons name={item.icon as any} size={20} color={colors.textMid} />
+              <Text style={styles.settingsLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* "How to use P2P" progress — hides itself once every step is done (moved from Home). */}
+        <GetStartedCard />
+
         {/* Peer Guide dashboard */}
         {profile?.role === "peer_guide" && (
           <TouchableOpacity accessibilityRole="button" style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/registrations")}>
@@ -511,6 +559,20 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.dashboardTitle}>{t("profile.adminDashboard")}</Text>
               <Text style={styles.dashboardSub}>Curriculum, registrations, help requests & team</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
+          </TouchableOpacity>
+        )}
+
+        {/* Admin Centre for the other staff roles (admin_supervisor, admin_zone,
+            admin_content…). They reached it from Home before; same route and
+            role gate as that link (any role other than student). */}
+        {profile?.role && profile.role !== "student" && profile.role !== "peer_guide" && !ADMIN_ROLES.has(profile.role) && (
+          <TouchableOpacity accessibilityRole="button" style={styles.dashboardRow} activeOpacity={0.85} onPress={() => router.push("/admin/curriculum" as any)}>
+            <Ionicons name="settings-outline" size={18} color={colors.primaryGreen} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dashboardTitle}>{t("home.admin")}</Text>
+              <Text style={styles.dashboardSub}>{t("home.adminSub")}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.borderBeige} />
           </TouchableOpacity>
