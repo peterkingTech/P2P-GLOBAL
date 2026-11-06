@@ -7,12 +7,14 @@ import type { AppColors } from "@/constants/themes";
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { getLearningOverview, SOURCE_LABEL, STATE_LABEL, needsAction, dueLabel, type LearningOverview, type WorkItem } from "@/lib/learningCentreApi";
 import { AppButton } from "@/components/ui";
+import LearningDashboard from "@/components/learning/LearningDashboard";
 
 // Learning Centre: my Comprehensive Checks from Kingdom School, Kingdom
 // Stories, Family Circle and Church in one place — what to do, what waits
 // for review, feedback I've received, and reviews waiting for me. Each row
 // opens the existing screen where that work lives; nothing is answered,
-// reviewed or marked complete here.
+// reviewed or marked complete here. The learning dashboard (Kingdom School progress and the checks
+// counts — formerly "Your Learning Journey" on the Learning tab) sits at the top.
 
 type Section = { key: keyof LearningOverview; title: string; empty: string };
 const SECTIONS: Section[] = [
@@ -66,6 +68,7 @@ export default function LearningCentreScreen() {
       <Stack.Screen options={{ title: "Learning Centre" }} />
       <Text style={s.title} accessibilityRole="header">Learning Centre</Text>
       <Text style={s.meta}>Your {COMPREHENSIVE_CHECKS} from Kingdom School, Kingdom Stories, Family Circle and Church in one place. Tap one to open it where you answer it.</Text>
+      <LearningDashboard overview={data} failed={!!error} colors={c} />
       {error ? (
         <View style={s.card}>
           <Text style={s.error} accessibilityRole="alert">{error}</Text>
@@ -85,13 +88,6 @@ export default function LearningCentreScreen() {
         );
       }) : null}
 
-      {data ? (
-        <View style={[s.row, { marginTop: 8 }]}>
-          <AppButton label="Kingdom School" onPress={() => router.push("/kingdom-school" as any)} variant="secondary" />
-          <AppButton label="Kingdom Stories" onPress={() => router.push("/kingdom-stories" as any)} variant="secondary" />
-          <AppButton label="Discipleship Journal" onPress={() => router.push("/my-discipleship/journal" as any)} variant="secondary" />
-        </View>
-      ) : null}
     </ScrollView>
   );
 }

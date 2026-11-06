@@ -183,25 +183,26 @@ ok("story page: chapters, reflections and checks still open the existing reader"
 // ── 6. Navigation ───────────────────────────────────────────────────────
 const layout = src("app/(tabs)/_layout.tsx");
 const tabFiles = readdirSync(path.join(root, "app/(tabs)")).filter((f) => f.endsWith(".tsx") && f !== "_layout.tsx").map((f) => f.replace(".tsx", "")).sort();
-ok("tabs: exactly six destinations", tabFiles.join() === "discover,index,learn,messages,prayer,profile");
-ok("tabs: native, iPad capsule and classic bars list the same six", (layout.match(/<NativeTabs\.Trigger name=/g) ?? []).length === 6 && (layout.match(/\{ name: "(index|learn|messages|prayer|discover|profile)", label/g) ?? []).length === 12);
+// Owner decision 2026-11-06: Home, Learning, Bible, Messages, My Profile, More (Prayer + Discover inside More).
+ok("tabs: exactly six destinations", tabFiles.join() === "bible,index,learn,messages,more,profile");
+ok("tabs: native, iPad capsule and classic bars list the same six", (layout.match(/<NativeTabs\.Trigger name=/g) ?? []).length === 6 && (layout.match(/\{ name: "(index|learn|bible|messages|profile|more)", label/g) ?? []).length === 12);
 const en = JSON.parse(src("locales/en.json"));
 ok("tabs: Kingdom School tab is now 'Learning' (route unchanged)", en.tabs.learn === "Learning" && layout.includes('name="learn"') && !layout.includes("K-School\")"));
 ok("tabs: other languages keep their own word", JSON.parse(src("locales/fr.json")).tabs.learn === "Apprendre" && JSON.parse(src("locales/sw.json")).tabs.learn === "Jifunza");
 const learn = src("app/(tabs)/learn.tsx");
 const hub = src("components/LearningHub.tsx");
 ok("learning: Explore Learning on the tab; Kingdom School has its own screen (no second dashboard)", learn.includes("<LearningHub") && !learn.includes("<KingdomSchoolCards") && src("app/kingdom-school.tsx").includes("<KingdomSchoolCards"));
-for (const r of ["/kingdom-school", "/kingdom-stories", "/bible-study", "/study-together"]) {
+for (const r of ["/kingdom-school", "/kingdom-stories", "/learning"]) {
   const file = [path.join(root, "app", r.slice(1), "index.tsx"), path.join(root, "app", `${r.slice(1)}.tsx`)].find(existsSync);
   ok(`learning: hub opens the existing ${r} screen`, hub.includes(`route: "${r}"`) && !!file);
 }
-const homeTab = src("app/(tabs)/index.tsx"), discoverTab = src("app/(tabs)/discover.tsx");
+const homeTab = src("app/(tabs)/index.tsx"), discoverTab = src("components/more/DiscoverHome.tsx");
 ok("home: no My Community section or church cards (moved off the Home dashboard)", !/My Community|GroveHomeCard|RegisterChurchPromptCard|MemberChurchCard/.test(homeTab));
 ok("discover: My Community entry opens the overview", discoverTab.includes(">My Community</Text>") && discoverTab.includes('router.push("/community" as any)'));
 ok("church: leader dashboard, register and own church still reachable", src("app/church/index.tsx").includes('router.push("/church/grove" as any)') && discoverTab.includes('{profile?.isMinistryLeader && !userChurch && (') && discoverTab.includes('router.push("/church/register" as any)'));
 const myCommunity = readFileSync(path.join(root, "app/community.tsx"), "utf8");
 ok("My Community: families, church, gatherings and community learning — linking to the existing screens", ["My Families", "My Church", "Community Learning", "getMyFamilies()", '"/family/[familyId]"', '"/church/calls"', '"/learning/[scope]/[groupId]"', "<StudyTogetherLink"].every((x) => myCommunity.includes(x)));
-ok("home: Messages / Prayer / Discover / Profile tabs untouched by this work", !/LearningHub/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/discover.tsx") + src("app/(tabs)/profile.tsx")) && !/My Community/.test(src("app/(tabs)/messages.tsx") + src("app/(tabs)/prayer.tsx") + src("app/(tabs)/profile.tsx")));
+ok("home: Messages / Prayer / Discover / Profile tabs untouched by this work", !/LearningHub/.test(src("app/(tabs)/messages.tsx") + src("components/more/PrayerHome.tsx") + src("components/more/DiscoverHome.tsx") + src("app/(tabs)/profile.tsx")) && !/My Community/.test(src("app/(tabs)/messages.tsx") + src("components/more/PrayerHome.tsx") + src("app/(tabs)/profile.tsx")));
 
 console.log(`kingdomStoriesExperience: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

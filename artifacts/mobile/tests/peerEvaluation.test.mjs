@@ -92,7 +92,7 @@ const guide = src("constants/evaluationGuidance.ts");
 ok("orientation: the five Scriptures and the orientation message", ["1 Peter 4:10", "Galatians 6:2", "Colossians 3:23–24", "Matthew 20:26–28", "2 Timothy 2:2"].every((r) => guide.includes(r)) && guide.includes("You are not merely reviewing an assignment."));
 const noComments = (s) => s.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 ok("orientation: no guilt or pressure language", !/you must|shame|guilt|you are failing|disappoint/i.test(noComments(guide + src("app/evaluation/orientation.tsx"))));
-ok("Learning tab: My Evaluations entry (no new main tab)", src("app/(tabs)/learn.tsx").includes('router.push("/evaluation" as any)') && !existsSync(path.join(root, "app/(tabs)/evaluation.tsx")));
+ok("Learning tab: My Evaluations tile (no new main tab)", src("app/(tabs)/learn.tsx").includes("<LearningHub") && src("components/LearningHub.tsx").includes('route: "/evaluation"') && !existsSync(path.join(root, "app/(tabs)/evaluation.tsx")));
 for (const f of screens.filter((x) => x.startsWith("app/"))) {
   const s = src(f);
   ok(`${f}: theme colours only`, !(s.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? []).some((h) => !["#fff", "#FFF", "#C0392B"].includes(h)));
@@ -107,7 +107,7 @@ ok("Review submissions screen: directly assigned reviews only — no learner tab
   !old.includes("getMySubmissions") && !old.includes("CircleEvaluationCard") && !old.includes("/circles/") && !old.includes("Recently Approved") && old.includes("My Evaluations"));
 const home = src("app/(tabs)/index.tsx");
 ok("Home: the waiting badge opens My Evaluations; the general entry lives in Learning", !home.includes(`go("/evaluations")`) && !home.includes(`router.push("/evaluations")`)
-  && src("app/(tabs)/learn.tsx").includes(`router.push("/evaluation" as any)`) && home.includes(`pathname: "/evaluation", params: { tab: "serving" }`));
+  && src("components/LearningHub.tsx").includes('route: "/evaluation"') && home.includes(`pathname: "/evaluation", params: { tab: "serving" }`));
 const mine = src("app/evaluation/index.tsx");
 ok("My Evaluations: opens on Evaluating from Home; directly assigned reviews counted and linked", mine.includes(`params.tab === "serving"`) && mine.includes("pendingEvaluations.length") && mine.includes(`router.push("/evaluations" as any)`));
 const m231 = readFileSync(path.join(root, "../../migrations/231_combine_evaluation_waiting_notices.sql"), "utf8");

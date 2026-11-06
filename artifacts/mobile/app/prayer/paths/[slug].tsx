@@ -12,6 +12,7 @@ import { savePath, saveScripture, logPrayerActivity } from "@/lib/prayerLibraryA
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 
 type ScreenState = "landing" | "active" | "complete";
@@ -226,7 +227,7 @@ export default function PrayerPathFlowScreen() {
             )}
             <AppButton label="Pray for Missions" onPress={() => router.push("/missions" as any)} variant="outline" icon="earth-outline" />
 
-            <AppButton label="Return to Prayer" onPress={() => router.replace("/(tabs)/prayer" as any)} style={{ marginTop: 4 }} />
+            <AppButton label="Return to Prayer" onPress={() => router.replace(PRAYER_ROUTE as any)} style={{ marginTop: 4 }} />
           </View>
         )}
       </ScrollView>

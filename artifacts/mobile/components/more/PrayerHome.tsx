@@ -237,12 +237,13 @@ function PostCard({
   );
 }
 
-export default function PrayerTab() {
+// Shown inside the More tab (app/(tabs)/more.tsx), which passes its Prayer / Discover switch as topSlot.
+export default function PrayerTab({ topSlot, reselectKey = "more" }: { topSlot?: React.ReactNode; reselectKey?: string } = {}) {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
   const tabScrollRef = React.useRef<ScrollView>(null);
-  useScrollToTopOnTabReselect("prayer", tabScrollRef);
+  useScrollToTopOnTabReselect(reselectKey, tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   const { getPrayerWallPosts, createPrayerWallPost, reactToPost, markPostAnswered, reportContent } = useData();
@@ -472,6 +473,7 @@ export default function PrayerTab() {
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: topPad }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
+      {topSlot}
       <ScrollView ref={tabScrollRef} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: 20 }]}>
           <View>

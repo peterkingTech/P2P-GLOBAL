@@ -195,16 +195,16 @@ ok("no screen keeps its own 'current module' rule", x.length === 0, show(x));
 
 for (const f of ["app/kingdom-school.tsx", "app/kingdom-stories/index.tsx", "app/community.tsx"]) ok(`Study Together reachable from ${f}`, read(f).includes("<StudyTogetherLink"));
 ok("Study Together reachable from Bible Study, Family and Church hubs", read("app/bible-study/index.tsx").includes('route: "/study-together"') && read("app/family/[familyId].tsx").includes('router.push("/study-together"') && read("app/church/index.tsx").includes('router.push("/study-together"'));
-ok("Discover: one My Community entry that opens the overview (moved from Home)", (read("app/(tabs)/discover.tsx").match(/router\.push\("\/community" as any\)/g) ?? []).length === 1 && !read("app/(tabs)/index.tsx").includes("/community"));
+ok("Discover: one My Community entry that opens the overview (moved from Home)", (read("components/more/DiscoverHome.tsx").match(/router\.push\("\/community" as any\)/g) ?? []).length === 1 && !read("app/(tabs)/index.tsx").includes("/community"));
 const conn = read("app/connect/index.tsx");
-ok("old /connect hub redirects to Discover; Discover has every people path", conn.includes("<Redirect") && conn.includes('"/(tabs)/discover"') && ["/connect/discover", "/connect/groups", "/connect/smart-match", "/connect/by-username?type=peer_guide", "/connect/invite", "/connect/by-username", "/connections"].every((r) => read("app/(tabs)/discover.tsx").includes(`route: "${r}"`)));
+ok("old /connect hub redirects to Discover; Discover has every people path", conn.includes("<Redirect") && conn.includes("DISCOVER_ROUTE") && ["/connect/discover", "/connect/groups", "/connect/smart-match", "/connect/by-username?type=peer_guide", "/connect/invite", "/connect/by-username", "/connections"].every((r) => read("components/more/DiscoverHome.tsx").includes(`route: "${r}"`)));
 for (const f of ["app/call/audio.tsx", "app/call/video.tsx"]) ok(`${f}: shared "No answer" view, own handlers`, read(f).includes("<CallNoAnswerView") && !/UNANSWERED_LABEL: Record/.test(read(f)) && read(f).includes("onCallAgain={handleCallAgain}"));
 ok("one video player (feature players removed)", ["KingdomStoryVideoPlayer", "KingdomWinVideoPlayer", "MissionVideoPlayer", "TestimonyVideoPlayer"].every((n) => !existsSync(path.join(root, `components/${n}.tsx`))) && offenders(/<VideoPlayer /).length === 4);
 const ctxSrc = read("contexts/DataContext.tsx");
 ok("DataContext: data shapes moved out, still re-exported", ctxSrc.includes('export * from "./data/learningModel";') && ctxSrc.includes('export * from "./data/types";') && !/^export interface Module \{/m.test(ctxSrc) && /^export interface Module \{/m.test(read("contexts/data/learningModel.ts")));
 
 // ── 5. No entry that just repeats a tab or another home ──────────────────────
-const disc = read("app/(tabs)/discover.tsx"), homeSrc = read("app/(tabs)/index.tsx");
+const disc = read("components/more/DiscoverHome.tsx"), homeSrc = read("app/(tabs)/index.tsx");
 ok("Discover: no Kingdom Stories card (it lives in Learning)", !/route: "\/kingdom-stories"/.test(disc));
 ok("Discover: no Prayer Wall card (Prayer is a tab) and no unused prayer-wall request", !/route: "\/\(tabs\)\/prayer"/.test(disc) && !disc.includes("getPrayerWallPosts"));
 ok("Discover: your own church is not repeated (join / register stay)", !disc.includes(">My Church</Text>") && disc.includes('router.push("/church/join"'));

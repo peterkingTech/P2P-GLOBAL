@@ -5,7 +5,9 @@
     "prayer": "기도",
     "messages": "메시지",
     "discover": "탐색",
-    "missions": "선교"
+    "missions": "선교",
+    "bible": "성경",
+    "more": "더보기"
   },
   "profile": {
     "title": "내 프로필",

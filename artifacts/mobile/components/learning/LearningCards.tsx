@@ -125,24 +125,6 @@ export function CompactLearningCard({ item, colors, onPress }: { item: FeaturedL
   );
 }
 
-/** One learning experience (Explore Learning): its picture, what it is, and where you are in it. */
-export function CategoryCard({ title, sub, status, icon, art, colors, onPress }: {
-  title: string; sub: string; status?: string | null; icon: string; art: LearningArtSource; colors: AppColors; onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed: p }) => [styles.category, { backgroundColor: colors.card }, p && pressed]}
-      accessibilityRole="button" accessibilityLabel={`${title}. ${sub}${status ? `. ${status}` : ""}`}>
-      <LearningArt art={art} icon={icon} height={84} maxWidth={112} colors={colors} radius={12} />
-      <View style={{ flex: 1, gap: 3 }}>
-        <Text style={[styles.categoryTitle, { color: colors.textDark }]} numberOfLines={2}>{title}</Text>
-        <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={2}>{sub}</Text>
-        {status ? <Text style={[styles.status, { color: colors.accentGreen }]} numberOfLines={2}>{status}</Text> : null}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-    </Pressable>
-  );
-}
-
 /** A Learning Journey figure: a number, what it counts, and an icon that lights up when there's something there. */
 export function ProgressStat({ value, label, icon, colors, highlight = false, wide = false }: { value: number | string; label: string; icon: string; colors: AppColors; highlight?: boolean; wide?: boolean }) {
   const lit = highlight && value !== 0;
@@ -169,8 +151,6 @@ const styles = StyleSheet.create({
   continueText: { fontSize: 14, fontFamily: "Inter_700Bold" },
   compact: { width: 272, flexDirection: "row", alignItems: "center", gap: 12, padding: 10, borderRadius: 16 },
   compactTitle: { fontSize: 14, lineHeight: 18, fontFamily: "Inter_700Bold" },
-  category: { flexDirection: "row", alignItems: "center", gap: 14, padding: 12, borderRadius: 18, minHeight: 108 },
-  categoryTitle: { fontSize: 16, lineHeight: 21, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
   status: { fontSize: 12, lineHeight: 16, fontFamily: "Inter_600SemiBold", marginTop: 2 },
   stat: { flexGrow: 1, flexBasis: "45%", minWidth: 120, padding: 12, borderRadius: 14, gap: 2 },
   statValue: { fontSize: 22, lineHeight: 27, fontFamily: "Inter_700Bold", letterSpacing: -0.4, marginTop: 4 },

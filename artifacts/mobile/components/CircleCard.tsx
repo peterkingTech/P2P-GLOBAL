@@ -6,7 +6,7 @@ import { AppButton } from "@/components/ui";
 
 // One shared rectangular circle card, replacing three near-identical local
 // implementations (app/circles/index.tsx "My Circles", app/circles/discover.tsx
-// "Find a Circle", and the Peer Circles teaser in app/(tabs)/discover.tsx).
+// "Find a Circle", and the Peer Circles teaser in components/more/DiscoverHome.tsx).
 // Covers the union of fields those three screens already show — this does
 // not add any field/status none of them already displayed.
 export interface CircleCardProps {

@@ -1,11 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Ionicons } from "@expo/vector-icons";
+import { DISCOVER_ROUTE, PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 // "How to use P2P" — a reopenable, step-by-step guide. Progress is stored
 // per user on this device (AsyncStorage, same as other per-user UI state).
 
 export type GetStartedStepId =
-  | "understand" | "learning-path" | "connect" | "learn-together" | "pray" | "help-grow" | "discover";
+  | "understand" | "learning-path" | "peer-evaluation" | "connect" | "learn-together" | "pray" | "help-grow" | "discover";
 
 export interface GetStartedStep {
   id: GetStartedStepId;
@@ -17,6 +18,13 @@ export interface GetStartedStep {
   /** Where "Open" takes the user. Omitted when the step is read-only. */
   route?: string;
   actionLabel?: string;
+  /**
+   * When set, the step is finished only by ticking this statement (the participant confirms they
+   * understood) — never by opening the route, and never inferred from activity.
+   */
+  acknowledgement?: string;
+  /** Show whether the service behind this step is running (peer evaluation readiness). */
+  showsServiceStatus?: boolean;
 }
 
 export const GET_STARTED_STEPS: GetStartedStep[] = [
@@ -41,7 +49,24 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/kingdom-school", actionLabel: "Open Kingdom School",
   },
   {
-    id: "connect", number: 3, title: "Connect with peers", icon: "people-outline",
+    // Peer evaluation: there is no sign-up and no volunteer list. Passing a resource through an
+    // independent evaluation is what qualifies someone, for that exact resource only.
+    id: "peer-evaluation", number: 3, title: "Learn Together. Help Others Grow.", icon: "people-circle-outline",
+    summary: "How peer evaluation works — and how you'll be invited to help.",
+    points: [
+      "You learn through Kingdom School, Kingdom Stories, reading plans and other P2P resources.",
+      "When you finish a Comprehensive Check, a peer who has already passed that same resource evaluates it.",
+      "When your own work on a resource is approved by an independent peer, you automatically become able to evaluate others on that exact resource.",
+      "You will only ever be invited for resources you have passed yourself — never for anything else.",
+      "There is nothing to register for and no volunteer sign-up. Invitations come to you when someone needs a peer for a resource you passed.",
+      "You never evaluate your own work, and you keep learning while you help others grow.",
+    ],
+    route: "/evaluation", actionLabel: "Open My Evaluations",
+    acknowledgement: "I understand how peer evaluation works",
+    showsServiceStatus: true,
+  },
+  {
+    id: "connect", number: 4, title: "Connect with peers", icon: "people-outline",
     summary: "Find people to grow with, and stay in touch.",
     points: [
       "Connect with peers from Discover or a peer's profile.",
@@ -51,7 +76,7 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/connect", actionLabel: "Find peers",
   },
   {
-    id: "learn-together", number: 4, title: "Learn together", icon: "school-outline",
+    id: "learn-together", number: 5, title: "Learn together", icon: "school-outline",
     summary: "Study the Bible with others, live.",
     points: [
       "Peer Circles meet regularly for Bible study.",
@@ -61,16 +86,16 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/circles/discover", actionLabel: "Explore Peer Circles",
   },
   {
-    id: "pray", number: 5, title: "Pray together", icon: "hand-left-outline",
+    id: "pray", number: 6, title: "Pray together", icon: "hand-left-outline",
     summary: "Bring requests, pray for others, and share what God has done.",
     points: [
       "Post a prayer request or pray for someone else's.",
       "Share testimonies so others are encouraged.",
     ],
-    route: "/(tabs)/prayer", actionLabel: "Open Prayer",
+    route: PRAYER_ROUTE, actionLabel: "Open Prayer",
   },
   {
-    id: "help-grow", number: 6, title: "Help someone grow", icon: "person-add-outline",
+    id: "help-grow", number: 7, title: "Help someone grow", icon: "person-add-outline",
     summary: "Be an Electronic Evangelist.",
     points: [
       "Your phone can be more than a place to consume. Use it to help someone grow.",
@@ -79,13 +104,13 @@ export const GET_STARTED_STEPS: GetStartedStep[] = [
     route: "/connect/invite", actionLabel: "Invite a peer",
   },
   {
-    id: "discover", number: 7, title: "Discover Kingdom opportunities", icon: "compass-outline",
+    id: "discover", number: 8, title: "Discover Kingdom opportunities", icon: "compass-outline",
     summary: "See what God is doing, and where you can take part.",
     points: [
       "Discover shows live rooms, peer groups, churches and Kingdom Stories.",
       "Missions — stories, mission fields and ways to pray — now live inside Discover.",
     ],
-    route: "/(tabs)/discover", actionLabel: "Open Discover",
+    route: DISCOVER_ROUTE, actionLabel: "Open Discover",
   },
 ];
 

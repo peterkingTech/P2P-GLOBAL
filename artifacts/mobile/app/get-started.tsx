@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,9 +8,14 @@ import { AppColors } from "@/constants/themes";
 import { GET_STARTED_STEPS, type GetStartedStepId } from "@/lib/getStarted";
 import { useGetStartedProgress } from "@/hooks/useGetStartedProgress";
 import { AppButton } from "@/components/ui";
+import { getEvaluationStatus, type EvaluationStatus } from "@/lib/peerEvaluationApi";
 
 // "How to use P2P". Reachable any time from Home and Profile — not a
 // first-launch-only tutorial.
+//
+// A step with an `acknowledgement` (peer evaluation) is finished only when the participant ticks it:
+// opening the feature doesn't finish it, and nothing about it is inferred. Whether the service behind
+// it is running is shown separately (from /evaluation/status) and never assumed.
 export default function GetStartedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -22,9 +27,28 @@ export default function GetStartedScreen() {
     () => GET_STARTED_STEPS.find((s) => !completed.has(s.id))?.id ?? null,
   );
 
-  async function handleOpen(stepId: GetStartedStepId, route: string) {
-    await complete(stepId);
+  const [acknowledged, setAcknowledged] = useState<Set<GetStartedStepId>>(new Set());
+  // null = checking; "error" = we couldn't reach the service (shown as unavailable, never as ready).
+  const [service, setService] = useState<EvaluationStatus | "error" | null>(null);
+  const statusStepOpen = !!GET_STARTED_STEPS.find((s) => s.id === openStep)?.showsServiceStatus;
+
+  useEffect(() => {
+    if (!statusStepOpen) return;
+    let cancelled = false;
+    setService(null);
+    getEvaluationStatus().then((r) => { if (!cancelled) setService(r); }, () => { if (!cancelled) setService("error"); });
+    return () => { cancelled = true; };
+  }, [statusStepOpen]);
+
+  async function handleOpen(stepId: GetStartedStepId, route: string, acknowledgement?: string) {
+    if (!acknowledgement) await complete(stepId);
     router.push(route as any);
+  }
+
+  function finish(step: (typeof GET_STARTED_STEPS)[number]) {
+    void complete(step.id);
+    const next = GET_STARTED_STEPS.find((s) => s.number > step.number && !completed.has(s.id));
+    setOpenStep(next?.id ?? null);
   }
 
   return (
@@ -79,21 +103,40 @@ export default function GetStartedScreen() {
                       <Text style={styles.pointText}>{p}</Text>
                     </View>
                   ))}
+                  {step.showsServiceStatus && <ServiceStatusLine service={service} styles={styles} colors={colors} />}
+                  {step.acknowledgement && (
+                    <TouchableOpacity
+                      style={styles.ackRow}
+                      disabled={done}
+                      onPress={() => setAcknowledged((prev) => {
+                        const n = new Set(prev);
+                        if (n.has(step.id)) n.delete(step.id); else n.add(step.id);
+                        return n;
+                      })}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: done || acknowledged.has(step.id), disabled: done }}
+                      accessibilityLabel={step.acknowledgement}
+                    >
+                      <View style={[styles.ackBox, (done || acknowledged.has(step.id)) && styles.ackBoxOn]}>
+                        {(done || acknowledged.has(step.id)) && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <Text style={styles.ackText}>{step.acknowledgement}</Text>
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.stepActions}>
                     {step.route && (
-                      <AppButton label={`${step.actionLabel ?? "Open"}`} onPress={() => { void handleOpen(step.id, step.route as string); }} style={{ flex: 1 }} />
+                      <AppButton label={`${step.actionLabel ?? "Open"}`} onPress={() => { void handleOpen(step.id, step.route as string, step.acknowledgement); }} style={{ flex: 1 }} />
                     )}
                     {!done && (
                       <TouchableOpacity accessibilityRole="button"
-                        style={step.route ? styles.secondaryBtn : styles.primaryBtn}
-                        onPress={() => {
-                          void complete(step.id);
-                          const next = GET_STARTED_STEPS.find((s) => s.number > step.number && !completed.has(s.id));
-                          setOpenStep(next?.id ?? null);
-                        }}
+                        style={[step.route ? styles.secondaryBtn : styles.primaryBtn, !!step.acknowledgement && !acknowledged.has(step.id) && styles.btnDisabled]}
+                        disabled={!!step.acknowledgement && !acknowledged.has(step.id)}
+                        accessibilityState={{ disabled: !!step.acknowledgement && !acknowledged.has(step.id) }}
+                        accessibilityHint={step.acknowledgement ? "Tick the statement above first" : undefined}
+                        onPress={() => finish(step)}
                       >
                         <Text style={step.route ? styles.secondaryBtnText : styles.primaryBtnText}>
-                          {step.route ? "Mark as done" : "Got it"}
+                          {step.acknowledgement ? "Done" : step.route ? "Mark as done" : "Got it"}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -104,6 +147,21 @@ export default function GetStartedScreen() {
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+// Whether peer evaluation is running right now — separate from the participant understanding it.
+function ServiceStatusLine({ service, styles, colors }: { service: EvaluationStatus | "error" | null; styles: ReturnType<typeof makeStyles>; colors: AppColors }) {
+  const unavailable = service === "error" || service?.state === "unavailable";
+  const text = service === null ? "Checking whether peer evaluation is running…"
+    : service === "error" ? "We couldn't check whether peer evaluation is running right now. Your work is kept safe either way."
+    : service.message;
+  return (
+    <View style={[styles.statusBox, unavailable && styles.statusBoxWarn]} accessibilityLiveRegion="polite">
+      <Ionicons name={service === null ? "time-outline" : unavailable ? "alert-circle-outline" : "checkmark-circle-outline"} size={16}
+        color={unavailable ? colors.amber : colors.accentGreen} style={{ marginTop: 1 }} />
+      <Text style={styles.statusText}>{text}</Text>
     </View>
   );
 }
@@ -139,5 +197,13 @@ function makeStyles(c: AppColors) {
     stepActions: { flexDirection: "row", gap: 10, marginTop: 6 },
     primaryBtn: { flex: 1, backgroundColor: c.accentGreen, borderRadius: 12, height: 42, alignItems: "center", justifyContent: "center" },
     primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "Inter_700Bold" },
+    btnDisabled: { opacity: 0.45 },
+    ackRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, marginTop: 2 },
+    ackBox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.accentGreen, alignItems: "center", justifyContent: "center" },
+    ackBoxOn: { backgroundColor: c.accentGreen },
+    ackText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    statusBox: { flexDirection: "row", gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: c.borderBeige, marginTop: 4, marginBottom: 4 },
+    statusBoxWarn: { borderColor: c.amber },
+    statusText: { flex: 1, fontSize: 13, color: c.textDark, lineHeight: 19, fontFamily: "Inter_400Regular" },
   });
 }

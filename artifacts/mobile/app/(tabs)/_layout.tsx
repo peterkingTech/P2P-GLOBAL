@@ -12,6 +12,7 @@ import { useData } from "@/contexts/DataContext";
 import {
   IPadTabCapsule, TabCapsuleContentTopContext, TabReselectContext, capsuleContentTop, createTabReselectEmitter, useIPadTabCapsuleVisible,
 } from "@/components/IPadTabCapsule";
+import { usePrayerBadge } from "@/hooks/usePrayerBadge";
 import "@/lib/i18n";
 
 
@@ -20,6 +21,11 @@ import "@/lib/i18n";
 function profileTabLabel(t: (key: string, opts?: Record<string, unknown>) => string): string {
   return t("tabs.profile", { defaultValue: t("home.myProfile") });
 }
+
+// Six tabs: Home, Learning, Bible, Messages, My Profile, More. Prayer and Discover live inside
+// More (app/(tabs)/more.tsx); its badge counts new prayer activity (hooks/usePrayerBadge).
+const bibleLabel = (t: (key: string, opts?: Record<string, unknown>) => string) => t("tabs.bible", { defaultValue: "Bible" });
+const moreLabel = (t: (key: string, opts?: Record<string, unknown>) => string) => t("tabs.more", { defaultValue: "More" });
 
 // Auto-shrinks to fit its slot instead of truncating — a fixed-size label
 // (e.g. the old "K-School" abbreviation, added specifically to dodge
@@ -43,6 +49,7 @@ function TabLabel({ label, color, baseFontSize }: { label: string; color: string
 function NativeTabLayout() {
   const { t } = useTranslation();
   const { totalUnreadCount } = useData();
+  const prayerBadge = usePrayerBadge();
   // iPad: the native floating top bar can only show five of the six tabs, so
   // it is hidden and IPadTabCapsule draws all six in its place (same
   // navigator, routes and state). iPhone and narrow iPad windows: unchanged.
@@ -61,25 +68,26 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Label>{t("tabs.home")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="learn">
-        <NativeTabs.Trigger.Icon sf={{ default: "book", selected: "book.fill" }} />
+        <NativeTabs.Trigger.Icon sf={{ default: "graduationcap", selected: "graduationcap.fill" }} />
         <NativeTabs.Trigger.Label>{t("tabs.learn")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="bible">
+        <NativeTabs.Trigger.Icon sf={{ default: "book", selected: "book.fill" }} />
+        <NativeTabs.Trigger.Label>{bibleLabel(t)}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="messages">
         <NativeTabs.Trigger.Icon sf={{ default: "message", selected: "message.fill" }} />
         <NativeTabs.Trigger.Label>{t("tabs.messages")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Badge hidden={totalUnreadCount === 0}>{String(totalUnreadCount)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="prayer">
-        <NativeTabs.Trigger.Icon sf={{ default: "hands.sparkles", selected: "hands.sparkles.fill" }} />
-        <NativeTabs.Trigger.Label>{t("tabs.prayer")}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="discover">
-        <NativeTabs.Trigger.Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <NativeTabs.Trigger.Label>{t("tabs.discover")}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Icon sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }} />
         <NativeTabs.Trigger.Label>{profileTabLabel(t)}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="more">
+        <NativeTabs.Trigger.Icon sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }} />
+        <NativeTabs.Trigger.Label>{moreLabel(t)}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Badge hidden={prayerBadge === 0}>{String(prayerBadge)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
     </NativeTabs>
     {capsuleVisible && (
@@ -87,10 +95,10 @@ function NativeTabLayout() {
         items={[
           { name: "index", label: t("tabs.home") },
           { name: "learn", label: t("tabs.learn") },
+          { name: "bible", label: bibleLabel(t) },
           { name: "messages", label: t("tabs.messages"), badge: totalUnreadCount },
-          { name: "prayer", label: t("tabs.prayer") },
-          { name: "discover", label: t("tabs.discover") },
           { name: "profile", label: profileTabLabel(t) },
+          { name: "more", label: moreLabel(t), badge: prayerBadge },
         ]}
       />
     )}
@@ -107,6 +115,7 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === "web";
   const { t } = useTranslation();
   const { totalUnreadCount } = useData();
+  const prayerBadge = usePrayerBadge();
   // Take the larger of the real device inset and the previous flat value —
   // preserves existing look on devices the old constants already covered,
   // and fixes the gap on devices (e.g. some Android gesture nav) where the
@@ -115,14 +124,12 @@ function ClassicTabLayout() {
 
   const TAB_ITEMS = [
     { name: "index", label: t("tabs.home"), icon: "home" as const, iconActive: "home" as const },
-    { name: "learn", label: t("tabs.learn"), icon: "book-outline" as const, iconActive: "book" as const },
+    { name: "learn", label: t("tabs.learn"), icon: "school-outline" as const, iconActive: "school" as const },
+    { name: "bible", label: bibleLabel(t), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
-    // Wi-Fi/connectivity icon, not the prior hotspot-style "radio" icon —
-    // "God is the Hotspot and we are connecting to Him." Label/route/nav
-    // all unchanged; only the icon glyphs changed.
-    { name: "prayer", label: t("tabs.prayer"), icon: "wifi-outline" as const, iconActive: "wifi" as const },
-    { name: "discover", label: t("tabs.discover"), icon: "compass-outline" as const, iconActive: "compass" as const },
     { name: "profile", label: profileTabLabel(t), icon: "person-circle-outline" as const, iconActive: "person-circle" as const },
+    // Prayer (its Wi-Fi icon: "God is the Hotspot and we are connecting to Him.") and Discover live here.
+    { name: "more", label: moreLabel(t), icon: "ellipsis-horizontal-circle-outline" as const, iconActive: "ellipsis-horizontal-circle" as const },
   ];
 
   return (
@@ -166,6 +173,9 @@ function ClassicTabLayout() {
             ),
             ...(tab.name === "messages" && totalUnreadCount > 0
               ? { tabBarBadge: totalUnreadCount, tabBarBadgeStyle: { backgroundColor: "#C0392B" } }
+              : {}),
+            ...(tab.name === "more" && prayerBadge > 0
+              ? { tabBarBadge: prayerBadge, tabBarBadgeStyle: { backgroundColor: "#C0392B" } }
               : {}),
           }}
         />

@@ -8,7 +8,7 @@ import { useData } from "@/contexts/DataContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, SegmentedControl } from "@/components/ui";
 import Countdown from "@/components/evaluation/Countdown";
-import { getEvaluatorProfile, myEvaluations, reviewing, STAGE_LABEL, type EvaluatorProfile, type MyEvaluation, type ReviewCard, type Stage } from "@/lib/peerEvaluationApi";
+import { getEvaluationStatus, getEvaluatorProfile, myEvaluations, reviewing, STAGE_LABEL, type EvaluationStatus, type EvaluatorProfile, type MyEvaluation, type ReviewCard, type Stage } from "@/lib/peerEvaluationApi";
 
 // My Evaluations (Learning Centre): my submissions' evaluations, and — for
 // evaluators — invitations and evaluations I'm serving in. P2P Global
@@ -42,8 +42,12 @@ export default function MyEvaluations() {
   const [refreshing, setRefreshing] = useState(false);
   const isAdmin = ["super_admin", "admin_supervisor"].includes(String((profile as { role?: string } | null)?.role ?? ""));
 
+  // Whether the service is running — shown apart from "no invitations" (null while unknown).
+  const [service, setService] = useState<EvaluationStatus | "error" | null>(null);
+
   const load = useCallback(async () => {
-    const [a, b, p] = await Promise.allSettled([myEvaluations(), reviewing(), getEvaluatorProfile()]);
+    const [a, b, p, st] = await Promise.allSettled([myEvaluations(), reviewing(), getEvaluatorProfile(), getEvaluationStatus()]);
+    setService(st.status === "fulfilled" ? st.value : "error");
     if (a.status === "fulfilled") setMine(a.value.items); else { setMine((x) => x ?? []); setError((a.reason as Error)?.message ?? "Couldn't load your evaluations."); }
     if (b.status === "fulfilled") setServing(b.value);
     if (p.status === "fulfilled") setMe(p.value);
@@ -89,18 +93,57 @@ export default function MyEvaluations() {
         })
       ) : (
         <>
+          {service === "error" || service?.state === "unavailable" ? (
+            <View style={[s.panel, s.panelWarn]} accessibilityRole="alert">
+              <View style={s.stateRow}>
+                <Ionicons name="cloud-offline-outline" size={18} color={c.amber} />
+                <Text style={s.title}>Peer evaluation is temporarily unavailable</Text>
+              </View>
+              <Text style={s.meta}>{service === "error" ? "We couldn't reach the evaluation service just now. Pull down to try again." : service.message} This isn't about you — it doesn't mean you have no invitations.</Text>
+            </View>
+          ) : null}
           {me ? (
             <View style={s.panel}>
               <Text style={s.title}>How you're invited to evaluate</Text>
-              <Text style={s.meta}>{me.howInvited ?? "When you pass a lesson, story chapter or plan session through an independent evaluation, P2P Global may invite you to evaluate that same one."}</Text>
-              <Text style={s.meta}>{me.qualifiedResources ? `You can currently be invited for ${me.qualifiedResources} ${me.qualifiedResources === 1 ? "lesson or assignment" : "lessons and assignments"} you passed.` : "Nothing yet — pass a lesson through its evaluation first."} No sign-up is needed.</Text>
+              <Text style={s.meta}>{me.howInvited ?? "When you pass a lesson, story chapter or plan session through an independent evaluation, P2P Global may invite you to evaluate that same one."} No sign-up is needed.</Text>
+              {(() => {
+                const qualified = me.qualified ?? [];
+                const count = Math.max(me.qualifiedResources ?? 0, qualified.length);
+                const state = invites ? "invited" : count ? "qualified" : "not_qualified";
+                return (
+                  <View style={{ gap: 6, marginTop: 4 }}>
+                    <View style={s.stateRow}>
+                      <Ionicons name={state === "invited" ? "mail-unread" : state === "qualified" ? "ribbon-outline" : "school-outline"} size={18}
+                        color={state === "not_qualified" ? c.textMuted : state === "invited" ? c.amber : c.accentGreen} />
+                      <Text style={s.stateTitle}>
+                        {state === "invited" ? (invites === 1 ? "You have an invitation" : `You have ${invites} invitations`)
+                          : state === "qualified" ? "You're qualified to evaluate" : "Not yet qualified"}
+                      </Text>
+                    </View>
+                    {state === "not_qualified" ? (
+                      <Text style={s.meta}>Pass a lesson, story chapter or plan session through its independent evaluation, and you'll be able to evaluate others on that same one.</Text>
+                    ) : (
+                      <>
+                        <Text style={s.meta}>{count === 1 ? "You can be invited for the 1 resource you passed:" : `You can be invited for the ${count} resources you passed:`}</Text>
+                        {qualified.slice(0, 8).map((q) => (
+                          <Text key={q.resourceId} style={s.qualifiedItem} numberOfLines={1}>• {q.title}{q.within ? ` — ${q.within}` : ""}</Text>
+                        ))}
+                        {count > Math.min(8, qualified.length) ? <Text style={s.meta}>{qualified.length ? `and ${count - Math.min(8, qualified.length)} more` : "(group work and other resources)"}</Text> : null}
+                        {state === "qualified" ? (
+                          <Text style={s.meta}>No invitation for you right now. Invitations come only when someone submits work on a resource you passed, so there can be a while between them.</Text>
+                        ) : null}
+                      </>
+                    )}
+                  </View>
+                );
+              })()}
             </View>
           ) : null}
           {me ? (
             <Pressable style={s.card} onPress={() => router.push("/evaluation/orientation" as any)} accessibilityRole="button" accessibilityLabel="Evaluator guide, your availability and service record">
               <Ionicons name={me.available ? "checkmark-circle" : "pause-circle"} size={20} color={me.available ? c.accentGreen : c.amber} />
               <View style={{ flex: 1 }}>
-                <Text style={s.title}>{me.standing === "restricted" ? "Evaluating is paused" : me.available ? "Available for evaluations" : "Not taking new evaluations"}</Text>
+                <Text style={s.title}>{me.standing === "restricted" ? "Evaluating is paused" : me.available ? "You're open to invitations" : "You've paused new invitations"}</Text>
                 <Text style={s.meta}>Up to {me.capacity} at a time · {me.record.completed} completed{me.recognitions.length ? ` · ${me.recognitions.map((r) => r.title).join(", ")}` : ""}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
@@ -120,7 +163,7 @@ export default function MyEvaluations() {
           ) : null}
 
           <Text style={s.section} accessibilityRole="header">New invitations</Text>
-          {!serving?.invitations.length ? <Text style={s.meta}>No invitations right now.</Text> : serving.invitations.map((x) => (
+          {!serving?.invitations.length ? <Text style={s.meta}>{serving ? "No current invitation." : "Couldn't load invitations — pull down to try again."}</Text> : serving.invitations.map((x) => (
             <Pressable key={x.assignmentId} style={s.card} onPress={() => router.push({ pathname: "/evaluation/invitation/[assignmentId]", params: { assignmentId: x.assignmentId } } as any)}
               accessibilityRole="button" accessibilityLabel={`Invitation: ${x.lessonTitle}`}>
               <Ionicons name="mail-unread" size={20} color={c.amber} />
@@ -168,6 +211,10 @@ function makeStyles(c: AppColors) {
     section: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 8 },
     card: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, backgroundColor: c.card, minHeight: 64 },
     panel: { gap: 10, padding: 16, borderRadius: 16, backgroundColor: c.card },
+    panelWarn: { borderWidth: 1, borderColor: c.amber },
+    stateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    stateTitle: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    qualifiedItem: { fontSize: 13, lineHeight: 18, color: c.textDark, fontFamily: "Inter_400Regular", paddingLeft: 4 },
     title: { fontSize: 15, lineHeight: 20, color: c.textDark, fontFamily: "Inter_700Bold" },
     meta: { fontSize: 13, lineHeight: 18, color: c.textMuted, fontFamily: "Inter_400Regular" },
     histRow: { flexDirection: "row", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderBeige },

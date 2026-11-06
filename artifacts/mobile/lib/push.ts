@@ -6,6 +6,7 @@ import { Platform, AppState } from "react-native";
 import { apiFetch } from "@/lib/apiClient";
 import { registerNotificationCategories } from "@/lib/notificationCategories";
 import { callSystemInstalled } from "@/lib/callSystem";
+import { PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 const LAST_TOKEN_KEY = "p2p_last_push_token";
 
@@ -222,7 +223,7 @@ export function pathForNotification(
   // Daily prayer / journal reminder (lib/dailyReminders) — only to an approved route.
   if (notificationType === "daily_reminder") {
     const route = typeof data?.route === "string" ? data.route : "";
-    return ["/prayer/build-confession", "/prayer/journal", "/my-discipleship/journal"].includes(route) ? route : "/(tabs)/prayer";
+    return ["/prayer/build-confession", "/prayer/journal", "/my-discipleship/journal"].includes(route) ? route : PRAYER_ROUTE;
   }
   if ((notificationType === "new_message" || notificationType === "official_message_received") && conversationId) {
     return `/messages/${conversationId}`;

@@ -11,6 +11,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, clearContentCache } from "@/lib/query";
 import { Stack, useRouter, useSegments, usePathname, useGlobalSearchParams } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import SplashIntro, { splashIntroPending } from "@/components/SplashIntro";
 import React, { useEffect, useRef } from "react";
 import { Alert, AppState, I18nManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -710,7 +711,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      // On a fresh launch the video intro (components/SplashIntro) takes over from the native
+      // splash itself, without a flash; otherwise hide it as before.
+      if (!splashIntroPending()) SplashScreen.hideAsync();
+      // Safety net: the native splash never outlives a broken intro.
+      const t = setTimeout(() => { SplashScreen.hideAsync().catch(() => {}); }, 4000);
+      return () => clearTimeout(t);
     }
   }, [fontsLoaded, fontError]);
 
@@ -748,6 +754,8 @@ export default function RootLayout() {
                 <AppVersionGate>
                   <RootLayoutNav />
                 </AppVersionGate>
+                {/* Fresh launch only: the video intro on top of the app, which starts normally underneath. */}
+                <SplashIntro />
               </KeyboardProvider>
             </GestureHandlerRootView>
           </QueryClientProvider>

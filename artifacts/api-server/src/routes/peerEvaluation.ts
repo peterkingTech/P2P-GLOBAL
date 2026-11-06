@@ -18,7 +18,8 @@ import {
 // this API only identifies the caller, checks what they may see, validates
 // what they send and calls the engine. The phone never chooses an evaluator,
 // never sets a deadline and never sees who was merely invited.
-//   GET  /me/evaluator                    my evaluator profile: orientation, availability, service record, recognitions
+//   GET  /status                          is peer evaluation running? ready | coordinators | unavailable (no internals)
+//   GET  /me/evaluator                    my evaluator profile: qualified resources, availability, service record, recognitions
 //   PUT  /me/evaluator                    { available, unavailableUntil, capacity, categories }
 //   POST /me/orientation                  { commitments: [...] } — all required
 //   GET  /mine                            my submissions' evaluations (evaluatee)
@@ -40,6 +41,8 @@ import {
 //   GET /admin/operations (qualified evaluators, workload, expiries, reassignments, turnaround),
 //   GET /admin/integrity, POST /admin/integrity/:pairKey/review { decision, note } (reciprocal approvals, audited),
 //   POST /admin/resources/revision { kind, resourceId, reason } (a material assessment revision restarts qualification)
+//   GET /admin/readiness (service health, qualified evaluators, pending, matching failures, undelivered
+//   invitations, expiries, coverage gaps, and live read-only checks of the engine's rules)
 
 const router = Router();
 const ADMIN_ROLES = new Set(["super_admin", "admin_supervisor"]);
@@ -158,17 +161,26 @@ router.get("/me/evaluator", async (req, res) => {
     const record = serviceRecord((asg.data ?? []) as AssignmentRow[], (qual.data ?? []) as QualityRow[]);
     const prof = p as Record<string, unknown> | null;
     // Which exact resources this person may be invited to evaluate (passed through an independent evaluation).
-    const [{ count: passedLessons }, { count: passedGroup }] = await Promise.all([
-      db.from("p2p_growth_evidence").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("evidence_type", "learning.assessment_passed").eq("verification", "verified").is("voided_at", null),
+    const [passed, { count: passedGroup }] = await Promise.all([
+      db.from("p2p_growth_evidence").select("source_id").eq("user_id", userId).eq("evidence_type", "learning.assessment_passed").eq("verification", "verified").is("voided_at", null).limit(500),
       db.from("p2p_group_assignment_submissions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "reviewed").neq("reviewed_by", userId),
     ]);
+    const lessonIds = [...new Set(((passed.data ?? []) as { source_id: string }[]).map((r) => r.source_id).filter(isUuid))];
+    const units = lessonIds.length
+      ? ((await db.from("p2p_growth_learning_units").select("lesson_id,title,curriculum_title").in("lesson_id", lessonIds.slice(0, 200))).data ?? []) as { lesson_id: string; title: string | null; curriculum_title: string | null }[]
+      : [];
+    const passedLessons = lessonIds.length;
     return res.json({
       // No orientation gate any more (240): older builds read `oriented`, so it is always true.
       oriented: true,
       guideRead: !!prof?.orientation_acknowledged_at && Number(prof?.orientation_version ?? 0) >= (s?.orientation_version ?? ORIENTATION_VERSION),
-      qualifiedResources: (passedLessons ?? 0) + (passedGroup ?? 0),
+      qualifiedResources: passedLessons + (passedGroup ?? 0),
+      // Each exact resource passed through an independent evaluation (resource identity, never a title match).
+      qualified: units.map((u) => ({ resourceId: u.lesson_id, title: u.title ?? "Lesson", within: u.curriculum_title })).sort((a, b) => a.title.localeCompare(b.title)),
       howInvited: "When you pass a lesson, story chapter or plan session through an independent evaluation, P2P Global may invite you to evaluate that same one — never anything you haven't passed.",
-      available: prof ? !!prof.available : false,
+      // Same rule as the engine's matching (coalesce(available, true); the column defaults to true):
+      // nobody is paused until they pause themselves. A pause date that has passed is over.
+      available: (prof?.available ?? true) !== false && !(prof?.unavailable_until && Date.parse(String(prof.unavailable_until)) > Date.now()),
       unavailableUntil: prof?.unavailable_until ?? null,
       capacity: (prof?.capacity as number | null) ?? s?.default_capacity ?? 2,
       categories: (prof?.categories as string[] | undefined) ?? [],
@@ -358,6 +370,109 @@ async function loadEval(id: string): Promise<EvalRow> {
   if (!e) throw notFound();
   return e;
 }
+
+// ── Readiness ───────────────────────────────────────────────────────────────
+// Whether peer evaluation is actually running, separately from whether a person has learned how it
+// works. The engine sweep runs every 5 minutes; a sweep older than 15 minutes means it has stopped.
+type Readiness = { state: "ready" | "coordinators" | "unavailable"; engineEnabled: boolean; lastSweepAt: string | null; sweepLate: boolean; reason: string | null };
+async function readiness(): Promise<Readiness> {
+  try {
+    const [settings, sweeps] = await Promise.all([
+      db.from("p2p_evaluation_settings").select("engine_enabled").maybeSingle(),
+      db.from("p2p_evaluation_events").select("created_at").eq("event_type", "sweep").order("created_at", { ascending: false }).limit(1),
+    ]);
+    if (settings.error) throw settings.error;
+    if (sweeps.error) throw sweeps.error;
+    const engineEnabled = !!(settings.data as { engine_enabled?: boolean } | null)?.engine_enabled;
+    const lastSweepAt = ((sweeps.data ?? []) as { created_at: string }[])[0]?.created_at ?? null;
+    const sweepLate = !lastSweepAt || Date.now() - Date.parse(lastSweepAt) > 15 * 60_000;
+    // Engine off: evaluations still happen, arranged the earlier way (coordinators / direct assignment).
+    if (!engineEnabled) return { state: "coordinators", engineEnabled, lastSweepAt, sweepLate, reason: "engine_off" };
+    if (sweepLate) return { state: "unavailable", engineEnabled, lastSweepAt, sweepLate, reason: "sweep_stopped" };
+    return { state: "ready", engineEnabled, lastSweepAt, sweepLate, reason: null };
+  } catch {
+    return { state: "unavailable", engineEnabled: false, lastSweepAt: null, sweepLate: true, reason: "service_error" };
+  }
+}
+
+// One alert to the evaluation administrators per 6 hours while the service is unavailable.
+const ALERT_EVERY_MS = 6 * 3600_000;
+let lastAlertAt = 0;
+async function alertAdminsUnavailable(reason: string) {
+  if (Date.now() - lastAlertAt < ALERT_EVERY_MS) return;
+  lastAlertAt = Date.now();
+  try {
+    const since = new Date(Date.now() - ALERT_EVERY_MS).toISOString();
+    const { count } = await db.from("p2p_notifications").select("id", { count: "exact", head: true })
+      .eq("notification_type", "evaluation_escalation").contains("data", { kind: "service_unavailable" }).gte("created_at", since);
+    if (count) return; // another API instance already alerted
+    const { data: admins } = await db.from("p2p_profiles").select("id").in("role", [...ADMIN_ROLES]);
+    if (!admins?.length) return;
+    await db.from("p2p_notifications").insert((admins as { id: string }[]).map((a) => ({
+      user_id: a.id, title: "Peer evaluation needs attention",
+      message: reason === "sweep_stopped" ? "The evaluation engine's 5-minute sweep has stopped — invitations and reassignments are not being sent. Open Evaluation oversight." : "The evaluation service isn't responding. Open Evaluation oversight.",
+      notification_type: "evaluation_escalation", data: { kind: "service_unavailable", reason },
+    })));
+  } catch { /* alerting must never break the request */ }
+}
+
+// For everyone: is it running? Plain words only — no counts, people or internals.
+router.get("/status", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  const r = await readiness();
+  if (r.state === "unavailable") void alertAdminsUnavailable(r.reason ?? "service_error");
+  const message = r.state === "ready" ? "Peer evaluation is running. Invitations are sent automatically to people who passed the same resource."
+    : r.state === "coordinators" ? "Peer evaluation is running. For now, evaluations are arranged by P2P coordinators while automatic invitations are being switched on."
+    : "Peer evaluation is temporarily unavailable. Your submissions are kept safe and will be evaluated when it is back. Administrators have been told.";
+  return res.json({ state: r.state, message });
+});
+
+// For administrators: the whole picture, plus live read-only checks of the engine's rules.
+router.get("/admin/readiness", async (req, res) => {
+  const userId = await caller(req, res); if (!userId) return;
+  try {
+    await needAdmin(userId);
+    const r = await readiness();
+    const ops = (must(await db.rpc("p2p_eval_operations")) ?? {}) as Record<string, unknown>;
+    const coverage = (must(await db.from("p2p_eval_coverage").select("resource_kind,resource_id,title,waiting,has_qualified_people").limit(500)) ?? []) as { resource_kind: string; resource_id: string; title: string | null; waiting: number; has_qualified_people: boolean }[];
+    // Invitations with no in-app notification to the invited person = not delivered.
+    const invited = (must(await db.from("p2p_evaluation_assignments").select("id,evaluator_id,evaluation_id,invited_at").eq("status", "invited").limit(500)) ?? []) as { id: string; evaluator_id: string; evaluation_id: string; invited_at: string }[];
+    let undelivered = 0;
+    if (invited.length) {
+      const notes = (must(await db.from("p2p_notifications").select("user_id,data").eq("notification_type", "evaluation_invitation").in("user_id", [...new Set(invited.map((x) => x.evaluator_id))]).limit(2000)) ?? []) as { user_id: string; data: Record<string, unknown> | null }[];
+      const seen = new Set(notes.map((n) => `${n.user_id}:${String(n.data?.assignmentId ?? n.data?.assignment_id ?? "")}`));
+      undelivered = invited.filter((x) => !seen.has(`${x.evaluator_id}:${x.id}`)).length;
+    }
+    // Live checks (read-only): the engine's own functions answer for real records.
+    const checks: { key: string; label: string; ok: boolean | null; detail: string }[] = [];
+    checks.push({ key: "service", label: "Evaluation service responds", ok: r.reason !== "service_error", detail: r.reason === "service_error" ? "Settings or events couldn't be read" : "OK" });
+    checks.push({ key: "engine", label: "Automatic invitations switched on", ok: r.engineEnabled, detail: r.engineEnabled ? "Engine on" : "Engine off — evaluations are arranged the earlier way" });
+    checks.push({ key: "sweep", label: "5-minute sweep running (invitations, expiries, reassignment)", ok: r.engineEnabled ? !r.sweepLate : null, detail: r.lastSweepAt ? `Last sweep ${r.lastSweepAt}` : "No sweep recorded yet" });
+    const sample = (must(await db.from("p2p_lesson_evaluations").select("id,submitter_id").not("submitter_id", "is", null).order("created_at", { ascending: false }).limit(1)) ?? []) as { id: string; submitter_id: string }[];
+    if (sample[0]) {
+      const self = must(await db.rpc("p2p_eval_can_evaluate", { p_user: sample[0].submitter_id, p_eval: sample[0].id }));
+      checks.push({ key: "no_self", label: "A submitter can never evaluate their own work", ok: self === false, detail: self === false ? "Engine refused the submitter" : "Engine allowed the submitter — investigate" });
+    } else checks.push({ key: "no_self", label: "A submitter can never evaluate their own work", ok: null, detail: "No evaluation to check against yet" });
+    const covered = coverage.find((x) => x.has_qualified_people);
+    const anyQualified = (await db.from("p2p_growth_evidence").select("source_id").eq("evidence_type", "learning.assessment_passed").eq("verification", "verified").is("voided_at", null).limit(1)).data as { source_id: string }[] | null;
+    const probe = covered ? { kind: covered.resource_kind, id: covered.resource_id } : anyQualified?.[0] && isUuid(anyQualified[0].source_id) ? { kind: "lesson", id: anyQualified[0].source_id } : null;
+    if (probe) {
+      const pool = (must(await db.rpc("p2p_eval_qualified_pool", { p_kind: probe.kind, p_resource: probe.id })) ?? []) as unknown[];
+      checks.push({ key: "matching", label: "Matching finds people qualified for the exact resource", ok: pool.length > 0, detail: `${pool.length} qualified for one resource checked` });
+    } else checks.push({ key: "matching", label: "Matching finds people qualified for the exact resource", ok: null, detail: "Nobody has passed a resource through evaluation yet" });
+    const gaps = coverage.filter((x) => !x.has_qualified_people);
+    return res.json({
+      state: r.state, engineEnabled: r.engineEnabled, lastSweepAt: r.lastSweepAt, sweepLate: r.sweepLate,
+      counts: {
+        qualifiedEvaluators: Number(ops.qualifiedEvaluators ?? 0), resourcesWithQualifiedPeople: Number(ops.resourcesWithQualifiedPeople ?? 0),
+        pending: Number(ops.pending ?? 0), unassigned: Number(ops.unassigned ?? 0), matchingFailures: gaps.reduce((n, g) => n + g.waiting, 0),
+        undeliveredInvitations: undelivered, expired30d: Number(ops.expired30d ?? 0), reassigned30d: Number(ops.reassigned30d ?? 0),
+      },
+      coverageGaps: gaps.map((g) => ({ resourceKind: g.resource_kind, resourceId: g.resource_id, title: g.title ?? "Resource", waiting: g.waiting })).sort((a, b) => b.waiting - a.waiting).slice(0, 50),
+      checks,
+    });
+  } catch (e) { return fail(res, e); }
+});
 
 router.get("/:id", async (req, res) => {
   const userId = await caller(req, res); if (!userId) return;

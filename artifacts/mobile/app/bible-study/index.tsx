@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import { bookByCode } from "@/lib/bibleReaderApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
 import { AppButton, IconButton } from "@/components/ui";
 import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
+import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 
 // Bible Study — the starting point for Scripture in Learning. It reuses what
 // exists and adds no Bible system of its own:
@@ -24,9 +25,17 @@ import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/
 //     opening a passage never changes anyone's Pray the Word progress).
 // Reading plans are not offered here: no plan with a real reading schedule
 // exists yet, and an empty plan must not look like a working feature.
+// The same page is the Bible tab (asTab: no Back button, room for the tab bar).
 
 export default function BibleStudyScreen() {
+  return <BibleStudyHome />;
+}
+
+export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   const insets = useSafeAreaInsets();
+  const capsuleTopInset = useTabCapsuleTopInset(insets.top);
+  const scrollRef = React.useRef<ScrollView>(null);
+  useScrollToTopOnTabReselect(asTab ? "bible" : "", scrollRef);
   const router = useRouter();
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -52,13 +61,15 @@ export default function BibleStudyScreen() {
   ] as const;
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 8 }]}>
+    <View style={[s.screen, { paddingTop: asTab ? insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0) + 8 : insets.top + 8 }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }, centeredMaxWidth(contentMaxWidth)]}>
+      <ScrollView ref={scrollRef} contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + (asTab ? 110 : 40) }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={s.header}>
-          <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
+          {!asTab ? (
+            <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/learn" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
+          ) : null}
           <View style={{ flex: 1 }}>
-            <Text style={s.title} accessibilityRole="header">Bible Study</Text>
+            <Text style={s.title} accessibilityRole="header">{asTab ? "Bible" : "Bible Study"}</Text>
             <Text style={s.meta}>Read, search and explore Scripture.</Text>
           </View>
         </View>

@@ -20,7 +20,7 @@ const routeExists = (r) => [path.join(root, "app", `${r.slice(1)}.tsx`), path.jo
 
 const home = src("app/(tabs)/index.tsx");
 const profile = src("app/(tabs)/profile.tsx");
-const discover = src("app/(tabs)/discover.tsx");
+const discover = src("components/more/DiscoverHome.tsx");
 const learn = src("app/(tabs)/learn.tsx");
 
 // 1. Home
@@ -55,7 +55,7 @@ ok("profile: every non-student role still has an admin entry",
 ok("discover: My Community entry", discover.includes(">My Community</Text>") && discover.includes('router.push("/community" as any)'));
 ok("plans: Recommended for You stays on the Plans screen, opened from Kingdom School", src("app/plans/index.tsx").includes("Recommended for You") && src("app/kingdom-school.tsx").includes('router.push("/plans?tab=find" as any)'));
 ok("learning centre: still no Recommended for You (owner's earlier request)", !/Recommended for You|recommended/.test(learn));
-ok("learning: My Evaluations entry", learn.includes('router.push("/evaluation" as any)'));
+ok("learning: My Evaluations tile", learn.includes("<LearningHub") && src("components/LearningHub.tsx").includes('route: "/evaluation"'));
 ok("messages: unread count stays on the Messages tab", /tabBarBadge|unread/i.test(src("app/(tabs)/_layout.tsx")));
 
 // 3. Native widgets untouched

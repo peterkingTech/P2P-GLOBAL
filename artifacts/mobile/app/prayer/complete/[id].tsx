@@ -10,6 +10,7 @@ import { getGathering, createInvitation, type PrayerGathering, type PrayerGather
 import { formatDuration } from "@/lib/prayerTimeDisplay";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 
 // Connects outward to EXISTING systems only — no new study/growth/mission
@@ -57,7 +58,7 @@ export default function PrayerCompleteScreen() {
     setSavingReflection(true);
     try {
       // Reuses the EXISTING, unmodified private prayer journal table —
-      // the exact same insert shape app/(tabs)/prayer.tsx's own
+      // the exact same insert shape components/more/PrayerHome.tsx's own
       // logPrayerAction already uses. No second journal is created.
       await supabase.from("p2p_prayer_journal").insert({ user_id: profile.id, prayer_text: reflection.trim(), category: "prayer_together" });
       setReflectionSaved(true);
@@ -83,7 +84,7 @@ export default function PrayerCompleteScreen() {
         proposedStartAt: newStart.toISOString(), proposedEndAt: newEnd.toISOString(), message: gathering.prayerFocus ?? undefined,
       });
       showAlert("Invitation sent", `${otherParticipant.displayName} will be notified.`);
-      router.replace("/(tabs)/prayer" as any);
+      router.replace(PRAYER_ROUTE as any);
     } catch (e: any) {
       showAlert("Couldn't send a new invitation", e.message ?? "Please try again.");
     } finally {
@@ -138,7 +139,7 @@ export default function PrayerCompleteScreen() {
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>
         ))}
-        <AppButton label="Done" onPress={() => router.replace("/(tabs)/prayer" as any)} variant="tertiary" style={{ marginTop: 6 }} />
+        <AppButton label="Done" onPress={() => router.replace(PRAYER_ROUTE as any)} variant="tertiary" style={{ marginTop: 6 }} />
       </View>
     </View>
   );

@@ -17,6 +17,7 @@ import type { P2PCallColors } from "@/components/call/p2pCallTheme";
 import { P2PControlButton } from "@/components/call/P2PControlButton";
 import { AppButton } from "@/components/ui";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { DISCOVER_ROUTE } from "@/lib/moreRoutes";
 
 interface RoomParticipant { userId: string; name: string; country: string | null; joinedAt: string }
 interface RoomDetail {
@@ -112,7 +113,7 @@ export default function BreakRoomScreen() {
       });
     } catch { /* leaving either way */ }
     if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)/discover" as any);
+    else router.replace(DISCOVER_ROUTE as any);
   }, [profile?.id, params.roomId, router]);
 
   const doJoin = useCallback(async () => {
@@ -301,7 +302,7 @@ export default function BreakRoomScreen() {
       });
       leftRef.current = true;
       if (router.canGoBack()) router.back();
-      else router.replace("/(tabs)/discover" as any);
+      else router.replace(DISCOVER_ROUTE as any);
     } catch {
       showAlert("Couldn't end room", "Please try again.");
       setEnding(false);

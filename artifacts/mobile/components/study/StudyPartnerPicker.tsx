@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/apiClient";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { Avatar } from "@/components/Avatar";
+import { DISCOVER_ROUTE } from "@/lib/moreRoutes";
 // "Who would you like to study with?" — the Kingdom School lesson entry
 // point's person picker (Study Together Phase 1, discoverability slice).
 // Only resolves WHO; the caller starts the call itself once a person is
@@ -65,7 +66,7 @@ export function StudyPartnerPicker({
           ) : people.length === 0 ? (
             <View style={{ gap: 12 }}>
               <Text style={styles.emptyText}>You don't have anyone available to study with yet.</Text>
-              <TouchableOpacity accessibilityRole="button" style={styles.connectBtn} onPress={() => { onClose(); router.push("/(tabs)/discover" as any); }}>
+              <TouchableOpacity accessibilityRole="button" style={styles.connectBtn} onPress={() => { onClose(); router.push(DISCOVER_ROUTE as any); }}>
                 <Text style={styles.connectBtnText}>Find Someone to Connect With</Text>
               </TouchableOpacity>
             </View>

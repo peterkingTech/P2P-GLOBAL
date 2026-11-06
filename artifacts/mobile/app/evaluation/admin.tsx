@@ -6,7 +6,7 @@ import type { AppColors } from "@/constants/themes";
 import { AppButton, SegmentedControl } from "@/components/ui";
 import {
   adminConcerns, adminCoverage, adminEvaluators, adminHistory, adminIntegrity, adminIntegrityReview, adminOperations, adminOverview, adminReassign, adminRecordRevision,
-  adminReviewConcern, adminSetStanding, adminSettings, adminSweep,
+  adminReadiness, adminReviewConcern, adminSetStanding, adminSettings, adminSweep, type EvaluationReadiness,
 } from "@/lib/peerEvaluationApi";
 
 // Evaluation oversight (super admins / supervisors only — the server checks).
@@ -29,15 +29,16 @@ export default function EvaluationAdmin() {
   const [ops, setOps] = useState<Awaited<ReturnType<typeof adminOperations>> | null>(null);
   const [pairs, setPairs] = useState<Awaited<ReturnType<typeof adminIntegrity>>["items"] | null>(null);
   const [history, setHistory] = useState<Record<string, any> | null>(null);
+  const [ready, setReady] = useState<EvaluationReadiness | "error" | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [o, e, cc, cv, op, ip] = await Promise.all([adminOverview(), adminEvaluators(), adminConcerns(), adminCoverage().catch(() => ({ items: [] })),
-        adminOperations().catch(() => null), adminIntegrity().catch(() => ({ items: [] }))]);
-      setOv(o); setEvs(e.items); setConcerns(cc.items); setCoverage(cv.items); setOps(op); setPairs(ip.items); setError(null);
+      const [o, e, cc, cv, op, ip, rd] = await Promise.all([adminOverview(), adminEvaluators(), adminConcerns(), adminCoverage().catch(() => ({ items: [] })),
+        adminOperations().catch(() => null), adminIntegrity().catch(() => ({ items: [] })), adminReadiness().catch(() => "error" as const)]);
+      setOv(o); setEvs(e.items); setConcerns(cc.items); setCoverage(cv.items); setOps(op); setPairs(ip.items); setReady(rd); setError(null);
     } catch (e: any) { setError(e?.message ?? "Couldn't load."); }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -71,6 +72,25 @@ export default function EvaluationAdmin() {
             {[["Arranging", n.arranging], ["Invitations", n.invitations], ["In progress", n.inProgress], ["Due < 6 h", n.dueSoon], ["Overdue", n.overdue]].map(([l, v]) => (
               <View key={String(l)} style={s.stat}><Text style={s.statN}>{v ?? 0}</Text><Text style={s.meta}>{l}</Text></View>
             ))}
+          </View>
+          {/* Readiness: is the platform able to run peer evaluation right now (counts only — no answers). */}
+          <View style={[s.panel, (ready === "error" || ready?.state !== "ready") && { borderLeftWidth: 4, borderLeftColor: c.amber }]}>
+            <Text style={s.section}>Readiness</Text>
+            {ready === null ? <ActivityIndicator color={c.accentGreen} accessibilityLabel="Checking readiness" />
+              : ready === "error" ? <Text style={s.body}>Couldn't check readiness — the evaluation service didn't answer.</Text> : (
+              <>
+                <Text style={s.body}>{ready.state === "ready" ? "Ready — automatic invitations are running." : ready.state === "coordinators" ? "Running the earlier way — the engine is off, so coordinators arrange evaluations." : "Unavailable — participants are being told, and admins alerted."}</Text>
+                {ready.checks.map((k) => (
+                  <Text key={k.key} style={s.meta}>{k.ok === true ? "✓" : k.ok === false ? "✗" : "–"} {k.label} — {k.detail}</Text>
+                ))}
+                <Text style={s.meta}>
+                  {ready.counts.qualifiedEvaluators} qualified evaluators · {ready.counts.pending} pending · {ready.counts.matchingFailures} waiting with nobody qualified · {ready.counts.undeliveredInvitations} undelivered invitations · {ready.counts.expired30d} expired / {ready.counts.reassigned30d} reassigned (30 days)
+                </Text>
+                {ready.coverageGaps.length ? (
+                  <Text style={s.meta}>Coverage gaps: {ready.coverageGaps.slice(0, 10).map((g) => `${g.title} (${g.waiting})`).join(" · ")}{ready.coverageGaps.length > 10 ? ` · and ${ready.coverageGaps.length - 10} more` : ""}</Text>
+                ) : <Text style={s.meta}>No coverage gaps.</Text>}
+              </>
+            )}
           </View>
           <View style={[s.panel, ov.health?.sweepLate && { borderLeftWidth: 4, borderLeftColor: c.amber }]}>
             <Text style={s.section}>System health</Text>

@@ -48,7 +48,8 @@ function makeDb() {
     from(table) {
       const q = { op: "select", f: [], payload: null, single: false, lim: null, orders: [], head: false };
       const rows = () => (T[table] ??= []);
-      const match = (r) => q.f.every(([op, k, v]) => op === "eq" ? r[k] === v : op === "in" ? v.includes(r[k]) : op === "is" ? (r[k] ?? null) === v : op === "neq" ? r[k] !== v : true);
+      const match = (r) => q.f.every(([op, k, v]) => op === "eq" ? r[k] === v : op === "in" ? v.includes(r[k]) : op === "is" ? (r[k] ?? null) === v : op === "neq" ? r[k] !== v
+        : op === "notnull" ? r[k] != null : op === "gte" ? r[k] >= v : op === "contains" ? Object.entries(v).every(([kk, vv]) => r[k]?.[kk] === vv) : true);
       const exec = () => {
         let data;
         if (q.op === "insert") { const list = (Array.isArray(q.payload) ? q.payload : [q.payload]).map((p) => ({ id: randomUUID(), created_at: new Date().toISOString(), ...p })); rows().push(...list); data = list; }
@@ -62,6 +63,8 @@ function makeDb() {
         select(_c, o) { if (o?.head) q.head = true; return c; }, insert(p) { q.op = "insert"; q.payload = p; return c; }, update(p) { q.op = "update"; q.payload = p; return c; },
         eq(k, v) { q.f.push(["eq", k, v]); return c; }, in(k, v) { q.f.push(["in", k, v]); return c; },
         is(k, v) { q.f.push(["is", k, v]); return c; }, neq(k, v) { q.f.push(["neq", k, v]); return c; },
+        gte(k, v) { q.f.push(["gte", k, v]); return c; }, contains(k, v) { q.f.push(["contains", k, v]); return c; },
+        not(k, op, v) { if (op === "is" && v === null) q.f.push(["notnull", k]); return c; },
         order(k, o) { q.orders.push([k, o?.ascending !== false]); return c; }, limit(n) { q.lim = n; return c; },
         maybeSingle() { q.single = true; return c; }, single() { q.single = true; return c; },
         then(res, rej) { try { res(exec()); } catch (e) { rej(e); } },
@@ -195,14 +198,30 @@ try {
   // Orientation and availability.
   ok("orientation: every commitment required", (await call("POST", "/e/me/orientation", X, { commitments: ["purpose"] })).status === 400);
   ok("orientation: recorded with the version", (await call("POST", "/e/me/orientation", X, { commitments: ["purpose", "deadline", "reassignment", "respect", "privacy", "report"] })).status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === X).orientation_version === 1);
+  const FRESH = randomUUID();
+  T.p2p_profiles.push({ id: FRESH, full_name: "Fay Fresh", role: "student", photo_url: null });
+  ok("availability: nobody is paused until they pause themselves (no profile yet → open, as the engine matches)", (await call("GET", "/e/me/evaluator", FRESH)).body.available === true && !T.p2p_evaluator_profiles?.some((p) => p.user_id === FRESH));
   const self = await call("PUT", "/e/me/evaluator", X, { available: false, capacity: 3, standing: "good" });
+  ok("availability: someone who paused shows as paused", (await call("GET", "/e/me/evaluator", X)).body.available === false);
   ok("availability is self-service; standing (restriction) is not", self.status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === X).available === false && T.p2p_evaluator_profiles.find((p) => p.user_id === X).standing === undefined);
   const prof = await call("GET", "/e/me/evaluator", X);
   ok("my evaluator profile: no orientation gate (older builds see oriented), commitments, 48 hours, private record", prof.body.oriented === true && prof.body.deadlineHours === 48 && prof.body.commitments.length === 6 && prof.body.record.completed === 0);
-  T.p2p_growth_evidence = [{ id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_passed", verification: "verified", voided_at: null }, { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_attempted", verification: "verified", voided_at: null }];
+  const FAILED_LESSON = randomUUID(), VOIDED_LESSON = randomUUID();
+  T.p2p_growth_evidence = [
+    { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_passed", verification: "verified", voided_at: null, source_table: "p2p_lessons", source_id: LESSON },
+    // The same lesson passed again never counts twice.
+    { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_passed", verification: "verified", voided_at: null, source_table: "p2p_lessons", source_id: LESSON },
+    // An attempt that didn't pass, and a voided pass, never qualify.
+    { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_attempted", verification: "verified", voided_at: null, source_table: "p2p_lessons", source_id: FAILED_LESSON },
+    { id: randomUUID(), user_id: E2, evidence_type: "learning.assessment_passed", verification: "verified", voided_at: t0, source_table: "p2p_lessons", source_id: VOIDED_LESSON },
+  ];
+  T.p2p_growth_learning_units = [{ lesson_id: LESSON, title: "Grace", curriculum_title: "The Gospel" }, { lesson_id: FAILED_LESSON, title: "Faith", curriculum_title: "The Gospel" }, { lesson_id: VOIDED_LESSON, title: "Hope", curriculum_title: "The Gospel" }];
   T.p2p_group_assignment_submissions = [{ id: randomUUID(), user_id: E2, status: "reviewed", reviewed_by: ADMIN }, { id: randomUUID(), user_id: E2, status: "reviewed", reviewed_by: E2 }];
   const p2 = await call("GET", "/e/me/evaluator", E2);
   ok("my evaluator profile: how invitations work, and how many exact resources I've passed independently (self-reviews never count)", p2.body.qualifiedResources === 2 && /that same one/.test(p2.body.howInvited));
+  ok("my evaluator profile: the exact resources listed by identity — once each; failed and voided ones never qualify", p2.body.qualified.length === 1 && p2.body.qualified[0].resourceId === LESSON
+    && p2.body.qualified[0].title === "Grace" && p2.body.qualified[0].within === "The Gospel" && !p2.text.includes("Faith") && !p2.text.includes("Hope"));
+  ok("my evaluator profile: someone who passed nothing is not yet qualified", (await call("GET", "/e/me/evaluator", X)).body.qualified.length === 0);
   const noSignup = await call("PUT", "/e/me/evaluator", L, { available: false });
   ok("availability needs no sign-up: a first change simply creates the profile", noSignup.status === 200 && T.p2p_evaluator_profiles.find((p) => p.user_id === L).available === false);
 
@@ -272,7 +291,58 @@ try {
   const rv = await call("POST", "/e/admin/resources/revision", ADMIN, { kind: "lesson", resourceId: LESSON, reason: "Questions rewritten for the new edition" });
   ok("revision: recorded through the database; the new assessment version comes back", rv.body.version === 2 && rpcCalls.at(-1).fn === "p2p_assessment_record_revision" && rpcCalls.at(-1).args.p_actor === ADMIN);
   rpcResult = { ok: true };
+
+  // Readiness: whether peer evaluation is running — separate from a person understanding it.
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+  ok("status: signed out → 401", (await call("GET", "/e/status")).status === 401);
+  T.p2p_evaluation_settings[0].engine_enabled = false;
+  const stOff = await call("GET", "/e/status", L);
+  ok("status: engine off → running the earlier way (coordinators), never 'unavailable'", stOff.status === 200 && stOff.body.state === "coordinators" && /coordinators/.test(stOff.body.message));
+  ok("status: plain words only — no counts, people or internals", Object.keys(stOff.body).join() === "state,message" && !/Esi|Eli|sweep|\b\d+\b/.test(stOff.body.message));
+  T.p2p_evaluation_settings[0].engine_enabled = true;
+  T.p2p_notifications = [];
+  const stLate = await call("GET", "/e/status", L);
+  await tick();
+  const alerts = () => T.p2p_notifications.filter((n) => n.notification_type === "evaluation_escalation" && n.data?.kind === "service_unavailable");
+  ok("status: engine on but the sweep has stopped → unavailable (never falsely ready)", stLate.body.state === "unavailable" && /temporarily unavailable/.test(stLate.body.message));
+  ok("status: unavailable alerts the administrators — only them", alerts().length === 1 && alerts()[0].user_id === ADMIN && alerts()[0].data.reason === "sweep_stopped");
+  await call("GET", "/e/status", E1); await tick();
+  ok("status: the alert isn't repeated on every request", alerts().length === 1);
+  T.p2p_evaluation_events.push({ evaluation_id: null, event_type: "sweep", created_at: new Date().toISOString() });
+  ok("status: engine on and the sweep recent → ready", (await call("GET", "/e/status", L)).body.state === "ready");
+  const realFrom = globalThis.__ev.db.from;
+  globalThis.__ev.db.from = (t) => t === "p2p_evaluation_settings" ? { select() { return this; }, maybeSingle() { return this; }, then(res) { res({ data: null, error: { message: "down" } }); } } : realFrom(t);
+  const stErr = await call("GET", "/e/status", L);
+  globalThis.__ev.db.from = realFrom;
+  ok("status: a database error → unavailable (distinct from 'no invitations')", stErr.status === 200 && stErr.body.state === "unavailable");
+
+  ok("readiness: administrators only", (await call("GET", "/e/admin/readiness", E1)).status === 403);
+  // One invitation delivered (its notification names that assignment), one not.
+  const DELIVERED = randomUUID(), MISSING = randomUUID();
+  T.p2p_evaluation_assignments.push({ id: DELIVERED, evaluation_id: REV, evaluator_id: E1, attempt: 2, status: "invited", invited_at: t0 }, { id: MISSING, evaluation_id: REV, evaluator_id: E2, attempt: 2, status: "invited", invited_at: t0 });
+  T.p2p_notifications.push({ id: randomUUID(), user_id: E1, notification_type: "evaluation_invitation", data: { evaluationId: REV, assignmentId: DELIVERED } },
+    { id: randomUUID(), user_id: E2, notification_type: "evaluation_invitation", data: { evaluationId: REV, assignmentId: DELIVERED } });
+  const invitedNow = T.p2p_evaluation_assignments.filter((a) => a.status === "invited");
+  const expectUndelivered = invitedNow.filter((a) => !T.p2p_notifications.some((n) => n.notification_type === "evaluation_invitation" && n.user_id === a.evaluator_id && n.data?.assignmentId === a.id)).length;
+  rpcResult = (fn, args) => fn === "p2p_eval_operations" ? { qualifiedEvaluators: 4, resourcesWithQualifiedPeople: 2, pending: 3, unassigned: 1, expired30d: 2, reassigned30d: 1 }
+    : fn === "p2p_eval_can_evaluate" ? args.p_user !== L
+    : fn === "p2p_eval_qualified_pool" ? [{ user_id: E2 }] : { ok: true };
+  const rd = await call("GET", "/e/admin/readiness", ADMIN);
+  ok("readiness: service health and counts (qualified, pending, expired, reassigned)", rd.status === 200 && rd.body.state === "ready" && rd.body.counts.qualifiedEvaluators === 4 && rd.body.counts.pending === 3 && rd.body.counts.expired30d === 2 && rd.body.counts.reassigned30d === 1);
+  ok("readiness: matching failures and coverage gaps (waiting with nobody qualified)", rd.body.counts.matchingFailures === 3 && rd.body.coverageGaps[0].title === "Grace" && rd.body.coverageGaps[0].waiting === 3);
+  ok("readiness: undelivered invitations = invited with no notification for that assignment", rd.body.counts.undeliveredInvitations === expectUndelivered && expectUndelivered >= 1 && expectUndelivered === invitedNow.length - 1);
+  const chk = Object.fromEntries(rd.body.checks.map((k) => [k.key, k]));
+  ok("readiness: live checks — the engine refuses self-evaluation; matching finds people for the exact resource", chk.no_self.ok === true && rpcCalls.some((r) => r.fn === "p2p_eval_can_evaluate" && r.args.p_user === L)
+    && chk.matching.ok === true && rpcCalls.some((r) => r.fn === "p2p_eval_qualified_pool" && r.args.p_resource === LESSON) && chk.engine.ok === true && chk.sweep.ok === true && chk.service.ok === true);
+  rpcResult = (fn) => fn === "p2p_eval_can_evaluate" ? true : fn === "p2p_eval_qualified_pool" ? [] : {};
+  const rdBad = await call("GET", "/e/admin/readiness", ADMIN);
+  const bad = Object.fromEntries(rdBad.body.checks.map((k) => [k.key, k]));
+  ok("readiness: a broken rule is reported, never hidden", bad.no_self.ok === false && bad.matching.ok === false);
+  ok("readiness: no private answers or journal text", !rd.text.includes("Unearned favour") && !rd.text.includes("PRIVATE") && !rd.text.includes("shopping"));
+  rpcResult = { ok: true };
   const routeSrc = readFileSync(path.join(root, "src/routes/peerEvaluation.ts"), "utf8");
+  ok("no volunteer / evaluator-application / sign-up route exists", !/router\.(post|put)\([^)]*(volunteer|apply|application|signup|sign-up|register)/i.test(routeSrc));
+  ok("/status is declared before /:id (so 'status' is never read as an evaluation id)", routeSrc.indexOf('router.get("/status"') > 0 && routeSrc.indexOf('router.get("/status"') < routeSrc.indexOf('router.get("/:id"'));
   ok("no transfer / choose-replacement / extension route exists", !/router\.(post|put)\([^)]*(transfer|replacement|extension|choose)/i.test(routeSrc));
 } catch (e) {
   fail++; console.log("FAIL crashed", e?.stack ?? e);

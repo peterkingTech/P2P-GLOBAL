@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, FlatList } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import LearningHub, { type LearningHubDetails } from "@/components/LearningHub";
-import { FeaturedLearningCard, CompactLearningCard, ProgressBar, ProgressStat, type FeaturedLearning } from "@/components/learning/LearningCards";
+import { FeaturedLearningCard, CompactLearningCard, type FeaturedLearning } from "@/components/learning/LearningCards";
 import { getDiscoverHome, type DiscoverHome } from "@/lib/kingdomStoriesApi";
 import { getMyStudies, type MyStudies } from "@/lib/studyTogetherApi";
 import { getLearningOverview, type LearningOverview } from "@/lib/learningCentreApi";
@@ -20,15 +20,16 @@ import { continueItems, isStoryInProgress, type ContinueItem } from "@/lib/learn
 import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
-import { AppButton } from "@/components/ui";
 import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
 
-// The Learning tab — the Learning Centre landing. One clean starting point:
+// The Learning tab. One clean starting point:
 //   a personal header (your name, what's under way);
 //   Continue Learning — the most relevant unfinished activity (real progress
 //     only: Kingdom School module, Kingdom Story, shared study, Bible chapter);
-//   Explore Learning — Bible Study, Kingdom School, Kingdom Stories, Study Together;
-//   Your Learning Journey — the existing Learning Centre data (My Learning).
+//   Explore Learning — an icon launcher: Kingdom School, Kingdom Stories, Learning Centre,
+//     My Evaluations (Bible has its own tab; Study Together opens from the resources that support it).
+//   The learning dashboard (Kingdom School progress, Comprehensive Checks) lives in the Learning
+//   Centre, which is "My Learning" — so it isn't repeated here.
 // Kingdom School's full dashboard lives on its own screen (/kingdom-school);
 // nothing is duplicated here. Each section loads on its own, so one slow or
 // failed source never blocks the others. Everything comes from the shared
@@ -44,13 +45,12 @@ export default function LearnTab() {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth, isTablet, isLargeTablet } = useLayout();
-  const { modules } = useData();
+  const { modules, pendingEvaluations } = useData();
   const { profile } = useAuth();
 
   const [stories, setStories] = useState<DiscoverHome | null>(() => peekCached<DiscoverHome>(qk.storiesHome()) ?? null);
   const [studies, setStudies] = useState<MyStudies["active"] | null>(() => peekCached<MyStudies>(qk.myStudies())?.active ?? null);
   const [overview, setOverview] = useState<LearningOverview | null>(() => peekCached<LearningOverview>(qk.learningOverview()) ?? null);
-  const [overviewFailed, setOverviewFailed] = useState(false);
   const [bible, setBible] = useState<ReadingPosition | null>(null);
   const [loaded, setLoaded] = useState(() => ({ stories: !!stories, studies: !!studies }));
 
@@ -59,7 +59,7 @@ export default function LearnTab() {
     loadCached(qk.storiesHome(), () => getDiscoverHome(), { maxAgeMs: 30_000 }).then(setStories).catch(() => {}).finally(() => setLoaded((l) => ({ ...l, stories: true })));
     // Studies and Comprehensive Checks change elsewhere — shown from memory, always refreshed.
     loadCached(qk.myStudies(), () => getMyStudies(), { fresh: true }).then((r) => setStudies(r.active)).catch(() => setStudies((x) => x ?? [])).finally(() => setLoaded((l) => ({ ...l, studies: true })));
-    loadCached(qk.learningOverview(), () => getLearningOverview(), { fresh: true }).then((o) => { setOverview(o); setOverviewFailed(false); }).catch(() => setOverviewFailed(true));
+    loadCached(qk.learningOverview(), () => getLearningOverview(), { fresh: true }).then(setOverview).catch(() => {});
     loadPosition().then(setBible).catch(() => {});
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -86,7 +86,6 @@ export default function LearnTab() {
   }), [modules, stories, studies, bible, storyCovers]);
   const [lead, ...more] = items;
   const { modulesCompleted, totalModules } = getModuleProgressCounts(modules);
-  const lessonsCompleted = modules.reduce((n, m) => n + m.completedLessons, 0);
   const storiesUnderWay = (stories?.continueLearning ?? []).filter(isStoryInProgress).length;
   const go = (r: ContinueItem["route"]) => router.push(r as any);
   const topPad = insets.top + capsuleTopInset + (Platform.OS === "web" ? 67 : 0);
@@ -103,30 +102,20 @@ export default function LearnTab() {
     toDo ? `${toDo} ${COMPREHENSIVE_CHECKS} to do` : null,
   ].filter(Boolean).join(" · ") || "Grow in Scripture, understanding and discipleship.";
 
-  // Explore Learning: each experience's picture and "where you are", from the data above.
-  const schoolPhoto = (modules.find((m) => !m.isLocked && m.lessonCount > 0 && m.completedLessons < m.lessonCount && m.imageUrl) ?? modules.find((m) => m.imageUrl))?.imageUrl ?? null;
-  const storyPhoto = stories?.featured?.hero?.mediaPath ?? Object.values(storyCovers)[0] ?? null;
-  const studyPhoto = (studies ?? []).map((x) => (x.contentType === "kingdom_story" && x.contentId ? storyCovers[x.contentId] : null)).find(Boolean) ?? null;
+  // Explore Learning: "where you are" in each experience, from the data above.
   const hub: LearningHubDetails = {
-    bible: { status: bibleAt ? `Last read: ${bibleAt.bookName} ${bibleAt.chapter}` : null },
-    school: { status: totalModules ? `${modulesCompleted} of ${totalModules} modules complete` : null, art: { url: schoolPhoto } },
-    stories: { status: storiesUnderWay ? `${storiesUnderWay} ${storiesUnderWay === 1 ? "story" : "stories"} in progress` : null, art: { path: storyPhoto } },
-    together: { status: studies?.length ? `${studies.length} active ${studies.length === 1 ? "study" : "studies"}` : null, art: { path: studyPhoto } },
+    school: { status: totalModules ? `${modulesCompleted} of ${totalModules} modules complete` : null },
+    stories: { status: storiesUnderWay ? `${storiesUnderWay} ${storiesUnderWay === 1 ? "story" : "stories"} in progress` : null },
+    centre: { status: toDo ? `${toDo} ${COMPREHENSIVE_CHECKS} to do` : null },
+    evaluations: { status: pendingEvaluations.length ? `${pendingEvaluations.length} waiting for you` : null },
   };
-
-  const journey = overview ? [
-    { key: "todo", label: "To do", n: overview.toDo.length, icon: "create-outline", highlight: true },
-    { key: "review", label: "Awaiting review", n: overview.awaitingReview.length, icon: "hourglass-outline", highlight: false },
-    { key: "feedback", label: "Feedback received", n: overview.feedback.length, icon: "chatbubble-ellipses-outline", highlight: true },
-    { key: "toReview", label: "Waiting for your review", n: overview.toReview.length, icon: "people-outline", highlight: true },
-  ] : [];
 
   return (
     <View style={[s.screen, { paddingTop: topPad }]}>
       <ScrollView ref={scrollRef} contentContainerStyle={[s.scroll, wide && { paddingHorizontal: isLargeTablet ? 32 : 24 }, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
         {/* Header — personal, compact, so the learning content gets the space */}
         <View style={s.header}>
-          <Text style={s.eyebrow}>Learning Centre</Text>
+          <Text style={s.eyebrow}>Learning</Text>
           <Text style={[s.title, wide && { fontSize: 34, lineHeight: 40 }]} accessibilityRole="header">
             {firstName ? `${greeting}, ${firstName}` : "Your learning"}
           </Text>
@@ -152,46 +141,7 @@ export default function LearnTab() {
 
         {/* Explore Learning */}
         <SectionHeading s={s} title="Explore Learning" />
-        <LearningHub colors={colors} details={hub} columns={wide ? 2 : 1} />
-
-        {/* Your Learning Journey — the existing Learning Centre (My Learning) */}
-        <SectionHeading s={s} title="Your Learning Journey"
-          action={<AppButton label="My Learning" onPress={() => router.push("/learning" as any)} variant="tertiary" icon="chevron-forward" iconPosition="trailing" accessibilityLabel="Open My Learning" />} />
-        <Pressable style={({ pressed }) => [s.journey, wide && { padding: 20 }, pressed && { opacity: 0.94 }]} onPress={() => router.push("/learning" as any)} accessibilityRole="button"
-          accessibilityLabel={`My Learning. ${modulesCompleted} of ${totalModules} Kingdom School modules completed${overview ? `. ${journey.map((j) => `${j.n} ${j.label}`).join(", ")}` : ""}`}>
-          {/* Kingdom School progress — from the modules already loaded */}
-          <View style={s.journeyTop}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={s.journeyKicker}>Kingdom School</Text>
-              <Text style={s.journeyFigure}>
-                {modulesCompleted}<Text style={s.journeyOf}> of {totalModules} modules complete</Text>
-              </Text>
-            </View>
-            <View style={s.lessonsBadge}>
-              <Text style={s.lessonsN}>{lessonsCompleted}</Text>
-              <Text style={s.lessonsLabel}>{lessonsCompleted === 1 ? "lesson" : "lessons"}{"\n"}completed</Text>
-            </View>
-          </View>
-          {totalModules > 0 ? <ProgressBar value={modulesCompleted / totalModules} color={colors.progressFill} track={colors.progressTrack} height={6} /> : null}
-
-          {/* Comprehensive Checks — the Learning Centre overview */}
-          <Text style={[s.journeyKicker, { marginTop: 18 }]}>{COMPREHENSIVE_CHECKS}</Text>
-          {overview ? (
-            <View style={s.stats}>
-              {journey.map((j) => <ProgressStat key={j.key} value={j.n} label={j.label} icon={j.icon} colors={colors} highlight={j.highlight} wide={wide} />)}
-            </View>
-          ) : overviewFailed ? <Text style={[s.meta, { marginTop: 6 }]}>Your {COMPREHENSIVE_CHECKS} couldn't load. Tap to open My Learning.</Text>
-            : <ActivityIndicator color={colors.accentGreen} style={{ marginVertical: 12 }} />}
-          <Text style={[s.meta, { marginTop: 12 }]}>From Kingdom School, Kingdom Stories, Family Circle and Church</Text>
-        </Pressable>
-
-        {/* My Evaluations — feedback on my checks, and serving others as an evaluator (Peer Evaluation Engine) */}
-        <SectionHeading s={s} title="My Evaluations"
-          action={<AppButton label="Open" onPress={() => router.push("/evaluation" as any)} variant="tertiary" icon="chevron-forward" iconPosition="trailing" accessibilityLabel="Open My Evaluations" />} />
-        <Pressable style={({ pressed }) => [s.journey, wide && { padding: 20 }, pressed && { opacity: 0.94 }]} onPress={() => router.push("/evaluation" as any)} accessibilityRole="button"
-          accessibilityLabel="My Evaluations: feedback on your checks, and serving others as an evaluator">
-          <Text style={s.meta}>Follow each check from submission to feedback, discuss it with your evaluator, and — when you are ready — serve a fellow disciple as an evaluator.</Text>
-        </Pressable>
+        <LearningHub colors={colors} details={hub} columns={wide ? 4 : 2} />
       </ScrollView>
     </View>
   );
@@ -229,14 +179,5 @@ function makeStyles(c: AppColors) {
     rail: { marginHorizontal: -16 },
     railContent: { paddingHorizontal: 16 },
     empty: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 18, backgroundColor: c.card },
-    journey: { padding: 16, borderRadius: 20, backgroundColor: c.card },
-    journeyTop: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginBottom: 10 },
-    journeyKicker: { fontSize: 11, lineHeight: 15, color: c.amber, fontFamily: "Inter_700Bold", letterSpacing: 1, textTransform: "uppercase" },
-    journeyFigure: { fontSize: 28, lineHeight: 34, color: c.textDark, fontFamily: "Inter_700Bold", letterSpacing: -0.6 },
-    journeyOf: { fontSize: 14, color: c.textMuted, fontFamily: "Inter_500Medium", letterSpacing: 0 },
-    lessonsBadge: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.lightCream },
-    lessonsN: { fontSize: 20, lineHeight: 24, color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    lessonsLabel: { fontSize: 11, lineHeight: 14, color: c.textMuted, fontFamily: "Inter_500Medium" },
-    stats: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   });
 }

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton } from "@/components/ui";
+import { PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 const REFLECTION_QUESTIONS = [
   "What has this story stirred in you?",
@@ -42,7 +43,7 @@ export default function MissionGoScreen() {
           just stories, Scripture, and questions to sit with.
         </Text>
 
-        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push("/(tabs)/prayer" as any)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.card} onPress={() => router.push(PRAYER_ROUTE as any)}>
           <Ionicons name="hand-left-outline" size={20} color={c.accentGreen} />
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Pray</Text>

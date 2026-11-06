@@ -115,11 +115,12 @@ function makeStyles(c: AppColors) {
   });
 }
 
-export default function DiscoverTab() {
+// Shown inside the More tab (app/(tabs)/more.tsx), which passes its Prayer / Discover switch as topSlot.
+export default function DiscoverTab({ topSlot, reselectKey = "more" }: { topSlot?: React.ReactNode; reselectKey?: string } = {}) {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
   const tabScrollRef = React.useRef<ScrollView>(null);
-  useScrollToTopOnTabReselect("discover", tabScrollRef);
+  useScrollToTopOnTabReselect(reselectKey, tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
   const { getDiscoverablePeers, getGroups, forestStats, missions, userChurch } = useData();
@@ -235,6 +236,7 @@ export default function DiscoverTab() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
+      {topSlot}
       <View style={[styles.header, { paddingTop: 20 }]}>
         <Text style={styles.headerTitle}>{t("discover.title")}</Text>
         <Text style={styles.headerSub}>{t("discover.subtitle")}</Text>

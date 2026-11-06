@@ -1,4 +1,5 @@
 import { currentModule, isStoryInProgress } from "@/lib/learningHome";
+import { PRAYER_ROUTE } from "@/lib/moreRoutes";
 
 // Home-screen / Lock Screen widgets read ONE small snapshot that the app
 // writes after it has loaded real data (lib/widgetSync). The widgets never
@@ -138,7 +139,7 @@ export function buildWidgetSnapshot(i: WidgetInputs): WidgetSnapshot {
       ? { title: i.nextGathering.title, startsAt: i.nextGathering.startsAt, where: i.nextGathering.churchName, url: i.link("/church/calls") }
       : { title: null, startsAt: null, where: null, url: i.link("/community") },
     progress: { modulesCompleted, totalModules },
-    reminders: { prayerUrl: i.link("/(tabs)/prayer"), journalUrl: i.link("/my-discipleship/journal") },
+    reminders: { prayerUrl: i.link(PRAYER_ROUTE), journalUrl: i.link("/my-discipleship/journal") },
     privacy: { lockScreenDetails: i.prefs.lockScreenDetails, showCommunity: community },
   };
 }

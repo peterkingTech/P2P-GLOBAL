@@ -15,6 +15,7 @@ import {
 import { getKingdomWinsFeed, type KingdomWin } from "@/lib/kingdomWinsApi";
 import { AppButton } from "@/components/ui";
 import { timeAgo } from "@/lib/timeFormat";
+import { DISCOVER_ROUTE } from "@/lib/moreRoutes";
 
 // Missions — rebuilt Discover-first landing (Stage 2). The old screen's
 // two data sources are handled deliberately:
@@ -106,7 +107,7 @@ function makeStyles(c: AppColors) {
   });
 }
 
-// Formerly the Missions tab; now opened from Discover (see (tabs)/discover.tsx).
+// Formerly the Missions tab; now opened from Discover (More tab → Discover, components/more/DiscoverHome.tsx).
 export default function MissionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -163,7 +164,7 @@ export default function MissionsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[{ flex: 1 }, centeredMaxWidth(contentMaxWidth)]}>
       <TouchableOpacity
-        onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/discover" as any))}
+        onPress={() => (router.canGoBack() ? router.back() : router.replace(DISCOVER_ROUTE as any))}
         style={{ paddingHorizontal: 16, paddingTop: 8, alignSelf: "flex-start" }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessibilityRole="button"

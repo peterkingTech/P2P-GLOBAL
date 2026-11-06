@@ -75,6 +75,19 @@ export interface EvaluatorProfile {
   commitments: { id: string; text: string }[]; deadlineHours: number; invitationWindowMinutes: number; engineEnabled: boolean;
   record: { invited: number; accepted: number; completed: number; onTime: number; onTimeRate: number | null; missedDeadlines: number; declined: number; expired: number; unableReports: number; ratings: number; helpedUnderstandRate: number | null };
   recognitions: { id: string; title: string; reason: string }[];
+  /** The exact resources this person passed through independent evaluation (invitations come only for these). */
+  qualified?: { resourceId: string; title: string; within: string | null }[];
+}
+
+/** Is peer evaluation running? Separate from whether a person understands it. */
+export type EvaluationServiceState = "ready" | "coordinators" | "unavailable";
+export interface EvaluationStatus { state: EvaluationServiceState; message: string }
+
+export interface EvaluationReadiness {
+  state: EvaluationServiceState; engineEnabled: boolean; lastSweepAt: string | null; sweepLate: boolean;
+  counts: { qualifiedEvaluators: number; resourcesWithQualifiedPeople: number; pending: number; unassigned: number; matchingFailures: number; undeliveredInvitations: number; expired30d: number; reassigned30d: number };
+  coverageGaps: { resourceKind: string; resourceId: string; title: string; waiting: number }[];
+  checks: { key: string; label: string; ok: boolean | null; detail: string }[];
 }
 
 const call = async <T,>(path: string, init: RequestInit = {}) => {
@@ -85,6 +98,7 @@ const call = async <T,>(path: string, init: RequestInit = {}) => {
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const getEvaluatorProfile = () => call<EvaluatorProfile>("/me/evaluator");
+export const getEvaluationStatus = () => call<EvaluationStatus>("/status");
 export const acknowledgeOrientation = (commitments: string[]) => call<{ oriented: true }>("/me/orientation", json("POST", { commitments }));
 export const updateAvailability = (p: { available?: boolean; unavailableUntil?: string | null; capacity?: number; categories?: string[] }) => call<{ saved: true }>("/me/evaluator", json("PUT", p));
 export const myEvaluations = () => call<{ items: MyEvaluation[] }>("/mine");
@@ -116,6 +130,8 @@ export const adminCoverage = () => call<{ items: { resourceKind: string; resourc
 export const adminSweep = () => call<Record<string, number>>("/admin/sweep", { method: "POST" });
 export const adminOperations = () => call<{ qualifiedEvaluators: number; resourcesWithQualifiedPeople: number; pending: number; unassigned: number; expired30d: number; reassigned30d: number;
   medianHoursToAccept: number | null; medianHoursToComplete: number | null; workload: { activeEvaluations: number; people: number }[]; reciprocalPairs: number }>("/admin/operations");
+/** Service health, qualified evaluators, matching failures, undelivered invitations, coverage gaps, and live checks of the engine's rules. */
+export const adminReadiness = () => call<EvaluationReadiness>("/admin/readiness");
 export const adminIntegrity = () => call<{ items: { pairKey: string; people: string[]; approvals: number[]; lastAt: string; review: { decision: string; note: string; at: string } | null; needsReview: boolean }[] }>("/admin/integrity");
 export const adminIntegrityReview = (pairKey: string, decision: "no_concern" | "concern_raised" | "evidence_voided", note: string) => call<{ saved: true }>(`/admin/integrity/${pairKey}/review`, json("POST", { decision, note }));
 /** A MATERIAL revision of an assessment: earlier passes keep their credit but no longer qualify evaluators for the new version. */

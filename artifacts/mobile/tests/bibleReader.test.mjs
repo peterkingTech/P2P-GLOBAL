@@ -118,9 +118,10 @@ ok("client sends the user's session token (through the shared client)", /apiRequ
 // Navigation + connections
 const layout = src("app/_layout.tsx");
 ok("Bible routes draw their own header", /"bible\/index", "bible\/search", "bible\/library"/.test(layout));
-ok("no new bottom tab", !/bible/i.test(src("app/(tabs)/_layout.tsx")));
-// The Learning Centre header carries the Bible shortcut; Bible Study (Explore Learning) opens the reader too.
-ok("Learning opens Bible Study, which opens the Bible (one place, no repeated shortcut rows)", src("components/LearningHub.tsx").includes('route: "/bible-study"') && src("app/bible-study/index.tsx").includes('route: "/bible"')
+// Owner decision 2026-11-06: Bible is a main tab (the Bible Study page; the reader opens on top).
+ok("Bible tab: the Bible Study page as a tab", src("app/(tabs)/bible.tsx").includes("<BibleStudyHome asTab />") && src("app/(tabs)/_layout.tsx").includes('name="bible"'));
+// Bible has its own main tab (the Bible Study page, which opens the reader); Learning doesn't repeat it (owner, 2026-11-06).
+ok("Bible tab opens Bible Study, which opens the Bible (one place, no repeated shortcut rows)", !src("components/LearningHub.tsx").includes('"/bible-study"') && src("app/(tabs)/bible.tsx").includes("<BibleStudyHome asTab />") && src("app/bible-study/index.tsx").includes('route: "/bible"')
   && !src("app/(tabs)/learn.tsx").includes('"/notes"') && !src("app/kingdom-school.tsx").includes('"/notes"') && !src("app/kingdom-school.tsx").includes('"/bible"'));
 const lesson = src("app/lesson/[id].tsx");
 ok("lesson Scripture opens in the P2P Bible (bible.com only as fallback)", /readerTarget\(s\.reference\)/.test(lesson) && /router\.push\(bibleRoute\(/.test(lesson) && /Read in Bible/.test(lesson));
@@ -135,7 +136,7 @@ const link = src("components/bible/ReadInBibleLink.tsx");
 ok("ReadInBibleLink renders nothing for unreadable references and can close a Modal first", /if \(!readerTarget\(reference\)\) return null/.test(link) && /beforeOpen\?\.\(\)/.test(link));
 for (const f of ["app/prayer/study/[scriptureId].tsx", "app/prayer/pray-the-word/[slug].tsx", "app/prayer/paths/[slug].tsx", "app/fruit/[fruitKey].tsx", "app/living-tree.tsx", "components/study/StudyLessonTab.tsx", "components/study/StudyScriptureTab.tsx"])
   ok(`${f}: Read in Bible link`, /<ReadInBibleLink reference=/.test(src(f)));
-ok("Prayer tab modal closes before opening the reader", /<ReadInBibleLink reference=\{activePrayer\?\.scripture_reference\}[^>]*beforeOpen=\{\(\) => setActivePrayer\(null\)\}/.test(src("app/(tabs)/prayer.tsx")));
+ok("Prayer tab modal closes before opening the reader", /<ReadInBibleLink reference=\{activePrayer\?\.scripture_reference\}[^>]*beforeOpen=\{\(\) => setActivePrayer\(null\)\}/.test(src("components/more/PrayerHome.tsx")));
 const os = src("lib/openScripture.ts");
 ok("openScripture pushes (keeps the current screen/call mounted)", /router\.push\(/.test(os) && !/router\.replace/.test(os));
 const myBible = src("components/family/MyBibleSheet.tsx");
