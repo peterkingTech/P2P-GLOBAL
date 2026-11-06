@@ -31,7 +31,7 @@ function load(file, mocks = {}) {
 }
 
 // ── Stages ──
-const S = load("constants/stages.ts");
+const S = load("constants/stages.ts", { "@/lib/growthModels": { stageStillUrl: (i) => `still-${i}` } });
 ok("five personal stages; Forest of Nations kept as the collective (index 5)", S.PERSONAL_STAGE_COUNT === 5 && S.STAGES[S.COLLECTIVE_STAGE_INDEX].name === "Forest of Nations");
 ok("old points → personal stage, never Forest of Nations (115 → Forest Builder)", [0, 4, 12, 28, 60, 110, 115, 999].map(S.getStageFromPoints).join() === "0,1,2,3,4,4,4,4");
 const OFFICIAL = [

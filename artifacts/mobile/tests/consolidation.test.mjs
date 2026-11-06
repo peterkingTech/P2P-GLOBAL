@@ -208,7 +208,8 @@ const disc = read("app/(tabs)/discover.tsx"), homeSrc = read("app/(tabs)/index.t
 ok("Discover: no Kingdom Stories card (it lives in Learning)", !/route: "\/kingdom-stories"/.test(disc));
 ok("Discover: no Prayer Wall card (Prayer is a tab) and no unused prayer-wall request", !/route: "\/\(tabs\)\/prayer"/.test(disc) && !disc.includes("getPrayerWallPosts"));
 ok("Discover: your own church is not repeated (join / register stay)", !disc.includes(">My Church</Text>") && disc.includes('router.push("/church/join"'));
-ok("Home: no Living Tree link (it lives in Profile → My growth) and no tile that only opens the Discover tab", !homeSrc.includes("/living-tree") && read("app/(tabs)/profile.tsx").includes('route: "/living-tree"') && !homeSrc.includes('go("/(tabs)/discover")'));
+// Owner decision 2026-11-06: the growth stage is back on Home (its card opens the Living Tree); Profile keeps its entry too.
+ok("Home: the growth-stage card opens the Living Tree (also in Profile → My growth); no tile that only opens the Discover tab", homeSrc.includes('onPress={go("/living-tree")}') && read("app/(tabs)/profile.tsx").includes('route: "/living-tree"') && !homeSrc.includes('go("/(tabs)/discover")'));
 
 console.log(`consolidation: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

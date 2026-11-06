@@ -19,6 +19,7 @@ import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX, get
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { confirmAction } from "@/lib/alerts";
+import { STAGE_MODELS } from "@/lib/growthModels";
 import {
   MILESTONE_DISCLAIMER, MILESTONE_EXPLANATION, endGrowthPause, getGrowthJourney, localDate, percentOf, progressText, setShareCountryInCollective,
   startGrowthPause, timeInStage, type GrowthJourney,
@@ -96,7 +97,7 @@ export default function StagesScreen() {
 
       {/* Where you are */}
       <View style={[styles.stageRow, styles.stageRowCurrent]}>
-        <Image source={STAGE_IMAGES[stageIndex]} style={styles.thumb} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <Image source={STAGE_IMAGES[stageIndex]} style={styles.thumb} resizeMode="contain" accessibilityIgnoresInvertColors />
         <View style={styles.stageInfo}>
           <View style={styles.stageNameRow}>
             <Text style={styles.stageEmoji}>{STAGES[stageIndex].emoji}</Text>
@@ -108,6 +109,10 @@ export default function StagesScreen() {
           {journey ? <Text style={styles.meta}>In this stage for {timeInStage(journey.stage.since)}</Text> : null}
           {journey?.stage.verification === "legacy_unverified" ? (
             <Text style={styles.meta}>Recognised from your growth before this journey began. It stays yours; the milestones confirm it as you continue.</Text>
+          ) : null}
+          {STAGE_MODELS[stageIndex] ? (
+            <AppButton label="View in 3D" icon="cube-outline" size="sm" variant="secondary" palette="fixedLight" style={{ marginTop: 8, alignSelf: "flex-start" }}
+              onPress={() => router.push({ pathname: "/tree-3d", params: { model: STAGE_MODELS[stageIndex] } } as any)} />
           ) : null}
         </View>
       </View>
@@ -258,7 +263,7 @@ export default function StagesScreen() {
           const when = journey?.history.find((h) => h.stage === i + 1);
           return (
             <View key={stage.name} style={[styles.stageRow, current && styles.stageRowCurrent, ahead && styles.stageRowLocked]}>
-              <Image source={STAGE_IMAGES[i]} style={[styles.thumbSmall, ahead && styles.thumbLocked]} resizeMode="cover" accessibilityIgnoresInvertColors />
+              <Image source={STAGE_IMAGES[i]} style={[styles.thumbSmall, ahead && styles.thumbLocked]} resizeMode="contain" accessibilityIgnoresInvertColors />
               <View style={styles.stageInfo}>
                 <View style={styles.stageNameRow}>
                   <Text style={styles.stageEmoji}>{stage.emoji}</Text>
@@ -269,6 +274,10 @@ export default function StagesScreen() {
                 <Text style={[styles.desc, ahead && styles.descLocked]} numberOfLines={3}>{stage.description}</Text>
                 <ReadableText style={styles.verse}>{stage.verse} — {stage.verseRef}</ReadableText>
                 {when ? <Text style={styles.meta}>Reached {new Date(when.achievedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}{when.kind === "legacy_import" ? " (recognised from your earlier growth)" : ""}</Text> : null}
+                {reached && STAGE_MODELS[i] ? (
+                  <AppButton label={`View ${stage.name}`} icon="cube-outline" size="sm" variant="tertiary" palette="fixedLight" style={{ alignSelf: "flex-start" }}
+                    onPress={() => router.push({ pathname: "/tree-3d", params: { model: STAGE_MODELS[i] } } as any)} />
+                ) : null}
               </View>
             </View>
           );

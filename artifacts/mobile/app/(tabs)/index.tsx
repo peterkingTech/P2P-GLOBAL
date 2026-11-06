@@ -33,6 +33,8 @@ import { Avatar } from "@/components/Avatar";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { currentModule as currentModuleOf } from "@/lib/learningHome";
+import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
+import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -208,6 +210,36 @@ function makeStyles(c: AppColors) {
     heroVerseText: { fontSize: 15, lineHeight: 23, color: "rgba(255,255,255,0.92)", fontFamily: "Inter_400Regular" },
     heroVerseRef: { fontSize: 13, color: "rgba(242,201,120,0.95)", marginTop: 8, fontFamily: "Inter_600SemiBold" },
 
+    // Growth stage: the stage's 3D still on top, the next milestone underneath.
+    growthCard: {
+      borderRadius: 22, overflow: "hidden", marginBottom: 20,
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige,
+    },
+    treeCard: { aspectRatio: 16 / 9, width: "100%", position: "relative" },
+    treePhoto: { width: "100%", height: "100%" },
+    treeShade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "45%" },
+    treePhotoFallback: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
+    treeFallbackEmoji: { fontSize: 64 },
+    growthBody: { padding: 16, gap: 6 },
+    stageOverlay: { position: "absolute", bottom: 14, left: 14, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8 },
+    stageOverlayText: { color: "#fff", fontSize: 18, fontFamily: "Inter_700Bold" },
+    stageOfText: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+    arrowOverlay: {
+      position: "absolute", top: 14, right: 14, backgroundColor: "rgba(0,0,0,0.35)",
+      width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center",
+    },
+    progressLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    progressToward: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    progressCount: { fontSize: 14, color: c.accentGreen, fontFamily: "Inter_700Bold" },
+    progressBarBg: { height: 8, backgroundColor: c.progressTrack, borderRadius: 4, overflow: "hidden" },
+    progressBarFill: { height: 8, backgroundColor: c.progressFill, borderRadius: 4 },
+    progressHint: { fontSize: 12, color: c.textMuted, fontFamily: "Inter_400Regular" },
+    forestLinkRow: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 40,
+      marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.borderBeige,
+    },
+    forestLinkText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold", flex: 1 },
+
     sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10, marginTop: 4 },
     sectionHeading: { flex: 1, fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
 
@@ -269,12 +301,13 @@ function makeStyles(c: AppColors) {
 }
 
 // Home is a calm starting point: the greeting with the Daily Word, the
+// person's growth stage (their 3D tree, opening the Living Tree), the
 // updates that need this person (shown only when present), and one next
-// step. Everything that used to sit here as a dashboard widget lives in its
-// own place now: growth, journey and My P2P in Profile (My growth / My
-// space), families and church in Discover's community entry, the
-// recommended plans on the Plans screen, messages in the Messages tab. Native home-screen widgets are
-// separate (WidgetSyncHost in app/_layout.tsx) and unchanged.
+// step. The other former dashboard widgets live in their own places:
+// journey and My P2P in Profile (My growth / My space), families and church
+// in Discover's community entry, the recommended plans on the Plans screen,
+// messages in the Messages tab. Native home-screen widgets are separate
+// (WidgetSyncHost in app/_layout.tsx) and unchanged.
 export default function HomeTab() {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
@@ -282,11 +315,17 @@ export default function HomeTab() {
   useScrollToTopOnTabReselect("index", tabScrollRef);
   const router = useRouter();
   const { profile } = useAuth();
-  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules } = useData();
+  const { dailyVerse, isLoading, refreshData, pendingEvaluations, modules, forestStats } = useData();
   const { colors } = useTheme();
 
   const styles = makeStyles(colors);
-  const { contentMaxWidth } = useLayout();
+  const { contentMaxWidth, isTablet, screenWidth, screenHeight } = useLayout();
+  // The growth MILESTONE (server-calculated) decides the tree shown, everywhere.
+  const { stageIndex, journey } = useGrowthStage();
+  const stage = STAGES[stageIndex];
+  const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;
+  const requirements = nextRequirementsMet(journey);
+  const [treeStillFailed, setTreeStillFailed] = useState(false);
   const { t } = useTranslation();
 
   const { modulesStarted, modulesCompleted, totalModules } = getModuleProgressCounts(modules);
@@ -385,6 +424,71 @@ export default function HomeTab() {
         styles={styles}
       />
 
+      {/* 2. Current growth stage — a still of the stage's 3D model; opens the Living Tree. */}
+      <View style={styles.growthCard}>
+        <TouchableOpacity
+          // Tablets: a 21:9 band, made wider (shorter) when that would take
+          // more than ~42% of the window height.
+          style={[styles.treeCard, isTablet && { aspectRatio: Math.max(21 / 9, ((contentMaxWidth ?? screenWidth) - 40) / (screenHeight * 0.42)) }]}
+          onPress={go("/living-tree")}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel={`${stage.name}, ${t("home.stageOf", { stage: stageIndex + 1 })}. ${t("home.livingTree")}`}
+        >
+          <LinearGradient colors={[colors.card, colors.lightCream]} style={StyleSheet.absoluteFill} />
+          {!treeStillFailed ? (
+            <Image
+              source={STAGE_IMAGES[stageIndex]}
+              style={styles.treePhoto}
+              resizeMode="contain"
+              onError={() => setTreeStillFailed(true)}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <View style={styles.treePhotoFallback}><Text style={styles.treeFallbackEmoji}>{stage.emoji}</Text></View>
+          )}
+          <LinearGradient colors={["transparent", "rgba(0,0,0,0.45)"]} style={styles.treeShade} pointerEvents="none" />
+          <View style={styles.stageOverlay}>
+            <Text style={styles.stageOverlayText}>{stage.emoji} {stage.name}</Text>
+            <Text style={styles.stageOfText}>{t("home.stageOf", { stage: stageIndex + 1 })}</Text>
+          </View>
+          <View style={styles.arrowOverlay}>
+            <Ionicons name="chevron-forward" size={16} color="#fff" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.growthBody}>
+          <View style={styles.progressLabelRow}>
+            {nextStage ? (
+              <Text style={styles.progressToward} numberOfLines={2}>
+                {t("home.growingToward")} {nextStage.emoji} {nextStage.name}
+              </Text>
+            ) : (
+              <Text style={styles.progressToward}>{stage.emoji} {stage.name}</Text>
+            )}
+            {requirements ? <Text style={styles.progressCount}>{requirements.met} of {requirements.total}</Text> : null}
+          </View>
+          {requirements ? (
+            <>
+              <View style={styles.progressBarBg} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <View style={[styles.progressBarFill, { width: `${requirements.total ? (requirements.met / requirements.total) * 100 : 0}%` as any }]} />
+              </View>
+              <Text style={styles.progressHint}>{requirements.met} of {requirements.total} requirements met for {nextStage?.name}.</Text>
+            </>
+          ) : null}
+          <TouchableOpacity style={styles.forestLinkRow} onPress={go("/stages")} activeOpacity={0.85} accessibilityRole="button">
+            <Text style={styles.forestLinkText}>Your growth journey</Text>
+            <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.forestLinkRow} onPress={go("/forest")} activeOpacity={0.85} accessibilityRole="button">
+            <Text style={styles.forestLinkText}>
+              🌳 View My Forest — {1 + forestStats.totalDisciples} tree{1 + forestStats.totalDisciples === 1 ? "" : "s"}, {forestStats.countriesReached.length} nation{forestStats.countriesReached.length === 1 ? "" : "s"}
+            </Text>
+            <Ionicons name="chevron-forward" size={15} color={colors.primaryGreen} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Elijah Protocol check-in, if pastoral care has flagged one */}
       {pendingElijahCheckIn && (
         <ElijahCheckInCard
@@ -447,7 +551,7 @@ export default function HomeTab() {
         </TouchableOpacity>
       )}
 
-      {/* 2. Continue — the one next step in the Kingdom School journey */}
+      {/* 3. Continue — the one next step in the Kingdom School journey */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionHeading} accessibilityRole="header">{t("home.continueJourney")}</Text>
       </View>

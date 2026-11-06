@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,7 +29,8 @@ import { Avatar } from "@/components/Avatar";
 import { GrainExplanationSheet } from "@/components/GrainExplanationSheet";
 import SkillsMultiSelect from "@/components/SkillsMultiSelect";
 import { skillLabel } from "@/constants/skillsTaxonomy";
-import LivingTree, { stageLabel } from "@/components/LivingTree";
+import { STAGES, STAGE_IMAGES } from "@/constants/stages";
+import { useGrowthStage } from "@/hooks/useGrowthStage";
 import "@/lib/i18n";
 import { publicLocationLabel, calledToValue } from "@/lib/publicIdentity";
 import { AppButton } from "@/components/ui";
@@ -100,7 +102,8 @@ function makeStyles(c: AppColors) {
       alignItems: "center", backgroundColor: c.card, borderRadius: 14,
       borderWidth: 1, borderColor: c.borderBeige, paddingVertical: 14, marginBottom: 16,
     },
-    treeMiniLabel: { fontSize: 13, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 4 },
+    treeMiniImage: { width: "100%", height: 200 },
+    treeMiniLabel: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 6 },
     completionBadgeCard: {
       backgroundColor: "rgba(224,164,65,0.1)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(224,164,65,0.3)",
       padding: 14, marginBottom: 16,
@@ -244,7 +247,8 @@ export default function ProfileScreen() {
   useScrollToTopOnTabReselect("profile", tabScrollRef);
   const router = useRouter();
   const { profile, signOut, updateProfile } = useAuth();
-  const { submitHelpRequest, treeData, getMyInviteLink, modules } = useData();
+  const { submitHelpRequest, getMyInviteLink, modules } = useData();
+  const { stageIndex: growthStage } = useGrowthStage();
   const { modulesCompleted } = getModuleProgressCounts(modules);
   const { t } = useTranslation();
   const { colors, style } = useTheme();
@@ -416,15 +420,13 @@ export default function ProfileScreen() {
           displayName={profile?.displayName || "This person"}
         />
 
-        {/* Living Tree — compact real SVG tree (what other users see when
-            they view this profile — the profile owner's tree, not the
-            viewer's). */}
-        {treeData && (
-          <View style={styles.treeMiniCard}>
-            <LivingTree treeData={treeData} userId={profile?.id} compact />
-            <Text style={styles.treeMiniLabel}>{stageLabel(treeData.growthStage)}</Text>
-          </View>
-        )}
+        {/* Growth stage — a still of the stage's 3D model; the picture and the label are
+            the same growth milestone. Opens the Living Tree (live 3D). */}
+        <TouchableOpacity style={styles.treeMiniCard} onPress={() => router.push("/living-tree" as any)} activeOpacity={0.88}
+          accessibilityRole="button" accessibilityLabel={`${STAGES[growthStage].name}. Open the Living Tree`}>
+          <Image source={STAGE_IMAGES[growthStage]} style={styles.treeMiniImage} resizeMode="contain" accessibilityIgnoresInvertColors />
+          <Text style={styles.treeMiniLabel}>{STAGES[growthStage].emoji} {STAGES[growthStage].name}</Text>
+        </TouchableOpacity>
 
         {/* Completion badge */}
         {profile?.curriculumCompletedAt && (

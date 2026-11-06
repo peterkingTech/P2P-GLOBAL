@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Animated, BackHandler, ActivityIndicator, TouchableOpacity, useWindowDimensions } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -6,7 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, supabase } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import LivingTree from "@/components/LivingTree";
+import StageStill from "@/components/growth/StageStill";
+import { useGrowthStage } from "@/hooks/useGrowthStage";
 import { apiFetch } from "@/lib/apiClient";
 import colors from "@/constants/colors";
 import { AppButton } from "@/components/ui";
@@ -28,7 +29,9 @@ export default function CompletionMomentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, updateProfile } = useAuth();
-  const { treeData, treeMentees, forestStats, modules, fruitCatalog, userFruits } = useData();
+  const { treeData, treeMentees, forestStats, modules } = useData();
+  // The growth milestone decides the tree shown (a still of its 3D model).
+  const { stageIndex } = useGrowthStage();
 
   const [phase, setPhase] = useState<Phase>(1);
 
@@ -38,12 +41,6 @@ export default function CompletionMomentScreen() {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => phase < 4);
     return () => sub.remove();
   }, [phase]);
-
-  const categoryByFruitKey = useMemo(() => new Map(fruitCatalog.map((f) => [f.fruitKey, f.category])), [fruitCatalog]);
-  const treeFruits = useMemo(
-    () => userFruits.map((f) => ({ fruitKey: f.fruitKey, category: categoryByFruitKey.get(f.fruitKey) ?? "special", awardedAt: f.awardedAt })),
-    [userFruits, categoryByFruitKey]
-  );
 
   return (
     <View style={styles.root}>
@@ -55,7 +52,7 @@ export default function CompletionMomentScreen() {
         ))}
       </View>
 
-      {phase === 1 && <Phase1TreeTransforms treeData={treeData} fruits={treeFruits} onDone={() => setPhase(2)} />}
+      {phase === 1 && <Phase1TreeTransforms treeData={treeData} stageIndex={stageIndex} onDone={() => setPhase(2)} />}
       {phase === 2 && (
         <Phase2Letter
           learnerId={profile?.id ?? null}
@@ -66,6 +63,7 @@ export default function CompletionMomentScreen() {
       {phase === 3 && (
         <Phase3ForestReveal
           treeData={treeData}
+          stageIndex={stageIndex}
           mentees={treeMentees}
           modules={modules}
           countriesReached={forestStats.countriesReached.length}
@@ -90,7 +88,7 @@ export default function CompletionMomentScreen() {
 }
 
 // ── PHASE 1 — The Tree Transforms (~45s, non-skippable) ─────────────────────
-function Phase1TreeTransforms({ treeData, fruits, onDone }: { treeData: any; fruits: any[]; onDone: () => void }) {
+function Phase1TreeTransforms({ treeData, stageIndex, onDone }: { treeData: any; stageIndex: number; onDone: () => void }) {
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const treeScale = useRef(new Animated.Value(1)).current;
   const fruitGlow = useRef(new Animated.Value(0)).current;
@@ -188,7 +186,7 @@ function Phase1TreeTransforms({ treeData, fruits, onDone }: { treeData: any; fru
 
       <Animated.View style={{ transform: [{ scale: treeScale }] }}>
         <Animated.View style={[styles.fruitGlowRing, { opacity: fruitGlow }]} />
-        <LivingTree treeData={treeData} compact fruits={fruits} />
+        <StageStill stageIndex={stageIndex} size={260} />
       </Animated.View>
 
       {particles.map((p, i) => (
@@ -293,8 +291,8 @@ function Phase2Letter({ learnerId, learnerName, onContinue }: { learnerId: strin
 }
 
 // ── PHASE 3 — The Forest Reveal ──────────────────────────────────────────────
-function Phase3ForestReveal({ treeData, mentees, modules, countriesReached, onContinue }: {
-  treeData: any; mentees: any[]; modules: any[]; countriesReached: number; onContinue: () => void;
+function Phase3ForestReveal({ treeData, stageIndex, mentees, modules, countriesReached, onContinue }: {
+  treeData: any; stageIndex: number; mentees: any[]; modules: any[]; countriesReached: number; onContinue: () => void;
 }) {
   const [visibleLines, setVisibleLines] = useState(0);
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -322,7 +320,7 @@ function Phase3ForestReveal({ treeData, mentees, modules, countriesReached, onCo
   return (
     <Animated.View style={[styles.phaseContainer, { opacity: fadeIn }]}>
       <View style={styles.forestWrap}>
-        {treeData && <LivingTree treeData={treeData} compact />}
+        <StageStill stageIndex={stageIndex} size={200} />
         {mentees.length > 0 && (
           <View style={styles.menteeRing}>
             {mentees.slice(0, 6).map((m, i) => (

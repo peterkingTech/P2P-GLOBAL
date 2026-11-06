@@ -13,27 +13,24 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { useEventListener } from "expo";
-import { useAuth, supabase } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { STAGES, PERSONAL_STAGE_COUNT, getStageFromPoints } from "@/constants/stages";
+import { STAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
 import { getTreeStage } from "@/constants/treeStages";
-import { readTreeEnvironment } from "@/lib/hemisphereSeason";
-import { getWatchGrowthPlan, GROWTH_VIDEO_SOURCE, STAGE_VIDEO_SEGMENTS, LAST_VIDEO_STAGE_INDEX } from "@/constants/growthVideo";
+import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
-import LivingTree, { stageLabel, FruitInfo } from "@/components/LivingTree";
-import { EnvironmentSetting } from "@/components/tree/TreeEnvironment";
-import EnvironmentPicker from "@/components/tree/EnvironmentPicker";
+import GrowthModelView from "@/components/growth/GrowthModelView";
+import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
+import { GROWTH_MODELS, STAGE_MODELS, limitNote } from "@/lib/growthModels";
 import FruitDetailCard from "@/components/tree/FruitDetailCard";
 import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import ReadableText from "@/components/ReadableText";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
-import { AppButton } from "@/components/ui";
+import { AppButton, IconButton } from "@/components/ui";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -109,55 +106,34 @@ export default function LivingTreeScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const { contentMaxWidth } = useLayout();
   const { profile } = useAuth();
-  const { forestNodes, forestStats, isLoading, treeData, treeMentees, fruitCatalog, userFruits, refreshTreeData } = useData();
+  const { forestNodes, forestStats, isLoading, treeData, fruitCatalog, userFruits } = useData();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
   const [tab, setTab] = useState<"tree" | "forest">(params.tab === "forest" ? "forest" : "tree");
   const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
   const [showForestTransition, setShowForestTransition] = useState(false);
-  const [heroVideoFailed, setHeroVideoFailed] = useState(false);
   const autoTriggeredRef = useRef(false);
-  const heroSeekedRef = useRef(false);
 
-  // ── My Tree redesign — real fruit data, environment, and the new
-  // granular 8-stage progression (separate from the growth_level-based
-  // stage/video block above, which is untouched). ──
+  // The tree is the 3D model of the person's growth MILESTONE (server-calculated), the same stage
+  // the label shows. Earned fruit is listed (tap for its details); the old drawn tree's roots view,
+  // seasons and per-person branches don't exist on a 3D model.
   const [selectedFruitKey, setSelectedFruitKey] = useState<string | null>(null);
   const [showAccessibleSummary, setShowAccessibleSummary] = useState(false);
-  const [environmentOverride, setEnvironmentOverride] = useState<EnvironmentSetting | null>(null);
-
-  const fruitsForTree: FruitInfo[] = userFruits.map((f) => {
-    const entry = fruitCatalog.find((c) => c.fruitKey === f.fruitKey);
-    return { fruitKey: f.fruitKey, category: entry?.category ?? "personal_growth", awardedAt: f.awardedAt };
-  });
   const selectedCatalogEntry = selectedFruitKey ? fruitCatalog.find((c) => c.fruitKey === selectedFruitKey) ?? null : null;
   const selectedEarnedFruit = selectedFruitKey ? userFruits.find((f) => f.fruitKey === selectedFruitKey) ?? null : null;
 
-  const treeEnvironment = readTreeEnvironment({ latitude: profile?.latitude ?? null, countryCode: profile?.countryCode ?? null });
-  const environmentSetting: EnvironmentSetting =
-    environmentOverride ?? (treeData?.treeEnvironmentPreference as EnvironmentSetting | undefined) ?? "auto";
-  // The tree's drawing still grows with its own score; its NAME is the one official personal stage.
+  // The accessible list view still describes fruit by the My Tree score's detail stage.
   const newTreeStage = getTreeStage(treeData?.treeGrowthScore ?? 0);
 
-  async function handleEnvironmentChange(setting: EnvironmentSetting) {
-    setEnvironmentOverride(setting);
-    if (!profile?.id) return;
-    // Purely cosmetic — never touches growth score, stage, or fruit.
-    await supabase.from("p2p_profiles").update({ tree_environment_preference: setting === "auto" ? null : setting }).eq("id", profile.id);
-    refreshTreeData();
-  }
-
   const growthPoints = profile?.growthLevel ?? 0;
-  const stageIndex = getStageFromPoints(growthPoints);
+  const { stageIndex, journey } = useGrowthStage();
   const stage = STAGES[stageIndex];
   // Forest Builder is the highest personal stage (Forest of Nations is collective).
   const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;
-
-  const prevPoints = stage.unlockPoints;
-  const nextPoints = nextStage?.unlockPoints ?? prevPoints;
-  const progressPct = nextStage
-    ? Math.round(((growthPoints - prevPoints) / (nextPoints - prevPoints)) * 100)
-    : 100;
-  const pointsNeeded = nextStage ? nextPoints - growthPoints : 0;
+  // Progress toward the next milestone: verified requirements met (counts, never points).
+  const requirements = nextRequirementsMet(journey);
+  const progressPct = requirements && requirements.total ? Math.round((requirements.met / requirements.total) * 100) : nextStage ? 0 : 100;
+  const modelId = STAGE_MODELS[stageIndex];
+  const note = limitNote(GROWTH_MODELS[modelId]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -186,55 +162,6 @@ export default function LivingTreeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.prevStage]);
 
-  // Ambient hero video — plays the current stage's segment of the growth
-  // video on a continuous loop (re-seeking to the segment start instead of
-  // pausing, unlike the one-shot GrowthVideoModal). Only stages 0-3 have
-  // footage (see constants/growthVideo.ts); stages 4-5 and any load failure
-  // fall back to the SVG tree.
-  const hasHeroVideo = stageIndex <= LAST_VIDEO_STAGE_INDEX && !heroVideoFailed;
-  const heroSegment = STAGE_VIDEO_SEGMENTS[Math.min(stageIndex, LAST_VIDEO_STAGE_INDEX)];
-
-  // expo-video's player (and its `source`) are created once — GROWTH_VIDEO_SOURCE
-  // never changes, only which in/out segment of it this screen plays, so the
-  // player is not recreated per stage. timeUpdateEventInterval must be set
-  // explicitly (default 0 = event never fires) to get frequent enough position
-  // updates to catch the segment-end boundary, matching onPlaybackStatusUpdate's
-  // continuous callbacks in the previous expo-av version.
-  const heroPlayer = useVideoPlayer(GROWTH_VIDEO_SOURCE, (player) => {
-    player.muted = true;
-    player.loop = false;
-    player.timeUpdateEventInterval = 0.1;
-  });
-
-  useEventListener(heroPlayer, "statusChange", ({ status, error }) => {
-    if (status === "error") { setHeroVideoFailed(true); return; }
-    if (status === "readyToPlay" && !heroSeekedRef.current) {
-      heroSeekedRef.current = true;
-      heroPlayer.currentTime = heroSegment.start;
-      heroPlayer.play();
-    }
-  });
-
-  useEventListener(heroPlayer, "timeUpdate", ({ currentTime }) => {
-    if (currentTime >= heroSegment.end - 0.08) {
-      heroPlayer.currentTime = heroSegment.start;
-      heroPlayer.play();
-    }
-  });
-
-  // Stage change (not a fresh load) — the player already exists and is
-  // likely already playing a different segment of the same source, so
-  // re-seek immediately instead of waiting for another "readyToPlay".
-  useEffect(() => {
-    heroSeekedRef.current = false;
-    if (heroPlayer.status === "readyToPlay") {
-      heroPlayer.currentTime = heroSegment.start;
-      heroPlayer.play();
-      heroSeekedRef.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageIndex]);
-
   const { modules } = useData();
   const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
   const countriesCount = forestStats.countriesReached.length;
@@ -250,7 +177,7 @@ export default function LivingTreeScreen() {
   }
   const isForestBuilder = stageIndex === 4;
   const isForestOfNations = stageIndex >= 5;
-  const heroHeight = Math.min(screenWidth * 1.05, 320);
+  const heroHeight = Math.min(screenWidth * 1.1, 400);
 
   return (
     <View style={[styles.screen, { paddingTop: topPad }]}>
@@ -277,23 +204,15 @@ export default function LivingTreeScreen() {
 
       {tab === "tree" && (
         <View style={[styles.videoHero, { width: screenWidth, height: heroHeight }]}>
-          {hasHeroVideo ? (
-            <VideoView
-              player={heroPlayer}
-              style={{ width: screenWidth, height: heroHeight }}
-              contentFit="cover"
-              nativeControls={false}
-            />
-          ) : treeData ? (
-            <View style={[styles.videoHeroFallback, { width: screenWidth, height: heroHeight }]}>
-              <LivingTree treeData={treeData} compact />
-            </View>
-          ) : (
-            <View style={[styles.videoHeroPlayer, styles.loading, { width: screenWidth, height: heroHeight }]}>
-              <ActivityIndicator color="#fff" />
-            </View>
-          )}
-          <View style={styles.videoHeroLabel}>
+          <GrowthModelView
+            modelId={modelId}
+            style={{ width: screenWidth, height: heroHeight }}
+            extraControls={
+              <IconButton variant="tinted" palette="fixedLight" icon="expand-outline" accessibilityLabel="Open full screen"
+                onPress={() => router.push({ pathname: "/tree-3d", params: { model: modelId } } as any)} />
+            }
+          />
+          <View style={styles.videoHeroLabel} pointerEvents="none">
             <Text style={styles.videoHeroEmoji}>{stage.emoji}</Text>
             <Text style={styles.videoHeroText}>{stage.name}</Text>
           </View>
@@ -328,20 +247,31 @@ export default function LivingTreeScreen() {
                 <Text style={{ color: colors.accentGreen, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Your growth journey →</Text>
               </TouchableOpacity>
 
+              {note ? (
+                <View style={styles.limitNote} accessible accessibilityRole="text">
+                  <Ionicons name="information-circle-outline" size={15} color={colors.amber} />
+                  <Text style={styles.limitNoteText}>{note}</Text>
+                </View>
+              ) : null}
+
               {!showAccessibleSummary ? (
-                <View style={styles.treeSceneWrap}>
-                  <LivingTree
-                    treeData={treeData}
-                    userId={profile?.id}
-                    mentees={treeMentees}
-                    fruits={fruitsForTree}
-                    onTapFruit={setSelectedFruitKey}
-                    season={treeEnvironment.season}
-                    weather={treeEnvironment.weather}
-                    environmentSetting={environmentSetting}
-                    reducedMotion={profile?.id ? undefined : true}
-                    interactive
-                  />
+                <View style={styles.fruitSection}>
+                  <Text style={styles.fruitHeading}>Your fruit · {userFruits.length}</Text>
+                  {userFruits.length === 0 ? (
+                    <Text style={styles.fruitEmpty}>Fruit appears as you finish lessons, pray, share sessions and help others.</Text>
+                  ) : (
+                    <View style={styles.fruitChips}>
+                      {userFruits.map((f) => {
+                        const entry = fruitCatalog.find((c) => c.fruitKey === f.fruitKey);
+                        return (
+                          <TouchableOpacity key={f.fruitKey} style={styles.fruitChip} onPress={() => setSelectedFruitKey(f.fruitKey)}
+                            accessibilityRole="button" accessibilityLabel={`${entry?.name ?? "Fruit"}: details`}>
+                            <Text style={styles.fruitChipText}>🍎 {entry?.name ?? f.fruitKey}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               ) : (
                 <TreeAccessibleSummary stage={{ ...newTreeStage, name: stage.name, description: stage.description }} earnedFruits={userFruits} fruitCatalog={fruitCatalog} />
@@ -351,18 +281,11 @@ export default function LivingTreeScreen() {
                 style={styles.accessibleToggle}
                 onPress={() => setShowAccessibleSummary((v) => !v)}
                 accessibilityRole="button"
-                accessibilityLabel={showAccessibleSummary ? "Show visual tree" : "Show list view"}
+                accessibilityLabel={showAccessibleSummary ? "Show fruit" : "Show as list"}
               >
                 <Ionicons name={showAccessibleSummary ? "image-outline" : "list-outline"} size={14} color={colors.accentGreen} />
-                <Text style={styles.accessibleToggleText}>{showAccessibleSummary ? "Show visual tree" : "Show as list"}</Text>
+                <Text style={styles.accessibleToggleText}>{showAccessibleSummary ? "Show fruit" : "Show as list"}</Text>
               </TouchableOpacity>
-
-              {!showAccessibleSummary && (
-                <View style={styles.environmentPickerWrap}>
-                  <Text style={styles.environmentPickerLabel}>Setting</Text>
-                  <EnvironmentPicker value={environmentSetting} onChange={handleEnvironmentChange} />
-                </View>
-              )}
             </View>
           )}
 
@@ -415,19 +338,19 @@ export default function LivingTreeScreen() {
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
                   <Text style={styles.progressToward}>Growing toward {nextStage.emoji} {nextStage.name}</Text>
-                  <Text style={styles.progressPct}>{progressPct}%</Text>
+                  {requirements ? <Text style={styles.progressPct}>{requirements.met} of {requirements.total}</Text> : null}
                 </View>
                 <View style={styles.progressBarBg}>
                   <View style={[styles.progressBarFill, { width: `${progressPct}%` }]} />
                 </View>
-                <Text style={styles.pointsHint}>{pointsNeeded} more points of shared study, prayer, and mentoring to grow again.</Text>
+                <Text style={styles.pointsHint}>{requirements ? `${requirements.met} of ${requirements.total} requirements met for ${nextStage.name}.` : "See what the next milestone asks for in your growth journey."}</Text>
               </View>
             )}
           </View>
 
           {treeData && (
             <View style={styles.treeDataCard}>
-              <Text style={styles.treeStageLabel}>{stageLabel(treeData.growthStage)}</Text>
+              <Text style={styles.treeStageLabel}>{stage.emoji} {stage.name}</Text>
               <View style={styles.treeStatsRow}>
                 <Text style={styles.treeStatItem}>{treeData.fruitCount} fruit</Text>
                 <Text style={styles.treeStatDot}>·</Text>
@@ -455,7 +378,6 @@ export default function LivingTreeScreen() {
                   </View>
                 ))}
               </View>
-              <Text style={styles.tapHint}>Tap the roots, trunk, branches, canopy, or fruit to explore each one.</Text>
             </View>
           )}
 
@@ -543,11 +465,16 @@ const styles = StyleSheet.create({
   treeStageDesc: { fontSize: 12, color: colors.textMid, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 2, marginBottom: 10 },
   treeStageProgressBg: { width: "80%", height: 5, backgroundColor: colors.progressTrack, borderRadius: 3, overflow: "hidden", marginBottom: 12 },
   treeStageProgressFill: { height: 5, backgroundColor: colors.accentGreen, borderRadius: 3 },
-  treeSceneWrap: { alignItems: "center", justifyContent: "center" },
+  limitNote: { flexDirection: "row", gap: 6, alignItems: "flex-start", backgroundColor: "rgba(186,117,23,0.08)", borderRadius: 10, padding: 8, marginBottom: 10, alignSelf: "stretch" },
+  limitNoteText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", color: colors.textMid },
+  fruitSection: { alignSelf: "stretch", gap: 8 },
+  fruitHeading: { fontSize: 13, fontFamily: "Inter_700Bold", color: colors.textDark },
+  fruitEmpty: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.textMuted },
+  fruitChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  fruitChip: { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, justifyContent: "center", backgroundColor: colors.lightCream, borderWidth: 1, borderColor: colors.borderBeige },
+  fruitChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.textDark },
   accessibleToggle: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 12 },
   accessibleToggleText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_600SemiBold" },
-  environmentPickerWrap: { width: "100%", marginTop: 14 },
-  environmentPickerLabel: { fontSize: 11, fontWeight: "700", color: colors.textMuted, fontFamily: "Inter_700Bold", letterSpacing: 0.4, marginBottom: 6, textTransform: "uppercase" },
 
   back: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, marginLeft: 20, marginBottom: 8, alignSelf: "flex-start" },
   backLabel: { fontSize: 15, color: colors.primaryGreen, fontFamily: "Inter_500Medium" },
@@ -595,8 +522,6 @@ const styles = StyleSheet.create({
   pointsHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
 
   videoHero: { position: "relative", backgroundColor: "#0B0B0B", alignSelf: "center" },
-  videoHeroPlayer: { width: "100%", height: "100%" },
-  videoHeroFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.card },
   videoHeroLabel: {
     position: "absolute", bottom: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(0,0,0,0.48)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
@@ -627,7 +552,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(29,158,117,0.2)",
   },
   chipText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
-  tapHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", fontStyle: "italic" },
 
   forestHeader: { paddingHorizontal: 20 },
   stageBanner: {

@@ -81,8 +81,8 @@ export function InviteEncouragementCard({ modulesCompleted }: { modulesCompleted
   return (
     <View style={styles.card} accessibilityRole="summary">
       <View style={styles.headerRow}>
-        {/* The Sprout growth-stage photo — an existing asset, no new imagery. */}
-        <Image source={STAGE_IMAGES[1]} style={styles.image} resizeMode="cover" accessibilityIgnoresInvertColors />
+        {/* The Sprout growth-stage still (from its 3D model). */}
+        <Image source={STAGE_IMAGES[1]} style={styles.image} resizeMode="contain" accessibilityIgnoresInvertColors />
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{message.title} 🌱</Text>
           <Text style={styles.body}>{message.body}</Text>

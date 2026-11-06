@@ -1,11 +1,11 @@
+import { stageStillUrl } from "@/lib/growthModels";
+
 export type StageImageSource = { uri: string };
 
+// The five personal stages are stills of their 3D models (transparent background — show them with
+// resizeMode "contain"); Forest of Nations is the collective landscape scene.
 export const STAGE_IMAGES: StageImageSource[] = [
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Dormant%20Seed.jpg" },
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/sprout.jpg" },
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Young%20tree.jpg" },
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Fruitful%20tree.jpg" },
-  { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20Builder.jpeg" },
+  ...[0, 1, 2, 3, 4].map((i) => ({ uri: stageStillUrl(i)! })),
   { uri: "https://omkqkasniakcnmfcwrvs.supabase.co/storage/v1/object/public/Forests/Forest%20of%20nations.jpeg" },
 ];
 
