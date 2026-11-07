@@ -8,6 +8,7 @@ import discoverRouter from "./kingdomStoryDiscover";
 import { savesFor, libraryNotReady } from "../lib/kingdomStoryLibrary";
 import { chapterLearning, storiesProgress, lockChapter } from "../lib/kingdomStoryLearning";
 import { neighbours } from "../lib/kingdomStoryJourney";
+import { chapterNarration } from "../lib/storyNarration";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
 // Genuinely different authorization model from every other content route
@@ -287,6 +288,31 @@ router.post("/:id/chapters/:chapterId/finish", async (req, res) => {
     { onConflict: "user_id,lesson_id" });
   if (error) return err(res, error.code === "23514" ? "Complete the previous chapter first." : error.message, error.code === "23514" ? 403 : 500);
   return ok(res, { finished: true });
+});
+
+// A chapter's studio narration (lib/storyNarration), for its Listen button. Same access as the
+// chapter itself: a published story (or an editor), and a chapter the reader has opened — the
+// database's own rule (p2p_kingdom_story_chapter_open). { narration: null } when it has none.
+router.get("/:id/chapters/:chapterId/narration", async (req, res) => {
+  const userId = await verifyCaller(req);
+  if (!userId) return err(res, "Unauthorized", 401);
+  if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.chapterId)) return err(res, "Chapter not found", 404);
+  const [{ data: story }, editor] = await Promise.all([
+    db.from("p2p_kingdom_stories").select("id,status").eq("id", req.params.id).maybeSingle(),
+    isEditor(userId),
+  ]);
+  if (!story || (story.status !== "published" && !editor)) return err(res, "Chapter not found", 404);
+  const { data: ch } = await db.from("p2p_kingdom_story_chapters").select("id,lesson_id").eq("id", req.params.chapterId).eq("story_id", req.params.id).maybeSingle();
+  if (!ch) return err(res, "Chapter not found", 404);
+  if (!editor && ch.lesson_id) {
+    const { data: open } = await db.rpc("p2p_kingdom_story_chapter_open", { p_user_id: userId, p_lesson_id: ch.lesson_id });
+    if (open !== true) return ok(res, { narration: null });
+  }
+  try {
+    return ok(res, { narration: await chapterNarration(req.params.id, req.params.chapterId) });
+  } catch {
+    return ok(res, { narration: null }); // never block reading or the phone's voice
+  }
 });
 
 // Everything below requires an authorized editor (admin_content/super_admin).

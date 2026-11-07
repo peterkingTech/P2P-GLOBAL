@@ -11,6 +11,7 @@ import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL, chapterListenSections } from "@/lib/storybook";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState, type ListenContent } from "@/lib/listen";
+import { loadNarration, type RecordedNarration } from "@/lib/listen/narration";
 import { usePerfVisit } from "@/lib/perf";
 import { loadCached, peekCached, qk } from "@/lib/query";
 import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
@@ -163,8 +164,7 @@ export default function KingdomStoryChapterScreen() {
     // It plays directly (works after leaving this screen); if the chapter is still open here, the page follows.
     const link = (to: KingdomStoryChapter | undefined) => to && to.learning?.state !== "locked"
       ? { label: `Chapter ${to.chapterNumber}`, open: () => {
-          const next = listenContent(to);
-          if (next) void listen.play(next, "start", { present: listen.getState().presented });
+          void withNarration(to).then((next) => { if (next) void listen.play(next, "start", { present: listen.getState().presented }); });
           if (mounted.current) go(to);
         } } : null;
     const hasReflections = (target.learning?.reflectionQuestions?.length ?? 0) > 0 || target.reflections.length > 0;
@@ -186,6 +186,8 @@ export default function KingdomStoryChapterScreen() {
       subtitle: `Chapter ${target.chapterNumber}: ${target.title}`,
       // Kingdom Stories are written in English (no translated stories yet).
       language: "en",
+      // A studio recording when this chapter has one (the questions are still read by the phone's voice).
+      narration: narrations.current.get(target.id) ?? undefined,
       // The questions exactly as the chapter shows them (before activities are prepared: its own text).
       sections: chapterListenSections(target, {
         reflections: target.learning?.reflectionQuestions?.length ? target.learning.reflectionQuestions : target.reflections.map((q, k) => ({ id: `r${k}`, question: q })),
@@ -197,18 +199,35 @@ export default function KingdomStoryChapterScreen() {
       next: link(chapters[i + 1]),
     };
   };
+  // Studio narration (lib/listen/narration): loaded for this chapter and its neighbours as soon as
+  // they're open, so Listen and "next chapter" start in the narrator's voice. If it isn't there
+  // within a moment (or the chapter has none), the phone's voice reads as before.
+  const narrations = React.useRef(new Map<string, RecordedNarration | null>());
+  useEffect(() => {
+    if (!story) return;
+    for (const t of [prev, ch, next]) {
+      if (t && t.learning?.state !== "locked" && !narrations.current.has(t.id)) {
+        void loadNarration(story.id, t.id).then((n) => { narrations.current.set(t.id, n); });
+      }
+    }
+  }, [story?.id, ch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const withNarration = async (target: KingdomStoryChapter): Promise<ListenContent | null> => {
+    if (story && !narrations.current.has(target.id)) {
+      const n = await Promise.race([loadNarration(story.id, target.id), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      if (n) narrations.current.set(target.id, n);
+    }
+    return listenContent(target);
+  };
   useEffect(() => {
     if (!autoListen.current || !ch) return;
     autoListen.current = false;
-    const content = listenContent(ch);
-    if (content) void listen.play(content, "start");
+    void withNarration(ch).then((content) => { if (content) void listen.play(content, "start"); });
   }, [ch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const listeningHere = !!story && !!ch && listenState.content?.key === `story:${story.id}:${ch.id}` && listenState.status !== "idle";
   const onListen = () => {
     if (!ch) return;
     if (listeningHere) return listen.present();
-    const content = listenContent(ch);
-    if (content) void listen.play(content, "saved");
+    void withNarration(ch).then((content) => { if (content) void listen.play(content, "saved"); });
   };
 
   if (loading && !story) return <View style={[s.screen, s.center]}><Stack.Screen options={{ headerShown: false }} /><ActivityIndicator color={c.accentGreen} /></View>;

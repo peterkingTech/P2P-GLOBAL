@@ -24,7 +24,9 @@
     "test:minors": "node tests/minorSafeguards.test.mjs",
     "test:scripture-collections": "node tests/scriptureCollections.test.mjs",
     "test:bible-parser": "node tests/bibleParser.test.mjs",
-    "test:bible-providers": "node tests/bibleProviders.test.mjs"
+    "test:bible-providers": "node tests/bibleProviders.test.mjs",
+    "test:narration": "node tests/storyNarration.test.mjs",
+    "narrate": "node scripts/narrate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

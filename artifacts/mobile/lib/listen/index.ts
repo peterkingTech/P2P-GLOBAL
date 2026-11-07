@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { AppState, Platform } from "react-native";
-import { setAudioModeAsync } from "expo-audio";
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
+import { segmentFor, type RecordedNarration } from "./narration";
 import { getActiveGathering } from "@/lib/activeGathering";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -63,8 +64,78 @@ const deviceSpeech: SpeechDriver = {
   getVoices: async () => (await Speech.getAvailableVoicesAsync()).map((v) => ({ identifier: v.identifier, name: v.name, language: v.language, quality: String(v.quality) })),
 };
 
-/** The one shared player: the device's own voice, speaking straight from the text. */
-export const listen = createListenEngine(deviceSpeech, {
+// A studio recording (lib/listen/narration): each sentence plays its own stretch of the one file
+// (expo-audio), so the engine's sentence-by-sentence behaviour is unchanged. Consecutive sentences
+// play straight on without re-seeking (the engine stops and starts between sentences; the pause is
+// deferred one tick so the next sentence can simply continue). A sentence the recording doesn't
+// contain — or any failure — falls back to the phone's voice.
+let recPlayer: AudioPlayer | null = null;
+let recUrl = "";
+let recToken = 0;
+let recCursor = 0;
+let recPause: ReturnType<typeof setTimeout> | null = null;
+let recSub: { remove: () => void } | null = null;
+const recBroken = new Set<string>();
+const recordedNarration: SpeechDriver = {
+  speak(text, o) {
+    const n = o.narration as RecordedNarration | undefined;
+    const seg = n && o.source && !recBroken.has(n.url) ? segmentFor(n, o.source, recCursor) : null;
+    if (!n || !seg) { recStop(true); return deviceSpeech.speak(text, o); }
+    const token = ++recToken;
+    if (recPause) { clearTimeout(recPause); recPause = null; }
+    try {
+      if (!recPlayer || recUrl !== n.url) {
+        recStop(true);
+        recPlayer?.remove();
+        recPlayer = createAudioPlayer({ uri: n.url }, { updateInterval: 100 });
+        recUrl = n.url;
+        recCursor = 0;
+        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: !!o.background, interruptionMode: "doNotMix" }).catch(() => {});
+      }
+      const p = recPlayer;
+      recCursor = seg.lastWord + 1;
+      let done = false;
+      const finish = () => { if (done || token !== recToken) return; done = true; recSub?.remove(); recSub = null; o.onDone?.(); };
+      recSub?.remove();
+      recSub = p.addListener("playbackStatusUpdate", (s) => {
+        if (token !== recToken) return;
+        if (s.didJustFinish || s.currentTime >= seg.end - 0.02) finish();
+      });
+      // Carry straight on when the recording is already at this sentence (it just finished the one before).
+      const here = p.currentTime;
+      const contiguous = p.playing && here >= seg.start - 0.6 && here <= seg.start + 0.3;
+      p.setPlaybackRate(o.rate);
+      if (contiguous) p.play();
+      else p.seekTo(seg.start).then(() => { if (token === recToken) p.play(); }, () => { if (token === recToken) p.play(); });
+      // The recording can't be played (no connection, an expired link): this sentence — and the rest
+      // of this recording — goes to the phone's voice rather than silence.
+      setTimeout(() => {
+        if (done || token !== recToken || p.currentTime > seg.start + 0.05 || p.playing) return;
+        done = true; recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);
+      }, 6000);
+      // Never stuck: if status updates stop, move on after the segment's length (+ slack).
+      setTimeout(finish, ((seg.end - seg.start) / Math.max(0.5, o.rate)) * 1000 + 2500);
+    } catch {
+      recStop(true);
+      deviceSpeech.speak(text, o);
+    }
+  },
+  stop: () => { recStop(false); return deviceSpeech.stop(); },
+  capabilities: deviceSpeech.capabilities,
+  getVoices: deviceSpeech.getVoices,
+};
+function recStop(now: boolean) {
+  recToken++;
+  recSub?.remove(); recSub = null;
+  if (recPause) { clearTimeout(recPause); recPause = null; }
+  if (!recPlayer) return;
+  if (now) { try { recPlayer.pause(); } catch {} return; }
+  // Deferred: if the engine starts the next sentence straight away, it carries on without a gap.
+  recPause = setTimeout(() => { recPause = null; try { recPlayer?.pause(); } catch {} }, 0);
+}
+
+/** The one shared player: the device's own voice, or a chapter's studio recording when it has one. */
+export const listen = createListenEngine(recordedNarration, {
   get: (k) => AsyncStorage.getItem(k),
   set: (k, v) => AsyncStorage.setItem(k, v),
   remove: (k) => AsyncStorage.removeItem(k),

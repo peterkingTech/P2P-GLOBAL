@@ -166,8 +166,13 @@ ok("a reminder tap goes only to approved places (the real regex from lib/push.ts
 
 // ── Source checks ───────────────────────────────────────────────────────────
 const index = src("lib/listen/index.ts"), session = src("lib/listen/playlistSession.ts"), engineSrc = src("lib/listen/engine.ts");
-ok("one player: the shared engine speaks with the device voice directly; nothing else creates a speech engine", index.includes("export const listen = createListenEngine(deviceSpeech, {") && !/createListenEngine\(/.test(session) && !/createAudioPlayer/.test(session));
-ok("device speech speaks straight from the text (expo-speech), never via audio files", /Speech\.speak\(text, \{/.test(index) && !/synthesize|\.caf\b|FileSystem|createAudioPlayer|fileSpeech/.test(index));
+// 2026-11-07: Kingdom Stories chapters may have a studio recording (made on the server, lib/listen/narration);
+// the one engine plays it through a driver whose every fallback is the device voice. Device speech itself
+// is still spoken straight from the text — nothing on the phone ever turns speech into an audio file.
+ok("one player: the shared engine — device voice, or a server-made studio recording falling back to it; nothing else creates a speech engine",
+  index.includes("export const listen = createListenEngine(recordedNarration, {") && index.includes("return deviceSpeech.speak(text, o);") && !/createListenEngine\(/.test(session) && !/createAudioPlayer/.test(session));
+ok("device speech speaks straight from the text (expo-speech), never via audio files made on the phone", /Speech\.speak\(text, \{/.test(index) && !/synthesize|\.caf\b|FileSystem|fileSpeech/.test(index)
+  && (index.match(/createAudioPlayer\(/g) ?? []).length === 1 && index.includes("createAudioPlayer({ uri: n.url }"));
 ok("the audio-file pipeline is gone: no file driver, no speech-to-file native module", !existsSync(path.join(root, "lib/listen/fileSpeech.ts")) && !existsSync(path.join(root, "modules/p2p-speech-audio")));
 ok("the engine has no sentence preparation, Now Playing or lock-screen button hooks (no misleading controls)", !/prepare\?\(|nowPlaying|setRemote|RemoteControls|publishNowPlaying/.test(engineSrc));
 ok("nothing auto-plays after a restart: resume is only ever a tap", !/AppState|useEffect\([^)]*resumePlaylist/.test(session) && src("app/library/index.tsx").includes("onPress={() => resume(continueItem.id)}"));

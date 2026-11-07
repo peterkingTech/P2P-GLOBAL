@@ -1,0 +1,3 @@
+# Generated audio: the cache (never regenerate) and the finished files (they go to Supabase Storage).
+.cache/
+out/

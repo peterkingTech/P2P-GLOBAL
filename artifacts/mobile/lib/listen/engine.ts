@@ -1,8 +1,9 @@
 // Listen: the ONE shared player behind every "Listen" button (Bible,
 // Kingdom Stories, Kingdom School / Core Curriculum, Learning Plans) and the
 // P2P Global Read & Listen screen. The phone's own speech voice reads the text
-// the screen already shows — no recorded files, no paid or AI voices, nothing
-// generated server-side.
+// the screen already shows. The one exception: content with a studio recording
+// (`narration`, Kingdom Stories — lib/listen/narration) plays each sentence from
+// that recording instead; everything else is still the phone's voice.
 //
 // Guarantees:
 //  • one speech session at a time — every utterance carries a generation
@@ -43,6 +44,10 @@ export interface SpeakOptions {
   background?: boolean;
   onStart?: () => void; onDone?: () => void; onStopped?: () => void;
   onError?: (e: Error) => void; onBoundary?: (e: { charIndex: number }) => void;
+  /** The chunk exactly as displayed (before speech preparation) — lets a recording find it. */
+  source?: string;
+  /** The content's recorded narration, when it has one (opaque here; see lib/listen/narration). */
+  narration?: unknown;
 }
 /** What a narration source can honestly report. */
 export interface NarrationCapabilities {
@@ -107,6 +112,8 @@ export interface ListenContent {
   resumeGroup?: string;
   /** Bible: { t, book, chapter, lastChapter } — lastChapter = the book's final chapter. */
   meta?: Record<string, string | number>;
+  /** A studio recording of this content (Kingdom Stories); sentences it doesn't contain use the phone's voice. */
+  narration?: unknown;
 }
 /** Bible: what happens when a chapter finishes (separate from Auto Listen Again). */
 export type BibleContinue = "stop" | "again" | "next";
@@ -241,6 +248,8 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
         voice: state.voice.voice ?? undefined,
         rate: state.rate,
         background: prefs.background,
+        source: content.sections[c.section]?.parts[c.part]?.text.slice(c.start, c.end),
+        narration: content.narration,
         onBoundary: (e) => { if (g === gen && typeof e?.charIndex === "number") boundary = spokenFrom + e.charIndex; },
         onDone: () => { if (g === gen) advance(); },
         onError: (e) => { if (g === gen) fail("speech", `Listening stopped: ${e?.message || "the speech engine reported a problem"}.`); },

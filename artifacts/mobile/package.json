@@ -52,7 +52,7 @@
     "test:home": "node tests/homeSimplification.test.mjs",
     "test:learning-centre": "node tests/learningCentre.test.mjs",
     "test:handwriting": "node tests/handwriting.test.mjs",
-    "test:listen": "node tests/listen.test.mjs",
+    "test:listen": "node tests/listen.test.mjs && node tests/narration.test.mjs",
     "test:content-loading": "node tests/contentLoading.test.mjs",
     "test:scripture-library": "node tests/scriptureLibrary.test.mjs",
     "test:scripture-listening": "node tests/scriptureListening.test.mjs",

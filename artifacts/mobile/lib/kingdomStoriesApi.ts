@@ -285,6 +285,11 @@ export function getKingdomStoriesFeed(opts: { category?: string; featured?: bool
 export function getKingdomStory(id: string): Promise<KingdomStory> {
   return authedFetch(`/kingdom-stories/${id}`);
 }
+/** A chapter's studio narration (ElevenLabs), or null — then Listen uses the phone's voice. */
+export interface ChapterNarrationData { url: string; voice: string; model: string; createdAt: string; words: string; starts: number[]; ends: number[] }
+export function getChapterNarration(storyId: string, chapterId: string): Promise<{ narration: ChapterNarrationData | null }> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}/narration`);
+}
 
 // ── Admin (admin_content / super_admin only) ────────────────────────────────
 export function getKingdomStoriesAdminList(status?: KingdomStoryStatus): Promise<KingdomStory[]> {
