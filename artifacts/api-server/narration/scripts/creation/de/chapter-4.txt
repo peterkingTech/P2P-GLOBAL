@@ -1,0 +1,100 @@
+### story
+[warmly] Die Schöpfung: Der Anfang von allem.
+### title
+[cheerfully] Kapitel 4: Die lebendige Welt.
+### p0
+[calm, storytelling] Die Welt hatte durch Gottes schöpferisches Wirken Gestalt angenommen. Der Himmel spannte sich über die Erde, die Meere hatten sich an ihren bestimmten Orten gesammelt, das Land brachte Pflanzen hervor, und die Himmelslichter kennzeichneten Tag, Nacht, Zeiten und Jahre.
+### p1
+[curious, building anticipation] Nun wandte sich der Schöpfungsbericht dem Erscheinen der Tierwelt zu.
+### p2
+[dramatic pause] [hushed] Gott sprach erneut.
+### p3
+[commanding, powerful and reverent] Er gebot den Wassern, von lebendigen Wesen zu WIMMELN — [excited] und den Vögeln, über der Erde unter der Feste des Himmels zu fliegen!
+### p4
+[full of wonder] Die Wasser, die sich zu Meeren gesammelt hatten, sollten bald von Leben erfüllt sein. Der Himmel über der Erde sollte nicht mehr nur als Feste beschrieben werden, die die Wasser scheidet. [cheerfully] Er sollte zum Raum werden, durch den die Vögel fliegen.
+### p5
+[awed] Gott schuf die großen Meerestiere und alles Lebendige, das sich im Wasser regte, jedes nach seiner Art. [warmly] Er schuf auch alle gefiederten Vögel, jeden nach seiner Art.
+### p6
+[excited] Die Meere waren voller Lebewesen, und der Himmel war voller Vögel!
+### p7
+[full of wonder] Der Schöpfungsbericht beschreibt eine Fülle von Leben, das in den Lebensräumen erscheint, die Gott geschaffen hatte. Die Wasser waren nicht mehr nur Gewässer, und der Himmel war keine leere Weite mehr. [happy] Beide wurden zu Orten, die von Lebewesen bewohnt waren.
+### p8
+[happy] Gott sah, dass es gut war.
+### p9
+[tenderly] Dann segnete Gott die Meerestiere und die Vögel. [warmly] Er gebot ihnen, fruchtbar zu sein und sich zu mehren, die Wasser in den Meeren zu füllen, und die Vögel sollten sich auf der Erde mehren.
+### p10
+[thoughtful] Das Leben erschien nicht nur; ihm wurde auch die Fähigkeit geschenkt, sich zu VERMEHREN.
+### p11
+[calm] Die Wasser würden Generationen von Lebewesen beherbergen, und die Vögel würden weiterhin den Himmel füllen. [reverent] Der Segen Gottes begleitete den Beginn dieser Fülle.
+### p12
+[gently] Es wurde Abend, und es wurde Morgen. Der fünfte Tag war vollendet.
+### p13
+[curious] Dann wandte sich der Schöpfungsbericht dem sechsten Tag zu.
+### p14
+[commanding, reverent] Gott gebot der Erde, lebendige Wesen hervorzubringen, jedes nach seiner Art: [cheerfully] Vieh, Kriechtiere und wilde Tiere, jedes nach seiner Art.
+### p15
+[awed] Die Erde brachte die Tiere hervor, wie Gott es geboten hatte.
+### p16
+[playful] Das Land, das bereits Pflanzen und Bäume hervorgebracht hatte, wurde nun zur Heimat vieler verschiedener Lebewesen. [giggles] Tiere bewegten sich über den Boden, Vieh bevölkerte das Land — und wilde Tiere erschienen, jedes nach seiner Art.
+### p17
+[cheerfully] Der Bericht betont die Vielfalt der Tierwelt, die Gott schuf. Die Meere hatten ihre Lebewesen, der Himmel hatte seine Vögel, und das Land hatte seine Tiere.
+### p18
+[happy] Gott sah, dass es gut war.
+### p19
+[warmly] Die Welt füllte sich immer mehr mit Leben. Jeder Lebensraum hatte seinen Platz in dem sich entfaltenden Schöpfungsbericht, und die Lebewesen gehörten zu der Ordnung, die Gott festgelegt hatte.
+### p20
+[slowly, painting the picture] Die Wasser bargen ihre Fülle. Die Vögel zogen durch den Himmel. Die Tiere bevölkerten das Land.
+### p21
+[sincerely] Der Schöpfungsbericht stellt diese Lebewesen nicht als bedeutungslose Zugaben zu einer leeren Welt dar. Sie sind Teil des Werkes, das Gott vollbrachte und gut nannte.
+### p22
+[calm] Der fünfte Tag hatte Leben in die Wasser und an den Himmel gebracht. Der sechste Tag begann mit dem Erscheinen der Tiere auf dem Land.
+### p23
+[hushed, building anticipation] Doch der sechste Tag war noch nicht vorüber. [dramatic pause] [awed] Der Schöpfungsbericht stand kurz vor einem seiner bedeutsamsten Momente: der Erschaffung des Menschen nach dem Bild Gottes.
+### p24
+[breathes in] [gently] Zum Nachdenken: Bedenke die Vielfalt des Lebens auf der ganzen Welt. [cheerfully] Fische schwimmen durch die Wasser, Vögel fliegen durch den Himmel, und Tiere ziehen über das Land.
+### p25
+[warmly] Der Schöpfungsbericht stellt diese Vielfalt als Teil von Gottes Werk dar.
+### p26
+[calm] Das Kapitel lädt uns ein, den Reichtum der lebendigen Welt wertzuschätzen. Die Lebewesen des Meeres, die Vögel des Himmels und die Tiere des Landes werden nicht als getrennt vom Ziel der Schöpfung beschrieben. [warmly] Sie gehören zu der Welt, die Gott formte und gut nannte.
+### p27
+[tenderly] Gottes Segen über die Meerestiere und Vögel unterstreicht auch die Bedeutung der Fruchtbarkeit. Dem Leben wird die Fähigkeit geschenkt, sich zu mehren und fortzubestehen.
+### p28
+[thoughtful] Dieser Abschnitt kann uns ermutigen, sorgfältig darüber nachzudenken, wie wir mit der lebendigen Welt um uns herum umgehen. [sincerely] Wenn der Schöpfungsbericht Lebewesen als Teil von Gottes gutem Werk darstellt, dann sollten sie nicht achtlos oder gedankenlos behandelt werden.
+### p29
+[softly, building anticipation] Das Kapitel bereitet uns auch auf die Erschaffung des Menschen vor. Bevor Menschen in der Erzählung erscheinen, beschreibt der Bericht eine Welt, die bereits von vielfältigem Leben erfüllt ist.
+### lessons
+[warmly] Lektionen aus der Geschichte.
+### lesson0
+[reverent] Lektion 1. Gott ist der Schöpfer der Tierwelt. Der Bericht schreibt die Erschaffung der Meerestiere, Vögel und Landtiere Gott zu. Lebewesen werden als Teil Seines schöpferischen Wirkens dargestellt.
+### lesson1
+[cheerfully] Lektion 2. Die Schöpfung birgt große Vielfalt. Das Kapitel beschreibt Lebewesen im Wasser, Vögel am Himmel und Tiere auf dem Land. [warmly] Diese Vielfalt zeigt den Reichtum der Welt, die der Schöpfungsbericht darstellt.
+### lesson2
+[warmly] Lektion 3. Gott nennt Seine Schöpfung gut. Nachdem Er die Meerestiere, Vögel und Landtiere geschaffen hat, sieht Gott, dass Sein Werk gut ist. Der Bericht stellt die Schöpfung durchgehend als etwas dar, das Ihm wertvoll ist.
+### lesson3
+[tenderly] Lektion 4. Gottes Segen schließt Fruchtbarkeit ein. Gott segnet die Meerestiere und Vögel und gebietet ihnen, sich zu mehren. Das Fortbestehen und die Fülle des Lebens gehören zu dem Ziel, das der Abschnitt beschreibt.
+### lesson4
+[calm] Lektion 5. Lebewesen haben einen Platz in Gottes Schöpfung. Die Tiere bewohnen die Lebensräume, die Gott geschaffen hat. Die Wasser, der Himmel und das Land sind von verschiedenen Arten von Lebewesen erfüllt, und jedes gehört zur größeren Ordnung der Schöpfung.
+### reflection:label
+[gently] Persönliche Reflexionen.
+### reflection:a5cc898c-be46-42b6-b265-98d92e4e4964
+[curious] Frage 1. Was lehrt dich die Vielfalt der Meerestiere, Vögel und Landtiere über Gottes Schöpfung?
+### reflection:1a81286d-8620-4f46-9aee-1c725ac5b969
+[thoughtful] Frage 2. Warum betont der Schöpfungsbericht wohl immer wieder, dass Gott sah, dass Sein Werk gut war?
+### reflection:d3f4e07e-d842-474d-8773-adfd69ef56fd
+[gently] Frage 3. Welche Bedeutung hat Gottes Segen über die Meerestiere und Vögel?
+### reflection:5fa06986-7364-4393-b669-eb2505a8acc7
+[sincerely] Frage 4. Wie kannst du den Tieren und ihren Lebensräumen mehr Wertschätzung und Verantwortung entgegenbringen?
+### reflection:15796f88-1222-4e0f-bc15-6460338978b3
+[warmly] Frage 5. Was lehrt dich dieses Kapitel über den Platz der Lebewesen in der größeren Schöpfungsgeschichte?
+### check:label
+[calm, clear] Umfassende Lernkontrolle.
+### check:13e650d1-ae87-435a-a4a5-59fb5153e577
+[calm, clear] Frage 1. 1. Was gebot Gott den Wassern hervorzubringen, und was sollte nach Seinem Gebot unter dem Himmel fliegen?
+
+2. Welche Arten von Lebewesen schuf Gott in den Meeren und am Himmel, und welchen Segen gab Er ihnen?
+
+3. Welche Gruppen von Landtieren werden in 1. Mose 1,24–25 genannt?
+
+4. [curious] Was zeigt Gottes Aussage, dass Sein Werk gut war, darüber, wie der Schöpfungsbericht die Lebewesen darstellt?
+
+5. [warmly] Nenne zwei Lektionen aus diesem Kapitel und erkläre, wie eine davon dein Handeln gegenüber der Natur leiten kann.

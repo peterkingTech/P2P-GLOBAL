@@ -17,41 +17,47 @@ export interface ChapterNarration {
   /** The recording's words, normalised, space separated; starts/ends in centiseconds. */
   words: string; starts: number[]; ends: number[];
 }
-interface Manifest { version: number; storyId: string; chapterId: string; voice: { id: string; name: string }; model: string; file: string; createdAt: string; words: string; starts: number[]; ends: number[] }
+interface Manifest { version: number; storyId: string; chapterId: string; language?: string; voice: { id: string; name: string }; model: string; file: string; createdAt: string; words: string; starts: number[]; ends: number[] }
 
 const BUCKET = "kingdom-stories-media";
 const TTL_MS = 5 * 60_000, SIGNED_SECONDS = 6 * 3600;
-const cache = new Map<string, { at: number; manifest: Manifest | null }>();
+const cache = new Map<string, { at: number; manifest: Manifest | null; dir?: string }>();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function manifestFor(storyId: string, chapterId: string): Promise<Manifest | null> {
-  const key = `${storyId}/${chapterId}`;
+// Files live under narration/<lang>/; the first English upload sits directly in narration/ (still read).
+async function manifestFor(storyId: string, chapterId: string, lang: string): Promise<{ m: Manifest; dir: string } | null> {
+  const key = `${storyId}/${lang}/${chapterId}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.manifest;
-  let manifest: Manifest | null = null;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.manifest ? { m: hit.manifest, dir: hit.dir! } : null;
+  const dirs = lang === "en" ? [`${lang}/`, ""] : [`${lang}/`];
+  let found: { m: Manifest; dir: string } | null = null;
   const localDir = process.env.NARRATION_LOCAL_DIR;
-  if (localDir) {
-    const f = path.join(localDir, storyId, `${chapterId}.json`);
-    if (existsSync(f)) manifest = JSON.parse(readFileSync(f, "utf8")) as Manifest;
-  } else {
-    const { data } = await db.storage.from(BUCKET).download(`${storyId}/narration/${chapterId}.json`);
-    if (data) manifest = JSON.parse(await data.text()) as Manifest;
+  for (const dir of dirs) {
+    let m: Manifest | null = null;
+    if (localDir) {
+      const f = path.join(localDir, storyId, dir, `${chapterId}.json`);
+      if (existsSync(f)) m = JSON.parse(readFileSync(f, "utf8")) as Manifest;
+    } else {
+      const { data } = await db.storage.from(BUCKET).download(`${storyId}/narration/${dir}${chapterId}.json`);
+      if (data) m = JSON.parse(await data.text()) as Manifest;
+    }
+    if (m && m.storyId === storyId && m.chapterId === chapterId && (m.language ?? "en") === lang) { found = { m, dir }; break; }
   }
-  if (manifest && (manifest.storyId !== storyId || manifest.chapterId !== chapterId)) manifest = null;
-  cache.set(key, { at: Date.now(), manifest });
-  return manifest;
+  cache.set(key, { at: Date.now(), manifest: found?.m ?? null, dir: found?.dir });
+  return found;
 }
 
-/** A chapter's narration with a playable link, or null when it has none. */
-export async function chapterNarration(storyId: string, chapterId: string): Promise<ChapterNarration | null> {
-  if (!UUID.test(storyId) || !UUID.test(chapterId)) return null;
-  const m = await manifestFor(storyId, chapterId);
-  if (!m) return null;
+/** A chapter's narration in `lang` (ISO 639-1) with a playable link, or null when it has none. */
+export async function chapterNarration(storyId: string, chapterId: string, lang = "en"): Promise<ChapterNarration | null> {
+  if (!UUID.test(storyId) || !UUID.test(chapterId) || !/^[a-z]{2,3}$/.test(lang)) return null;
+  const found = await manifestFor(storyId, chapterId, lang);
+  if (!found) return null;
+  const { m, dir } = found;
   let url: string | null = null;
   const localBase = process.env.NARRATION_LOCAL_BASE_URL;
-  if (process.env.NARRATION_LOCAL_DIR && localBase) url = `${localBase.replace(/\/$/, "")}/${storyId}/${m.file}`;
+  if (process.env.NARRATION_LOCAL_DIR && localBase) url = `${localBase.replace(/\/$/, "")}/${storyId}/${dir}${m.file}`;
   else {
-    const { data } = await db.storage.from(BUCKET).createSignedUrl(`${storyId}/narration/${m.file}`, SIGNED_SECONDS);
+    const { data } = await db.storage.from(BUCKET).createSignedUrl(`${storyId}/narration/${dir}${m.file}`, SIGNED_SECONDS);
     url = data?.signedUrl ?? null;
   }
   if (!url) return null;

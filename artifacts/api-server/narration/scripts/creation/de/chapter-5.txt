@@ -1,0 +1,104 @@
+### story
+[warmly] Die Schöpfung: Der Anfang von allem.
+### title
+[reverent] Kapitel 5: Der Mensch als Bild Gottes.
+### p0
+[calm, storytelling] Die Welt nahm Gestalt an, während Gott Sein Schöpfungswerk fortsetzte.
+### p1
+[calm] Das Licht war von der Finsternis geschieden. Himmel, Land und Meere waren errichtet. [warmly] Pflanzen bedeckten das Land, die Himmelslichter kennzeichneten den Lauf der Zeit, und Lebewesen erfüllten die Wasser, den Himmel und das Land.
+### p2
+[hushed, building anticipation] Dann erreichte der Schöpfungsbericht einen bemerkenswerten Moment.
+### p3
+[dramatic pause] [reverent, deep and powerful] Gott sprach: „Lasst uns Menschen machen nach unserem Bild... uns ähnlich.“
+### p4
+[awed] Diese Worte markierten einen bedeutsamen Punkt in der sich entfaltenden Geschichte. Der Bericht hatte bereits die Erschaffung der natürlichen Welt und das Erscheinen der Tierwelt beschrieben. [softly] Nun wandte er sich dem Menschen zu.
+### p5
+[reverent] Gott erklärte, dass die Menschen nach Seinem Bild und Ihm ähnlich gemacht würden. [calm, confident] Er bestimmte auch, dass sie herrschen sollten über die Fische im Meer, die Vögel am Himmel, das Vieh, die wilden Tiere und die Kriechtiere, die sich auf der Erde regen.
+### p6
+[warmly] Der Mensch sollte einen besonderen Platz in der Welt haben, die Gott geschaffen hatte.
+### p7
+[hushed] Dann berichtet der Text, wie Gottes Wort sich erfüllte.
+### p8
+[slowly, reverent] Gott schuf den Menschen nach Seinem Bild. [awed] Nach dem Bild Gottes schuf Er ihn; [tenderly] als Mann und Frau schuf Er sie.
+### p9
+[sincerely] Der Mensch wurde nicht als zufällige Zugabe zur Schöpfung dargestellt. Der Bericht verbindet das menschliche Dasein unmittelbar mit Gottes bewusstem Schöpfungswirken... und nennt das Bild Gottes als ein prägendes Merkmal des Menschen.
+### p10
+[tenderly] Nachdem Gott die Menschen geschaffen hatte, segnete Er sie.
+### p11
+[warmly] Er gebot ihnen, fruchtbar zu sein und sich zu mehren, die Erde zu füllen und sie sich untertan zu machen. [calm, confident] Er vertraute ihnen die Herrschaft an über die Fische im Meer, die Vögel am Himmel und alle Lebewesen, die sich auf der Erde regen.
+### p12
+[thoughtful] Der Mensch empfing sowohl einen Segen ALS AUCH eine Verantwortung.
+### p13
+[calm] Die Erde sollte mit menschlichem Leben erfüllt werden, und den Menschen wurde Autorität über die anderen Lebewesen anvertraut. [gently] Ihr Platz in der Schöpfung war besonders, doch er war auch mit einem Auftrag verbunden.
+### p14
+[warmly] Dann sprach Gott über die Nahrung.
+### p15
+[cheerfully] Er gab den Menschen alle samentragenden Pflanzen auf der ganzen Erde und alle Bäume mit samentragenden Früchten. Sie wurden ihnen zur Nahrung gegeben.
+### p16
+[tenderly] Gott gab auch den Tieren der Erde, den Vögeln am Himmel und den Kriechtieren auf dem Boden grüne Pflanzen — allem, was den Atem des Lebens hatte.
+### p17
+[warmly] Der Schöpfungsbericht stellt die Welt deshalb als einen Ort dar, an dem Gott für die Bedürfnisse des Lebens gesorgt hatte, das Er geschaffen hatte.
+### p18
+[calm] Die Pflanzen und Bäume, die früher in der Geschichte erschienen waren, wurden nun Teil der Versorgung, die für Menschen und Tiere beschrieben wird.
+### p19
+[dramatic pause] [softly] Gott sah alles an, was Er gemacht hatte.
+### p20
+[building anticipation] Diesmal sagt der Bericht nicht nur, dass ein einzelner Teil der Schöpfung gut war. [excited, joyful] Er erklärt, dass Gott alles sah, was Er gemacht hatte — und siehe, es war SEHR gut!
+### p21
+[full of wonder] Das Land, die Meere, der Himmel, die Pflanzen, die Himmelslichter, die Tiere und die Menschen gehörten alle zu dem vollendeten Werk, das der Abschnitt beschreibt.
+### p22
+[reverent] Die Erschaffung des Menschen war ein entscheidender Moment in diesem Bericht. [warmly] Die Menschen wurden nach Gottes Bild gemacht, von Ihm gesegnet, versorgt und mit Verantwortung für die Erde betraut.
+### p23
+[calm] Die Welt war nicht mehr nur ein Ort, der für das Leben vorbereitet war. [happy] Sie war nun bewohnt von den Menschen, den Lebewesen und allem anderen, was Gott in Seiner Schöpfung geformt hatte.
+### p24
+[calm, storytelling] Der sechste Tag brachte die Erschaffung der Landtiere und des Menschen. Mit der Erschaffung des Menschen erreichte der Bericht seine Aussage, dass alles, was Gott gemacht hatte, sehr gut war.
+### p25
+[softly, building anticipation] Das Werk der Schöpfung war fast vollendet. Ein letzter Tag blieb noch... [hushed] und er sollte einen weiteren wichtigen Teil von Gottes Ordnung für die Schöpfung offenbaren: den siebten Tag der Ruhe.
+### p26
+[breathes in] [gently] Zum Nachdenken: Die Erschaffung des Menschen bringt eine tiefe Wahrheit in die biblische Geschichte: [reverent] Der Mensch ist nach dem Bild Gottes und Ihm ähnlich geschaffen.
+### p27
+[warmly] Das gibt dem Bericht einen besonderen Schwerpunkt. Der Mensch ist von Gott geschaffen, von Ihm gesegnet und mit Aufgaben in der Welt betraut, die Er gemacht hat.
+### p28
+[thoughtful] Der Abschnitt lädt uns ein, darüber nachzudenken, wie wir uns selbst sehen und wie wir mit anderen Menschen umgehen. [sincerely] Wenn der Mensch als nach Gottes Bild geschaffen beschrieben wird, dann darf menschliches Leben NICHT als bedeutungslos oder wertlos angesehen werden.
+### p29
+[calm] Auch die Verantwortung, die dem Menschen gegeben wurde, verdient sorgfältiges Nachdenken. Die Herrschaft über die Erde wird nicht bloß als Vorrecht dargestellt. [gently] Sie ist mit dem Auftrag verbunden, die Welt, die Gott geschaffen hat, zu bewohnen und zu verwalten.
+### p30
+[warmly] Der Abschnitt erinnert uns außerdem daran, dass Versorgung Teil der Geschichte ist. Gott gibt den Menschen Pflanzen und fruchttragende Bäume und den Tieren grüne Pflanzen.
+### p31
+[softly] Schließlich lädt uns Gottes Aussage, dass alles, was Er gemacht hatte, sehr gut war, ein, die Schöpfung als Ganzes zu betrachten. [tenderly] Der Mensch hat eine besondere Rolle, doch er bleibt Teil der größeren Welt, die Gott geformt hat.
+### lessons
+[warmly] Lektionen aus der Geschichte.
+### lesson0
+[reverent] Lektion 1. Jeder Mensch hat einen besonderen Platz in der Schöpfung. Die Genesis beschreibt den Menschen als nach dem Bild Gottes und Ihm ähnlich geschaffen. Das begründet eine einzigartige Identität des Menschen im Schöpfungsbericht.
+### lesson1
+[calm] Lektion 2. Menschliches Leben wird als Werk Gottes dargestellt. Der Bericht verbindet das Dasein des Menschen unmittelbar mit Gottes schöpferischem Handeln. [gently] Menschen werden nicht als selbst erschaffen beschrieben, sondern als von Gott gemacht.
+### lesson2
+[calm, confident] Lektion 3. Autorität bringt Verantwortung mit sich. Gott gibt dem Menschen die Herrschaft über andere Lebewesen und gebietet ihm, sich die Erde untertan zu machen. [sincerely] Diese Autorität sollte zusammen mit der Verantwortung verstanden werden, die dem Menschen in der Schöpfung anvertraut ist.
+### lesson3
+[warmly] Lektion 4. Gottes Versorgung gehört zur Schöpfungsgeschichte. Gott gibt den Menschen Pflanzen und fruchttragende Bäume und den Tieren grüne Pflanzen. Der Bericht betont, dass die Welt Versorgung für das Leben bereithält, das Gott geschaffen hat.
+### lesson4
+[joyful] Lektion 5. Gott nennt die vollendete Schöpfung sehr gut. Nachdem Er den Menschen geschaffen und alles betrachtet hat, was Er gemacht hatte, nennt Gott die ganze Schöpfung sehr gut. [warmly] Der Bericht stellt den Menschen als Teil des größeren Werkes dar, das Gott vollendet hat, und nicht als eine isolierte Schöpfung, getrennt vom Rest der Welt.
+### reflection:label
+[gently] Persönliche Reflexionen.
+### reflection:efac096f-aec1-436e-883d-91f280d07723
+[tenderly] Frage 1. Was bedeutet es DIR, dass der Mensch nach dem Bild Gottes und Ihm ähnlich geschaffen wurde?
+### reflection:5bf0f4f7-3b30-4083-8a16-2a3d9b8ba838
+[sincerely] Frage 2. Wie sollte die biblische Beschreibung des Menschen die Art prägen, wie wir mit anderen Menschen umgehen?
+### reflection:82b14676-fdcf-467b-9ff3-e49d95c0a9c4
+[thoughtful] Frage 3. Welche Verantwortung geht deiner Meinung nach mit der Autorität einher, die Gott dem Menschen über die Erde anvertraut hat?
+### reflection:25894b0e-e16b-4659-85f2-3f0fc829faf6
+[curious] Frage 4. Wie trägt Gottes Versorgung mit Nahrung für Menschen und Tiere zu deinem Verständnis des Schöpfungsberichts bei?
+### reflection:da5f1c13-863b-43df-ad5e-2523814a3df5
+[warmly] Frage 5. Was lehrt dich Gottes Aussage, dass alles, was Er gemacht hatte, sehr gut war, über den Wert Seiner vollendeten Schöpfung?
+### check:label
+[calm, clear] Umfassende Lernkontrolle.
+### check:40b94f2c-114c-4d6f-80eb-1e8ebe769fd2
+[calm, clear] Frage 1. 1. Was sagte Gott über die Erschaffung des Menschen, und was bedeutet das im Zusammenhang des Abschnitts?
+
+2. Welche Aufgaben und Segnungen gab Gott den Menschen, nachdem Er sie als Mann und Frau geschaffen hatte?
+
+3. Was gab Gott den Menschen zur Nahrung, und was gab Er den Tieren?
+
+4. [curious] Wie unterscheidet sich Gottes Aussage, dass alles, was Er gemacht hatte, sehr gut war, von den früheren Aussagen, dass einzelne Teile der Schöpfung gut waren?
+
+5. [warmly] Erkläre zwei Lektionen aus diesem Kapitel und beschreibe einen praktischen Weg, eine davon in deinen Beziehungen oder Aufgaben anzuwenden.

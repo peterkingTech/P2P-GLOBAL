@@ -33,6 +33,13 @@ const onlyChapters = arg("--chapters")?.split(",").map(Number) ?? null;
 const upload = process.argv.includes("--upload");
 const dryRun = process.argv.includes("--dry-run");
 const config = JSON.parse(readFileSync(path.join(API, "narration/config.json"), "utf8"));
+// Language: scripts in <story>/<lang>/, one narrator per language, files under …/narration/<lang>/.
+// English scripts carry the screen's own words (checked word for word); other languages are cached,
+// reviewed translations of every part (checked for completeness) — never retranslated.
+const lang = arg("--lang") ?? "en";
+const L = config.languages[lang];
+if (!L) throw new Error(`no narrator configured for language "${lang}" (narration/config.json)`);
+const voice = L.voice;
 const CACHE = path.join(API, "narration/.cache");
 mkdirSync(CACHE, { recursive: true });
 
@@ -110,6 +117,9 @@ function checkScript(chapter, script) {
       problems.push(`words differ in ${p.key} near "…${a.slice(Math.max(0, i - 25), i + 25)}…" vs "…${b.slice(Math.max(0, i - 25), i + 25)}…"`);
     }
   }
+  if (lang !== "en") return problems.filter((x) => x.startsWith("missing")).concat(
+    [...script].filter(([, t]) => !t.replace(TAG, "").trim()).map(([k]) => `empty translation for ${k}`),
+    [...script.keys()].filter((k) => !chapter.sections.some((s) => s.parts.some((p) => p.key === k))).map((k) => `script has an unknown part ${k} (the chapter changed?)`));
   const known = new Set(chapter.sections.flatMap((s) => s.parts.map((p) => p.key)));
   for (const k of script.keys()) if (!known.has(k)) problems.push(`script has an unknown part ${k} (the chapter changed?)`);
   return problems;
@@ -118,11 +128,11 @@ function checkScript(chapter, script) {
 // ── ElevenLabs ─────────────────────────────────────────────────────────────
 let contextSupported = true;
 async function tts(text, previousText) {
-  const body = { text, model_id: config.modelId, language_code: config.languageCode, voice_settings: config.voiceSettings };
-  const key = createHash("sha256").update(JSON.stringify({ body, voice: config.voice.id, format: config.outputFormat, previousText: previousText ?? null })).digest("hex");
+  const body = { text, model_id: config.modelId, language_code: lang, voice_settings: config.voiceSettings };
+  const key = createHash("sha256").update(JSON.stringify({ body, voice: voice.id, format: config.outputFormat, previousText: previousText ?? null })).digest("hex");
   const file = path.join(CACHE, `${key}.mp3`);
   if (existsSync(file)) return { audio: readFileSync(file), cached: true };
-  const call = (withContext) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${config.voice.id}?output_format=${config.outputFormat}`, {
+  const call = (withContext) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice.id}?output_format=${config.outputFormat}`, {
     method: "POST", headers: { "xi-api-key": XI, "content-type": "application/json" },
     body: JSON.stringify(withContext && previousText ? { ...body, previous_text: previousText } : body),
   });
@@ -163,27 +173,49 @@ async function put(objectPath, data, contentType) {
   if (!r.ok) throw new Error(`storage upload ${objectPath} ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
 
+// The chapter's translation into the shared translation store (p2p_content_translations, migration 243):
+// content_type kingdom_story_chapter, every part in metadata.parts. Created as a draft for review; a
+// later run updates the text only — it never changes a status a reviewer has set.
+async function saveTranslation(ch, parts) {
+  const title = (parts.find((p) => p.key === "title")?.text ?? "").replace(/^[^:]*\d+:\s*/, "").replace(/\.$/, "");
+  const row = {
+    title, body: parts.filter((p) => /^p\d+$/.test(p.key)).map((p) => p.text).join("\n\n"),
+    metadata: { source: "narration-script", scriptFile: `narration/scripts/${path.basename(scriptDir)}/${lang}/chapter-${ch.number}.txt`, parts },
+    translated_at: new Date().toISOString(),
+  };
+  const q = `content_type=eq.kingdom_story_chapter&content_id=eq.${ch.id}&language_code=eq.${lang}`;
+  const existing = await rest(`p2p_content_translations?select=id,status&${q}`);
+  const r = existing.length
+    ? await fetch(`${SB}/rest/v1/p2p_content_translations?${q}`, { method: "PATCH", headers: { ...sbHeaders, "content-type": "application/json" }, body: JSON.stringify(row) })
+    : await fetch(`${SB}/rest/v1/p2p_content_translations`, { method: "POST", headers: { ...sbHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ ...row, content_type: "kingdom_story_chapter", content_id: ch.id, language_code: lang, status: "draft" }) });
+  if (!r.ok) throw new Error(`translation save ${ch.number} ${r.status}: ${(await r.text()).slice(0, 200)}`);
+}
+
 // ── Run ────────────────────────────────────────────────────────────────────
 const meta = JSON.parse(readFileSync(path.join(scriptDir, "story.json"), "utf8"));
 const chapters = await spokenChapters(meta.storyId);
-const files = readdirSync(scriptDir).filter((f) => /^chapter-\d+\.txt$/.test(f));
-const outDir = path.join(API, "narration/out", meta.storyId);
+const langDir = path.join(scriptDir, lang);
+const files = existsSync(langDir) ? readdirSync(langDir).filter((f) => /^chapter-\d+\.txt$/.test(f)) : [];
+const outDir = path.join(API, "narration/out", meta.storyId, lang);
 mkdirSync(outDir, { recursive: true });
 for (const ch of chapters) {
   if (onlyChapters && !onlyChapters.includes(ch.number)) continue;
   if (!files.includes(`chapter-${ch.number}.txt`)) { console.log(`chapter ${ch.number}: no script yet — skipped`); continue; }
-  const script = readScript(path.join(scriptDir, `chapter-${ch.number}.txt`));
+  const script = readScript(path.join(langDir, `chapter-${ch.number}.txt`));
   const problems = checkScript(ch, script);
   if (problems.length) { console.log(`chapter ${ch.number}: NOT generated —\n  ${problems.join("\n  ")}`); process.exitCode = 1; continue; }
 
   // Blocks: consecutive parts of one section, up to blockMaxChars, so delivery flows naturally.
+  // Each part as it will be shown in this language: the screen's own text (English) or its translation.
+  const shown = (p) => (lang === "en" ? p.text : script.get(p.key).replace(TAG, "").replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").trim());
   const blocks = [];
   for (const s of ch.sections) {
     let cur = null;
     for (const p of s.parts) {
       const t = withAliases(script.get(p.key));
-      if (cur && cur.text.length + t.length + 2 <= config.blockMaxChars) { cur.text += `\n\n${t}`; cur.plain += `\n\n${p.text}`; }
-      else { cur = { text: t, plain: p.text }; blocks.push(cur); }
+      if (cur && cur.text.length + t.length + 2 <= config.blockMaxChars) { cur.text += `\n\n${t}`; cur.plain += `\n\n${shown(p)}`; }
+      else { cur = { text: t, plain: shown(p) }; blocks.push(cur); }
     }
   }
   if (dryRun) { console.log(`chapter ${ch.number}: script OK — ${blocks.length} blocks, ${blocks.reduce((n, b) => n + b.text.length, 0)} characters to generate`); continue; }
@@ -199,15 +231,18 @@ for (const ch of chapters) {
   const al = await align(mp3, transcript);
   const words = (al.words ?? []).flatMap((x) => x.text.split(/[—–-]+/).map((t) => ({ ...x, text: t }))).filter((x) => normWord(x.text));
   const manifest = {
-    version: 1, storyId: meta.storyId, chapterId: ch.id, chapterNumber: ch.number,
-    voice: config.voice, model: config.modelId, file: `${ch.id}.mp3`, createdAt: new Date().toISOString(),
+    version: 2, storyId: meta.storyId, chapterId: ch.id, chapterNumber: ch.number, language: lang,
+    voice: { id: voice.id, name: voice.name }, model: config.modelId, file: `${ch.id}.mp3`, createdAt: new Date().toISOString(),
+    // The chapter as shown in this language, part by part (the cached translation, for the reader).
+    parts: ch.sections.flatMap((s) => s.parts.map((p) => ({ section: s.id, key: p.key, text: shown(p) }))),
     words: words.map((x) => normWord(x.text)).join(" "), starts: words.map((x) => Math.round(x.start * 100)), ends: words.map((x) => Math.round(x.end * 100)),
   };
   writeFileSync(path.join(outDir, `${ch.id}.mp3`), mp3);
   writeFileSync(path.join(outDir, `${ch.id}.json`), JSON.stringify(manifest));
   if (upload) {
-    await put(`${meta.storyId}/narration/${ch.id}.mp3`, mp3, "audio/mpeg");
-    await put(`${meta.storyId}/narration/${ch.id}.json`, JSON.stringify(manifest), "application/json");
+    await put(`${meta.storyId}/narration/${lang}/${ch.id}.mp3`, mp3, "audio/mpeg");
+    await put(`${meta.storyId}/narration/${lang}/${ch.id}.json`, JSON.stringify(manifest), "application/json");
+    if (lang !== "en") await saveTranslation(ch, manifest.parts);
   }
   console.log(`chapter ${ch.number}: ${blocks.length} blocks (${fresh} new, ${chars} characters), ${Math.round(words.at(-1)?.end ?? 0)} s, alignment loss ${al.loss?.toFixed?.(2)}${upload ? ", uploaded" : ""}${contextSupported ? "" : " (previous_text not accepted — sent without)"}`);
 }

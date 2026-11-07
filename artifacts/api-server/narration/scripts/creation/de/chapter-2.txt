@@ -1,0 +1,104 @@
+### story
+[warmly] Die Schöpfung: Der Anfang von allem.
+### title
+[calm] Kapitel 2: Licht, Himmel, Land und Meere.
+### p0
+[hushed] Die Erde war wüst und leer, und Finsternis lag auf der Tiefe. [whispers] Der Geist Gottes schwebte über den Wassern. [softly] Die geordnete Welt, die Menschen eines Tages bewohnen würden, hatte noch keine Gestalt angenommen.
+### p1
+[dramatic pause] [breathes in] Dann sprach Gott.
+### p2
+[commanding, powerful and reverent] „Es werde LICHT.“
+### p3
+[gasps] [awed] Auf Gottes Befehl hin erschien das Licht.
+### p4
+[calm, full of wonder] Die Finsternis, die die Szene bedeckt hatte, war nicht länger der einzige Zustand, den der Bericht beschreibt. [warmly] Gott sah, dass das Licht gut war, und Er schied das Licht von der Finsternis. Er nannte das Licht Tag... und die Finsternis Nacht.
+### p5
+[gently] Es wurde Abend, und es wurde Morgen. Der erste Tag war vergangen.
+### p6
+[curious] Das Werk der Schöpfung ging weiter.
+### p7
+[calm, confident] Gott sprach, es solle eine Feste zwischen den Wassern sein, die Wasser von Wasser scheidet. Er machte die Feste und schied die Wasser unter ihr von den Wassern über ihr. [awed] Gott nannte die Feste Himmel.
+### p8
+[softly] Wieder wurde es Abend, und es wurde Morgen. Der zweite Tag war vollendet.
+### p9
+[curious] Am dritten Tag wandte Gott sich den Wassern unter dem Himmel zu.
+### p10
+[building excitement] Er gebot den Wassern, sich an einem Ort zu sammeln, damit das trockene Land sichtbar würde. Die Wasser sammelten sich, wie Er es befohlen hatte — [excited] und das trockene Land kam zum Vorschein!
+### p11
+[warmly] Gott nannte das Trockene Land, und die gesammelten Wasser nannte Er Meere.
+### p12
+[full of wonder] Die Welt nahm eine erkennbare Gestalt an. Wo der Bericht zuvor Wüste und Leere beschrieben hatte, beschrieb er nun klar unterschiedene Bereiche: den Himmel oben, das Land darunter und die Meere, gesammelt an ihren bestimmten Orten.
+### p13
+[happy] Gott sah, dass es gut war.
+### p14
+[playful] Aber das Werk des dritten Tages war NOCH NICHT vollendet.
+### p15
+[excited] Gott gebot dem Land, Pflanzen hervorzubringen: Kräuter, die Samen tragen, und Bäume, die Früchte mit Samen darin tragen, jedes nach seiner Art. [cheerfully] Die Erde folgte dem Befehl. Pflanzen sprossen hervor, Kräuter brachten Samen — und Bäume trugen Früchte mit Samen.
+### p16
+[warmly] Das Land war nicht länger nur trockener Boden. Es wurde zu einem Ort, der Leben tragen konnte... und durch die Pflanzen und Bäume, die Gott hervorgebracht hatte, NOCH MEHR Leben hervorbrachte.
+### p17
+[laughs softly] Wieder sah Gott, dass es gut war.
+### p18
+[gently] Es wurde Abend, und es wurde Morgen. Der dritte Tag war vollendet.
+### p19
+[calm, storytelling] Der Schöpfungsbericht hatte nun drei wichtige Abschnitte durchlaufen. Das Licht war von der Finsternis geschieden worden. Die Wasser waren geteilt worden, um den Himmel zu bilden. Die Wasser unter dem Himmel waren gesammelt worden, damit trockenes Land erscheinen konnte, und das Land hatte begonnen, Pflanzen hervorzubringen.
+### p20
+[softly] Die Welt wurde geordnet und vorbereitet.
+### p21
+[slowly, painting the picture] Das Licht erhellte den Tag. Die Finsternis kennzeichnete die Nacht. Der Himmel spannte sich über die Erde. Die Meere nahmen ihre Plätze ein... und das Land brachte Pflanzen und Bäume hervor.
+### p22
+[awed] Was als eine Erde begonnen hatte, die als wüst und leer beschrieben wurde, wurde zu einer Welt mit unterschiedlichen Lebensräumen und den Anfängen reichen Lebens.
+### p23
+[reverent] Auf jeder Stufe gebot Gott, die Schöpfung antwortete — und Gott sah, dass Sein Werk gut war.
+### p24
+[thoughtful] Himmel, Land, Meere, Pflanzen und Bäume waren keine getrennten Geschichten ohne Zusammenhang. Sie waren Teile eines einzigen, sich entfaltenden Schöpfungswerks, und jedes trug zu der Welt bei, die Gott vorbereitete.
+### p25
+[building anticipation] Das Werk ging weiter... und die Erde war bereit für die nächsten Stufen der Schöpfung.
+### p26
+[breathes in] [gently] Zum Nachdenken: Schau dich in der Welt um: der Himmel über dir, der Boden unter deinen Füßen, die Wasser, die das Leben erhalten, und die Pflanzen und Bäume, die aus der Erde wachsen.
+### p27
+[warmly] Der Schöpfungsbericht lädt uns ein, diese Dinge als Teile einer Welt zu sehen, die Gott bewusst geformt und geordnet hat.
+### p28
+[calm] Licht und Finsternis haben ihren eigenen Platz. Der Himmel spannt sich über Land und Meere. Die Erde bringt Pflanzen hervor, und Pflanzen und Bäume tragen durch ihre Samen die Möglichkeit weiteren Wachstums in sich.
+### p29
+[thoughtful] Dieses Kapitel zeigt auch, dass sich die Schöpfung in Stufen entfaltet. Die Welt erscheint in der Erzählung nicht auf einmal in ihrer vollendeten Form. Gott führt Sein Werk in einer geordneten Abfolge aus.
+### p30
+[gently] Wenn du über diesen Bericht nachdenkst, bedenke die Bedeutung von Ordnung, Sinn und Fruchtbarkeit in deinem eigenen Leben. [tenderly] Denke an die Mittel, Gelegenheiten, Beziehungen und Aufgaben, die dir anvertraut wurden.
+### p31
+[sincerely] Der Abschnitt fordert uns auch heraus, die geschaffene Welt wertzuschätzen, statt sie als etwas Wertloses zu behandeln. [warmly] Das Land, die Wasser, die Pflanzen und die Bäume gehören alle zu der Schöpfung, die Gott gut nannte.
+### lessons
+[warmly] Lektionen aus der Geschichte.
+### lesson0
+[calm] Lektion 1. Gottes Wort verwirklicht Seine schöpferischen Absichten. Die wiederholten Befehle im Bericht zeigen, wie Gott das Werk der Schöpfung lenkt. [awed] Wenn Gott dem Licht gebietet zu erscheinen, erscheint es. Sein Wort steht im Mittelpunkt der sich entfaltenden Schöpfungsgeschichte.
+### lesson1
+[calm] Lektion 2. Gott schafft Ordnung und Unterscheidung. Das Licht wird von der Finsternis geschieden, die Wasser werden geteilt, und das Land wird von den Meeren unterschieden. Der Schöpfungsbericht zeigt eine geordnete Welt und keine Welt ohne Unterscheidung oder Struktur.
+### lesson2
+[warmly] Lektion 3. Gott erkennt die Güte Seines Werkes. Der Bericht sagt immer wieder, dass Gott sah, was Er gemacht hatte, und dass es gut war. [reverent] Die Schöpfung wird als Werk eines weisen Schöpfers dargestellt, der die Güte dessen erkennt, was Er ins Dasein gerufen hat.
+### lesson3
+[calm] Lektion 4. Die Welt wird in Stufen vorbereitet. Himmel, Land, Meere und Pflanzen erscheinen in einer sich entfaltenden Reihenfolge. [curious] Jede Stufe trägt zum entstehenden Lebensraum bei und bereitet den Rahmen für die Lebewesen, die später erscheinen werden.
+### lesson4
+[cheerfully] Lektion 5. Leben und Fruchtbarkeit gehören zum Ziel der Schöpfung. Gott gebietet der Erde, Pflanzen und fruchttragende Bäume hervorzubringen. Das Land wird als fruchtbar dargestellt, nicht bloß als leere Fläche. [warmly] Pflanzen tragen Samen, und Bäume bringen Früchte mit Samen hervor.
+### reflection:label
+[gently] Persönliche Reflexionen.
+### reflection:3e57ad55-6a4f-47e2-ab00-aa76d4c60465
+[curious] Frage 1. Welcher Teil von Gottes Werk in diesem Kapitel spricht DICH am meisten an, und warum?
+### reflection:cedb15b7-abf7-4633-81b4-52048a579855
+[thoughtful] Frage 2. Was lehrt dich die Scheidung von Licht und Finsternis und das Sammeln der Wasser über die Ordnung in der Schöpfung?
+### reflection:e58ecbbc-a0a4-4726-bba0-8c609232cdd6
+[gently] Frage 3. Warum sagt der Schöpfungsbericht wohl immer wieder, dass Gott sah, dass Sein Werk gut war?
+### reflection:da6a4476-f2b2-4cb9-8b3c-4c6e3f6d91b1
+[warmly] Frage 4. Was kann uns das Erscheinen von Pflanzen und fruchttragenden Bäumen über Wachstum und Fruchtbarkeit lehren?
+### reflection:60fd5b51-bc0c-49f4-be4d-34e94937d31e
+[sincerely] Frage 5. Wie kannst du der Natur um dich herum mehr Wertschätzung und Verantwortung entgegenbringen?
+### check:label
+[calm, clear] Umfassende Lernkontrolle.
+### check:b1a26036-3e72-48a8-80c0-270b748e51d7
+[calm, clear] Frage 1. 1. Was gebot Gott am ersten Tag, der in diesem Kapitel beschrieben wird, zu erscheinen, und was tat Er mit dem Licht und der Finsternis?
+
+2. Was schuf Gott am zweiten Tag, und wie nannte Er die Feste?
+
+3. Was geschah am dritten Tag mit den Wassern, und welche Namen gab Gott dem trockenen Land und den gesammelten Wassern?
+
+4. [curious] Welche Arten von Pflanzen gebot Gott dem Land hervorzubringen, und was zeigt das über Fruchtbarkeit?
+
+5. [warmly] Nenne zwei wichtige Lektionen aus diesem Kapitel und erkläre, wie eine davon deinen Alltag prägen kann.

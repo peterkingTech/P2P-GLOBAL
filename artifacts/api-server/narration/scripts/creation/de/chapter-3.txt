@@ -1,0 +1,88 @@
+### story
+[warmly] Die Schöpfung: Der Anfang von allem.
+### title
+[calm] Kapitel 3: Sonne, Mond, Sterne und Jahreszeiten.
+### p0
+[calm, storytelling] Die Erde hatte Gestalt angenommen. Licht und Finsternis waren geschieden, der Himmel war errichtet, die Wasser hatten sich zu Meeren gesammelt, und trockenes Land war erschienen. [warmly] Pflanzen bedeckten nun das Land, Kräuter trugen Samen, und Bäume brachten Früchte hervor.
+### p1
+[curious] Der Schöpfungsbericht wandte sich einem weiteren Teil von Gottes Werk zu.
+### p2
+[building anticipation] Am vierten Tag gebot Gott, dass Lichter an der Feste des Himmels erscheinen sollten, um den Tag von der Nacht zu scheiden. [awed] Diese Lichter sollten als Zeichen für Zeiten, Tage und Jahre dienen.
+### p3
+[softly] Der Himmel erhielt eine geordnete Aufgabe im Leben der Welt.
+### p4
+[awed] Gott machte die zwei großen Lichter: das größere Licht, um den Tag zu regieren, und das kleinere Licht, um die Nacht zu regieren. [dramatic pause] [whispers] Er machte auch die Sterne.
+### p5
+[slowly, painting the picture] Das größere Licht sollte die Stunden des Tages bestimmen, während das kleinere Licht in der Nacht leuchten sollte. [full of wonder] Die Sterne sollten den Himmel mit Lichtpunkten füllen und Teil des weiten Himmelsbildes werden.
+### p6
+[firmly, kindly] Der Schöpfungsbericht beschreibt diese Lichter NICHT als eigenständige Mächte, die die Welt beherrschen. Sie werden als Teil dessen dargestellt, was Gott geschaffen und bestimmt hat, um innerhalb Seiner geordneten Schöpfung zu dienen.
+### p7
+[calm] Gott setzte sie an die Feste des Himmels, damit sie auf die Erde leuchteten, den Tag und die Nacht regierten und das Licht von der Finsternis schieden.
+### p8
+[thoughtful] Die Welt hatte nun einen festen Rhythmus von Licht und Finsternis, und die Himmelslichter waren dazu bestimmt, die Zeit zu kennzeichnen.
+### p9
+[gently, rhythmic] Tage würden einander folgen. Jahreszeiten würden zu ihrer bestimmten Zeit kommen. Jahre würden durch die in der Schöpfung festgelegte Ordnung gezählt.
+### p10
+[warmly] Für die Menschen, die die Erde einst bewohnen würden, sollte der Himmel sichtbare Zeichen dieser Ordnung geben. Aufgang und Untergang der Sonne würden den Übergang vom Tag zur Nacht kennzeichnen. [softly] Der Mond würde in der Nacht leuchten... und die Sterne würden am ganzen Himmel erscheinen.
+### p11
+[thoughtful] Der Schöpfungsbericht stellt diese Lichter als Teil der Welt dar, die Gott vorbereitete. Sie waren nicht bloß schöne Erscheinungen am Himmel; [warmly] sie hatten auch eine Aufgabe in der Ordnung der Schöpfung.
+### p12
+[happy] Gott sah, dass es gut war.
+### p13
+[gently] Es wurde Abend, und es wurde Morgen. Der vierte Tag war vollendet.
+### p14
+[calm, storytelling] Die Schöpfungsgeschichte war von der Errichtung des Himmels, des Landes, der Meere und der Pflanzen zur Einsetzung der Lichter am Himmel fortgeschritten. Die Welt wurde immer vollständiger geordnet, und die Himmelslichter dienten als Kennzeichen von Tagen, Zeiten und Jahren.
+### p15
+[reverent] Der Bericht erinnert uns daran, dass der Himmel Teil von Gottes Schöpfung ist. Seine Gegenwart und seine bestimmten Aufgaben gehören zu dem größeren Muster der Ordnung, das das ganze erste Kapitel der Genesis durchzieht.
+### p16
+[softly] Sonne, Mond und Sterne würden zu vertrauten Begleitern menschlicher Erfahrung werden, [reverent] doch der Schöpfungsbericht lenkt den Blick über die geschaffenen Lichter hinaus — auf den Einen, der sie gemacht hat.
+### p17
+[building anticipation] Der Himmel wurde nach Gottes Gebot erfüllt... und das Werk der Schöpfung ging weiter.
+### p18
+[breathes in] [hushed, full of wonder] Zum Nachdenken: Stell dir vor, du schaust in den Nachthimmel und siehst unzählige Sterne, verstreut über die Dunkelheit. [softly] Denke an den Mond, der über der Erde leuchtet, und an die Sonne, die die Welt am Tag erhellt.
+### p19
+[warmly] Diese vertrauten Bilder sind Teil der geordneten Schöpfung, die in der Genesis beschrieben wird.
+### p20
+[calm] Der Abschnitt erinnert uns daran, dass die Himmelslichter bestimmte Aufgaben haben. Sie helfen, Tag und Nacht zu unterscheiden, und kennzeichnen Zeiten, Tage und Jahre. Ihr Platz in der Schöpfung wird nicht als bedeutungslos dargestellt.
+### p21
+[thoughtful] Dieses Kapitel lädt uns auch ein, über den Unterschied nachzudenken, etwas Schönes zu bewundern und seinen Ursprung zu erkennen. [reverent] Sonne, Mond und Sterne mögen Staunen wecken, doch der biblische Bericht richtet dieses Staunen auf Gott, den Schöpfer.
+### p22
+[gently] Die Zeit selbst ist ein weiteres wichtiges Thema. Tage vergehen, Jahreszeiten wechseln, und Jahre folgen aufeinander. Der Schöpfungsbericht stellt diese Rhythmen in die Ordnung, die Gott festgelegt hat.
+### p23
+[tenderly] Wenn du darüber nachdenkst, frage dich, wie du die Zeit nutzt, die dir geschenkt ist. [curious] Gehst du jeden Tag mit einem Ziel an? [gently] Schätzt du die Rhythmen und Aufgaben des Lebens, oder lässt du deine Zeit vergehen, ohne innezuhalten?
+### lessons
+[warmly] Lektionen aus der Geschichte.
+### lesson0
+[reverent] Lektion 1. Gott ist der Schöpfer der Himmelslichter. Sonne, Mond und Sterne werden als Teil von Gottes Schöpfung dargestellt. Ihre Gegenwart lenkt den Blick auf den Schöpfer, statt die geschaffenen Lichter als Ursprung ihres eigenen Daseins darzustellen.
+### lesson1
+[calm] Lektion 2. Gott schafft Ordnung in der Zeit. Die Himmelslichter sind als Zeichen für Zeiten, Tage und Jahre bestimmt. Der Schöpfungsbericht stellt die Zeit als Teil der geordneten Welt dar, die Gott geschaffen hat.
+### lesson2
+[warmly] Lektion 3. Die Schöpfung hat einen Sinn, der über das Äußere hinausgeht. Die Lichter am Himmel tun MEHR, als den Himmel zu erhellen. Sie dienen dazu, Tag und Nacht zu unterscheiden und den Lauf der Zeit zu kennzeichnen.
+### lesson3
+[calm] Lektion 4. Die Natur spiegelt eine geordnete Schöpfung wider. Der Wechsel von Tag und Nacht und das Kennzeichnen der Jahreszeiten zeigen eine geordnete Welt. Der Schöpfungsbericht stellt diese Rhythmen als Teil von Gottes Werk dar.
+### lesson4
+[sincerely] Lektion 5. Der Schöpfer verdient mehr Aufmerksamkeit als das Geschaffene. Sonne, Mond und Sterne sind eindrucksvolle Erscheinungen am Himmel, doch die Genesis stellt sie als Geschöpfe Gottes dar. [reverent] Ihre Schönheit und ihr Nutzen weisen zurück auf den Einen, der sie gemacht hat.
+### reflection:label
+[gently] Persönliche Reflexionen.
+### reflection:c4fdb904-4931-4c5b-b316-c4dc9642315d
+[curious] Frage 1. Was zeigt die Erschaffung von Sonne, Mond und Sternen über Gottes Rolle als Schöpfer?
+### reflection:dac22d5d-78a1-4bbf-a8f1-c800675271cb
+[thoughtful] Frage 2. Warum wurden die Himmelslichter dazu bestimmt, Zeiten, Tage und Jahre zu kennzeichnen?
+### reflection:d2040592-6933-4d9c-91ed-766d9e08aea1
+[gently] Frage 3. Wie hilft dir dieses Kapitel, die Beziehung zwischen Schönheit und Sinn in der Schöpfung zu verstehen?
+### reflection:18551f1b-0e67-46a7-97cf-4fae5984f11f
+[softly, full of wonder] Frage 4. Wenn du den Himmel, die Sonne, den Mond oder die Sterne betrachtest, welche Gedanken über Gott regt dieser Bericht in dir an?
+### reflection:4ae7aa26-1c56-44da-9f54-7d4fd18d284d
+[warmly] Frage 5. Wie kannst du deine Zeit im Licht der in diesem Kapitel beschriebenen Ordnung sinnvoller nutzen?
+### check:label
+[calm, clear] Umfassende Lernkontrolle.
+### check:4b2c308c-98bf-4bee-ac61-ae6143ef756b
+[calm, clear] Frage 1. 1. Was gebot Gott am vierten Tag, an der Feste des Himmels zu erscheinen?
+
+2. Welche Aufgaben wurden den Himmelslichtern laut 1. Mose 1,14–18 zugewiesen?
+
+3. Welches Licht wurde dazu bestimmt, den Tag zu regieren, und welches, die Nacht zu regieren?
+
+4. [curious] Was lehrt der Schöpfungsbericht über die Beziehung zwischen Sonne, Mond, Sternen und Gott?
+
+5. [warmly] Erkläre zwei Lektionen aus diesem Kapitel und beschreibe einen praktischen Weg, eine davon in deinem Leben anzuwenden.

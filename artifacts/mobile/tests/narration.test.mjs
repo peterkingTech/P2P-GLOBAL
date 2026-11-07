@@ -66,8 +66,11 @@ ok("API: private storage, signed links; a local folder for development", lib.inc
 ok("generator: key from the environment only, never printed", gen.includes("process.env.ELEVENLABS_API_KEY") && !/console\.log\([^)]*XI\b/.test(gen));
 ok("generator: refuses a script whose words differ from the screen", gen.includes("words differ in") && gen.includes("NOT generated"));
 ok("generator: every block cached by a hash of what shapes it (never regenerated)", gen.includes("createHash(\"sha256\")") && gen.includes("if (existsSync(file)) return { audio: readFileSync(file), cached: true };"));
-ok("generator: one narrator and the expressive model from config", cfg.modelId === "eleven_v4" && /^[A-Za-z0-9]{20}$/.test(cfg.voice.id) && cfg.languageCode === "en");
-ok("scripts: Topic 1 (Creation) has all six chapters scripted", [1, 2, 3, 4, 5, 6].every((k) => apiSrc(`narration/scripts/creation/chapter-${k}.txt`).includes("### check:label")));
+ok("generator: one narrator per language (English Jon, native German Alexander) and the expressive model", cfg.modelId === "eleven_v4"
+  && Object.values(cfg.languages).every((l) => /^[A-Za-z0-9]{20}$/.test(l.voice.id)) && cfg.languages.en.voice.short === "Jon" && cfg.languages.de.voice.short === "Alexander");
+ok("generator: files per language (scripts, output, storage); English words checked against the screen, translations for completeness", gen.includes("path.join(scriptDir, lang)") && gen.includes("narration/${lang}/${ch.id}.mp3") && gen.includes('if (lang !== "en")'));
+ok("scripts: Topic 1 (Creation) has all six chapters in English and German", ["en", "de"].every((l) => [1, 2, 3, 4, 5, 6].every((k) => apiSrc(`narration/scripts/creation/${l}/chapter-${k}.txt`).includes("### check:label"))));
+ok("API: narration per language (?lang=), English still served from the first upload's place", route.includes("req.query.lang") && lib.includes('const dirs = lang === "en" ? [`${lang}/`, ""] : [`${lang}/`];'));
 
 console.log(`narration (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

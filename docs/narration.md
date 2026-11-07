@@ -37,6 +37,25 @@ The ElevenLabs *default* voices expire on 31 December 2026, so a Voice Library v
 
 Nothing is generated when someone presses play.
 
+## Other languages
+
+Each language has its own narrator (`languages` in `config.json`). Currently that's English, **Jon**, and German, **Alexander** (a native German "Deep TV Narrator"). Each language also has its own script folder (`narration/scripts/<story>/<lang>/`), output folder (`narration/out/<storyId>/<lang>/`) and Storage folder (`<storyId>/narration/<lang>/`).
+
+- **English** scripts must match the screen word for word.
+- **A translation** is the cached, reviewable script itself. It is checked for completeness (every part translated) and is never retranslated.
+
+Run `--lang de --upload` to do three things at once:
+- upload the audio;
+- save each chapter's translation into the shared translation store, `p2p_content_translations` (`content_type` `kingdom_story_chapter`, every part in `metadata.parts`; migration 243), as a **draft** for review. A later run updates only the text and never changes a status a reviewer has set;
+- make the API serve the narration for `?lang=de`. A language without its own recording gets none; English audio is never served instead.
+
+The aim is that a reader's **content language** shows every part of a story, and its narration, in that language.
+
+| Story | Language | Narrator | Length | Translation |
+|---|---|---|---|---|
+| Creation (Biblical History, topic 1) | English | Jon | about 48 min | (source text) |
+| Creation (Biblical History, topic 1) | German | Alexander | about 50 min | 6 chapters, draft (awaiting review) |
+
 ## Local development
 
 `NARRATION_LOCAL_DIR` points at the generator's `narration/out` folder, and `NARRATION_LOCAL_BASE_URL` at a local file server (port 8796, with byte-range support). With both set, the local API serves narration before anything is uploaded.

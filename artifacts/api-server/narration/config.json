@@ -1,8 +1,10 @@
 {
-  "comment": "Kingdom Stories narration (scripts/narrate.mjs). One narrator for every story; change voiceId here only. Model and tags per the ElevenLabs Eleven v4 docs (2026-11-07).",
+  "comment": "Kingdom Stories narration (scripts/narrate.mjs). One narrator per language for every story; change a voice id here only. Model and tags per the ElevenLabs Eleven v4 docs (2026-11-07).",
   "modelId": "eleven_v4",
-  "languageCode": "en",
-  "voice": { "id": "MFZUKuGQUsGJPQjTS4wC", "name": "Jon — Warm & Grounded Storyteller (ElevenLabs Voice Library, neutral American)" },
+  "languages": {
+    "en": { "name": "English", "voice": { "id": "MFZUKuGQUsGJPQjTS4wC", "short": "Jon", "name": "Jon — Warm & Grounded Storyteller (ElevenLabs Voice Library, neutral American)" } },
+    "de": { "name": "German", "voice": { "id": "kkJxCnlRCckmfFvzDW5Q", "short": "Alexander", "name": "Alexander — Deep TV Narrator (ElevenLabs Voice Library, native German)" } }
+  },
   "voiceSettings": { "stability": 0.3, "similarity_boost": 0.75, "speed": 1.0 },
   "outputFormat": "mp3_44100_128",
   "blockMaxChars": 1400,

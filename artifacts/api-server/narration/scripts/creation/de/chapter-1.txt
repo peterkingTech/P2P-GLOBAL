@@ -1,0 +1,78 @@
+### story
+[warmly] Die Schöpfung: Der Anfang von allem.
+### title
+[calm] Kapitel 1: Vor allem anderen... Im Anfang.
+### p0
+[calm, slow storytelling voice] Im Anfang... gab es keine Welt, wie die Menschen sie einmal kennen würden. Es gab keine hoch aufragenden Berge, keine fließenden Flüsse, keine grünen Felder — und keine fernen Sterne, verstreut über den Himmel. [softly] Die vertrauten Bilder und Klänge des Lebens waren noch nicht erschienen.
+### p1
+[whispers] Aber Gott war da.
+### p2
+[reverent] Die Bibel beginnt mit einer Aussage, die das Fundament für alles Folgende legt: [awed] Im Anfang schuf Gott Himmel und Erde.
+### p3
+[chuckles] Die Geschichte beginnt nicht mit einem menschlichen König, einem mächtigen Volk oder einer alten Stadt. [warmly] Sie beginnt mit Gott SELBST. Bevor die Welt existierte, war Gott bereits da... und alles, was folgen sollte, begann mit Seinem schöpferischen Wirken.
+### p4
+[hushed] Die Erde war wüst und leer. Finsternis lag auf der Tiefe... [whispers] und der Geist Gottes schwebte über den Wassern.
+### p5
+[curious] Die Szene war ganz anders als die Welt, die wir heute kennen. Es gab keine Gärten voller Bäume, keine Tiere, die durch die Wildnis zogen, [softly] und keine menschlichen Stimmen, die sich unterhielten. Die geordnete Welt, die in den folgenden Kapiteln beschrieben wird, hatte noch keine Gestalt angenommen.
+### p6
+[gently] Doch der Bericht stellt Finsternis und Leere nicht als das Ende der Geschichte dar. [warmly] Gottes Gegenwart ist BEREITS da.
+### p7
+[hushed, building anticipation] Der Geist Gottes schwebt über den Wassern, während der Schöpfungsbericht auf das erste große Gebot zugeht, das die Szene verwandeln wird. [excited] Die Erde wird bald ein Ort des Lichts, der Ordnung, des Lebens und der Schönheit sein!
+### p8
+[dramatic pause] [reverent] Alles beginnt mit Gott.
+### p9
+[calm] Himmel und Erde werden nicht als Werk menschlicher Hände dargestellt. Sie sind das Werk des Schöpfers. Jeder Berg, jeder Ozean, jedes Lebewesen — [tenderly] und jeder Mensch — gehört zu der Geschichte, die hier beginnt.
+### p10
+[softly] Bevor die Menschen nach Gott suchen konnten, bevor sie Orte der Anbetung bauen konnten und bevor irgendjemand ein Gebet sprechen konnte... [awed] war Gott bereits der Eine, der vor der geschaffenen Welt existierte.
+### p11
+[calm, confident] Die ersten beiden Verse der Bibel legen deshalb eine Wahrheit fest, die die gesamte biblische Geschichte prägen wird: Gott ist der Schöpfer, und alles Folgende beginnt mit Ihm.
+### p12
+[excited, building wonder] Die Welt ist kurz davor, aus ihrem wüsten und leeren Zustand hervorzutreten. Die Finsternis wird dem Licht weichen, die Wasser werden geschieden, das trockene Land wird erscheinen — und Leben wird die Erde erfüllen!
+### p13
+[slowly, reverent] Doch vor dem Licht, vor dem Land und vor dem Leben steht der Anfang — [whispers] und am Anfang ist Gott.
+### p14
+[breathes in] [gently] Zum Nachdenken: Nimm dir einen Moment Zeit, um über den Anfang der Schöpfungsgeschichte nachzudenken.
+### p15
+[warmly] Die Bibel beginnt nicht mit den Leistungen, Entdeckungen oder Fragen der Menschheit. [softly] Sie beginnt mit Gott.
+### p16
+[thoughtful] Das lädt uns ein, über die Fundamente unseres eigenen Lebens nachzudenken. Worauf bauen wir unser Verständnis vom Leben? [gently] Erkennen wir, dass unser Dasein Teil von etwas Größerem ist als unsere persönlichen Pläne und Erfolge?
+### p17
+[calm] Die Beschreibung der Erde als wüst und leer erinnert uns auch daran, dass der Anfang einer Geschichte nicht immer ihr Ende verrät. [warmly] Der Schöpfungsbericht führt von diesem ersten Bild hin zu einer geordneten Welt voller Leben.
+### p18
+[softly] Der Abschnitt ermutigt uns, über das hinauszublicken, was wir unmittelbar sehen können... und die Bedeutung von Gottes Platz in der biblischen Geschichte zu bedenken.
+### lessons
+[warmly] Lektionen aus der Geschichte.
+### lesson0
+[calm] Lektion 1. Gott ist der Ursprung der Schöpfung. Der biblische Bericht beginnt mit Gott als dem Schöpfer von Himmel und Erde. Alles in der Schöpfungsgeschichte hängt von Seinem schöpferischen Wirken ab. [gently] Das erinnert uns daran, dass die Welt nicht als Ergebnis menschlicher Anstrengung dargestellt wird, sondern als Werk Gottes.
+### lesson1
+[calm] Lektion 2. Gott existierte vor der geschaffenen Welt. Die Geschichte beginnt mit Gott und nicht mit dem Universum oder der Menschheit. Sie stellt Ihn als den Einen dar, der die Schöpfung ins Leben ruft. [reverent] Alles, was im Schöpfungsbericht entsteht, verdankt Ihm seinen Anfang.
+### lesson2
+[gently] Lektion 3. Leere bedeutet nicht das Ende der Geschichte. Die Erde wird als wüst und leer beschrieben, doch der Schöpfungsbericht geht weiter, hin zu Ordnung, Schönheit und Leben. [warmly] Der Anfangszustand ist NICHT der Endzustand. Gott setzt Sein schöpferisches Wirken fort, bis die Welt ein geordneter Ort voller Leben ist.
+### lesson3
+[softly] Lektion 4. Gottes Gegenwart ist nicht auf Orte beschränkt, die vollendet aussehen. Der Geist Gottes schwebt über den Wassern, noch bevor die geordnete Welt Gestalt annimmt. [tenderly] Der Abschnitt lenkt unseren Blick auf Gottes Gegenwart ganz am Anfang, noch bevor der Schöpfungsbericht die Welt als vollständig geformt beschreibt.
+### lesson4
+[calm, confident] Lektion 5. Jede große Geschichte hat ein Fundament. Der Schöpfungsbericht zeigt, wer Gott im Verhältnis zur Welt ist. [warmly] Dieses Fundament zu verstehen, hilft uns, den Rest der biblischen Erzählung zu verstehen — auch den Platz der Menschheit in der Schöpfung und die Beziehung zwischen Gott und Seiner Schöpfung.
+### reflection:label
+[gently] Persönliche Reflexionen.
+### reflection:6b16e011-a809-430c-b067-73ff0cbf9130
+[warmly] Frage 1. Was bedeutet es DIR, dass Gott der Schöpfer von allem ist?
+### reflection:d42bd986-2e77-46b1-a75d-bb872585e38c
+[curious] Frage 2. Wie beeinflusst die Tatsache, dass die Bibel mit Gott beginnt, dein Verständnis der übrigen Heiligen Schrift?
+### reflection:bd136182-5c73-4d39-a154-cddd8d9d64d1
+[tenderly] Frage 3. Wenn sich etwas in deinem Leben unfertig oder unsicher anfühlt... wie fordert dieser Anfangsabschnitt deine Sichtweise heraus?
+### reflection:cc872303-26da-47d9-8f80-360541a46672
+[thoughtful] Frage 4. Was kannst du daraus lernen, dass der Schöpfungsbericht mit Gott beginnt und nicht mit der Menschheit?
+### reflection:07d52581-5ea1-4f37-b1bf-0e9c05a8bf01
+[gently] Frage 5. Wie könnte es deinen Alltag prägen, Gott als den Ursprung der Schöpfung anzuerkennen?
+### check:label
+[calm, clear] Umfassende Lernkontrolle.
+### check:50d1edf9-17ea-4b27-8b5e-32ef3a4fdacb
+[calm, clear] Frage 1. 1. Mit welchen Worten beginnt der biblische Schöpfungsbericht, und was sagen sie uns über den Anfang der Welt?
+
+2. Was hat Gott laut 1. Mose 1,1–2 geschaffen, wie wurde die Erde beschrieben, und was tat der Geist Gottes?
+
+3. [curious] Warum ist es bedeutsam, dass die Bibel mit Gott beginnt und nicht mit der Menschheit?
+
+4. Wie bereitet uns die Beschreibung der Erde als wüst und leer auf die folgenden Ereignisse vor?
+
+5. [warmly] Was ist die wichtigste Wahrheit, die du in diesem Kapitel gelernt hast, und wie kannst du sie in deinem Leben anwenden?

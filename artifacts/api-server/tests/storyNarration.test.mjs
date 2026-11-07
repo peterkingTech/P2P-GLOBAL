@@ -50,6 +50,10 @@ mkdirSync(path.join(dir, S), { recursive: true });
 const manifest = (chapterId) => ({ version: 1, storyId: S, chapterId, voice: { id: "v", name: "Jon" }, model: "eleven_v4", file: `${chapterId}.mp3`, createdAt: "2026-11-07", words: "in the beginning", starts: [0, 30, 60], ends: [20, 50, 90] });
 writeFileSync(path.join(dir, S, `${OPEN}.json`), JSON.stringify(manifest(OPEN)));
 writeFileSync(path.join(dir, S, `${LOCKED}.json`), JSON.stringify(manifest(LOCKED)));
+// German, in its own language folder (and a mislabelled file that must never be served as German).
+mkdirSync(path.join(dir, S, "de"), { recursive: true });
+writeFileSync(path.join(dir, S, "de", `${OPEN}.json`), JSON.stringify({ ...manifest(OPEN), version: 2, language: "de", voice: { id: "a", name: "Alexander" }, words: "im anfang" , starts: [0, 30], ends: [20, 50] }));
+writeFileSync(path.join(dir, S, "de", `${NONE}.json`), JSON.stringify({ ...manifest(NONE), version: 2, language: "en" }));
 process.env.NARRATION_LOCAL_DIR = dir;
 process.env.NARRATION_LOCAL_BASE_URL = "http://127.0.0.1:8796/";
 
@@ -74,6 +78,13 @@ try {
   ok("an unpublished story → 404 for readers", (await get(`/${DRAFT}/chapters/${OPEN}/narration`, "READER")).status === 404);
   ok("a chapter of another story → 404", (await get(`/${S}/chapters/66666666-6666-4666-8666-666666666666/narration`, "READER")).status === 404);
   ok("not an id → 404", (await get(`/${S}/chapters/abc/narration`, "READER")).status === 404);
+  const de = await get(`/${S}/chapters/${OPEN}/narration?lang=de`, "READER");
+  ok("German (?lang=de): the German narrator's recording from the language folder", de.body?.narration?.voice === "Alexander" && de.body.narration.url === `http://127.0.0.1:8796/${S}/de/${OPEN}.mp3`);
+  ok("German: a chapter without German → no narration (never English instead, never a mislabelled file)", (await get(`/${S}/chapters/${NONE}/narration?lang=de`, "READER")).body?.narration === null
+    && (await get(`/${S}/chapters/${LOCKED}/narration?lang=de`, "READER")).body?.narration === null);
+  ok("English still served from the first upload's place", (await get(`/${S}/chapters/${OPEN}/narration?lang=en`, "READER")).body?.narration?.voice === "Jon");
+  ok("German: a locked chapter stays locked", (await get(`/${S}/chapters/${LOCKED}/narration?lang=de`, "READER")).body?.narration === null);
+  ok("a nonsense language → no narration", (await get(`/${S}/chapters/${OPEN}/narration?lang=../x`, "READER")).body?.narration === null);
 } catch (e) {
   fail++; console.log("FAIL crashed", e?.stack ?? e);
 } finally {

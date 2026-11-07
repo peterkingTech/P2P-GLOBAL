@@ -309,7 +309,9 @@ router.get("/:id/chapters/:chapterId/narration", async (req, res) => {
     if (open !== true) return ok(res, { narration: null });
   }
   try {
-    return ok(res, { narration: await chapterNarration(req.params.id, req.params.chapterId) });
+    // ?lang= the reader's content language (ISO 639-1); English when absent.
+    const lang = typeof req.query.lang === "string" ? req.query.lang.toLowerCase().slice(0, 3) : "en";
+    return ok(res, { narration: await chapterNarration(req.params.id, req.params.chapterId, lang) });
   } catch {
     return ok(res, { narration: null }); // never block reading or the phone's voice
   }
