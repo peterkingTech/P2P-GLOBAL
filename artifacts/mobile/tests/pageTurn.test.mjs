@@ -79,7 +79,7 @@ const reader = src("app/kingdom-stories/chapter.tsx");
 const goFn = reader.slice(reader.indexOf("const go = (target"), reader.indexOf("const toContents"));
 ok("in place: setParams, not router.replace", goFn.includes("router.setParams") && !goFn.includes("router.replace"));
 ok("in place: page turn starts before/independent of loading", goFn.includes("pageTurn.turn(") && !/await/.test(goFn));
-ok("no story refetch per page: load doesn't depend on chapterId", /\}, \[id, lessonParam\]\);/.test(reader));
+ok("no story refetch per page: load doesn't depend on chapterId (only the story, its lesson and the content language)", /\}, \[id, lessonParam, lang\]\);/.test(reader));
 ok("locked chapters still refused", goFn.includes('target.learning?.state === "locked"'));
 ok("chapter selector", reader.includes("setChaptersOpen(true)") && reader.includes("<Modal visible={chaptersOpen}"));
 ok("current chapter title in header", reader.includes("s.headerChapter") && reader.includes("{ch.title}"));

@@ -1,0 +1,24 @@
+### meta:subtitle
+Gott ist der Schöpfer aller Dinge. Seine Schöpfung offenbart Seine Macht, Weisheit, Ordnung, Güte und Absicht.
+### meta:theme
+Gott ist der Schöpfer aller Dinge. Seine Schöpfung offenbart Seine Macht, Weisheit, Ordnung, Güte und Absicht.
+### label
+[warmly] Einleitung.
+### title
+[warmly, storytelling] Die Schöpfung: Der Anfang von allem. [reverent] Gott ist der Schöpfer aller Dinge. Seine Schöpfung offenbart Seine Macht, Weisheit, Ordnung, Güte und Absicht.
+### p0
+[hushed, slow storytelling voice] Vor dem ersten Sonnenaufgang, bevor sich die Ozeane über die Erde breiteten, bevor die Sterne den Nachthimmel erhellten und bevor die Menschheit ihren ersten Atemzug tat... [whispers] war Gott.
+### p1
+[softly] Es gab keine Städte, keine Berge voller Wälder, keine Vögel, die in den Bäumen sangen, und keine Wellen, die sich am Ufer brachen. [calm] Die Welt, wie wir sie kennen, existierte noch nicht.
+### p2
+[dramatic pause] [awed] Dann, am Anfang von allem, handelte Gott.
+### p3
+[full of wonder] Der Anfang der Bibel führt uns zum Fundament des Daseins selbst. In sechs Tagen bringt Gott Ordnung in das, was als wüst und leer beschrieben wird. [building excitement] Er gebietet dem Licht zu leuchten, scheidet die Wasser, sammelt die Meere, lässt Pflanzen hervorsprießen, setzt Lichter an den Himmel, erfüllt die Wasser und den Himmel mit Lebewesen und erschafft die Tiere auf dem Land.
+### p4
+[hushed, reverent] Dann kommt der außergewöhnlichste Moment der Schöpfung: [awed] Gott macht den Menschen nach Seinem eigenen Bild und gibt ihm einen einzigartigen Platz und eine besondere Verantwortung in Seiner Schöpfung.
+### p5
+[warmly] Am Ende Seines Werkes betrachtet Gott alles, was Er gemacht hat, [joyful] und nennt es SEHR gut. [softly] Am siebten Tag ruht Er von Seinem Schöpfungswerk und segnet den Tag.
+### p6
+[calm, with conviction] Dies ist die Geschichte des Anfangs — nicht nur der Welt, sondern der Fundamente, auf denen sich die biblische Geschichte entfaltet. [reverent] Sie stellt uns den Gott vor, der erschafft, Ordnung bringt, Leben schenkt, Sinn gibt und Seine Schöpfung gut nennt.
+### p7
+[warmly, inviting] In diesen sechs Kapiteln reisen wir durch den Schöpfungsbericht, entdecken, was auf jeder Stufe geschah, [cheerfully] und finden die Lektionen, Gedanken und Wahrheiten, die uns der Anfang von allem heute schenkt.

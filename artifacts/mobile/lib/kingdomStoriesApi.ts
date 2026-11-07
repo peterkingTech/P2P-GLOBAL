@@ -46,6 +46,10 @@ export interface KingdomStorySource {
 }
 export interface KingdomStory {
   id: string; title: string; subtitle: string | null; categoryId: string;
+  /** The language the chapters came back in (reader detail only): "en" unless a translation was applied. */
+  contentLanguage?: string;
+  /** The language of the title, subtitle and introduction (reader detail only). */
+  introLanguage?: string;
   category?: { slug: string; title: string } | null;
   contentType: KingdomStoryContentType | null; body: string;
   historicalPeriod: string | null; startYear: number | null; endYear: number | null;
@@ -282,13 +286,23 @@ export function getKingdomStoriesFeed(opts: { category?: string; featured?: bool
   q.set("limit", String(opts.limit ?? 20));
   return authedFetch(`/kingdom-stories/feed?${q}`);
 }
-export function getKingdomStory(id: string): Promise<KingdomStory> {
-  return authedFetch(`/kingdom-stories/${id}`);
+/**
+ * A story in the reader's content language: approved translations of its chapters (title, story,
+ * Story Lessons, Personal Reflections, Comprehensive Check) come back in place of the English;
+ * `contentLanguage` says which language the chapters are actually in.
+ */
+export function getKingdomStory(id: string, lang?: string): Promise<KingdomStory> {
+  return authedFetch(`/kingdom-stories/${id}${lang && lang !== "en" ? `?lang=${encodeURIComponent(lang)}` : "?lang=en"}`);
 }
-/** A chapter's studio narration (ElevenLabs), or null — then Listen uses the phone's voice. */
+/** The reader's content language as a base code ("de-CH" → "de"); English when unset. */
+export function baseContentLanguage(code: string | null | undefined): string {
+  const c = String(code ?? "en").toLowerCase().split(/[-_]/)[0];
+  return /^[a-z]{2,3}$/.test(c) ? c : "en";
+}
+/** A chapter's studio narration (ElevenLabs) in that language, or null — then Listen uses the phone's voice. */
 export interface ChapterNarrationData { url: string; voice: string; model: string; createdAt: string; words: string; starts: number[]; ends: number[] }
-export function getChapterNarration(storyId: string, chapterId: string): Promise<{ narration: ChapterNarrationData | null }> {
-  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}/narration`);
+export function getChapterNarration(storyId: string, chapterId: string, lang = "en"): Promise<{ narration: ChapterNarrationData | null }> {
+  return authedFetch(`/kingdom-stories/${storyId}/chapters/${chapterId}/narration?lang=${encodeURIComponent(lang)}`);
 }
 
 // ── Admin (admin_content / super_admin only) ────────────────────────────────

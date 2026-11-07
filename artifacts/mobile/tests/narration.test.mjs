@@ -55,8 +55,14 @@ ok("engine: passes the displayed text and the content's narration to the driver"
 ok("driver: the phone's voice when there's no recording, no match, a broken recording, or any failure", index.includes("if (!n || !seg) { recStop(true); return deviceSpeech.speak(text, o); }") && index.includes("recBroken.add(n.url); recStop(true); deviceSpeech.speak(text, o);") && /catch \{\s*recStop\(true\);\s*deviceSpeech\.speak\(text, o\);/.test(index));
 ok("driver: consecutive sentences carry on without a seek; never stuck", index.includes("const contiguous = p.playing") && index.includes("recPause = setTimeout(") && index.includes("setTimeout(finish, ((seg.end - seg.start)"));
 ok("driver: one player, replaced (and the cursor reset) when the recording changes", index.includes("recPlayer?.remove();") && index.includes("recCursor = 0;"));
-ok("chapter: narration loaded for this chapter and its neighbours; Listen waits briefly, then the phone's voice", chapter.includes("for (const t of [prev, ch, next])") && chapter.includes("setTimeout(() => r(null), 3000)") && chapter.includes("narration: narrations.current.get(target.id) ?? undefined,"));
-ok("client: the API route", client.includes("`/kingdom-stories/${storyId}/chapters/${chapterId}/narration`"));
+ok("chapter: narration loaded for this chapter and its neighbours; Listen waits briefly, then the phone's voice", chapter.includes("for (const t of [prev, ch, next])") && chapter.includes("setTimeout(() => r(null), 3000)") && chapter.includes("narration: narrations.current.get(`${storyLang}:${target.id}`) ?? undefined,")
+  && chapter.includes("loadNarration(story.id, target.id, storyLang)"));
+ok("client: the API route, in the chapter's language", client.includes("`/kingdom-stories/${storyId}/chapters/${chapterId}/narration?lang=${encodeURIComponent(lang)}`"));
+ok("content language: the story and its chapters are requested and cached per content language", chapter.includes("getKingdomStory(id, lang)") && chapter.includes("qk.story(id, lang)")
+  && src("app/kingdom-stories/[id].tsx").includes("getKingdomStory(id, lang)") && src("lib/query.ts").includes('story: (id: string, lang: string = "en")'));
+ok("introduction: in its own language, with its studio narration ('intro'), else the phone's voice", src("app/kingdom-stories/[id].tsx").includes('loadNarration(story.id, "intro", introLang)')
+  && src("app/kingdom-stories/[id].tsx").includes("narration: introNarration.current?.n ?? undefined,") && src("app/kingdom-stories/[id].tsx").includes("language: introLang,"));
+ok("content language: German check label matches the narration", JSON.parse(src("locales/de.json")).lesson.assignment === "Umfassende Lernkontrolle");
 ok("no ElevenLabs key or call in the app", !/api\.elevenlabs\.io|xi-api-key|ELEVENLABS_API_KEY/i.test(index + chapter + client + src("lib/listen/narration.ts")));
 
 // API + generator

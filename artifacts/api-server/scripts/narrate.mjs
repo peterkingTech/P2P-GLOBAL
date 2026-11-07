@@ -29,7 +29,7 @@ const API = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOBILE = path.resolve(API, "../mobile");
 const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
 const scriptDir = path.resolve(API, arg("--script") ?? "");
-const onlyChapters = arg("--chapters")?.split(",").map(Number) ?? null;
+const onlyChapters = arg("--chapters")?.split(",").map((x) => x.trim()) ?? null;
 const upload = process.argv.includes("--upload");
 const dryRun = process.argv.includes("--dry-run");
 const config = JSON.parse(readFileSync(path.join(API, "narration/config.json"), "utf8"));
@@ -92,6 +92,14 @@ async function spokenChapters(storyId) {
   });
 }
 
+// The story's introduction, as the story page's Listen speaks it (introListenSections): "label", "title", "p0"…
+// Its id is "intro" (files narration/<lang>/intro.*); the story's own subtitle and body come along for the translation.
+async function spokenIntro(storyId) {
+  const [story] = await rest(`p2p_kingdom_stories?select=id,title,subtitle,body&id=eq.${storyId}`);
+  const sections = storybook.introListenSections({ title: story.title, subtitle: story.subtitle, body: story.body ?? "" }, labels);
+  return sections.length ? { id: "intro", number: "intro", sections, story } : null;
+}
+
 // ── Scripts ────────────────────────────────────────────────────────────────
 const TAG = /\[([^\]]+)\]/g;
 const normWord = (w) => w.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
@@ -117,12 +125,28 @@ function checkScript(chapter, script) {
       problems.push(`words differ in ${p.key} near "…${a.slice(Math.max(0, i - 25), i + 25)}…" vs "…${b.slice(Math.max(0, i - 25), i + 25)}…"`);
     }
   }
+  // "meta:*" entries aren't spoken (e.g. a translated subtitle or theme line for the screen).
+  const spokenKeys = [...script.keys()].filter((k) => !k.startsWith("meta:"));
   if (lang !== "en") return problems.filter((x) => x.startsWith("missing")).concat(
     [...script].filter(([, t]) => !t.replace(TAG, "").trim()).map(([k]) => `empty translation for ${k}`),
-    [...script.keys()].filter((k) => !chapter.sections.some((s) => s.parts.some((p) => p.key === k))).map((k) => `script has an unknown part ${k} (the chapter changed?)`));
+    spokenKeys.filter((k) => !chapter.sections.some((s) => s.parts.some((p) => p.key === k))).map((k) => `script has an unknown part ${k} (the chapter changed?)`));
   const known = new Set(chapter.sections.flatMap((s) => s.parts.map((p) => p.key)));
-  for (const k of script.keys()) if (!known.has(k)) problems.push(`script has an unknown part ${k} (the chapter changed?)`);
+  for (const k of spokenKeys) if (!known.has(k)) problems.push(`script has an unknown part ${k} (the chapter changed?)`);
   return problems;
+}
+
+// Spoken emphasis in a translation is written in CAPITALS; on screen it is ordinary spelling: lower case,
+// a capital at a sentence start, and nouns (German capitalises them) from config.emphasisNouns[lang].
+function unemphasise(text) {
+  const nouns = new Set((config.emphasisNouns?.[lang] ?? []).map((w) => w.toUpperCase()));
+  return text.replace(/(^|[.!?…:]\s+|[„"“«]\s*|\n\s*)?(\p{Lu}{2,})(?![\p{L}\d])/gu, (all, lead, word, offset, whole) => {
+    if (/^\p{Lu}\d/u.test(word) || /\d/.test(word)) return all;
+    const before = whole.slice(0, offset).replace(/\s+$/, "");
+    const atStart = lead !== undefined || before === "" || /[.!?…:„"“«]$/.test(before);
+    const lower = word.toLowerCase();
+    const cased = nouns.has(word) || atStart ? lower[0].toUpperCase() + lower.slice(1) : lower;
+    return (lead ?? "") + cased;
+  });
 }
 
 // ── ElevenLabs ─────────────────────────────────────────────────────────────
@@ -176,39 +200,62 @@ async function put(objectPath, data, contentType) {
 // The chapter's translation into the shared translation store (p2p_content_translations, migration 243):
 // content_type kingdom_story_chapter, every part in metadata.parts. Created as a draft for review; a
 // later run updates the text only — it never changes a status a reviewer has set.
-async function saveTranslation(ch, parts) {
-  const title = (parts.find((p) => p.key === "title")?.text ?? "").replace(/^[^:]*\d+:\s*/, "").replace(/\.$/, "");
-  const row = {
-    title, body: parts.filter((p) => /^p\d+$/.test(p.key)).map((p) => p.text).join("\n\n"),
-    metadata: { source: "narration-script", scriptFile: `narration/scripts/${path.basename(scriptDir)}/${lang}/chapter-${ch.number}.txt`, parts },
-    translated_at: new Date().toISOString(),
-  };
-  const q = `content_type=eq.kingdom_story_chapter&content_id=eq.${ch.id}&language_code=eq.${lang}`;
+// The introduction is saved as the STORY's translation (content_type kingdom_story, content_id = story):
+// title, subtitle and the full introduction body — the English body's structure kept, its "Central theme"
+// line translated (meta:theme) and its Scripture lines left as references (they link to the Bible).
+async function saveTranslation(ch, parts, script) {
+  const intro = ch.id === "intro";
+  const plain = (k) => (script.get(k) ?? "").replace(TAG, "").replace(/[ \t]+/g, " ").trim();
+  let row;
+  if (intro) {
+    const titleLine = parts.find((p) => p.key === "title")?.text ?? "";
+    const subtitle = plain("meta:subtitle") || null;
+    const title = (subtitle && titleLine.endsWith(` ${subtitle}`) ? titleLine.slice(0, -subtitle.length - 1) : titleLine.split(/\.\s/)[0]).replace(/\.$/, "");
+    let n = 0;
+    const body = String(ch.story.body ?? "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean).map((p) => {
+      const m = p.match(/^(Central theme|Primary Scripture|Supporting Scripture):\s*([\s\S]+)$/);
+      if (m?.[1] === "Central theme") return plain("meta:theme") ? `Central theme: ${plain("meta:theme")}` : p;
+      if (m) return p;
+      const key = `p${n++}`;
+      return parts.find((x) => x.key === key)?.text ?? p;
+    }).join("\n\n");
+    row = { title, subtitle, body, description: plain("meta:theme") || null };
+  } else {
+    row = { title: (parts.find((p) => p.key === "title")?.text ?? "").replace(/^[^:]*\d+:\s*/, "").replace(/\.$/, ""), body: parts.filter((p) => /^p\d+$/.test(p.key)).map((p) => p.text).join("\n\n") };
+  }
+  row = { ...row, translated_at: new Date().toISOString(),
+    metadata: { source: "narration-script", scriptFile: `narration/scripts/${path.basename(scriptDir)}/${lang}/${intro ? "intro" : `chapter-${ch.number}`}.txt`, parts } };
+  const type = intro ? "kingdom_story" : "kingdom_story_chapter", id = intro ? meta.storyId : ch.id;
+  const q = `content_type=eq.${type}&content_id=eq.${id}&language_code=eq.${lang}`;
   const existing = await rest(`p2p_content_translations?select=id,status&${q}`);
   const r = existing.length
     ? await fetch(`${SB}/rest/v1/p2p_content_translations?${q}`, { method: "PATCH", headers: { ...sbHeaders, "content-type": "application/json" }, body: JSON.stringify(row) })
     : await fetch(`${SB}/rest/v1/p2p_content_translations`, { method: "POST", headers: { ...sbHeaders, "content-type": "application/json" },
-        body: JSON.stringify({ ...row, content_type: "kingdom_story_chapter", content_id: ch.id, language_code: lang, status: "draft" }) });
+        body: JSON.stringify({ ...row, content_type: type, content_id: id, language_code: lang, status: "draft" }) });
   if (!r.ok) throw new Error(`translation save ${ch.number} ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────
 const meta = JSON.parse(readFileSync(path.join(scriptDir, "story.json"), "utf8"));
-const chapters = await spokenChapters(meta.storyId);
+// The introduction first (when the story has one), then the chapters. --chapters takes numbers and "intro".
+const intro = await spokenIntro(meta.storyId);
+const chapters = [...(intro ? [intro] : []), ...(await spokenChapters(meta.storyId))];
 const langDir = path.join(scriptDir, lang);
-const files = existsSync(langDir) ? readdirSync(langDir).filter((f) => /^chapter-\d+\.txt$/.test(f)) : [];
+const files = existsSync(langDir) ? readdirSync(langDir).filter((f) => /^(chapter-\d+|intro)\.txt$/.test(f)) : [];
 const outDir = path.join(API, "narration/out", meta.storyId, lang);
 mkdirSync(outDir, { recursive: true });
+const fileFor = (ch) => (ch.id === "intro" ? "intro.txt" : `chapter-${ch.number}.txt`);
 for (const ch of chapters) {
-  if (onlyChapters && !onlyChapters.includes(ch.number)) continue;
-  if (!files.includes(`chapter-${ch.number}.txt`)) { console.log(`chapter ${ch.number}: no script yet — skipped`); continue; }
-  const script = readScript(path.join(langDir, `chapter-${ch.number}.txt`));
+  if (onlyChapters && !onlyChapters.includes(String(ch.number))) continue;
+  if (!files.includes(fileFor(ch))) { console.log(`${ch.id === "intro" ? "introduction" : `chapter ${ch.number}`}: no script yet — skipped`); continue; }
+  const script = readScript(path.join(langDir, fileFor(ch)));
   const problems = checkScript(ch, script);
   if (problems.length) { console.log(`chapter ${ch.number}: NOT generated —\n  ${problems.join("\n  ")}`); process.exitCode = 1; continue; }
 
   // Blocks: consecutive parts of one section, up to blockMaxChars, so delivery flows naturally.
-  // Each part as it will be shown in this language: the screen's own text (English) or its translation.
-  const shown = (p) => (lang === "en" ? p.text : script.get(p.key).replace(TAG, "").replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").trim());
+  // Each part as it will be shown in this language: the screen's own text (English) or its translation —
+  // cues removed, and CAPITALS used only for spoken emphasis written normally ("SEHR gut" → "sehr gut").
+  const shown = (p) => (lang === "en" ? p.text : unemphasise(script.get(p.key).replace(TAG, "").replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").trim()));
   const blocks = [];
   for (const s of ch.sections) {
     let cur = null;
@@ -242,7 +289,7 @@ for (const ch of chapters) {
   if (upload) {
     await put(`${meta.storyId}/narration/${lang}/${ch.id}.mp3`, mp3, "audio/mpeg");
     await put(`${meta.storyId}/narration/${lang}/${ch.id}.json`, JSON.stringify(manifest), "application/json");
-    if (lang !== "en") await saveTranslation(ch, manifest.parts);
+    if (lang !== "en") await saveTranslation(ch, manifest.parts, script);
   }
   console.log(`chapter ${ch.number}: ${blocks.length} blocks (${fresh} new, ${chars} characters), ${Math.round(words.at(-1)?.end ?? 0)} s, alignment loss ${al.loss?.toFixed?.(2)}${upload ? ", uploaded" : ""}${contextSupported ? "" : " (previous_text not accepted — sent without)"}`);
 }

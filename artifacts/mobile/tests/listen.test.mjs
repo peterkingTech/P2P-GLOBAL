@@ -388,7 +388,7 @@ ok("Bible: each passage starts with where it is ('John, Chapter 3' / 'John 3:16�
   && /`\$\{d\.book\.name\} \$\{chapter\}\.`/.test(bibleSrc) && /if \(!chapter\) return \[\]/.test(bibleSrc));
 ok("Bible: the heading part is not a verse (verse marker unaffected)", /key: "heading"/.test(bibleSrc) && /Number\(listening!\.partKey\)/.test(bibleSrc));
 ok("plan overview announced 'Overview' in its language", /spokenLabels\(plan\.textLanguage \?\? "en"\)\.overview/.test(src("app/plan/[id].tsx")));
-ok("screens pass labels for the text's language", /spokenLabels\(textLanguage\)/.test(src("app/lesson/[id].tsx")) && /spokenLabels\("en"\), story\.title\)/.test(src("app/kingdom-stories/chapter.tsx")) && /introListenSections\(story, spokenLabels\("en"\)\)/.test(src("app/kingdom-stories/[id].tsx")));
+ok("screens pass labels for the text's language", /spokenLabels\(textLanguage\)/.test(src("app/lesson/[id].tsx")) && /spokenLabels\(storyLang\), story\.title\)/.test(src("app/kingdom-stories/chapter.tsx")) && src("app/kingdom-stories/chapter.tsx").includes('const storyLang = story?.contentLanguage ?? "en";') && /introListenSections\(story, spokenLabels\(introLang\)\)/.test(src("app/kingdom-stories/[id].tsx")) && src("app/kingdom-stories/[id].tsx").includes('const introLang = story?.introLanguage ?? "en";'));
 
 // ── Source checks: one shared player, wired into the four areas ─────────────
 const screens = { bible: "app/bible/index.tsx", story: "app/kingdom-stories/chapter.tsx", "story-intro": "app/kingdom-stories/[id].tsx", lesson: "app/lesson/[id].tsx", plan: "app/plan/[id].tsx" };

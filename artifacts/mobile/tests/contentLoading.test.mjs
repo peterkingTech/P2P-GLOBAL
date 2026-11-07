@@ -109,10 +109,11 @@ ok("Kingdom School catalogue: lock state and modules/lessons together; cached pe
 
 // ── Stories, lessons, plans ────────────────────────────────────────────────
 const chapter = src("app/kingdom-stories/chapter.tsx"), storyPage = src("app/kingdom-stories/[id].tsx"), storiesHome = src("app/kingdom-stories/index.tsx");
-ok("story page and chapters share one cached story (opening a chapter is instant)", /loadCached\(qk\.story\(id\), \(\) => getKingdomStory\(id\)/.test(chapter) && /loadCached\(qk\.story\(id\), \(\) => getKingdomStory\(id\)/.test(storyPage)
-  && /peekCached<KingdomStory>\(qk\.story\(id\)\)/.test(chapter) && /peekCached<KingdomStory>\(qk\.story\(id\)\)/.test(storyPage));
+// (2026-11-07: one cached story per content language — the story page and its chapters share it.)
+ok("story page and chapters share one cached story (opening a chapter is instant)", /loadCached\(qk\.story\(id, lang\), \(\) => getKingdomStory\(id, lang\)/.test(chapter) && /loadCached\(qk\.story\(id, lang\), \(\) => getKingdomStory\(id, lang\)/.test(storyPage)
+  && /peekCached<KingdomStory>\(qk\.story\(id, lang\)\)/.test(chapter) && /peekCached<KingdomStory>\(qk\.story\(id, lang\)\)/.test(storyPage));
 ok("after finishing a chapter / answering, the story is fetched fresh (progress stays correct)", /await load\(true\); await loadAnswers\(\)/.test(chapter) && /\{ maxAgeMs: 30_000, fresh \}/.test(chapter));
-ok("favourites keep the cached copies honest", /setCached\(qk\.story\(story!\.id\)/.test(storyPage) && /invalidateCached\(qk\.storiesHome\(\)\); invalidateCached\(qk\.story\(id\)\)/.test(storiesHome));
+ok("favourites keep the cached copies honest", /setCached\(qk\.story\(story!\.id, lang\)/.test(storyPage) && /invalidateCached\(qk\.storiesHome\(\)\); invalidateCached\(qk\.story\(id\)\)/.test(storiesHome));
 ok("stories home cached; pull-to-refresh is always fresh", /loadCached\(qk\.storiesHome\(\), \(\) => getDiscoverHome\(\)/.test(storiesHome) && /onRefresh=\{\(\) => \{ setRefreshing\(true\); load\(true\); \}\}/.test(storiesHome));
 const lesson = src("app/lesson/[id].tsx");
 ok("lesson content cached (never answers or progress); a failed load isn't cached", /loadCached<LessonContent>\(qk\.lessonContent\(id\)/.test(lesson) && /if \(lessonError\) throw lessonError;/.test(lesson) && !/loadCached[\s\S]{0,200}(submission|progress)/i.test(lesson));
@@ -121,7 +122,7 @@ ok("plan cached per person for 30 s (locks / progress refresh after that)", /loa
 // ── Server: opening a story ────────────────────────────────────────────────
 const route = readFileSync(path.join(root, "../api-server/src/routes/kingdomStories.ts"), "utf8").replace(/\r\n/g, "\n");
 const handler = route.slice(route.indexOf('router.get("/:id", async'), route.indexOf("\n});", route.indexOf('router.get("/:id", async')));
-ok("server: story, editor check and saves fetched together", /const \[\{ data: story \}, editor, saves\] = await Promise\.all\(\[[\s\S]*isEditor\(userId\),[\s\S]*savesFor\(userId, \[req\.params\.id\]\),/.test(handler));
+ok("server: story, editor check, saves and the content language fetched together", /const \[\{ data: story \}, editor, saves, lang\] = await Promise\.all\(\[[\s\S]*isEditor\(userId\),[\s\S]*savesFor\(userId, \[req\.params\.id\]\),[\s\S]*contentLanguage\(req, userId\),/.test(handler));
 ok("server: access rule unchanged (not found / unpublished-non-editor before anything else is returned)", handler.indexOf('if (story.status !== "published" && !editor) return err(res, "Story not found", 404);') > 0
   && handler.indexOf('if (story.status !== "published" && !editor)') < handler.indexOf("return ok(res"));
 ok("server: neighbours fetched alongside the other details; no extra sequential awaits", /siblingsRes\]/.test(handler) && !/await savesFor\(/.test(handler) && !/const editor = await isEditor/.test(handler) && (handler.match(/await /g) ?? []).length <= 6);

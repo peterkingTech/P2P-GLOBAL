@@ -9,6 +9,7 @@ import { savesFor, libraryNotReady } from "../lib/kingdomStoryLibrary";
 import { chapterLearning, storiesProgress, lockChapter } from "../lib/kingdomStoryLearning";
 import { neighbours } from "../lib/kingdomStoryJourney";
 import { chapterNarration } from "../lib/storyNarration";
+import { approvedChapterTranslations, approvedStoryTranslation, translateChapter, translatedStoryTitle, LANG_RE } from "../lib/kingdomStoryTranslations";
 
 // Kingdom Stories — P2P-curated editorial content (migration 152).
 // Genuinely different authorization model from every other content route
@@ -230,10 +231,12 @@ router.get("/:id", async (req, res) => {
   // Independent lookups run together (each database round trip costs real time):
   // the story, whether the caller is an editor, and the caller's own saves. The
   // access rule is unchanged: nothing is returned before the published/editor check.
-  const [{ data: story }, editor, saves] = await Promise.all([
+  // …and the content language (?lang=, else the reader's saved setting) the chapters should come back in.
+  const [{ data: story }, editor, saves, lang] = await Promise.all([
     db.from("p2p_kingdom_stories").select("*").eq("id", req.params.id).maybeSingle(),
     isEditor(userId),
     savesFor(userId, [req.params.id]),
+    contentLanguage(req, userId),
   ]);
   if (!story) return err(res, "Story not found", 404);
   if (story.status !== "published" && !editor) return err(res, "Story not found", 404);
@@ -249,12 +252,25 @@ router.get("/:id", async (req, res) => {
   // Storybook (migration 212): each chapter's state for this reader. Editors
   // see every chapter in full; readers get a locked chapter's title only.
   const preview = editor && story.status !== "published";
-  const { byChapter, progress } = await chapterLearning({ id: story.id as string, status: story.status as string }, loaded, userId, preview);
+  // Approved translations in the content language are fetched alongside (lib/kingdomStoryTranslations)
+  // and laid over each chapter; a locked chapter only gets its title.
+  const [{ byChapter, progress }, translations, storyTr] = await Promise.all([
+    chapterLearning({ id: story.id as string, status: story.status as string }, loaded, userId, preview),
+    lang === "en" ? Promise.resolve(new Map<string, { key: string; text: string }[]>()) : approvedChapterTranslations(loaded.map((c) => c.id), lang).catch(() => new Map<string, { key: string; text: string }[]>()),
+    // The story's own translation: title, subtitle and introduction.
+    lang === "en" ? Promise.resolve(null) : approvedStoryTranslation(story.id as string, lang).catch(() => null),
+  ]);
   const chapters = loaded.map((ch) => {
     const learning = byChapter.get(ch.id)!;
-    const visible = learning.state === "locked" && !editor ? lockChapter(ch) : ch;
-    return { ...visible, learning: learning.state === "locked" && !editor ? { ...learning, reflectionQuestions: [], check: null } : learning };
+    const locked = learning.state === "locked" && !editor;
+    const visible = locked ? lockChapter(ch) : ch;
+    const shown = { ...visible, learning: locked ? { ...learning, reflectionQuestions: [], check: null } : learning };
+    const parts = translations.get(ch.id);
+    if (!parts) return shown;
+    if (locked) return { ...shown, title: translateChapter({ ...shown, lessons: [], reflections: [], narrative: "" } as any, parts.filter((p: { key: string }) => p.key === "title")).title };
+    return translateChapter(shown as any, parts);
   });
+  const storyTitle = storyTr?.title || (translations.size ? translatedStoryTitle(translations) : null);
   const mine = saves.get(story.id as string) ?? { favourite: false, later: false };
   // The published stories just before and after this one in its category's order.
   let sequence: { previous: SequenceLink | null; next: SequenceLink | null } = { previous: null, next: null };
@@ -265,8 +281,26 @@ router.get("/:id", async (req, res) => {
     const link = (id: string | null): SequenceLink | null => { const x = id ? list.find((r) => r.id === id) : null; return x ? { id: x.id, title: x.title, topicNumber: x.topic_number ?? null } : null; };
     sequence = { previous: link(n.previous), next: link(n.next) };
   }
-  return ok(res, { ...mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related }), progress, mine, sequence });
+  const mapped = mapStory(story as Record<string, unknown>, { category, media, sources, chapters, related });
+  return ok(res, {
+    ...mapped, ...(storyTitle ? { title: storyTitle } : {}),
+    ...(storyTr?.subtitle ? { subtitle: storyTr.subtitle } : {}), ...(storyTr?.body ? { body: storyTr.body } : {}),
+    // The language the story actually came back in ("en" when nothing was translated);
+    // introLanguage: the language of its title, subtitle and introduction.
+    contentLanguage: translations.size || storyTr ? lang : "en",
+    introLanguage: storyTr?.body ? lang : "en",
+    progress, mine, sequence,
+  });
 });
+
+/** The reader's content language: ?lang= when given, else their saved profile setting, else English. */
+async function contentLanguage(req: import("express").Request, userId: string): Promise<string> {
+  const q = typeof req.query.lang === "string" ? req.query.lang.toLowerCase() : "";
+  if (LANG_RE.test(q)) return q;
+  const { data } = await db.from("p2p_profiles").select("content_language").eq("id", userId).maybeSingle();
+  const saved = String((data as { content_language?: string } | null)?.content_language ?? "en").toLowerCase().split("-")[0];
+  return LANG_RE.test(saved) ? saved : "en";
+}
 
 // A chapter with no Comprehensive Check is finished by reading it. (Chapters
 // with a check finish through the check, like any Core Curriculum lesson.)
@@ -296,13 +330,15 @@ router.post("/:id/chapters/:chapterId/finish", async (req, res) => {
 router.get("/:id/chapters/:chapterId/narration", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
-  if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.chapterId)) return err(res, "Chapter not found", 404);
+  // "intro": the story's introduction (on the story page, never locked) — the story's own access rule only.
+  const intro = req.params.chapterId === "intro";
+  if (!UUID_RE.test(req.params.id) || (!intro && !UUID_RE.test(req.params.chapterId))) return err(res, "Chapter not found", 404);
   const [{ data: story }, editor] = await Promise.all([
     db.from("p2p_kingdom_stories").select("id,status").eq("id", req.params.id).maybeSingle(),
     isEditor(userId),
   ]);
   if (!story || (story.status !== "published" && !editor)) return err(res, "Chapter not found", 404);
-  const { data: ch } = await db.from("p2p_kingdom_story_chapters").select("id,lesson_id").eq("id", req.params.chapterId).eq("story_id", req.params.id).maybeSingle();
+  const { data: ch } = intro ? { data: { id: "intro", lesson_id: null } } : await db.from("p2p_kingdom_story_chapters").select("id,lesson_id").eq("id", req.params.chapterId).eq("story_id", req.params.id).maybeSingle();
   if (!ch) return err(res, "Chapter not found", 404);
   if (!editor && ch.lesson_id) {
     const { data: open } = await db.rpc("p2p_kingdom_story_chapter_open", { p_user_id: userId, p_lesson_id: ch.lesson_id });

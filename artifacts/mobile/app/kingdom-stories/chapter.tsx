@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useData } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext";
 import type { AppColors } from "@/constants/themes";
-import { getKingdomStory, finishKingdomStoryChapter, markStoryOpened, getKingdomStoryMediaSignedUrl, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
+import { baseContentLanguage, getKingdomStory, finishKingdomStoryChapter, markStoryOpened, getKingdomStoryMediaSignedUrl, type KingdomStory, type KingdomStoryChapter } from "@/lib/kingdomStoriesApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
 import { paragraphs, paragraphKind, illustrationSlots, lockedMessage, STATE_LABEL, chapterListenSections } from "@/lib/storybook";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
@@ -65,9 +66,12 @@ export default function KingdomStoryChapterScreen() {
   const reading = useReadingScale();
   const s = useMemo(() => makeStyles(c, reading.scale), [c, reading.scale]);
 
+  // The reader's content language: approved translations of the chapters come back in it (API).
+  const { profile } = useAuth();
+  const lang = baseContentLanguage(profile?.contentLanguage);
   // The story is shared with the story page (lib/query): opening a chapter from it shows at once.
-  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id)) ?? null : null));
-  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id))));
+  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id, lang)) ?? null : null));
+  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id, lang))));
   const [error, setError] = useState<string | null>(null);
   const [reflSubs, setReflSubs] = useState<Map<string, Sub>>(new Map());
   const [checkSubs, setCheckSubs] = useState<Map<string, Sub>>(new Map());
@@ -83,7 +87,7 @@ export default function KingdomStoryChapterScreen() {
   const load = useCallback(async (fresh = false) => {
     if (!id) return;
     try {
-      const st = await loadCached(qk.story(id), () => getKingdomStory(id), { maxAgeMs: 30_000, fresh });
+      const st = await loadCached(qk.story(id, lang), () => getKingdomStory(id, lang), { maxAgeMs: 30_000, fresh });
       setStory(st);
       setError(null);
       const cur = chapterRef.current;
@@ -94,7 +98,7 @@ export default function KingdomStoryChapterScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, lessonParam]);
+  }, [id, lessonParam, lang]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   // Per chapter: the resume point (never progress) and this reader's own answers.
@@ -157,6 +161,8 @@ export default function KingdomStoryChapterScreen() {
     getKingdomStoryMediaSignedUrl(cover.mediaPath).then((u) => { if (live) setCoverUrl(u ?? null); }).catch(() => {});
     return () => { live = false; };
   }, [story?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The language the chapters actually came back in (a story without a translation stays English).
+  const storyLang = story?.contentLanguage ?? "en";
   const listenContent = (target: KingdomStoryChapter): ListenContent | null => {
     if (!story || target.learning?.state === "locked") return null;
     const i = chapters.findIndex((x) => x.id === target.id);
@@ -184,17 +190,17 @@ export default function KingdomStoryChapterScreen() {
       ],
       title: story.title,
       subtitle: `Chapter ${target.chapterNumber}: ${target.title}`,
-      // Kingdom Stories are written in English (no translated stories yet).
-      language: "en",
+      // The chapter's language: the reader's content language where it has been translated, else English.
+      language: storyLang,
       // A studio recording when this chapter has one (the questions are still read by the phone's voice).
-      narration: narrations.current.get(target.id) ?? undefined,
+      narration: narrations.current.get(`${storyLang}:${target.id}`) ?? undefined,
       // The questions exactly as the chapter shows them (before activities are prepared: its own text).
       sections: chapterListenSections(target, {
         reflections: target.learning?.reflectionQuestions?.length ? target.learning.reflectionQuestions : target.reflections.map((q, k) => ({ id: `r${k}`, question: q })),
         check: target.learning?.check
           ? { title: checkTitle(target.learning.check.title), questions: target.learning.check.questions }
           : target.assignment?.text ? { title: COMPREHENSIVE_CHECK, questions: [{ id: "check", question: target.assignment.text }] } : null,
-      }, spokenLabels("en"), story.title),
+      }, spokenLabels(storyLang), story.title),
       previous: link(chapters[i - 1]),
       next: link(chapters[i + 1]),
     };
@@ -206,15 +212,15 @@ export default function KingdomStoryChapterScreen() {
   useEffect(() => {
     if (!story) return;
     for (const t of [prev, ch, next]) {
-      if (t && t.learning?.state !== "locked" && !narrations.current.has(t.id)) {
-        void loadNarration(story.id, t.id).then((n) => { narrations.current.set(t.id, n); });
+      if (t && t.learning?.state !== "locked" && !narrations.current.has(`${storyLang}:${t.id}`)) {
+        void loadNarration(story.id, t.id, storyLang).then((n) => { narrations.current.set(`${storyLang}:${t.id}`, n); });
       }
     }
-  }, [story?.id, ch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [story?.id, ch?.id, storyLang]); // eslint-disable-line react-hooks/exhaustive-deps
   const withNarration = async (target: KingdomStoryChapter): Promise<ListenContent | null> => {
-    if (story && !narrations.current.has(target.id)) {
-      const n = await Promise.race([loadNarration(story.id, target.id), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
-      if (n) narrations.current.set(target.id, n);
+    if (story && !narrations.current.has(`${storyLang}:${target.id}`)) {
+      const n = await Promise.race([loadNarration(story.id, target.id, storyLang), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      if (n) narrations.current.set(`${storyLang}:${target.id}`, n);
     }
     return listenContent(target);
   };

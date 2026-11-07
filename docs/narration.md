@@ -49,7 +49,11 @@ Run `--lang de --upload` to do three things at once:
 - save each chapter's translation into the shared translation store, `p2p_content_translations` (`content_type` `kingdom_story_chapter`, every part in `metadata.parts`; migration 243), as a **draft** for review. A later run updates only the text and never changes a status a reviewer has set;
 - make the API serve the narration for `?lang=de`. A language without its own recording gets none; English audio is never served instead.
 
-The aim is that a reader's **content language** shows every part of a story, and its narration, in that language.
+A reader's **content language** shows every translated part of a story, and its narration, in that language:
+- `GET /api/kingdom-stories/:id` takes `?lang=`; otherwise it uses the reader's saved content language. It lays the **approved** chapter translations over the English chapters: title, story text, Story Lessons, Personal Reflections and the Comprehensive Check. A locked chapter gets only its translated title, and the story's title comes from the translated "story" part.
+- Anything without an approved translation stays English. That currently includes the story's subtitle and introduction, and the people, places and evidence notes.
+- In the app, the story page and chapters ask for the reader's content language (cached per language). Listen speaks the app's labels in the chapter's language and plays that language's narration, with sentence highlighting.
+- The translated parts are exactly what the narration says, so text, highlighting and voice always line up.
 
 | Story | Language | Narrator | Length | Translation |
 |---|---|---|---|---|

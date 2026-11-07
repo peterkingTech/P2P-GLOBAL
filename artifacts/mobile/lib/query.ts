@@ -26,7 +26,8 @@ export const queryClient = new QueryClient({
 
 /** Cache keys — one place, so a feature and its screens always agree. */
 export const qk = {
-  story: (id: string) => ["kingdom-story", id] as const,
+  /** A story as the reader sees it in their content language (English unless translated). */
+  story: (id: string, lang: string = "en") => (lang === "en" ? ["kingdom-story", id] : ["kingdom-story", id, lang]) as readonly string[],
   storiesHome: () => ["kingdom-stories", "discover"] as const,
   storyCategories: () => ["kingdom-stories", "categories"] as const,
   lessonContent: (id: string) => ["lesson-content", id] as const,

@@ -22,12 +22,12 @@ export function fromData(d: ChapterNarrationData | null | undefined): RecordedNa
 }
 
 const loaded = new Map<string, Promise<RecordedNarration | null>>();
-/** A chapter's narration (or null), fetched once per session; a failure means the phone's voice. */
-export function loadNarration(storyId: string, chapterId: string): Promise<RecordedNarration | null> {
-  const key = `${storyId}/${chapterId}`;
+/** A chapter's narration in `lang` (or null), fetched once per session; a failure means the phone's voice. */
+export function loadNarration(storyId: string, chapterId: string, lang = "en"): Promise<RecordedNarration | null> {
+  const key = `${storyId}/${chapterId}/${lang}`;
   let p = loaded.get(key);
   if (!p) {
-    p = getChapterNarration(storyId, chapterId).then((r) => fromData(r?.narration), () => { loaded.delete(key); return null; });
+    p = getChapterNarration(storyId, chapterId, lang).then((r) => fromData(r?.narration), () => { loaded.delete(key); return null; });
     loaded.set(key, p);
   }
   return p;

@@ -1,15 +1,17 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Share } from "react-native";
 import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import type { AppColors } from "@/constants/themes";
-import { getKingdomStory, saveStory, unsaveStory, markStoryOpened, formatTopicNumber, CONTENT_TYPE_LABELS, IMAGE_KIND_LABELS, type KingdomStory, type KingdomStoryChapter, type KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
+import { baseContentLanguage, getKingdomStory, saveStory, unsaveStory, markStoryOpened, formatTopicNumber, CONTENT_TYPE_LABELS, IMAGE_KIND_LABELS, type KingdomStory, type KingdomStoryChapter, type KingdomStoryMedia } from "@/lib/kingdomStoriesApi";
 import ShareStorySheet from "@/components/kingdom-stories/ShareStorySheet";
 import SharedStudySheet from "@/components/study/SharedStudySheet";
 import { getScriptureReference, type ScriptureReference } from "@/lib/prayerTopicsApi";
 import { SCRIPTURE_FONT } from "@/lib/bibleReaderApi";
+import { loadNarration, type RecordedNarration } from "@/lib/listen/narration";
 import { storyIntro, progressSummary, STATE_LABEL, lockedMessage, introListenSections } from "@/lib/storybook";
 import ListenPlayer, { ListenButton } from "@/components/listen/ListenPlayer";
 import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/listen";
@@ -46,9 +48,12 @@ export default function KingdomStoryBookScreen() {
   // chapter the reader is up to (once; the book stays underneath for Back).
   const { id, open } = useLocalSearchParams<{ id: string; open?: string }>();
   const autoOpened = useRef(false);
+  // In the reader's content language where translated (same cache as the chapters).
+  const { profile } = useAuth();
+  const lang = baseContentLanguage(profile?.contentLanguage);
   // Shared with the chapters (lib/query): coming back from a chapter shows the book at once.
-  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id))));
-  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id)) ?? null : null));
+  const [loading, setLoading] = useState(() => !(id && peekCached(qk.story(id, lang))));
+  const [story, setStory] = useState<KingdomStory | null>(() => (id ? peekCached<KingdomStory>(qk.story(id, lang)) ?? null : null));
   usePerfVisit("story", "Kingdom Story page", id, !!story && story.id === id);
   const [scripture, setScripture] = useState<ScriptureReference | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -61,7 +66,7 @@ export default function KingdomStoryBookScreen() {
     if (!id) return;
     let live = true;
     // A copy under 30 s old is reused; finishing a chapter refreshes it (chapter screen), so progress stays current.
-    loadCached(qk.story(id), () => getKingdomStory(id), { maxAgeMs: 30_000 }).then((st) => {
+    loadCached(qk.story(id, lang), () => getKingdomStory(id, lang), { maxAgeMs: 30_000 }).then((st) => {
       if (!live) return;
       setStory(st);
       if (st.mine) setMine(st.mine);
@@ -77,20 +82,36 @@ export default function KingdomStoryBookScreen() {
       .finally(() => live && setLoading(false));
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]));
+  }, [id, lang]));
 
   // Listen to the introduction (the shared player; the chapters have their own).
   useListenOwner("story-intro");
   const listenState = useListenState();
-  const introSections = story ? introListenSections(story, spokenLabels("en")) : [];
+  // In the introduction's own language (the reader's content language where translated), with its
+  // studio narration when it has one (lib/listen/narration; "intro") — else the phone's voice.
+  const introLang = story?.introLanguage ?? "en";
+  const introSections = story ? introListenSections(story, spokenLabels(introLang)) : [];
+  const introNarration = useRef<{ key: string; n: RecordedNarration | null } | null>(null);
+  useEffect(() => {
+    if (!story) return;
+    const key = `${story.id}:${introLang}`;
+    if (introNarration.current?.key === key) return;
+    void loadNarration(story.id, "intro", introLang).then((n) => { introNarration.current = { key, n }; });
+  }, [story?.id, introLang]); // eslint-disable-line react-hooks/exhaustive-deps
   const introKey = story ? `story-intro:${story.id}` : "";
   const listeningIntro = !!story && listenState.content?.key === introKey && listenState.status !== "idle";
-  const onListenIntro = () => {
+  const onListenIntro = async () => {
     if (!story || !introSections.length) return;
     if (listeningIntro) return listen.present();
+    const key = `${story.id}:${introLang}`;
+    if (introNarration.current?.key !== key) {
+      const n = await Promise.race([loadNarration(story.id, "intro", introLang), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      introNarration.current = { key, n };
+    }
     const first = [...(story.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber).find((x) => x.learning?.state !== "locked");
     void listen.play({
-      key: introKey, owner: "story-intro", kind: "story-intro", route: { pathname: "/kingdom-stories/[id]", params: { id: story.id } }, highlight: "sentence", title: story.title, subtitle: "Introduction", language: "en", sections: introSections,
+      key: introKey, owner: "story-intro", kind: "story-intro", route: { pathname: "/kingdom-stories/[id]", params: { id: story.id } }, highlight: "sentence", title: story.title, subtitle: "Introduction", language: introLang, sections: introSections,
+      narration: introNarration.current?.n ?? undefined,
       // The next learning step, chosen by the reader — never opened automatically.
       completionActions: first
         ? [{ label: `Start Chapter ${first.chapterNumber}`, icon: "book-outline", open: () => router.push({ pathname: "/kingdom-stories/chapter", params: { id: story.id, chapter: first.id } } as any) }]
@@ -131,8 +152,8 @@ export default function KingdomStoryBookScreen() {
     try {
       await (on ? saveStory(story!.id, kind) : unsaveStory(story!.id, kind));
       // Keep the shared copy in step, so reopening shows the new Favourite / Saved state.
-      const cached = peekCached<KingdomStory>(qk.story(story!.id));
-      if (cached) setCached(qk.story(story!.id), { ...cached, mine: { ...(cached.mine ?? { favourite: false, later: false }), [kind]: on } });
+      const cached = peekCached<KingdomStory>(qk.story(story!.id, lang));
+      if (cached) setCached(qk.story(story!.id, lang), { ...cached, mine: { ...(cached.mine ?? { favourite: false, later: false }), [kind]: on } });
       invalidateCached(qk.storiesHome());
     }
     catch (e: any) { setMine((m) => ({ ...m, [kind]: !on })); showAlert("Couldn't update your library", e?.message ?? "Please try again."); }

@@ -8,6 +8,7 @@
   "voiceSettings": { "stability": 0.3, "similarity_boost": 0.75, "speed": 1.0 },
   "outputFormat": "mp3_44100_128",
   "blockMaxChars": 1400,
+  "emphasisNouns": { "de": ["Licht"] },
   "tagAliases": {
     "dramatic pause": "long pause",
     "breathes in": "inhales deeply",

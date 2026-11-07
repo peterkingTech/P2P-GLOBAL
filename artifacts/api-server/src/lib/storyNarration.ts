@@ -49,7 +49,8 @@ async function manifestFor(storyId: string, chapterId: string, lang: string): Pr
 
 /** A chapter's narration in `lang` (ISO 639-1) with a playable link, or null when it has none. */
 export async function chapterNarration(storyId: string, chapterId: string, lang = "en"): Promise<ChapterNarration | null> {
-  if (!UUID.test(storyId) || !UUID.test(chapterId) || !/^[a-z]{2,3}$/.test(lang)) return null;
+  // A chapter's id, or "intro" for the story's introduction.
+  if (!UUID.test(storyId) || !(UUID.test(chapterId) || chapterId === "intro") || !/^[a-z]{2,3}$/.test(lang)) return null;
   const found = await manifestFor(storyId, chapterId, lang);
   if (!found) return null;
   const { m, dir } = found;

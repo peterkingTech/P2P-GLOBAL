@@ -125,7 +125,9 @@ ok("images: accessibility description, loading + error states, cached by path", 
 ok("images: AI/artistic images labelled, never passed off as records", src("lib/kingdomStoriesApi.ts").includes("AI-generated illustration (not a historical record)") && img.includes("IMAGE_KIND_LABELS"));
 ok("readers never get a locked chapter's text from the server", (() => {
   const r = readFileSync(path.join(repo, "artifacts/api-server/src/routes/kingdomStories.ts"), "utf8");
-  return r.includes('learning.state === "locked" && !editor ? lockChapter(ch) : ch') && r.includes("chapterLearning(");
+  // (2026-11-07: same rule, written once as `locked`; a translated locked chapter gets only its title.)
+  return r.includes('const locked = learning.state === "locked" && !editor;') && r.includes("const visible = locked ? lockChapter(ch) : ch;")
+    && r.includes('parts.filter((p: { key: string }) => p.key === "title")') && r.includes("chapterLearning(");
 })());
 ok("old single-page chapter component removed", (() => { try { src("components/kingdom-stories/StoryChapters.tsx"); return false; } catch { return true; } })());
 

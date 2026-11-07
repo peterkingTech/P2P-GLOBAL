@@ -82,7 +82,8 @@ export type ParagraphKind =
   | { kind: "numbered"; number: string; text: string }
   | { kind: "labelled"; label: string; text: string }
   | { kind: "plain"; text: string };
-const LABELS = /^(Reflection|Closing thought|Topic review|Historical note|Interpretive note|Editorial note|Note)(:)\s+([\s\S]+)$/;
+// English, and the same labels in translated stories (German: Zum Nachdenken, Schlussgedanke, Rückblick auf das Thema, …).
+const LABELS = /^(Reflection|Closing thought|Topic review|Historical note|Interpretive note|Editorial note|Note|Zum Nachdenken|Schlussgedanke|Rückblick auf das Thema|Historische Anmerkung|Anmerkung)(:)\s+([\s\S]+)$/;
 export function paragraphKind(p: string): ParagraphKind {
   const t = p.trim();
   if (t.length <= 90 && /:$/.test(t) && !/[.!?]\s/.test(t)) return { kind: "heading", text: t.slice(0, -1) };
