@@ -10,6 +10,7 @@ import colors from "@/constants/colors";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import { Avatar } from "@/components/Avatar";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 const DEPARTMENT_OPTIONS: { value: ComposeDepartment; label: string }[] = [
   { value: "support_help", label: "Support & Help" },
   { value: "crisis_safeguarding", label: "Crisis & Safeguarding" },
@@ -48,6 +49,7 @@ interface ComposeMessageModalProps {
 // message and leaves before sending, save it as a draft"). Opening with
 // initialDraft resumes that same draft row rather than creating a new one.
 export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: ComposeMessageModalProps) {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const sheetWidth = useSheetWidth();
   const { searchUsersForCompose, sendOfficialMessage, saveOfficialMailDraft, deleteOfficialMailDraft } = useData();
 
@@ -258,7 +260,7 @@ export function ComposeMessageModal({ visible, onClose, onSent, initialDraft }: 
                       style={[styles.input, styles.textarea]}
                       value={body}
                       onChangeText={(t) => setBody(t.slice(0, MAX_BODY_LENGTH))}
-                      placeholder="Write your message here…"
+                      placeholder={privacyPlaceholder}
                       placeholderTextColor={colors.textMuted}
                       multiline
                       maxLength={MAX_BODY_LENGTH}

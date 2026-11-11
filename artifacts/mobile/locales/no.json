@@ -417,6 +417,7 @@
     "emptyTitle": "Ingen samtaler ennå",
     "emptySub": "Start en fra profilen til en medtroende eller fra en gruppe.",
     "messagePlaceholder": "Melding ...",
+    "privacyPlaceholder": "Ikke skriv inn sensitive personopplysninger",
     "title": "Samtale"
   },
   "connect": {

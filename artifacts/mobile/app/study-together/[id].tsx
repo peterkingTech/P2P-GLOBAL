@@ -14,6 +14,7 @@ import {
 import { AppButton, IconButton } from "@/components/ui";
 import { confirmAction } from "@/lib/alerts";
 import { timeAgo as ago } from "@/lib/timeFormat";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 
 // One shared study: what we're studying, where the group is (the leader's
 // shared chapter), discussion questions (the chapter's own reflection
@@ -25,6 +26,7 @@ import { timeAgo as ago } from "@/lib/timeFormat";
 
 
 export default function SharedStudyScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors: c } = useTheme();
@@ -97,7 +99,7 @@ export default function SharedStudyScreen() {
         ))}
         {active && st.me.canParticipate ? (
           <View style={s.composer}>
-            <TextInput style={s.input} value={draft} onChangeText={(t) => setDrafts((d) => ({ ...d, [k]: t }))} placeholder="Share a response with the group…" placeholderTextColor={c.textMuted} multiline maxLength={2000} accessibilityLabel={`Response${label ? ` to: ${label}` : ""}`} />
+            <TextInput style={s.input} value={draft} onChangeText={(t) => setDrafts((d) => ({ ...d, [k]: t }))} placeholder={privacyPlaceholder} placeholderTextColor={c.textMuted} multiline maxLength={2000} accessibilityLabel={`Response${label ? ` to: ${label}` : ""}`} />
             <TouchableOpacity style={[s.sendBtn, (!draft.trim() || busy === k) && { opacity: 0.5 }]} disabled={!draft.trim() || busy === k}
               onPress={() => act(k, async () => { await postStudyResponse(st.id, { body: draft.trim(), ...target }); setDrafts((d) => ({ ...d, [k]: "" })); })}
               accessibilityRole="button" accessibilityLabel="Post response">
@@ -183,7 +185,7 @@ export default function SharedStudyScreen() {
           {st.me.isLeader && active ? (
             <View style={s.card}>
               <Text style={s.cardTitle}>Add a discussion question</Text>
-              <TextInput style={s.input} value={newPrompt} onChangeText={setNewPrompt} placeholder={current ? `A question about Chapter ${current.number}` : "A question for the group"} placeholderTextColor={c.textMuted} multiline maxLength={1000} accessibilityLabel="New discussion question" />
+              <TextInput style={s.input} value={newPrompt} onChangeText={setNewPrompt} placeholder={privacyPlaceholder} placeholderTextColor={c.textMuted} multiline maxLength={1000} accessibilityLabel="New discussion question" />
               <TouchableOpacity style={[s.btn, !newPrompt.trim() && { opacity: 0.5 }]} disabled={!newPrompt.trim() || busy === "prompt"}
                 onPress={() => act("prompt", async () => { await addStudyPrompt(st.id, newPrompt.trim(), current?.id ?? null); setNewPrompt(""); })} accessibilityRole="button">
                 <Text style={s.btnText}>Add question</Text>

@@ -7,6 +7,7 @@ import colors from "@/constants/colors";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 interface PeerGuideRequestModalProps {
   visible: boolean;
   onClose: () => void;
@@ -22,6 +23,7 @@ const MAX_MESSAGE_LENGTH = 500;
 // (app/connect/smart-match.tsx), though both go through the same
 // POST /discipleship/request endpoint and p2p_discipleship_links table.
 export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetName, onSent }: PeerGuideRequestModalProps) {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const sheetWidth = useSheetWidth();
   const { profile } = useAuth();
   const [message, setMessage] = useState("");
@@ -88,7 +90,7 @@ export function PeerGuideRequestModal({ visible, onClose, targetUserId, targetNa
                 style={styles.input}
                 value={message}
                 onChangeText={(t) => setMessage(t.slice(0, MAX_MESSAGE_LENGTH))}
-                placeholder="Tell them why you would like them to be your Peer Guide…"
+                placeholder={privacyPlaceholder}
                 placeholderTextColor={colors.textMuted}
                 multiline
               />

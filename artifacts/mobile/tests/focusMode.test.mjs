@@ -56,7 +56,8 @@ ok("drafts: device copy first (works offline); online copy is the writer's own a
 const lesson = src("app/lesson/[id].tsx");
 ok("lesson answer is a persisted draft keyed by user + lesson + kind + question", /useDraft\(profile\?\.id \? draftKey\(profile\.id, `lesson:\$\{lessonId\}:\$\{kind\}:\$\{question\.id\}`\) : null\)/.test(lesson));
 ok("draft cleared only after a successful submit", /if \(err\) \{ setError\(err\); return; \}[\s\S]{0,400}setFocusWriting\(false\);\s*\n\s*await draft\.clear\(\);/.test(lesson));
-ok("a restored draft re-opens the composer", /if \(draft\.restored && !submitted\) \{ setExpanded\(true\); setMode\("text"\); \}/.test(lesson));
+// 2026-11-11: numbered checks also reopen the questions that have a saved answer (lib/checkParts).
+ok("a restored draft re-opens the composer", /if \(draft\.restored && !submitted\) \{\s*setExpanded\(true\); setMode\("text"\);/.test(lesson));
 ok("Expand opens a full-screen writing view bound to the same draft text", /accessibilityLabel="Expand writing to full screen"/.test(lesson)
   && /<Modal visible=\{focusWriting\}[\s\S]{0,200}presentationStyle="fullScreen"/.test(lesson) && (lesson.match(/value=\{text\}\s*\n\s*onChangeText=\{setText\}/g) ?? []).length >= 2);
 ok("focus writing: Done restores; Android back closes it", /onRequestClose=\{\(\) => setFocusWriting\(false\)\}/.test(lesson) && /accessibilityLabel="Done, return to the lesson"/.test(lesson));

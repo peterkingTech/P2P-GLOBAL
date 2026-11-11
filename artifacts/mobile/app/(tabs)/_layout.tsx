@@ -80,14 +80,15 @@ function NativeTabLayout() {
         <NativeTabs.Trigger.Label>{t("tabs.messages")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Badge hidden={totalUnreadCount === 0}>{String(totalUnreadCount)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <NativeTabs.Trigger.Icon sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }} />
-        <NativeTabs.Trigger.Label>{profileTabLabel(t)}</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <NativeTabs.Trigger.Icon sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }} />
         <NativeTabs.Trigger.Label>{moreLabel(t)}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Badge hidden={prayerBadge === 0}>{String(prayerBadge)}</NativeTabs.Trigger.Badge>
+      </NativeTabs.Trigger>
+      {/* My Profile is always the last tab (owner, 2026-11-11). */}
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Icon sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }} />
+        <NativeTabs.Trigger.Label>{profileTabLabel(t)}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
     {capsuleVisible && (
@@ -97,8 +98,8 @@ function NativeTabLayout() {
           { name: "learn", label: t("tabs.learn") },
           { name: "bible", label: bibleLabel(t) },
           { name: "messages", label: t("tabs.messages"), badge: totalUnreadCount },
-          { name: "profile", label: profileTabLabel(t) },
           { name: "more", label: moreLabel(t), badge: prayerBadge },
+          { name: "profile", label: profileTabLabel(t) },
         ]}
       />
     )}
@@ -127,9 +128,10 @@ function ClassicTabLayout() {
     { name: "learn", label: t("tabs.learn"), icon: "school-outline" as const, iconActive: "school" as const },
     { name: "bible", label: bibleLabel(t), icon: "book-outline" as const, iconActive: "book" as const },
     { name: "messages", label: t("tabs.messages"), icon: "chatbubbles-outline" as const, iconActive: "chatbubbles" as const },
-    { name: "profile", label: profileTabLabel(t), icon: "person-circle-outline" as const, iconActive: "person-circle" as const },
     // Prayer (its Wi-Fi icon: "God is the Hotspot and we are connecting to Him.") and Discover live here.
     { name: "more", label: moreLabel(t), icon: "ellipsis-horizontal-circle-outline" as const, iconActive: "ellipsis-horizontal-circle" as const },
+    // My Profile is always the last tab (owner, 2026-11-11).
+    { name: "profile", label: profileTabLabel(t), icon: "person-circle-outline" as const, iconActive: "person-circle" as const },
   ];
 
   return (

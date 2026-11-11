@@ -85,7 +85,8 @@ ok("status unreachable → hidden (never blocks typing)", (await api.getAttachme
 // 3. Wiring
 const card = src("app/lesson/[id].tsx");
 ok("lesson card: tray only on Comprehensive Check answers", card.includes('{kind === "assignment" ? <AttachmentTray') && !/kind === "reflection"[^\n]*AttachmentTray/.test(card));
-ok("lesson card: typing still works; send needs words or a ready file, waits for uploads", card.includes('const canSend = (!!text.trim() || (kind === "assignment" && files.ids.length > 0)) && !files.busy;'));
+ok("lesson card: typing still works; send needs words or a ready file, waits for uploads", card.includes('const canSend = (parts ? partsLeft === 0 : (!!text.trim() || (kind === "assignment" && files.ids.length > 0))) && !files.busy;'));
+// (2026-11-11: a numbered check needs every question answered — lib/checkParts; otherwise unchanged.)
 ok("lesson card: sent answers show their files", card.includes('<AttachmentList kind="core_submission" submissionId={submitted.id}'));
 const dc = src("contexts/DataContext.tsx");
 const linkAt = dc.indexOf("await linkToCoreAnswer("), insertAt = dc.indexOf('supabase.from("p2p_submissions").insert(');

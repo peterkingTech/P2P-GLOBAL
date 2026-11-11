@@ -28,9 +28,9 @@ const load = (rel, mocks = {}) => {
 
 // ── Tab bar ──
 const layout = src("app/(tabs)/_layout.tsx");
-const order = ["index", "learn", "bible", "messages", "profile", "more"];
+const order = ["index", "learn", "bible", "messages", "more", "profile"]; // My Profile last (owner, 2026-11-11)
 const tabFiles = readdirSync(path.join(root, "app/(tabs)")).filter((f) => f.endsWith(".tsx") && f !== "_layout.tsx").map((f) => f.replace(".tsx", "")).sort();
-ok("tabs: exactly Home, Learning, Bible, Messages, My Profile, More", tabFiles.join() === [...order].sort().join(), tabFiles.join());
+ok("tabs: exactly Home, Learning, Bible, Messages, More, My Profile", tabFiles.join() === [...order].sort().join(), tabFiles.join());
 const nativeOrder = [...layout.matchAll(/<NativeTabs\.Trigger name="([a-z]+)"/g)].map((m) => m[1]);
 ok("tabs: native bar in order", nativeOrder.join() === order.join(), nativeOrder.join());
 const listOrders = [...layout.matchAll(/\{ name: "([a-z]+)", label/g)].map((m) => m[1]);

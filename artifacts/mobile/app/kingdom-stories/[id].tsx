@@ -23,6 +23,7 @@ import KingdomStoryMediaGallery from "@/components/KingdomStoryMediaGallery";
 import { AppButton, IconButton } from "@/components/ui";
 import { CoverArt } from "@/components/kingdom-stories/DiscoverRow";
 import { useFullScreenPhotoHeight } from "@/hooks/useLayout";
+import { listenTime, secondsForWords, summaryLine, wordCount } from "@/lib/listen/timing";
 import { showAlert } from "@/lib/alerts";
 
 // A Kingdom Story as a book: cover, introduction, the reader's progress,
@@ -123,6 +124,9 @@ export default function KingdomStoryBookScreen() {
   if (!story) return <View style={[s.screen, s.center]}><Stack.Screen options={{ headerShown: false }} /><Text style={s.muted}>This story isn't available.</Text></View>;
 
   const chapters = [...(story.chapters ?? [])].sort((a, b) => a.chapterNumber - b.chapterNumber);
+  // Listening length per chapter and in all (lib/listen/timing: an estimate from the words, so "about").
+  const chapterSeconds = new Map(chapters.map((ch) => [ch.id, secondsForWords(wordCount(ch.narrative ?? ""))]));
+  const storySeconds = [...chapterSeconds.values()].reduce((a, b) => a + b, 0);
   const media = story.media ?? [];
   const cover = media.find((m) => m.isCover && m.mediaType === "image") ?? media.find((m) => !m.chapterId && m.mediaType === "image") ?? null;
   // Story Overview image (migration 215 role) sits with the introduction, not in the gallery.
@@ -188,7 +192,7 @@ export default function KingdomStoryBookScreen() {
           <Text style={s.title} accessibilityRole="header">{story.title}</Text>
           {!!story.subtitle && <Text style={s.subtitle}>{story.subtitle}</Text>}
           <Text style={s.meta}>
-            {[story.category?.title, story.historicalPeriod, story.location, chapters.length ? `${chapters.length} chapters` : null].filter(Boolean).join(" · ")}
+            {[story.category?.title, story.historicalPeriod, story.location, chapters.length ? summaryLine(chapters.length, ["chapter", "chapters"], storySeconds) : null].filter(Boolean).join(" · ")}
           </Text>
 
           {!!prog.total && !preview && (
@@ -283,7 +287,7 @@ export default function KingdomStoryBookScreen() {
                         : <View style={s.tocNum}><Text style={s.tocNumText}>{ch.chapterNumber}</Text></View>}
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={s.tocKicker}>Chapter {ch.chapterNumber}{isCurrent ? " · Up next" : ""}</Text>
+                      <Text style={s.tocKicker}>Chapter {ch.chapterNumber}{chapterSeconds.get(ch.id) ? ` · about ${listenTime(chapterSeconds.get(ch.id)!)}` : ""}{isCurrent ? " · Up next" : ""}</Text>
                       <Text style={[s.tocTitle, locked && { color: c.textMuted }]} numberOfLines={2}>{ch.title || `Chapter ${ch.chapterNumber}`}</Text>
                       <View style={s.stateRow}>
                         <Ionicons name={STATE_ICON[st]} size={13} color={st === "completed" ? c.accentGreen : c.textMuted} />

@@ -50,10 +50,7 @@ export function OfficialBadge({ accountType, size = "medium" }: OfficialBadgePro
               <Text style={styles.sheetTitle}>{accountType === "crisis_response" ? "Official Crisis Response Account" : "P2P Official Account"}</Text>
             </View>
             <Text style={styles.sheetBody}>
-              This account is operated by the Amen Kingdom Tech Ministry team. It is verified and trusted.
-            </Text>
-            <Text style={styles.sheetBody}>
-              Messages from this account are genuine official communications from P2P Global.
+              Messages from this account are genuine official communications from P2P Global. This account is verified and trusted.
             </Text>
             <Text style={styles.sheetWarning}>
               If you receive a message claiming to be from P2P Official from a different account — report it immediately using the three-dot menu.

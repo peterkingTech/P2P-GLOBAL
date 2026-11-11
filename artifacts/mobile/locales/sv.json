@@ -417,6 +417,7 @@
     "emptyTitle": "Inga samtal ännu",
     "emptySub": "Starta ett från en lärjunges profil eller en grupp.",
     "messagePlaceholder": "Meddelande...",
+    "privacyPlaceholder": "Ange inte känsliga personuppgifter",
     "title": "Samtal"
   },
   "connect": {

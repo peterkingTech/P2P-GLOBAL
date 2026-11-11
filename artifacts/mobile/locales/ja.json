@@ -417,6 +417,7 @@
     "emptyTitle": "会話はまだありません",
     "emptySub": "仲間のプロフィールまたはグループから始めましょう。",
     "messagePlaceholder": "メッセージ…",
+    "privacyPlaceholder": "機密性の高い個人情報を入力しないでください",
     "title": "会話"
   },
   "connect": {

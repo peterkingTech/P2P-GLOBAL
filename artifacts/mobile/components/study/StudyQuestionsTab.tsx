@@ -5,6 +5,7 @@ import { useData, Assignment, AssignmentQuestion, QuestionSubmission } from "@/c
 import { QuestionResponseCard } from "@/app/lesson/[id]";
 import type { useStudySession, StudyProgress, OtherParticipant } from "@/hooks/useStudySession";
 import type { GroupStudyProgress } from "@/lib/groupStudy";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 
 interface QuestionRow { id: string; question: string; kind: "reflection" | "assignment" }
 
@@ -13,6 +14,7 @@ interface QuestionRow { id: string; question: string; kind: "reflection" | "assi
 // question together is a pure UI focus signal, never a data write; only "My
 // Answer" ever touches p2p_submissions, per-participant, unchanged.
 export function StudyQuestionsTab({ session, otherParticipants }: { session: ReturnType<typeof useStudySession>; otherParticipants: OtherParticipant[] }) {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const {
     getAssignmentForLesson, getQuestionSubmissionsForLesson,
     getAssignmentQuestionsForLesson, getAssignmentQuestionSubmissionsForLesson,
@@ -131,7 +133,7 @@ export function StudyQuestionsTab({ session, otherParticipants }: { session: Ret
                   style={styles.discussionInput}
                   value={discussionText}
                   onChangeText={setDiscussionText}
-                  placeholder="Say something…"
+                  placeholder={privacyPlaceholder}
                   placeholderTextColor="rgba(255,255,255,0.4)"
                   onSubmitEditing={handleSendDiscussion}
                 />

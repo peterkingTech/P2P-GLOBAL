@@ -417,6 +417,7 @@
     "emptyTitle": "Nu există încă conversații",
     "emptySub": "Începe una din profilul unui partener sau dintr-un grup.",
     "messagePlaceholder": "Mesaj...",
+    "privacyPlaceholder": "Nu introduce informații personale sensibile",
     "title": "Conversație"
   },
   "connect": {

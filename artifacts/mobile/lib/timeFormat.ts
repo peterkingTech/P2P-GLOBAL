@@ -79,7 +79,9 @@ export type DurationStyle =
   /** 1h 20m · 35m (minutes rounded to nearest) */
   | "hourMinRounded"
   /** 35 min · 2h · 1h 20m (minutes rounded to nearest) */
-  | "words";
+  | "words"
+  /** Listening lengths, as music apps write them: 45 sec · 24 min · 1 hr · 1 hr 47 min (minutes rounded to nearest) */
+  | "listen";
 
 /** A length of time in seconds as text. */
 export function formatDuration(totalSeconds: number, style: DurationStyle = "hourMin"): string {
@@ -89,6 +91,7 @@ export function formatDuration(totalSeconds: number, style: DurationStyle = "hou
     const m = Math.floor(whole / 60);
     return m > 0 ? `${m}m ${whole % 60}s` : `${whole % 60}s`;
   }
+  if (style === "listen" && Math.round(secs) < 60) return `${Math.max(1, Math.round(secs))} sec`;
   const mins = style === "hourMin" ? Math.floor(secs / 60) : Math.round(secs / 60);
   const h = Math.floor(mins / 60);
   const rem = mins % 60;
@@ -96,6 +99,7 @@ export function formatDuration(totalSeconds: number, style: DurationStyle = "hou
     if (mins < 60) return `${mins} min`;
     return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
   }
+  if (style === "listen") return h > 0 ? `${h} hr${rem ? ` ${rem} min` : ""}` : `${mins} min`;
   return h > 0 ? `${h}h ${rem}m` : `${mins}m`;
 }
 

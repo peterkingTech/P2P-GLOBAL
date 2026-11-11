@@ -8,7 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import GatheringReturnBar from "@/components/family/GatheringReturnBar";
 import BookChapterPicker from "@/components/bible/BookChapterPicker";
-import TranslationPicker from "@/components/bible/TranslationPicker";
+import { takeChosenTranslation } from "@/lib/bibleVersions";
 import BibleNoteSheet from "@/components/bible/BibleNoteSheet";
 import SaveScriptureSheet from "@/components/library/SaveScriptureSheet";
 import ReadingPrefsSheet from "@/components/bible/ReadingPrefsSheet";
@@ -77,7 +77,7 @@ export default function BibleReaderScreen() {
   const [translations, setTranslations] = useState<BibleTranslation[] | null>(null);
   const [trError, setTrError] = useState<string | null>(null);
   const [trAttempt, setTrAttempt] = useState(0);
-  const [loc, setLoc] = useState<{ t: string; book: string; chapter: number; v?: number; ve?: number } | null>(null);
+  const [loc, setLoc] = useState<{ t: string; book: string; chapter: number; v?: number; ve?: number; at?: number } | null>(null);
   const [data, setData] = useState<BibleChapter | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; status: number } | null>(null);
@@ -179,6 +179,10 @@ export default function BibleReaderScreen() {
     getChapter(loc.book, loc.chapter, loc.t, ac.signal)
       .then((ch) => {
         if (id !== reqId.current) return;
+        // The blocks are rebuilt (and the verse to return to is set) only now that the new text is here —
+        // never against the previous translation's layout.
+        pendingScroll.current = loc.v ?? loc.at ?? null;
+        setRenderKey((n) => n + 1);
         setData(ch);
         savePosition({ translation: loc.t, book: loc.book, chapter: loc.chapter });
         if (loc.v) {
@@ -186,7 +190,7 @@ export default function BibleReaderScreen() {
           const endLen = ch.verses.find((x) => x.verse === ve)?.text.length ?? 0;
           setRange({ start: { verse: loc.v, offset: 0 }, end: { verse: ve, offset: endLen } });
         }
-        else scrollRef.current?.scrollTo({ y: 0, animated: false });
+        else if (!loc.at) scrollRef.current?.scrollTo({ y: 0, animated: false });
       })
       .catch((e) => {
         if (id !== reqId.current || e?.name === "AbortError") return;
@@ -331,7 +335,14 @@ export default function BibleReaderScreen() {
   // Blocks remount per navigation so onLayout fires even for a cached chapter.
   const pendingScroll = useRef<number | null>(null);
   const [renderKey, setRenderKey] = useState(0);
-  useEffect(() => { pendingScroll.current = loc?.v ?? null; setRenderKey((n) => n + 1); }, [loc]);
+  // The verse at the top of the screen (from block positions and the scroll offset), so a
+  // translation change can reopen the chapter at the same verse.
+  const scrollY = useRef(0);
+  const topVerse = () => {
+    let best: number | null = null;
+    for (const [verse, y] of blockY.current) if (y <= scrollY.current + 40 && (best === null || verse > best)) best = verse;
+    return best ?? undefined;
+  };
   const onBlockLayout = (first: number, last: number, y: number) => {
     blockY.current.set(first, y);
     const want = pendingScroll.current;
@@ -340,6 +351,15 @@ export default function BibleReaderScreen() {
       setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true }), 50);
     }
   };
+
+  // A version chosen on the Bible Versions screen is applied once the reader is in front again (never
+  // while another screen or sheet is still closing over it): same book and chapter, at the verses
+  // selected, else at the verse that was at the top of the screen.
+  useFocusEffect(useCallback(() => {
+    const chosen = takeChosenTranslation();
+    if (!chosen || !loc || chosen === loc.t) return;
+    setLoc(sel ? { t: chosen, book: loc.book, chapter: loc.chapter, v: sel.start, ve: sel.end } : { t: chosen, book: loc.book, chapter: loc.chapter, at: topVerse() });
+  }, [loc, sel])); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const verseList = useMemo(() => (data?.verses ?? []).map((v) => ({ verse: v.verse, text: v.text })), [data]);
@@ -526,7 +546,7 @@ export default function BibleReaderScreen() {
         {book ? <Text style={styles.refText} numberOfLines={1}>{` ${loc?.chapter}`}</Text> : null}
         <Ionicons name="chevron-down" size={16} color={c.accentGreen} style={{ marginLeft: 4 }} />
       </TouchableOpacity>
-      <AppButton label={`${loc?.t ?? "—"}`} onPress={() => setSheet("translations")} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
+      <AppButton label={`${loc?.t ?? "—"}`} onPress={() => router.push({ pathname: "/bible/versions", params: { current: loc?.t ?? "" } } as any)} variant="secondary" size="sm" accessibilityLabel={`Translation ${translation?.name ?? loc?.t ?? ""}. Change translation`} style={{ minWidth: 44, marginHorizontal: 2 }} />
       <TouchableOpacity hitSlop={10} style={styles.iconBtn} onPress={() => setSheet("compare")} disabled={!loc || !translations?.length} accessibilityRole="button"
         accessibilityLabel={compare.length ? `Comparing ${compare.length + 1} translations. Change` : "Compare translations"} accessibilityState={{ selected: compare.length > 0 }}>
         <Ionicons name={compare.length ? "git-compare" : "git-compare-outline"} size={21} color={compare.length ? c.accentGreen : c.textDark} />
@@ -563,7 +583,7 @@ export default function BibleReaderScreen() {
   if (data && compare.length && !trError && !(error && !data) && loc) {
     // Bible Compare: the same chapter in up to four licensed translations, verse by verse.
     body = (
-      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
+      <ScrollView ref={scrollRef} scrollEventThrottle={64} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         <CompareView bookCode={loc.book} chapter={loc.chapter} primary={data} others={compare} translations={translations ?? []}
@@ -582,7 +602,7 @@ export default function BibleReaderScreen() {
     body = <View style={styles.center}><ActivityIndicator color={c.accentGreen} accessibilityLabel="Loading" /></View>;
   } else {
     body = (
-      <ScrollView ref={scrollRef} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
+      <ScrollView ref={scrollRef} scrollEventThrottle={64} onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }} contentContainerStyle={[styles.scroll, fullWidth, { paddingTop: focus ? insets.top + 56 : 8, paddingBottom: (sel ? 200 : 40) + insets.bottom }]}>
         {error && <Text style={styles.inlineError}>{error.message}</Text>}
         <Text style={styles.chapterTitle} accessibilityRole="header">{data.book.name} {data.chapter}</Text>
         {blocks.map((blk) => {
@@ -793,9 +813,6 @@ export default function BibleReaderScreen() {
 
       <BookChapterPicker visible={sheet === "books"} onClose={() => setSheet(null)} currentBook={loc?.book ?? "JHN"} currentChapter={loc?.chapter ?? 1}
         onSelect={(b, ch) => go(b, ch)} testaments={translation?.coverage === "nt" ? ["NT"] : translation?.coverage === "ot" ? ["OT"] : undefined} />
-      <TranslationPicker visible={sheet === "translations"} onClose={() => setSheet(null)} translations={translations ?? []} current={loc?.t ?? ""}
-        error={trError} onRetry={() => setTrAttempt((n) => n + 1)}
-        onSelect={(t) => { setSheet(null); if (loc && t !== loc.t) setLoc({ ...loc, t, v: sel?.start, ve: sel?.end }); }} />
       <ReadingPrefsSheet visible={sheet === "prefs"} prefs={prefs} onChange={updatePrefs} onClose={() => setSheet(null)} />
       <CompareSheet visible={sheet === "compare"} onClose={() => setSheet(null)} translations={translations ?? []} primary={loc?.t ?? ""} selected={compare} onApply={applyCompare} />
       {book && loc && (

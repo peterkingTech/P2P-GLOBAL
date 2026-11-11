@@ -68,6 +68,8 @@ export interface BibleTranslation {
   languageName?: string | null;
   /** bible | bible_plus | nt | ot | nt_plus | partial — and how to say it. Null = not recorded (API.Bible: complete). */
   coverage?: string | null; coverageLabel?: string | null;
+  /** The provider supplies recorded audio AND its licence permits playing it (server-decided; never assumed). */
+  recordedAudio?: boolean;
 }
 /** `through`: the last verse this text covers when a translation joins verses (The Message: "1–2"). */
 export interface ChapterVerse { verse: number; text: string; paragraph: number; poetry: boolean; through?: number }

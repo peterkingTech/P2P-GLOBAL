@@ -36,6 +36,7 @@ import type { WorshipNote } from "@/lib/familyApi";
 import { loadChurchSound, saveChurchSound, voicesPlaybackLevel, DEFAULT_CHURCH_SOUND, type ChurchSound } from "@/lib/mediaRotation";
 import type { GatheringLesson, GatheringLessonRef, WorshipScripture } from "@/lib/familyApi";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 
 
 const REACTIONS = ["🙏", "❤️", "🙌", "🔥", "👏"];
@@ -61,6 +62,7 @@ interface Signal { type: SignalType; from: string; data?: any }
 // Meeting/Bible Study/Prayer/etc. share the same balanced grid) — all on
 // top of the same call, never a second call system.
 export default function ChurchCallScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useAuth();
@@ -768,7 +770,7 @@ export default function ChurchCallScreen() {
             <View style={styles.chatInputRow}>
               <TextInput
                 style={styles.chatInput}
-                placeholder="Message..."
+                placeholder={privacyPlaceholder}
                 placeholderTextColor="rgba(255,255,255,0.4)"
                 value={chatInput}
                 onChangeText={setChatInput}

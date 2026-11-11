@@ -13,6 +13,7 @@ import colors from "@/constants/colors";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 const DEPARTMENT_LABELS: Record<ContactDepartment, string> = {
   help_request: "Help Request", crisis_response: "Crisis Response", p2p_support: "P2P Support", marketing: "Marketing",
 };
@@ -97,6 +98,7 @@ function ForwardModal({
 }
 
 export default function AdminEmailMessageDetail() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const { messageId } = useLocalSearchParams<{ messageId: string }>();
   const router = useRouter();
   const {
@@ -295,7 +297,7 @@ export default function AdminEmailMessageDetail() {
             style={styles.composeInput}
             value={composeText}
             onChangeText={setComposeText}
-            placeholder={composeAsNote ? "Note visible to admins only..." : "Write a reply to the sender..."}
+            placeholder={composeAsNote ? "Note visible to admins only..." : privacyPlaceholder}
             placeholderTextColor={colors.textMuted}
             multiline
           />

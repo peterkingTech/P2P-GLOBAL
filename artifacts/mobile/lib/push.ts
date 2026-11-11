@@ -228,6 +228,21 @@ export function pathForNotification(
   if ((notificationType === "new_message" || notificationType === "official_message_received") && conversationId) {
     return `/messages/${conversationId}`;
   }
+  // P2P Mail and private Groups / Communities (migrations 244–245). Ids are checked before routing.
+  const uuidOf = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v) ? v : null);
+  if (notificationType === "p2p_mail" || notificationType === "official_mail") {
+    const threadId = uuidOf(data?.threadId);
+    return threadId ? `/mail/${threadId}` : "/(tabs)/messages?section=mail";
+  }
+  if (notificationType === "group_added") {
+    const gid = uuidOf(data?.conversationId);
+    return gid ? `/messages/${gid}` : "/(tabs)/messages?section=groups";
+  }
+  if (notificationType === "group_invitation" || notificationType === "community_invitation") return "/groups/invitations";
+  if (notificationType === "community_added") {
+    const cid = uuidOf(data?.communityId);
+    return cid ? `/groups/community/${cid}` : "/(tabs)/messages?section=groups";
+  }
   if (notificationType === "contact_message_replied" && contactMessageId) {
     return `/messages/contact-thread/${contactMessageId}`;
   }

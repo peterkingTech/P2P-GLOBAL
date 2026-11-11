@@ -15,6 +15,7 @@ import { ARTWORK_FILL } from "@/constants/artwork";
 import { LARGE_TABLET_BREAKPOINT, TABLET_BREAKPOINT } from "@/hooks/useLayout";
 import ReadAlongText from "./ReadAlongText";
 import PlaylistControls from "./PlaylistControls";
+import { listenTime, playbackTiming, progressLine } from "@/lib/listen/timing";
 
 // P2P GLOBAL — READ & LISTEN. One shared player for every Listen button:
 //   • the Listen screen in front shows its own slim bar (<ListenPlayer owner=…>);
@@ -28,8 +29,11 @@ import PlaylistControls from "./PlaylistControls";
 // wider column; desktops / web and phones in landscape put the text beside a
 // controls panel (the text column never stretches past a readable width).
 // The voice is the phone's own speech engine — said plainly, no narrator
-// persona. Device speech has no length or seconds, so progress is in
-// sentences and steps are "a sentence back / forward" (no fake times).
+// persona. Steps are "a sentence back / forward". Progress is a line, the
+// percentage played and the time left (lib/listen/timing, owner request
+// 2026-11-10): device speech reports no length, so its times are estimates
+// from the words at the chosen speed and always say "about"; a studio
+// recording's real length is shown as is.
 // Listening never completes anything; when it finishes, the next learning
 // step is offered as a button. Branding: the official P2P Global logo in the
 // header and as a faint watermark; the app icon in the mini players and as
@@ -74,11 +78,14 @@ function MiniBar({ st, c, s, floating, bottomInset }: { st: ListenState; c: AppC
   const playing = st.status === "playing";
   const finished = st.status === "completed";
   const err = st.status === "error" ? st.error : null;
-  const text = statusLine(st);
-  const progress = st.chunkCount ? (st.chunk + (finished ? 1 : 0)) / st.chunkCount : 0;
+  const timing = playbackTiming(st);
+  const progress = timing?.fraction ?? (st.chunkCount ? (st.chunk + (finished ? 1 : 0)) / st.chunkCount : 0);
+  // The status, then where they are: "Genesis 1 · 45% · about 3 min left".
+  const text = [statusLine(st), st.status === "playing" || st.status === "paused" ? progressLine(timing) : ""].filter(Boolean).join(" · ");
   return (
     <View style={floating ? [s.floating, { bottom: bottomInset }] : [s.bar, { paddingBottom: 6 + bottomInset }]} accessibilityRole="toolbar" accessibilityLabel="Listening">
-      {floating && <View style={s.floatTrack}><View style={[s.trackFill, { width: `${Math.round(progress * 100)}%` as any }]} /></View>}
+      {/* The progress line, on both the floating and the inline bar. */}
+      <View style={floating ? s.floatTrack : s.barTrack}><View style={[s.trackFill, { width: `${Math.round(progress * 100)}%` as any }]} /></View>
       <View style={s.barRow}>
         <Pressable style={s.barText} onPress={() => listen.present()} accessibilityRole="button" accessibilityLabel={`${content.title}. ${text}. Open Read and Listen`}>
           <AppArtwork size={36} radius={9} />
@@ -151,7 +158,8 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
   const close = () => { setSettingsOpen(false); listen.dismiss(); };
   const mode: ListenMode = ui.mode;
   const reading = mode !== "audio";
-  const progress = st.chunkCount ? (st.chunk + (finished ? 1 : 0)) / st.chunkCount : 0;
+  const timing = playbackTiming(st);
+  const progress = timing?.fraction ?? (st.chunkCount ? (st.chunk + (finished ? 1 : 0)) / st.chunkCount : 0);
   const bible = content.kind === "bible";
   const playlist = content.kind === "playlist";
   const partWord = playlist ? "passage" : "part";
@@ -183,13 +191,17 @@ function ListenScreen({ st, c, s, dark }: { st: ListenState; c: AppColors; s: St
 
   const progressBar = (
     <View style={{ gap: 6 }}>
-      <View style={s.track} accessibilityRole="progressbar" accessibilityLabel="Listening progress" accessibilityValue={{ min: 0, max: st.chunkCount, now: Math.min(st.chunkCount, st.chunk + 1) }}>
+      <View style={s.track} accessibilityRole="progressbar" accessibilityLabel="Listening progress"
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100), text: progressLine(timing) || undefined }}>
         <View style={[s.trackFill, { width: `${Math.round(progress * 100)}%` as any }]} />
       </View>
       <View style={s.progressRow}>
-        {/* Sentences, not minutes: device speech reports no length or time. */}
-        <Text style={s.progressText}>{st.chunkCount ? `${Math.min(st.chunkCount, st.chunk + 1)} of ${st.chunkCount}` : ""}</Text>
-        <Text style={[s.progressText, { flex: 1, textAlign: "right" }]} numberOfLines={1}>{many ? sectionTitle : ""}</Text>
+        {/* Percentage played and time left (lib/listen/timing): estimated for the phone's voice ("about"),
+            real for a studio recording. */}
+        <Text style={s.progressText}>{progressLine(timing)}</Text>
+        <Text style={[s.progressText, { flex: 1, textAlign: "right" }]} numberOfLines={1}>
+          {many ? sectionTitle : timing ? `${timing.exact ? "" : "about "}${listenTime(timing.totalSeconds)} in all` : ""}
+        </Text>
       </View>
     </View>
   );
@@ -471,6 +483,7 @@ const makeStyles = (c: AppColors, dark: boolean) => StyleSheet.create({
     shadowColor: "#000", shadowOpacity: dark ? 0.5 : 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 12,
   },
   floatTrack: { position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: withAlpha(c.accentGreen, 0.15) },
+  barTrack: { height: 3, borderRadius: 2, marginBottom: 6, marginRight: 4, overflow: "hidden", backgroundColor: withAlpha(c.accentGreen, 0.15) },
   barRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   barText: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 10 },
   barTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },

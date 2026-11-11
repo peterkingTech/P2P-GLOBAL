@@ -417,6 +417,7 @@
     "emptyTitle": "尚無對話",
     "emptySub": "從同儕的個人檔案或小組開始一段對話。",
     "messagePlaceholder": "訊息……",
+    "privacyPlaceholder": "請勿輸入敏感個人資訊",
     "title": "對話"
   },
   "connect": {

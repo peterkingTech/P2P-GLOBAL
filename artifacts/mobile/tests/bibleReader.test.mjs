@@ -92,7 +92,10 @@ for (const [f, s] of all) {
   ok(`${f}: no Bible light/dark switch`, !/setMode\(|Appearance\.|setColorScheme|darkMode/.test(s));
   // No Bible audio files or audio packages. Listening is only the shared
   // on-device speech player (lib/listen), reading the licensed text on screen.
-  ok(`${f}: no audio files or audio packages (Listen = shared device speech only)`, !/expo-av|expo-audio|expo-speech|Audio\.|playAudio|\.mp3|audioUrl|\baudio\b/i.test(s));
+  // (2026-11-09: the Bible Versions / Languages screens may SAY whether licensed recorded audio exists —
+  // the word "audio" — but, like every Bible screen, play nothing.)
+  const showsAvailabilityOnly = /bible\/(versions|languages)\.tsx$/.test(f);
+  ok(`${f}: no audio files or audio packages (Listen = shared device speech only)`, !/expo-av|expo-audio|expo-speech|Audio\.|playAudio|\.mp3|audioUrl/i.test(s) && (showsAvailabilityOnly || !/\baudio\b/i.test(s)));
 }
 const reader = src("app/bible/index.tsx");
 ok("reader: verse text is copied/shared only when the translation allows it", /textCopyAllowed \? `“\$\{selectedText\(\)\}” — \$\{selLabel\}` : selLabel/.test(reader));

@@ -7,6 +7,7 @@ import FamilyIcon, { type FamilyIconName } from "./FamilyIcon";
 
 import { useSheetWidth } from "@/hooks/useLayout";
 import { formatTimeOfDay } from "@/lib/timeFormat";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 const CHIP_ICON = "rgba(255,255,255,0.7)";
 
 interface Props {
@@ -61,6 +62,7 @@ export default function ChatPanel({
   visible, onClose, messages, myUserId, draft, onChangeDraft, onSend,
   currentScripture, currentMedia, pendingContext, onSetPendingContext, dockRight, groupChat,
 }: Props) {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const sheetWidth = useSheetWidth();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -136,7 +138,7 @@ export default function ChatPanel({
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="Message the Gathering…"
+              placeholder={privacyPlaceholder}
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={draft}
               onChangeText={onChangeDraft}

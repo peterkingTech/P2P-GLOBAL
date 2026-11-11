@@ -227,14 +227,18 @@ router.get("/", async (req, res) => {
     const visibleShared = shared.filter((c) => !blocked.has(c.owner_id));
     const all = [...((mine ?? []) as Coll[]), ...visibleShared];
     const ids = all.map((c) => c.id);
-    const counts = new Map<string, number>();
-    if (ids.length) for (const r of (must(await db.from("p2p_scripture_collection_items").select("collection_id").in("collection_id", ids)) ?? []) as { collection_id: string }[]) counts.set(r.collection_id, (counts.get(r.collection_id) ?? 0) + 1);
+    // Passages and verses per collection (verses give the app its "about N min" listening time).
+    const counts = new Map<string, number>(), verses = new Map<string, number>();
+    if (ids.length) for (const r of (must(await db.from("p2p_scripture_collection_items").select("collection_id,start_verse,end_verse").in("collection_id", ids)) ?? []) as { collection_id: string; start_verse: number; end_verse: number }[]) {
+      counts.set(r.collection_id, (counts.get(r.collection_id) ?? 0) + 1);
+      verses.set(r.collection_id, (verses.get(r.collection_id) ?? 0) + Math.max(1, r.end_verse - r.start_verse + 1));
+    }
     const shareCounts = new Map<string, number>();
     if (mine?.length) for (const r of (must(await db.from("p2p_scripture_collection_shares").select("collection_id").in("collection_id", (mine as Coll[]).map((c) => c.id)).eq("status", "active")) ?? []) as { collection_id: string }[]) shareCounts.set(r.collection_id, (shareCounts.get(r.collection_id) ?? 0) + 1);
     const people = await profilesById([...visibleShared.map((c) => c.owner_id), ...((mine ?? []) as Coll[]).map((c) => c.origin_owner_id ?? ""), ...applicable.map((s) => s.shared_by ?? "")]);
     const urls = await photoUrls(all);
     const card = (c: Coll) => ({
-      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, updatedAt: c.updated_at, cover: coverOut(c, urls), tags: c.tags ?? [],
+      id: c.id, kind: c.kind, title: c.title, description: c.description, itemCount: counts.get(c.id) ?? 0, verseCount: verses.get(c.id) ?? 0, updatedAt: c.updated_at, cover: coverOut(c, urls), tags: c.tags ?? [],
       isCopy: !!c.copied_at, originOwnerName: c.origin_owner_id ? people.get(c.origin_owner_id)?.name ?? null : null,
     });
     return res.json({

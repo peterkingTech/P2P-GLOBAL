@@ -417,6 +417,7 @@
     "emptyTitle": "Aún no hay conversaciones",
     "emptySub": "Comienza una desde el perfil de un par o un grupo.",
     "messagePlaceholder": "Mensaje...",
+    "privacyPlaceholder": "No introduzcas información personal sensible",
     "title": "Conversación"
   },
   "connect": {

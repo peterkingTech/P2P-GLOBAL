@@ -37,6 +37,8 @@ import bibleRouter from "./bible";
 import bibleReaderRouter from "./bibleReader";
 import groupResourcesRouter from "./groupResources";
 import circlesRouter from "./circles";
+import mailRouter from "./mail";
+import groupsRouter from "./groups";
 import pastoralCareRouter from "./pastoralCare";
 import accountRouter from "./account";
 import callsRouter from "./calls";
@@ -99,6 +101,8 @@ router.use("/bible", bibleRouter);
 router.use("/bible", bibleReaderRouter); // Bible reader: chapters, search, related lessons, private study data
 router.use("/resources", groupResourcesRouter); // Family/Church Files & Resources (private bucket, signed URLs, members only)
 router.use("/circles", circlesRouter);
+router.use("/mail", mailRouter); // P2P Mail — internal official correspondence, separate from chat (migration 244)
+router.use("/groups", groupsRouter); // Private groups and Communities (migration 245)
 router.use("/pastoral-care", pastoralCareRouter);
 router.use("/account", accountRouter);
 router.use(callsRouter); // calls + break rooms (paths differ, handled internally)

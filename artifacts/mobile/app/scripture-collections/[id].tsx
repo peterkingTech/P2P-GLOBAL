@@ -15,7 +15,7 @@ import {
   type CollectionDetail, type CollectionItem,
 } from "@/lib/scriptureCollectionsApi";
 import { favouriteCollection, listFavourites, removeFavourite } from "@/lib/scriptureLibraryApi";
-import { estimateMinutes } from "@/lib/libraryRules";
+import { secondsForVerses, summaryLine } from "@/lib/listen/timing";
 import CoverArt from "@/components/library/CoverArt";
 import CoverPicker from "@/components/library/CoverPicker";
 
@@ -94,7 +94,9 @@ export default function CollectionScreen() {
     act(`move:${x}`, () => reorderCollection(d.id, ids, d.revision));
   };
   const listen = (from?: string, shuffle = false) => act(shuffle ? "shuffle" : from ? `listen:${from}` : "listen", () => playSavedCollection(d.id, { startKey: from ?? null, shuffle }));
-  const minutes = estimateMinutes(d.items);
+  // "10 scriptures · about 20 min" (lib/listen/timing; an estimate for the phone's voice).
+  const verses = d.items.reduce((n, i) => n + Math.max(1, i.endVerse - i.startVerse + 1), 0);
+  const summary = summaryLine(d.items.length, ["scripture", "scriptures"], secondsForVerses(verses));
   // The owner's wide header photo across the top (edge to edge), fading into the page, with the title on it.
   const heroHeight = Math.round(Math.min(440, Math.max(240, width * 0.72)));
   void language;
@@ -133,7 +135,7 @@ export default function CollectionScreen() {
         </View>
       ) : d.header ? null : <Text style={s.title} accessibilityRole="header">{d.title}</Text>}
       <Text style={s.status}>{status}</Text>
-      <Text style={s.muted}>{d.items.length} {d.items.length === 1 ? "passage" : "passages"}{minutes ? ` · about ${minutes} min` : ""}{d.tags?.length ? ` · ${d.tags.join(", ")}` : ""}</Text>
+      <Text style={s.muted}>{summary}{d.tags?.length ? ` · ${d.tags.join(", ")}` : ""}</Text>
       {d.status === "shared" ? <Text style={s.muted}>Owner: {d.owner.name}</Text> : null}
         </View>
       </View>

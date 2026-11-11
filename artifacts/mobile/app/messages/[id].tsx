@@ -50,6 +50,7 @@ import { clearConversationNotifications, dismissConversationNotifications } from
 import { setOpenConversation } from "@/lib/push";
 import { AppButton, IconButton } from "@/components/ui";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 
 interface Message {
   id: string;
@@ -343,6 +344,7 @@ function MessageBubbleRow({
 }
 
 export default function ChatScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -365,6 +367,7 @@ export default function ChatScreen() {
   const [title, setTitle] = useState("Conversation");
   const [isDirect, setIsDirect] = useState(false);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [isPrivateGroup, setIsPrivateGroup] = useState(false);
   const [otherUserPhotoUrl, setOtherUserPhotoUrl] = useState<string | null>(null);
   const [otherUserUsername, setOtherUserUsername] = useState<string | null>(null);
   const [otherUserVerified, setOtherUserVerified] = useState(false);
@@ -563,6 +566,9 @@ export default function ChatScreen() {
       setIsDirect(false);
       setTitle(conv?.name ?? "Group chat");
       setOtherUserOfficialType(null);
+      // Separate, error-tolerant read so the chat still loads where the column isn't readable.
+      const { data: kind } = await supabase.from("p2p_conversations").select("conversation_type").eq("id", id).maybeSingle();
+      setIsPrivateGroup((kind as any)?.conversation_type === "private_group");
     }
 
     const [{ data: msgs, error: msgsErr }, { data: pinned, error: pinnedErr }] = await Promise.all([
@@ -1283,6 +1289,11 @@ export default function ChatScreen() {
           </TouchableOpacity>
           {isDirect && otherUserId && !otherUserOfficialType && (
             <View style={styles.headerCallBtns}>
+              {/* Formal correspondence with this person lives in P2P Mail, separate from this chat. */}
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`P2P Mail with ${title}`}
+                onPress={() => router.push({ pathname: "/mail", params: { with: otherUserId, name: title } } as any)} style={styles.headerIconBtn}>
+                <Ionicons name="mail-outline" size={21} color={colors.accentGreen} />
+              </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" onPress={() => initiateCall("audio")} disabled={!!callingType} style={styles.headerIconBtn}>
                 {callingType === "audio" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="call-outline" size={20} color={colors.accentGreen} />}
               </TouchableOpacity>
@@ -1290,6 +1301,11 @@ export default function ChatScreen() {
                 {callingType === "video" ? <ActivityIndicator size="small" color={colors.accentGreen} /> : <Ionicons name="videocam-outline" size={22} color={colors.accentGreen} />}
               </TouchableOpacity>
             </View>
+          )}
+          {!isDirect && isPrivateGroup && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Group info" onPress={() => router.push(`/groups/${id}` as any)} style={styles.headerIconBtn}>
+              <Ionicons name="information-circle-outline" size={22} color={colors.accentGreen} />
+            </TouchableOpacity>
           )}
         </View>
 
@@ -1516,7 +1532,7 @@ export default function ChatScreen() {
               style={styles.input}
               value={text}
               onChangeText={handleTextChange}
-              placeholder="Message..."
+              placeholder={privacyPlaceholder}
               placeholderTextColor={colors.textMuted}
               multiline
             />

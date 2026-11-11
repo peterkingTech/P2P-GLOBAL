@@ -417,6 +417,7 @@
     "emptyTitle": "Ancora nessuna conversazione",
     "emptySub": "Inizia una conversazione dal profilo di un compagno o da un gruppo.",
     "messagePlaceholder": "Messaggio...",
+    "privacyPlaceholder": "Non inserire informazioni personali sensibili",
     "title": "Conversazione"
   },
   "connect": {

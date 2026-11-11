@@ -19,6 +19,7 @@ import { apiFetch } from "@/lib/apiClient";
 import { startPeerCall, buildCallRouteParams } from "@/lib/callStart";
 import colors from "@/constants/colors";
 import { showAlert } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 
 // Help-request tier -> the P2P Official identity that responds, matching
 // DEPARTMENT_TO_OFFICIAL_TYPE in officialMessages.ts (crisis_safeguarding ->
@@ -39,6 +40,7 @@ const TIER_CONFIG: Record<"crisis" | "struggling", {
 // can read/reply — Call here starts a REAL personal call exactly like the
 // Help Requests list's Call button, unrelated to the official text thread.
 export default function HelpMailThreadScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const { helpRequestId, targetUserId, targetUserName, tier } = useLocalSearchParams<{
     helpRequestId: string; targetUserId: string; targetUserName: string; tier: string;
   }>();
@@ -173,7 +175,7 @@ export default function HelpMailThreadScreen() {
           style={styles.input}
           value={body}
           onChangeText={setBody}
-          placeholder="Write your official reply…"
+          placeholder={privacyPlaceholder}
           placeholderTextColor={colors.textMuted}
           multiline
         />

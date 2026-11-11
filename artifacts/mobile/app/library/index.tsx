@@ -10,6 +10,7 @@ import { createCollection, listCollections, PERMISSION_LABEL, type CollectionCar
 import { listFavourites, listHistory, listSaved, recentlyPlayed, type Favourites, type HistoryItem } from "@/lib/scriptureLibraryApi";
 import { filterCards, sortCards, LIBRARY_FILTERS, LIBRARY_SORTS, type LibraryFilter, type LibrarySort } from "@/lib/libraryRules";
 import { playSavedCollection, resumePlaylist } from "@/lib/listen/playlistSession";
+import { secondsForVerses, summaryLine } from "@/lib/listen/timing";
 
 // My Scripture Library — playlists, collections, saved Scriptures and
 // favourites in one place, with Continue listening, Recently played, what's
@@ -202,7 +203,7 @@ export default function LibraryHome() {
                       {favIds.has(x.id) ? <View style={s.favDot}><Ionicons name="heart" size={12} color="#fff" /></View> : null}
                     </View>
                     <Text style={s.smallTitle} numberOfLines={2}>{x.title}</Text>
-                    <Text style={s.meta} numberOfLines={1}>{x.kind === "playlist" ? "Playlist" : "Collection"} · {x.itemCount} {x.itemCount === 1 ? "passage" : "passages"}</Text>
+                    <Text style={s.meta} numberOfLines={1}>{x.kind === "playlist" ? "Playlist" : "Collection"} · {summaryLine(x.itemCount, ["scripture", "scriptures"], secondsForVerses(x.verseCount ?? 0))}</Text>
                   </Pressable>
                   {x.itemCount ? (
                     <Pressable style={[s.playFab, { top: 6 + coverSize - 48, right: 14 }]} onPress={() => play(x.id)} accessibilityRole="button" accessibilityLabel={`Play ${x.title}`} hitSlop={8}>
@@ -220,7 +221,7 @@ export default function LibraryHome() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={s.cardTitle} numberOfLines={1}>{x.title}{favIds.has(x.id) ? "  ♥" : ""}</Text>
                     {x.description ? <Text style={s.meta} numberOfLines={1}>{x.description}</Text> : null}
-                    <Text style={s.meta} numberOfLines={1}>{x.kind === "playlist" ? "Playlist" : "Collection"} · {x.itemCount} · {badge(x)}</Text>
+                    <Text style={s.meta} numberOfLines={1}>{x.kind === "playlist" ? "Playlist" : "Collection"} · {summaryLine(x.itemCount, ["scripture", "scriptures"], secondsForVerses(x.verseCount ?? 0))} · {badge(x)}</Text>
                   </View>
                 </Pressable>
                 {x.itemCount ? <IconButton icon="play-circle-outline" accessibilityLabel={`Play ${x.title}`} onPress={() => play(x.id)} loading={busy === `play:${x.id}`} /> : null}

@@ -30,6 +30,9 @@ import * as SplashScreen from "expo-splash-screen";
 export const SPLASH_INTRO_VIDEO = require("../assets/videos/p2p-splash-intro.mp4");
 const VIDEO_BG = "#000000"; // the video's own background
 
+/** Where in the clip the intro starts (0 = the beginning). The clip itself is already 0:08–end of the owner's
+ * original (2026-11-10), so it starts at the beginning; a later start is skipped, never shown. */
+export const SPLASH_START_SECONDS = 0;
 const START_TIMEOUT_MS = 2500;
 const MAX_INTRO_MS = 9000;
 const VIDEO_FADE_IN_MS = 250;
@@ -65,6 +68,7 @@ function IntroLayer({ skip, onDone }: { skip: boolean; onDone: () => void }) {
     p.muted = true;
     p.loop = false;
     p.timeUpdateEventInterval = 0.25;
+    p.currentTime = SPLASH_START_SECONDS;
   });
 
   const finish = useCallback(() => {
@@ -82,12 +86,21 @@ function IntroLayer({ skip, onDone }: { skip: boolean; onDone: () => void }) {
     Animated.timing(video, { toValue: 1, duration: VIDEO_FADE_IN_MS, useNativeDriver: native }).start();
   }, [video, native]);
 
+  // A frame from before the start point is never faded in (playback advancing past it shows the video).
+  const firstFrame = useCallback(() => {
+    try { if (player.currentTime >= SPLASH_START_SECONDS - 0.05) showVideo(); } catch { /* released */ }
+  }, [player, showVideo]);
+
   useEventListener(player, "statusChange", ({ status }) => {
-    if (status === "readyToPlay") player.play();
+    if (status === "readyToPlay") {
+      // Some platforms ignore a start time set before loading: make sure playback begins at 0.8 s.
+      if (player.currentTime < SPLASH_START_SECONDS - 0.05) player.currentTime = SPLASH_START_SECONDS;
+      player.play();
+    }
     if (status === "error") finish();
   });
-  // Web has no first-frame event; playback advancing means a frame is showing.
-  useEventListener(player, "timeUpdate", ({ currentTime }) => { if (currentTime > 0) showVideo(); });
+  // Web has no first-frame event; playback advancing past the start point means a frame is showing.
+  useEventListener(player, "timeUpdate", ({ currentTime }) => { if (currentTime > SPLASH_START_SECONDS) showVideo(); });
   useEventListener(player, "playToEnd", () => finish());
 
   useEffect(() => {
@@ -119,7 +132,7 @@ function IntroLayer({ skip, onDone }: { skip: boolean; onDone: () => void }) {
           // Android: a TextureView fades with its layer; no shutter frame before the first frame.
           surfaceType="textureView"
           useExoShutter={false}
-          onFirstFrameRender={showVideo}
+          onFirstFrameRender={firstFrame}
         />
         <Text style={[styles.tagline, { bottom: insets.bottom + 28 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}
           accessibilityElementsHidden importantForAccessibility="no">

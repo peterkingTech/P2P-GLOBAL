@@ -431,6 +431,7 @@
     "emptyTitle": "No conversations yet",
     "emptySub": "Start one from a peer's profile or a group.",
     "messagePlaceholder": "Message...",
+    "privacyPlaceholder": "Do not enter sensitive personal information",
     "title": "Conversation"
   },
   "connect": {

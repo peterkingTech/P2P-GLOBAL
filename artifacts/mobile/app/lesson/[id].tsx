@@ -17,6 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { supabase, useAuth } from "@/contexts/AuthContext";
 import { useDraft, draftKey } from "@/lib/drafts";
+import { shareResponse, shareableResponse, type ResponseShare } from "@/lib/shareResponse";
+import { combineAnswers, readPartDrafts, splitCheckQuestion, splitCombinedAnswer, writePartDrafts } from "@/lib/checkParts";
 import {
   useData,
   Assignment,
@@ -47,7 +49,7 @@ import { listen, spokenLabels, useListenOwner, useListenState } from "@/lib/list
 import { lessonListenSections } from "@/lib/listen/lessonContent";
 import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
-import { checkTitle } from "@/lib/terminology";
+import { checkTitle, COMPREHENSIVE_CHECK } from "@/lib/terminology";
 import { useStudyTimeTracker } from "@/lib/studyTime";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
@@ -131,6 +133,7 @@ export function QuestionResponseCard({
   kind = "reflection",
   assignmentId,
   onSubmitted,
+  shareContext,
 }: {
   question: { id: string; question: string };
   questionIndex: number;
@@ -139,6 +142,12 @@ export function QuestionResponseCard({
   kind?: "reflection" | "assignment";
   assignmentId?: string;
   onSubmitted?: () => void;
+  /**
+   * Comprehensive Check (every one — lessons and Kingdom Stories): offer "Share Your Response" for THIS
+   * question once it is submitted (lib/shareResponse) — the participant's choice, never automatic, no
+   * effect on evaluation.
+   */
+  shareContext?: Omit<ResponseShare, "question" | "response">;
 }) {
   const { submitContent } = useData();
   const { profile } = useAuth();
@@ -147,6 +156,9 @@ export function QuestionResponseCard({
   const insets = useSafeAreaInsets();
   const qStyles = makeQStyles(colors);
   const [expanded, setExpanded] = useState(false);
+  // Numbered checks: which questions' answer boxes are open.
+  const [openParts, setOpenParts] = useState<number[]>([]);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const [mode, setMode] = useState<SubmissionType>("text");
   // The written answer is a persisted draft (lib/drafts): it survives leaving
   // the lesson, the focus view, backgrounding and app restarts; cleared on submit.
@@ -163,7 +175,16 @@ export function QuestionResponseCard({
   const trayKey = `lesson:${lessonId}:${question.id}`;
   const [files, setFiles] = useState<{ ids: string[]; busy: boolean; count: number }>({ ids: [], busy: false, count: 0 });
   const [trayReset, setTrayReset] = useState(0);
-  const canSend = (!!text.trim() || (kind === "assignment" && files.ids.length > 0)) && !files.busy;
+  // A check whose question is a numbered list ("1. … 2. …", every Kingdom Stories check): each numbered
+  // question gets its own answer box and its own "Share Your Response"; the answers are submitted
+  // together as one answer, each under its question (lib/checkParts — owner decision 2026-11-11).
+  const parts = kind === "assignment" ? splitCheckQuestion(question.question) : null;
+  const partAnswers = parts ? readPartDrafts(text, parts.length) : [];
+  const setPartAnswer = (i: number, v: string) => { const next = [...partAnswers]; next[i] = v; setText(writePartDrafts(next)); };
+  const partsLeft = parts ? partAnswers.filter((a) => !a.trim()).length : 0;
+  const answerText = parts ? combineAnswers(parts, partAnswers) : text.trim();
+  const submittedParts = parts && submitted ? splitCombinedAnswer(submitted.textContent, parts) : null;
+  const canSend = (parts ? partsLeft === 0 : (!!text.trim() || (kind === "assignment" && files.ids.length > 0))) && !files.busy;
 
   // existingSub is refetched (with real evaluation status) after every submit
   // and can also change from a live realtime update — keep local state in sync
@@ -174,7 +195,11 @@ export function QuestionResponseCard({
 
   // A saved draft re-opens the composer so the writer sees it right away.
   useEffect(() => {
-    if (draft.restored && !submitted) { setExpanded(true); setMode("text"); }
+    if (draft.restored && !submitted) {
+      setExpanded(true); setMode("text");
+      // Numbered check: reopen the questions that already have a saved answer.
+      if (parts) setOpenParts(partAnswers.map((a, n) => (a.trim() ? n : -1)).filter((n) => n >= 0));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.restored]);
 
@@ -188,13 +213,13 @@ export function QuestionResponseCard({
       assignmentQuestionId: kind === "assignment" ? question.id : null,
       assignmentId: kind === "assignment" ? assignmentId : null,
       type: "text",
-      text: text.trim(),
+      text: answerText,
       attachmentIds: kind === "assignment" && files.ids.length ? files.ids : undefined,
     });
     setSubmitting(false);
     if (err) { setError(err); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: "text", textContent: text.trim(), mediaUrl: null, durationSeconds: null, createdAt: new Date().toISOString(), evaluationStatus: "pending" });
+    setSubmitted({ id: Date.now().toString(), questionId: question.id, submissionType: "text", textContent: answerText, mediaUrl: null, durationSeconds: null, createdAt: new Date().toISOString(), evaluationStatus: "pending" });
     setExpanded(false);
     setFocusWriting(false);
     await draft.clear();
@@ -259,6 +284,119 @@ export function QuestionResponseCard({
     </Modal>
   );
 
+  // Numbered check: every question with its own "Share your response" (opens its own answer box) and,
+  // once submitted, its own answer and its own "Share Your Response". One submit sends them all.
+  const shareOne = async (q: string, response: string) => {
+    if (!shareContext) return;
+    const r = await shareResponse({ ...shareContext, question: q, response });
+    if (r === "copied") setShareNote("Copied — paste it wherever you'd like to share it.");
+  };
+  const anyPartOpen = openParts.length > 0;
+  const partsView = parts ? (
+    <View style={qStyles.wrapper}>
+      {parts.map((pq, i) => {
+        const open = openParts.includes(i);
+        const answered = submittedParts?.[i] ?? null;
+        return (
+          <View key={i} style={qStyles.part}>
+            <View style={qStyles.questionRow}>
+              <View style={qStyles.questionNum}><Text style={qStyles.questionNumText}>{i + 1}</Text></View>
+              <Text style={qStyles.questionText}>{pq}</Text>
+            </View>
+            {submitted ? (
+              answered ? (
+                <View style={qStyles.shareRow}>
+                  <Text style={qStyles.partAnswer}>{answered}</Text>
+                  {shareContext ? (
+                    <AppButton label="Share Your Response" icon="share-outline" variant="tertiary"
+                      accessibilityLabel={`Share your response to question ${i + 1}`} onPress={() => shareOne(pq, answered)} />
+                  ) : null}
+                </View>
+              ) : null
+            ) : (
+              <>
+                <TouchableOpacity accessibilityRole="button" style={qStyles.shareToggle} activeOpacity={0.75}
+                  onPress={() => setOpenParts((o) => (o.includes(i) ? o.filter((x) => x !== i) : [...o, i]))}>
+                  <Ionicons name={open ? "chevron-up" : "chatbubble-outline"} size={13} color={colors.textMid} />
+                  <Text style={qStyles.shareToggleText}>{open ? t("lesson.hide") : t("lesson.shareYourResponse")}</Text>
+                </TouchableOpacity>
+                {open && mode === "text" ? (
+                  <View style={qStyles.inputArea}>
+                    <TextInput style={qStyles.textInput} multiline placeholder={t("lesson.writeReflection")} placeholderTextColor={colors.textMuted}
+                      value={partAnswers[i]} onChangeText={(v) => setPartAnswer(i, v)} accessibilityLabel={`Your answer to question ${i + 1}`} />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
+        );
+      })}
+
+      {submitted ? (
+        <>
+          {submitted.evaluationStatus === "needs_revision" ? (
+            <TouchableOpacity accessibilityRole="button" style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]} activeOpacity={0.7}
+              onPress={() => {
+                // Revising: start from the answers already given (unless a newer draft exists).
+                if (submittedParts && !partAnswers.some((a) => a.trim())) setText(writePartDrafts(submittedParts));
+                setSubmitted(null); setExpanded(true); setOpenParts(parts.map((_, n) => n));
+              }}>
+              <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
+              <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[qStyles.submittedBadge, { backgroundColor: badgeInfo.bg }]}>
+              <Ionicons name={badgeInfo.icon as any} size={12} color={badgeInfo.color} />
+              <Text style={[qStyles.submittedText, { color: badgeInfo.color }]}>{badgeInfo.label}</Text>
+            </View>
+          )}
+          <View style={{ marginLeft: 36 }}><AttachmentList kind="core_submission" submissionId={submitted.id} compact /></View>
+          {/* An answer written before the split (one block) can't be divided: one Share for the whole answer. */}
+          {!submittedParts && shareContext && shareableResponse(submitted.textContent) ? (
+            <View style={qStyles.shareRow}>
+              <AppButton label="Share Your Response" icon="share-outline" variant="tertiary" accessibilityLabel="Share your response"
+                onPress={() => shareOne(question.question, shareableResponse(submitted.textContent)!)} />
+            </View>
+          ) : null}
+          {shareNote ? <Text style={[qStyles.draftNote, { marginLeft: 36 }]} accessibilityLiveRegion="polite">{shareNote}</Text> : null}
+          {submitted.evaluationStatus === "needs_revision" && submitted.feedback ? (
+            <View style={qStyles.revisionBanner}>
+              <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
+              <Text style={qStyles.revisionBannerText}>{submitted.feedback}</Text>
+            </View>
+          ) : null}
+        </>
+      ) : anyPartOpen || expanded ? (
+        <View style={qStyles.inputArea}>
+          <TypeTabs value={mode} onChange={setMode} disabled={submitting} />
+          {mode === "text" ? (
+            <>
+              <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">
+                {partsLeft ? `Answer all ${parts.length} questions to submit — ${partsLeft} still to answer.` : "All answered — your draft is saved on your other devices too."}
+              </Text>
+              <AttachmentTray key={trayReset} trayKey={trayKey} disabled={submitting} onChange={setFiles} />
+              {error && <Text style={qStyles.error}>{error}</Text>}
+              <AppButton label={t("lesson.shareResponse")} onPress={handleTextSubmit} icon="send" disabled={!canSend || submitting} loading={submitting} />
+            </>
+          ) : mode === "audio" ? (
+            <>
+              <Text style={qStyles.draftNote}>One recording answers all {parts.length} questions.</Text>
+              {error && <Text style={qStyles.error}>{error}</Text>}
+              <AudioRecorder onSubmit={handleMediaSubmit} disabled={submitting} />
+            </>
+          ) : (
+            <>
+              <Text style={qStyles.draftNote}>One video answers all {parts.length} questions.</Text>
+              {error && <Text style={qStyles.error}>{error}</Text>}
+              <VideoRecorder onSubmit={handleMediaSubmit} disabled={submitting} />
+            </>
+          )}
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+  if (partsView) return partsView;
+
   return (
     <View style={qStyles.wrapper}>
       {focusModal}
@@ -287,6 +425,24 @@ export function QuestionResponseCard({
             </View>
           )}
           {kind === "assignment" ? <View style={{ marginLeft: 36 }}><AttachmentList kind="core_submission" submissionId={submitted.id} compact /></View> : null}
+          {kind === "assignment" && shareContext ? (() => {
+            const written = shareableResponse(submitted.textContent);
+            return (
+              <View style={qStyles.shareRow}>
+                {written ? (
+                  <AppButton label="Share Your Response" icon="share-outline" variant="tertiary"
+                    accessibilityLabel={`Share your response to question ${questionIndex + 1}`}
+                    onPress={async () => {
+                      const r = await shareResponse({ ...shareContext, question: question.question, response: written });
+                      if (r === "copied") setShareNote("Copied — paste it wherever you'd like to share it.");
+                    }} />
+                ) : (
+                  <Text style={qStyles.draftNote}>Sharing is available for written responses.</Text>
+                )}
+                {shareNote ? <Text style={qStyles.draftNote} accessibilityLiveRegion="polite">{shareNote}</Text> : null}
+              </View>
+            );
+          })() : null}
           {kind === "assignment" && submitted.evaluationStatus === "needs_revision" && submitted.feedback ? (
             <View style={qStyles.revisionBanner}>
               <Ionicons name="chatbox-ellipses-outline" size={14} color="#C0392B" />
@@ -378,6 +534,9 @@ function makeQStyles(c: AppColors) {
   inputArea: { marginLeft: 36, marginTop: 8 },
   draftRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   draftNote: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
+  shareRow: { marginLeft: 36, marginTop: 6, gap: 4, alignItems: "flex-start" },
+  part: { marginBottom: 12 },
+  partAnswer: { fontSize: 13.5, color: c.textDark, lineHeight: 20, fontFamily: "Inter_400Regular" },
   focusScreen: { flex: 1, backgroundColor: c.lightCream, paddingHorizontal: 18 },
   focusBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 },
   focusTitle: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
@@ -1012,6 +1171,7 @@ export default function LessonScreen() {
                   kind="assignment"
                   assignmentId={assignment.id}
                   onSubmitted={loadSubmissions}
+                  shareContext={{ storyTitle: content.title, source: COMPREHENSIVE_CHECK }}
                 />
               ))}
             </View>

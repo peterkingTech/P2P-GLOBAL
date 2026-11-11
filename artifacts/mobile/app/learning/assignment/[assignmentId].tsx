@@ -13,6 +13,8 @@ import {
 } from "@/lib/lessonWorkApi";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { shareResponse, shareableResponse } from "@/lib/shareResponse";
+import { COMPREHENSIVE_CHECK } from "@/lib/terminology";
 
 const STATUS_LABEL: Record<Submission["status"], string> = { submitted: "Submitted", reviewed: "Reviewed", returned: "Returned" };
 type ReviewRow = Submission & { attempts: number; author: { id: string; name: string; photoUrl: string | null } };
@@ -118,6 +120,14 @@ export default function AssignmentScreen() {
                 {isAttachedOnlyText(a.content) ? null : <Text style={styles.body}>{a.content}</Text>}
                 <AttachmentList kind="group_submission" submissionId={a.id} compact />
                 {a.feedback ? <Text style={styles.feedback}>Feedback: {a.feedback}</Text> : null}
+                {/* The participant's own written answer only — never the feedback or review status. */}
+                {!isAttachedOnlyText(a.content) && shareableResponse(a.content) ? (
+                  <AppButton label="Share Your Response" icon="share-outline" variant="tertiary" accessibilityLabel={`Share your response, attempt ${a.attempt}`}
+                    onPress={async () => {
+                      const r = await shareResponse({ storyTitle: assignment.title, source: COMPREHENSIVE_CHECK, question: assignment.instructions || assignment.title, response: a.content });
+                      if (r === "copied") showAlert("Copied", "Paste it wherever you'd like to share it.");
+                    }} />
+                ) : null}
               </View>
             ))}
             {canSubmit ? (

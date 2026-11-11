@@ -32,7 +32,8 @@ ok("once per launch: the layout asks before hiding the native splash itself", la
 ok("playback: muted, once, no controls, no picture-in-picture", intro.includes("p.muted = true;") && intro.includes("p.loop = false;") && intro.includes("nativeControls={false}") && intro.includes("allowsPictureInPicture={false}"));
 ok("playback: fitted on black, full screen (safe areas ignored), explicit size for web", intro.includes('contentFit="contain"') && intro.includes('video: { width: "100%", height: "100%"') && /layer: \{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0/.test(intro));
 ok("playback: no logo image drawn by the intro (no flash before the video)", !/<Image|logo\.png/.test(intro));
-ok("playback: video fades in on its first frame (native event, or playback advancing on web)", intro.includes("onFirstFrameRender={showVideo}") && intro.includes('"timeUpdate"'));
+ok("playback: video fades in on its first frame past the start point (native event, or playback advancing on web)", intro.includes("onFirstFrameRender={firstFrame}") && intro.includes('"timeUpdate"'));
+ok("playback: start point (0 — the clip is already 0:08–end of the original, owner 2026-11-10), set before load and again when ready; a skipped opening never flashes", intro.includes("export const SPLASH_START_SECONDS = 0;") && intro.includes("p.currentTime = SPLASH_START_SECONDS;") && intro.includes("player.currentTime = SPLASH_START_SECONDS;") && intro.includes("if (currentTime > SPLASH_START_SECONDS) showVideo();") && intro.includes("if (player.currentTime >= SPLASH_START_SECONDS - 0.05) showVideo();"));
 ok("playback: Android uses a TextureView without the ExoPlayer shutter", intro.includes('surfaceType="textureView"') && intro.includes("useExoShutter={false}"));
 
 ok("tagline: a small 'P2P GLOBAL' at the bottom centre, above the home indicator, one line", /\n\s+P2P GLOBAL\r?\n/.test(intro) && intro.includes("bottom: insets.bottom + 28")

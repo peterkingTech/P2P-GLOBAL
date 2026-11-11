@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Platform, ActivityIndicator, TextInput, Alert,
 } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -18,17 +18,24 @@ import { statusAccessibilityLabel } from "@/lib/messageReceipts";
 import { useActivityStatus } from "@/lib/presence";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { timeAgo } from "@/lib/timeFormat";
+import MailHome from "@/components/messages/MailHome";
+import GroupsHome from "@/components/messages/GroupsHome";
+import { mailUnread } from "@/lib/mailApi";
 import "@/lib/i18n";
 
-type TabKey = "all" | "unread" | "favourites" | "family_church" | "peer_groups" | "circles";
+// Three separate spaces: Chats (one-to-one, informal), P2P Mail (formal letters, never mixed into a chat)
+// and Groups (private groups, Family & Church, Peer Groups, Circles and Communities). Each has its own badge.
+type Section = "chats" | "mail" | "groups";
+const SECTIONS: { key: Section; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "chats", label: "Chats", icon: "chatbubble-ellipses-outline" },
+  { key: "mail", label: "P2P Mail", icon: "mail-outline" },
+  { key: "groups", label: "Groups", icon: "people-outline" },
+];
+type TabKey = "all" | "unread" | "favourites";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "favourites", label: "Favourites" },
-  // Permanent Family Circle and Church conversations (migration 197).
-  { key: "family_church", label: "Family & Church" },
-  { key: "peer_groups", label: "Peer Groups" },
-  { key: "circles", label: "Circles" },
 ];
 
 
@@ -51,6 +58,15 @@ function makeStyles(c: AppColors) {
       borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
     },
     searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
+    sectionBar: { flexDirection: "row", marginHorizontal: 16, marginBottom: 12, padding: 4, gap: 4, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    sectionBtn: { flex: 1, minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10 },
+    sectionBtnActive: { backgroundColor: c.accentGreen },
+    sectionText: { fontSize: 13, color: c.textMid, fontFamily: "Inter_600SemiBold" },
+    sectionTextActive: { color: "#fff", fontFamily: "Inter_700Bold" },
+    sectionBadge: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center", backgroundColor: c.accentGreen },
+    sectionBadgeActive: { backgroundColor: "#fff" },
+    sectionBadgeText: { fontSize: 10.5, color: "#fff", fontFamily: "Inter_700Bold" },
+    sectionBadgeTextActive: { color: c.accentGreen },
     tabsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 6, marginBottom: 8 },
     tabChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16 },
     tabChipActive: { backgroundColor: c.accentGreen },
@@ -144,6 +160,12 @@ export default function MessagesTab() {
     pinConversation, unpinConversation,
   } = useData();
 
+  const params = useLocalSearchParams<{ section?: string }>();
+  const [section, setSection] = useState<Section>("chats");
+  React.useEffect(() => {
+    if (params.section === "mail" || params.section === "groups" || params.section === "chats") setSection(params.section);
+  }, [params.section]);
+  const [mailUnreadCount, setMailUnreadCount] = useState(0);
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
   // Online dot only here; the fuller "Active today" wording is in the chat
@@ -152,22 +174,33 @@ export default function MessagesTab() {
     conversations.filter((c) => c.type !== "group" && !c.otherUserOfficialType).map((c) => c.otherUserId),
   );
 
-  useFocusEffect(React.useCallback(() => { loadConversations(); }, [loadConversations]));
+  useFocusEffect(React.useCallback(() => {
+    loadConversations();
+    mailUnread().then((r) => setMailUnreadCount(r.unreadThreads)).catch(() => {});
+  }, [loadConversations]));
+
+  // Official P2P conversations (the verified P2P Official account) belong with formal correspondence:
+  // they are listed in P2P Mail, not in Chats. Same conversation, same screen — only where it's found.
+  const officialChats = useMemo(() => conversations.filter((c) => c.type !== "group" && !!c.otherUserOfficialType), [conversations]);
+  const chats = useMemo(() => conversations.filter((c) => c.type !== "group" && !c.otherUserOfficialType), [conversations]);
+  const groups = useMemo(() => conversations.filter((c) => c.type === "group"), [conversations]);
+  const badge: Record<Section, number> = {
+    chats: chats.filter((c) => c.unreadCount > 0).length,
+    mail: mailUnreadCount + officialChats.filter((c) => c.unreadCount > 0).length,
+    groups: groups.filter((c) => c.unreadCount > 0).length,
+  };
 
   const filtered = useMemo(() => {
-    let rows = conversations;
+    let rows = chats;
     if (tab === "unread") rows = rows.filter((c) => c.unreadCount > 0);
     else if (tab === "favourites") rows = rows.filter((c) => c.isFavourite);
-    else if (tab === "family_church") rows = rows.filter((c) => c.conversationType === "family" || c.conversationType === "church");
-    else if (tab === "peer_groups") rows = rows.filter((c) => c.conversationType === "peer_group");
-    else if (tab === "circles") rows = rows.filter((c) => c.conversationType === "circle");
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       rows = rows.filter((c) => (c.name ?? "").toLowerCase().includes(q));
     }
     return rows;
-  }, [conversations, tab, search]);
+  }, [chats, tab, search]);
 
   function handleLongPressRow(item: ConversationSummary) {
     const options: { text: string; style?: "default" | "cancel" | "destructive"; onPress?: () => void }[] = [];
@@ -192,12 +225,9 @@ export default function MessagesTab() {
   }
 
   const emptyMessages: Record<TabKey, { title: string; sub: string }> = {
-    all: { title: "No conversations yet", sub: "Start a conversation from a peer's profile or a study group." },
+    all: { title: "No chats yet", sub: "Start a conversation from a peer's profile." },
     unread: { title: "You are all caught up ✓", sub: "No unread messages right now." },
     favourites: { title: "No favourites yet", sub: "Star conversations to find them quickly here." },
-    family_church: { title: "No family or church chats yet", sub: "Your Family Circle and church conversations appear here." },
-    peer_groups: { title: "No peer groups yet", sub: "Create one from the Connect tab." },
-    circles: { title: "Not in any circles yet", sub: "Find one in Discover." },
   };
 
   return (
@@ -210,13 +240,82 @@ export default function MessagesTab() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.sectionBar} accessibilityRole="tablist">
+        {SECTIONS.map((sc) => {
+          const active = section === sc.key, n = badge[sc.key];
+          return (
+            <TouchableOpacity key={sc.key} accessibilityRole="tab" accessibilityState={{ selected: active }}
+              accessibilityLabel={`${sc.label}${n ? `, ${n} unread` : ""}`}
+              style={[styles.sectionBtn, active && styles.sectionBtnActive]} onPress={() => setSection(sc.key)}>
+              <Ionicons name={sc.icon} size={16} color={active ? "#fff" : colors.textMid} />
+              <Text style={[styles.sectionText, active && styles.sectionTextActive]} numberOfLines={1}>{sc.label}</Text>
+              {n > 0 ? (
+                <View style={[styles.sectionBadge, active && styles.sectionBadgeActive]}>
+                  <Text style={[styles.sectionBadgeText, active && styles.sectionBadgeTextActive]}>{n > 99 ? "99+" : n}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* P2P Mail holds all formal correspondence, so Contact P2P Global (support, help and crisis team)
+          lives here too — the same screens as before, just found in one place. */}
+      {section === "mail" ? (<>
+        <TouchableOpacity accessibilityRole="button" style={styles.contactP2PButton} onPress={() => router.push("/messages/contact-p2p" as any)}>
+          <View style={styles.contactP2PLeft}>
+            <View style={styles.contactP2PIcon}>
+              <Text style={{ fontSize: 18 }}>✉️</Text>
+            </View>
+            <View>
+              <Text style={styles.contactP2PTitle}>Contact P2P Global</Text>
+              <Text style={styles.contactP2PSubtitle}>Message our support, help, or crisis team</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={styles.myContactMessagesRow} onPress={() => router.push("/messages/my-contact-messages" as any)}>
+          <Text style={styles.myContactMessagesText}>My Messages to P2P Global</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+        {officialChats.map((item) => {
+          const unread = item.unreadCount > 0;
+          return (
+            <TouchableOpacity key={item.id} accessibilityRole="button" style={styles.row} activeOpacity={0.8}
+              accessibilityLabel={`${item.name ?? "P2P Official"}, official${unread ? `, ${item.unreadCount} unread` : ""}`}
+              onPress={() => router.push(`/messages/${item.id}` as any)} onLongPress={() => handleLongPressRow(item)}>
+              <Avatar photoUrl={item.otherUserPhotoUrl} name={item.name} size={46} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.rowTop}>
+                  {unread && <View style={styles.unreadDot} />}
+                  <Text style={[styles.rowTitle, unread && styles.rowTitleUnread]} numberOfLines={1}>{item.name ?? "P2P Official"}</Text>
+                  {item.otherUserOfficialType && <OfficialBadge accountType={item.otherUserOfficialType} size="small" />}
+                </View>
+                <Text style={[styles.rowSub, unread && styles.rowSubUnread]} numberOfLines={1}>{item.lastMessage ?? "Official messages from P2P Global"}</Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Text style={styles.timeText}>{timeAgo(item.lastMessageAt, "compact")}</Text>
+                {unread && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+        <View style={styles.contactDivider} />
+        <MailHome bottomPad={insets.bottom + 90} onUnreadChange={setMailUnreadCount} />
+      </>) : null}
+      {section === "groups" ? <GroupsHome conversations={groups} bottomPad={insets.bottom + 90} /> : null}
+      {section === "chats" ? (<>
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search conversations"
+          placeholder="Search chats"
           placeholderTextColor={colors.textMuted}
         />
         {search.length > 0 && (
@@ -237,24 +336,6 @@ export default function MessagesTab() {
           </TouchableOpacity>
         ))}
       </View>
-
-      <TouchableOpacity accessibilityRole="button" style={styles.contactP2PButton} onPress={() => router.push("/messages/contact-p2p" as any)}>
-        <View style={styles.contactP2PLeft}>
-          <View style={styles.contactP2PIcon}>
-            <Text style={{ fontSize: 18 }}>✉️</Text>
-          </View>
-          <View>
-            <Text style={styles.contactP2PTitle}>Contact P2P Global</Text>
-            <Text style={styles.contactP2PSubtitle}>Message our support, help, or crisis team</Text>
-          </View>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      </TouchableOpacity>
-      <TouchableOpacity accessibilityRole="button" style={styles.myContactMessagesRow} onPress={() => router.push("/messages/my-contact-messages" as any)}>
-        <Text style={styles.myContactMessagesText}>My Messages to P2P Global</Text>
-        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-      </TouchableOpacity>
-      <View style={styles.contactDivider} />
 
       {pendingConnectionRequestCount > 0 && (
         <TouchableOpacity accessibilityRole="button" style={styles.requestsBanner} onPress={() => router.push("/connections/requests" as any)}>
@@ -356,6 +437,7 @@ export default function MessagesTab() {
           }}
         />
       )}
+      </>) : null}
       </View>
     </View>
   );

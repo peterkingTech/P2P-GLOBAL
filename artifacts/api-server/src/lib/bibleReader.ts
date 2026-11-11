@@ -121,6 +121,8 @@ export const publicTranslation = (r: TRow) => ({
   // How much Scripture it has (recorded for AO Lab translations; API.Bible ones are complete Bibles).
   coverage: r.coverage ?? null,
   coverageLabel: r.coverage ? r.description ?? null : null,
+  // Recorded audio: only when the provider supplies it AND the reviewed licence permits it (never assumed).
+  recordedAudio: canPlayRecordedAudio(r),
 });
 
 export class BibleError extends Error { status: number; constructor(message: string, status: number) { super(message); this.status = status; } }

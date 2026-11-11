@@ -26,6 +26,7 @@
     "test:bible-parser": "node tests/bibleParser.test.mjs",
     "test:bible-providers": "node tests/bibleProviders.test.mjs",
     "test:narration": "node tests/storyNarration.test.mjs && node tests/kingdomStoryTranslations.test.mjs",
+    "test:communication": "node tests/communication.test.mjs",
     "narrate": "node scripts/narrate.mjs"
   },
   "dependencies": {

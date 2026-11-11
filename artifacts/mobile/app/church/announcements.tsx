@@ -9,6 +9,7 @@ import colors from "@/constants/colors";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
   general: "General", bible_study: "Bible Study", discipleship: "Discipleship", prayer: "Prayer",
   learning_goal: "Learning Goal", study_plan: "Study Plan", event: "Event", important: "Important",
@@ -16,6 +17,7 @@ const TYPE_LABELS: Record<ChurchAnnouncementType, string> = {
 };
 
 export default function ChurchAnnouncementsScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -114,7 +116,7 @@ export default function ChurchAnnouncementsScreen() {
           <View style={[styles.modalSheet, sheetWidth]}>
             <Text style={styles.modalTitle}>New Announcement</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
+            <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder={privacyPlaceholder} placeholderTextColor={colors.textMuted} multiline />
             <View style={styles.modalBtnRow}>
               <AppButton label="Cancel" onPress={() => setComposerOpen(false)} variant="outline" style={{ flex: 1 }} palette="fixedLight" />
               <AppButton label="Post" onPress={handlePost} disabled={posting || !title.trim() || !body.trim()} loading={posting} style={{ flex: 1 }} palette="fixedLight" />

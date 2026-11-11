@@ -417,6 +417,7 @@
     "emptyTitle": "Ingen samtaler endnu",
     "emptySub": "Start en fra en ligeværdigs profil eller en gruppe.",
     "messagePlaceholder": "Besked...",
+    "privacyPlaceholder": "Indtast ikke følsomme personoplysninger",
     "title": "Samtale"
   },
   "connect": {

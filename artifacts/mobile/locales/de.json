@@ -417,6 +417,7 @@
     "emptyTitle": "Noch keine Unterhaltungen",
     "emptySub": "Starte eine über das Profil eines Peers oder eine Gruppe.",
     "messagePlaceholder": "Nachricht...",
+    "privacyPlaceholder": "Gib keine sensiblen persönlichen Daten ein",
     "title": "Unterhaltung"
   },
   "connect": {

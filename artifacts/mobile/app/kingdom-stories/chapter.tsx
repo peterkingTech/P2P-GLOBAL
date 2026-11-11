@@ -420,7 +420,8 @@ export default function KingdomStoryChapterScreen() {
                 </View>
                 {preview || !check ? <Text style={s.previewQ}>{check?.questions[0]?.question ?? ch.assignment?.text}</Text>
                   : check.questions.map((q, i) => (
-                    <QuestionResponseCard key={q.id} question={q} questionIndex={i} lessonId={learning!.lessonId!} existingSub={checkSubs.get(q.id)} kind="assignment" assignmentId={check.assignmentId} onSubmitted={reloadAll} />
+                    <QuestionResponseCard key={q.id} question={q} questionIndex={i} lessonId={learning!.lessonId!} existingSub={checkSubs.get(q.id)} kind="assignment" assignmentId={check.assignmentId} onSubmitted={reloadAll}
+                      shareContext={{ storyTitle: story.title, chapterLabel: `Chapter ${ch.chapterNumber}: ${ch.title}` }} />
                   ))}
                 {!!checkSub && checkSub.evaluationStatus === "approved" && <Text style={s.reviewed}>Reviewed and approved by a fellow peer{checkSub.feedback ? `: “${checkSub.feedback}”` : "."}</Text>}
               </View>

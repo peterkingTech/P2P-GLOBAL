@@ -40,9 +40,11 @@ To replace it, put the new file at the same path (or change `SPLASH_INTRO_VIDEO`
 | Video | H.264 **Main** profile (plays on every iOS and Android device) | H.264 Main |
 | Resolution | 1280×720 (fitted, so any aspect works; keep a plain background that matches the edges) | 1280×720, on black |
 | Frame rate | 24–30 fps | 24 fps |
-| Bitrate | about 2–3 Mbps | about 2.6 Mbps |
-| Duration | 3–6 s (it delays the first screen) | 4.79 s |
+| Bitrate | about 2–3 Mbps | about 1.8 Mbps (a mostly still logo needs less) |
+| Duration | 2–6 s (it delays the first screen) | 2.04 s |
 | Audio | none (it plays muted) | none |
-| Size | under 3 MB | 1.58 MB |
+| Size | under 3 MB | 0.45 MB |
 
-The current file is the owner's "P2P Splash Logo Video" (1920×1080, 10 s, 8.2 MB), cut to its first 4.79 s and re-encoded at 720p without audio.
+The current file is the owner's "P2P Splash Logo Video" (1920×1080, 10 s, 8.2 MB), cut to **0:08 → the end** (2.04 s, owner request 2026-11-10: the whole logo and its movement, not zoomed) and re-encoded at 720p, H.264 Main, 24 fps, without audio (ffmpeg: `-ss 8 -an -vf scale=1280:720 -c:v libx264 -profile:v main -b:v 2600k -movflags +faststart`). The previous cut (the first 4.79 s, a zoom-out) was replaced.
+
+Playback starts at the beginning of the file (`SPLASH_START_SECONDS = 0` in components/SplashIntro.tsx). A later start point can be set there; the skipped opening never appears (the video fades in only once it is past that point).

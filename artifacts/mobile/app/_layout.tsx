@@ -80,7 +80,9 @@ const OWN_HEADER_ROUTES = [
   "prayer/journal", "prayer/library/index", "prayer/my-prayer", "prayer/paths/index", "prayer/pray-the-word/index",
   "prayer/pray-with-me", "prayer/requests", "prayer/sinners-prayer",
   "prayer/testimony/feed", "prayer/testimony/record", "prayer/testimony/[id]",
-  "bible/index", "bible/search", "bible/library", "resources/[scope]/[groupId]",
+  "bible/index", "bible/search", "bible/library", "bible/versions", "bible/languages", "resources/[scope]/[groupId]",
+  "mail/index", "mail/[id]", "mail/compose",
+  "groups/create", "groups/[id]", "groups/community/[id]", "groups/invitations", "groups/join",
 ];
 
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);

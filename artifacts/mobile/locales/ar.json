@@ -417,6 +417,7 @@
     "emptyTitle": "لا توجد محادثات بعد",
     "emptySub": "ابدأ واحدة من ملف نظير أو من مجموعة.",
     "messagePlaceholder": "رسالة...",
+    "privacyPlaceholder": "لا تُدخل معلومات شخصية حساسة",
     "title": "محادثة"
   },
   "connect": {

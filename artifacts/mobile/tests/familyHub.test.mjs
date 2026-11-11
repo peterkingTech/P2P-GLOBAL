@@ -67,9 +67,11 @@ ok("summary section is 'Discussion' (it's a message count)", /<Text style=\{styl
 ok("real sharing kept: Gathering room invite + family invite links/QR", /<ShareRoomPanel/.test(src("app/family/worship/[sessionId].tsx")) && /QrShareSheet/.test(src("components/family/FamilyInvitePanel.tsx")));
 
 // ── Messages + Church ─────────────────────────────────────────────────
-const inbox = src("app/(tabs)/messages.tsx");
-ok("Messages: 'Family & Church' tab filters the two new conversation types", /\{ key: "family_church", label: "Family & Church" \}/.test(inbox)
-  && /c\.conversationType === "family" \|\| c\.conversationType === "church"/.test(inbox) && /family_church: \{ title:/.test(inbox));
+// Communication redesign: group chats moved to Messages › Groups (components/messages/GroupsHome.tsx).
+const inbox = src("app/(tabs)/messages.tsx"), groupsHome = src("components/messages/GroupsHome.tsx");
+ok("Messages › Groups: 'Family & Church' filter covers the two conversation types", /\{ key: "family_church", label: "Family & Church" \}/.test(groupsHome)
+  && /filter === "family_church" \? g\.kind === "family" \|\| g\.kind === "church"/.test(groupsHome)
+  && /<GroupsHome conversations=\{groups\}/.test(inbox) && /conversations\.filter\(\(c\) => c\.type === "group"\)/.test(inbox));
 ok("ConversationType includes family + church (data types, re-exported by DataContext)", /"circle" \| "family" \| "church";/.test(src("contexts/data/types.ts")) && src("contexts/DataContext.tsx").includes('export * from "./data/types";'));
 const ctx = src("contexts/DataContext.tsx"), church = src("app/church/index.tsx");
 ok("church: all churches + conversation loaded from my-church", /setUserChurches\(Array\.isArray\(body\?\.churches\) \? body\.churches : \[\]\);/.test(ctx) && /setChurchConversationId\(body\?\.conversationId \?\? null\);/.test(ctx));

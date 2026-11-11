@@ -12,6 +12,7 @@ import colors from "@/constants/colors";
 import { useSheetWidth } from "@/hooks/useLayout";
 import { AppButton } from "@/components/ui";
 import { showAlert } from "@/lib/alerts";
+import { useMessagePlaceholder } from "@/lib/messagePrivacy";
 const TYPE_OPTIONS: { value: ChurchAnnouncementType; label: string }[] = [
   { value: "general", label: "General" }, { value: "bible_study", label: "Bible Study" },
   { value: "discipleship", label: "Discipleship" }, { value: "prayer", label: "Prayer" },
@@ -26,6 +27,7 @@ const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 90;
 
 export default function ChurchAnnouncementsManagementScreen() {
+  const privacyPlaceholder = useMessagePlaceholder(); // privacy reminder in the empty composer (lib/messagePrivacy)
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -164,7 +166,7 @@ export default function ChurchAnnouncementsManagementScreen() {
           <ScrollView style={[styles.modalSheet, sheetWidth]} contentContainerStyle={{ gap: 10 }}>
             <Text style={styles.modalTitle}>New Announcement</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Title" placeholderTextColor={colors.textMuted} />
-            <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder="Message" placeholderTextColor={colors.textMuted} multiline />
+            <TextInput style={[styles.input, styles.textArea]} value={body} onChangeText={setBody} placeholder={privacyPlaceholder} placeholderTextColor={colors.textMuted} multiline />
 
             <AppButton label={`${TYPE_OPTIONS.find((t) => t.value === announcementType)?.label}`} onPress={() => setTypePickerOpen(true)} variant="secondary" icon="chevron-down" iconPosition="trailing" palette="fixedLight" />
             {announcementType === "other" && (

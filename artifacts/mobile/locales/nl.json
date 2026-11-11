@@ -417,6 +417,7 @@
     "emptyTitle": "Nog geen gesprekken",
     "emptySub": "Begin een gesprek vanuit het profiel van een peer of vanuit een groep.",
     "messagePlaceholder": "Bericht...",
+    "privacyPlaceholder": "Voer geen gevoelige persoonlijke gegevens in",
     "title": "Gesprek"
   },
   "connect": {

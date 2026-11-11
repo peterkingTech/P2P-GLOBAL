@@ -417,6 +417,7 @@
     "emptyTitle": "아직 대화가 없습니다",
     "emptySub": "동료의 프로필이나 그룹에서 대화를 시작하세요.",
     "messagePlaceholder": "메시지...",
+    "privacyPlaceholder": "민감한 개인정보를 입력하지 마세요",
     "title": "대화"
   },
   "connect": {

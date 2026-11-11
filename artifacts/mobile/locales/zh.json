@@ -417,6 +417,7 @@
     "emptyTitle": "暂无对话",
     "emptySub": "从同侪的个人资料或小组开始一段对话。",
     "messagePlaceholder": "消息...",
+    "privacyPlaceholder": "请勿输入敏感个人信息",
     "title": "对话"
   },
   "connect": {

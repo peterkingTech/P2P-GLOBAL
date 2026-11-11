@@ -23,7 +23,7 @@ export const TARGET_LABEL: Record<TargetType, string> = { peer: "Person", family
 export interface CollectionCover { kind: "artwork" | "colour" | "image"; ref: string; /** Your own photo: a short-lived link (migration 228). */ url?: string }
 
 export interface CollectionCard {
-  id: string; kind: CollectionKind; title: string; description: string | null; itemCount: number; updatedAt: string;
+  id: string; kind: CollectionKind; title: string; description: string | null; itemCount: number; /** Verses in all its passages (listening time). */ verseCount?: number; updatedAt: string;
   isCopy: boolean; originOwnerName: string | null;
   shareCount?: number;
   ownerName?: string; sharedByName?: string; permission?: Permission | null;
