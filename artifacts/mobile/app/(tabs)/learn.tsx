@@ -21,6 +21,7 @@ import { COMPREHENSIVE_CHECKS } from "@/lib/terminology";
 import { loadCached, peekCached, qk } from "@/lib/query";
 import { usePerfVisit } from "@/lib/perf";
 import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
 // The Learning tab. One clean starting point:
 //   a personal header (your name, what's under way);
@@ -36,7 +37,7 @@ import { BIBLE_COVER, BIBLE_COVER_BG } from "@/constants/artwork";
 // cache first (instant on return), then refreshes: the stories home is the
 // same cached copy Kingdom Stories uses, so the two never fetch it twice.
 
-export default function LearnTab() {
+function LearnTab() {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
   const scrollRef = React.useRef<ScrollView>(null);
@@ -181,3 +182,6 @@ function makeStyles(c: AppColors) {
     empty: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 18, backgroundColor: c.card },
   });
 }
+
+// One tab's error stays in that tab (components/ScreenErrorBoundary.tsx).
+export default withScreenBoundary(LearnTab, "tabs/learn");

@@ -42,14 +42,20 @@ const A = load("lib/deepStudyApi.ts", { "@react-native-async-storage/async-stora
 ok("strongs: H430 → H0430, g3056 → G3056, nonsense → null", A.normaliseStrongs("H430") === "H0430" && A.normaliseStrongs("g3056") === "G3056" && A.normaliseStrongs("hello") === null);
 
 (async () => {
+  // A copy saved in the OLD format (v1, before credits carried `origin`) — it must never be read.
+  store.set("p2p.deepstudy.v1:/lexicon/H1254?book=GEN&chapter=1", JSON.stringify({ at: Date.now(), data: { stale: true } }));
+  store.set("p2p.deepstudy.v1.index", JSON.stringify(["/lexicon/H1254?book=GEN&chapter=1"]));
   const first = await A.lexiconEntry("H1254", { book: "GEN", chapter: 1 });
+  ok("an old-format (v1) saved copy is never used", !first.stale);
+  await new Promise((r) => setTimeout(r, 10));
+  ok("…and old-format copies are removed from the device", ![...store.keys()].some((k) => k.startsWith("p2p.deepstudy.v1")));
   ok("calls the Deep Study API with the passage", calls[0] === "/deep-study/lexicon/H1254?book=GEN&chapter=1" && first.path === calls[0]);
   const again = await A.lexiconEntry("H1254", { book: "GEN", chapter: 1 });
   ok("cache retrieval: a fresh copy is reused without the network", calls.length === 1 && again.n === first.n);
-  ok("cache: kept on the device (survives a restart)", [...store.keys()].some((k) => k.startsWith("p2p.deepstudy.v1:/lexicon/H1254")));
+  ok("cache: kept on the device (survives a restart)", [...store.keys()].some((k) => k.startsWith("p2p.deepstudy.v2:/lexicon/H1254")));
 
   // Make the copy old, then go offline: the old copy is shown, marked offline.
-  for (const [k, v] of store) if (k.startsWith("p2p.deepstudy.v1:/lexicon/H1254")) { const o = JSON.parse(v); o.at -= 7 * 3600_000; store.set(k, JSON.stringify(o)); }
+  for (const [k, v] of store) if (k.startsWith("p2p.deepstudy.v2:/lexicon/H1254")) { const o = JSON.parse(v); o.at -= 7 * 3600_000; store.set(k, JSON.stringify(o)); }
   const memReset = load("lib/deepStudyApi.ts", { "@react-native-async-storage/async-storage": storage, "@/lib/apiClient": api });
   mode = "offline";
   const off = await memReset.lexiconEntry("H1254", { book: "GEN", chapter: 1 });
@@ -90,8 +96,8 @@ ok("strongs: H430 → H0430, g3056 → G3056, nonsense → null", A.normaliseStr
   const screens = ["app/deep-study/index.tsx", "app/commentaries/[id].tsx", "app/commentaries/read.tsx", "app/study-tools/lexicon.tsx", "app/study-tools/word/[strongs].tsx"];
   ok("attribution shown on every content screen", screens.every((f) => src(f).includes("<Attribution credit=")));
   const ui = src("components/study/StudyUI.tsx");
-  ok("credit: the original source and the licence are ALWAYS visible links (not behind the toggle)", ui.indexOf("Linking.openURL(credit.origin.url)") > 0
-    && ui.indexOf("Linking.openURL(credit.origin.url)") < ui.indexOf("{open ? (") && ui.indexOf("Linking.openURL(credit.licence.url)") < ui.indexOf("{open ? ("));
+  ok("credit: the original source and the licence are ALWAYS visible links (not behind the toggle)", ui.includes("const links = [credit.origin, credit.licence && { label: credit.licence.name, url: credit.licence.url }]")
+    && ui.indexOf("links.map(") > 0 && ui.indexOf("links.map(") < ui.indexOf("{open ? ("));
   ok("one client for all three destinations (no direct provider calls in screens)", [...screens, "app/commentaries/index.tsx", "app/study-tools/index.tsx"].every((f) => !src(f).includes("helloao.org") && src(f).includes("@/lib/deepStudyApi")));
   ok("no second audio player", [...screens].every((f) => !/expo-audio|expo-av|useAudioPlayer/.test(src(f))));
   const layout = src("app/_layout.tsx");

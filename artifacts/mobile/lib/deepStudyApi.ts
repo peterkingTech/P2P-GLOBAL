@@ -16,8 +16,22 @@ export class StudyError extends Error {
   constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
-const PREFIX = "p2p.deepstudy.v1:";
-const INDEX = "p2p.deepstudy.v1.index";
+// The saved-copy format. BUMP THIS whenever the server's response shape changes, so screens never read
+// a saved answer in an older shape (2026-11-12: v1 copies lacked `credit.origin`). Older copies are removed.
+const SCHEMA = 2;
+const PREFIX = `p2p.deepstudy.v${SCHEMA}:`;
+const INDEX = `p2p.deepstudy.v${SCHEMA}.index`;
+let oldCleared = false;
+async function clearOlderSchemas() {
+  if (oldCleared) return;
+  oldCleared = true;
+  try {
+    for (let v = 1; v < SCHEMA; v++) {
+      const idx: string[] = JSON.parse((await AsyncStorage.getItem(`p2p.deepstudy.v${v}.index`)) ?? "[]");
+      await AsyncStorage.multiRemove([...idx.map((p) => `p2p.deepstudy.v${v}:${p}`), `p2p.deepstudy.v${v}.index`]);
+    }
+  } catch { /* best effort: older copies are never read either way */ }
+}
 const FRESH_MS = 6 * 3600_000;
 const MAX_ENTRIES = 80;
 
@@ -51,6 +65,7 @@ async function writeCache<T>(path: string, data: T) {
 
 /** Fresh-enough cache → network (with the server's own timeout + retry) → older cache when offline. */
 async function get<T>(path: string, opts: { refresh?: boolean } = {}): Promise<T & { offline?: boolean }> {
+  void clearOlderSchemas();
   const hit = await readCache<T>(path);
   if (hit && !opts.refresh && Date.now() - hit.at < FRESH_MS) return hit.data as T & { offline?: boolean };
   try {
@@ -73,10 +88,11 @@ const range = (from?: number | null, to?: number | null) => (from ? `?from=${fro
 export interface Credit {
   id: string; name: string; author: string; attribution: string; licence: { name: string; url: string }; shareAlike: boolean;
   providerNotice: string | null; changes: string; note: string | null;
-  /** The original source — always shown as a link (STEPBible requires "STEP Bible" linked to www.STEPBible.org). */
-  origin: { label: string; url: string };
-  via: { label: string; url: string };
-  licenceVerifiedOn: string;
+  /** The original source — always shown as a link (STEPBible requires "STEP Bible" linked to www.STEPBible.org).
+   *  Optional at the type level: an older server or saved copy may not have it, and screens must not crash. */
+  origin?: { label: string; url: string };
+  via?: { label: string; url: string };
+  licenceVerifiedOn?: string;
 }
 export interface StudyResource {
   id: string; kind: string; name: string; author: string; website: string | null; language: string; languageCode: string | null;

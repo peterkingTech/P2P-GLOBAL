@@ -6,6 +6,7 @@ import { SegmentedControl } from "@/components/ui";
 import PrayerHome from "@/components/more/PrayerHome";
 import DiscoverHome from "@/components/more/DiscoverHome";
 import { markPrayerSeen } from "@/hooks/usePrayerBadge";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
 // The More tab: Prayer first, then Discover (community, families, church, missions…), each the
 // full screen it was as its own tab. Links into either use ?section=prayer|discover
@@ -14,7 +15,7 @@ import { markPrayerSeen } from "@/hooks/usePrayerBadge";
 export type MoreSection = "prayer" | "discover";
 let lastSection: MoreSection = "prayer";
 
-export default function MoreTab() {
+function MoreTab() {
   const { profile } = useAuth();
   const params = useLocalSearchParams<{ section?: string }>();
   const [section, setSection] = useState<MoreSection>(lastSection);
@@ -39,3 +40,6 @@ export default function MoreTab() {
 }
 
 const styles = StyleSheet.create({ switchWrap: { paddingHorizontal: 20, paddingTop: 12 } });
+
+// One tab's error stays in that tab (components/ScreenErrorBoundary.tsx).
+export default withScreenBoundary(MoreTab, "tabs/more");

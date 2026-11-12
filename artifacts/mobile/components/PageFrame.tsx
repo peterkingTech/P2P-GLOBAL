@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useLayout } from "@/hooks/useLayout";
 import { useTheme } from "@/contexts/ThemeContext";
 import fixedColors from "@/constants/colors";
+import { ScreenErrorBoundary } from "@/components/ScreenErrorBoundary";
 
 // Wraps every root Stack screen (via the Stack's screenLayout) so screens that
 // never had a tablet layout get the same fluid page column as the main tabs:
@@ -54,13 +55,16 @@ export function isFullBleedRoute(routeName: string): boolean {
 export function PageFrame({ routeName, children }: { routeName: string; children: React.ReactNode }) {
   const { contentMaxWidth } = useLayout();
   const { colors } = useTheme();
-  if (isFullBleedRoute(routeName)) return <>{children}</>;
+  // Every screen gets its own error boundary: a screen that fails shows a contained message with
+  // Try again / Go back instead of taking down the whole app (components/ScreenErrorBoundary.tsx).
+  const guarded = <ScreenErrorBoundary routeName={routeName}>{children}</ScreenErrorBoundary>;
+  if (isFullBleedRoute(routeName)) return guarded;
   const framed = contentMaxWidth !== undefined;
   const marginColor = FIXED_LIGHT_BACKGROUND_ROUTES.has(routeName) ? fixedColors.lightCream : colors.lightCream;
   return (
     <View style={framed ? { flex: 1, backgroundColor: marginColor } : { flex: 1 }}>
       <View style={framed ? { flex: 1, width: "100%", maxWidth: contentMaxWidth, alignSelf: "center" } : { flex: 1 }}>
-        {children}
+        {guarded}
       </View>
     </View>
   );

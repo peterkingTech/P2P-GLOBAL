@@ -37,6 +37,7 @@ import { AppButton } from "@/components/ui";
 import { GetStartedCard } from "@/components/GetStartedCard";
 import { InviteEncouragementCard } from "@/components/InviteEncouragementCard";
 import { showAlert, confirmAction } from "@/lib/alerts";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
 const ALL_GIFTS: { key: SpiritualGift; label: string; icon: string }[] = [
   { key: "teaching", label: "Teaching", icon: "school" },
@@ -239,7 +240,7 @@ function makeStyles(c: AppColors) {
   });
 }
 
-export default function ProfileScreen() {
+function ProfileScreen() {
   const sheetWidth = useSheetWidth();
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
@@ -735,3 +736,6 @@ export default function ProfileScreen() {
     </View>
   );
 }
+
+// One tab's error stays in that tab (components/ScreenErrorBoundary.tsx).
+export default withScreenBoundary(ProfileScreen, "tabs/profile");

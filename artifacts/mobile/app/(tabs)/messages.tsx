@@ -22,6 +22,7 @@ import MailHome from "@/components/messages/MailHome";
 import GroupsHome from "@/components/messages/GroupsHome";
 import { mailUnread } from "@/lib/mailApi";
 import "@/lib/i18n";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
 // Three separate spaces: Chats (one-to-one, informal), P2P Mail (formal letters, never mixed into a chat)
 // and Groups (private groups, Family & Church, Peer Groups, Circles and Communities). Each has its own badge.
@@ -144,7 +145,7 @@ function makeStyles(c: AppColors) {
   });
 }
 
-export default function MessagesTab() {
+function MessagesTab() {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
   const tabScrollRef = React.useRef<FlatList>(null);
@@ -442,3 +443,6 @@ export default function MessagesTab() {
     </View>
   );
 }
+
+// One tab's error stays in that tab (components/ScreenErrorBoundary.tsx).
+export default withScreenBoundary(MessagesTab, "tabs/messages");

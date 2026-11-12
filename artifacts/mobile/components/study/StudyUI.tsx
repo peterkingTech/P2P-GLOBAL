@@ -14,8 +14,14 @@ export function Attribution({ credit, compact }: { credit: Credit | null | undef
   const { colors: c } = useTheme();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  if (!credit) return null;
+  if (!credit || typeof credit.attribution !== "string") return null;
   const s = styles(c);
+  // Every part is optional at render time: a credit from an older server or an older saved copy must
+  // never break the screen (2026-11-12: a missing `origin` crashed Deep Study). Links show when present.
+  const links = [credit.origin, credit.licence && { label: credit.licence.name, url: credit.licence.url }]
+    .filter((l): l is { label: string; url: string } => !!l && typeof l.url === "string" && typeof l.label === "string");
+  const open_ = (url: string) => Linking.openURL(url).catch(() => {});
+  const via = credit.via;
   return (
     <View style={[s.credit, compact && { marginTop: 6 }]}>
       <TouchableOpacity onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}
@@ -25,23 +31,26 @@ export function Attribution({ credit, compact }: { credit: Credit | null | undef
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={c.textMuted} />
       </TouchableOpacity>
       {/* Always visible: the original source and the licence, both linked (required by STEP Bible / CC BY). */}
-      <View style={s.links}>
-        <TouchableOpacity onPress={() => Linking.openURL(credit.origin.url).catch(() => {})} accessibilityRole="link" hitSlop={8}>
-          <Text style={s.link}>{credit.origin.label}</Text>
-        </TouchableOpacity>
-        <Text style={s.creditText}>·</Text>
-        <TouchableOpacity onPress={() => Linking.openURL(credit.licence.url).catch(() => {})} accessibilityRole="link" hitSlop={8}>
-          <Text style={s.link}>{credit.licence.name}</Text>
-        </TouchableOpacity>
-      </View>
+      {links.length ? (
+        <View style={s.links}>
+          {links.map((l, i) => (
+            <React.Fragment key={l.url}>
+              {i ? <Text style={s.creditText}>·</Text> : null}
+              <TouchableOpacity onPress={() => open_(l.url)} accessibilityRole="link" hitSlop={8}><Text style={s.link}>{l.label}</Text></TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </View>
+      ) : null}
       {open ? (
         <View style={{ gap: 4, marginTop: 4 }}>
           {credit.note ? <Text style={s.creditText}>{credit.note}</Text> : null}
           {credit.providerNotice ? <Text style={s.creditText}>{t("deepStudy.providerNotice", { defaultValue: "Provider's notice" })}: {credit.providerNotice}</Text> : null}
-          <Text style={s.creditText}>{t("deepStudy.changes", { defaultValue: "Changes" })}: {credit.changes}</Text>
-          <TouchableOpacity onPress={() => Linking.openURL(credit.via.url).catch(() => {})} accessibilityRole="link">
-            <Text style={s.creditText}>{t("deepStudy.via", { defaultValue: "Via" })} <Text style={s.link}>{credit.via.label}</Text></Text>
-          </TouchableOpacity>
+          {credit.changes ? <Text style={s.creditText}>{t("deepStudy.changes", { defaultValue: "Changes" })}: {credit.changes}</Text> : null}
+          {via?.url ? (
+            <TouchableOpacity onPress={() => open_(via.url)} accessibilityRole="link">
+              <Text style={s.creditText}>{t("deepStudy.via", { defaultValue: "Via" })} <Text style={s.link}>{via.label}</Text></Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
     </View>

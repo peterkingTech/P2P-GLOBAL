@@ -35,6 +35,7 @@ import { AppButton } from "@/components/ui";
 import { currentModule as currentModuleOf } from "@/lib/learningHome";
 import { STAGES, STAGE_IMAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 
 // Time-of-day palette for the greeting header. No stock imagery exists in
 // the project, so the "sunrise / daylight / night" feeling comes from
@@ -308,7 +309,7 @@ function makeStyles(c: AppColors) {
 // in Discover's community entry, the recommended plans on the Plans screen,
 // messages in the Messages tab. Native home-screen widgets are separate
 // (WidgetSyncHost in app/_layout.tsx) and unchanged.
-export default function HomeTab() {
+function HomeTab() {
   const insets = useSafeAreaInsets();
   const capsuleTopInset = useTabCapsuleTopInset(insets.top);
   const tabScrollRef = React.useRef<ScrollView>(null);
@@ -567,3 +568,6 @@ export default function HomeTab() {
     </ScrollView>
   );
 }
+
+// One tab's error stays in that tab (components/ScreenErrorBoundary.tsx).
+export default withScreenBoundary(HomeTab, "tabs/index");
