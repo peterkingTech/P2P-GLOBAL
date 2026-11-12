@@ -12,6 +12,7 @@ import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
 import { AppButton, IconButton } from "@/components/ui";
 import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
+import { useTranslation } from "react-i18next";
 
 // Bible Study — the starting point for Scripture in Learning. It reuses what
 // exists and adds no Bible system of its own:
@@ -38,6 +39,7 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   useScrollToTopOnTabReselect(asTab ? "bible" : "", scrollRef);
   const router = useRouter();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth } = useLayout();
   const [pos, setPos] = useState<ReadingPosition | null>(null);
@@ -102,6 +104,27 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
           ))}
         </View>
 
+        {/* The Bible Study area: Deep Study, Commentaries, Study Tools (one set of study records behind all three).
+            Scripture itself stays in the Bible above — no second Scripture destination here. */}
+        <Text style={s.section} accessibilityRole="header">{t("deepStudy.areaTitle", { defaultValue: "Bible Study" })}</Text>
+        <Text style={[s.meta, { marginBottom: 10 }]}>{t("deepStudy.areaSub", { defaultValue: "Go deeper: the original languages, classic commentaries and study tools." })}</Text>
+        <View style={{ gap: 10 }}>
+          {([
+            { icon: "layers-outline", title: t("deepStudy.title", { defaultValue: "Deep Study" }), sub: t("deepStudy.titleSub", { defaultValue: "One passage: original words, commentaries, cross references" }), route: "/deep-study" },
+            { icon: "library-outline", title: t("deepStudy.commentaries", { defaultValue: "Commentaries" }), sub: t("deepStudy.commentariesSub", { defaultValue: "Classic commentaries and open study notes" }), route: "/commentaries" },
+            { icon: "construct-outline", title: t("deepStudy.studyTools", { defaultValue: "Study Tools" }), sub: t("deepStudy.studyToolsSub", { defaultValue: "Hebrew, Greek and Aramaic lexicons, Strong's, cross references" }), route: "/study-tools" },
+          ] as const).map((d) => (
+            <TouchableOpacity key={d.route} style={s.dest} onPress={() => router.push(d.route as any)} accessibilityRole="button" accessibilityLabel={`${d.title}. ${d.sub}`}>
+              <View style={s.destIcon}><Ionicons name={d.icon} size={22} color={colors.primaryGreen} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.tileTitle}>{d.title}</Text>
+                <Text style={s.meta} numberOfLines={2}>{d.sub}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={s.section} accessibilityRole="header">Explore Scripture by Topic</Text>
         <Text style={[s.meta, { marginBottom: 10 }]}>Passages chosen by P2P editors for each topic. Open any passage to read it in context.</Text>
         {topics === null && !topicsFailed ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel="Loading topics" />
@@ -137,6 +160,8 @@ function makeStyles(c: AppColors) {
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
     tile: { flexBasis: "47%", flexGrow: 1, minHeight: 92, padding: 12, gap: 4, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     tileTitle: { fontSize: 14, color: c.textDark, fontFamily: "Inter_700Bold" },
+    dest: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 68, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
+    destIcon: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: c.lightCream },
     section: { fontSize: 17, lineHeight: 23, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 26, marginBottom: 4 },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     chip: { minHeight: 40, paddingHorizontal: 14, justifyContent: "center", borderRadius: 20, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },

@@ -35,6 +35,7 @@ import evaluationsRouter from "./evaluations";
 import translationsRouter from "./translations";
 import bibleRouter from "./bible";
 import bibleReaderRouter from "./bibleReader";
+import deepStudyRouter from "./deepStudy";
 import groupResourcesRouter from "./groupResources";
 import circlesRouter from "./circles";
 import mailRouter from "./mail";
@@ -99,6 +100,7 @@ router.use("/registration", registrationRouter);
 router.use("/translations", translationsRouter);
 router.use("/bible", bibleRouter);
 router.use("/bible", bibleReaderRouter); // Bible reader: chapters, search, related lessons, private study data
+router.use("/deep-study", deepStudyRouter); // Deep Study, Commentaries, Study Tools: interlinear, lexicon, cross references, commentaries (AO Lab, reviewed resources only)
 router.use("/resources", groupResourcesRouter); // Family/Church Files & Resources (private bucket, signed URLs, members only)
 router.use("/circles", circlesRouter);
 router.use("/mail", mailRouter); // P2P Mail — internal official correspondence, separate from chat (migration 244)

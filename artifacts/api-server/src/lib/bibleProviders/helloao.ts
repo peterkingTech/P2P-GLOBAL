@@ -17,7 +17,7 @@
 
 export const HELLOAO_BASE = "https://bible.helloao.org";
 export const HELLOAO_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-const BOOK_RE = /^[1-3A-Z][A-Z0-9]{2}$/;
+export const BOOK_RE = /^[1-3A-Z][A-Z0-9]{2}$/;
 const TIMEOUT_MS = 12_000;
 
 export class HelloAoError extends Error {
@@ -30,7 +30,7 @@ let fetchImpl: Fetch = (...a) => fetch(...a);
 /** Tests replace the network. */
 export function setHelloAoFetch(f: Fetch | null) { fetchImpl = f ?? ((...a) => fetch(...a)); }
 
-async function getJson(pathname: string): Promise<unknown> {
+export async function getJson(pathname: string): Promise<unknown> {
   // `pathname` is built only from validated parts below.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -86,7 +86,7 @@ export function parseCatalogue(json: unknown): HelloAoTranslation[] {
 
 // Small in-memory caches with in-flight de-duplication (catalogue / books: 12 h).
 const memo = new Map<string, { at: number; p: Promise<unknown> }>();
-function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+export function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
   const hit = memo.get(key);
   if (hit && Date.now() - hit.at < ttlMs) return hit.p as Promise<T>;
   const p = load();

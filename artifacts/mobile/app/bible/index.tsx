@@ -754,6 +754,9 @@ export default function BibleReaderScreen() {
             <Action styles={styles} c={c} icon="copy-outline" label="Copy" onPress={onCopy} />
             <Action styles={styles} c={c} icon={Platform.OS === "ios" ? "share-outline" : "share-social-outline"} label="Share" onPress={onShare} />
             <Action styles={styles} c={c} icon="school-outline" label="Lessons" onPress={() => setSheet("related")} />
+            {/* Deep Study opens on top; the reader (book, chapter, selection, translation) is untouched underneath. */}
+            <Action styles={styles} c={c} icon="layers-outline" label="Deep Study" disabled={!selRef}
+              onPress={() => selRef && router.push({ pathname: "/deep-study", params: { book: selRef.bookCode, chapter: String(selRef.chapter), v: String(selRef.startVerse), ve: String(selRef.endVerse), t: selRef.translationCode } } as any)} />
           </View>
           {!my.available && <Text style={styles.soon}>Highlights, notes and saving are coming soon.</Text>}
         </View>

@@ -1,0 +1,95 @@
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Linking, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import type { AppColors } from "@/constants/themes";
+import { AppButton } from "@/components/ui";
+import type { Credit } from "@/lib/deepStudyApi";
+
+// Shared pieces for Deep Study, Commentaries and Study Tools.
+
+/** Source + licence for a study resource. Always shown with its content (CC BY / BY-SA need it). */
+export function Attribution({ credit, compact }: { credit: Credit | null | undefined; compact?: boolean }) {
+  const { colors: c } = useTheme();
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  if (!credit) return null;
+  const s = styles(c);
+  return (
+    <View style={[s.credit, compact && { marginTop: 6 }]}>
+      <TouchableOpacity onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${t("deepStudy.source", { defaultValue: "Source" })}: ${credit.attribution}`} style={s.creditRow}>
+        <Ionicons name="information-circle-outline" size={14} color={c.textMuted} />
+        <Text style={s.creditText} numberOfLines={open ? undefined : 2}>{credit.attribution}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={c.textMuted} />
+      </TouchableOpacity>
+      {/* Always visible: the original source and the licence, both linked (required by STEP Bible / CC BY). */}
+      <View style={s.links}>
+        <TouchableOpacity onPress={() => Linking.openURL(credit.origin.url).catch(() => {})} accessibilityRole="link" hitSlop={8}>
+          <Text style={s.link}>{credit.origin.label}</Text>
+        </TouchableOpacity>
+        <Text style={s.creditText}>·</Text>
+        <TouchableOpacity onPress={() => Linking.openURL(credit.licence.url).catch(() => {})} accessibilityRole="link" hitSlop={8}>
+          <Text style={s.link}>{credit.licence.name}</Text>
+        </TouchableOpacity>
+      </View>
+      {open ? (
+        <View style={{ gap: 4, marginTop: 4 }}>
+          {credit.note ? <Text style={s.creditText}>{credit.note}</Text> : null}
+          {credit.providerNotice ? <Text style={s.creditText}>{t("deepStudy.providerNotice", { defaultValue: "Provider's notice" })}: {credit.providerNotice}</Text> : null}
+          <Text style={s.creditText}>{t("deepStudy.changes", { defaultValue: "Changes" })}: {credit.changes}</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(credit.via.url).catch(() => {})} accessibilityRole="link">
+            <Text style={s.creditText}>{t("deepStudy.via", { defaultValue: "Via" })} <Text style={s.link}>{credit.via.label}</Text></Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** Loading, error (with Try again) and "offline copy" states. */
+export function StudyState({ loading, error, onRetry, offline, empty }: { loading?: boolean; error?: string | null; onRetry?: () => void; offline?: boolean; empty?: string | null }) {
+  const { colors: c } = useTheme();
+  const { t } = useTranslation();
+  const s = styles(c);
+  if (loading) return <View style={s.center}><ActivityIndicator color={c.accentGreen} accessibilityLabel={t("deepStudy.loading", { defaultValue: "Loading" })} /></View>;
+  if (error) return (
+    <View style={s.center}>
+      <Ionicons name="cloud-offline-outline" size={28} color={c.textMuted} />
+      <Text style={s.muted}>{error}</Text>
+      {onRetry ? <AppButton label={t("deepStudy.tryAgain", { defaultValue: "Try again" })} variant="secondary" size="sm" onPress={onRetry} /> : null}
+    </View>
+  );
+  if (offline) return <Text style={s.offline} accessibilityLiveRegion="polite">{t("deepStudy.offlineCopy", { defaultValue: "You're offline — showing the copy saved on this device." })}</Text>;
+  if (empty) return <View style={s.center}><Text style={s.muted}>{empty}</Text></View>;
+  return null;
+}
+
+/** Original-language text in its own direction (Hebrew/Aramaic right to left, Greek left to right). */
+export function OriginalText({ text, direction, size = 22, style }: { text: string; direction: "ltr" | "rtl"; size?: number; style?: object }) {
+  const { colors: c } = useTheme();
+  return (
+    <Text style={[{ fontSize: size, lineHeight: size * 1.45, color: c.textDark, writingDirection: direction, textAlign: direction === "rtl" ? "right" : "left",
+      fontFamily: Platform.select({ ios: direction === "rtl" ? "Arial Hebrew" : "Times New Roman", default: undefined }) }, style]}
+      accessibilityLanguage={direction === "rtl" ? "he" : "el"}>
+      {text}
+    </Text>
+  );
+}
+
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  const { colors: c } = useTheme();
+  return <Text style={{ fontSize: 12, letterSpacing: 0.6, color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", marginTop: 6 }} accessibilityRole="header">{children}</Text>;
+}
+
+const styles = (c: AppColors) => StyleSheet.create({
+  credit: { marginTop: 10, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.borderBeige },
+  creditRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, minHeight: 32 },
+  creditText: { flex: 1, fontSize: 11.5, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  link: { fontSize: 12, color: c.accentGreen, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
+  links: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 2, marginLeft: 20 },
+  center: { alignItems: "center", justifyContent: "center", gap: 10, padding: 24 },
+  muted: { fontSize: 13.5, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },
+  offline: { fontSize: 12, color: c.amber, fontFamily: "Inter_500Medium", paddingVertical: 4 },
+});

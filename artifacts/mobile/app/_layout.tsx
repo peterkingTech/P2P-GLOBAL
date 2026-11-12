@@ -83,6 +83,7 @@ const OWN_HEADER_ROUTES = [
   "bible/index", "bible/search", "bible/library", "bible/versions", "bible/languages", "resources/[scope]/[groupId]",
   "mail/index", "mail/[id]", "mail/compose",
   "groups/create", "groups/[id]", "groups/community/[id]", "groups/invitations", "groups/join",
+  "deep-study/index", "commentaries/index", "commentaries/[id]", "commentaries/read", "study-tools/index", "study-tools/lexicon", "study-tools/word/[strongs]",
 ];
 
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);
