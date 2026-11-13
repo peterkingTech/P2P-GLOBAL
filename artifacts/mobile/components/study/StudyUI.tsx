@@ -92,23 +92,35 @@ export function OriginalText({ text, direction, size = 22, style }: { text: stri
 /**
  * Hear one original-language word, through the shared P2P Listen speech session (listen.speakSnippet —
  * no second player). Play / Replay / Slower. Says exactly what is heard: the device's own voice, its
- * language, and that the pronunciation is NOT verified (lib/listen/originalLanguage.ts). Aramaic: no audio.
+ * language, and that the pronunciation is NOT verified (lib/listen/originalLanguage.ts). With no voice for
+ * the language (often on desktop; always for Aramaic) it plays the sounds-like spelling of the
+ * transliteration in the device's English voice, and says that this is an English approximation.
  */
-export function PronounceButton({ text, language }: { text: string; language: string }) {
+export function PronounceButton({ text, language, transliteration }: { text: string; language: string; transliteration?: string | null }) {
   const { colors: c } = useTheme();
   const { t } = useTranslation();
   const s = styles(c);
-  const plan = pronunciationPlan(text, language);
-  const [state, setState] = useState<{ status: "idle" | "playing" | "no_voice" | "error"; voice?: string }>({ status: "idle" });
+  const plan = pronunciationPlan(text, language, transliteration);
+  const [state, setState] = useState<{ status: "idle" | "playing" | "no_voice" | "error"; voice?: string; approx?: boolean }>({ status: "idle" });
   if (!ORIGINAL_AUDIO.words) return null;
-  if (!plan.speechLanguage) return <Text style={s.pronounceNote}>{language === "aramaic"
+  if (!plan.speechLanguage && !plan.soundsLike) return <Text style={s.pronounceNote}>{language === "aramaic"
     ? t("deepStudy.noAramaicVoice", { defaultValue: "No reliable Aramaic voice is available. Aramaic is not read with a Hebrew voice — use the transliteration." })
     : t("deepStudy.noVoiceLanguage", { defaultValue: "No voice is available for this language." })}</Text>;
   const play = async (rate: number) => {
     setState({ status: "playing" });
-    const r = await listen.speakSnippet(plan.speak, { language: plan.speechLanguage!, rate });
+    const r = plan.speechLanguage ? await listen.speakSnippet(plan.speak, { language: plan.speechLanguage, rate }) : { result: "no_voice" as const };
+    if (r.result === "no_voice" && plan.soundsLike) {
+      const f = await listen.speakSnippet(plan.soundsLike, { language: plan.fallbackLanguage, rate });
+      return setState(f.result === "spoken" ? { status: "idle", approx: true, voice: f.voice ? `${f.voice.name} (${f.voice.language})` : undefined } : { status: f.result });
+    }
     setState(r.result === "spoken" ? { status: "idle", voice: r.voice ? `${r.voice.name} (${r.voice.language})` : undefined } : { status: r.result });
   };
+  const approx = state.approx || !plan.speechLanguage;
+  const approxNote = language === "aramaic"
+    ? t("deepStudy.approxAramaic", { defaultValue: "Said by your device's English voice from the transliteration — an approximation; there is no Aramaic voice." })
+    : language === "hebrew"
+      ? t("deepStudy.approxHebrew", { defaultValue: "Said by your device's English voice from the transliteration — an approximation, because this device has no Hebrew voice." })
+      : t("deepStudy.approxGreek", { defaultValue: "Said by your device's English voice from the transliteration — an approximation, because this device has no Greek voice." });
   return (
     <View style={{ gap: 4 }}>
       <View style={s.pronounceRow}>
@@ -116,8 +128,9 @@ export function PronounceButton({ text, language }: { text: string; language: st
           loading={state.status === "playing"} onPress={() => play(0.85)} accessibilityLabel={t("deepStudy.pronounceA11y", { defaultValue: "Hear the pronunciation" })} />
         <AppButton label={t("deepStudy.slower", { defaultValue: "Slower" })} icon="speedometer-outline" size="sm" variant="tertiary" onPress={() => play(0.5)} disabled={state.status === "playing"} />
       </View>
+      {plan.soundsLike ? <Text style={s.soundsLike}>{t("deepStudy.soundsLike", { defaultValue: "Sounds like: {{spelling}}", spelling: plan.soundsLike })}</Text> : null}
       <Text style={s.pronounceNote}>
-        {language === "hebrew"
+        {approx ? approxNote : language === "hebrew"
           ? t("deepStudy.conventionHebrew", { defaultValue: "Modern Israeli Hebrew (device voice) — not verified for Biblical Hebrew" })
           : t("deepStudy.conventionGreek", { defaultValue: "Modern Greek (device voice) — not a reconstructed Koine pronunciation" })}
         {state.voice ? ` · ${state.voice}` : ""}
@@ -141,6 +154,7 @@ const styles = (c: AppColors) => StyleSheet.create({
   links: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 2, marginLeft: 20 },
   pronounceRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   pronounceNote: { fontSize: 11.5, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  soundsLike: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
   pronounceWarn: { fontSize: 12, color: c.amber, fontFamily: "Inter_500Medium", lineHeight: 17 },
   center: { alignItems: "center", justifyContent: "center", gap: 10, padding: 24 },
   muted: { fontSize: 13.5, color: c.textMuted, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 19 },

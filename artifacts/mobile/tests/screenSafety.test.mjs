@@ -121,7 +121,7 @@ ok("the app-wide boundary remains as the last resort", src("app/_layout.tsx").in
 
 // ── Saved copies can't come back in an old shape ─────────────────────────
 const api = src("lib/deepStudyApi.ts");
-ok("Deep Study saved-copy format is versioned (v2) and older copies are removed", /const SCHEMA = 2;/.test(api) && api.includes("clearOlderSchemas()") && api.includes("BUMP THIS whenever the server's response shape changes"));
+ok("Deep Study saved-copy format is versioned (v3) and older copies are removed", /const SCHEMA = 3;/.test(api) && api.includes("clearOlderSchemas()") && api.includes("BUMP THIS whenever the server's response shape changes"));
 ok("credit fields from the server are optional in the app's types (the compiler forces checks)", /origin\?: \{ label: string; url: string \}/.test(api) && /via\?: \{ label: string; url: string \}/.test(api));
 
 console.log(`screenSafety (app): ${pass} passed, ${fail} failed`);

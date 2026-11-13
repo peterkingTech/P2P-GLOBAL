@@ -17,8 +17,9 @@ export class StudyError extends Error {
 }
 
 // The saved-copy format. BUMP THIS whenever the server's response shape changes, so screens never read
-// a saved answer in an older shape (2026-11-12: v1 copies lacked `credit.origin`). Older copies are removed.
-const SCHEMA = 2;
+// a saved answer in an older shape (2026-11-12: v1 copies lacked `credit.origin`; 2026-11-13: v2 dictionary
+// answers lacked reference `articles`). Older copies are removed.
+const SCHEMA = 3;
 const PREFIX = `p2p.deepstudy.v${SCHEMA}:`;
 const INDEX = `p2p.deepstudy.v${SCHEMA}.index`;
 let oldCleared = false;
@@ -157,12 +158,25 @@ export interface DictTermSummary {
   type: "term"; key: string; display: string; letter: string; records: number;
   languages: { language: DictLanguage; count: number }[]; preview: { id: string; language: DictLanguage; lemma: string; transliteration: string }[];
 }
-export type DictSearchItem = (DictTermSummary | (DictRecord & { type: "record" })) & { rank: number; matched: string };
+/** A historical/theological reference article (Easton's 1897) — its own entry type, never a lexical record. */
+export interface DictArticleSummary { type: "article"; id: string; title: string; letter: string; source: string; preview: string }
+export type DictSearchItem = (DictTermSummary | (DictRecord & { type: "record" }) | DictArticleSummary) & { rank: number; matched: string };
 export interface DictOverview {
   letters: { letter: string; count: number }[]; terms: number; records: number; languages: { language: DictLanguage; records: number }[];
   builtAt: string; referenceSources: { id: string; name: string; status: string }[]; credits: Credit[]; note: string;
+  /** Absent from older servers: then there are no reference articles to show. */
+  articles?: { total: number; letters: { letter: string; count: number }[]; credit: Credit | null; note: string } | null;
 }
-export interface DictTerm { key: string; display: string; letter: string; records: DictRecord[]; renderedAs: (DictRecord & { renderCount: number })[]; renderedNote: string; credits: Credit[] }
+export interface DictTerm { key: string; display: string; letter: string; records: DictRecord[]; renderedAs: (DictRecord & { renderCount: number })[]; renderedNote: string; credits: Credit[]; articles?: DictArticleSummary[] }
+/** Article text: plain text, or a cited passage ["r", "JHN.7.48" | null, label], a see-also ["s", id | null, label], a foreign word ["i", text]. */
+export type DictArticleSegment = string | ["r", string | null, string] | ["s", string | null, string] | ["i", string];
+export interface DictScriptureRef { ref: string; book: string; chapter: number; verse: number | null; endChapter: number | null; endVerse: number | null; label: string }
+export interface DictArticle {
+  type: "article"; id: string; title: string; letter: string; paragraphs: DictArticleSegment[][];
+  scripture: DictScriptureRef[]; seeAlso: { id: string; title: string }[];
+  relatedWords: { key: string; display: string; records: { strongs: string; language: DictLanguage; lemma: string; transliteration: string; gloss: string }[] }[];
+  credit: Credit | null; credits: Credit[]; note: string; relatedNote: string;
+}
 export interface DictRecordDetail { record: DictRecord; terms: { key: string; display: string }[]; countsNote: string; credits: Credit[] }
 export interface DictOccurrences {
   id: string; words: number; verses: number; offset: number; note: string; credits: Credit[];
@@ -175,6 +189,8 @@ export const dictionarySearch = (q: string, language?: DictLanguage | null, offs
 export const dictionaryTerm = (key: string) => get<DictTerm>(`/dictionary/term/${encodeURIComponent(key)}`);
 export const dictionaryRecord = (strongs: string) => get<DictRecordDetail>(`/dictionary/record/${encodeURIComponent(strongs)}`);
 export const dictionaryOccurrences = (strongs: string, offset = 0) => get<DictOccurrences>(`/dictionary/record/${encodeURIComponent(strongs)}/occurrences?offset=${offset}&limit=25`);
+export const dictionaryArticles = (letter: string, offset = 0) => get<{ letter: string; total: number; offset: number; items: DictArticleSummary[]; credit: Credit | null }>(`/dictionary/articles?letter=${encodeURIComponent(letter)}&offset=${offset}&limit=50`);
+export const dictionaryArticle = (id: string) => get<DictArticle>(`/dictionary/article/${encodeURIComponent(id)}`);
 
 /** "H1254", "h430", "G3056" → the zero-padded id the provider uses ("H0430"), or null. */
 export function normaliseStrongs(input: string): string | null {

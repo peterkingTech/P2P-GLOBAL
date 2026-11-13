@@ -8,7 +8,7 @@
 // their attribution, allow this. (Generating and caching audio files is a separate decision — see
 // lib/listen/originalLanguage.ts audioCacheKey.)
 import type { ListenSection } from "./chunking";
-import { speakableGreek, speakableHebrew } from "./originalLanguage";
+import { soundsLike, speakableGreek, speakableHebrew } from "./originalLanguage";
 
 const sentence = (s: string) => { const t = s.trim(); return !t ? "" : /[.!?:;…]$/.test(t) ? t : `${t}.`; };
 const credit = (attribution: string | null | undefined, id: string): ListenSection[] =>
@@ -52,8 +52,8 @@ export function lexiconSections(e: {
   return [...out, ...credit(e.attribution, e.id)];
 }
 
-/** A dictionary headword: each original word in turn (by transliteration — never original letters read
- *  in an English voice), its lexicon gloss and real usage counts, then the source. */
+/** A dictionary headword: each original word in turn (by its sounds-like spelling — never original
+ *  letters read in an English voice), its lexicon gloss and real usage counts, then the source. */
 export function dictionarySections(d: {
   key: string; display: string;
   records: { id: string; language: string; transliteration: string; gloss: string; partOfSpeech: string; words: number; verses: number }[];
@@ -63,11 +63,23 @@ export function dictionarySections(d: {
   const out: ListenSection[] = [{ id: `dict:${d.key}:h`, title: d.display, parts: [{ key: `dict:${d.key}:h`,
     text: sentence(`${d.display}. ${d.records.length === 1 ? "One original word has" : `${d.records.length} different original words have`} this English gloss in the lexicon. Each is its own word`) }] }];
   for (const r of d.records) out.push({ id: `dict:${d.key}:${r.id}`, title: `${lang(r.language)} · ${r.transliteration || r.id}`, parts: [
-    { key: `dict:${d.key}:${r.id}:w`, text: sentence(`${lang(r.language)}: ${r.transliteration || "transliteration not given"}, Strong's ${r.id.replace(/^([HG])0*/, "$1 ")}`) },
+    { key: `dict:${d.key}:${r.id}:w`, text: sentence(`${lang(r.language)}: ${soundsLike(r.transliteration, r.language) ?? (r.transliteration || "transliteration not given")}, Strong's ${r.id.replace(/^([HG])0*/, "$1 ")}`) },
     ...(r.gloss ? [{ key: `dict:${d.key}:${r.id}:g`, text: sentence(`Lexicon gloss: ${r.gloss}`) }] : []),
     { key: `dict:${d.key}:${r.id}:n`, text: sentence(r.words ? `Used ${r.words} times in ${r.verses} verses, counting every form` : "No occurrences in the interlinear") },
   ] });
   return [...out, ...credit(attribution, `dict:${d.key}`)];
+}
+
+/** A reference article (Easton's 1897): its title, every paragraph exactly as printed (cited passages read
+ *  as printed, e.g. "Matt. 23:15"), then the source. */
+export function articleSections(a: { id: string; title: string; paragraphs: (string | [string, string | null, string] | [string, string])[][] }, attribution?: string | null): ListenSection[] {
+  const text = (p: (typeof a.paragraphs)[number]) => p.map((s) => (typeof s === "string" ? s : s[s.length - 1] ?? "")).join("").replace(/\s+/g, " ").trim();
+  const paras = a.paragraphs.map(text).filter(Boolean);
+  if (!paras.length) return [];
+  return [{ id: `art:${a.id}`, title: a.title, parts: [
+    { key: `art:${a.id}:h`, text: sentence(a.title) },
+    ...paras.map((p, i) => ({ key: `art:${a.id}:${i}`, text: p })),
+  ] }, ...credit(attribution, `art:${a.id}`)];
 }
 
 /** People, places and events in a passage, grouped as on screen. */

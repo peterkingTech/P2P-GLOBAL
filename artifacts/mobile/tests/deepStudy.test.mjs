@@ -52,10 +52,10 @@ ok("strongs: H430 → H0430, g3056 → G3056, nonsense → null", A.normaliseStr
   ok("calls the Deep Study API with the passage", calls[0] === "/deep-study/lexicon/H1254?book=GEN&chapter=1" && first.path === calls[0]);
   const again = await A.lexiconEntry("H1254", { book: "GEN", chapter: 1 });
   ok("cache retrieval: a fresh copy is reused without the network", calls.length === 1 && again.n === first.n);
-  ok("cache: kept on the device (survives a restart)", [...store.keys()].some((k) => k.startsWith("p2p.deepstudy.v2:/lexicon/H1254")));
+  ok("cache: kept on the device (survives a restart)", [...store.keys()].some((k) => k.startsWith("p2p.deepstudy.v3:/lexicon/H1254")));
 
   // Make the copy old, then go offline: the old copy is shown, marked offline.
-  for (const [k, v] of store) if (k.startsWith("p2p.deepstudy.v2:/lexicon/H1254")) { const o = JSON.parse(v); o.at -= 7 * 3600_000; store.set(k, JSON.stringify(o)); }
+  for (const [k, v] of store) if (k.startsWith("p2p.deepstudy.v3:/lexicon/H1254")) { const o = JSON.parse(v); o.at -= 7 * 3600_000; store.set(k, JSON.stringify(o)); }
   const memReset = load("lib/deepStudyApi.ts", { "@react-native-async-storage/async-storage": storage, "@/lib/apiClient": api });
   mode = "offline";
   const off = await memReset.lexiconEntry("H1254", { book: "GEN", chapter: 1 });

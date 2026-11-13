@@ -5,7 +5,8 @@
 // Greek and Hebrew with and without accents/points, Strong's in any form, transliteration, homonym senses,
 // Aramaic, language filter, ranking, no duplicates), headword entries (separate lemmas never merged,
 // "also translated"), occurrences (counts agree, canonical refs, word forms from the interlinear),
-// reference entries (none fabricated), errors.
+// reference articles (Easton's 1897: a separate entry type, edition + licence recorded, wording unchanged,
+// passages and related lexicon words), errors.
 // Run: node tests/dictionary.test.mjs
 import { createRequire } from "node:module";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
@@ -35,6 +36,8 @@ try {
     export { default as router } from ${JSON.stringify(path.join(root, "src/routes/deepStudy.ts"))};
     export { setHelloAoFetch } from ${JSON.stringify(path.join(root, "src/lib/bibleProviders/helloao.ts"))};
     export * from ${JSON.stringify(path.join(root, "src/lib/dictionary.ts"))};
+    export { getArticles, scriptureRef, titleForms } from ${JSON.stringify(path.join(root, "src/lib/referenceArticles.ts"))};
+    export { STUDY_RESOURCES } from ${JSON.stringify(path.join(root, "src/lib/studyResources.ts"))};
   `);
   const out = await build({ entryPoints: [path.join(tmp, "entry.ts")], bundle: true, platform: "node", format: "esm", write: false, logLevel: "silent", external: ["express"], plugins: [noDb] });
   writeFileSync(path.join(tmp, "m.mjs"), out.outputFiles[0].text);
@@ -85,7 +88,7 @@ try {
   ok("Aramaic: language filter returns Aramaic only (e.g. מֶלֶךְ H4430)", aram.items.length > 0 && aram.items.every((i) => i.type === "term" ? i.languages.some((l) => l.language === "aramaic") : i.language === "aramaic"));
   ok("homonyms: H1254 keeps its lettered senses apart", (D.records.get("H1254")?.senses.length ?? 0) >= 2);
   const all = await s("god");
-  ok("no duplicate results", new Set(all.items.map((i) => i.type + (i.key ?? i.strongs))).size === all.items.length);
+  ok("no duplicate results", new Set(all.items.map((i) => i.type + (i.key ?? i.strongs ?? i.id))).size === all.items.length);
   ok("ranking: results are in rank order", all.items.every((i, k, xs) => k === 0 || xs[k - 1].rank <= i.rank));
   ok("empty search → no results, no error", (await s("")).total === 0);
   ok("nonsense → empty, not an error", (await s("zzqqxx")).total === 0);
@@ -104,7 +107,37 @@ try {
   ok("unknown headword → 404", (await get("/dictionary/term/zzqqxx")).status === 404);
 
   // ── Reference entries, credits ──
-  ok("reference entries: none fabricated while no licensed source is approved", M.REFERENCE_SOURCES.length === 0 && ov.body.referenceSources.length === 0);
+  // ── Reference articles (Easton's Bible Dictionary, 1897) ──
+  const A = M.getArticles();
+  ok("articles: the whole edition (3,963 entries) with its edition, module, licence and pinned download recorded", A.list.length === 3963 && A.source.licence === "Public Domain" && A.source.textSource === "CCEL"
+    && A.source.module.version === "2.0.1" && /^[0-9a-f]{64}$/.test(A.source.module.sha256) && /1897/.test(A.source.edition) && A.source.verified.at.length === 2);
+  ok("articles: the source is registered as approved, verified at its primary source", M.REFERENCE_SOURCES.some((x) => x.id === "easton" && x.status === "approved") && M.STUDY_RESOURCES.easton.kind === "reference" && M.STUDY_RESOURCES.easton.eligible && /crosswire.org/.test(M.STUDY_RESOURCES.easton.verified.at));
+  ok("articles: a separate entry type — no article id is a Strong's number or a headword key", A.list.every((x) => !D.records.has(x.id)) && ov.body.articles.total === 3963);
+  ok("articles: A–Z counts add up", ov.body.articles.letters.reduce((n, l) => n + l.count, 0) === 3963);
+  const want = { pharisee: "pharisees", sadducee: "sadducees", sanhedrin: "sanhedrim", septuagint: "septuagint", synagogue: "synagogue", covenant: "covenant", tabernacle: "tabernacle" };
+  for (const [q, id] of Object.entries(want)) {
+    const r = await s(q);
+    ok(`articles: '${q}' finds the ${id} article as an exact headword`, r.items.some((i) => i.type === "article" && i.id === id && i.rank === 3));
+  }
+  const tg = await s("targum");
+  ok("articles: 'targum' (no entry of its own) → Version, which describes the Targums, first among the articles naming it", tg.items.filter((i) => i.type === "article")[0]?.id === "version" && tg.items.every((i) => i.type !== "article" || i.rank === 7));
+  ok("articles: not offered under a Hebrew/Aramaic/Greek filter, nor for Strong's or original-script searches", !(await s("covenant", "&language=hebrew")).items.some((i) => i.type === "article") && !(await s("G26")).items.some((i) => i.type === "article") && !(await s("ἀγάπη")).items.some((i) => i.type === "article"));
+  const ph = (await get("/dictionary/article/pharisees")).body;
+  const phText = ph.paragraphs.flat().map((x) => (typeof x === "string" ? x : x[x.length - 1])).join("");
+  ok("article: wording exactly as the edition (Pharisees opens 'Separatists (Heb. persahin …')", phText.startsWith("Separatists (Heb. persahin, from parash, “to separate”).") && /generation of vipers/.test(phText));
+  ok("article: cited passages open in the reader (John 7:48, Acts 23:6–8)", ph.scripture.some((r) => r.ref === "JHN.7.48" && r.label === "John 7:48" && r.book === "JHN" && r.verse === 48) && ph.scripture.some((r) => r.ref === "ACT.23.6-8" && r.endVerse === 8));
+  ok("article: its own credit — Easton, public domain, CrossWire link — plus the 1897 note", ph.credit.id === "easton" && /Public Domain/.test(ph.credit.licence.name) && /crosswire.org/.test(ph.credit.origin.url) && ph.credit.via.label === "CrossWire SWORD module" && /1897/.test(ph.note));
+  ok("article: related original words come from the lexicon (Pharisee → G5330), kept apart", ph.relatedWords.some((w) => w.records.some((r) => r.strongs === "G5330")) && /lexicon, not the article/.test(ph.relatedNote));
+  const cv = (await get("/dictionary/article/covenant")).body;
+  ok("article: Covenant → בְּרִית H1285 and διαθήκη G1242 as related words; a whole chapter cited stays a chapter (Gen 15)", cv.relatedWords.some((w) => w.records.some((r) => r.strongs === "H1285")) && cv.relatedWords.some((w) => w.records.some((r) => r.strongs === "G1242")) && cv.scripture.some((r) => r.ref === "GEN.15" && r.verse === null && r.label === "Genesis 15"));
+  const sx = (await get("/dictionary/article/septuagint")).body;
+  ok("article: Septuagint's 'See VERSIONS' resolves to the edition's Version entry (singular/plural only)", sx.seeAlso.length === 1 && sx.seeAlso[0].id === "version");
+  ok("article: a see-also the edition doesn't have stays plain text, never a guessed link", A.counts.seeAlsoUnresolved > 0 && A.list.every((x) => x.paragraphs.flat().every((g) => !Array.isArray(g) || g[0] !== "s" || g[1] === null || A.byId.has(g[1]))));
+  ok("article: every Scripture link is a valid canonical reference", A.list.every((x) => x.paragraphs.flat().every((g) => !Array.isArray(g) || g[0] !== "r" || g[1] === null || M.scriptureRef(g[1]))));
+  ok("article: the term page links its article (covenant → covenant)", (await get("/dictionary/term/covenant")).body.articles.some((x) => x.id === "covenant"));
+  ok("article: the edition's own spelling note (Sanhedrim, 'More correctly Sanhedrin') is the only alias", M.titleForms("sanhedrin").includes("sanhedrim") && !M.titleForms("targum").some((f) => A.byTitle.has(f)));
+  ok("articles: unknown → 404; bad letter → 400; a letter lists only its articles", (await get("/dictionary/article/zzqq")).status === 404 && (await get("/dictionary/articles?letter=AB")).status === 400
+    && (await get("/dictionary/articles?letter=P")).body.items.every((x) => x.letter === "P" && x.type === "article"));
   ok("credits: STEPBible (CC BY 4.0) and BSB interlinear on every answer", ["stepbible-lexicon", "bsb-interlinear"].every((id) => ov.body.credits.some((c) => c.id === id)) && loveTerm.credits.length === 2 && occ.credits.length === 2);
   server.close();
 } finally { rmSync(tmp, { recursive: true, force: true }); }

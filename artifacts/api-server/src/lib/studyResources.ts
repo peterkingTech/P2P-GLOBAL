@@ -14,7 +14,7 @@
 //   • English-only resources are labelled as English.
 // Last reviewed: 2026-11-12 against the live catalogue.
 
-export type StudyKind = "commentary" | "interlinear" | "lexicon" | "cross_references" | "people_places";
+export type StudyKind = "commentary" | "interlinear" | "lexicon" | "cross_references" | "people_places" | "reference";
 
 export interface StudyResource {
   id: string;
@@ -36,6 +36,8 @@ export interface StudyResource {
   /** Where the licence was verified at its PRIMARY source (not only the provider's catalogue), and when. */
   verified: { on: string; at: string; finding: string };
   note?: string;
+  /** How it reaches P2P Global when not through AO Lab's API (e.g. a CrossWire SWORD module bundled with the server). */
+  via?: { label: string; url: string };
 }
 
 const PD = { name: "Public Domain (Public Domain Mark 1.0)", url: "https://creativecommons.org/publicdomain/mark/1.0/" };
@@ -100,6 +102,16 @@ export const STUDY_RESOURCES: Record<string, StudyResource> = {
     verified: { on: REVIEWED, at: "https://tyndaleopenresources.com/", finding: "\"This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.\" Shown unmodified; no derivative is made, so share-alike obligations are not triggered beyond attribution and the licence link." },
     note: "Shown unmodified under CC BY-SA 4.0.",
   },
+  // Not from AO Lab: bundled with the server (data/reference-easton.txt, scripts/build-reference-index.mjs).
+  easton: {
+    id: "easton", kind: "reference", name: "Easton's Bible Dictionary (1897)", author: "M. G. Easton",
+    licence: PD,
+    attribution: "From Easton's Bible Dictionary by M. G. Easton (Illustrated Bible Dictionary, 3rd edition, Thomas Nelson, 1897). Public domain. Text from the CrossWire SWORD module (v2.0.1), from the CCEL etext; the illustrations are not included.",
+    source: { label: "CrossWire Bible Society", url: "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Easton" }, shareAlike: false, mayTranslate: false, eligible: true,
+    verified: { on: "2026-11-13", at: "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Easton", finding: "Module .conf: DistributionLicense=Public Domain, TextSource=CCEL, \"Public Domain -- Copy Freely\"; CCEL's own info file (ccel.org/ccel/easton/ebd/easton-info.txt) carries the same notice. The download is pinned by SHA-256." },
+    note: "Written in 1897 and not revised since: dates, places and scholarship reflect that time.",
+    via: { label: "CrossWire SWORD module", url: "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Easton" },
+  },
 };
 
 /** The change P2P Global makes to every resource (stated wherever CC BY / BY-SA requires changes to be indicated). */
@@ -136,7 +148,7 @@ export function creditFor(id: string, providerNotice: string | null = null) {
     /** The original source, always shown as a link (STEPBible requires "STEP Bible" linked to its site). */
     origin: r.source,
     /** How it reaches P2P Global (AO Lab's API: MIT licensed, adds no restrictions of its own). */
-    via: { label: "Free Use Bible API (AO Lab)", url: "https://bible.helloao.org" },
+    via: r.via ?? { label: "Free Use Bible API (AO Lab)", url: "https://bible.helloao.org" },
     licenceVerifiedOn: r.verified.on,
   };
 }

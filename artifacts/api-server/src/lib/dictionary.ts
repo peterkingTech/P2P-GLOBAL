@@ -9,10 +9,12 @@
 //   • record — one original-language lexical record (Hebrew, Aramaic or Greek), by Strong's number;
 //   • term   — an English headword (from the lexicon's own glosses) that leads to every record glossed
 //              with it — so "love" lists ἀγάπη, ἀγαπάω, φιλέω, אָהַב … SEPARATELY, never merged.
-// Historical/theological reference articles (Pharisee, Septuagint …) need a licensed reference source;
-// until one is approved there are none — the index never fabricates one (see REFERENCE_SOURCES).
+// Historical/theological reference ARTICLES (Pharisees, Septuagint …) are a third, separate entry type
+// from a licensed reference source (lib/referenceArticles.ts — Easton's 1897, public domain); search lists
+// them alongside, labelled, never merged into a record or a term.
 import indexText from "../../data/dictionary-index.txt";
 import { normaliseStrongs, plainScript } from "./bibleProviders/helloaoStudy";
+import { articleSummary, searchArticles, type Articles } from "./referenceArticles";
 
 export type Lang = "hebrew" | "aramaic" | "greek";
 const LANG: Record<string, Lang> = { h: "hebrew", a: "aramaic", g: "greek" };
@@ -122,14 +124,15 @@ export function termEntry(d: Dictionary, key: string) {
 }
 
 // ── Search ──────────────────────────────────────────────────────────────────
-export type SearchItem = (ReturnType<typeof termSummary> | (ReturnType<typeof recordView> & { type: "record" })) & { rank: number; matched: string };
+export type SearchItem = (ReturnType<typeof termSummary> | (ReturnType<typeof recordView> & { type: "record" }) | (ReturnType<typeof articleSummary> & { mentions?: number })) & { rank: number; matched: string };
 /**
  * One search box for every method: Strong's number, Hebrew/Aramaic or Greek letters (points and accents
  * ignored for matching, kept for display), transliteration, and English headwords. Ranking (brief §5):
  * 1 exact original-language, 2 exact Strong's, 3 exact English gloss, 4 exact transliteration or BSB
- * rendering, 5 starts-with, 6 contains. Each record or term appears once.
+ * rendering, 5 starts-with, 6 contains; reference articles also 7 (named in an article's text). Each
+ * record, term or article appears once.
  */
-export function search(d: Dictionary, qRaw: string, opts: { language?: Lang | null; offset?: number; limit?: number } = {}) {
+export function search(d: Dictionary, qRaw: string, opts: { language?: Lang | null; offset?: number; limit?: number; articles?: Articles | null } = {}) {
   const q = qRaw.normalize("NFC").trim().slice(0, 60);
   const limit = Math.min(50, Math.max(1, opts.limit ?? 30)), offset = Math.max(0, opts.offset ?? 0);
   const best = new Map<string, SearchItem>();
@@ -162,13 +165,18 @@ export function search(d: Dictionary, qRaw: string, opts: { language?: Lang | nu
         else if (r.renderings.some((x) => latinKey(x.text) === k)) rec(r, 4, "rendering");
         else if (k.length >= 2 && r.latin.startsWith(k)) rec(r, 5, "transliteration");
       }
+      // Reference articles: English only, and not when a Hebrew/Aramaic/Greek filter is chosen.
+      if (opts.articles && !opts.language) for (const h of searchArticles(opts.articles, q)) add("a:" + h.a.id, { ...articleSummary(h.a), rank: h.rank, matched: h.matched, mentions: h.mentions });
     }
   }
   // A record already listed under an exactly-matching headword isn't repeated as a row of its own.
   const underExact = new Set([...best.values()].flatMap((i) => (i.type === "term" && i.rank === 3 ? d.terms.get(i.key)?.ids ?? [] : [])));
   for (const [k, i] of best) if (i.type === "record" && i.rank > 3 && underExact.has(i.strongs)) best.delete(k);
-  const weight = (i: SearchItem) => (i.type === "term" ? 0 : -(i as { words: number }).words);
-  const all = [...best.values()].sort((a, b) => a.rank - b.rank || weight(a) - weight(b) || collator.compare(a.type === "term" ? a.display : a.lemma, b.type === "term" ? b.display : b.lemma));
+  // Within a rank: records by how often they are used, then headwords, then reference articles (those
+  // naming the word most often first).
+  const weight = (i: SearchItem) => (i.type === "term" ? 0 : i.type === "article" ? 1 - (i.mentions ?? 0) / 1e4 : -(i as { words: number }).words);
+  const name = (i: SearchItem) => (i.type === "term" ? i.display : i.type === "article" ? i.title : i.lemma);
+  const all = [...best.values()].sort((a, b) => a.rank - b.rank || weight(a) - weight(b) || collator.compare(name(a), name(b)));
   return { q, mode, total: all.length, offset, items: all.slice(offset, offset + limit) };
 }
 
@@ -188,6 +196,7 @@ export function occurrencePage(d: Dictionary, id: string, offset = 0, limit = 25
   return { id, words: r.words, verses: all.length, offset, items: page };
 }
 
-/** Licensed sources for historical/theological reference articles. None is approved yet, so there are no
- *  reference entries — the dictionary says so rather than inventing them. */
-export const REFERENCE_SOURCES: { id: string; name: string; status: "approved" | "pending_licence_review" }[] = [];
+/** Licensed sources for historical/theological reference articles (each verified at its primary source). */
+export const REFERENCE_SOURCES: { id: string; name: string; status: "approved" | "pending_licence_review" }[] = [
+  { id: "easton", name: "Easton's Bible Dictionary (1897)", status: "approved" },
+];

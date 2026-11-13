@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -67,7 +67,7 @@ export default function DictionaryTermScreen() {
       </Text>
       {renderCount ? <Text style={s.meta}>{t("dictionary.renderedThisWay", { defaultValue: "Translated “{{word}}” {{n}} times in the BSB", word: d?.display ?? "", n: renderCount })}</Text>
         : r.renderings.length ? <Text style={s.meta}>{t("dictionary.bsbRenders", { defaultValue: "BSB renders it" })}: {r.renderings.slice(0, 5).map((x) => `${x.text} (${x.count})`).join(", ")}</Text> : null}
-      <PronounceButton text={r.lemma} language={r.language} />
+      <PronounceButton text={r.lemma} language={r.language} transliteration={r.transliteration} />
       <View style={s.actions}>
         <AppButton label={t("dictionary.fullEntry", { defaultValue: "Full entry" })} icon="book-outline" size="sm" variant="secondary" onPress={() => openRecord(r.strongs)} />
         {r.words ? <AppButton label={t("dictionary.occurrences", { defaultValue: "Occurrences" })} icon="list-outline" size="sm" variant="secondary" onPress={() => openOccurrences(r.strongs)} /> : null}
@@ -91,6 +91,19 @@ export default function DictionaryTermScreen() {
                 : t("dictionary.glossNote", { defaultValue: "{{n}} different original words have this English gloss. Each is its own word with its own range of meaning — the meaning in a verse depends on the verse.", n: d.records.length })}</Text>
               <AppButton label={t("dictionary.listenEntry", { defaultValue: "Listen to this entry" })} icon="headset-outline" variant="secondary" onPress={onListen} />
             </View>
+            {d.articles?.length ? (
+              <View style={{ gap: 8 }}>
+                <SectionTitle>{t("dictionary.referenceArticle", { defaultValue: "Reference article" })}</SectionTitle>
+                {d.articles.map((x) => (
+                  <TouchableOpacity key={x.id} style={s.card} onPress={() => router.push({ pathname: "/dictionary/article/[id]", params: { id: x.id } } as any)} accessibilityRole="button"
+                    accessibilityLabel={`${x.title}, ${t("dictionary.kindArticle", { defaultValue: "Reference article · Easton's Bible Dictionary (1897)" })}`}>
+                    <Text style={s.translit}>{x.title}</Text>
+                    <Text style={s.kind}>{t("dictionary.kindArticle", { defaultValue: "Reference article · Easton's Bible Dictionary (1897)" })}</Text>
+                    <Text style={s.meta} numberOfLines={3}>{x.preview}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
             {ORDER.map((lang) => {
               const list = d.records.filter((r) => r.language === lang);
               return list.length ? (

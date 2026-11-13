@@ -25,7 +25,7 @@ function load(file, mocks = {}) {
 }
 
 // ── Listening content (real module) ──
-const SC = load("lib/listen/studyContent.ts", { "./originalLanguage": { speakableGreek: (s) => s, speakableHebrew: (s) => s } });
+const SC = load("lib/listen/studyContent.ts", { "./originalLanguage": load("lib/listen/originalLanguage.ts") });
 const term = { key: "love", display: "love", records: [
   { id: "G0026", language: "greek", transliteration: "agapē", gloss: "love", partOfSpeech: "N-F", words: 116, verses: 106 },
   { id: "H0157", language: "hebrew", transliteration: "a.hev", gloss: "to love", partOfSpeech: "V", words: 217, verses: 197 },
@@ -33,17 +33,21 @@ const term = { key: "love", display: "love", records: [
 const secs = SC.dictionarySections(term, "STEPBible … CC BY 4.0");
 const text = secs.flatMap((x) => x.parts.map((p) => p.text)).join(" ");
 ok("listen: one section per original word (kept separate), headword first, source last", secs.length === 4 && secs[0].title === "love" && secs[3].title === "Source" && /STEPBible/.test(secs[3].parts[0].text));
-ok("listen: words read by transliteration — never original letters in an English voice", text.includes("agapē") && text.includes("a.hev") && !/[֐-׿Ͱ-Ͽ]/.test(text));
+ok("listen: words read by their sounds-like spelling — never original letters in an English voice", text.includes("Greek: ah-gah-pay") && text.includes("Hebrew: ah-hehv") && !/[֐-׿Ͱ-Ͽ]/.test(text) && secs[1].title.includes("agapē"));
 ok("listen: real counts and the lexicon gloss are read, labelled", text.includes("Used 116 times in 106 verses") && text.includes("Lexicon gloss: love"));
 ok("listen: nothing to read → no sections", SC.dictionarySections({ key: "x", display: "x", records: [] }, null).length === 0);
+const art = SC.articleSections({ id: "pharisees", title: "Pharisees", paragraphs: [["Separatists (Heb. ", ["i", "persahin"], "). The popular party (", ["r", "JHN.7.48", "John 7:48"], "). See ", ["s", "sadducees", "SADDUCEES"], "."]] }, "From Easton's Bible Dictionary … Public domain.");
+const artText = art.flatMap((x) => x.parts.map((p) => p.text)).join(" ");
+ok("listen: an article is read exactly as printed (passages as printed), then its source", art.length === 2 && artText.includes("Separatists (Heb. persahin). The popular party (John 7:48). See SADDUCEES.") && /Easton/.test(art[1].parts[0].text));
 
 // ── Client ──
 const api = src("lib/deepStudyApi.ts");
-ok("client: every dictionary call goes through the ONE study client (/deep-study/dictionary…)", ["/dictionary\"", "/dictionary/browse?", "/dictionary/search?", "/dictionary/term/", "/dictionary/record/"].every((p) => api.includes(p)));
+ok("client: every dictionary call goes through the ONE study client (/deep-study/dictionary…)", ["/dictionary\"", "/dictionary/browse?", "/dictionary/search?", "/dictionary/term/", "/dictionary/record/", "/dictionary/articles?", "/dictionary/article/"].every((p) => api.includes(p)));
+ok("client: saved-copy format bumped for the new dictionary fields; new fields optional (older servers)", /const SCHEMA = 3;/.test(api) && api.includes("articles?: { total: number;") && api.includes("articles?: DictArticleSummary[]"));
 ok("client: search answers are session-only (typing never evicts saved entries)", /dictionarySearch[\s\S]{0,300}persist: false/.test(api) && api.includes("if (opts.persist === false)"));
 
 // ── Screens ──
-const index = src("app/dictionary/index.tsx"), entry = src("app/dictionary/term/[key].tsx"), occ = src("app/dictionary/occurrences/[strongs].tsx"), word = src("app/study-tools/word/[strongs].tsx");
+const index = src("app/dictionary/index.tsx"), entry = src("app/dictionary/term/[key].tsx"), occ = src("app/dictionary/occurrences/[strongs].tsx"), word = src("app/study-tools/word/[strongs].tsx"), article = src("app/dictionary/article/[id].tsx");
 ok("A–Z: letters from real counts, empty letters disabled, selection announced", index.includes("overview?.letters") && index.includes("disabled={!count}") && index.includes("accessibilityState={{ selected: L === letter, disabled: !count }}"));
 ok("A–Z: position kept for the session (letter, search, language)", index.includes("const saved = {") && index.includes("saved.letter = letter; saved.q = q; saved.language = language;"));
 ok("search: debounced, late answers ignored, paged with onEndReached", index.includes("searching ? 300 : 0") && index.includes("if (n !== seq.current) return;") && index.includes("onEndReached={loadMore}"));
@@ -52,25 +56,32 @@ ok("entry: each original word separate, by language, never merged", entry.includ
 ok("entry: lexicon gloss vs BSB renderings kept apart, real counts explained", entry.includes("Lexicon gloss") && entry.includes("BSB renders it") && entry.includes("every form, BSB interlinear"));
 ok("entry: says when no Aramaic word has the gloss (none invented)", entry.includes("No Aramaic word in the lexicon has this gloss."));
 ok("entry: opens the CANONICAL lexicon entry (same record as Study Tools / Deep Study)", entry.includes('pathname: "/study-tools/word/[strongs]"') && index.includes('pathname: "/study-tools/word/[strongs]"'));
-ok("entry: pronunciation via the shared PronounceButton (labelled device voice; Aramaic refused there)", entry.includes("<PronounceButton text={r.lemma} language={r.language} />"));
+ok("entry: pronunciation via the shared PronounceButton (device voice, or the labelled sounds-like fallback)", entry.includes("<PronounceButton text={r.lemma} language={r.language} transliteration={r.transliteration} />"));
 ok("audio: the shared P2P Listen player only (no second player, no audio library)", [entry].every((f) => f.includes('import ListenPlayer from "@/components/listen/ListenPlayer"') && f.includes("useListenOwner(OWNER)") && f.includes("listen.play(")) && ![index, entry, occ].some((f) => /expo-av|expo-audio|new Audio\(/.test(f)));
 ok("occurrences: actual word form per verse; Bible reader, Deep Study and Commentaries for each", occ.includes("i.forms.map(") && occ.includes("`/bible?book=${i.book}&chapter=${i.chapter}&v=${i.verse}`") && occ.includes('pathname: "/deep-study"') && occ.includes('study(i, "commentaries")'));
 ok("occurrences: a missing form is said, not invented", occ.includes("The word form couldn't be loaded for this verse."));
 ok("word page: 'Across the Bible' from the same record, links into the dictionary", word.includes("dictionaryRecord(String(p.strongs))") && word.includes('pathname: "/dictionary/term/[key]"') && word.includes('pathname: "/dictionary/occurrences/[strongs]"'));
 ok("word page: related entries labelled honestly (not claimed as same root)", word.includes("does not by itself mean the words share a root"));
-ok("RTL: Hebrew/Aramaic shown right-to-left, Greek left-to-right", [index, entry, occ].every((f) => f.includes('=== "greek" ? "ltr" : "rtl"')));
-ok("reference articles: none shown until a licensed source is approved (stated)", index.includes("dictionary.referencePending") && !/type: "reference"/.test(index + entry));
-ok("no AI teacher wording", ![index, entry, occ].some((f) => /\bAI\b|artificial intelligence|tutor|mentor/i.test(f)));
+ok("RTL: Hebrew/Aramaic shown right-to-left, Greek left-to-right", [index, entry, occ, article].every((f) => f.includes('=== "greek" ? "ltr" : "rtl"')));
+ok("reference articles: their own entry type and A–Z, labelled with the source in every row", index.includes('item.type === "article"') && index.includes("dictionaryArticles(letter") && index.includes("overview?.articles?.letters") && index.includes("dictionary.kindArticle"));
+ok("reference articles: still says they're pending if the server has none (older server)", index.includes("dictionary.referencePending") && index.includes("overview?.articles ?"));
+ok("article: text as published, cited passages → the normal Bible reader, see-also → other articles", article.includes("p.map(segment)") && article.includes("router.push(`/bible?book=${r.book}&chapter=${r.chapter}${r.verse ? `&v=${r.verse}` : \"\"}`") && article.includes('pathname: "/dictionary/article/[id]"'));
+ok("article: a passage or see-also the edition can't resolve is plain text, never a guessed link", article.includes("if (!target) return label;"));
+ok("article: 1897 / not revised / English / separate-from-lexicon note, and its own credit", article.includes("dictionary.articleNote") && article.includes("<Attribution credit={a.credit} />"));
+ok("article: related lexicon words kept apart, with the server's explanation, opening the headword", article.includes("dictionary.relatedOriginal") && article.includes("{a.relatedNote}") && article.includes('pathname: "/dictionary/term/[key]"'));
+ok("article: Listen through the shared player", article.includes('import ListenPlayer from "@/components/listen/ListenPlayer"') && article.includes("useListenOwner(OWNER)") && article.includes("articleSections(a,"));
+ok("entry: links its reference article (when the headword has one)", entry.includes("d.articles?.length") && entry.includes('pathname: "/dictionary/article/[id]"'));
+ok("no AI teacher wording", ![index, entry, occ, article].some((f) => /\bAI\b|artificial intelligence|tutor|mentor/i.test(f)));
 
 // ── Navigation ──
 const layout = src("app/_layout.tsx"), hub = src("app/bible-study/index.tsx"), tools = src("app/study-tools/index.tsx");
-ok("routes registered (own headers)", ['"dictionary/index"', '"dictionary/term/[key]"', '"dictionary/occurrences/[strongs]"'].every((r) => layout.includes(r)));
+ok("routes registered (own headers)", ['"dictionary/index"', '"dictionary/term/[key]"', '"dictionary/occurrences/[strongs]"', '"dictionary/article/[id]"'].every((r) => layout.includes(r)));
 ok("reachable without a passage: Bible Study hub (under Deep Study) and Study Tools", /route: "\/deep-study" \},\s*\{ icon: "text-outline", title: t\("dictionary\.title"/.test(hub) && tools.includes('go: () => router.push("/dictionary" as any)'));
 ok("normal Bible reader untouched by the dictionary", !src("app/bible/index.tsx").includes("dictionary"));
 
 // ── Languages ──
 const en = JSON.parse(src("locales/en.json")).dictionary;
-const used = new Set([...[index, entry, occ, word, hub, tools, src("lib/dictionaryLabels.ts")].join("\n").matchAll(/t\("dictionary\.([A-Za-z0-9]+)"/g)].map((m) => m[1]));
+const used = new Set([...[index, entry, occ, word, hub, tools, article, src("lib/dictionaryLabels.ts")].join("\n").matchAll(/t\("dictionary\.([A-Za-z0-9]+)"/g)].map((m) => m[1]));
 ok("every dictionary string used in code exists in English", [...used].every((k) => en?.[k]), [...used].filter((k) => !en?.[k]).join(","));
 const ph = (s) => (s.match(/\{\{\w+\}\}/g) ?? []).sort().join();
 // Words genuinely spelled the same in that language (checked by hand), not untranslated text.

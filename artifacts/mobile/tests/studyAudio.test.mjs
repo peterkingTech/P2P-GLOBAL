@@ -52,6 +52,16 @@ const bara = gen11.find((w) => w.strongs === "H1254"), logos = jhn11.find((w) =>
   ok("Greek: original script with its accents; labelled Modern Greek, not reconstructed Koine", g.speak === "Λόγος" && g.speechLanguage === "el-GR" && /not a reconstructed Koine/.test(g.convention));
   const a = O.pronunciationPlan(aram.text, "aramaic");
   ok("Aramaic: NEVER read with a Hebrew voice — no audio, with the reason", a.speechLanguage === null && a.speak === "" && /not read with a Hebrew voice/.test(a.unavailableReason));
+  // ── Sounds-like fallback (owner 2026-11-13: "Hear it" always plays) ──
+  const SL = [["agapē", "greek", "ah-gah-pay"], ["Christos", "greek", "khree-stohs"], ["anthrōpos", "greek", "ahn-throh-pohs"], ["angelos", "greek", "ahn-geh-lohs"],
+    ["Pharisaiōn", "greek", "fah-ree-sigh-ohn"], ["sha.lom", "hebrew", "shah-lohm"], ["che.sed", "hebrew", "kheh-sehd"], ["bə·rê·šîṯ", "hebrew", "buh-ray-sheet"],
+    ["’ĕ·lō·hîm", "hebrew", "eh-loh-heem"], ["miz·mō·wr", "hebrew", "meez-mohr"], ["wə·ḥō·šeḵ", "hebrew", "wuh-khoh-shehkh"]];
+  const bad = SL.filter(([t, l, want]) => O.soundsLike(t, l) !== want);
+  ok("sounds-like spelling from both transliteration styles (lexicon + BSB interlinear)", !bad.length, bad.map(([t, l]) => `${t} → ${O.soundsLike(t, l)}`).join(", "));
+  ok("sounds-like: nothing without a transliteration; never original letters", O.soundsLike("", "greek") === null && O.soundsLike(null, "hebrew") === null && O.soundsLike("λόγος", "greek") === null);
+  const hp = O.pronunciationPlan(bara.text, "hebrew", bara.transliteration), ap = O.pronunciationPlan(aram.text, "aramaic", aram.transliteration);
+  ok("plan: own-language voice first, English sounds-like fallback (Aramaic too, still never a Hebrew voice)",
+    hp.speechLanguage === "he-IL" && /^[a-z -]+$/.test(hp.soundsLike) && hp.fallbackLanguage === "en" && ap.speechLanguage === null && /^[a-z -]+$/.test(ap.soundsLike));
   // The meteg (U+05BD, a vowel-point mark affecting stress) is KEPT: vowel information is never silently removed.
 ok("maqaf joins become a space; sof pasuq and cantillation removed; meteg kept", O.speakableHebrew("וְאֵ֥ת־הָאָֽרֶץ׃") === "וְאֵת הָאָֽרֶץ");
   ok("labels never claim a human recording for computer speech", O.audioSourceLabel("device_tts").includes("computer-generated") && !/person/.test(O.audioSourceLabel("device_tts")) && O.audioSourceLabel("ai_tts") === "AI-generated voice");
@@ -110,7 +120,8 @@ ok("maqaf joins become a space; sof pasuq and cantillation removed; meteg kept",
 
   // ── Wiring ──
   const ui = src("components/study/StudyUI.tsx");
-  ok("pronunciation goes through P2P Listen (listen.speakSnippet), with Replay and Slower", ui.includes("listen.speakSnippet(plan.speak, { language: plan.speechLanguage!, rate })") && ui.includes('"deepStudy.replay"') && ui.includes('"deepStudy.slower"'));
+  ok("pronunciation goes through P2P Listen (listen.speakSnippet), with Replay and Slower", ui.includes("listen.speakSnippet(plan.speak, { language: plan.speechLanguage, rate })") && ui.includes('"deepStudy.replay"') && ui.includes('"deepStudy.slower"'));
+  ok("no own-language voice → the sounds-like spelling in the English voice, labelled an approximation", ui.includes('r.result === "no_voice" && plan.soundsLike') && ui.includes("listen.speakSnippet(plan.soundsLike, { language: plan.fallbackLanguage, rate })") && ui.includes('"deepStudy.approxGreek"') && ui.includes('"deepStudy.approxHebrew"') && ui.includes('"deepStudy.approxAramaic"') && ui.includes('"deepStudy.soundsLike"'));
   ok("pronunciation label always shown (device voice, unverified)", ui.includes('"deepStudy.conventionHebrew"') && ui.includes('"deepStudy.conventionGreek"'));
   const screens = { "app/deep-study/index.tsx": "deep-study", "app/study-tools/word/[strongs].tsx": "study-word", "app/commentaries/read.tsx": "commentary" };
   for (const [f, owner] of Object.entries(screens)) {
@@ -119,7 +130,7 @@ ok("maqaf joins become a space; sof pasuq and cantillation removed; meteg kept",
     ok(`${f}: no second audio player`, !/expo-av|expo-audio|useAudioPlayer|new Audio\(/.test(s));
   }
   const ds = src("app/deep-study/index.tsx");
-  ok("Deep Study: word detail has pronunciation; commentaries, cross references and people can be heard", ds.includes("<PronounceButton text={picked.text} language={picked.language} />")
+  ok("Deep Study: word detail has pronunciation; commentaries, cross references and people can be heard", ds.includes("<PronounceButton text={picked.text} language={picked.language} transliteration={picked.transliteration} />")
     && ds.includes("commentarySections(") && ds.includes("crossRefSections(") && ds.includes("peopleSections("));
   ok("study listening is read in English and says so", ds.includes('language: "en"') && ds.includes('"deepStudy.readInEnglish"'));
   ok("engine: study is a content kind; other kinds unchanged", /export type ListenKind = "bible" \| "story" \| "story-intro" \| "lesson" \| "plan" \| "playlist" \| "study";/.test(src("lib/listen/engine.ts")));

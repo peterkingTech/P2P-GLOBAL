@@ -96,7 +96,7 @@ try {
   ok("licence: public-domain commentaries say so; nothing may be translated without review", mh.credit.licence.name.startsWith("Public Domain") && Object.values(M.STUDY_RESOURCES).every((x) => x.mayTranslate === false));
   // Licence review (2026-11-12, primary sources — docs/deep-study-licences.md).
   const all = Object.values(M.STUDY_RESOURCES);
-  ok("licence review: every shown resource was verified at its primary source, with a finding", all.filter((x) => x.eligible).every((x) => /^https:\/\//.test(x.verified.at) && x.verified.on === "2026-11-12" && x.verified.finding.length > 30));
+  ok("licence review: every shown resource was verified at its primary source, with a finding", all.filter((x) => x.eligible).every((x) => /^https:\/\//.test(x.verified.at) && x.verified.on >= "2026-11-12" && x.verified.finding.length > 30));
   ok("licence review: every shown resource links its original source", all.every((x) => /^https:\/\//.test(x.source.url) && x.source.label));
   const step = r.body.datasets.find((d) => d.id === "stepbible-lexicon").credit;
   ok("STEP Bible: credited to \"STEP Bible\" linked to www.STEPBible.org (its licence condition)", /STEP Bible \(www\.STEPBible\.org\)/.test(step.attribution) && step.origin.label === "STEP Bible" && step.origin.url === "https://www.STEPBible.org");

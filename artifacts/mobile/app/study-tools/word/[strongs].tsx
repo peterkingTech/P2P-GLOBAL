@@ -75,7 +75,7 @@ export default function WordScreen() {
                   </View>
                   <Text style={s.senseId}>{sense.id}</Text>
                 </View>
-                {sense.lemma ? <PronounceButton text={sense.lemma} language={sense.language ?? d.entry.language ?? ""} /> : null}
+                {sense.lemma ? <PronounceButton text={sense.lemma} language={sense.language ?? d.entry.language ?? ""} transliteration={sense.transliteration} /> : null}
                 {sense.gloss ? <Text style={s.gloss}>“{sense.gloss}”</Text> : null}
                 {sense.partOfSpeech ? <Text style={s.meta}>{t("deepStudy.partOfSpeech", { defaultValue: "Part of speech" })}: {sense.partOfSpeech}</Text> : null}
                 {sense.definition ? <Text style={s.definition}>{sense.definition.replace(/\n{3,}/g, "\n\n").trim()}</Text> : null}

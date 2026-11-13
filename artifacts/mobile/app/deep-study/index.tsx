@@ -167,7 +167,7 @@ function OriginalTab({ book, chapter, from, to, translation }: { book: string; c
               <OriginalText text={picked.text} direction={v.direction} size={26} />
               {picked.transliteration ? <Text style={s.wTranslitBig}>{picked.transliteration}</Text> : null}
               <Text style={s.small}>{languageName(picked.language)}</Text>
-              <PronounceButton text={picked.text} language={picked.language} />
+              <PronounceButton text={picked.text} language={picked.language} transliteration={picked.transliteration} />
               <Text style={s.detailRow}><Text style={s.detailKey}>{t("deepStudy.gloss", { defaultValue: "Gloss" })}: </Text>{picked.gloss ?? t("deepStudy.noGlossLong", { defaultValue: "— (not translated as a separate English word)" })}</Text>
               {picked.parsingFull ? <Text style={s.detailRow}><Text style={s.detailKey}>{t("deepStudy.parsing", { defaultValue: "Grammar" })}: </Text>{picked.parsingFull}</Text> : null}
               {picked.strongs ? <Text style={s.detailRow}><Text style={s.detailKey}>Strong's: </Text>{picked.strongs}</Text> : null}
