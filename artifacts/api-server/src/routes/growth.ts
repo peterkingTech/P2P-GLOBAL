@@ -15,6 +15,7 @@ import { COLLECTIVE_OBJECTIVE, COLLECTIVE_STAGE, DIMENSIONS, MILESTONE_DISCLAIME
 //   POST /growth/me/pause/:id/end      — resume early
 //   PUT  /growth/me/collective-country — opt in/out of my country in the collective totals
 //   GET  /growth/me/core-foundations   — every Kingdom School Foundations lesson and my status (from Seed onwards)
+//   GET  /growth/me/tree               — My Growth Tree: roots, trunk, branches, fruits (one per verified contribution), seeds
 
 const router = Router();
 
@@ -142,6 +143,90 @@ router.get("/me/evidence", async (req, res) => {
       status: e.voided_at ? "withdrawn" : e.verification,
     })),
   });
+});
+
+// ── My Growth Tree: the tree's data, read from what is already verified (never a second score) ─────────
+// Roots ← Kingdom School Foundations + learning units + active weeks/months (the Matrix's own facts);
+// trunk ← the verified stage and its dated history; stems ← verified practical actions; branches ←
+// verified, credited evidence per P2P area (only real evidence makes a branch); fruits ← ONE per
+// Service & Contribution ledger record (its unique dedup_key means one action = one record: a repeated
+// approval can't add a fruit; a group session is one record for its facilitator, however many attended);
+// seeds ← people I helped who now verifiably help others (development history + their own verified
+// service evidence — the date only). Withdrawn/rejected records stay listed (history is kept) but are
+// never shown as verified fruit. Counts and dates only — never content, answers or messages.
+const GROUP_FRUIT = new Set(["service.study_session_facilitated", "service.family_learning_facilitated", "service.shared_study_facilitated"]);
+const AREA_LABELS: Record<string, string> = {
+  kingdom_school: "Kingdom School", kingdom_stories: "Kingdom Stories", learning_plan: "Learning Plans", study_together: "Study Together",
+  family: "Family", church: "Church", evaluation: "Peer evaluation", peer_confirmation: "Peer support", scripture: "Bible", prayer: "Prayer",
+};
+type EvRow = { id: string; evidence_type: string; dimension: string; credit: boolean; source_resource: string; local_date: string; verification: string; voided_at: string | null };
+router.get("/me/tree", async (req, res) => {
+  const caller = await verifyCaller(req);
+  if (!caller) return res.status(401).json({ error: "Please sign in." });
+  try {
+    const [{ data: st }, { data: history }, { data: ev, error: evErr }] = await Promise.all([
+      db.from("p2p_growth_status").select(STATUS_COLS).eq("user_id", caller).maybeSingle(),
+      db.from("p2p_growth_history").select("to_stage,achieved_at,kind").eq("user_id", caller).order("to_stage", { ascending: true }),
+      db.from("p2p_growth_evidence").select("id,evidence_type,dimension,credit,source_resource,local_date,verification,voided_at").eq("user_id", caller).order("occurred_at", { ascending: true }).limit(5000),
+    ]);
+    if (evErr) throw evErr;
+    if (!st) return res.status(404).json({ error: "Open your growth journey first." });
+    const s = st as Status;
+    const rows = (ev ?? []) as EvRow[];
+    const counts = (r: EvRow) => r.credit && r.verification === "verified" && !r.voided_at;
+    const facts = verifiedSummary(s.checklist?.facts);
+
+    // Fruits: Service & Contribution records, one each; people helped per record (a count only).
+    const service = rows.filter((r) => r.dimension === "service");
+    const ids = service.map((r) => r.id);
+    const helpedBy = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: b } = await db.from("p2p_growth_evidence_beneficiaries").select("evidence_id").in("evidence_id", ids.slice(i, i + 200));
+      for (const x of (b ?? []) as { evidence_id: string }[]) helpedBy.set(x.evidence_id, (helpedBy.get(x.evidence_id) ?? 0) + 1);
+    }
+    const fruits = service.map((r) => ({
+      id: r.id, type: r.evidence_type, label: EVIDENCE_LABELS[r.evidence_type] ?? r.evidence_type, date: r.local_date,
+      area: r.source_resource, areaLabel: AREA_LABELS[r.source_resource] ?? r.source_resource,
+      kind: GROUP_FRUIT.has(r.evidence_type) ? "group" : "individual", peopleHelped: helpedBy.get(r.id) ?? null,
+      status: r.voided_at ? "withdrawn" : r.verification, countsTowardMilestone: counts(r),
+    }));
+
+    // Branches: only areas with verified, credited evidence.
+    const byArea = new Map<string, number>();
+    for (const r of rows) if (counts(r)) byArea.set(r.source_resource, (byArea.get(r.source_resource) ?? 0) + 1);
+
+    // Seeds: from the development history (relationships), the date each helped person first verifiably helped others.
+    const { data: dh } = await db.rpc("p2p_development_history", { p_person: caller });
+    const helped = ((dh as { helped?: { personId: string; contributions: number; helpsOthers: boolean }[] } | null)?.helped ?? []);
+    const firstHelp = new Map<string, string>();
+    const helpers = helped.filter((h) => h.helpsOthers).map((h) => h.personId);
+    if (helpers.length) {
+      const { data: theirs } = await db.from("p2p_growth_evidence").select("user_id,local_date,verification,voided_at,credit").in("user_id", helpers).eq("dimension", "service").order("occurred_at", { ascending: true }).limit(5000);
+      for (const x of (theirs ?? []) as { user_id: string; local_date: string; verification: string; voided_at: string | null; credit: boolean }[]) {
+        if (x.credit && x.verification === "verified" && !x.voided_at && !firstHelp.has(x.user_id)) firstHelp.set(x.user_id, x.local_date);
+      }
+    }
+
+    return res.json({
+      stage: { ...stageInfo(s.stage), objective: stageObjective(s.stage), since: s.stage_since, verification: s.verification },
+      history: ((history ?? []) as { to_stage: number; achieved_at: string; kind: string }[]).map((h) => ({ stage: h.to_stage, name: stageInfo(h.to_stage).name, achievedAt: h.achieved_at, kind: h.kind })),
+      roots: { coreLessons: facts.coreLessons, learningUnits: facts.learningUnits, activeWeeks: facts.activeWeeks, activeMonths: facts.activeMonths },
+      stems: { practicalActions: facts.practicalActions },
+      branches: [...byArea.entries()].sort((a, b) => b[1] - a[1]).map(([area, verified]) => ({ area, label: AREA_LABELS[area] ?? area, verified })),
+      fruits,
+      fruitTotals: {
+        verified: fruits.filter((f) => f.countsTowardMilestone).length,
+        pendingReview: fruits.filter((f) => f.status === "pending_review").length,
+        withdrawn: fruits.filter((f) => f.status === "withdrawn").length,
+        rejected: fruits.filter((f) => f.status === "rejected").length,
+      },
+      seeds: helped.map((h, i) => ({ ref: `p${i + 1}`, verifiedContributionsToThem: h.contributions, nowHelpingOthers: h.helpsOthers, firstHelpedOthersOn: firstHelp.get(h.personId) ?? null })),
+      disclaimer: MILESTONE_DISCLAIMER,
+      note: "Every part of the tree comes from records already verified for your growth milestones. Nothing here is a new score.",
+    });
+  } catch {
+    return res.status(500).json({ error: "Couldn't load your tree." });
+  }
 });
 
 const REASONS = new Set(["health", "family", "travel", "work", "ministry", "other", "prefer_not_to_say"]);

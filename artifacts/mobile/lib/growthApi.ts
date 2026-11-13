@@ -85,3 +85,24 @@ export function localDate(days = 0, now: Date = new Date()): string {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// ── My Growth Tree (GET /growth/me/tree) — a VIEW of what the Matrix already verified, never a score ──
+export interface TreeFruit {
+  /** The evidence ledger record's id: one fruit = one verified action. */
+  id: string; type: string; label: string; date: string; area: string; areaLabel: string;
+  /** A group session is ONE fruit for its facilitator; peopleHelped is only a count. */
+  kind: "group" | "individual"; peopleHelped: number | null;
+  status: "verified" | "pending_review" | "rejected" | "withdrawn"; countsTowardMilestone: boolean;
+}
+export interface GrowthTree {
+  stage: GrowthStageInfo & { objective: StageObjective; since: string; verification: string };
+  history: { stage: number; name: string; achievedAt: string; kind: string }[];
+  roots: { coreLessons: { passed: number; total: number; percent: number }; learningUnits: number; activeWeeks: number; activeMonths: number };
+  stems: { practicalActions: number };
+  branches: { area: string; label: string; verified: number }[];
+  fruits: TreeFruit[];
+  fruitTotals: { verified: number; pendingReview: number; withdrawn: number; rejected: number };
+  seeds: { ref: string; verifiedContributionsToThem: number; nowHelpingOthers: boolean; firstHelpedOthersOn: string | null }[];
+  disclaimer: string; note: string;
+}
+export const getGrowthTree = () => apiRequest<GrowthTree>("/growth/me/tree", {}, { fallbackError: "Couldn't load your tree." });

@@ -4,17 +4,20 @@ import type { TreeModelViewerHandle, TreeModelViewerProps } from "./treeModelVie
 
 // Web: the same three.js page in an iframe; it reports back with window.postMessage.
 const TreeModelViewer = forwardRef<TreeModelViewerHandle, TreeModelViewerProps>(function TreeModelViewer(
-  { standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, onStatus, reloadKey }, ref,
+  { standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts, onStatus, onSelect, reloadKey }, ref,
 ) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const html = useMemo(() => treeViewerHtml({ standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp }), [standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp]);
+  const html = useMemo(() => treeViewerHtml({ standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts }), [standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts]);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
   useEffect(() => {
     const on = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
-      const m = (e.data as { p2pTreeViewer?: { type?: string } })?.p2pTreeViewer;
+      const m = (e.data as { p2pTreeViewer?: { type?: string; id?: string | null } })?.p2pTreeViewer;
       if (m?.type === "status") statusRef.current(m as never);
+      else if (m?.type === "select") selectRef.current?.(m.id ?? null);
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);

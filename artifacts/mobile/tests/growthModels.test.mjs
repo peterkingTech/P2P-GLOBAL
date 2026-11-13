@@ -61,7 +61,9 @@ ok("viewer: a failed detailed download keeps the standard copy", html.includes("
 ok("viewer: offline gets its own message", html.includes("You're offline"));
 ok("viewer: messages reach both the WebView and the web iframe", html.includes("window.ReactNativeWebView.postMessage") && html.includes("window.parent.postMessage({ p2pTreeViewer: msg }"));
 ok("viewer: panning stays on the model", html.includes("bounds.clampPoint(controls.target, controls.target)"));
-ok("viewer: auto-rotate follows reduced motion and stops when touched", html.includes("controls.autoRotate = !CFG.reduceMotion") && html.includes('addEventListener("start", () => { controls.autoRotate = false; })'));
+ok("viewer: auto-rotate follows reduced motion and stops when touched", html.includes("controls.autoRotate = !CFG.reduceMotion") && html.includes('addEventListener("start", () => { controls.autoRotate = false;'));
+ok("viewer: a copy swap never interrupts a gesture (waits for the finger to lift; textures/shaders prepared first; geometry decoded off the main thread)",
+  html.includes("while (interacting && !ctl.signal.aborted)") && html.includes("renderer.compileAsync(") && html.includes("renderer.initTexture(") && html.includes("MeshoptDecoder.useWorkers"));
 const front = treeViewerHtml({ standardUrl: "a", detailedUrl: "b", background: "#fff", reduceMotion: false, frontOnly: true });
 ok("viewer: front-only turns ±30° near eye level and never auto-turns into its edges", front.includes("controls.minAzimuthAngle = -Math.PI / 6") && front.includes("!CFG.frontOnly") && front.includes('"frontOnly":true'));
 const single = treeViewerHtml({ standardUrl: "a", detailedUrl: null, background: "#fff", reduceMotion: false, noCloseUp: true });

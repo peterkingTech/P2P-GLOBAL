@@ -14,7 +14,7 @@
     "test:push": "node tests/pushDelivery.test.mjs",
     "test:security": "node tests/securityPhase0.test.mjs",
     "test:discipleship": "node tests/discipleshipRelationships.test.mjs",
-    "test:growth": "node tests/growthJourney.test.mjs && node tests/growthMatrixMigration.test.mjs",
+    "test:growth": "node tests/growthJourney.test.mjs && node tests/growthMatrixMigration.test.mjs && node tests/growthTree.test.mjs",
     "test:genealogy": "node tests/genealogy.test.mjs",
     "test:admin-identity": "node tests/adminIdentity.test.mjs",
     "test:admin-centre": "node tests/adminCentre.test.mjs",

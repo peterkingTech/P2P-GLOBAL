@@ -14,6 +14,9 @@ export interface TreeViewerConfig {
   reduceMotion: boolean;
   frontOnly?: boolean;
   noCloseUp?: boolean;
+  /** Modular Growth Tree (lib/growthTreePlacement.ts): parts drawn on the body, one instanced mesh per
+   *  part. Each instance: [x,y,z, nx,ny,nz, size, yaw, hang]. ids[asset][i] is reported when tapped. */
+  parts?: { urls: Record<string, string>; instances: Record<string, number[][]>; ids: Record<string, string[]> };
 }
 
 const THREE_VERSION = "0.170.0";
@@ -77,8 +80,13 @@ if (CFG.frontOnly) {
   controls.minAzimuthAngle = -Math.PI / 6; controls.maxAzimuthAngle = Math.PI / 6;
   controls.minPolarAngle = Math.PI / 2 - 0.35; controls.maxPolarAngle = Math.PI / 2 + 0.2;
 }
-controls.addEventListener("start", () => { controls.autoRotate = false; });
+// While a finger is down the copy swap waits (its one-off GPU upload never interrupts a pinch or drag).
+let interacting = false;
+controls.addEventListener("start", () => { controls.autoRotate = false; interacting = true; });
+controls.addEventListener("end", () => { interacting = false; });
 
+// Geometry is decoded in background workers so a large copy never freezes the view while it arrives.
+try { MeshoptDecoder.useWorkers?.(2); } catch (e) { /* main-thread decoding still works */ }
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 let current = null, currentLevel = null, height = 1, pending = null, lowFillSince = 0;
 const DETAIL_AT = 1.5, STANDARD_AT = 0.9, STANDARD_AFTER_MS = 1500;
@@ -119,7 +127,59 @@ function show(gltf, level) {
   if (current) { scene.remove(current); dispose(current); }
   current = root; currentLevel = level;
   post({ type: "status", state: level, triangles: renderer.info.render.triangles });
+  if (CFG.parts && !partsGroup) loadParts();
 }
+
+// ── Modular parts: each part file is downloaded once and drawn as ONE instanced mesh. Sizes are in
+// the body's own units (the body is never moved, so part positions share its coordinates).
+let partsGroup = null;
+async function loadParts() {
+  partsGroup = new THREE.Group(); scene.add(partsGroup);
+  const UP = new THREE.Vector3(0, 1, 0);
+  await Promise.all(Object.entries(CFG.parts.instances).map(async ([asset, list]) => {
+    const url = CFG.parts.urls[asset]; if (!url || !list.length) return;
+    try {
+      const g = await loader.loadAsync(url);
+      g.scene.updateMatrixWorld(true);
+      let mesh = null; g.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+      if (!mesh) return;
+      // Normalise the part to unit size; hanging parts (fruit) hang from their top centre.
+      const box = new THREE.Box3().setFromObject(g.scene), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+      const k = 1 / Math.max(s.x, s.y, s.z);
+      const im = new THREE.InstancedMesh(mesh.geometry, mesh.material, list.length);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), turn = new THREE.Quaternion();
+      list.forEach((v, i) => {
+        const hang = v[8] === 1;
+        const norm = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-c.x, hang ? -box.max.y : -c.y, -c.z)).multiply(mesh.matrixWorld);
+        // Upright parts lean a little toward the branch's outward normal; fruit hangs straight down.
+        q.setFromUnitVectors(UP, hang ? UP : new THREE.Vector3(v[3], v[4], v[5]).lerp(UP, 0.6).normalize());
+        turn.setFromAxisAngle(UP, v[7]); q.multiply(turn);
+        m.compose(new THREE.Vector3(v[0], v[1], v[2]), q, new THREE.Vector3(v[6], v[6], v[6])).multiply(norm);
+        im.setMatrixAt(i, m);
+      });
+      im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere();
+      im.userData = { asset, ids: CFG.parts.ids[asset] || [] };
+      partsGroup.add(im);
+    } catch (e) { post({ type: "status", state: currentLevel, partFailed: asset }); }
+  }));
+  post({ type: "status", state: currentLevel, parts: partsGroup.children.length, triangles: renderer.info.render.triangles });
+}
+
+// Tap a fruit, bud or tip → the app shows what it stands for (its record).
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let downAt = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!partsGroup || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(partsGroup.children, false)[0];
+  if (hit && hit.instanceId != null) post({ type: "select", asset: hit.object.userData.asset, id: hit.object.userData.ids[hit.instanceId] ?? null });
+});
+window.addEventListener("pagehide", () => {
+  if (partsGroup) dispose(partsGroup); if (current) dispose(current);
+  window.__p2pStats = { ...window.__p2pStats, afterDispose: { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures } };
+  renderer.dispose();
+});
 
 async function load(level) {
   if (pending) pending.abort();
@@ -130,6 +190,13 @@ async function load(level) {
       (p) => post({ type: "status", state: level === "standard" ? "loading" : "detail-loading", progress: Math.round(p * 100) }));
     const gltf = await loader.parseAsync(data, "");
     if (ctl.signal.aborted) { dispose(gltf.scene); return; }
+    if (current) {
+      // Swapping copies: upload textures and compile shaders BEFORE showing it, so the swap is one smooth frame.
+      gltf.scene.traverse((o) => { const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of mats) for (const v of Object.values(m)) if (v && v.isTexture) renderer.initTexture(v); });
+      try { await renderer.compileAsync(gltf.scene, camera, scene); } catch (e) { /* shown anyway */ }
+      while (interacting && !ctl.signal.aborted) await new Promise((r) => setTimeout(r, 100));
+      if (ctl.signal.aborted) { dispose(gltf.scene); return; }
+    }
     pending = null; show(gltf, level);
   } catch (e) {
     if (ctl.signal.aborted) return;
@@ -144,8 +211,18 @@ function fill() {
   return height / (2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
 }
 
+// Performance readout for tests: frames per second and what is on the GPU.
+let frames = 0, fpsSince = performance.now();
+window.__p2pStats = { fps: 0 };
 function tick(now) {
   requestAnimationFrame(tick);
+  frames++;
+  if (now - fpsSince >= 1000) {
+    const i = renderer.info;
+    window.__p2pStats = { fps: Math.round((frames * 1000) / (now - fpsSince)), triangles: i.render.triangles, calls: i.render.calls, geometries: i.memory.geometries, textures: i.memory.textures,
+      level: currentLevel, fill: current ? Math.round(fill() * 100) / 100 : 0 };
+    frames = 0; fpsSince = now;
+  }
   controls.update();
   if (current) {
     const f = fill();

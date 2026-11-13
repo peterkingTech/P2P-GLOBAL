@@ -9,6 +9,9 @@ import { AppButton, IconButton } from "@/components/ui";
 import { Attribution, SectionTitle, StudyState } from "@/components/study/StudyUI";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { commentaryChapter, commentaryIntroduction, studyResources, type CommentaryChapter, type Credit } from "@/lib/deepStudyApi";
+import ListenPlayer from "@/components/listen/ListenPlayer";
+import { listen, useListenOwner } from "@/lib/listen";
+import { commentarySections } from "@/lib/listen/studyContent";
 
 // Reading one commentary on one chapter (or its introduction to a book) — the same records Deep Study shows.
 // Each section names the verses it covers and can open them in Deep Study.
@@ -32,7 +35,18 @@ export default function CommentaryReadScreen() {
     studyResources().then((r) => { const x = r.commentaries.find((y) => y.id === p.id); if (x) { setName(x.name); setDirection(x.direction); } }).catch(() => {});
   }, [p.id, p.book, chapter, intro]);
   useEffect(load, [load]);
+  // P2P Listen (the shared player): this chapter, or the book introduction, read aloud in English.
+  useListenOwner("commentary");
   const book = bookByCode(String(p.book));
+  const onListen = () => {
+    if (!d) return;
+    const sections = commentarySections({ id: String(p.id), name: name || String(p.id), chapter, attribution: d.credit?.attribution, introduction: d.introduction,
+      sections: "sections" in d && d.sections ? d.sections : [] });
+    if (!sections.length) return;
+    void listen.play({ key: `commentary:${p.id}:${p.book}:${intro ? "intro" : chapter}`, owner: "commentary", kind: "study", title: `${name} · ${book?.name ?? p.book}${intro ? "" : ` ${chapter}`}`,
+      subtitle: t("deepStudy.readInEnglish", { defaultValue: "Read in English" }), language: "en", highlight: "sentence", sections,
+      route: { pathname: "/commentaries/read", params: { id: String(p.id), book: String(p.book), ...(intro ? { intro: "1" } : { chapter: String(chapter) }) } } }, "saved");
+  };
   const paras = (txt: string) => txt.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean);
   return (
     <View style={[s.screen, { paddingTop: insets.top + 4 }]}>
@@ -49,6 +63,9 @@ export default function CommentaryReadScreen() {
         {!d || error ? <StudyState loading={!d && !error} error={error} onRetry={load} /> : (
           <>
             <StudyState offline={(d as { offline?: boolean }).offline} />
+            {d.introduction || ("sections" in d && d.sections?.length) ? (
+              <AppButton label={t("deepStudy.listen", { defaultValue: "Listen" })} icon="headset-outline" variant="secondary" size="sm" onPress={onListen} />
+            ) : null}
             {"covered" in d && d.covered === false ? <StudyState empty={t("deepStudy.notCovered", { defaultValue: "Doesn't cover this book or chapter." })} /> : null}
             {d.introduction ? (
               <View style={s.card}>
@@ -68,6 +85,7 @@ export default function CommentaryReadScreen() {
           </>
         )}
       </ScrollView>
+      <ListenPlayer owner="commentary" bottomInset={insets.bottom} />
     </View>
   );
 }

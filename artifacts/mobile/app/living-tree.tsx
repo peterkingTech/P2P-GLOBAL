@@ -23,6 +23,7 @@ import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
 import GrowthModelView from "@/components/growth/GrowthModelView";
+import ModularTreeView from "@/components/growth/ModularTreeView";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
 import { GROWTH_MODELS, STAGE_MODELS, limitNote } from "@/lib/growthModels";
 import FruitDetailCard from "@/components/tree/FruitDetailCard";
@@ -204,12 +205,19 @@ export default function LivingTreeScreen() {
 
       {tab === "tree" && (
         <View style={[styles.videoHero, { width: screenWidth, height: heroHeight }]}>
-          <GrowthModelView
-            modelId={modelId}
+          {/* The modular tree (your verified fruit on your stage's body) where the v2 models are set up;
+              otherwise — and whenever it can't load — the stage model as before. */}
+          <ModularTreeView
             style={{ width: screenWidth, height: heroHeight }}
-            extraControls={
-              <IconButton variant="tinted" palette="fixedLight" icon="expand-outline" accessibilityLabel="Open full screen"
-                onPress={() => router.push({ pathname: "/tree-3d", params: { model: modelId } } as any)} />
+            fallback={
+              <GrowthModelView
+                modelId={modelId}
+                style={{ width: screenWidth, height: heroHeight }}
+                extraControls={
+                  <IconButton variant="tinted" palette="fixedLight" icon="expand-outline" accessibilityLabel="Open full screen"
+                    onPress={() => router.push({ pathname: "/tree-3d", params: { model: modelId } } as any)} />
+                }
+              />
             }
           />
           <View style={styles.videoHeroLabel} pointerEvents="none">
@@ -384,6 +392,9 @@ export default function LivingTreeScreen() {
           <AppButton label="View My Forest" onPress={() => setTab("forest")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
 
           <AppButton label="Your growth journey" onPress={() => router.push("/stages")} variant="secondary" icon="chevron-forward" iconPosition="trailing" style={{ marginBottom: 8 }} palette="fixedLight" />
+          {/* From the verified ledger: each fruit one contribution; the story from recorded events only. */}
+          <AppButton label="Fruit Harvest" onPress={() => router.push("/fruit-harvest" as any)} variant="secondary" icon="nutrition-outline" style={{ marginBottom: 8 }} palette="fixedLight" />
+          <AppButton label="Growth Story" onPress={() => router.push("/growth-timeline" as any)} variant="secondary" icon="time-outline" style={{ marginBottom: 8 }} palette="fixedLight" />
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>

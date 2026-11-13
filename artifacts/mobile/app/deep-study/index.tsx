@@ -6,7 +6,10 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
-import { Attribution, OriginalText, SectionTitle, StudyState } from "@/components/study/StudyUI";
+import { Attribution, OriginalText, PronounceButton, SectionTitle, StudyState } from "@/components/study/StudyUI";
+import ListenPlayer from "@/components/listen/ListenPlayer";
+import { listen, useListenOwner, type ListenSection } from "@/lib/listen";
+import { commentarySections, crossRefSections, peopleSections } from "@/lib/listen/studyContent";
 import { CANON, SCRIPTURE_FONT, bibleRoute, bookByCode, formatRef, getChapter, readerTarget, type BibleChapter } from "@/lib/bibleReaderApi";
 import { loadPosition } from "@/lib/bibleReadingPrefs";
 import {
@@ -34,6 +37,8 @@ export default function DeepStudyScreen() {
   const [tab, setTab] = useState<Tab>(p.tab === "commentaries" || p.tab === "xref" || p.tab === "people" ? p.tab : "original");
   const [translation, setTranslation] = useState<string | null>(p.t ? String(p.t) : null);
   useEffect(() => { if (!p.t) loadPosition().then((pos) => setTranslation(pos?.translation ?? null)); }, [p.t]);
+  // P2P Listen (the one shared player): Deep Study's listening shows its bar here; leaving keeps it in reach.
+  useListenOwner(LISTEN_OWNER);
 
   // No passage yet: choose one.
   if (!book || !chapter || chapter > book.chapters) return <PassagePicker tab={p.tab} />;
@@ -67,8 +72,24 @@ export default function DeepStudyScreen() {
         {tab === "xref" ? <CrossRefTab book={book.code} chapter={chapter} from={from} to={to} onOpen={go} /> : null}
         {tab === "people" ? <PeopleTab book={book.code} chapter={chapter} from={from} to={to} /> : null}
       </ScrollView>
+      <ListenPlayer owner={LISTEN_OWNER} bottomInset={insets.bottom} />
     </View>
   );
+}
+
+// ── Listening (P2P Listen) ───────────────────────────────────────────────────
+const LISTEN_OWNER = "deep-study";
+/**
+ * Start study content in the shared P2P Listen player (read aloud by the device's voice; nothing stored).
+ * Study resources are in English, so they are read in English. The passage is kept in the route, so
+ * "Go to the text" from the player comes back to this same passage.
+ */
+function listenTo(key: string, title: string, subtitle: string, sections: ListenSection[], passage: { book: string; chapter: number; from: number | null; to: number | null }, tab: Tab) {
+  if (!sections.length) return;
+  void listen.play({
+    key: `study:${key}`, owner: LISTEN_OWNER, kind: "study", title, subtitle, language: "en", highlight: "sentence", sections,
+    route: { pathname: "/deep-study", params: { book: passage.book, chapter: String(passage.chapter), ...(passage.from ? { v: String(passage.from), ve: String(passage.to ?? passage.from) } : {}), tab } },
+  }, "start");
 }
 
 // ── The passage itself (in the reader's translation, from the existing licensed Bible service) ──────
@@ -145,6 +166,8 @@ function OriginalTab({ book, chapter, from, to, translation }: { book: string; c
             <View style={s.detail}>
               <OriginalText text={picked.text} direction={v.direction} size={26} />
               {picked.transliteration ? <Text style={s.wTranslitBig}>{picked.transliteration}</Text> : null}
+              <Text style={s.small}>{languageName(picked.language)}</Text>
+              <PronounceButton text={picked.text} language={picked.language} />
               <Text style={s.detailRow}><Text style={s.detailKey}>{t("deepStudy.gloss", { defaultValue: "Gloss" })}: </Text>{picked.gloss ?? t("deepStudy.noGlossLong", { defaultValue: "— (not translated as a separate English word)" })}</Text>
               {picked.parsingFull ? <Text style={s.detailRow}><Text style={s.detailKey}>{t("deepStudy.parsing", { defaultValue: "Grammar" })}: </Text>{picked.parsingFull}</Text> : null}
               {picked.strongs ? <Text style={s.detailRow}><Text style={s.detailKey}>Strong's: </Text>{picked.strongs}</Text> : null}
@@ -178,10 +201,17 @@ function CommentariesTab({ book, chapter, from, to }: { book: string; chapter: n
   const label = (r: CompareResult) => r.status === "ok" ? null : r.status === "no_entry" ? t("deepStudy.noEntry", { defaultValue: "No note on these verses." })
     : r.status === "not_covered" ? t("deepStudy.notCovered", { defaultValue: "Doesn't cover this book or chapter." }) : (r.error ?? t("deepStudy.unavailable", { defaultValue: "Unavailable right now." }));
   const ordered = [...d.commentaries].sort((a, b) => Number(b.status === "ok") - Number(a.status === "ok"));
+  const passage = { book, chapter, from, to };
+  const sectionsOf = (r: CompareResult) => commentarySections({ id: r.id, name: r.name, chapter, attribution: r.credit?.attribution, introduction: r.introduction, sections: r.sections });
+  const ready = ordered.filter((r) => r.status === "ok");
   return (
     <View style={{ gap: 10 }}>
       <StudyState offline={d.offline} />
       <Text style={s.small}>{t("deepStudy.commentaryNote", { defaultValue: "Historical commentaries and study notes, shown as published (in English). They are their authors' views, not P2P Global teaching." })}</Text>
+      {ready.length > 1 ? (
+        <AppButton label={t("deepStudy.listenAllCommentaries", { defaultValue: "Listen to all {{n}} commentaries", n: ready.length })} icon="headset-outline" variant="secondary"
+          onPress={() => listenTo(`compare:${book}.${chapter}.${from ?? 0}-${to ?? 0}`, t("deepStudy.tabCommentaries", { defaultValue: "Commentaries" }), t("deepStudy.readInEnglish", { defaultValue: "Read in English" }), ready.flatMap(sectionsOf), passage, "commentaries")} />
+      ) : null}
       {ordered.map((r) => {
         const isOpen = open.includes(r.id);
         return (
@@ -209,8 +239,12 @@ function CommentariesTab({ book, chapter, from, to }: { book: string; chapter: n
                     {sec.paragraphs.map((para, i) => <Text key={i} style={[s.cText, { writingDirection: r.direction }]}>{para}</Text>)}
                   </View>
                 ))}
-                <AppButton label={t("deepStudy.openInCommentaries", { defaultValue: "Read the whole chapter in Commentaries" })} variant="tertiary" size="sm"
-                  onPress={() => router.push({ pathname: "/commentaries/read", params: { id: r.id, book, chapter: String(chapter) } } as any)} />
+                <View style={s.rowButtons}>
+                  <AppButton label={t("deepStudy.listen", { defaultValue: "Listen" })} icon="headset-outline" variant="secondary" size="sm"
+                    onPress={() => listenTo(`c:${r.id}:${book}.${chapter}.${from ?? 0}-${to ?? 0}`, r.name, t("deepStudy.readInEnglish", { defaultValue: "Read in English" }), sectionsOf(r), passage, "commentaries")} />
+                  <AppButton label={t("deepStudy.openInCommentaries", { defaultValue: "Read the whole chapter in Commentaries" })} variant="tertiary" size="sm"
+                    onPress={() => router.push({ pathname: "/commentaries/read", params: { id: r.id, book, chapter: String(chapter) } } as any)} />
+                </View>
                 <Attribution credit={r.credit} compact />
               </View>
             ) : null}
@@ -232,9 +266,13 @@ function CrossRefTab({ book, chapter, from, to, onOpen }: { book: string; chapte
   useEffect(load, [load]);
   if (!d || error) return <StudyState loading={!d && !error} error={error} onRetry={load} />;
   if (!d.verses.length) return <StudyState empty={t("deepStudy.noCrossRefs", { defaultValue: "No cross references for this passage." })} />;
+  const named = d.verses.map((v) => ({ verse: v.verse, references: v.references.map((r) => { const b = bookByCode(r.book); return b ? formatRef(b, r.chapter, r.verse, r.endVerse) : `${r.book} ${r.chapter}:${r.verse}`; }) }));
   return (
     <View style={{ gap: 10 }}>
       <StudyState offline={d.offline} />
+      <AppButton label={t("deepStudy.listen", { defaultValue: "Listen" })} icon="headset-outline" variant="secondary" size="sm"
+        onPress={() => listenTo(`x:${book}.${chapter}.${from ?? 0}-${to ?? 0}`, t("deepStudy.tabCrossRefs", { defaultValue: "Cross references" }), t("deepStudy.readInEnglish", { defaultValue: "Read in English" }),
+          crossRefSections(named, chapter, d.credit?.attribution), { book, chapter, from, to }, "xref")} />
       {d.verses.map((v) => (
         <View key={v.verse} style={s.card}>
           <Text style={s.verseLabel}>{chapter}:{v.verse} · {t("deepStudy.crossRefCount", { defaultValue: "{{n}} references", n: v.total })}</Text>
@@ -270,6 +308,9 @@ function PeopleTab({ book, chapter, from, to }: { book: string; chapter: number;
   return (
     <View style={{ gap: 10 }}>
       <StudyState offline={d.offline} />
+      <AppButton label={t("deepStudy.listen", { defaultValue: "Listen" })} icon="headset-outline" variant="secondary" size="sm"
+        onPress={() => listenTo(`pp:${book}.${chapter}.${from ?? 0}-${to ?? 0}`, t("deepStudy.tabPeople", { defaultValue: "People & places" }), t("deepStudy.readInEnglish", { defaultValue: "Read in English" }),
+          peopleSections(d.items, chapter, d.credit?.attribution), { book, chapter, from, to }, "people")} />
       {groups.map(([k, l]) => {
         const items = d.items.filter((i) => i.kind === k);
         return items.length ? (
@@ -377,6 +418,7 @@ function makeStyles(c: AppColors) {
     cHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44 },
     cName: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
     cStatus: { fontSize: 12.5, color: c.amber, fontFamily: "Inter_500Medium" },
+    rowButtons: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
     cText: { fontSize: 14.5, color: c.textDark, fontFamily: "Inter_400Regular", lineHeight: 22 },
     xref: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderBeige },
     xrefText: { flex: 1, fontSize: 14.5, color: c.textDark, fontFamily: "Inter_600SemiBold" },

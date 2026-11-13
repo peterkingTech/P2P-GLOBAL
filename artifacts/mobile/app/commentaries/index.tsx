@@ -51,7 +51,7 @@ export default function CommentariesScreen() {
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={s.name}>{r.name}</Text>
               <Text style={s.meta}>{r.author}</Text>
-              <Text style={s.meta}>{r.language} · {r.coverage.books ?? "?"} {t("deepStudy.books", { defaultValue: "books" })} · {r.credit.licence.name}</Text>
+              <Text style={s.meta}>{r.language} · {r.coverage.books ?? "?"} {t("deepStudy.books", { defaultValue: "books" })} · {r.credit?.licence?.name ?? ""}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </TouchableOpacity>

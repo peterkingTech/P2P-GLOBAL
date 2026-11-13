@@ -6,10 +6,10 @@ import type { TreeModelViewerHandle, TreeModelViewerProps } from "./treeModelVie
 
 // iOS/Android: the three.js page runs in a WebView (WebGL 2). Model files are fetched by the page.
 const TreeModelViewer = forwardRef<TreeModelViewerHandle, TreeModelViewerProps>(function TreeModelViewer(
-  { standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, onStatus, reloadKey }, ref,
+  { standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts, onStatus, onSelect, reloadKey }, ref,
 ) {
   const web = useRef<WebView>(null);
-  const html = useMemo(() => treeViewerHtml({ standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp }), [standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp]);
+  const html = useMemo(() => treeViewerHtml({ standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts }), [standardUrl, detailedUrl, background, reduceMotion, frontOnly, noCloseUp, parts]);
   useImperativeHandle(ref, () => ({
     zoom: (f) => web.current?.injectJavaScript(`window.__p2pZoom && window.__p2pZoom(${Number(f)}); true;`),
     reset: () => web.current?.injectJavaScript("window.__p2pReset && window.__p2pReset(); true;"),
@@ -30,7 +30,7 @@ const TreeModelViewer = forwardRef<TreeModelViewerHandle, TreeModelViewerProps>(
       overScrollMode="never"
       setSupportMultipleWindows={false}
       onMessage={(e) => {
-        try { const m = JSON.parse(e.nativeEvent.data); if (m?.type === "status") onStatus(m); } catch { /* not ours */ }
+        try { const m = JSON.parse(e.nativeEvent.data); if (m?.type === "status") onStatus(m); else if (m?.type === "select") onSelect?.(m.id ?? null); } catch { /* not ours */ }
       }}
       onError={() => onStatus({ state: "error", message: "The 3D view couldn't start." })}
       onContentProcessDidTerminate={() => onStatus({ state: "error", message: "The 3D view was interrupted." })}

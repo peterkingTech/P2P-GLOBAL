@@ -75,7 +75,7 @@ export interface ListenLink { label: string; open: () => void }
 /** After listening: the next learning step on the same screen (never automatic). */
 export interface ListenAction { label: string; icon?: string; open: () => void }
 /** "playlist": a Scripture playlist / collection — one section per passage; plays on through them (Repeat applies). */
-export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan" | "playlist";
+export type ListenKind = "bible" | "story" | "story-intro" | "lesson" | "plan" | "playlist" | "study";
 /** Playlists only: off · the current passage again · the whole queue again. */
 export type RepeatMode = "off" | "one" | "all";
 export type ArtworkSource = number | { uri: string };
@@ -487,6 +487,37 @@ export function createListenEngine(driver: SpeechDriver, store: ListenStore, now
       try {
         driver.speak(sample.slice(0, 220), { language: v.language, voice: v.identifier, rate: state.rate, background: prefs.background, onDone: end, onError: end });
       } catch { end(); }
+    },
+    /**
+     * One short utterance — e.g. a single original-language word (Deep Study) — through the SAME speech
+     * session: a playing narration pauses (keeping its place) and carries on afterwards; never two at once.
+     * Spoken only with a device voice FOR THAT LANGUAGE: when there is none it reports "no_voice" (a
+     * Hebrew word is never read by an English voice). Resolves with the voice used, so the screen can say
+     * exactly what was heard (device voice, language).
+     */
+    async speakSnippet(text: string, o: { language: string; rate?: number }): Promise<{ result: "spoken" | "no_voice" | "error"; voice?: { name: string; language: string } }> {
+      const sample = text.trim();
+      if (!sample) return { result: "error" };
+      const v = voicesFor(o.language, await loadVoices())[0];
+      if (!v) return { result: "no_voice" };
+      const wasPlaying = state.status === "playing";
+      if (wasPlaying) pause();
+      halt();
+      const g = gen;
+      const voice = { name: v.name, language: v.language };
+      return new Promise((resolve) => {
+        let settled = false;
+        const end = (result: "spoken" | "error") => {
+          if (settled) return;
+          settled = true;
+          if (g === gen && wasPlaying) speakFrom(state.chunk, spokenFrom);
+          resolve({ result, voice });
+        };
+        try {
+          driver.speak(sample.slice(0, 400), { language: v.language, voice: v.identifier, rate: o.rate ?? state.rate, background: prefs.background,
+            onDone: () => end("spoken"), onStopped: () => end("spoken"), onError: () => end("error") });
+        } catch { end("error"); }
+      });
     },
     nextSection() {
       if (!content) return;

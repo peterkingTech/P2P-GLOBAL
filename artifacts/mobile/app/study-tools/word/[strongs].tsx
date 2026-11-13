@@ -5,8 +5,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
-import { IconButton } from "@/components/ui";
-import { Attribution, OriginalText, SectionTitle, StudyState } from "@/components/study/StudyUI";
+import { AppButton, IconButton } from "@/components/ui";
+import { Attribution, OriginalText, PronounceButton, SectionTitle, StudyState } from "@/components/study/StudyUI";
+import ListenPlayer from "@/components/listen/ListenPlayer";
+import { listen, useListenOwner } from "@/lib/listen";
+import { lexiconSections } from "@/lib/listen/studyContent";
 import { languageName, lexiconEntry, type LexiconEntry } from "@/lib/deepStudyApi";
 import { bookByCode } from "@/lib/bibleReaderApi";
 
@@ -30,6 +33,15 @@ export default function WordScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.strongs, p.book, p.chapter]);
   useEffect(load, [load]);
+  // P2P Listen (the shared player): the entry read aloud — in English, as the lexicon is English.
+  useListenOwner("study-word");
+  const listenEntry = () => {
+    if (!d) return;
+    const sections = lexiconSections({ id: d.entry.id, languageName: languageName(d.entry.language), attribution: d.credit?.attribution, senses: d.entry.senses });
+    if (!sections.length) return;
+    void listen.play({ key: `lexicon:${d.entry.id}`, owner: "study-word", kind: "study", title: d.entry.id, subtitle: t("deepStudy.readInEnglish", { defaultValue: "Read in English" }),
+      language: "en", highlight: "sentence", sections, route: { pathname: "/study-tools/word/[strongs]", params: { strongs: d.entry.id } } }, "start");
+  };
 
   const open = (strongs: string) => router.push({ pathname: "/study-tools/word/[strongs]", params: { strongs, ...(at ? { book: at.book, chapter: String(at.chapter), t: p.t ?? "" } : {}) } } as any);
   const book = at ? bookByCode(at.book) : null;
@@ -49,6 +61,7 @@ export default function WordScreen() {
               <Text style={s.badge}>{languageName(d.entry.language)}</Text>
               <Text style={s.badge}>{d.entry.senses.length} {d.entry.senses.length === 1 ? t("deepStudy.sense", { defaultValue: "sense" }) : t("deepStudy.senses", { defaultValue: "senses" })}</Text>
             </View>
+            <AppButton label={t("deepStudy.listenEntry", { defaultValue: "Listen to this entry" })} icon="headset-outline" variant="secondary" size="sm" onPress={listenEntry} />
             {d.entry.senses.map((sense) => (
               <View key={sense.id} style={[s.card, d.requestedSense === sense.id && s.cardOn]}>
                 <View style={s.senseHead}>
@@ -58,6 +71,7 @@ export default function WordScreen() {
                   </View>
                   <Text style={s.senseId}>{sense.id}</Text>
                 </View>
+                {sense.lemma ? <PronounceButton text={sense.lemma} language={sense.language ?? d.entry.language ?? ""} /> : null}
                 {sense.gloss ? <Text style={s.gloss}>“{sense.gloss}”</Text> : null}
                 {sense.partOfSpeech ? <Text style={s.meta}>{t("deepStudy.partOfSpeech", { defaultValue: "Part of speech" })}: {sense.partOfSpeech}</Text> : null}
                 {sense.definition ? <Text style={s.definition}>{sense.definition.replace(/\n{3,}/g, "\n\n").trim()}</Text> : null}
@@ -91,6 +105,7 @@ export default function WordScreen() {
           </>
         )}
       </ScrollView>
+      <ListenPlayer owner="study-word" bottomInset={insets.bottom} />
     </View>
   );
 }

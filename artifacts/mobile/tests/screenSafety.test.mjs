@@ -37,6 +37,8 @@ const mocks = {
   "@/contexts/ThemeContext": { useTheme: () => ({ colors }) },
   "@/components/ui": { AppButton: host("AppButton") },
   "@/components/ErrorFallback": { ErrorFallback: host("RootFallback") },
+  // P2P Listen (native speech) isn't needed to render the credit.
+  "@/lib/listen": { listen: { speakSnippet: async () => ({ result: "spoken" }) } },
   "expo-router": { useRouter: () => ({ canGoBack: () => true, back: () => routerCalls.push("back"), replace: (r) => routerCalls.push(`replace:${r}`) }) },
 };
 const cache = new Map();

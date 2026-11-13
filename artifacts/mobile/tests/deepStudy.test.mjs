@@ -109,7 +109,7 @@ ok("strongs: H430 → H0430, g3056 → G3056, nonsense → null", A.normaliseStr
   const missing = langs.flatMap((l) => { const b = JSON.parse(src(`locales/${l}.json`)).deepStudy ?? {}; return Object.keys(en).filter((k) => !b[k]).map((k) => `${l}.${k}`); });
   ok("interface translated in all 8 Bible Study languages (every key)", Object.keys(en).length > 100 && missing.length === 0, missing.slice(0, 5).join(","));
   ok("placeholders kept in every language", langs.every((l) => { const b = JSON.parse(src(`locales/${l}.json`)).deepStudy; return Object.keys(en).every((k) => ((en[k].match(/\{\{\w+\}\}/g) ?? []).sort().join() === ((b[k] ?? "").match(/\{\{\w+\}\}/g) ?? []).sort().join())); }));
-  const used = new Set(screens.concat(["app/commentaries/index.tsx", "app/study-tools/index.tsx", "components/study/StudyUI.tsx", "app/bible-study/index.tsx"]).flatMap((f) => [...src(f).matchAll(/t\("deepStudy\.([A-Za-z]+)"/g)].map((m) => m[1])));
+  const used = new Set(screens.concat(["app/commentaries/index.tsx", "app/study-tools/index.tsx", "components/study/StudyUI.tsx", "app/bible-study/index.tsx"]).flatMap((f) => [...src(f).matchAll(/t\("deepStudy\.([A-Za-z0-9]+)"/g)].map((m) => m[1])));
   ok("every string used on screen exists in English", [...used].every((k) => k in en), [...used].filter((k) => !(k in en)).join(","));
   ok("commentary and lexicon content is labelled English, never auto-translated", ds.includes("(in English)") && src("app/study-tools/index.tsx").includes("Lexicons and notes are in English"));
 

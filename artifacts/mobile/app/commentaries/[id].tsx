@@ -35,7 +35,7 @@ export default function CommentaryScreen() {
             <View style={s.card}>
               <Text style={s.name}>{d.name}</Text>
               <Text style={s.meta}>{d.author}</Text>
-              <Text style={s.meta}>{t("deepStudy.language", { defaultValue: "Language" })}: {d.language} · {d.credit.licence.name}</Text>
+              <Text style={s.meta}>{t("deepStudy.language", { defaultValue: "Language" })}: {d.language} · {d.credit?.licence?.name ?? ""}</Text>
               <Text style={s.meta}>{d.books.length} {t("deepStudy.books", { defaultValue: "books" })} · {d.coverage.chapters ?? "?"} {t("deepStudy.chapters", { defaultValue: "chapters" })}</Text>
               {d.website ? <AppButton label={t("deepStudy.aboutSource", { defaultValue: "About this source" })} variant="tertiary" size="sm" icon="open-outline" onPress={() => Linking.openURL(d.website!).catch(() => {})} /> : null}
               <Attribution credit={d.credit} />
