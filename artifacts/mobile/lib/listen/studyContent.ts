@@ -52,6 +52,24 @@ export function lexiconSections(e: {
   return [...out, ...credit(e.attribution, e.id)];
 }
 
+/** A dictionary headword: each original word in turn (by transliteration — never original letters read
+ *  in an English voice), its lexicon gloss and real usage counts, then the source. */
+export function dictionarySections(d: {
+  key: string; display: string;
+  records: { id: string; language: string; transliteration: string; gloss: string; partOfSpeech: string; words: number; verses: number }[];
+}, attribution?: string | null): ListenSection[] {
+  if (!d.records.length) return [];
+  const lang = (l: string) => (l === "hebrew" ? "Hebrew" : l === "aramaic" ? "Aramaic" : l === "greek" ? "Greek" : l);
+  const out: ListenSection[] = [{ id: `dict:${d.key}:h`, title: d.display, parts: [{ key: `dict:${d.key}:h`,
+    text: sentence(`${d.display}. ${d.records.length === 1 ? "One original word has" : `${d.records.length} different original words have`} this English gloss in the lexicon. Each is its own word`) }] }];
+  for (const r of d.records) out.push({ id: `dict:${d.key}:${r.id}`, title: `${lang(r.language)} · ${r.transliteration || r.id}`, parts: [
+    { key: `dict:${d.key}:${r.id}:w`, text: sentence(`${lang(r.language)}: ${r.transliteration || "transliteration not given"}, Strong's ${r.id.replace(/^([HG])0*/, "$1 ")}`) },
+    ...(r.gloss ? [{ key: `dict:${d.key}:${r.id}:g`, text: sentence(`Lexicon gloss: ${r.gloss}`) }] : []),
+    { key: `dict:${d.key}:${r.id}:n`, text: sentence(r.words ? `Used ${r.words} times in ${r.verses} verses, counting every form` : "No occurrences in the interlinear") },
+  ] });
+  return [...out, ...credit(attribution, `dict:${d.key}`)];
+}
+
 /** People, places and events in a passage, grouped as on screen. */
 export function peopleSections(items: { name: string; kind: "person" | "place" | "event"; verses: number[] }[], chapter: number, attribution?: string | null): ListenSection[] {
   const groups: [string, string][] = [["person", "People"], ["place", "Places"], ["event", "Events"]];

@@ -111,6 +111,7 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
         <View style={{ gap: 10 }}>
           {([
             { icon: "layers-outline", title: t("deepStudy.title", { defaultValue: "Deep Study" }), sub: t("deepStudy.titleSub", { defaultValue: "One passage: original words, commentaries, cross references" }), route: "/deep-study" },
+            { icon: "text-outline", title: t("dictionary.title", { defaultValue: "Biblical Dictionary" }), sub: t("dictionary.hubSub", { defaultValue: "A–Z: Hebrew, Aramaic and Greek words, meanings and where they occur" }), route: "/dictionary" },
             { icon: "library-outline", title: t("deepStudy.commentaries", { defaultValue: "Commentaries" }), sub: t("deepStudy.commentariesSub", { defaultValue: "Classic commentaries and open study notes" }), route: "/commentaries" },
             { icon: "construct-outline", title: t("deepStudy.studyTools", { defaultValue: "Study Tools" }), sub: t("deepStudy.studyToolsSub", { defaultValue: "Hebrew, Greek and Aramaic lexicons, Strong's, cross references" }), route: "/study-tools" },
           ] as const).map((d) => (

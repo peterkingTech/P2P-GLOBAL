@@ -84,7 +84,7 @@ const OWN_HEADER_ROUTES = [
   "mail/index", "mail/[id]", "mail/compose",
   "groups/create", "groups/[id]", "groups/community/[id]", "groups/invitations", "groups/join",
   "fruit-harvest", "growth-timeline",
-  "deep-study/index", "commentaries/index", "commentaries/[id]", "commentaries/read", "study-tools/index", "study-tools/lexicon", "study-tools/word/[strongs]",
+  "deep-study/index", "commentaries/index", "commentaries/[id]", "commentaries/read", "study-tools/index", "study-tools/lexicon", "study-tools/word/[strongs]", "dictionary/index", "dictionary/term/[key]", "dictionary/occurrences/[strongs]",
 ];
 
 const AUTH_SETUP_SCREENS = new Set(["profile-setup", "intake", "goals-onboarding", "journey", "username-setup"]);

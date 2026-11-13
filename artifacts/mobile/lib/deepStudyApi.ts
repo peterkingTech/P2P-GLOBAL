@@ -64,8 +64,20 @@ async function writeCache<T>(path: string, data: T) {
 }
 
 /** Fresh-enough cache → network (with the server's own timeout + retry) → older cache when offline. */
-async function get<T>(path: string, opts: { refresh?: boolean } = {}): Promise<T & { offline?: boolean }> {
+async function get<T>(path: string, opts: { refresh?: boolean; persist?: boolean } = {}): Promise<T & { offline?: boolean }> {
   void clearOlderSchemas();
+  // Search answers are kept for this session only (memory), so typing never pushes saved entries out.
+  if (opts.persist === false) {
+    const m = mem.get(path);
+    if (m && Date.now() - m.at < FRESH_MS) return m.data as T & { offline?: boolean };
+    const data = await apiRequest<T>(`/deep-study${path}`, {}, {
+      fallbackError: "Deep Study couldn't load this. Please try again.",
+      offlineError: "You're offline — check your connection and try again.",
+      makeError: (message, status) => new StudyError(message, status),
+    });
+    mem.set(path, { at: Date.now(), data });
+    return data as T & { offline?: boolean };
+  }
   const hit = await readCache<T>(path);
   if (hit && !opts.refresh && Date.now() - hit.at < FRESH_MS) return hit.data as T & { offline?: boolean };
   try {
@@ -133,6 +145,36 @@ export const commentaryDetail = (id: string) => get<CommentaryDetail>(`/commenta
 export const commentaryIntroduction = (id: string, book: string) => get<{ introduction: string | null; credit: Credit }>(`/commentaries/${id}/${book}/introduction`);
 export const commentaryChapter = (id: string, book: string, chapter: number, from?: number | null, to?: number | null) => get<CommentaryChapter>(`/commentaries/${id}/${book}/${chapter}${range(from, to)}`);
 export const compareCommentaries = (book: string, chapter: number, from?: number | null, to?: number | null) => get<{ commentaries: CompareResult[]; offline?: boolean }>(`/compare/${book}/${chapter}${range(from, to)}`);
+
+// ── Biblical Dictionary (A–Z) — the same Strong's-numbered records (api-server lib/dictionary.ts) ──
+export type DictLanguage = "hebrew" | "aramaic" | "greek";
+export interface DictRecord {
+  id: string; strongs: string; language: DictLanguage; lemma: string; transliteration: string; gloss: string; partOfSpeech: string;
+  senses: { id: string; gloss: string }[]; words: number; verses: number;
+  renderings: { text: string; count: number }[]; occurrenceLanguages: DictLanguage[];
+}
+export interface DictTermSummary {
+  type: "term"; key: string; display: string; letter: string; records: number;
+  languages: { language: DictLanguage; count: number }[]; preview: { id: string; language: DictLanguage; lemma: string; transliteration: string }[];
+}
+export type DictSearchItem = (DictTermSummary | (DictRecord & { type: "record" })) & { rank: number; matched: string };
+export interface DictOverview {
+  letters: { letter: string; count: number }[]; terms: number; records: number; languages: { language: DictLanguage; records: number }[];
+  builtAt: string; referenceSources: { id: string; name: string; status: string }[]; credits: Credit[]; note: string;
+}
+export interface DictTerm { key: string; display: string; letter: string; records: DictRecord[]; renderedAs: (DictRecord & { renderCount: number })[]; renderedNote: string; credits: Credit[] }
+export interface DictRecordDetail { record: DictRecord; terms: { key: string; display: string }[]; countsNote: string; credits: Credit[] }
+export interface DictOccurrences {
+  id: string; words: number; verses: number; offset: number; note: string; credits: Credit[];
+  items: { book: string; bookName: string; chapter: number; verse: number; forms: { wordId: string; text: string; transliteration: string | null; parsing: string | null; gloss: string | null; language: string }[] | null }[];
+}
+export const dictionaryOverview = () => get<DictOverview>("/dictionary");
+export const dictionaryBrowse = (letter: string, offset = 0) => get<{ letter: string; total: number; offset: number; items: DictTermSummary[] }>(`/dictionary/browse?letter=${encodeURIComponent(letter)}&offset=${offset}&limit=50`);
+export const dictionarySearch = (q: string, language?: DictLanguage | null, offset = 0) =>
+  get<{ q: string; mode: string; total: number; offset: number; items: DictSearchItem[] }>(`/dictionary/search?q=${encodeURIComponent(q)}${language ? `&language=${language}` : ""}&offset=${offset}&limit=30`, { persist: false });
+export const dictionaryTerm = (key: string) => get<DictTerm>(`/dictionary/term/${encodeURIComponent(key)}`);
+export const dictionaryRecord = (strongs: string) => get<DictRecordDetail>(`/dictionary/record/${encodeURIComponent(strongs)}`);
+export const dictionaryOccurrences = (strongs: string, offset = 0) => get<DictOccurrences>(`/dictionary/record/${encodeURIComponent(strongs)}/occurrences?offset=${offset}&limit=25`);
 
 /** "H1254", "h430", "G3056" → the zero-padded id the provider uses ("H0430"), or null. */
 export function normaliseStrongs(input: string): string | null {

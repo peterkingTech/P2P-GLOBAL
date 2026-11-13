@@ -10,7 +10,7 @@ import { Attribution, OriginalText, PronounceButton, SectionTitle, StudyState } 
 import ListenPlayer from "@/components/listen/ListenPlayer";
 import { listen, useListenOwner } from "@/lib/listen";
 import { lexiconSections } from "@/lib/listen/studyContent";
-import { languageName, lexiconEntry, type LexiconEntry } from "@/lib/deepStudyApi";
+import { dictionaryRecord, languageName, lexiconEntry, type DictRecordDetail, type LexiconEntry } from "@/lib/deepStudyApi";
 import { bookByCode } from "@/lib/bibleReaderApi";
 
 // One lexicon entry (STEPBible brief lexicons) — the SAME record whether it was opened from a word in
@@ -33,6 +33,10 @@ export default function WordScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.strongs, p.book, p.chapter]);
   useEffect(load, [load]);
+  // The same record in the Biblical Dictionary: usage across the Bible and its headwords (optional extra —
+  // the entry above never depends on it).
+  const [across, setAcross] = useState<DictRecordDetail | null>(null);
+  useEffect(() => { setAcross(null); dictionaryRecord(String(p.strongs)).then(setAcross, () => setAcross(null)); }, [p.strongs]);
   // P2P Listen (the shared player): the entry read aloud — in English, as the lexicon is English.
   useListenOwner("study-word");
   const listenEntry = () => {
@@ -80,6 +84,7 @@ export default function WordScreen() {
             {d.entry.relatedStrongs.length ? (
               <View style={{ gap: 6 }}>
                 <SectionTitle>{t("deepStudy.relatedEntries", { defaultValue: "Related entries" })}</SectionTitle>
+                <Text style={s.meta}>{t("dictionary.relatedNote", { defaultValue: "Entries this definition refers to (for example a Hebrew or Aramaic counterpart). Being named here does not by itself mean the words share a root." })}</Text>
                 <View style={s.badges}>
                   {d.entry.relatedStrongs.map((r) => (
                     <TouchableOpacity key={r} onPress={() => open(r)} accessibilityRole="button" style={s.chip}><Text style={s.chipText}>{r}</Text></TouchableOpacity>
@@ -98,6 +103,24 @@ export default function WordScreen() {
                     <Text style={s.occGloss} numberOfLines={1}>{o.gloss ?? "—"}</Text>
                   </TouchableOpacity>
                 )) : <Text style={s.meta}>{t("deepStudy.notInChapter", { defaultValue: "Not used in this chapter." })}</Text>}
+              </View>
+            ) : null}
+            {across ? (
+              <View style={{ gap: 6 }}>
+                <SectionTitle>{t("dictionary.acrossBible", { defaultValue: "Across the Bible" })}</SectionTitle>
+                <Text style={s.meta}>{across.record.words ? t("dictionary.usage", { defaultValue: "{{words}} times in {{verses}} verses (every form, BSB interlinear)", words: across.record.words.toLocaleString(), verses: across.record.verses.toLocaleString() }) : t("dictionary.noOccurrences", { defaultValue: "No occurrences in the BSB interlinear." })}</Text>
+                {across.record.words ? <AppButton label={t("dictionary.allOccurrences", { defaultValue: "All occurrences" })} icon="list-outline" variant="secondary" size="sm"
+                  onPress={() => router.push({ pathname: "/dictionary/occurrences/[strongs]", params: { strongs: d.entry.id } } as any)} /> : null}
+                {across.terms.length ? (
+                  <View style={s.badges}>
+                    <Text style={s.meta}>{t("dictionary.inDictionary", { defaultValue: "In the dictionary:" })}</Text>
+                    {across.terms.map((x) => (
+                      <TouchableOpacity key={x.key} onPress={() => router.push({ pathname: "/dictionary/term/[key]", params: { key: x.key } } as any)} accessibilityRole="button" style={s.chip}>
+                        <Text style={s.chipText}>{x.display}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             ) : null}
             <Text style={s.note}>{d.note}</Text>

@@ -6,6 +6,8 @@ import {
 } from "../lib/bibleProviders/helloaoStudy";
 import { STUDY_RESOURCES, creditFor, directionFor, isEligible, languageLabel, originalDirection } from "../lib/studyResources";
 import { bookByCode } from "../lib/bibleReader";
+import { normaliseStrongs } from "../lib/bibleProviders/helloaoStudy";
+import { LETTERS, REFERENCE_SOURCES, browse, getDictionary, letterCounts, occurrencePage, recordView, search, termEntry } from "../lib/dictionary";
 
 // Deep Study, Commentaries and Study Tools — ONE set of study records for all three destinations in the
 // app (the same interlinear words, lexicon entries, commentary sections and cross references, by the same
@@ -200,6 +202,78 @@ router.get("/compare/:book/:chapter", async (req, res) => {
     }));
     return ok(res, { ...p, commentaries: results });
   } catch (e) { return fail(res, e); }
+});
+
+// ── Biblical Dictionary (A–Z) — the same Strong's-numbered lexical records (lib/dictionary.ts) ──
+//   GET /deep-study/dictionary                         — letters (real counts), sources, coverage
+//   GET /deep-study/dictionary/browse?letter&offset&limit
+//   GET /deep-study/dictionary/search?q&language&offset&limit
+//   GET /deep-study/dictionary/term/:key               — an English headword and every record behind it
+//   GET /deep-study/dictionary/record/:strongs         — one record's index data + its headwords
+//   GET /deep-study/dictionary/record/:strongs/occurrences?offset&limit — verses, with the word form in each
+const LEXICON_CREDIT = "The Translators Brief lexicons of Extended Strongs (TBESH and TBESG) are by STEPBible.org / Tyndale House, Cambridge, and are licensed under CC BY 4.0. Changes were made to the data to fit the Free Use Bible API format.";
+const BSB_CREDIT = "The Berean Standard Bible and its interlinear tables are in the public domain. Changes were made to the data to fit the Free Use Bible API format.";
+function dictionary(res: Response) {
+  try { return getDictionary(); }
+  catch { res.status(503).json({ error: "The dictionary isn't available right now.", kind: "unavailable" }); return null; }
+}
+const dictCredits = () => [creditFor("stepbible-lexicon", LEXICON_CREDIT), creditFor("bsb-interlinear", BSB_CREDIT)];
+const int = (v: unknown, d: number, max: number) => { const n = Number(v); return Number.isInteger(n) && n >= 0 ? Math.min(n, max) : d; };
+const dictLang = (v: unknown) => (["hebrew", "aramaic", "greek"].includes(String(v)) ? (String(v) as "hebrew" | "aramaic" | "greek") : null);
+
+router.get("/dictionary", (_req, res) => {
+  const d = dictionary(res); if (!d) return;
+  const languages = (["hebrew", "aramaic", "greek"] as const).map((l) => ({ language: l, records: [...d.records.values()].filter((r) => r.language === l).length }));
+  return ok(res, {
+    letters: letterCounts(d), terms: d.sorted.length, records: d.records.size, languages,
+    builtAt: d.header.builtAt, datasets: d.header.datasets.map((x) => ({ id: x.id, version: x.sha256.slice(0, 16) })),
+    referenceSources: REFERENCE_SOURCES, credits: dictCredits(),
+    note: "Headwords are the English glosses of the STEPBible brief lexicons. A gloss is a short meaning, not a full interpretation: each original word keeps its own entry, and its meaning in a verse depends on the verse.",
+  });
+});
+router.get("/dictionary/browse", (req, res) => {
+  const d = dictionary(res); if (!d) return;
+  const letter = String(req.query.letter ?? "A").toUpperCase();
+  if (!LETTERS.includes(letter)) return res.status(400).json({ error: "Choose a letter.", kind: "bad_request" });
+  return ok(res, browse(d, letter, int(req.query.offset, 0, 100000), int(req.query.limit, 50, 100) || 50));
+});
+router.get("/dictionary/search", (req, res) => {
+  const d = dictionary(res); if (!d) return;
+  return ok(res, search(d, String(req.query.q ?? ""), { language: dictLang(req.query.language), offset: int(req.query.offset, 0, 100000), limit: int(req.query.limit, 30, 50) || 30 }));
+});
+router.get("/dictionary/term/:key", (req, res) => {
+  const d = dictionary(res); if (!d) return;
+  const t = termEntry(d, String(req.params.key).slice(0, 60));
+  if (!t) return res.status(404).json({ error: "That word isn't in the dictionary.", kind: "not_found" });
+  return ok(res, { ...t, credits: dictCredits(),
+    renderedNote: "Also translated with this word in the Berean Standard Bible: these original words have other dictionary meanings, but the BSB renders them this way in some verses." });
+});
+router.get("/dictionary/record/:strongs", (req, res) => {
+  const d = dictionary(res); if (!d) return;
+  const s = normaliseStrongs(String(req.params.strongs)); const r = s ? d.records.get(s.id) : null;
+  if (!r) return res.status(404).json({ error: "This Strong's number has no entry in the brief lexicons.", kind: "not_found" });
+  const terms = d.sorted.filter((t) => t.ids.includes(r.id)).map((t) => ({ key: t.key, display: t.display }));
+  return ok(res, { record: recordView(r), terms, credits: dictCredits(),
+    countsNote: "Counts come from the BSB interlinear: every word tagged with this Strong's number, in any form. They are not counts of an English word in any one translation." });
+});
+router.get("/dictionary/record/:strongs/occurrences", async (req, res) => {
+  const d = dictionary(res); if (!d) return;
+  const s = normaliseStrongs(String(req.params.strongs));
+  const page = s ? occurrencePage(d, s.id, int(req.query.offset, 0, 100000), int(req.query.limit, 25, 50) || 25) : null;
+  if (!page) return res.status(404).json({ error: "This Strong's number has no entry in the brief lexicons.", kind: "not_found" });
+  // The word form in each verse, from the same (cached) interlinear chapters Deep Study uses.
+  const chapters = new Map<string, Awaited<ReturnType<typeof getInterlinear>> | null>();
+  for (const it of page.items) {
+    const k = `${it.book}.${it.chapter}`;
+    if (!chapters.has(k)) chapters.set(k, await getInterlinear(it.book, it.chapter).catch(() => null));
+  }
+  const items = page.items.map((it) => {
+    const ch = chapters.get(`${it.book}.${it.chapter}`);
+    const words = ch ? ch.verses.find((v) => v.verse === it.verse)?.words.filter((w) => w.strongs === page.id) ?? [] : null;
+    return { ...it, bookName: bookByCode(it.book)?.name ?? it.book, forms: words?.map((w) => ({ wordId: w.id, text: w.text, transliteration: w.transliteration, parsing: w.parsing, gloss: w.gloss, language: w.language })) ?? null };
+  });
+  return ok(res, { ...page, items, credits: dictCredits(),
+    note: "Each verse where this lemma appears in the BSB interlinear, with the actual word form used there." });
 });
 
 export default router;
