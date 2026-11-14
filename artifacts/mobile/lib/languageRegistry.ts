@@ -117,14 +117,16 @@ export const LANGUAGES: LanguageEntry[] = [
   L("arc", "ארמית", "Aramaic", null, ["aramaic", "tmr", "syc"], { rtl: true, review: true }),
 ];
 
-/** Mappings the owner should confirm (shown in the report and kept here so the reason travels with the code). */
+/** Mappings that were a judgement call, with the reason (it travels with the code). All six were reviewed and
+ *  CONFIRMED by the owner on 2026-11-14 ("keep them all") — change them only with the owner's decision. */
+export const MAPPINGS_CONFIRMED_ON = "2026-11-14";
 export const REVIEW_NOTES: Record<string, string> = {
-  en: "English: the app previously showed 🇺🇸 (copied from p2p_languages.flag_emoji); the brief asks for 🇬🇧. Now 🇬🇧 everywhere; the database column is unchanged (no data change).",
-  pt: "Portuguese: previously 🇧🇷 (database column); the brief asks for 🇵🇹. Now 🇵🇹; most Portuguese speakers are in Brazil — confirm.",
-  "zh-TW": "Traditional Chinese: 🇹🇼 kept from the existing app; used in Taiwan, Hong Kong and Macau — confirm the representative flag.",
-  he: "Hebrew: 🇮🇱 per the brief. The Dictionary/Lexicon 'Hebrew' filter means Biblical Hebrew, which uses the same entry — confirm a modern national flag is wanted there.",
-  pa: "Punjabi: 🇮🇳 (Gurmukhi script, as in the unused locale file); widely spoken in Pakistan in Shahmukhi script — confirm.",
-  arc: "Aramaic: no country can stand for it (an ancient language with modern Neo-Aramaic communities in several countries). No flag shown — confirm, or choose one.",
+  en: "English: 🇬🇧 (the app previously showed 🇺🇸, copied from p2p_languages.flag_emoji; that database column is unchanged and unused). Confirmed by the owner.",
+  pt: "Portuguese: 🇵🇹 (previously 🇧🇷; most Portuguese speakers are in Brazil). Confirmed by the owner.",
+  "zh-TW": "Traditional Chinese: 🇹🇼 (also used in Hong Kong and Macau). Confirmed by the owner.",
+  he: "Hebrew: 🇮🇱, also shown on the Dictionary/Lexicon 'Hebrew' (Biblical Hebrew) filter. Confirmed by the owner.",
+  pa: "Punjabi: 🇮🇳 (Gurmukhi script; also widely spoken in Pakistan in Shahmukhi script). Confirmed by the owner.",
+  arc: "Aramaic: no flag — no country can stand for an ancient language with Neo-Aramaic communities in several countries. Confirmed by the owner.",
 };
 
 // ── Lookup ──
