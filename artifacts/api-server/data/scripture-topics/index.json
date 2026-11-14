@@ -1,0 +1,58 @@
+{
+  "about": "P2P Global — Explore Scripture by Topic: editorial collection (references only, never Bible text). Every new topic and passage here is a PROPOSAL with status needs_review until a P2P editor approves it. Existing published topics are matched by title and never renamed, reordered or removed. Passage format: 'Book Chapter:Start-End | short editorial title | kind | optional context note'. kind: teaching · promise · prayer · example · prophecy · wisdom · praise.",
+  "status": "needs_review",
+  "categories": [
+    { "key": "knowing_god", "title": "Knowing God and His Word" },
+    { "key": "identity", "title": "Christian Identity and New Life" },
+    { "key": "spiritual_life", "title": "Prayer and Spiritual Life" },
+    { "key": "character", "title": "Character and Christian Living" },
+    { "key": "relationships", "title": "Relationships and Family" },
+    { "key": "difficult_seasons", "title": "Difficult Seasons" },
+    { "key": "discipleship", "title": "Discipleship, Church and Ministry" },
+    { "key": "work_society", "title": "Work, Society and Daily Life" },
+    { "key": "hope", "title": "God's Promises and Biblical Hope" }
+  ],
+  "existingTopicCategories": {
+    "Calling": "discipleship", "Comfort": "difficult_seasons", "Discipleship": "discipleship", "Evangelism": "discipleship",
+    "Faith": "spiritual_life", "Family": "relationships", "Fear & Anxiety": "difficult_seasons", "Forgiveness": "character",
+    "Freedom": "identity", "God's Character": "knowing_god", "God's Presence": "knowing_god", "God's Promises": "hope",
+    "God's Will": "knowing_god", "Grace": "identity", "Gratitude": "spiritual_life", "Grief": "difficult_seasons",
+    "Guidance": "spiritual_life", "Healing": "difficult_seasons", "Holiness": "character", "Hope": "hope",
+    "Identity in Christ": "identity", "Joy": "spiritual_life", "Leadership": "discipleship", "Loneliness": "difficult_seasons",
+    "Love": "character", "Missions": "discipleship", "Obedience": "character", "Peace": "spiritual_life",
+    "Perseverance": "difficult_seasons", "Protection": "hope", "Provision": "hope", "Relationships": "relationships",
+    "Rest": "spiritual_life", "Salvation": "identity", "Spiritual Growth": "identity", "Strength": "difficult_seasons",
+    "Temptation": "character", "The Church": "discipleship", "Trust": "spiritual_life", "Unity": "relationships",
+    "Waiting on God": "spiritual_life", "Wisdom": "character"
+  },
+  "consolidated": {
+    "note": "Candidate topics from the brief that duplicate or merely rename an existing topic were not added as new topics.",
+    "intoExisting": {
+      "Gratitude": ["Thanksgiving"], "Waiting on God": ["Waiting and Patience", "Waiting for Breakthrough"], "God's Presence": ["God's Presence in Trials"],
+      "Protection": ["God's Protection"], "Provision": ["God's Provision", "God's Help in Times of Need"], "Guidance": ["God's Guidance", "Making Wise Decisions", "Facing Difficult Decisions", "Ethical Decisions"],
+      "Peace": ["God's Peace"], "Strength": ["God's Strength", "Overcoming Obstacles"], "Spiritual Growth": ["Spiritual Maturity", "Transformation"], "Freedom": ["Freedom from Sin"],
+      "Unity": ["Unity in the Church", "Unity among Believers", "Unity in the Family"], "Grief": ["Loss and Bereavement", "Regret"], "Comfort": ["God's Comfort in Suffering"],
+      "Hope": ["Hope in Difficult Seasons", "The Hope of Glory"], "Perseverance": ["Endurance in Hard Times"], "Discipleship": ["Following Jesus"], "Evangelism": ["Preaching the Gospel"],
+      "Missions": ["The Mission of the Church", "Church Growth"], "Rest": ["Rest and Sabbath"], "Forgiveness": ["Forgiving Others"], "Trust": ["Dependence on God", "Uncertainty"],
+      "God's Character": ["God's Holiness", "God's Wisdom", "The Works of God"], "Leadership": ["Church Leadership", "Leadership in Society"], "God's Promises": ["The Faithfulness of God's Promises"],
+      "Holiness": ["Righteous Living"], "The Church": ["The Body of Christ"], "Love": ["Love and Commitment"]
+    },
+    "mergedNew": {
+      "Knowing God": ["Knowing God", "The Father", "Intimacy with God"], "God's Faithfulness": ["God's Faithfulness", "God's Faithfulness in Every Generation"], "God's Kingdom": ["God's Kingdom", "The Kingdom of Heaven"],
+      "God's Word": ["God's Word", "God's Truth", "Studying God's Word"], "The Holy Spirit": ["The Holy Spirit", "The Promise of the Holy Spirit", "Living by the Spirit"],
+      "New Creation": ["New Creation", "Born Again", "Life in Christ", "Transformation"], "Adoption into God's Family": ["Adoption into God's Family", "Children of God"],
+      "Justification by Faith": ["Righteousness", "Justification"], "Worship and Praise": ["Worship", "Praise"], "Hearing God": ["Knowing God's Voice", "Hearing and Obeying God"],
+      "Seeking God": ["Seeking God", "Walking with God"], "Spiritual Warfare": ["Spiritual Warfare", "Putting on the Armour of God"], "Integrity": ["Integrity", "Honesty", "Integrity at Work"],
+      "Self-Control": ["Self-Control", "Discipline"], "Kindness and Compassion": ["Kindness", "Compassion", "Gentleness"], "Generosity": ["Generosity", "Giving and Generosity"],
+      "Courage": ["Courage", "Boldness"], "Diligence": ["Diligence", "Working with Excellence", "Faithfulness in Small Things"], "Serving Others": ["Serving Others", "Serving One Another", "Selflessness"],
+      "Marriage": ["Marriage", "Husband and Wife"], "Parenting": ["Parenting", "Children", "Raising Children"], "Christian Fellowship": ["Christian Fellowship"],
+      "Conflict and Reconciliation": ["Conflict Resolution", "Reconciliation (between people)", "Respect"], "Encouraging One Another": ["Encouraging Others", "Mentoring and Encouragement"],
+      "Caring for the Poor and Vulnerable": ["Caring for the Poor", "Helping the Needy", "Caring for the Vulnerable", "Mercy"], "Trials and Testing": ["Trials"],
+      "Persecution": ["Persecution", "Persecution of the Church"], "Discouragement": ["Discouragement", "Disappointment"], "Shame and Guilt": ["Shame", "Guilt"], "Anger and Bitterness": ["Anger", "Bitterness"],
+      "Making Disciples": ["The Great Commission", "Making Disciples"], "Teaching and Equipping": ["Teaching God's Word", "Equipping Believers"], "Serving in the Church": ["Serving in the Church", "Faithful Ministry"],
+      "Money and Possessions": ["Money and Finances", "Debt and Stewardship"], "Authority and Citizenship": ["Respect for Authority", "Citizenship"], "Time and Planning": ["Time Management", "Planning and Preparation"],
+      "Controlling the Tongue": ["Controlling the Tongue", "Wisdom in Speech"], "Resurrection": ["Resurrection", "The Resurrection of the Dead"], "The Return of Christ": ["The Return of Christ", "The Second Coming of Jesus", "The Day of the Lord"],
+      "Reconciliation with God": ["Reconciliation (with God)"], "Humility": ["Humility", "The Mind of Christ"]
+    }
+  }
+}

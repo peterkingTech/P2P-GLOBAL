@@ -1,4 +1,4 @@
-// HOW AN APPLE TREE GROWS — the apple tree's natural lifecycle, shown with the owner's Meshy models
+// The apple tree's complete natural lifecycle (used by HOW MY TREE GROWS, app/botanical) with the owner's Meshy models
 // (registry: lib/growthTreeAssets.ts BOTANICAL_REGISTRY). Teaching only: these phases are what any apple
 // tree goes through in a year. They are NOT participant stages, never applied to a person's tree on a
 // schedule, and never count toward anything. Seasons (dormant bud, June drop, autumn leaf) are nature's

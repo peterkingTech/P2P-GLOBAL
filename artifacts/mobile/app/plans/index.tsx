@@ -1,892 +1,159 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  ActivityIndicator,
-  Modal,
-  LayoutChangeEvent,
-} from "react-native";
-import { Stack, useRouter, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
-import ViewShot from "react-native-view-shot";
-import * as Sharing from "expo-sharing";
-import { useAuth, supabase } from "@/contexts/AuthContext";
-import { useData, Plan, PlanCategory, PlanSearchResult, PlanWithCategory } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { AppColors } from "@/constants/themes";
-import { getApiUrl } from "@/lib/apiUrl";
-import { getPlanCategoryMeta } from "@/lib/planCategories";
-import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
-import { ResponsiveGrid } from "@/components/ResponsiveGrid";
-import { AppButton } from "@/components/ui";
-import { showAlert } from "@/lib/alerts";
+import type { AppColors } from "@/constants/themes";
+import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
+import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
+import { getMyPlans, getPlans, type FocusType, type MyPlans, type PlanCard, type RunItem } from "@/lib/studyPlansApi";
+import { FOCUS_TYPES, dueKey, filterPlans, shelves, todayIso } from "@/lib/studyPlansUi";
 
-type PlansTab = "my" | "find" | "saved" | "completed";
-type FindSubTab = "categories" | "az" | "search";
+// P2P PLANS — HOME (owner brief 2026-11-14). One plan system: continue your plans, explore (search, focus
+// filter, discovery collections — shelves, not separate systems), and My Plans (active, paused, completed,
+// created by me, saved, together). The Learning Centre's topic plans keep their own browser
+// (/plans/learning, unchanged). No streaks, no "late", no points.
+type MineTab = "active" | "paused" | "completed" | "created" | "saved" | "together";
+const MINE_TABS: MineTab[] = ["active", "paused", "completed", "created", "saved", "together"];
 
-type ActivePlan = Plan & { progressPercent: number; lastActivityAt: string | null };
-type SavedPlan = Plan & { savedAt: string | null };
-type CompletedPlan = Plan & { completedAt: string | null };
-
-const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-
-
-// The 10 top-level plan category collections (p2p_curriculums rows with
-// type='plan_category', see migration 054_plan_categories.sql) — id/
-// planCount/description are fetched live via DataContext's planCategories
-// (the database is authoritative for those); label/icon/color/order come
-// from the shared PLAN_CATEGORIES constant (lib/planCategories.ts) so
-// they're defined in exactly one place across the app.
-//
-// Restored two-column colored card (the original Plan Collections
-// presentation) — deliberately NOT the photo-split card pattern used by
-// Foundations/Curriculum: a solid category-color background, emoji, title,
-// and plan count only. No image/photo column, no aspect-ratio or percentage-
-// height container, nothing that depends on useCardPhotoWidth() — the card's
-// size is fully determined by its own fixed layout (width: "48%" of the
-// grid row below, minHeight for consistent row heights), so there is no
-// path back to the blank-card/narrow-media-strip failure mode that pattern
-// produced.
-function CategoryCard({ category, colors, onPress }: { category: PlanCategory; colors: AppColors; onPress: () => void }) {
-  const styles = makeStyles(colors);
-  const meta = getPlanCategoryMeta(category.category);
-  const color = meta?.color ?? category.colorTheme;
-  const emoji = meta?.icon ?? "📖";
-  const title = meta?.label ?? category.title;
-  const countLabel = `${category.planCount} plan${category.planCount === 1 ? "" : "s"}`;
-  return (
-    <TouchableOpacity
-      style={[styles.categoryCard, { backgroundColor: color }]}
-      activeOpacity={0.85}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${title}. ${countLabel}. Tap to open.`}
-    >
-      <Text style={styles.categoryCardEmoji}>{emoji}</Text>
-      <View style={styles.categoryCardTextCol}>
-        <Text style={styles.categoryCardTitle} numberOfLines={2}>{title}</Text>
-        <Text style={styles.categoryCardCount}>{countLabel}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// Shared row for the A-Z list and Search Results — both show a plan's
-// title, its category (colored dot + name), and lock status.
-function PlanListRow({
-  title, categoryTitle, categoryColorTheme, locked, unlockMessage, onPress,
-}: {
-  title: string; categoryTitle: string | null; categoryColorTheme: string;
-  locked: boolean; unlockMessage: string | null; onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity accessibilityRole="button"
-      style={[styles.azRow, locked && styles.azRowLocked]}
-      activeOpacity={0.85}
-      onPress={() => (locked ? showAlert("Plan Locked", unlockMessage ?? "Complete the previous plan first to access this plan.") : onPress())}
-    >
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.azRowTitle, locked && styles.azRowTitleLocked]} numberOfLines={1}>{title}</Text>
-        {categoryTitle && (
-          <View style={styles.azRowCategoryRow}>
-            <View style={[styles.azRowDot, { backgroundColor: categoryColorTheme }]} />
-            <Text style={styles.azRowCategoryText}>{categoryTitle}</Text>
-          </View>
-        )}
-      </View>
-      <Ionicons name={locked ? "lock-closed" : "chevron-forward"} size={16} color={locked ? colors.textMuted : colors.textMuted} />
-    </TouchableOpacity>
-  );
-}
-
-const FORMAT_LABELS: Record<string, string> = {
-  solo: "Solo",
-  "peer-guide": "With Peer Guide",
-  "peer_guide": "With Peer Guide",
-  group: "Group Circle",
-  "group-circle": "Group Circle",
-};
-
-function formatBadgeFromTags(tags: string[]): string | null {
-  for (const tag of tags) {
-    const key = tag.toLowerCase().trim();
-    if (FORMAT_LABELS[key]) return FORMAT_LABELS[key];
-  }
-  return null;
-}
-
-// ── Shared plan card ─────────────────────────────────────────────────────────
-function PlanCard({
-  plan,
-  colors,
-  progressPercent,
-  subLine,
-  categoryLabel,
-  isSaved,
-  onToggleSave,
-  primaryLabel,
-  onPrimary,
-  secondaryLabel,
-  onSecondary,
-  onPress,
-}: {
-  plan: Plan;
-  colors: AppColors;
-  progressPercent?: number;
-  subLine?: string;
-  // Which of the 10 plan-category collections this plan belongs to — shown
-  // as "Category · Title" so an enrolled plan in My Plans carries context of
-  // which collection it's from (see migration 054_plan_categories.sql).
-  categoryLabel?: string;
-  isSaved?: boolean;
-  onToggleSave?: () => void;
-  primaryLabel?: string;
-  onPrimary?: () => void;
-  secondaryLabel?: string;
-  onSecondary?: () => void;
-  onPress: () => void;
-}) {
-  const styles = makeStyles(colors);
-  const [imgErr, setImgErr] = useState(false);
-  const format = formatBadgeFromTags(plan.tags);
-
-  return (
-    <TouchableOpacity accessibilityRole="button" style={styles.planCard} activeOpacity={0.88} onPress={onPress}>
-      <View style={styles.planCardTop}>
-        {plan.coverImageUrl && !imgErr ? (
-          <Image source={{ uri: plan.coverImageUrl }} style={styles.planCardImg} resizeMode="cover" onError={() => setImgErr(true)} />
-        ) : (
-          <View style={[styles.planCardImg, styles.planCardImgPlaceholder, { backgroundColor: `${plan.colorTheme}1A` }]}>
-            <Ionicons name="book-outline" size={26} color={plan.colorTheme} />
-          </View>
-        )}
-        {onToggleSave && (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={isSaved ? "Remove from saved" : "Save"} accessibilityState={{ selected: !!isSaved }}
-            style={styles.bookmarkBtn}
-            onPress={(e) => { e.stopPropagation?.(); onToggleSave(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={18} color={isSaved ? colors.accentGreen : "#fff"} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.planCardBody}>
-        <Text style={styles.planCardTitle} numberOfLines={2}>
-          {categoryLabel ? `${categoryLabel} · ${plan.title}` : plan.title}
-        </Text>
-        {plan.teachingCreditName && (
-          <Text style={styles.planCardCredit} numberOfLines={1}>{plan.teachingCreditName}</Text>
-        )}
-        {subLine && <Text style={styles.planCardSub} numberOfLines={1}>{subLine}</Text>}
-
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, { borderColor: plan.colorTheme }]}>
-            <Text style={[styles.badgeText, { color: plan.colorTheme }]}>{plan.difficultyLevel}</Text>
-          </View>
-          {plan.estimatedWeeks ? (
-            <View style={styles.badgeMuted}>
-              <Text style={styles.badgeMutedText}>{plan.estimatedWeeks} wk{plan.estimatedWeeks === 1 ? "" : "s"}</Text>
-            </View>
-          ) : null}
-          {format ? (
-            <View style={styles.badgeMuted}>
-              <Text style={styles.badgeMutedText}>{format}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {typeof progressPercent === "number" && (
-          <View style={styles.progressRow}>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${progressPercent}%` as any, backgroundColor: progressPercent === 100 ? colors.accentGreen : colors.amber }]} />
-            </View>
-            <Text style={styles.progressPctText}>{progressPercent}%</Text>
-          </View>
-        )}
-
-        <View style={styles.cardActionsRow}>
-          {primaryLabel && onPrimary && (
-            <AppButton label={`${primaryLabel}`} onPress={(e) => { e.stopPropagation?.(); onPrimary(); }} style={{ flex: 1 }} />
-          )}
-          {secondaryLabel && onSecondary && (
-            <AppButton label={`${secondaryLabel}`} onPress={(e) => { e.stopPropagation?.(); onSecondary(); }} variant="outline" style={{ flex: 1 }} />
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function EmptyState({ colors, icon, text, actionLabel, onAction }: { colors: AppColors; icon: keyof typeof Ionicons.glyphMap; text: string; actionLabel?: string; onAction?: () => void }) {
-  const styles = makeStyles(colors);
-  return (
-    <View style={styles.emptyState}>
-      <Ionicons name={icon} size={36} color={colors.textMuted} />
-      <Text style={styles.emptyStateText}>{text}</Text>
-      {actionLabel && onAction && (
-        <AppButton label={`${actionLabel}`} onPress={onAction} style={{ marginTop: 4 }} />
-      )}
-    </View>
-  );
-}
-
-// ── Plan completion share modal (Completed tab) ─────────────────────────────
-function PlanCompletionShareModal({ plan, completedAt, onClose }: { plan: CompletedPlan; completedAt: string | null; onClose: () => void }) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const { screenWidth } = useLayout();
-  const shotRef = useRef<ViewShot>(null);
-  const [busy, setBusy] = useState(false);
-  // Bounded responsive width — fits comfortably on a 320px phone (was a
-  // flat 280, only 20px of breathing room either side) without letting the
-  // shareable card balloon on a tablet.
-  const cardWidth = Math.min(screenWidth - 48, 320);
-  const dateLabel = completedAt
-    ? new Date(completedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
-    : new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-
-  async function handleShare() {
-    setBusy(true);
-    try {
-      const uri = await shotRef.current?.capture?.();
-      if (!uri) throw new Error("Could not capture the card");
-      const available = await Sharing.isAvailableAsync();
-      if (!available) return;
-      await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your completion" });
-    } catch {
-      // Non-critical — sharing is a bonus action, not a core flow.
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal visible animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
-      <View style={styles.shareOverlay}>
-        <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" style={styles.shareCloseBtn} onPress={onClose} hitSlop={12}>
-          <Ionicons name="close" size={24} color="#fff" />
-        </TouchableOpacity>
-        <ViewShot ref={shotRef} options={{ format: "png", quality: 1 }}>
-          <View style={[styles.shareCard, { width: cardWidth, borderColor: `${plan.colorTheme}66` }]}>
-            <View style={[styles.shareBadge, { backgroundColor: plan.colorTheme }]}>
-              <Ionicons name="checkmark" size={22} color="#fff" />
-            </View>
-            <Text style={styles.shareTitle}>{plan.title}</Text>
-            <Text style={styles.shareSubtitle}>Completed</Text>
-            <Text style={styles.shareDate}>{dateLabel}</Text>
-          </View>
-        </ViewShot>
-        <AppButton label="Share" onPress={handleShare} icon="share-outline" disabled={busy} loading={busy} style={{ marginTop: 24 }} />
-      </View>
-    </Modal>
-  );
-}
-
-export default function PlansHubScreen() {
-  const insets = useSafeAreaInsets();
-  const { contentMaxWidth } = useLayout();
+function PlansHome() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
-  const { profile } = useAuth();
-  const { plans: allPlans, getPlanProgress, planCategories, loadPlanCategories, searchPlans, getAllPlansAZ } = useData();
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
+  const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const [plans, setPlans] = useState<PlanCard[] | null>(null);
+  const [mine, setMine] = useState<MyPlans | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [focus, setFocus] = useState<FocusType | null>(null);
+  const [together, setTogether] = useState(false);
+  const [tab, setTab] = useState<MineTab>("active");
+  const load = useCallback(() => {
+    setError(null);
+    Promise.all([getPlans(), getMyPlans()]).then(([p, m]) => { setPlans(p.plans); setMine(m); }, (e) => setError(e?.status === 503 ? t("p2pPlans.notAvailable") : e?.message ?? t("p2pPlans.notAvailable")));
+  }, [t]);
+  useFocusEffect(load);
+  const today = todayIso();
+  const filtering = !!q.trim() || !!focus || together;
+  const results = plans ? filterPlans(plans, { q, focus, together }) : [];
+  const open = (id: string) => router.push({ pathname: "/study-plan/[id]", params: { id } } as any);
+  const sessionsLabel = (p: PlanCard) => (p.derived ? t("p2pPlans.sessionsFollowCurriculum") : t("p2pPlans.sessions", { count: p.sessionCount ?? 0 }));
+  const badge = (p: PlanCard) => (p.official ? t("p2pPlans.official") : t("p2pPlans.yourPlan"));
 
-  const initialTab: PlansTab = params.tab === "find" || params.tab === "saved" || params.tab === "completed" ? (params.tab as PlansTab) : "my";
-  const [tab, setTab] = useState<PlansTab>(initialTab);
-
-  // My Plans state
-  const [activePlans, setActivePlans] = useState<ActivePlan[]>([]);
-  const [myPlansLoading, setMyPlansLoading] = useState(true);
-
-  // Saved state
-  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([]);
-  const [savedLoading, setSavedLoading] = useState(true);
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-
-  // Completed state
-  const [completedPlans, setCompletedPlans] = useState<CompletedPlan[]>([]);
-  const [completedLoading, setCompletedLoading] = useState(true);
-  const [shareTarget, setShareTarget] = useState<CompletedPlan | null>(null);
-
-  // Find Plans state
-  const [search, setSearch] = useState("");
-  const [findSubTab, setFindSubTab] = useState<FindSubTab>("categories");
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [azPlans, setAzPlans] = useState<PlanWithCategory[]>([]);
-  const [azLoading, setAzLoading] = useState(false);
-  const [azLoaded, setAzLoaded] = useState(false);
-  const [searchResults, setSearchResults] = useState<PlanSearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const azScrollRef = useRef<ScrollView>(null);
-  const letterOffsets = useRef<Record<string, number>>({});
-
-  const loadMyPlans = useCallback(async () => {
-    if (!profile?.id) return;
-    setMyPlansLoading(true);
-    try {
-      const res = await fetch(`${getApiUrl()}/plans/active/${profile.id}`);
-      const data = (await res.json()) as ActivePlan[];
-      setActivePlans(Array.isArray(data) ? data : []);
-    } catch {
-      setActivePlans([]);
-    } finally {
-      setMyPlansLoading(false);
-    }
-  }, [profile?.id]);
-
-  // Enroll — first time through, route via the pre-plan goal questions
-  // (Prompt 3); once a p2p_plan_enrollments row already exists, skip
-  // straight to the plan itself.
-  const goToPlanOrQuestions = useCallback(async (planId: string) => {
-    if (!profile?.id) { router.push(`/plan/${planId}` as any); return; }
-    const { data } = await supabase
-      .from("p2p_plan_enrollments")
-      .select("id")
-      .eq("user_id", profile.id)
-      .eq("plan_id", planId)
-      .maybeSingle();
-    if (data) router.push(`/plan/${planId}` as any);
-    else router.push(`/plans/pre-plan-questions?planId=${planId}` as any);
-  }, [profile?.id, router]);
-
-  const loadSaved = useCallback(async () => {
-    if (!profile?.id) return;
-    setSavedLoading(true);
-    try {
-      const res = await fetch(`${getApiUrl()}/plans/saved/${profile.id}`);
-      const data = (await res.json()) as SavedPlan[];
-      setSavedPlans(Array.isArray(data) ? data : []);
-      setSavedIds(new Set((Array.isArray(data) ? data : []).map((p) => p.id)));
-    } catch {
-      setSavedPlans([]);
-    } finally {
-      setSavedLoading(false);
-    }
-  }, [profile?.id]);
-
-  const loadCompleted = useCallback(async () => {
-    if (!profile?.id) return;
-    setCompletedLoading(true);
-    try {
-      const res = await fetch(`${getApiUrl()}/plans/completed/${profile.id}`);
-      const data = (await res.json()) as CompletedPlan[];
-      setCompletedPlans(Array.isArray(data) ? data : []);
-    } catch {
-      setCompletedPlans([]);
-    } finally {
-      setCompletedLoading(false);
-    }
-  }, [profile?.id]);
-
-  const loadCategories = useCallback(async () => {
-    setCategoriesLoading(true);
-    await loadPlanCategories();
-    setCategoriesLoading(false);
-  }, [loadPlanCategories]);
-
-  const loadAz = useCallback(async () => {
-    setAzLoading(true);
-    try {
-      const data = await getAllPlansAZ();
-      setAzPlans(data);
-      setAzLoaded(true);
-    } finally {
-      setAzLoading(false);
-    }
-  }, [getAllPlansAZ]);
-
-  useEffect(() => { loadMyPlans(); }, [loadMyPlans]);
-  useEffect(() => { loadSaved(); }, [loadSaved]);
-  useEffect(() => { loadCompleted(); }, [loadCompleted]);
-  useEffect(() => { loadCategories(); }, [loadCategories]);
-
-  // Load the A-Z list lazily, the first time that sub-tab is opened.
-  useEffect(() => {
-    if (findSubTab === "az" && !azLoaded && !azLoading) loadAz();
-  }, [findSubTab, azLoaded, azLoading, loadAz]);
-
-  // 300ms-debounced server search — jumps to the Search Results sub-tab the
-  // moment text appears, and returns to Categories once it's cleared.
-  useEffect(() => {
-    const q = search.trim();
-    if (!q) {
-      setSearchResults([]);
-      setFindSubTab((prev) => (prev === "search" ? "categories" : prev));
-      return;
-    }
-    setFindSubTab("search");
-    setSearchLoading(true);
-    const timer = setTimeout(async () => {
-      const results = await searchPlans(q);
-      setSearchResults(results);
-      setSearchLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search, searchPlans]);
-
-  function scrollToLetter(letter: string) {
-    const y = letterOffsets.current[letter];
-    if (y !== undefined) azScrollRef.current?.scrollTo({ y, animated: true });
-  }
-
-  async function toggleSave(planId: string) {
-    if (!profile?.id) return;
-    const isSaved = savedIds.has(planId);
-    setSavedIds((prev) => {
-      const next = new Set(prev);
-      if (isSaved) next.delete(planId); else next.add(planId);
-      return next;
-    });
-    try {
-      if (isSaved) {
-        await fetch(`${getApiUrl()}/plans/${planId}/save?userId=${profile.id}`, { method: "DELETE" });
-      } else {
-        await fetch(`${getApiUrl()}/plans/${planId}/save`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: profile.id }),
-        });
-      }
-      loadSaved();
-    } catch {
-      // Revert optimistic toggle on failure
-      setSavedIds((prev) => {
-        const next = new Set(prev);
-        if (isSaved) next.add(planId); else next.delete(planId);
-        return next;
-      });
-    }
-  }
-
-  // A topic plan's category slug lives in tags[0] (see migration
-  // 054_plan_categories.sql) — same convention already used everywhere else
-  // in this file for tag-based lookups.
-  const categoryTitleBySlug = new Map(planCategories.filter((c) => c.category).map((c) => [c.category as string, c.title]));
-  function categoryLabelFor(plan: Plan): string | undefined {
-    return plan.tags[0] ? categoryTitleBySlug.get(plan.tags[0]) : undefined;
-  }
-
-  const now = Date.now();
-  const recentActive = activePlans.filter((p) => p.lastActivityAt && now - new Date(p.lastActivityAt).getTime() < FOURTEEN_DAYS_MS);
-  const staleEnrolled = activePlans.filter((p) => !p.lastActivityAt || now - new Date(p.lastActivityAt).getTime() >= FOURTEEN_DAYS_MS);
-
-  const recommended = allPlans.filter((p) => p.isFeatured).slice(0, 6);
-
-  // Grid order follows PLAN_CATEGORIES' canonical `order`, not whatever
-  // order the API happened to return (though in practice they already
-  // agree, since display_order in the DB was seeded to match).
-  const orderedCategories = [...planCategories].sort(
-    (a, b) => (getPlanCategoryMeta(a.category)?.order ?? 99) - (getPlanCategoryMeta(b.category)?.order ?? 99)
+  const Card = ({ p }: { p: PlanCard }) => (
+    <TouchableOpacity style={s.card} onPress={() => open(p.id)} accessibilityRole="button" accessibilityLabel={`${p.title}. ${t(`p2pPlans.focus.${p.focusType}`)}: ${p.focusLabel}. ${sessionsLabel(p)}. ${badge(p)}`}>
+      <Text style={s.kicker}>{t(`p2pPlans.focus.${p.focusType}`)} · {p.focusLabel}</Text>
+      <Text style={s.cardTitle}>{p.title}</Text>
+      {p.description ? <Text style={s.small} numberOfLines={2}>{p.description}</Text> : null}
+      <View style={s.metaRow}>
+        <Text style={s.pill}>{sessionsLabel(p)}</Text>
+        <Text style={[s.pill, p.official ? s.pillOfficial : null]}>{badge(p)}</Text>
+        {p.saved ? <Text style={s.pill}>{t("p2pPlans.detail.saved")}</Text> : null}
+      </View>
+    </TouchableOpacity>
   );
-
-  // Group the A-Z list by first letter for the alphabet-strip index.
-  const azGroups: { letter: string; plans: PlanWithCategory[] }[] = [];
-  for (const letter of ALPHABET) {
-    const inLetter = azPlans.filter((p) => p.title.trim().charAt(0).toUpperCase() === letter);
-    if (inLetter.length) azGroups.push({ letter, plans: inLetter });
-  }
-  const availableLetters = new Set(azGroups.map((g) => g.letter));
+  const RunCard = ({ i }: { i: RunItem }) => {
+    const due = i.current ? dueKey(i.current.dueDate, today) : null;
+    return (
+      <TouchableOpacity style={s.card} onPress={() => open(i.plan.id)} accessibilityRole="button"
+        accessibilityLabel={`${i.plan.title}. ${t("p2pPlans.progress", { completed: i.progress.completed, total: i.progress.total })}. ${t(`p2pPlans.mode.${i.run.mode}`)}`}>
+        <View style={s.rowBetween}>
+          <Text style={s.kicker}>{i.plan.focusLabel}</Text>
+          <Text style={s.pill}>{t(`p2pPlans.mode.${i.run.mode}`)}</Text>
+        </View>
+        <Text style={s.cardTitle}>{i.plan.title}</Text>
+        <Text style={s.progress}>{t("p2pPlans.progress", { completed: i.progress.completed, total: i.progress.total })} · {t(`p2pPlans.pace.${i.run.pace}`)}{i.run.status === "paused" ? ` · ${t("p2pPlans.status.paused")}` : ""}</Text>
+        {i.current ? <Text style={s.body}>{t("p2pPlans.current", { title: i.current.title })}{due ? ` · ${t(`p2pPlans.${due.key}`, { date: due.date ? fmt(due.date) : "" })}` : ""}</Text> : null}
+        {i.next ? <Text style={s.small}>{t("p2pPlans.next", { title: i.next.title })}</Text> : null}
+      </TouchableOpacity>
+    );
+  };
+  const mineList = (): (RunItem | PlanCard)[] => {
+    if (!mine) return [];
+    if (tab === "together") return [...mine.active, ...mine.paused, ...mine.completed].filter((i) => i.run.mode === "together");
+    return mine[tab];
+  };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[s.screen, { paddingTop: insets.top + 4 }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.headerBar}>
-        <TouchableOpacity accessibilityLabel="Back" accessibilityRole="button" onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="arrow-back" size={22} color={colors.textDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerBarTitle}>Plans</Text>
-        <View style={{ width: 22 }} />
+      <View style={s.header}>
+        <IconButton icon="chevron-back" accessibilityLabel={t("p2pPlans.back")} onPress={() => router.back()} color={c.textDark} />
+        <Text style={s.title} accessibilityRole="header">{t("p2pPlans.title")}</Text>
+        <AppButton label={t("p2pPlans.create")} icon="add" size="sm" onPress={() => router.push("/plans/builder" as any)} />
       </View>
-
-      <View style={styles.tabBar}>
-        {([
-          { key: "my", label: "My Plans" },
-          { key: "find", label: "Find Plans" },
-          { key: "saved", label: "Saved" },
-          { key: "completed", label: "Completed" },
-        ] as { key: PlansTab; label: string }[]).map((t) => (
-          <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
-            <Text style={[styles.tabBtnText, tab === t.key && styles.tabBtnTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* ── My Plans ── */}
-      {tab === "my" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
-          {myPlansLoading ? (
-            <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
-          ) : (
-            <>
-              <Text style={styles.sectionHeading}>Active Plans</Text>
-              {recentActive.length === 0 ? (
-                <EmptyState
-                  colors={colors}
-                  icon="compass-outline"
-                  text="You have not started any electives yet. Find your first one below."
-                  actionLabel="Find Electives"
-                  onAction={() => setTab("find")}
-                />
-              ) : (
-                <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{recentActive.map((p) => (
-                  <PlanCard
-                    key={p.id}
-                    plan={p}
-                    colors={colors}
-                    progressPercent={p.progressPercent}
-                    subLine={p.lastActivityAt ? `Last active ${new Date(p.lastActivityAt).toLocaleDateString()}` : undefined}
-                    categoryLabel={categoryLabelFor(p)}
-                    primaryLabel="Continue"
-                    onPrimary={() => router.push(`/plan/${p.id}` as any)}
-                    onPress={() => router.push(`/plan/${p.id}` as any)}
-                  />
-                ))}</ResponsiveGrid>
-              )}
-
-              {staleEnrolled.length > 0 && (
-                <>
-                  <Text style={styles.sectionHeading}>Enrolled</Text>
-                  {staleEnrolled.map((p) => (
-                    <PlanCard
-                      key={p.id}
-                      plan={p}
-                      colors={colors}
-                      progressPercent={p.progressPercent}
-                      subLine="You started this — pick it up again"
-                      categoryLabel={categoryLabelFor(p)}
-                      primaryLabel="Continue"
-                      onPrimary={() => router.push(`/plan/${p.id}` as any)}
-                      onPress={() => router.push(`/plan/${p.id}` as any)}
-                    />
-                  ))}
-                </>
-              )}
-
-              <Text style={styles.sectionHeading}>Peer Circles</Text>
-              <EmptyState colors={colors} icon="people-outline" text="You're not part of any peer circles yet." />
-            </>
-          )}
-        </ScrollView>
-      )}
-
-      {/* ── Find Plans ── */}
-      {tab === "find" && (
-        <View style={{ flex: 1 }}>
-          <View style={[styles.searchBar, { marginHorizontal: 20, marginTop: 16 }]}>
-            <Ionicons name="search" size={16} color={colors.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search plans by title, module, or lesson..."
-              placeholderTextColor={colors.textMuted}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity accessibilityLabel="Close" accessibilityRole="button" hitSlop={10} onPress={() => setSearch("")}>
-                <Ionicons name="close-circle" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            )}
+      <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
+        <Text style={s.body}>{t("p2pPlans.intro")}</Text>
+        {error ? (
+          <View style={[s.card, { alignItems: "center" }]}>
+            <Text style={s.cardTitle}>{error}</Text>
+            <AppButton label={t("p2pPlans.tryAgain")} size="sm" variant="secondary" onPress={load} />
           </View>
+        ) : !plans || !mine ? <ActivityIndicator color={c.primaryGreen} accessibilityLabel={t("p2pPlans.loading")} /> : (
+          <>
+            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.continue")}</Text>
+            {mine.active.length || mine.paused.length ? [...mine.active, ...mine.paused].map((i) => <RunCard key={i.run.id} i={i} />) : <Text style={s.meta}>{t("p2pPlans.continueEmpty")}</Text>}
 
-          <View style={styles.findSubTabRow}>
-            {([
-              { key: "categories", label: "Categories" },
-              { key: "az", label: "A-Z" },
-              ...(search.trim() ? [{ key: "search", label: "Search Results" }] : []),
-            ] as { key: FindSubTab; label: string }[]).map((t) => (
-              <TouchableOpacity accessibilityRole="button" key={t.key} style={[styles.findSubTabBtn, findSubTab === t.key && styles.findSubTabBtnActive]} onPress={() => setFindSubTab(t.key)}>
-                <Text style={[styles.findSubTabText, findSubTab === t.key && styles.findSubTabTextActive]}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── Categories sub-tab ── */}
-          {findSubTab === "categories" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
-              {recommended.length > 0 && (
-                <>
-                  <View style={styles.recommendedHeaderRow}>
-                    <Text style={styles.sectionHeading}>Recommended for You</Text>
-                    <Text style={styles.recommendedTag}>Based on your goals</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 20 }}>
-                    {recommended.map((p) => (
-                      <View key={p.id} style={{ width: 220 }}>
-                        <PlanCard
-                          plan={p}
-                          colors={colors}
-                          isSaved={savedIds.has(p.id)}
-                          onToggleSave={() => toggleSave(p.id)}
-                          primaryLabel="Enroll"
-                          onPrimary={() => goToPlanOrQuestions(p.id)}
-                          onPress={() => router.push(`/plan/${p.id}` as any)}
-                        />
-                      </View>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-
-              <Text style={styles.sectionHeading}>Plan Collections</Text>
-              {categoriesLoading ? (
-                <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 20 }} />
-              ) : planCategories.length === 0 ? (
-                <EmptyState colors={colors} icon="albums-outline" text="Plan collections are not available yet." />
-              ) : (
-                <View style={styles.categoryGrid}>
-                  {orderedCategories.map((c) => (
-                    <CategoryCard key={c.id} category={c} colors={colors} onPress={() => router.push(`/plans/category/${c.id}` as any)} />
-                  ))}
+            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.explore")}</Text>
+            <TextInput value={q} onChangeText={setQ} placeholder={t("p2pPlans.searchPlaceholder")} placeholderTextColor={c.textMuted} style={s.input} accessibilityLabel={t("p2pPlans.search")} />
+            <ChipRow accessibilityLabel={t("p2pPlans.explore")} single>
+              <FilterChip label={t("p2pPlans.allFocus")} selected={!focus} selection="single" onPress={() => setFocus(null)} />
+              {FOCUS_TYPES.map((f) => <FilterChip key={f} label={t(`p2pPlans.focus.${f}`)} selected={focus === f} selection="single" onPress={() => setFocus(focus === f ? null : f)} />)}
+              <FilterChip label={t("p2pPlans.togetherOnly")} selected={together} onPress={() => setTogether(!together)} />
+            </ChipRow>
+            {filtering ? (results.length ? results.map((p) => <Card key={p.id} p={p} />) : <Text style={s.meta}>{t("p2pPlans.noMatch")}</Text>)
+              : shelves(plans).map((sh) => (
+                <View key={sh.collection} style={{ gap: 8 }}>
+                  <Text style={s.group}>{t(`p2pPlans.collection.${sh.collection}`)}</Text>
+                  {sh.plans.map((p) => <Card key={p.id} p={p} />)}
                 </View>
-              )}
-            </ScrollView>
-          )}
-
-          {/* ── A-Z sub-tab ── */}
-          {findSubTab === "az" && (
-            <View style={{ flex: 1, flexDirection: "row" }}>
-              <ScrollView
-                ref={azScrollRef}
-                style={{ flex: 1 }}
-                contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100, paddingRight: 32 }]}
-                showsVerticalScrollIndicator={false}
-              >
-                {azLoading ? (
-                  <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
-                ) : azGroups.length === 0 ? (
-                  <EmptyState colors={colors} icon="text-outline" text="No plans found." />
-                ) : (
-                  azGroups.map((group) => (
-                    <View key={group.letter} onLayout={(e: LayoutChangeEvent) => { letterOffsets.current[group.letter] = e.nativeEvent.layout.y; }}>
-                      <Text style={styles.azLetterHeading}>{group.letter}</Text>
-                      {group.plans.map((p) => (
-                        <PlanListRow
-                          key={p.id}
-                          title={p.title}
-                          categoryTitle={p.categoryTitle}
-                          categoryColorTheme={p.categoryColorTheme}
-                          locked={p.locked}
-                          unlockMessage={null}
-                          onPress={() => router.push(`/plan/${p.id}` as any)}
-                        />
-                      ))}
-                    </View>
-                  ))
-                )}
-              </ScrollView>
-              <View style={styles.alphabetStrip}>
-                {ALPHABET.map((letter) => (
-                  <TouchableOpacity accessibilityRole="button" key={letter} onPress={() => scrollToLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 4, right: 4 }}>
-                    <Text style={[styles.alphabetStripLetter, !availableLetters.has(letter) && styles.alphabetStripLetterMuted]}>{letter}</Text>
-                  </TouchableOpacity>
-                ))}
+              ))}
+            <TouchableOpacity style={[s.card, s.learning]} onPress={() => router.push("/plans/learning" as any)} accessibilityRole="button" accessibilityLabel={t("p2pPlans.learningPlans")}>
+              <View style={s.rowBetween}>
+                <Text style={s.cardTitle}>{t("p2pPlans.learningPlans")}</Text>
+                <Ionicons name="chevron-forward" size={18} color={c.textMid} />
               </View>
-            </View>
-          )}
+              <Text style={s.small}>{t("p2pPlans.learningPlansHint")}</Text>
+            </TouchableOpacity>
 
-          {/* ── Search Results sub-tab ── */}
-          {findSubTab === "search" && (
-            <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {searchLoading ? (
-                <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
-              ) : searchResults.length === 0 ? (
-                <EmptyState colors={colors} icon="search-outline" text="No plans match your search." />
-              ) : (
-                searchResults.map((p) => (
-                  <PlanListRow
-                    key={p.id}
-                    title={p.title}
-                    categoryTitle={p.categoryTitle}
-                    categoryColorTheme={p.categoryColorTheme}
-                    locked={p.locked}
-                    unlockMessage={p.unlockMessage}
-                    onPress={() => router.push(`/plan/${p.id}` as any)}
-                  />
-                ))
-              )}
-            </ScrollView>
-          )}
-        </View>
-      )}
-
-      {/* ── Saved ── */}
-      {tab === "saved" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
-          {savedLoading ? (
-            <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
-          ) : savedPlans.length === 0 ? (
-            <EmptyState colors={colors} icon="bookmark-outline" text="Save plans to come back to them later. Tap the bookmark icon on any plan." />
-          ) : (
-            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{savedPlans.map((p) => (
-              <PlanCard
-                key={p.id}
-                plan={p}
-                colors={colors}
-                subLine={p.savedAt ? `Saved ${new Date(p.savedAt).toLocaleDateString()}` : undefined}
-                isSaved
-                onToggleSave={() => toggleSave(p.id)}
-                primaryLabel="Start Now"
-                onPrimary={() => router.push(`/plan/${p.id}` as any)}
-                secondaryLabel="Remove"
-                onSecondary={() => toggleSave(p.id)}
-                onPress={() => router.push(`/plan/${p.id}` as any)}
-              />
-            ))}</ResponsiveGrid>
-          )}
-        </ScrollView>
-      )}
-
-      {/* ── Completed ── */}
-      {tab === "completed" && (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }, centeredMaxWidth(contentMaxWidth)]} showsVerticalScrollIndicator={false}>
-          {completedLoading ? (
-            <ActivityIndicator color={colors.accentGreen} style={{ marginTop: 40 }} />
-          ) : completedPlans.length === 0 ? (
-            <EmptyState colors={colors} icon="ribbon-outline" text="Complete your first plan to see it here." />
-          ) : (
-            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} rowGap={0}>{completedPlans.map((p) => (
-              <PlanCard
-                key={p.id}
-                plan={p}
-                colors={colors}
-                subLine={p.completedAt ? `Completed ${new Date(p.completedAt).toLocaleDateString()}` : "Completed"}
-                primaryLabel="Do Again"
-                onPrimary={() => router.push(`/plan/${p.id}` as any)}
-                secondaryLabel="Share"
-                onSecondary={() => setShareTarget(p)}
-                onPress={() => router.push(`/plan/${p.id}` as any)}
-              />
-            ))}</ResponsiveGrid>
-          )}
-        </ScrollView>
-      )}
-
-      {shareTarget && (
-        <PlanCompletionShareModal plan={shareTarget} completedAt={shareTarget.completedAt} onClose={() => setShareTarget(null)} />
-      )}
+            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.myPlans")}</Text>
+            <ChipRow accessibilityLabel={t("p2pPlans.myPlans")} single>
+              {MINE_TABS.map((k) => <FilterChip key={k} label={t(`p2pPlans.mine.${k}`)} selected={tab === k} selection="single" onPress={() => setTab(k)} />)}
+            </ChipRow>
+            {mineList().length ? mineList().map((x) => ("run" in x ? <RunCard key={x.run.id} i={x} /> : <Card key={x.id} p={x} />)) : <Text style={s.meta}>{t("p2pPlans.mine.empty")}</Text>}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
+const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+export default withScreenBoundary(PlansHome, "P2P Plans");
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.lightCream },
-    headerBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.borderBeige, gap: 12 },
-    headerBarTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold", textAlign: "center" },
-
-    tabBar: { flexDirection: "row", backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.borderBeige },
-    tabBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "transparent" },
-    tabBtnActive: { borderBottomColor: c.accentGreen },
-    tabBtnText: { fontSize: 12, fontWeight: "600", color: c.textMuted, fontFamily: "Inter_600SemiBold" },
-    tabBtnTextActive: { color: c.accentGreen },
-
-    scroll: { padding: 20 },
-    sectionHeading: { fontSize: 13, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, marginTop: 8 },
-
-    emptyState: { alignItems: "center", paddingVertical: 28, gap: 10 },
-    emptyStateText: { fontSize: 13, color: c.textMuted, textAlign: "center", fontFamily: "Inter_400Regular", paddingHorizontal: 20, lineHeight: 19 },
-
-    planCard: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.borderBeige, marginBottom: 14, overflow: "hidden" },
-    planCardTop: { position: "relative" },
-    planCardImg: { width: "100%", height: 110 },
-    planCardImgPlaceholder: { alignItems: "center", justifyContent: "center" },
-    bookmarkBtn: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center" },
-    planCardBody: { padding: 14 },
-    planCardTitle: { fontSize: 15, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    planCardCredit: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium", marginTop: 3 },
-    planCardSub: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", marginTop: 3 },
-
-    badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
-    badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-    badgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
-    badgeMuted: { backgroundColor: c.cardBeige, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-    badgeMutedText: { fontSize: 10, color: c.textMid, fontFamily: "Inter_500Medium" },
-
-    progressRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
-    progressBg: { flex: 1, height: 5, backgroundColor: c.progressTrack, borderRadius: 3, overflow: "hidden" },
-    progressFill: { height: 5, borderRadius: 3 },
-    progressPctText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular", minWidth: 30 },
-
-    cardActionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-
-    searchBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 },
-    searchInput: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_400Regular" },
-
-    recommendedHeaderRow: { marginBottom: 4 },
-    recommendedTag: { fontSize: 11, color: c.accentGreen, fontFamily: "Inter_500Medium", marginBottom: 12, marginTop: -8 },
-
-    findSubTabRow: { flexDirection: "row", gap: 6, marginHorizontal: 20, marginTop: 12, marginBottom: 4 },
-    findSubTabBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
-    findSubTabBtnActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
-    findSubTabText: { fontSize: 12, fontWeight: "600", color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    findSubTabTextActive: { color: "#fff" },
-
-    azLetterHeading: { fontSize: 13, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold", marginTop: 16, marginBottom: 6 },
-    azRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige, borderRadius: 12, padding: 12, marginBottom: 8 },
-    azRowLocked: { opacity: 0.55 },
-    azRowTitle: { fontSize: 14, fontWeight: "600", color: c.textDark, fontFamily: "Inter_600SemiBold" },
-    azRowTitleLocked: { color: c.textMuted },
-    azRowCategoryRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-    azRowDot: { width: 7, height: 7, borderRadius: 3.5 },
-    azRowCategoryText: { fontSize: 11, color: c.textMuted, fontFamily: "Inter_400Regular" },
-
-    alphabetStrip: { width: 22, paddingTop: 8, alignItems: "center", gap: 2 },
-    alphabetStripLetter: { fontSize: 10, fontWeight: "700", color: c.accentGreen, fontFamily: "Inter_700Bold" },
-    alphabetStripLetterMuted: { color: c.borderBeige },
-
-    // Restored two-column colored category grid — see CategoryCard's own
-    // comment above for why this replaces the old photo-split card. Width
-    // is a percentage of categoryGrid's own rendered width (never a
-    // hardcoded screen-width value), so it's correct on phones and tablets
-    // alike without any responsive-width helper.
-    categoryGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-    categoryCard: {
-      width: "48%", minHeight: 92, borderRadius: 14, marginBottom: 14,
-      flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 10,
-      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 1,
-    },
-    categoryCardEmoji: { fontSize: 26 },
-    // Fixed white/near-white regardless of theme — a deliberate exception,
-    // same rationale as the app's other fixed-on-color text (e.g. call
-    // screens' end-button red): these cards use the category's own solid
-    // color as background, which the theme doesn't control, so theme text
-    // colors (tuned for the neutral card background) aren't guaranteed to
-    // contrast against it.
-    categoryCardTextCol: { flex: 1 },
-    categoryCardTitle: { fontSize: 14, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", lineHeight: 18 },
-    categoryCardCount: { fontSize: 12, color: "rgba(255,255,255,0.85)", fontFamily: "Inter_500Medium", marginTop: 2 },
-
-    filterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-    filterSheet: { backgroundColor: c.lightCream, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, width: "100%", alignSelf: "center" },
-    filterHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-    filterTitle: { fontSize: 17, fontWeight: "700", color: c.textDark, fontFamily: "Inter_700Bold" },
-    filterLabel: { fontSize: 12, fontWeight: "700", color: c.textMuted, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8, marginTop: 8 },
-    filterChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    filterChip: { borderWidth: 1, borderColor: c.borderBeige, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-    filterChipActive: { backgroundColor: c.accentGreen, borderColor: c.accentGreen },
-    filterChipText: { fontSize: 12, color: c.textMid, fontFamily: "Inter_500Medium" },
-    filterChipTextActive: { color: "#fff", fontWeight: "700" },
-    filterActionsRow: { flexDirection: "row", gap: 10, marginTop: 20 },
-    filterClearText: { fontSize: 14, color: c.textMid, fontFamily: "Inter_600SemiBold" },
-    filterApplyText: { fontSize: 14, color: "#fff", fontWeight: "700", fontFamily: "Inter_700Bold" },
-
-    shareOverlay: { flex: 1, backgroundColor: "rgba(6,17,13,0.94)", alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
-    shareCloseBtn: { position: "absolute", top: 50, right: 20 },
-    shareCard: { backgroundColor: "#0B1F19", borderRadius: 20, borderWidth: 1.5, padding: 28, alignItems: "center" },
-    shareBadge: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 14 },
-    shareTitle: { fontSize: 17, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", textAlign: "center" },
-    shareSubtitle: { fontSize: 12, color: "#E0A441", fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6, marginTop: 6 },
-    shareDate: { fontSize: 12, color: "rgba(255,255,255,0.6)", fontFamily: "Inter_400Regular", marginTop: 8 },
+    screen: { flex: 1, backgroundColor: c.lightCream },
+    header: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8, paddingBottom: 6 },
+    title: { flex: 1, fontSize: 18, color: c.textDark, fontFamily: "Inter_700Bold" },
+    scroll: { padding: 16, gap: 12, width: "100%", maxWidth: 900, alignSelf: "center" },
+    body: { fontSize: 14, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 20 },
+    meta: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
+    small: { fontSize: 12.5, color: c.textMuted, fontFamily: "Inter_400Regular", lineHeight: 17 },
+    section: { fontSize: 18, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 10 },
+    group: { fontSize: 12.5, letterSpacing: 0.6, fontFamily: "Inter_700Bold", color: c.textMuted, textTransform: "uppercase", marginTop: 6 },
+    card: { padding: 14, gap: 5, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    learning: { backgroundColor: c.cardBeige },
+    cardTitle: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },
+    kicker: { fontSize: 11.5, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, flexShrink: 1 },
+    progress: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
+    rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+    metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 2 },
+    pill: { fontSize: 11.5, color: c.textDark, fontFamily: "Inter_600SemiBold", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: c.cardBeige, overflow: "hidden" },
+    pillOfficial: { backgroundColor: "rgba(29,158,117,0.14)", color: c.primaryGreen },
+    input: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card, paddingHorizontal: 12, color: c.textDark, fontFamily: "Inter_400Regular", fontSize: 14 },
   });
 }

@@ -102,7 +102,9 @@ ok("notification taps: a new stage → the journey; a relationship change → My
 const lt = src("app/living-tree.tsx");
 ok("My Tree shows the official stage (its own 8-stage names are gone), no percentage bar", lt.includes("{stage.name}") && !lt.includes("{stage.emoji}") && !lt.includes("{newTreeStage.name}") && !lt.includes("newTreeStageProgress") && !/treeStageProgressFill, \{ width/.test(lt));
 ok("…a Forest Builder isn't told they're 'growing toward' Forest of Nations", lt.includes("const nextStage = stageIndex + 1 < PERSONAL_STAGE_COUNT ? STAGES[stageIndex + 1] : null;"));
-ok("…the accessible summary names the same official stage", lt.includes("stage={{ ...newTreeStage, name: stage.name, description: stage.description }}"));
+// 2026-11-14 (My Growth): the legacy fruit list and its accessible summary (old fruit catalogue) are gone from
+// My Tree; the official stage is named in the stats ("Your Growth Stage") and the stage card instead.
+ok("…My Tree names the same official stage everywhere (no legacy fruit summary)", lt.includes('<Text style={styles.statRowLabel}>Your Growth Stage</Text>') && lt.includes("<Text style={styles.statRowValue}>{stage.name}</Text>") && !lt.includes("TreeAccessibleSummary"));
 
 console.log(`growthJourney (app): ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

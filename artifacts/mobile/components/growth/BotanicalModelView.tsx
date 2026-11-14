@@ -1,27 +1,32 @@
 import React, { useRef, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, type ViewStyle, type StyleProp } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, type ViewStyle, type StyleProp } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname } from "expo-router";
 import colors from "@/constants/colors";
 import { AppButton, IconButton } from "@/components/ui";
 import TreeModelViewer, { type TreeModelViewerHandle, type TreeViewerStatus } from "@/components/growth/TreeModelViewer";
 import { useReduceMotion } from "@/hooks/useReduceMotion";
-import { botanicalAsset, botanicalAssetUrl } from "@/lib/growthTreeAssets";
+import { botanicalAsset, botanicalAssetUrl, botanicalCloseUrl } from "@/lib/growthTreeAssets";
 
 // ONE botanical asset from the shared register (lib/growthTreeAssets.ts BOTANICAL_REGISTRY) in 3D — the same
 // renderer as the Growth Tree (TreeModelViewer → lib/treeViewerHtml.ts: caching, close-up rules, disposal,
 // pause when hidden). Wind only for assets that have leaves or petals (registry `wind`). Loading, Try again,
 // or "not available yet" — never a picture or another model in its place.
-export default function BotanicalModelView({ assetId, background = colors.lightCream, style, compact = false, label }: {
+export default function BotanicalModelView({ assetId, background = colors.lightCream, style, compact = false, label, onPress, accessibilityHint }: {
   assetId: string;
   background?: string;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
   /** Spoken description (defaults to the register's). */
   label?: string;
+  /** A card: the model is one button (Try again, if shown, sits beside it — never inside it). */
+  onPress?: () => void;
+  accessibilityHint?: string;
 }) {
   const asset = botanicalAsset(assetId);
   const url = botanicalAssetUrl(assetId);
+  // Large models (Forest of Nations) have a close-up copy, loaded only when zoomed in — never on a card.
+  const closeUrl = compact ? null : botanicalCloseUrl(assetId);
   const reduceMotion = useReduceMotion();
   const [status, setStatus] = useState<TreeViewerStatus>({ state: "loading", progress: 0 });
   const [reloadKey, setReloadKey] = useState(0);
@@ -32,7 +37,7 @@ export default function BotanicalModelView({ assetId, background = colors.lightC
   return (
     <View style={[styles.stage, { backgroundColor: background }, style]} accessibilityRole="image" accessibilityLabel={`3D model: ${description}`}>
       {url ? (
-        <TreeModelViewer ref={viewer} key={assetId} reloadKey={reloadKey} standardUrl={url} detailedUrl={null} noCloseUp background={background}
+        <TreeModelViewer ref={viewer} key={assetId} reloadKey={reloadKey} standardUrl={url} detailedUrl={closeUrl} noCloseUp={!closeUrl} background={background}
           reduceMotion={reduceMotion} wind={!!asset?.wind && !reduceMotion} compact={compact} paused={pathname !== openedOn} onStatus={setStatus} />
       ) : (
         <View style={[styles.overlay, { backgroundColor: background }]}>
@@ -45,6 +50,10 @@ export default function BotanicalModelView({ assetId, background = colors.lightC
           <ActivityIndicator color={colors.primaryGreen} />
           {!compact ? <Text style={styles.text}>Loading{status.progress ? ` · ${status.progress}%` : ""}</Text> : null}
         </View>
+      ) : null}
+      {/* A card: one tap target over the model (drawn below the error state, so Try again stays reachable). */}
+      {compact && onPress ? (
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={0.9} onPress={onPress} accessibilityRole="button" accessibilityLabel={description} accessibilityHint={accessibilityHint} />
       ) : null}
       {url && status.state === "error" ? (
         <View style={[styles.overlay, { backgroundColor: background }]}>

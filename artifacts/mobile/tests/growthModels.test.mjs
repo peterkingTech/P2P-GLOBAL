@@ -96,8 +96,12 @@ const living = src("app/living-tree.tsx");
 ok("My Tree: views shown; full-screen opens your own tree; Growth Story, Fruit Harvest and genealogy kept", living.includes("showViewControls") && living.includes('mine: "1"') && living.includes('label="Watch full growth story"') && living.includes("/fruit-harvest") && living.includes("/growth-timeline") && living.includes("/lineage"));
 ok("My Tree / Home: progress as requirements met, never points", !living.includes("more points of shared study") && living.includes("requirements met for") && home.includes("requirements met for"));
 const stages = src("app/stages.tsx");
-ok("Stages: one live model (yours); every stage opens its own model in 3D on request; no pictures; Forest of Nations stated unavailable in 3D",
-  !stages.includes("<Image") && stages.includes('params: { stage: String(i) }') && stages.includes("The 3D Forest of Nations scene isn&apos;t available yet."));
+ok("Stages: one live model (yours); every stage opens its own model in 3D on request; no pictures; Forest of Nations as its real 3D globe (never the PNG)",
+  !stages.includes("<Image") && stages.includes('params: { stage: String(i) }') && stages.includes('<BotanicalModelView assetId="forest-of-nations-3d-landscape"') && !stages.includes("Forest%20of%20nations"));
+const full3d = src("app/tree-3d.tsx"), lt3 = src("app/living-tree.tsx");
+ok("Forest of Nations: full screen (?forest=1) and the Global Forest tab use the shared model view; labelled not a personal stage",
+  full3d.includes('const forest = params.forest === "1"') && full3d.includes("<BotanicalModelView assetId={FOREST_ASSET}") && full3d.includes("Not a personal stage")
+  && lt3.includes('<BotanicalModelView assetId="forest-of-nations-3d-landscape"') && lt3.includes("Not a personal stage"));
 const full = src("app/tree-3d.tsx");
 ok("Full screen: a stage (0–4) or your own tree; real download sizes from the manifest", full.includes('mode={mine ? "tree" : "stage"}') && full.includes("asset.file.bytes") && full.includes("asset.file.close"));
 

@@ -1,0 +1,108 @@
+{
+  "slug": "the-life-of-jesus",
+  "title": "The Life of Jesus",
+  "description": "Walk through the life and teaching of Jesus Christ in the Gospels, from his birth to his resurrection and commission to his followers.",
+  "focusType": "biblical_person",
+  "focusLabel": "Jesus Christ",
+  "focusRef": { "person": "jesus" },
+  "collection": "life_of_jesus",
+  "suggestedPace": "daily",
+  "suggestedDays": 12,
+  "objectives": [
+    "Read the main events of Jesus' life in the Gospels",
+    "Notice what Jesus taught and how people responded to him",
+    "Consider who Jesus says he is"
+  ],
+  "sessions": [
+    { "title": "The Word became flesh", "passages": ["John 1:1-18"],
+      "intro": "John opens his Gospel before Bethlehem — with the eternal Word who was with God and was God.",
+      "supporting": [{ "kind": "word_study", "strongs": "G3056", "note": "logos, 'word'" }],
+      "questions": [
+        { "kind": "observe", "text": "What does John say about the Word in verses 1-5?" },
+        { "kind": "interpret", "text": "What does verse 14 say happened, and why is that remarkable after verses 1-3?" },
+        { "kind": "observe", "text": "According to verses 11-13, how did people respond to him, and what is given to those who received him?" }
+      ] },
+    { "title": "The birth of Jesus", "passages": ["Luke 2:1-20"],
+      "intro": "Luke places Jesus' birth in history — the reign of Caesar Augustus — and tells of shepherds who hear the news first.",
+      "questions": [
+        { "kind": "context", "text": "Why were Joseph and Mary in Bethlehem (verses 1-5)?" },
+        { "kind": "observe", "text": "What do the angels announce to the shepherds in verses 10-14?" },
+        { "kind": "observe", "text": "How do the shepherds and Mary respond in verses 15-20?" }
+      ] },
+    { "title": "Baptism and temptation", "passages": ["Matthew 3:13-17", "Matthew 4:1-11"],
+      "intro": "Before his public ministry begins, Jesus is baptised by John and tested in the wilderness.",
+      "questions": [
+        { "kind": "observe", "text": "What does the voice from heaven say in Matthew 3:17?" },
+        { "kind": "observe", "text": "How does Jesus answer each temptation in Matthew 4:1-11?" },
+        { "kind": "context", "text": "Jesus' answers come from Deuteronomy, from Israel's time in the wilderness. What connection might Matthew be drawing?" }
+      ] },
+    { "title": "Calling the first disciples", "passages": ["Mark 1:14-20", "Mark 1:29-39"],
+      "intro": "Jesus begins to proclaim the good news of God's kingdom, calls fishermen to follow him, and heals many.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "discipleship" }],
+      "questions": [
+        { "kind": "observe", "text": "What message does Jesus proclaim in Mark 1:14-15?" },
+        { "kind": "observe", "text": "What does Jesus ask Simon, Andrew, James and John to do, and how do they respond?" },
+        { "kind": "interpret", "text": "Why do you think Jesus leaves the crowds to pray and move on (verses 35-39)?" }
+      ] },
+    { "title": "The Sermon on the Mount", "passages": ["Matthew 5:1-16"],
+      "intro": "Jesus teaches his disciples about the blessed life in God's kingdom and their place in the world.",
+      "questions": [
+        { "kind": "observe", "text": "Who does Jesus call 'blessed' in verses 3-10?" },
+        { "kind": "interpret", "text": "What do the pictures of salt and light (verses 13-16) say about the disciples' role?" },
+        { "kind": "consider", "text": "Which of the beatitudes surprises you most, and why?" }
+      ] },
+    { "title": "Who is this?", "passages": ["Mark 4:35-41", "Mark 5:1-20"],
+      "intro": "Jesus calms a storm and sets free a man no one could restrain. Both events raise the question of who Jesus is.",
+      "questions": [
+        { "kind": "observe", "text": "What question do the disciples ask at the end of Mark 4:41?" },
+        { "kind": "observe", "text": "How is the man described before and after he meets Jesus in Mark 5?" },
+        { "kind": "interpret", "text": "What does Jesus tell the man to do in Mark 5:19, and what does he do?" }
+      ] },
+    { "title": "Parables of the lost", "passages": ["Luke 15:1-32"],
+      "intro": "When religious leaders grumble that Jesus welcomes sinners, he tells three stories about something lost and found.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "forgiveness" }],
+      "questions": [
+        { "kind": "context", "text": "Who is Jesus speaking to, and why does he tell these parables (verses 1-3)?" },
+        { "kind": "observe", "text": "What do the three parables have in common?" },
+        { "kind": "interpret", "text": "How does the older brother respond in verses 25-32, and who might he represent in the setting of verses 1-2?" }
+      ] },
+    { "title": "Peter's confession", "passages": ["Matthew 16:13-28"],
+      "intro": "At Caesarea Philippi, Jesus asks his disciples who they say he is, and then begins to speak of his coming death.",
+      "questions": [
+        { "kind": "observe", "text": "What answers do people give about Jesus, and what does Peter say (verses 13-16)?" },
+        { "kind": "observe", "text": "What does Jesus begin to explain in verse 21, and how does Peter react?" },
+        { "kind": "interpret", "text": "What does Jesus say following him involves in verses 24-26?" }
+      ] },
+    { "title": "Entering Jerusalem", "passages": ["Luke 19:28-44"],
+      "intro": "Jesus rides into Jerusalem on a colt, the crowds praise him, and he weeps over the city.",
+      "supporting": [{ "kind": "bible_passage", "book": "ZEC", "chapter": 9, "startVerse": 9, "endVerse": 9, "note": "The prophecy behind the colt" }],
+      "questions": [
+        { "kind": "context", "text": "Read Zechariah 9:9. What would the crowds have understood from Jesus riding a colt into Jerusalem?" },
+        { "kind": "observe", "text": "What do the disciples shout in verse 38?" },
+        { "kind": "observe", "text": "Why does Jesus weep over Jerusalem (verses 41-44)?" }
+      ] },
+    { "title": "The last supper and the garden", "passages": ["Luke 22:14-23", "Luke 22:39-46"],
+      "intro": "Jesus shares the Passover meal with his disciples and then prays on the Mount of Olives.",
+      "questions": [
+        { "kind": "context", "text": "The meal is the Passover. What did the Passover remember, and how does Jesus give new meaning to the bread and cup?" },
+        { "kind": "observe", "text": "What does Jesus pray in verse 42?" },
+        { "kind": "observe", "text": "What does Jesus tell his disciples to pray for in verses 40 and 46?" }
+      ] },
+    { "title": "The cross", "passages": ["Luke 23:32-49"],
+      "intro": "Jesus is crucified between two criminals. Luke records his words from the cross and the responses of those around him.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "salvation" }],
+      "questions": [
+        { "kind": "observe", "text": "What does Jesus say from the cross in verses 34, 43 and 46?" },
+        { "kind": "observe", "text": "How do the different people around the cross respond to him?" },
+        { "kind": "interpret", "text": "What does the conversation with the second criminal (verses 39-43) show?" }
+      ] },
+    { "title": "He is risen", "passages": ["Luke 24:1-12", "Luke 24:36-49"],
+      "intro": "The women find the tomb empty; later Jesus appears to his disciples, opens the Scriptures to them and sends them out.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "hope" }],
+      "questions": [
+        { "kind": "observe", "text": "What do the angels say to the women in verses 5-7?" },
+        { "kind": "observe", "text": "How does Jesus show the disciples that he is really alive (verses 36-43)?" },
+        { "kind": "interpret", "text": "According to verses 44-49, what does Jesus say the Scriptures were pointing to, and what will his followers do?" }
+      ] }
+  ]
+}

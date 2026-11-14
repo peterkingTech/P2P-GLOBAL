@@ -1,0 +1,155 @@
+{
+  "slug": "romans-16-sessions",
+  "title": "The Book of Romans",
+  "description": "Read Paul's letter to the church in Rome one chapter at a time: the gospel of God's righteousness, received by faith, and the life it creates.",
+  "focusType": "bible_book",
+  "focusLabel": "Romans",
+  "focusRef": { "book": "ROM" },
+  "collection": "bible_books",
+  "suggestedPace": "daily",
+  "suggestedDays": 16,
+  "objectives": [
+    "Follow the argument of Romans from beginning to end",
+    "Understand what Paul means by righteousness, faith and grace",
+    "See how the gospel shapes everyday life and the church"
+  ],
+  "sessions": [
+    { "title": "The gospel of God", "passages": ["Romans 1:1-32"],
+      "intro": "Paul introduces himself to a church he has not yet visited and states the theme of the letter (1:16-17) before describing humanity's turning away from God.",
+      "supporting": [{ "kind": "word_study", "strongs": "G2098", "note": "euangelion, 'good news'" }, { "kind": "deep_study", "book": "ROM", "chapter": 1, "startVerse": 16, "endVerse": 17, "note": "The letter's theme in the original language" }],
+      "questions": [
+        { "kind": "observe", "text": "How does Paul describe himself and the gospel in verses 1-6?" },
+        { "kind": "interpret", "text": "According to verses 16-17, what is revealed in the gospel, and how is it received?" },
+        { "kind": "context", "text": "In verses 18-32, what does Paul say people did with what they knew about God?" },
+        { "kind": "consider", "text": "Paul says he is 'not ashamed of the gospel'. What does that phrase suggest about how the gospel was viewed?" }
+      ] },
+    { "title": "God judges impartially", "passages": ["Romans 2:1-29"],
+      "intro": "Paul turns to those who judge others, and then to his own people, showing that knowing God's law does not place anyone beyond God's judgement.",
+      "questions": [
+        { "kind": "observe", "text": "What warning does Paul give in verses 1-4 to the person who judges others?" },
+        { "kind": "interpret", "text": "What does verse 11 say about God, and how does the rest of the chapter illustrate it?" },
+        { "kind": "context", "text": "Who is Paul addressing from verse 17 onwards, and what are they relying on?" },
+        { "kind": "interpret", "text": "What does Paul mean by circumcision 'of the heart, by the Spirit' (verse 29)?" }
+      ] },
+    { "title": "Righteousness through faith", "passages": ["Romans 3:1-31"],
+      "intro": "Paul concludes that all people, Jew and Gentile, are under sin, and then announces 'but now' — God's righteousness given through faith in Jesus Christ.",
+      "supporting": [{ "kind": "word_study", "strongs": "G1344", "note": "dikaioō, 'to justify'" }, { "kind": "scripture_topic", "slug": "grace", "note": "Grace across Scripture" }],
+      "questions": [
+        { "kind": "observe", "text": "What conclusion does Paul reach in verses 9-20?" },
+        { "kind": "interpret", "text": "In verses 21-26, how is God's righteousness made known, and to whom is it given?" },
+        { "kind": "interpret", "text": "Verse 26 says God is both 'just' and 'the justifier'. How does the death of Jesus make both true?" },
+        { "kind": "consider", "text": "What does verse 27 say happens to boasting, and why?" }
+      ] },
+    { "title": "Abraham believed God", "passages": ["Romans 4:1-25"],
+      "intro": "Paul shows from Genesis that Abraham was counted righteous through faith, before circumcision and apart from the law.",
+      "supporting": [{ "kind": "bible_passage", "book": "GEN", "chapter": 15, "startVerse": 1, "endVerse": 6, "note": "The promise Paul quotes" }],
+      "questions": [
+        { "kind": "context", "text": "Why does Paul turn to Abraham at this point in his argument?" },
+        { "kind": "observe", "text": "According to verses 9-12, when was Abraham counted righteous — before or after circumcision? Why does that matter?" },
+        { "kind": "interpret", "text": "How do verses 18-21 describe Abraham's faith?" },
+        { "kind": "consider", "text": "Verses 23-25 say these words were written 'for us also'. What connects Abraham's faith with faith in Jesus?" }
+      ] },
+    { "title": "Peace with God", "passages": ["Romans 5:1-21"],
+      "intro": "Paul describes what justification brings — peace, access, hope — and then compares Adam and Christ.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "hope", "note": "Hope across Scripture" }, { "kind": "scripture_topic", "slug": "peace" }],
+      "questions": [
+        { "kind": "observe", "text": "List what verses 1-5 say believers now have through Jesus." },
+        { "kind": "interpret", "text": "What does verse 8 show about God's love, and when was it shown?" },
+        { "kind": "interpret", "text": "In verses 12-21, what came through Adam, and what came through Christ?" },
+        { "kind": "consider", "text": "Paul links suffering with hope in verses 3-5. How does he describe that process?" }
+      ] },
+    { "title": "Dead to sin, alive to God", "passages": ["Romans 6:1-23"],
+      "intro": "Paul answers an objection: if grace abounds, should we keep sinning? He explains what union with Christ in his death and resurrection means.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "freedom", "note": "Freedom across Scripture" }],
+      "questions": [
+        { "kind": "context", "text": "What question is Paul answering in verse 1, and why might someone ask it after chapter 5?" },
+        { "kind": "interpret", "text": "What does baptism picture in verses 3-5?" },
+        { "kind": "observe", "text": "What does Paul tell believers to 'count' or 'consider' in verse 11?" },
+        { "kind": "interpret", "text": "Compare the 'wages' and the 'gift' in verse 23. What is the difference between them?" }
+      ] },
+    { "title": "The law and the struggle with sin", "passages": ["Romans 7:1-25"],
+      "intro": "Paul explains the believer's release from the law and describes, in the first person, the inner conflict between knowing what is good and doing it.",
+      "questions": [
+        { "kind": "observe", "text": "What illustration does Paul use in verses 1-4, and what point does it make?" },
+        { "kind": "interpret", "text": "According to verses 7-12, is the law itself sinful? What does Paul say the law does?" },
+        { "kind": "context", "text": "Christians have read verses 14-25 in different ways (Paul before or after faith in Christ). What details in the passage do readers point to?" },
+        { "kind": "observe", "text": "How does the chapter end (verses 24-25), and where does Paul look for rescue?" }
+      ] },
+    { "title": "Life in the Spirit", "passages": ["Romans 8:1-39"],
+      "intro": "There is now no condemnation for those in Christ Jesus. Paul describes the Spirit's work, the hope of creation and the love of God that nothing can separate us from.",
+      "supporting": [{ "kind": "word_study", "strongs": "G4151", "note": "pneuma, 'Spirit'" }, { "kind": "scripture_topic", "slug": "identity-in-christ" }],
+      "questions": [
+        { "kind": "observe", "text": "What does verse 1 declare, and what reason do verses 2-4 give for it?" },
+        { "kind": "interpret", "text": "What does the Spirit do for believers according to verses 14-17 and 26-27?" },
+        { "kind": "context", "text": "In verses 18-25, what is creation waiting for?" },
+        { "kind": "observe", "text": "Make a list of the things in verses 35-39 that cannot separate believers from God's love." }
+      ] },
+    { "title": "God's purposes and Israel", "passages": ["Romans 9:1-33"],
+      "intro": "Paul expresses deep grief for his own people and begins three chapters on how God's promises to Israel stand.",
+      "questions": [
+        { "kind": "observe", "text": "How does Paul describe his feelings for Israel in verses 1-5?" },
+        { "kind": "context", "text": "What question lies behind verse 6 ('it is not as though the word of God has failed')?" },
+        { "kind": "interpret", "text": "What examples from Israel's history does Paul use in verses 6-18, and what do they show about God's mercy?" },
+        { "kind": "observe", "text": "According to verses 30-32, how did Gentiles obtain righteousness, and why did Israel not obtain it?" }
+      ] },
+    { "title": "Everyone who calls on the Lord", "passages": ["Romans 10:1-21"],
+      "intro": "Paul explains that righteousness comes by faith, and that the message must be heard and proclaimed.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "salvation" }, { "kind": "scripture_topic", "slug": "evangelism" }],
+      "questions": [
+        { "kind": "observe", "text": "What does Paul pray for in verse 1?" },
+        { "kind": "interpret", "text": "According to verses 9-10, what is involved in being saved?" },
+        { "kind": "observe", "text": "Trace the chain of questions in verses 14-15. What is needed for people to call on the Lord?" },
+        { "kind": "consider", "text": "Verse 12 says there is 'no difference' between Jew and Greek. What is the basis for that?" }
+      ] },
+    { "title": "The olive tree and God's mercy", "passages": ["Romans 11:1-36"],
+      "intro": "Paul insists God has not rejected his people, uses the image of an olive tree, and ends in praise.",
+      "questions": [
+        { "kind": "observe", "text": "What evidence does Paul give in verses 1-6 that God has not rejected his people?" },
+        { "kind": "interpret", "text": "What does the olive tree illustration (verses 17-24) teach Gentile believers?" },
+        { "kind": "context", "text": "What warning against pride does Paul give in verses 18-22?" },
+        { "kind": "observe", "text": "How do verses 33-36 respond to everything Paul has explained in chapters 9-11?" }
+      ] },
+    { "title": "A living sacrifice", "passages": ["Romans 12:1-21"],
+      "intro": "'Therefore' — after eleven chapters about God's mercy, Paul describes the life that responds to it, in the body of Christ and toward everyone.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "the-church" }, { "kind": "scripture_topic", "slug": "love" }],
+      "questions": [
+        { "kind": "context", "text": "Verse 1 begins with 'therefore' and 'in view of God's mercy'. What has Paul shown about God's mercy in the earlier chapters?" },
+        { "kind": "interpret", "text": "What does it mean to be transformed 'by the renewing of your mind' (verse 2)?" },
+        { "kind": "observe", "text": "What picture of the church does Paul use in verses 4-8?" },
+        { "kind": "apply", "text": "Verses 17-21 describe how to respond to evil. Which of these instructions stands out to you, and why?" }
+      ] },
+    { "title": "Authorities, love and the day ahead", "passages": ["Romans 13:1-14"],
+      "intro": "Paul writes about governing authorities, sums up the commandments in love, and urges readiness because the day is near.",
+      "questions": [
+        { "kind": "context", "text": "Paul wrote this under Roman rule. What does he say about the purpose of governing authorities in verses 1-7?" },
+        { "kind": "interpret", "text": "According to verses 8-10, how does love fulfil the law?" },
+        { "kind": "observe", "text": "What does Paul say about time in verses 11-12?" },
+        { "kind": "interpret", "text": "What does it mean to 'clothe yourselves with the Lord Jesus Christ' (verse 14)?" }
+      ] },
+    { "title": "Welcoming one another", "passages": ["Romans 14:1-23"],
+      "intro": "Paul addresses disagreements in the church over food and special days, and how believers with different convictions should treat each other.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "unity" }],
+      "questions": [
+        { "kind": "context", "text": "What were the believers in Rome disagreeing about in verses 2-6?" },
+        { "kind": "observe", "text": "Why, according to verses 7-12, should believers not judge one another on these matters?" },
+        { "kind": "interpret", "text": "What does Paul say the kingdom of God is (and is not) in verse 17?" },
+        { "kind": "apply", "text": "Verse 19 says to pursue what leads to peace and building one another up. What might that look like where you are?" }
+      ] },
+    { "title": "Christ's welcome and Paul's mission", "passages": ["Romans 15:1-33"],
+      "intro": "Paul points to Christ's example of welcoming others, then shares his travel plans and asks for prayer.",
+      "questions": [
+        { "kind": "observe", "text": "Whose example does Paul point to in verses 3 and 7?" },
+        { "kind": "interpret", "text": "What do the Old Testament quotations in verses 9-12 have in common?" },
+        { "kind": "context", "text": "What are Paul's plans in verses 22-29, and what is the collection for Jerusalem?" },
+        { "kind": "observe", "text": "What does Paul ask the Romans to pray for in verses 30-32?" }
+      ] },
+    { "title": "Greetings and a final doxology", "passages": ["Romans 16:1-27"],
+      "intro": "Paul greets many people by name, warns against those who cause division, and closes in praise to God.",
+      "questions": [
+        { "kind": "observe", "text": "Look through the names in verses 1-16. What do you notice about the people Paul greets and how he describes them?" },
+        { "kind": "observe", "text": "What warning does Paul give in verses 17-20?" },
+        { "kind": "interpret", "text": "What does the final doxology (verses 25-27) say about the gospel and its purpose?" },
+        { "kind": "consider", "text": "Looking back over the whole letter, what has Romans shown you about the gospel?" }
+      ] }
+  ]
+}

@@ -8,7 +8,7 @@ import { supabase } from "@/contexts/AuthContext";
 import { Avatar } from "@/components/Avatar";
 import {
   getSharedStudy, respondToStudy, leaveStudy, concludeStudy, reopenStudy, setStudyPosition, addStudyPrompt, removeStudyPrompt,
-  postStudyResponse, removeStudyResponse, cancelStudyInvite, markStudyOpened, contentRoute, responsesFor, invitationNote,
+  postStudyResponse, removeStudyResponse, cancelStudyInvite, markStudyOpened, contentRoute, CONTENT_TYPE_LABELS, responsesFor, invitationNote,
   DESTINATION_LABELS, type SharedStudy, type StudyResponse,
 } from "@/lib/studyTogetherApi";
 import { AppButton, IconButton } from "@/components/ui";
@@ -117,12 +117,12 @@ export default function SharedStudyScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: "Study Together" }} />
-      <Text style={s.kicker}>{st.contentType === "kingdom_story" ? "Kingdom Story" : "Kingdom School lesson"}</Text>
+      <Text style={s.kicker}>{CONTENT_TYPE_LABELS[st.contentType] ?? "Study"}</Text>
       <Text style={s.title} accessibilityRole="header">{st.title}</Text>
       {st.subtitle ? <Text style={s.body}>{st.subtitle}</Text> : null}
       <Text style={s.meta}>{withWhom} · started by {st.me.isHost ? "you" : st.host.name}</Text>
       {notice ? <Text style={s.notice} accessibilityRole="alert">{notice}</Text> : null}
-      {!st.contentAvailable ? <Text style={s.notice}>This {st.contentType === "lesson" ? "lesson" : "story"} isn't available right now.</Text> : null}
+      {!st.contentAvailable ? <Text style={s.notice}>This {st.contentType === "lesson" ? "lesson" : st.contentType === "study_plan" ? "plan" : "story"} isn't available right now.</Text> : null}
 
       {st.me.invited ? (
         <View style={s.card}>
@@ -147,7 +147,7 @@ export default function SharedStudyScreen() {
       {st.me.canParticipate ? (
         <>
           <View style={s.row}>
-            <AppButton label={current ? `Read Chapter ${current.number}` : st.contentType === "lesson" ? "Open the lesson" : "Open the story"} onPress={() => router.push(contentRoute(st, current?.id) as any)} icon="book-outline" disabled={!st.contentAvailable} accessibilityLabel={current ? `Read chapter ${current.number}` : "Open"} />
+            <AppButton label={st.contentType === "study_plan" ? "Open my plan" : current ? `Read Chapter ${current.number}` : st.contentType === "lesson" ? "Open the lesson" : "Open the story"} onPress={() => router.push(contentRoute(st, current?.id) as any)} icon="book-outline" disabled={!st.contentAvailable} accessibilityLabel={current ? `Read chapter ${current.number}` : "Open"} />
           </View>
           <Text style={s.meta}>You read with your own progress — studying together doesn't mark anything complete for anyone.</Text>
 

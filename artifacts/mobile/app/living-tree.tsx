@@ -18,20 +18,19 @@ import { useData, ForestNode } from "@/contexts/DataContext";
 import colors from "@/constants/colors";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { STAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
-import { getTreeStage } from "@/constants/treeStages";
 import { getWatchGrowthPlan } from "@/constants/growthVideo";
 import { GrowthVideoModal } from "@/components/GrowthVideoModal";
 import { ForestTransition } from "@/components/ForestTransition";
 import LivingTreeView from "@/components/growth/LivingTreeView";
+import BotanicalModelView from "@/components/growth/BotanicalModelView";
 import { useGrowthTree } from "@/hooks/useGrowthTree";
 import { botanicalDevelopment } from "@/lib/botanicalDevelopment";
 import { useGrowthStage, nextRequirementsMet } from "@/hooks/useGrowthStage";
-import FruitDetailCard from "@/components/tree/FruitDetailCard";
-import TreeAccessibleSummary from "@/components/tree/TreeAccessibleSummary";
 import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import ReadableText from "@/components/ReadableText";
 import ReadInBibleLink from "@/components/bible/ReadInBibleLink";
 import { AppButton, IconButton } from "@/components/ui";
+import { useTranslation } from "react-i18next";
 
 const ROLE_COLORS: Record<string, string> = {
   super_admin: colors.brightYellow,
@@ -81,9 +80,6 @@ function NodeCard({ node, depth = 0 }: { node: ForestNode; depth?: number }) {
               {node.country && <Text style={styles.nodeCountry}>{node.country}</Text>}
             </View>
           </View>
-          <View style={styles.levelPill}>
-            <Text style={styles.levelText}>Lv{node.growthLevel}</Text>
-          </View>
         </TouchableOpacity>
       </View>
 
@@ -107,7 +103,8 @@ export default function LivingTreeScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const { contentMaxWidth } = useLayout();
   const { profile } = useAuth();
-  const { forestNodes, forestStats, isLoading, treeData, fruitCatalog, userFruits } = useData();
+  const { forestNodes, forestStats, isLoading } = useData();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ prevStage?: string; tab?: string }>();
   const [tab, setTab] = useState<"tree" | "forest">(params.tab === "forest" ? "forest" : "tree");
   const [videoPlan, setVideoPlan] = useState<{ start: number; end: number } | null>(null);
@@ -117,15 +114,8 @@ export default function LivingTreeScreen() {
   // The tree is the real Meshy 3D model of the person's growth MILESTONE (server-calculated), the same
   // stage the label shows, with one fruit per verified contribution (components/growth/LivingTreeView —
   // the same renderer as Home). Full tree / Roots / Canopy move the camera over the real model.
-  const [selectedFruitKey, setSelectedFruitKey] = useState<string | null>(null);
-  const [showAccessibleSummary, setShowAccessibleSummary] = useState(false);
-  const selectedCatalogEntry = selectedFruitKey ? fruitCatalog.find((c) => c.fruitKey === selectedFruitKey) ?? null : null;
-  const selectedEarnedFruit = selectedFruitKey ? userFruits.find((f) => f.fruitKey === selectedFruitKey) ?? null : null;
-
-  // The accessible list view still describes fruit by the My Tree score's detail stage.
-  const newTreeStage = getTreeStage(treeData?.treeGrowthScore ?? 0);
-
-  const growthPoints = profile?.growthLevel ?? 0;
+  // My Tree shows only VERIFIED growth (Growth Matrix + the shared tree data). The earlier points level,
+  // legacy fruit catalogue and "lessons completed" counts are no longer shown here (owner brief 2026-11-14).
   const { stageIndex, journey } = useGrowthStage();
   const stage = STAGES[stageIndex];
   // Forest Builder is the highest personal stage (Forest of Nations is collective).
@@ -133,8 +123,8 @@ export default function LivingTreeScreen() {
   // Progress toward the next milestone: verified requirements met (counts, never points).
   const requirements = nextRequirementsMet(journey);
   // How the tree looks (appearance only) — from the same tree data the 3D tree draws; never the stage.
-  const botany = botanicalDevelopment(stageIndex, useGrowthTree().plan);
-  const progressPct = requirements && requirements.total ? Math.round((requirements.met / requirements.total) * 100) : nextStage ? 0 : 100;
+  const { tree: myTree, plan: myPlan } = useGrowthTree();
+  const botany = botanicalDevelopment(stageIndex, myPlan);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -163,14 +153,14 @@ export default function LivingTreeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.prevStage]);
 
-  const { modules } = useData();
-  const completedLessons = modules.reduce((a, m) => a + m.completedLessons, 0);
   const countriesCount = forestStats.countriesReached.length;
-  const activities: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-    ...(completedLessons > 0 ? [{ icon: "book" as const, label: `${completedLessons} ${completedLessons === 1 ? "lesson" : "lessons"} completed` }] : []),
-    ...(forestStats.totalDisciples > 0 ? [{ icon: "person-add" as const, label: `${forestStats.totalDisciples} ${forestStats.totalDisciples === 1 ? "disciple" : "disciples"} in your network` }] : []),
-    ...(countriesCount > 0 ? [{ icon: "globe-outline" as const, label: `${countriesCount} ${countriesCount === 1 ? "country" : "countries"} reached` }] : []),
-  ];
+  // What grew the tree: verified records only (the same shared tree data the 3D tree draws).
+  const activities: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = myTree ? [
+    ...(myTree.roots.learningUnits > 0 ? [{ icon: "book" as const, label: `${myTree.roots.learningUnits} ${myTree.roots.learningUnits === 1 ? "learning unit" : "learning units"} passed` }] : []),
+    ...(myTree.stems.practicalActions > 0 ? [{ icon: "hand-left-outline" as const, label: `${myTree.stems.practicalActions} verified practical ${myTree.stems.practicalActions === 1 ? "activity" : "activities"}` }] : []),
+    ...(myTree.fruitTotals.verified > 0 ? [{ icon: "nutrition-outline" as const, label: `${myTree.fruitTotals.verified} verified ${myTree.fruitTotals.verified === 1 ? "contribution" : "contributions"}` }] : []),
+    ...(myTree.roots.activeWeeks > 0 ? [{ icon: "calendar-outline" as const, label: `${myTree.roots.activeWeeks} active ${myTree.roots.activeWeeks === 1 ? "week" : "weeks"}` }] : []),
+  ] : [];
 
   const totalNodes = forestNodes.reduce((acc, n) => acc + 1 + countDescendants(n), 0);
   function countDescendants(node: ForestNode): number {
@@ -236,61 +226,17 @@ export default function LivingTreeScreen() {
           <Text style={styles.introLabel}>PEER TO PEER GLOBAL DISCIPLESHIP NETWORK</Text>
           <Text style={styles.pageTitle}>The Living Tree</Text>
           <Text style={styles.pageDesc}>
-            Your tree grows only from what you actually do — every lesson finished, prayer offered,
-            session shared, and disciple invited. No shortcuts, just organic growth from a seed to a
-            forest of nations.
+            Your tree grows only from what has been verified: lessons you passed, practical activities
+            someone confirmed, and help you gave that supported others. Invitations, messages and app
+            opens never count.
           </Text>
 
-          {/* The interactive tree — real fruit, real growth, explorable */}
-          {treeData && (
-            <View style={styles.treeSceneCard}>
-              <Text style={styles.treeStageName}>{stage.name}</Text>
-              <Text style={styles.treeStageDesc}>{stage.description}</Text>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Your growth journey: what the next stage asks for" onPress={() => router.push("/stages")} style={{ alignSelf: "flex-start", paddingVertical: 6 }}>
-                <Text style={{ color: colors.accentGreen, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Your growth journey →</Text>
-              </TouchableOpacity>
-
-              {!showAccessibleSummary ? (
-                <View style={styles.fruitSection}>
-                  <Text style={styles.fruitHeading}>Your fruit · {userFruits.length}</Text>
-                  {userFruits.length === 0 ? (
-                    <Text style={styles.fruitEmpty}>Fruit appears as you finish lessons, pray, share sessions and help others.</Text>
-                  ) : (
-                    <View style={styles.fruitChips}>
-                      {userFruits.map((f) => {
-                        const entry = fruitCatalog.find((c) => c.fruitKey === f.fruitKey);
-                        return (
-                          <TouchableOpacity key={f.fruitKey} style={styles.fruitChip} onPress={() => setSelectedFruitKey(f.fruitKey)}
-                            accessibilityRole="button" accessibilityLabel={`${entry?.name ?? "Fruit"}: details`}>
-                            <Text style={styles.fruitChipText}>🍎 {entry?.name ?? f.fruitKey}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <TreeAccessibleSummary stage={{ ...newTreeStage, name: stage.name, description: stage.description }} earnedFruits={userFruits} fruitCatalog={fruitCatalog} />
-              )}
-
-              <TouchableOpacity
-                style={styles.accessibleToggle}
-                onPress={() => setShowAccessibleSummary((v) => !v)}
-                accessibilityRole="button"
-                accessibilityLabel={showAccessibleSummary ? "Show fruit" : "Show as list"}
-              >
-                <Ionicons name={showAccessibleSummary ? "image-outline" : "list-outline"} size={14} color={colors.accentGreen} />
-                <Text style={styles.accessibleToggleText}>{showAccessibleSummary ? "Show fruit" : "Show as list"}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <FruitDetailCard
-            visible={!!selectedFruitKey}
-            catalogEntry={selectedCatalogEntry}
-            earnedFruit={selectedEarnedFruit}
-            onClose={() => setSelectedFruitKey(null)}
-          />
+          {/* My Growth: explore the roots, application, contributions and consistency behind this tree. */}
+          <View style={styles.treeSceneCard}>
+            <Text style={styles.treeStageName}>{t("myGrowth.title")}</Text>
+            <Text style={styles.treeStageDesc}>{t("myGrowth.intro")}</Text>
+            <AppButton label={t("myGrowth.title")} icon="leaf-outline" onPress={() => router.push("/my-growth" as any)} palette="fixedLight" style={{ alignSelf: "flex-start", marginTop: 6 }} />
+          </View>
 
           {/* Botanical development — kept apart from the Growth Stage: how the tree looks, never a rank */}
           <View style={styles.botanyCard}>
@@ -304,15 +250,15 @@ export default function LivingTreeScreen() {
               </View>
             ))}
             <Text style={styles.botanyNote}>{botany.note}</Text>
-            <AppButton label="How an apple tree grows" icon="leaf-outline" size="sm" variant="secondary" palette="fixedLight" style={{ alignSelf: "flex-start", marginTop: 4 }}
+            <AppButton label="How My Tree Grows" icon="leaf-outline" size="sm" variant="secondary" palette="fixedLight" style={{ alignSelf: "flex-start", marginTop: 4 }}
               onPress={() => router.push("/botanical" as any)} />
           </View>
 
           {/* Vertical stat rows */}
           <View style={styles.statRowsCard}>
             <View style={styles.statRow}>
-              <Text style={styles.statRowLabel}>Growth Level</Text>
-              <Text style={styles.statRowValue}>{growthPoints}</Text>
+              <Text style={styles.statRowLabel}>Your Growth Stage</Text>
+              <Text style={styles.statRowValue}>{stage.name}</Text>
             </View>
             <View style={styles.statRowDivider} />
             <View style={styles.statRow}>
@@ -333,9 +279,9 @@ export default function LivingTreeScreen() {
 
           <View style={styles.stageCard}>
             <View style={styles.stageTopRow}>
-              <Text style={styles.stageOf}>STAGE {stageIndex + 1} OF 6</Text>
+              <Text style={styles.stageOf}>STAGE {stageIndex + 1} OF {PERSONAL_STAGE_COUNT}</Text>
               <View style={styles.dots}>
-                {STAGES.map((_, i) => (
+                {STAGES.slice(0, PERSONAL_STAGE_COUNT).map((_, i) => (
                   <View key={i} style={[styles.dot, i === stageIndex ? styles.dotActive : i < stageIndex ? styles.dotDone : styles.dotLocked]} />
                 ))}
               </View>
@@ -349,26 +295,12 @@ export default function LivingTreeScreen() {
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
                   <Text style={styles.progressToward}>Growing toward {nextStage.name}</Text>
-                  {requirements ? <Text style={styles.progressPct}>{requirements.met} of {requirements.total}</Text> : null}
-                </View>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: `${progressPct}%` }]} />
+                  {requirements ? <Text style={styles.progressCount}>{requirements.met} of {requirements.total}</Text> : null}
                 </View>
                 <Text style={styles.pointsHint}>{requirements ? `${requirements.met} of ${requirements.total} requirements met for ${nextStage.name}.` : "See what the next milestone asks for in your growth journey."}</Text>
               </View>
             )}
           </View>
-
-          {treeData && (
-            <View style={styles.treeDataCard}>
-              <Text style={styles.treeStageLabel}>{stage.name}</Text>
-              <View style={styles.treeStatsRow}>
-                <Text style={styles.treeStatItem}>{treeData.fruitCount} fruit</Text>
-                <Text style={styles.treeStatDot}>·</Text>
-                <Text style={styles.treeStatItem}>{treeData.activeMentees} mentee{treeData.activeMentees === 1 ? "" : "s"}</Text>
-              </View>
-            </View>
-          )}
 
           <View style={styles.descSection}>
             <Text style={styles.descText}>{stage.description}</Text>
@@ -402,6 +334,14 @@ export default function LivingTreeScreen() {
       ) : (
         <View style={{ flex: 1 }}>
           <View style={styles.forestHeader}>
+            {/* The collective Forest of Nations (owner's Meshy globe) — what everyone grows together, never a
+                personal stage. Tap for full screen. "Not available yet" until it is hosted. */}
+            <View style={styles.nationsCard}>
+              <BotanicalModelView assetId="forest-of-nations-3d-landscape" compact background={colors.card} style={styles.nationsGlobe}
+                onPress={() => router.push({ pathname: "/tree-3d", params: { forest: "1" } } as any)} accessibilityHint="Opens the Forest of Nations in 3D" />
+              <Text style={styles.nationsTitle}>Forest of Nations</Text>
+              <Text style={styles.nationsText}>What P2P Global&apos;s participants grow together, across the nations. Not a personal stage.</Text>
+            </View>
             {(isForestBuilder || isForestOfNations) && (
               <View style={[styles.stageBanner, isForestOfNations && styles.stageBannerNations]}>
                 <Ionicons name={isForestOfNations ? "globe-outline" : "people-outline"} size={26} color={colors.primaryGreen} />
@@ -449,7 +389,7 @@ export default function LivingTreeScreen() {
           startSec={videoPlan.start}
           endSec={videoPlan.end}
           stageName={stage.name}
-          progressPct={progressPct}
+          requirementsMet={requirements}
           nextStageName={nextStage?.name ?? null}
           onClose={() => setVideoPlan(null)}
         />
@@ -530,7 +470,7 @@ const styles = StyleSheet.create({
   progressSection: { gap: 6 },
   progressLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   progressToward: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_500Medium" },
-  progressPct: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
+  progressCount: { fontSize: 13, color: colors.textMuted, fontFamily: "Inter_500Medium" },
   progressBarBg: { height: 6, backgroundColor: colors.progressTrack, borderRadius: 3 },
   progressBarFill: { height: 6, backgroundColor: colors.progressFill, borderRadius: 3 },
   pointsHint: { fontSize: 12, color: colors.textMuted, fontFamily: "Inter_400Regular", marginTop: 2 },
@@ -575,6 +515,10 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, color: colors.accentGreen, fontFamily: "Inter_500Medium" },
 
   forestHeader: { paddingHorizontal: 20 },
+  nationsCard: { borderRadius: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderBeige, padding: 12, gap: 4, marginBottom: 12 },
+  nationsGlobe: { height: 200, borderRadius: 12, overflow: "hidden" },
+  nationsTitle: { fontSize: 16, color: colors.textDark, fontFamily: "Inter_700Bold", marginTop: 4 },
+  nationsText: { fontSize: 13, color: colors.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
   stageBanner: {
     flexDirection: "row", gap: 10, alignItems: "center",
     backgroundColor: "rgba(29,158,117,0.08)", borderRadius: 14, borderWidth: 1, borderColor: "rgba(29,158,117,0.25)",

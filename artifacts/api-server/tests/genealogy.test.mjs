@@ -148,6 +148,11 @@ try {
   r = await get("/history/ggk");
   ok("history: in someone else's history, a private person I'm not related to is just 'A disciple'", r.status === 200 && r.j.contributors[0].person.name === "A disciple" && r.j.contributors[0].person.id === null);
   ok("history: signed out → 401", (await get("/history/me", null)).status === 401);
+  // A pending/declined/expired REQUEST is not a relationship: it opens nothing (2026-11-14 fix).
+  T.p2p_discipleship_links.push({ id: "ldecl", mentor_id: "asker", disciple_id: "me", is_primary: false, status: "declined", started_at: null });
+  T.p2p_discipleship_links.push({ id: "lpend", mentor_id: "me", disciple_id: "hopeful", is_primary: false, status: "pending", started_at: null });
+  ok("history: a declined request does not open the other person's history", (await get("/history/asker")).status === 404);
+  ok("history: a pending request does not open the other person's history", (await get("/history/hopeful")).status === 404);
 
   ({ j } = await get("/collective"));
   ok("Forest of Nations: totals (relationships, people, generations, countries, stages, months)", j.activeRelationships === links.length && j.peopleBeingDiscipled === 68 && j.generations === 6 && j.countries === 2 && j.stages.length === 5, JSON.stringify({ g: j.generations, p: j.peopleBeingDiscipled }));

@@ -9,13 +9,17 @@ import type { AppColors } from "@/constants/themes";
 // existing screen; nothing here is a copy. The tab passes each status line from data it has
 // already loaded (no requests here).
 //   • Bible has its own main tab, so it isn't repeated here.
-//   • Study Together is reached from the resources that support it (Bible, stories, church,
-//     family, Continue Learning), so it isn't a separate tile.
+//   • Study Together (owner 2026-11-14) has its own tile: the existing hub (/study-together) is the
+//     one place every shared study lives — stories, lessons, plans, and Family / Church studies.
+//     Studies are still started from the resources themselves.
 //   • "My Learning" is the Learning Centre (same screen, which holds the learning dashboard),
 //     so it is one tile.
 export const LEARNING_DESTINATIONS = [
   { key: "school", icon: "school", title: "Kingdom School", route: "/kingdom-school", tint: "green" },
   { key: "stories", icon: "library", title: "Kingdom Stories", route: "/kingdom-stories", tint: "amber" },
+  // P2P Plans (2026-11-14): one plan system organising Bible, Kingdom School, Kingdom Stories and Deep Study.
+  { key: "plans", icon: "calendar", title: "P2P Plans", route: "/plans", tint: "green" },
+  { key: "together", icon: "people", title: "Study Together", route: "/study-together", tint: "amber" },
   { key: "centre", icon: "clipboard", title: "Learning Centre", route: "/learning", tint: "earth" },
   { key: "evaluations", icon: "checkmark-done-circle", title: "My Evaluations", route: "/evaluation", tint: "gold" },
 ] as const;

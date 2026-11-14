@@ -118,6 +118,9 @@ try {
   ok("no spiritual-measurement wording in the answer", !/spiritual fruit|spiritual growth|maturity/i.test(JSON.stringify(j)));
   ok("Forest of Nations is the collective view, said plainly", j.collective.name === "Forest of Nations" && /not a personal stage/.test(j.collective.note));
   ok("milestones still a draft; promotions off; calculation version 2", j.milestones === "draft" && j.promotionsEnabled === false && j.calcVersion === 2);
+  ok("later milestones (How My Tree Grows): the engine's checklists for the stages after the next, never past Forest Builder",
+    Array.isArray(j.later) && j.later.map((x) => x.name).join() === "Fruitful Tree,Forest Builder" && j.later.every((x) => x.dimensions.length === 4) && !JSON.stringify(j.later).includes("Forest of Nations"));
+  ok("…a stage the engine has no checklist for yet shows no requirements (never invented)", j.later[0].dimensions.every((d) => !d.required && d.items.length === 0));
   ok("history: the stages reached, with how", j.history.length === 1 && j.history[0].name === "Sprout" && j.history[0].kind === "legacy_import");
   ok("the current pause is shown", j.pauses.length === 1 && j.pauses[0].current && j.pauses[0].endsOn === "2026-11-20");
   ok("an up-to-date checklist is not recalculated on view", !rpc.some(([fn, a]) => fn === "p2p_growth_recalculate" && a.p_user === "ann"));

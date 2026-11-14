@@ -41,7 +41,7 @@ async function loadAnchors(bodyId: string): Promise<BodyAnchors | null> {
 /** The Meshy body for a personal stage index (0 = Seed … 4 = Forest Builder); the same map the tree uses. */
 export const bodyForStage = (stageIndex: number) => STAGE_BODIES[Math.min(5, Math.max(1, stageIndex + 1))];
 
-export default function LivingTreeView({ stageIndex, mode = "tree", compact = false, onPress, background = colors.lightCream, style, extraControls, showViewControls = false, accessibilityHint }: {
+export default function LivingTreeView({ stageIndex, mode = "tree", compact = false, onPress, background = colors.lightCream, style, extraControls, showViewControls = false, accessibilityHint, requestedView, onSelect }: {
   /** The person's (or the card's) personal stage, 0 = Seed … 4 = Forest Builder. */
   stageIndex: number;
   mode?: "tree" | "stage";
@@ -54,6 +54,10 @@ export default function LivingTreeView({ stageIndex, mode = "tree", compact = fa
   /** Full tree / Roots / Canopy and wind on/off (My Tree, full screen). */
   showViewControls?: boolean;
   accessibilityHint?: string;
+  /** Move the camera to this view when it changes (My Growth: Learning Roots → "roots"). The buttons still work. */
+  requestedView?: TreeView;
+  /** Told which tree part was tapped (an attachment id, e.g. "fruit:<evidence id>"), so a screen can show its record. */
+  onSelect?: (id: string | null) => void;
 }) {
   const reduceMotion = useReduceMotion();
   const [anchors, setAnchors] = useState<BodyAnchors | null>(null);
@@ -106,6 +110,12 @@ export default function LivingTreeView({ stageIndex, mode = "tree", compact = fa
   const pickView = (v: TreeView) => { setView(v); viewer.current?.view(v); };
   const toggleWind = () => { const on = !windOn; setWindOn(on); viewer.current?.setWind(on); };
   const retry = () => { setStatus({ state: "loading", progress: 0 }); setReloadKey((k) => k + 1); };
+  // A screen can ask for a view (once the model is drawn); asking again for the same view re-applies nothing.
+  const drawn = status.state === "standard" || status.state === "detailed" || status.state === "detail-loading";
+  useEffect(() => {
+    if (requestedView && drawn) { setView(requestedView); viewer.current?.view(requestedView); }
+  }, [requestedView, drawn]);
+  useEffect(() => { onSelect?.(picked); }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The model itself, with its loading / not-available states (no touch targets inside).
   const scene = (

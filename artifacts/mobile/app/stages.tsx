@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors from "@/constants/colors";
 import { STAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX, getStageFromPoints } from "@/constants/stages";
 import LivingTreeView from "@/components/growth/LivingTreeView";
+import BotanicalModelView from "@/components/growth/BotanicalModelView";
 import ReadableText from "@/components/ReadableText";
 import { AppButton } from "@/components/ui";
 import { confirmAction } from "@/lib/alerts";
@@ -288,8 +289,10 @@ export default function StagesScreen() {
         <Text style={styles.desc}>{collective.description}</Text>
         <ReadableText style={styles.verse}>{collective.verse} — {collective.verseRef}</ReadableText>
         <Text style={styles.meta}>Not a personal stage: it is what P2P Global&apos;s participants build together, shown only as totals — never names or rankings.</Text>
-        {/* Only a 2D picture of the Forest of Nations exists; its 3D scene is not available yet (no picture stands in for it). */}
-        <Text style={styles.meta}>The 3D Forest of Nations scene isn&apos;t available yet.</Text>
+        {/* The collective Forest of Nations in 3D (owner's Meshy globe, 2026-11-14) — never a personal stage, never
+            the 2D picture. Until it is hosted the card says it isn't available yet. */}
+        <BotanicalModelView assetId="forest-of-nations-3d-landscape" compact background={colors.card} style={styles.collectiveGlobe}
+          onPress={() => router.push({ pathname: "/tree-3d", params: { forest: "1" } } as any)} accessibilityHint="Opens the Forest of Nations in 3D" />
         {journey ? (
           <TouchableOpacity accessibilityRole="switch" accessibilityState={{ checked: !!journey.shareCountryInCollective }} style={styles.toggleRow}
             onPress={() => act(() => setShareCountryInCollective(!journey.shareCountryInCollective), journey.shareCountryInCollective ? "Your country is no longer counted." : "Your country is now counted in the totals.")}>
@@ -445,6 +448,7 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
 
   collectiveCard: { marginTop: 24, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.borderBeige, padding: 14, gap: 6 },
+  collectiveGlobe: { height: 260, borderRadius: 14, overflow: "hidden", marginTop: 4 },
   collectiveLabel: { fontSize: 10, letterSpacing: 1.5, color: colors.amber, fontFamily: "Inter_600SemiBold" },
   collectiveTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: colors.primaryGreen },
 });

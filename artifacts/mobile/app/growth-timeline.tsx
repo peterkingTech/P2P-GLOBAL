@@ -1,40 +1,42 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { AppColors } from "@/constants/themes";
 import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
-import { getGrowthTree, type GrowthTree } from "@/lib/growthApi";
+import { useTranslation } from "react-i18next";
+import { useGrowthTree } from "@/hooks/useGrowthTree";
+import { storyEvents, type StoryKind } from "@/lib/myGrowth";
 
-// GROWTH STORY & TIMELINE — my development over time, from RECORDED events only, in three kinds that are
-// always labelled apart: Growth Stage changes (verified milestones), contribution fruit (one per verified
-// contribution) and botanical events (how the tree looks — only where the data has a date: the first fruit).
+// GROWTH STORY & TIMELINE — my development over time, from RECORDED events only, in five kinds that are
+// always labelled apart (lib/myGrowth.ts storyEvents): A. Growth Stage changes (verified milestones),
+// B. learning milestones (the dated pass of the 1st, 10th, 20th… unique learning unit), C. verified
+// application, D. contribution fruit (one per verified contribution), E. botanical events (how the tree
+// looks — only where the data has a date: the first fruit). From the SAME shared tree data as Home,
+// My Tree and My Growth (hooks/useGrowthTree).
 // A stage opens its real 3D model on request. Choose a year to see that period. Nothing is inferred or invented.
-type Event = { date: string; kind: "stage" | "fruit" | "botany"; title: string; detail: string; stage?: number };
-const KIND_LABEL: Record<Event["kind"], string> = { stage: "Growth Stage", fruit: "Contribution fruit", botany: "Botanical" };
+type Event = { date: string; kind: StoryKind; title: string; detail: string; stage?: number };
+const KIND_COLOR: Record<StoryKind, string> = { stage: "#1D7A55", learning: "#2C5E8C", application: "#8A6A1E", fruit: "#B8322A", botany: "#8BB174" };
 
 export default function GrowthTimelineScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const s = useMemo(() => makeStyles(c), [c]);
-  const [d, setD] = useState<GrowthTree | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
+  const { tree: d, loaded, reload: load } = useGrowthTree();
+  const error = !d && loaded ? t("myGrowth.notAvailable") : null;
   const [year, setYear] = useState<string>("all");
-  const load = useCallback(() => { setError(null); getGrowthTree().then(setD, (e) => setError(e?.message ?? "Couldn't load your timeline.")); }, []);
-  useEffect(load, [load]);
+  const KIND_LABEL = (k: StoryKind) => t(`myGrowth.story.kinds.${k}`);
 
-  const events: Event[] = useMemo(() => {
-    if (!d) return [];
-    const e: Event[] = d.history.map((h) => ({ date: h.achievedAt.slice(0, 10), kind: "stage", stage: h.stage, title: `Became ${h.name}`,
-      detail: h.kind === "legacy_import" ? "Recognised from the earlier growth system" : "Verified milestone" }));
-    for (const f of d.fruits) if (f.countsTowardMilestone) e.push({ date: f.date, kind: "fruit", title: f.label, detail: `${f.areaLabel}${f.kind === "group" ? " · group" : ""}` });
-    // Botanical: the day the tree first bore fruit (appearance only — it counts for nothing extra).
-    const first = d.fruits.filter((f) => f.countsTowardMilestone).sort((a, b) => a.date.localeCompare(b.date))[0];
-    if (first) e.push({ date: first.date, kind: "botany", title: "First fruit on your tree", detail: "How your tree looks — not a milestone and not an extra contribution" });
-    return e.sort((a, b) => b.date.localeCompare(a.date));
-  }, [d]);
+  const events: Event[] = useMemo(() => storyEvents(d).map((e) => {
+    if (e.kind === "stage") return { date: e.date, kind: e.kind, stage: e.stage, title: t("myGrowth.stage.became", { name: e.title }), detail: e.legacy ? t("myGrowth.stage.legacy") : t("myGrowth.stage.verified") };
+    if (e.kind === "learning") return { date: e.date, kind: e.kind, title: t("myGrowth.story.learningMilestone", { count: e.units }), detail: t("myGrowth.story.learningDetail") };
+    if (e.kind === "application") return { date: e.date, kind: e.kind, title: e.title ?? "", detail: `${e.detail ?? ""} · ${t("myGrowth.story.applicationDetail")}` };
+    if (e.kind === "fruit") return { date: e.date, kind: e.kind, title: e.title ?? "", detail: e.detail ?? "" };
+    return { date: e.date, kind: e.kind, title: t("myGrowth.story.firstFruit"), detail: t("myGrowth.story.firstFruitDetail") };
+  }), [d, t]);
   const years = [...new Set(events.map((e) => e.date.slice(0, 4)))].sort().reverse();
   const shown = events.filter((e) => year === "all" || e.date.startsWith(year));
 
@@ -65,11 +67,11 @@ export default function GrowthTimelineScreen() {
             {shown.map((e, i) => {
               const stageIdx = e.kind === "stage" && e.stage && e.stage <= 5 ? e.stage - 1 : null;
               return (
-                <View key={`${e.date}-${i}`} style={s.event} accessible accessibilityLabel={`${e.date}: ${KIND_LABEL[e.kind]}: ${e.title}. ${e.detail}`}>
-                  <View style={[s.mark, e.kind === "stage" ? s.markStage : e.kind === "fruit" ? s.markFruit : s.markBotany]} />
+                <View key={`${e.date}-${i}`} style={s.event} accessible accessibilityLabel={`${e.date}: ${KIND_LABEL(e.kind)}: ${e.title}. ${e.detail}`}>
+                  <View style={[s.mark, { backgroundColor: KIND_COLOR[e.kind] }]} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={s.date}>{new Date(e.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</Text>
-                    <Text style={[s.kind, e.kind === "stage" ? s.kindStage : e.kind === "fruit" ? s.kindFruit : s.kindBotany]}>{KIND_LABEL[e.kind]}</Text>
+                    <Text style={[s.kind, { color: KIND_COLOR[e.kind] }]}>{KIND_LABEL(e.kind)}</Text>
                     <Text style={s.name}>{e.title}</Text>
                     <Text style={s.meta}>{e.detail}</Text>
                     {stageIdx !== null ? (
@@ -84,6 +86,7 @@ export default function GrowthTimelineScreen() {
             <View style={s.links}>
               <AppButton label="Fruit Harvest" icon="nutrition-outline" variant="secondary" size="sm" onPress={() => router.push("/fruit-harvest" as any)} />
               <AppButton label="My genealogy" icon="git-network-outline" variant="secondary" size="sm" onPress={() => router.push("/lineage" as any)} />
+              <AppButton label={t("myGrowth.title")} icon="leaf-outline" variant="secondary" size="sm" onPress={() => router.push("/my-growth" as any)} />
             </View>
             <Text style={s.small}>{d.disclaimer}</Text>
           </>

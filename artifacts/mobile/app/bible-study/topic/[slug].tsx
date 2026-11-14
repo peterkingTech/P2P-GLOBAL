@@ -9,6 +9,8 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { getTopic, type PrayerTopicDetail } from "@/lib/prayerTopicsApi";
 import { topicPassageRoute } from "@/lib/bibleStudy";
 import { AppButton, IconButton } from "@/components/ui";
+import { useTranslation } from "react-i18next";
+import { topicKey } from "@/lib/scriptureTopicsUi";
 
 // One Scripture topic (Bible Study → Explore Scripture by Topic): the
 // editorially curated references for the topic, each opened in context in the
@@ -22,14 +24,15 @@ export default function BibleTopicScreen() {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { contentMaxWidth } = useLayout();
+  const { t } = useTranslation();
   const [topic, setTopic] = useState<PrayerTopicDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!slug) return;
     setError(null);
-    getTopic(String(slug)).then(setTopic).catch((e) => setError(e?.message ?? "This topic couldn't load."));
-  }, [slug]);
+    getTopic(String(slug)).then(setTopic).catch((e) => setError(e?.message ?? t("scriptureTopics.topicFailed")));
+  }, [slug, t]);
   useEffect(() => { load(); }, [load]);
 
   const refs = [...(topic?.scriptures ?? [])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
@@ -38,27 +41,30 @@ export default function BibleTopicScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 40 }, centeredMaxWidth(contentMaxWidth)]}>
         <View style={s.header}>
-          <IconButton icon="arrow-back" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/bible-study" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
-          <Text style={[s.title, { flex: 1 }]} accessibilityRole="header" numberOfLines={2}>{topic?.title ?? "Topic"}</Text>
+          <IconButton icon="arrow-back" accessibilityLabel={t("scriptureTopics.back")} onPress={() => (router.canGoBack() ? router.back() : router.replace("/bible-study" as any))} color={colors.textDark} style={{ marginLeft: -10 }} />
+          <Text style={[s.title, { flex: 1 }]} accessibilityRole="header" numberOfLines={2}>{topic ? t(`scriptureTopics.names.${topicKey(topic.title)}`, { defaultValue: topic.title }) : ""}</Text>
         </View>
         {error ? (
           <View style={{ gap: 8 }}>
             <Text style={s.meta}>{error}</Text>
-            <AppButton label="Try again" onPress={load} variant="tertiary" />
+            <AppButton label={t("scriptureTopics.tryAgain")} onPress={load} variant="tertiary" />
           </View>
-        ) : !topic ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel="Loading topic" />
+        ) : !topic ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel={t("scriptureTopics.loading")} />
           : (
             <>
               {topic.description ? <Text style={s.body}>{topic.description}</Text> : null}
-              {refs.length === 0 ? <Text style={s.meta}>No passages are listed for this topic yet.</Text> : refs.map((r) => {
+              {refs.length === 0 ? <Text style={s.meta}>{t("scriptureTopics.noPassages")}</Text> : refs.map((r) => {
                 const route = topicPassageRoute(r);
                 return (
                   <TouchableOpacity key={r.id} style={s.ref} disabled={!route} onPress={() => route && router.push(route as any)}
-                    accessibilityRole="button" accessibilityLabel={`Read ${r.referenceDisplay} in context`} accessibilityState={{ disabled: !route }}>
+                    accessibilityRole="button" accessibilityLabel={`${t("scriptureTopics.readInContext", { ref: r.referenceDisplay })}${r.editorialTitle ? `. ${r.editorialTitle}` : ""}`} accessibilityState={{ disabled: !route }}>
                     <Ionicons name="book-outline" size={18} color={colors.accentGreen} />
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={s.refTitle}>{r.referenceDisplay}</Text>
-                      {r.role === "core" ? <Text style={s.kicker}>Key passage</Text> : null}
+                      {r.editorialTitle ? <Text style={s.refSub}>{r.editorialTitle}</Text> : null}
+                      {r.role === "core" || r.passageKind ? (
+                        <Text style={s.kicker}>{[r.role === "core" ? t("scriptureTopics.keyPassage") : null, r.passageKind ? t(`scriptureTopics.kinds.${r.passageKind}`) : null].filter(Boolean).join(" · ")}</Text>
+                      ) : null}
                       {r.editorialNote ? <Text style={s.meta}>{r.editorialNote}</Text> : null}
                     </View>
                     {route ? <Ionicons name="chevron-forward" size={16} color={colors.textMuted} /> : null}
@@ -84,6 +90,7 @@ function makeStyles(c: AppColors) {
     kicker: { fontSize: 11, color: c.amber, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4 },
     ref: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     refTitle: { fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
+    refSub: { fontSize: 13.5, color: c.textMid, fontFamily: "Inter_500Medium", lineHeight: 19 },
     retry: { minHeight: 44, justifyContent: "center" },
     retryText: { fontSize: 13, color: c.accentGreen, fontFamily: "Inter_600SemiBold" },
   });

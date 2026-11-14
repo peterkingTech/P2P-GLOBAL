@@ -64,14 +64,14 @@ ok("default base = the hosted, versioned v2 folder (uploaded and verified 2026-1
   && A0.modularFileUrl("asset-04-fruitful-apple-tree") === A0.MODULAR_TREE_BASE_URL + "body-04-fruitful-tree.glb" && A0.modularCloseUrl("asset-04-fruitful-apple-tree") === A0.MODULAR_TREE_BASE_URL + "body-04-fruitful-tree.close.glb");
 const A1 = load("lib/growthTreeAssets.ts", { EXPO_PUBLIC_GROWTH_MODEL_V2_BASE_URL: "http://127.0.0.1:8797" });
 ok("v2 configured → validated files resolve under that base", A1.modularFileUrl("asset-04-fruitful-apple-tree") === "http://127.0.0.1:8797/body-04-fruitful-tree.glb" && A1.anchorsUrl("asset-04-fruitful-apple-tree") === "http://127.0.0.1:8797/body-04-fruitful-tree.anchors.json");
-ok("a missing asset never gets a URL (Forest of Nations: only a 2D image exists)", A1.modularFileUrl("forest-of-nations-3d-landscape") === null && A1.anchorsUrl("asset-apple-stage-5-ripe-red") === null);
+ok("an asset that isn't hosted never gets a URL (Forest of Nations globe: validated, not hosted yet)", A1.modularFileUrl("forest-of-nations-3d-landscape") === null && A1.anchorsUrl("asset-apple-stage-5-ripe-red") === null);
 ok("bodies that carry their own leaves get no leaf clusters on top", P.placeTree(plan, anchors, { bodyHasFoliage: true }).filter((p) => p.id.startsWith("leaf:")).length === 0 && placed.some((p) => p.id.startsWith("leaf:")));
 ok("LivingTreeView respects the body's own foliage", src("components/growth/LivingTreeView.tsx").includes("bodyHasFoliage: !!assetById(plan.body)?.hasFoliage"));
 // Owner 2026-11-13: the first upload held the 13 the tree uses; the second (same day) the 17 lifecycle models.
 const used = [...Object.values(C.STAGE_BODIES), "asset-06-fruiting-spur-socket", "asset-apple-stage-5-ripe-red", "asset-apple-stage-6-striped-red", "asset-04d-blushed-apple",
   "asset-micro-7-balloon-stage-bud", "asset-micro-1-green-tip-bud", "asset-micro-3-unfurling-shoot-tip", "asset-micro-5-active-root-tip"];
 const hosted = [...A1.TREE_ASSETS, ...A1.EXTRA_ASSETS].filter((x) => x.release === "v2").map((x) => x.id);
-ok("hosted v2 = the 13 the tree uses + the 17 lifecycle models (30); nothing else", hosted.length === 30 && used.every((id) => hosted.includes(id)) && A1.TREE_ASSETS.filter((x) => !x.release && x.file).length === 0);
+ok("hosted v2 = the 13 the tree uses + the 17 lifecycle models (30); nothing else", hosted.length === 30 && used.every((id) => hosted.includes(id)) && A1.TREE_ASSETS.filter((x) => !x.release && x.file).map((x) => x.id).join() === "forest-of-nations-3d-landscape");
 ok("the tree itself only ever draws its 13 (lifecycle models never go on a person's tree)", [1, 2, 3, 4, 5].every((st) => C.composeTree(tree([fruit("a", "2026-11-10"), fruit("b", "2026-10-01"), fruit("p", "2026-11-11", { status: "pending_review", countsTowardMilestone: false })],
     { stage: { stage: st, name: "x" }, history: [{ stage: st, name: "x", achievedAt: "2026-11-08T00:00:00Z", kind: "verified" }] }), "2026-11-12").attachments.every((x) => used.includes(x.asset)))
   && P.placeTree(plan, anchors, { bodyHasFoliage: true }).every((p) => used.includes(p.asset)));

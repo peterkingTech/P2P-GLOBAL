@@ -13,7 +13,8 @@ interface GrowthVideoModalProps {
   endSec: number;
   stageName: string;
   eventLabel?: string | null;
-  progressPct: number;
+  /** "3 of 9 requirements met" — counts from the Growth Matrix (never a combined percentage). */
+  requirementsMet?: { met: number; total: number } | null;
   nextStageName?: string | null;
   onClose: () => void;
 }
@@ -23,7 +24,7 @@ export function GrowthVideoModal({
   endSec,
   stageName,
   eventLabel,
-  progressPct,
+  requirementsMet,
   nextStageName,
   onClose,
 }: GrowthVideoModalProps) {
@@ -77,15 +78,12 @@ export function GrowthVideoModal({
           <Text style={styles.stageName}>{stageName}</Text>
           {nextStageName ? (
             <View style={styles.progressBlock}>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${progressPct}%` }]} />
-              </View>
               <Text style={styles.progressText}>
-                {progressPct}% toward {nextStageName}
+                {requirementsMet ? `Toward ${nextStageName}: ${requirementsMet.met} of ${requirementsMet.total} requirements met` : `Growing toward ${nextStageName}`}
               </Text>
             </View>
           ) : (
-            <Text style={styles.progressText}>You&apos;ve reached the highest stage of growth.</Text>
+            <Text style={styles.progressText}>Forest Builder is the highest personal stage.</Text>
           )}
         </View>
       </View>

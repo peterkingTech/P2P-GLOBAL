@@ -1,0 +1,161 @@
+{
+  "category": "discipleship",
+  "topics": [
+    { "slug": "counting-the-cost", "title": "Counting the Cost", "description": "What it means to follow Jesus wholeheartedly.",
+      "passages": [
+        "Luke 14:25-33 | Count the cost | teaching",
+        "Luke 9:23-27 | Take up your cross daily | teaching",
+        "Luke 9:57-62 | No one who looks back | teaching",
+        "Matthew 16:24-26 | Whoever loses his life for my sake | teaching",
+        "Mark 10:17-31 | The rich young man | example",
+        "Matthew 13:44-46 | Treasure hidden in a field | teaching | Parables Jesus told",
+        "Philippians 3:7-14 | I count everything as loss | example",
+        "Matthew 4:18-22 | Immediately they left their nets | example",
+        "John 6:60-69 | To whom shall we go? | example",
+        "Hebrews 11:24-27 | Moses chose to be mistreated with God's people | example",
+        "Matthew 10:34-39 | Not peace but a sword | teaching",
+        "2 Timothy 2:1-7 | A good soldier of Christ Jesus | teaching"
+      ] },
+    { "slug": "making-disciples", "title": "Making Disciples", "description": "The Great Commission: helping others follow Jesus, who then help others.",
+      "passages": [
+        "Matthew 28:16-20 | Go and make disciples | teaching",
+        "2 Timothy 2:1-2 | Entrust to faithful people who will teach others | teaching",
+        "Mark 3:13-19 | He appointed twelve to be with him | example",
+        "Luke 10:1-12 | The seventy-two sent out | example",
+        "Acts 1:6-8 | You will be my witnesses | promise",
+        "Colossians 1:24-29 | To present everyone mature in Christ | teaching",
+        "1 Thessalonians 2:1-12 | Like a nursing mother, like a father | example",
+        "Acts 18:24-28 | Priscilla and Aquila teach Apollos | example",
+        "Acts 14:21-23 | Strengthening the souls of the disciples | example",
+        "John 1:35-42 | Come and you will see | example",
+        "Philippians 4:9 | What you have learned and seen in me, practise | teaching",
+        "Titus 2:1-8 | Older teaching younger | teaching",
+        "John 21:15-17 | Feed my sheep | teaching"
+      ] },
+    { "slug": "teaching-and-equipping", "title": "Teaching and Equipping", "description": "Teaching God's word faithfully and equipping others to serve.",
+      "passages": [
+        "Ephesians 4:11-16 | To equip the saints for ministry | teaching",
+        "2 Timothy 2:14-15 | Rightly handling the word of truth | teaching",
+        "2 Timothy 4:1-5 | Preach the word in season and out of season | teaching",
+        "Ezra 7:6-10 | Ezra set his heart to study, do and teach | example",
+        "Nehemiah 8:1-8 | They gave the sense | example",
+        "James 3:1 | Teachers will be judged more strictly | teaching",
+        "1 Timothy 4:11-16 | Devote yourself to teaching | teaching",
+        "Titus 1:5-9 | Hold firm to the trustworthy word | teaching",
+        "Matthew 7:28-29 | He taught as one who had authority | example",
+        "Acts 20:17-27 | I did not shrink from declaring the whole counsel | example",
+        "Hebrews 5:11-14 | You ought to be teachers | teaching",
+        "Deuteronomy 32:1-4 | May my teaching drop as the rain | example"
+      ] },
+    { "slug": "sharing-your-testimony", "title": "Sharing Your Testimony", "description": "Telling others what God has done in your life.",
+      "passages": [
+        "Mark 5:1-20 | Tell how much the Lord has done for you | example",
+        "John 4:27-42 | Come, see a man who told me all I ever did | example",
+        "John 9:24-34 | One thing I know: I was blind, now I see | example",
+        "Acts 26:1-29 | Paul tells his story to Agrippa | example",
+        "1 Peter 3:15-16 | Always be prepared to give a reason | teaching",
+        "Psalm 66:16-20 | Come and hear what he has done for my soul | praise",
+        "Psalm 107:1-3 | Let the redeemed of the Lord say so | praise",
+        "Acts 4:18-20 | We cannot but speak of what we have seen | example",
+        "1 John 1:1-4 | What we have seen and heard we proclaim | teaching",
+        "Revelation 12:10-11 | The word of their testimony | prophecy",
+        "Galatians 1:11-24 | He who persecuted us now preaches the faith | example",
+        "Psalm 40:9-10 | I have not hidden your deliverance | praise"
+      ] },
+    { "slug": "serving-in-the-church", "title": "Serving in the Church", "description": "Faithful ministry in the local church, each one serving.",
+      "passages": [
+        "Romans 12:3-8 | Gifts that differ | teaching",
+        "1 Corinthians 15:58 | Your labour is not in vain | promise",
+        "Colossians 4:17 | Fulfil the ministry you have received | teaching",
+        "Acts 6:1-7 | Men of good repute appointed to serve | example",
+        "1 Timothy 3:8-13 | Those who serve well | teaching",
+        "2 Timothy 4:9-13 | Mark is useful to me for ministry | example",
+        "Romans 16:1-16 | Phoebe, Priscilla and other workers | example",
+        "1 Corinthians 3:5-9 | God gives the growth | teaching",
+        "2 Corinthians 4:1-7 | Having this ministry by the mercy of God | teaching",
+        "Hebrews 13:17 | Leaders who keep watch over your souls | teaching",
+        "Exodus 35:30-35 | Bezalel filled with skill | example",
+        "Philippians 2:19-30 | Timothy and Epaphroditus | example"
+      ] },
+    { "slug": "spiritual-gifts", "title": "Spiritual Gifts", "description": "Gifts the Spirit gives for building up the church.",
+      "passages": [
+        "1 Corinthians 12:1-11 | Varieties of gifts, the same Spirit | teaching",
+        "1 Corinthians 12:12-31 | One body with many members | teaching",
+        "1 Corinthians 14:1-12 | Strive to excel in building up the church | teaching",
+        "Romans 12:4-8 | Having gifts that differ | teaching",
+        "Ephesians 4:7-13 | Grace given according to the measure of Christ's gift | teaching",
+        "1 Peter 4:10-11 | Use your gift to serve one another | teaching",
+        "1 Timothy 4:14-16 | Do not neglect the gift you have | teaching",
+        "2 Timothy 1:6 | Fan into flame the gift of God | teaching",
+        "Acts 2:14-21 | Your sons and daughters shall prophesy | example",
+        "1 Corinthians 13:1-3 | Without love, I am nothing | teaching",
+        "James 1:17 | Every good gift is from above | teaching",
+        "Exodus 31:1-6 | Filled with the Spirit of God for craftsmanship | example"
+      ] },
+    { "slug": "shepherding", "title": "Shepherding", "description": "Caring for God's people as Christ the Good Shepherd does.",
+      "passages": [
+        "John 10:11-18 | I am the good shepherd | teaching",
+        "1 Peter 5:1-4 | Shepherd the flock of God | teaching",
+        "Acts 20:28-35 | Care for the church of God | teaching",
+        "Ezekiel 34:1-16 | I myself will be the shepherd of my sheep | prophecy",
+        "Psalm 23:1-6 | The Lord is my shepherd | praise",
+        "Luke 15:3-7 | The lost sheep | teaching | A parable Jesus told",
+        "Jeremiah 3:15 | Shepherds after my own heart | prophecy",
+        "John 21:15-17 | Tend my sheep | teaching",
+        "Isaiah 40:9-11 | He will tend his flock like a shepherd | prophecy",
+        "Matthew 9:35-38 | Like sheep without a shepherd | example",
+        "Hebrews 13:20-21 | The great shepherd of the sheep | prayer",
+        "1 Thessalonians 2:7-12 | Gentle among you | example"
+      ] }
+  ],
+  "existingTopicAdditions": [
+    { "title": "Calling", "passages": [
+      "Ephesians 4:1 | Walk worthy of your calling | teaching",
+      "1 Corinthians 1:26-31 | Consider your calling | teaching",
+      "Isaiah 6:8 | Here I am, send me | example",
+      "Jeremiah 1:4-10 | Before I formed you, I knew you | example",
+      "Exodus 3:1-12 | Moses at the burning bush | example",
+      "2 Timothy 1:8-10 | He called us to a holy calling | teaching"
+    ] },
+    { "title": "Discipleship", "passages": [
+      "Luke 6:40 | Fully trained, like his teacher | teaching",
+      "John 8:31-32 | Truly my disciples | teaching",
+      "Matthew 11:28-30 | Take my yoke and learn from me | teaching",
+      "John 13:34-35 | By this all people will know | teaching",
+      "Acts 11:25-26 | First called Christians | example",
+      "Luke 5:1-11 | From now on you will catch men | example"
+    ] },
+    { "title": "Evangelism", "passages": [
+      "Romans 10:13-17 | How will they hear without someone preaching? | teaching",
+      "Acts 8:26-40 | Philip and the Ethiopian official | example",
+      "1 Corinthians 9:19-23 | All things to all people | teaching",
+      "Acts 17:22-31 | Paul at the Areopagus | example",
+      "Colossians 4:2-6 | Make the best use of the time | teaching",
+      "Romans 1:16-17 | Not ashamed of the gospel | teaching"
+    ] },
+    { "title": "Leadership", "passages": [
+      "Exodus 18:13-26 | Jethro's counsel to share the load | example",
+      "1 Timothy 3:1-7 | Qualifications for overseers | teaching",
+      "Mark 10:42-45 | Servant leadership | teaching",
+      "Nehemiah 2:11-18 | Let us rise up and build | example",
+      "Proverbs 29:2 | When the righteous increase | wisdom",
+      "Titus 1:5-9 | Above reproach | teaching"
+    ] },
+    { "title": "Missions", "passages": [
+      "Isaiah 49:5-6 | A light for the nations | prophecy",
+      "Acts 13:1-3 | Set apart for the work | example",
+      "Romans 15:18-21 | Where Christ has not been named | example",
+      "Psalm 67:1-7 | Let all the peoples praise you | prayer",
+      "Revelation 7:9-12 | A great multitude from every nation | prophecy",
+      "Matthew 24:14 | This gospel proclaimed to all nations | prophecy"
+    ] },
+    { "title": "The Church", "passages": [
+      "Matthew 16:13-20 | On this rock I will build my church | teaching",
+      "Ephesians 2:19-22 | A holy temple in the Lord | teaching",
+      "1 Corinthians 12:27 | You are the body of Christ | teaching",
+      "Ephesians 5:25-27 | Christ loved the church | teaching",
+      "1 Peter 2:9-10 | A chosen race, a royal priesthood | teaching",
+      "Revelation 2:1-7 | To the church in Ephesus | prophecy"
+    ] }
+  ]
+}

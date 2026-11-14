@@ -190,7 +190,8 @@ router.get("/history/:personId", async (req, res) => {
   try {
     // Who may open whose history: myself, anyone I'm directly in a relationship with, and my lineage above and below.
     if (target !== caller) {
-      const { data: direct } = await db.from("p2p_discipleship_links").select("id")
+      // A real relationship only (active, paused or ended) — a pending, declined or expired request grants nothing.
+      const { data: direct } = await db.from("p2p_discipleship_links").select("id").in("status", ["active", "paused", "ended"])
         .or(`and(mentor_id.eq.${caller},disciple_id.eq.${target}),and(mentor_id.eq.${target},disciple_id.eq.${caller})`).limit(1);
       let allowed = !!(direct as unknown[] | null)?.length;
       if (!allowed) allowed = (await descendants(caller)).some((d) => d.person_id === target);
@@ -211,7 +212,7 @@ router.get("/history/:personId", async (req, res) => {
     const [ps, ss] = await Promise.all([people(ids), stages(ids)]);
     // "Direct" for privacy = the viewer themself or someone the viewer is directly related to; the target's own circle is shown by their settings.
     const directToViewer = new Set<string>([caller]);
-    const { data: mine } = await db.from("p2p_discipleship_links").select("mentor_id,disciple_id").or(`mentor_id.eq.${caller},disciple_id.eq.${caller}`).limit(500);
+    const { data: mine } = await db.from("p2p_discipleship_links").select("mentor_id,disciple_id").in("status", ["active", "paused", "ended"]).or(`mentor_id.eq.${caller},disciple_id.eq.${caller}`).limit(500);
     for (const l of (mine ?? []) as { mentor_id: string; disciple_id: string }[]) { directToViewer.add(l.mentor_id); directToViewer.add(l.disciple_id); }
     // In my own history everyone listed helped me or was helped by me, so they are named; in someone
     // else's, people are named only if I'm directly related to them — otherwise their own settings apply.

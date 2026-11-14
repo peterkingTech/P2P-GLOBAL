@@ -99,8 +99,9 @@ ok("learning centre: loading, empty and failure states", learn.includes("Loading
 ok("learning centre: still the tab (reselect scrolls to top; iPad capsule inset)", learn.includes('useScrollToTopOnTabReselect("learn"') && learn.includes("useTabCapsuleTopInset"));
 const hub = src("components/LearningHub.tsx");
 // Owner decision 2026-11-06: an icon launcher of three — Bible has its own tab; Study Together opens from the resources that support it.
-ok("explore learning: Kingdom School, Kingdom Stories, Learning Centre (= My Learning) and My Evaluations", (hub.match(/\{ key: "/g) ?? []).length === 4 && ["/kingdom-school", "/kingdom-stories", "/learning", "/evaluation"].every((r) => hub.includes(`route: "${r}"`))
-  && !hub.includes('"/bible-study"') && !hub.includes('"/study-together"'));
+// Owner 2026-11-14: P2P Plans and Study Together (the one hub for every shared study) join the grid — 6 tiles, 3 even rows on phones.
+ok("explore learning: Kingdom School, Kingdom Stories, P2P Plans, Study Together, Learning Centre (= My Learning) and My Evaluations", (hub.match(/\{ key: "/g) ?? []).length === 6 && ["/kingdom-school", "/kingdom-stories", "/plans", "/study-together", "/learning", "/evaluation"].every((r) => hub.includes(`route: "${r}"`))
+  && !hub.includes('"/bible-study"'));
 ok("explore learning: each tile is an icon in a tinted square, a short label and an optional status", hub.includes("<Ionicons name={d.icon}") && hub.includes("s.icon, { backgroundColor: t.bg }") && hub.includes("{d.title}") && hub.includes("{status ?"));
 ok("explore learning: two columns on phones, four on tablets", learn.includes("columns={wide ? 4 : 2}") && hub.includes('half: { width: "47.9%" }') && hub.includes('third: { width: "31.6%" }'));
 ok("explore learning: theme colours (card, border, text from the theme; tints are translucent)", hub.includes("colors.card") && hub.includes("colors.borderBeige") && !/#[0-9A-Fa-f]{6}/.test(hub));

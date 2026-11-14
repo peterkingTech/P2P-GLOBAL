@@ -1,0 +1,94 @@
+{
+  "slug": "understanding-the-holy-spirit",
+  "title": "Understanding the Holy Spirit",
+  "description": "Follow what Scripture says about the Holy Spirit — from creation and the prophets, through Jesus' promise and Pentecost, to the Spirit's work in believers and the church.",
+  "focusType": "theme",
+  "focusLabel": "The Holy Spirit",
+  "focusRef": { "theme": "holy-spirit" },
+  "collection": "topical",
+  "suggestedPace": "five_weekly",
+  "suggestedDays": 14,
+  "objectives": [
+    "See how the Holy Spirit is described across the Old and New Testaments",
+    "Understand Jesus' promise of the Spirit and its fulfilment at Pentecost",
+    "Consider the Spirit's work in believers and in the church"
+  ],
+  "sessions": [
+    { "title": "The Spirit at creation and in Israel", "passages": ["Genesis 1:1-2", "Numbers 11:16-17", "Numbers 11:24-29"],
+      "intro": "The Spirit appears in Scripture's first verses, and later comes upon the elders who help Moses lead.",
+      "supporting": [{ "kind": "word_study", "strongs": "H7307", "note": "ruach, 'spirit, breath, wind'" }],
+      "questions": [
+        { "kind": "observe", "text": "What is the Spirit of God doing in Genesis 1:2?" },
+        { "kind": "context", "text": "In Numbers 11, why does Moses need help, and what happens when the Spirit comes on the seventy elders?" },
+        { "kind": "interpret", "text": "What does Moses' wish in Numbers 11:29 suggest about how widely the Spirit might one day be given?" }
+      ] },
+    { "title": "The promise through the prophets", "passages": ["Ezekiel 36:24-28", "Joel 2:28-29"],
+      "intro": "The prophets look forward to a day when God will put his Spirit within his people and pour it out on all kinds of people.",
+      "questions": [
+        { "kind": "observe", "text": "What does God promise to do in Ezekiel 36:26-27?" },
+        { "kind": "interpret", "text": "In Joel 2:28-29, who receives the Spirit? What is significant about that list?" },
+        { "kind": "context", "text": "These promises were given to Israel in times of exile and judgement. What hope do they hold out?" }
+      ] },
+    { "title": "The Spirit and Jesus", "passages": ["Luke 3:21-22", "Luke 4:1-2", "Luke 4:14-21"],
+      "intro": "The Spirit descends on Jesus at his baptism, leads him into the wilderness, and Jesus announces his mission in the Spirit's power.",
+      "questions": [
+        { "kind": "observe", "text": "What happens at Jesus' baptism in Luke 3:21-22?" },
+        { "kind": "observe", "text": "How often is the Spirit mentioned in Luke 4:1-18? What does that emphasise?" },
+        { "kind": "interpret", "text": "In Luke 4:18-19, Jesus reads from Isaiah. What does the Spirit anoint him to do?" }
+      ] },
+    { "title": "Born of the Spirit", "passages": ["John 3:1-8"],
+      "intro": "Jesus tells Nicodemus, a teacher of Israel, that no one can see the kingdom of God unless they are born again.",
+      "supporting": [{ "kind": "deep_study", "book": "JHN", "chapter": 3, "startVerse": 3, "endVerse": 8, "note": "'Born again / from above' in the original" }],
+      "questions": [
+        { "kind": "context", "text": "Who is Nicodemus, and when does he come to Jesus?" },
+        { "kind": "interpret", "text": "What does Jesus mean by being 'born of water and the Spirit' (verse 5)? What do the following verses add?" },
+        { "kind": "interpret", "text": "What does the comparison with the wind in verse 8 suggest about the Spirit's work?" }
+      ] },
+    { "title": "Another Helper", "passages": ["John 14:15-26", "John 16:7-15"],
+      "intro": "On the night before his death, Jesus promises his disciples that the Father will send the Spirit.",
+      "supporting": [{ "kind": "word_study", "strongs": "G3875", "note": "paraklētos, 'helper, advocate'" }],
+      "questions": [
+        { "kind": "observe", "text": "What names and descriptions does Jesus use for the Spirit in these passages?" },
+        { "kind": "observe", "text": "List what Jesus says the Spirit will do in John 14:26 and 16:8-15." },
+        { "kind": "interpret", "text": "Why does Jesus say in 16:7 that it is good for the disciples that he goes away?" }
+      ] },
+    { "title": "Pentecost", "passages": ["Acts 2:1-21", "Acts 2:37-41"],
+      "intro": "Fifty days after the resurrection, the Spirit is poured out on the disciples in Jerusalem, and Peter explains what is happening.",
+      "supporting": [{ "kind": "commentary", "book": "ACT", "chapter": 2, "note": "Commentary on Acts 2" }],
+      "questions": [
+        { "kind": "observe", "text": "Describe what happens in Acts 2:1-4 and how the crowd reacts." },
+        { "kind": "context", "text": "Which prophecy does Peter quote in verses 16-21, and how does it connect with what you read in Joel?" },
+        { "kind": "observe", "text": "What does Peter tell the crowd to do in verse 38, and what does he promise?" }
+      ] },
+    { "title": "Life by the Spirit", "passages": ["Romans 8:9-17"],
+      "intro": "Paul describes believers as people in whom the Spirit of God lives, led by the Spirit as God's children.",
+      "questions": [
+        { "kind": "interpret", "text": "According to verses 9-11, what difference does the Spirit's presence make?" },
+        { "kind": "observe", "text": "What does the Spirit enable believers to call God in verse 15?" },
+        { "kind": "interpret", "text": "What does verse 16 say the Spirit testifies to?" }
+      ] },
+    { "title": "The fruit of the Spirit", "passages": ["Galatians 5:16-26"],
+      "intro": "Paul contrasts the works of the flesh with the fruit the Spirit produces.",
+      "supporting": [{ "kind": "word_study", "strongs": "G2590", "note": "karpos, 'fruit'" }],
+      "questions": [
+        { "kind": "observe", "text": "What does Paul tell the Galatians to do in verses 16 and 25?" },
+        { "kind": "interpret", "text": "Paul speaks of the 'fruit' (singular) of the Spirit in verses 22-23. What might that word suggest about how these qualities grow?" },
+        { "kind": "consider", "text": "Which quality in verses 22-23 would you most like to understand better, and why?" }
+      ] },
+    { "title": "Gifts for the common good", "passages": ["1 Corinthians 12:1-13"],
+      "intro": "Writing to a divided church, Paul explains that the Spirit gives different gifts to different people for the good of all.",
+      "supporting": [{ "kind": "scripture_topic", "slug": "the-church" }, { "kind": "scripture_topic", "slug": "unity" }],
+      "questions": [
+        { "kind": "context", "text": "What was happening in the Corinthian church that led Paul to write about spiritual gifts?" },
+        { "kind": "observe", "text": "Who gives the gifts, and for what purpose (verses 4-7, 11)?" },
+        { "kind": "interpret", "text": "What does the picture of one body in verses 12-13 teach about believers' different gifts?" }
+      ] },
+    { "title": "Sealed and filled", "passages": ["Ephesians 1:13-14", "Ephesians 4:30", "Ephesians 5:15-20"],
+      "intro": "Paul describes the Spirit as God's seal and guarantee, warns against grieving the Spirit, and urges believers to be filled with the Spirit.",
+      "questions": [
+        { "kind": "interpret", "text": "What do the words 'seal' and 'deposit' or 'guarantee' (1:13-14) suggest about the Spirit's role?" },
+        { "kind": "observe", "text": "What does Paul say not to do in 4:30, and what surrounds that verse in 4:25-32?" },
+        { "kind": "observe", "text": "What does being filled with the Spirit look like in 5:18-20?" }
+      ] }
+  ]
+}

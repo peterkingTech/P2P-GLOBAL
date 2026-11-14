@@ -166,6 +166,7 @@ async function resourceIdentity(s: Study): Promise<Record<string, unknown>> {
     const type = (c as { type?: string } | null)?.type;
     return { feature: type === "core" ? "kingdom_school" : type === "plan" ? "bible_study_plan" : type === "kingdom_story" ? "kingdom_stories" : "learning", lessonId: s.content_id, curriculumId, version: lesson?.version ?? null };
   }
+  if (s.content_type === "study_plan") return { feature: "p2p_plans", planId: s.content_id, sessionId: s.current_section_id };
   return { feature: "bible_study", passageId: s.content_id };
 }
 
@@ -176,11 +177,11 @@ router.post("/", async (req, res) => {
   if (!userId) return;
   const b = (req.body ?? {}) as { contentType?: string; contentId?: string; destination?: string; groupId?: string; userIds?: string[]; prompt?: string; sectionId?: string };
   try {
-    if (!CONTENT_TYPES.includes(b.contentType as ContentType)) throw new StudyError(400, "Choose a story or lesson to study.");
+    if (!CONTENT_TYPES.includes(b.contentType as ContentType)) throw new StudyError(400, "Choose a story, lesson or plan to study.");
     if (!DESTINATIONS.includes(b.destination as Destination)) throw new StudyError(400, "Choose who to study with.");
     const type = b.contentType as ContentType, dest = b.destination as Destination;
-    const content = await loadContent(type, String(b.contentId ?? ""));
-    if (!content) throw new StudyError(404, "This story or lesson isn't available.");
+    const content = await loadContent(type, String(b.contentId ?? ""), userId);
+    if (!content) throw new StudyError(404, type === "study_plan" ? "This plan isn't available to share." : "This story or lesson isn't available.");
     const prompt = typeof b.prompt === "string" ? b.prompt.trim().slice(0, 1000) : "";
     // Start at an exact part of the resource (e.g. one Kingdom Stories chapter), if given — only a real part of it.
     if (b.sectionId !== undefined && b.sectionId !== null && !content.sections.some((x) => x.id === b.sectionId)) throw new StudyError(400, "That chapter isn't part of this story.");

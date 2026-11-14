@@ -9,11 +9,15 @@ export interface PrayerTopic {
   id: string; slug: string; title: string; description: string | null;
   displayOrder: number; status: "draft" | "published" | "archived"; parentTopicId: string | null;
   createdAt: string; updatedAt: string;
+  /** 2026-11-14 (optional — an older server omits them): passages a participant can see, and the topic's category key. */
+  scriptureCount?: number; category?: string | null;
 }
 export interface ScriptureReference {
   id: string; book: string; chapter: number; startVerse: number; endVerse: number;
   translationCode: string | null; referenceDisplay: string;
   role?: "core" | "supporting"; displayOrder?: number; editorialNote?: string | null;
+  /** Optional editorial fields (only on reviewed passages that have them). */
+  editorialTitle?: string; passageKind?: "teaching" | "promise" | "prayer" | "example" | "prophecy" | "wisdom" | "praise";
 }
 // Enhancement Stage 2 — sequential lock/progression, one row per
 // (user, topic), mirroring Prayer Paths' own progress shape exactly.

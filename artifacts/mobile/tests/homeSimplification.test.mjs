@@ -53,7 +53,8 @@ ok("profile: every non-student role still has an admin entry",
   profile.includes('profile?.role === "peer_guide"') && profile.includes("ADMIN_ROLES.has(profile.role)")
   && profile.includes('profile.role !== "student" && profile.role !== "peer_guide" && !ADMIN_ROLES.has(profile.role)') && profile.includes('router.push("/admin/curriculum" as any)'));
 ok("discover: My Community entry", discover.includes(">My Community</Text>") && discover.includes('router.push("/community" as any)'));
-ok("plans: Recommended for You stays on the Plans screen, opened from Kingdom School", src("app/plans/index.tsx").includes("Recommended for You") && src("app/kingdom-school.tsx").includes('router.push("/plans?tab=find" as any)'));
+// P2P Plans (2026-11-14): the Learning Centre topic-plan browser moved, unchanged, to /plans/learning; /plans is the P2P Plans home.
+ok("plans: Recommended for You stays on the Learning Plans screen, opened from Kingdom School", src("app/plans/learning.tsx").includes("Recommended for You") && src("app/kingdom-school.tsx").includes('router.push("/plans/learning?tab=find" as any)'));
 ok("learning centre: still no Recommended for You (owner's earlier request)", !/Recommended for You|recommended/.test(learn));
 ok("learning: My Evaluations tile", learn.includes("<LearningHub") && src("components/LearningHub.tsx").includes('route: "/evaluation"'));
 ok("messages: unread count stays on the Messages tab", /tabBarBadge|unread/i.test(src("app/(tabs)/_layout.tsx")));

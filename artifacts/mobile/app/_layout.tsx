@@ -83,7 +83,8 @@ const OWN_HEADER_ROUTES = [
   "bible/index", "bible/search", "bible/library", "bible/versions", "bible/languages", "resources/[scope]/[groupId]",
   "mail/index", "mail/[id]", "mail/compose",
   "groups/create", "groups/[id]", "groups/community/[id]", "groups/invitations", "groups/join",
-  "fruit-harvest", "growth-timeline",
+  "fruit-harvest", "growth-timeline", "my-growth",
+  "plans/index", "plans/learning", "plans/builder", "study-plan/[id]", "study-plan/session",
   "deep-study/index", "commentaries/index", "commentaries/[id]", "commentaries/read", "study-tools/index", "study-tools/lexicon", "study-tools/word/[strongs]", "dictionary/index", "dictionary/term/[key]", "dictionary/occurrences/[strongs]", "dictionary/article/[id]", "botanical/index",
 ];
 

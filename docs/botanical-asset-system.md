@@ -20,7 +20,7 @@ Botanical development never reads or writes the stage, awards nothing, counts to
 - **iCloud `Meshy AI/Meshy Models/`:** 72 files = 40 unique (39 GLB + 1 PNG).
   - 32 pairs of byte-identical exports. Every 12 Nov model is saved twice: once under its P2P name and once under Meshy's own name.
 - **Unique 12 Nov models:** 32.
-  - 25 of the brief's 26 assets. The 26th, the Forest of Nations 3D landscape, does not exist: there is only a PNG.
+  - 25 of the brief's 26 assets. The 26th, the Forest of Nations 3D landscape, arrived on 2026-11-14 as `export_Meshy_AI_2026-11-14_d4ff73.glb` (identified by eye: a globe whose continents are covered in fruit trees).
   - 5 extras: 2 leaf clusters and 3 root sets.
   - **2 previously missed:** *P2P - Half Apple with Seeds* and *P2P - Single Apple on Stall*. "Stall" means the stalk.
 - **Older exports (5 Nov):** 7 first-generation models, also copied identically in `Downloads/Meshy Models/`. They are superseded and not used.
@@ -39,7 +39,7 @@ Botanical development never reads or writes the stage, awards nothing, counts to
 
 ## 3. Register: every unique model
 
-Register counts: 33 entries = 32 files + Forest of Nations, which has no 3D file.
+Register counts: 33 entries, all with a 3D file (Forest of Nations added 2026-11-14).
 
 | Category | Entries |
 |---|---|
@@ -66,7 +66,7 @@ Integration states:
 | asset-03-young-apple-tree | stage_tree | P2P - Bare Young Tree_.glb<br>Photorealistic young apple tree, slender woody trunk with grey-brown bark, fresh green leaves, exposed fibrous root system_Meshy_AI_2026-11-12_7d529b.glb | GLB · 96.6 MB | body-03-young-tree.glb | GLB (meshopt, WebP) · 2.5 MB | 2,365,568 → 159,992 | Forests/models/v2/body-03-young-tree.glb (+ body-03-young-tree.close.glb) | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Young Tree stage tree | anchors (body-03-young-tree.anchors.json), close-up body-03-young-tree.close.glb |
 | asset-04-fruitful-apple-tree | stage_tree | P2P - Bare Fruitful Tree_.glb<br>Photorealistic mature European apple tree with no fruit, textured grey-brown bark, lush green foliage canopy, spreading roots_Meshy_AI_2026-11-12_73a6af.glb | GLB · 339.8 MB | body-04-fruitful-tree.glb | GLB (meshopt, WebP) · 4.7 MB | 7,622,300 → 250,000 | Forests/models/v2/body-04-fruitful-tree.glb (+ body-04-fruitful-tree.close.glb) | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Fruitful Tree stage tree | anchors (body-04-fruitful-tree.anchors.json), close-up body-04-fruitful-tree.close.glb |
 | asset-05-forest-builder-apple-tree | stage_tree | Ancient European apple tree, massive gnarled trunk with deep bark furrows, expansive green canopy, thick web of structural foundation roots, no fruit_Meshy_AI_2026-11-12_69c8ce.glb<br>P2P - Bare Forest Builder_.glb | GLB · 361.6 MB | body-05-forest-builder.glb | GLB (meshopt, WebP) · 6.5 MB | 7,674,068 → 250,000 | Forests/models/v2/body-05-forest-builder.glb (+ body-05-forest-builder.close.glb) | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Forest Builder stage tree | anchors (body-05-forest-builder.anchors.json), close-up body-05-forest-builder.close.glb |
-| forest-of-nations-3d-landscape | collective | — | — | — | — | — | — | missing | No 3D file (2D image only) | Global Forest environment — no 3D model exists (2D image only) | — |
+| forest-of-nations-3d-landscape | collective | export_Meshy_AI_2026-11-14_d4ff73.glb | GLB · 338.4 MB | collective-forest-of-nations.glb (+ .close.glb) | GLB (meshopt, WebP 2048) · 8.5 MB / 19.1 MB | 7,630,676 → 299,999 / 999,999 | — | local_review | Welded + decimated in Blender, optimised, checked by eye vs original 2026-11-14 | Collective Forest of Nations: Stages card, Global Forest tab, full screen `/tree-3d?forest=1`. Never an individual stage; no wind (slow turn only) | — |
 | asset-06-fruiting-spur-socket | structure | export_Meshy_AI_2026-11-12_dbf4a8.glb<br>P2P - Fruiting Spur Twig Socket_.glb | GLB · 60.1 MB | part-06-fruiting-spur.glb | GLB (meshopt, WebP) · 0.15 MB | 1,029,868 → 4,000 | Forests/models/v2/part-06-fruiting-spur.glb | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Branch areas with verified evidence; fruiting spur in the lifecycle | — |
 | asset-07-single-leaf-particle | leaf | export_Meshy_AI_2026-11-12_f06c27.glb<br>P2P - Single Leaf Particle Asset_.glb | GLB · 63.1 MB | part-07-single-leaf.glb | GLB (meshopt, WebP) · 0.56 MB | 1,254,864 → 20,000 | Forests/models/v2/part-07-single-leaf.glb | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Apple lifecycle: one leaf, close up (the stage trees carry their own leaves) | — |
 | asset-apple-blossoms | bud_blossom | Delicate European apple blossoms, white and soft pink petals, yellow stamens, pink buds, green leaves, woody twig, PBR textures_Meshy_AI_2026-11-12_ef470a.glb<br>P2P - Blossom Cluster_.glb | GLB · 70.0 MB | part-blossom-cluster.glb | GLB (meshopt, WebP) · 0.21 MB | 1,532,182 → 8,374 | Forests/models/v2/part-blossom-cluster.glb | live | Validated (GLB 2.0, 1 mesh, PBR, upright) | Apple lifecycle: blossom | — |
@@ -158,7 +158,7 @@ Both were validated and optimised on 2026-11-13, then compared by eye with the o
   - the Full tree / Roots / Canopy camera views;
   - wind.
 - **`LivingTreeView`:** a person's tree (stage tree plus contribution fruit, buds and tips placed on measured anchors). Used by Home, My Tree, Profile, Stages, full screen and the celebrations.
-- **`BotanicalModelView`:** any one registered asset, with loading / Try again / not-available states and no picture fallback. Used by "How an apple tree grows"; ready for other features.
+- **`BotanicalModelView`:** any one registered asset, with loading / Try again / not-available states and no picture fallback. Used by "How My Tree Grows"; ready for other features.
 - **`hooks/useGrowthTree`:** one shared copy of `GET /growth/me/tree`, so Home, My Tree and the 3D tree always describe the same tree.
 - **Wind:**
   - Stage trees: a vertex-shader displacement, weighted by the model's own leaf-green texture, height and distance from the measured trunk axis. The trunk, main limbs and roots stay still.
@@ -184,7 +184,7 @@ Each stage model already carries its own leaves and roots. The extra leaf and ro
 
 **Stage appearance:** the stage model's own look, for example "A young tree: slender trunk, open branches and fresh leaves".
 
-**Not applied to anyone's tree:** blossom, fruitlets, ripening colours and seasons. These are taught in "How an apple tree grows" (`app/botanical/index.tsx`, `lib/botanicalLifecycle.ts`): 26 lifecycle items in five sections (seed and roots, buds and shoots, leaves, blossom, fruitlet to ripe). They are labelled as the apple tree's natural year, not growth stages. All 26 are hosted, so a release build offers every one.
+**Not applied to anyone's tree:** blossom, fruitlets, ripening colours and seasons. These are explained in "How My Tree Grows" (`app/botanical/index.tsx`, `lib/botanicalLifecycle.ts`, `lib/howMyTreeGrows.ts`), each step tied to the person's own verified progress: 26 lifecycle items in five sections (seed and roots, buds and shoots, leaves, blossom, fruitlet to ripe). They are labelled as the apple tree's natural year, not growth stages. All 26 are hosted, so a release build offers every one.
 
 ### Proposed ripening rule (not implemented — needs a decision)
 
@@ -205,12 +205,12 @@ In every option a fruit stays one contribution, and its colour never counts for 
 | My Profile — growth card | Same tree | Profile summary | Card | One model | **Implemented** (hosted) |
 | Stages / full screen / celebrations | Each stage tree | See any stage in 3D on request | Yes / card | One model at a time | **Implemented** (hosted) |
 | Growth Story | — (text) | Stage changes, contribution fruit and botanical events labelled apart; "See this stage in 3D" | Link | None until opened | **Implemented** |
-| How an apple tree grows | 26 lifecycle models | Teach the tree's natural year; makes clear these are not stages | Yes | One model at a time | **Implemented** — all 26 hosted |
+| How My Tree Grows | 26 lifecycle models | Each step explained as part of the person's own journey, with their verified progress; never extra stages | Yes | One model at a time | **Implemented** — all 26 hosted |
 | Learning / Kingdom School | — | — | — | — | **Not needed** (owner decision 2026-11-13) |
 | Kingdom Stories | — | — | — | — | **Not needed** (owner decision 2026-11-13) |
 | Bible / Deep Study | — | — | — | — | **Not needed** (owner decision 2026-11-13) |
 | Study Together / Family / Church | Lifecycle models | Shared teaching moment (leader shows one model) | On request | One model | **Reserved** — no second growth or contribution system |
-| Forest of Nations (Global Forest) | — | Collective environment | — | — | **Missing**: only a 2D PNG exists; no 3D scene. Nothing substituted. |
+| Forest of Nations (Global Forest) | collective-forest-of-nations | Collective environment | On open | One model (+ close-up on zoom, full screen only) | **Integrated, local review**: not hosted yet, so release builds show "This 3D model isn't available yet" (never the PNG) |
 
 ## 8. Decisions
 
@@ -221,6 +221,7 @@ In every option a fruit stays one contribution, and its colour never counts for 
 **Still open:**
 1. **Special apples:** whether and where to use them. If approved, upload them too: 2 files, 0.86 MB.
 2. **Ripening rule:** keep option 1, or choose another (section 6).
-3. **Forest of Nations 3D scene:** it has to be created (Meshy or otherwise) before it can be integrated.
+3. **Forest of Nations upload (needs approval):** `Forests/models/v2/collective-forest-of-nations.glb` (8,530,708 bytes) and `Forests/models/v2/collective-forest-of-nations.close.glb` (19,144,136 bytes). New paths, nothing overwritten. After upload, set its integration to `live` in `lib/growthTreeAssets.ts`.
+4. **Half Apple with Seeds:** excluded by the owner (2026-11-14). **Single Apple on Stalk:** held back.
 
 No database change, migration or configuration change was needed. The only production change is the upload of the 17 models.

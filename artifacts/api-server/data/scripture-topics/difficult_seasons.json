@@ -1,0 +1,198 @@
+{
+  "category": "difficult_seasons",
+  "topics": [
+    { "slug": "suffering", "title": "Suffering", "description": "Pain in a broken world, and God's presence and purposes within it.",
+      "passages": [
+        "Romans 8:18-28 | The sufferings of this present time | teaching",
+        "2 Corinthians 4:7-18 | Afflicted but not crushed | teaching",
+        "1 Peter 4:12-19 | Do not be surprised at the fiery trial | teaching",
+        "Job 1:13-22 | The Lord gave and the Lord has taken away | example",
+        "Psalm 22:1-11 | My God, why have you forsaken me? | prayer",
+        "Isaiah 53:3-5 | A man of sorrows | prophecy",
+        "Hebrews 2:9-10 | Made perfect through suffering | teaching",
+        "2 Corinthians 12:7-10 | My grace is sufficient for you | promise",
+        "Philippians 3:7-11 | The fellowship of his sufferings | teaching",
+        "Revelation 21:3-5 | He will wipe away every tear | promise",
+        "Lamentations 3:1-24 | His mercies never come to an end | prayer",
+        "John 9:1-7 | Not because of his sin | teaching | Not all suffering is a punishment for personal sin"
+      ] },
+    { "slug": "trials-and-testing", "title": "Trials and Testing", "description": "Hard seasons that test and refine faith.",
+      "passages": [
+        "James 1:2-12 | Count it all joy when you meet trials | teaching",
+        "1 Peter 1:3-9 | Faith tested by fire | teaching",
+        "Romans 5:3-5 | Suffering produces endurance | teaching",
+        "Genesis 22:1-14 | God tested Abraham | example",
+        "Deuteronomy 8:1-5 | He humbled you and let you hunger | teaching",
+        "Psalm 66:8-12 | You have tried us as silver is tried | praise",
+        "Zechariah 13:9 | Refine them as one refines silver | prophecy",
+        "Malachi 3:1-3 | Like a refiner's fire | prophecy",
+        "Hebrews 12:3-11 | The Lord disciplines the one he loves | teaching",
+        "Isaiah 43:1-3 | When you pass through the waters | promise",
+        "2 Corinthians 1:8-11 | We despaired of life itself | example",
+        "Psalm 119:67-72 | It is good for me that I was afflicted | prayer"
+      ] },
+    { "slug": "persecution", "title": "Persecution", "description": "Suffering for following Christ, and the church's response.",
+      "passages": [
+        "Matthew 5:10-12 | Blessed are those who are persecuted | teaching",
+        "John 15:18-27 | If the world hates you | teaching",
+        "2 Timothy 3:10-15 | All who desire to live godly will be persecuted | teaching",
+        "Acts 5:27-42 | Rejoicing to suffer dishonour for the name | example",
+        "Acts 7:54-60 | Stephen's death | example",
+        "Acts 8:1-4 | Scattered, they preached the word | example",
+        "1 Peter 3:13-17 | If you suffer for righteousness | teaching",
+        "Hebrews 10:32-39 | You joyfully accepted the plundering of your property | example",
+        "2 Corinthians 11:23-30 | Paul's sufferings | example",
+        "Revelation 2:8-11 | Be faithful unto death | promise",
+        "Daniel 6:10-23 | Daniel in the lions' den | example",
+        "Romans 8:35-39 | Shall persecution separate us? | promise"
+      ] },
+    { "slug": "rejection", "title": "Rejection", "description": "When people turn away, God receives and does not cast out.",
+      "passages": [
+        "Isaiah 53:3 | Despised and rejected | prophecy",
+        "John 1:10-13 | His own people did not receive him | teaching",
+        "Psalm 27:10 | Though my father and mother forsake me | promise",
+        "John 6:35-40 | Whoever comes to me I will never cast out | promise",
+        "Genesis 37:18-28 | Joseph sold by his brothers | example",
+        "1 Samuel 16:6-13 | The Lord looks on the heart | example",
+        "Luke 4:16-30 | No prophet is acceptable in his hometown | example",
+        "Psalm 118:19-24 | The stone the builders rejected | praise",
+        "1 Peter 2:4-10 | Rejected by men, chosen by God | teaching",
+        "Isaiah 49:13-16 | I will not forget you | promise",
+        "Hebrews 13:5-6 | I will never leave you | promise",
+        "Mark 15:16-20 | Jesus mocked by soldiers | example"
+      ] },
+    { "slug": "discouragement", "title": "Discouragement", "description": "When hope runs low and plans fail, God restores.",
+      "passages": [
+        "Psalm 42:5-11 | Why are you cast down, O my soul? | prayer",
+        "1 Kings 19:1-8 | Elijah under the broom tree | example",
+        "Isaiah 40:27-31 | He gives power to the faint | promise",
+        "2 Corinthians 4:16-18 | We do not lose heart | teaching",
+        "Galatians 6:9 | Let us not grow weary | teaching",
+        "Joshua 1:9 | Do not be dismayed | promise",
+        "Luke 24:13-35 | We had hoped | example",
+        "Nehemiah 4:10-14 | Remember the Lord, great and awesome | example",
+        "Psalm 73:21-26 | God is the strength of my heart | praise",
+        "John 21:1-14 | Breakfast on the shore after a night of nothing | example",
+        "Hebrews 12:1-3 | So that you may not grow weary | teaching",
+        "Psalm 34:17-18 | The Lord is near to the brokenhearted | promise"
+      ] },
+    { "slug": "depression-and-despair", "title": "Depression and Despair", "description": "Honest laments and God's nearness in the dark. These passages are for comfort and prayer and are not a substitute for medical or professional care.",
+      "passages": [
+        "Psalm 88:1-18 | My soul is full of troubles | prayer | A lament that ends in darkness: God's word includes honest prayers like this",
+        "Psalm 13:1-6 | How long, O Lord? | prayer",
+        "Psalm 42:1-11 | Hope in God | prayer",
+        "1 Kings 19:1-8 | Elijah: it is enough; God gives food and rest | example",
+        "Lamentations 3:17-26 | Yet this I call to mind | prayer",
+        "Psalm 34:15-18 | He saves the crushed in spirit | promise",
+        "Isaiah 42:1-4 | A bruised reed he will not break | prophecy",
+        "Matthew 11:28-30 | Come to me, all who labour | promise",
+        "2 Corinthians 1:8-10 | We despaired of life itself | example",
+        "Psalm 40:1-3 | He drew me up from the pit | praise",
+        "Romans 8:26-27 | The Spirit intercedes with groanings | promise",
+        "Psalm 139:7-12 | Darkness is not dark to you | praise"
+      ] },
+    { "slug": "shame-and-guilt", "title": "Shame and Guilt", "description": "Forgiveness for real guilt, and freedom from shame in Christ.",
+      "passages": [
+        "Romans 8:1-4 | No condemnation | teaching",
+        "Psalm 32:1-5 | Blessed is the one whose sin is covered | praise",
+        "Isaiah 54:4-8 | You will forget the shame of your youth | prophecy",
+        "Hebrews 12:1-2 | Despising the shame | teaching",
+        "John 8:1-11 | Neither do I condemn you | example",
+        "1 John 1:9 | He is faithful to forgive | promise",
+        "Psalm 34:4-5 | Their faces shall never be ashamed | promise",
+        "Hebrews 10:19-22 | Hearts sprinkled clean from an evil conscience | teaching",
+        "Luke 22:54-62 | Peter weeps bitterly | example",
+        "John 21:15-19 | Peter restored: do you love me? | example",
+        "Romans 10:9-11 | Everyone who believes will not be put to shame | promise",
+        "Micah 7:18-19 | You will cast all our sins into the depths | prophecy"
+      ] },
+    { "slug": "anger-and-bitterness", "title": "Anger and Bitterness", "description": "Handling anger without sin and letting go of bitterness.",
+      "passages": [
+        "Ephesians 4:26-32 | Be angry and do not sin | teaching",
+        "James 1:19-20 | The anger of man does not produce righteousness | teaching",
+        "Proverbs 15:1 | A gentle answer turns away wrath | wisdom",
+        "Proverbs 29:11 | A fool gives full vent to his spirit | wisdom",
+        "Psalm 37:7-11 | Refrain from anger | wisdom",
+        "Genesis 4:3-8 | Sin is crouching at the door | example",
+        "Hebrews 12:14-15 | No root of bitterness | teaching",
+        "Colossians 3:8 | Put away anger, wrath, malice | teaching",
+        "Jonah 4:1-11 | Do you do well to be angry? | example",
+        "Matthew 5:21-24 | Anger and the heart | teaching",
+        "Psalm 4:4 | Be angry, and do not sin | prayer",
+        "Mark 3:1-5 | Jesus looked around with anger, grieved | example | Righteous anger at hardness of heart"
+      ] },
+    { "slug": "betrayal", "title": "Betrayal", "description": "When trust is broken, bringing the hurt to God.",
+      "passages": [
+        "Psalm 55:12-23 | It is not an enemy who taunts me | prayer",
+        "Psalm 41:9-13 | My close friend lifted his heel against me | prayer",
+        "Matthew 26:14-25 | Judas agrees to betray Jesus | example",
+        "Matthew 26:47-56 | Betrayed with a kiss | example",
+        "Genesis 50:15-21 | You meant it for evil | example",
+        "2 Samuel 15:10-14 | Absalom's conspiracy | example",
+        "2 Timothy 4:9-18 | All deserted me; the Lord stood by me | example",
+        "Micah 7:5-8 | When I fall, I shall rise | prophecy",
+        "1 Peter 2:21-23 | He entrusted himself to him who judges justly | teaching",
+        "Romans 12:17-21 | Never avenge yourselves | teaching",
+        "Jeremiah 12:1-6 | Even your brothers have dealt treacherously | prayer",
+        "John 13:21-30 | One of you will betray me | example"
+      ] }
+  ],
+  "existingTopicAdditions": [
+    { "title": "Comfort", "passages": [
+      "2 Corinthians 1:3-7 | The God of all comfort | praise",
+      "Isaiah 40:1-2 | Comfort, comfort my people | prophecy",
+      "Psalm 23:4 | Your rod and staff comfort me | praise",
+      "Isaiah 66:12-13 | As one whom his mother comforts | prophecy",
+      "John 14:1-3 | Let not your hearts be troubled | promise",
+      "Psalm 94:17-19 | Your consolations cheer my soul | prayer"
+    ] },
+    { "title": "Fear & Anxiety", "passages": [
+      "Philippians 4:6-7 | Do not be anxious about anything | teaching",
+      "1 Peter 5:6-7 | Cast all your anxieties on him | teaching",
+      "Matthew 6:25-34 | Do not be anxious about tomorrow | teaching",
+      "Isaiah 41:10 | Fear not, for I am with you | promise",
+      "Psalm 46:1-3 | We will not fear | praise",
+      "Mark 4:35-41 | Why are you so afraid? | example"
+    ] },
+    { "title": "Grief", "passages": [
+      "John 11:28-44 | Jesus wept | example",
+      "1 Thessalonians 4:13-18 | Not grieve as others who have no hope | teaching",
+      "Psalm 34:18 | Near to the brokenhearted | promise",
+      "Ruth 1:19-21 | Call me Mara | example",
+      "2 Samuel 18:33 | O my son Absalom | example",
+      "Revelation 21:1-4 | No more mourning | promise"
+    ] },
+    { "title": "Healing", "passages": [
+      "James 5:13-16 | Is anyone among you sick? | teaching",
+      "Psalm 103:1-5 | Who heals all your diseases | praise",
+      "Mark 5:21-43 | Jairus' daughter and the woman who touched him | example",
+      "Psalm 147:1-6 | He heals the brokenhearted | praise",
+      "2 Kings 20:1-7 | Hezekiah's prayer and healing | example",
+      "2 Corinthians 12:7-10 | Power made perfect in weakness | example | Not every prayer for healing is answered with healing in this life"
+    ] },
+    { "title": "Loneliness", "passages": [
+      "Psalm 68:5-6 | God settles the solitary in a home | praise",
+      "Deuteronomy 31:6-8 | He will not leave you or forsake you | promise",
+      "Psalm 25:16-18 | I am lonely and afflicted | prayer",
+      "Matthew 28:20 | I am with you always | promise",
+      "Genesis 2:18 | It is not good that the man should be alone | example",
+      "Psalm 139:7-10 | Where shall I go from your Spirit? | praise"
+    ] },
+    { "title": "Perseverance", "passages": [
+      "Hebrews 12:1-3 | Run with endurance | teaching",
+      "James 1:12 | Blessed is the man who remains steadfast | promise",
+      "Romans 5:3-5 | Endurance produces character | teaching",
+      "2 Timothy 4:6-8 | I have finished the race | example",
+      "Galatians 6:9 | In due season we will reap | promise",
+      "Revelation 3:7-13 | Hold fast what you have | promise"
+    ] },
+    { "title": "Strength", "passages": [
+      "Isaiah 40:28-31 | They shall mount up with wings | promise",
+      "Philippians 4:13 | I can do all things through him | teaching",
+      "2 Corinthians 12:9-10 | When I am weak, then I am strong | teaching",
+      "Psalm 28:6-9 | The Lord is my strength and shield | praise",
+      "Nehemiah 8:10 | The joy of the Lord is your strength | example",
+      "Ephesians 3:14-19 | Strengthened with power through his Spirit | prayer"
+    ] }
+  ]
+}

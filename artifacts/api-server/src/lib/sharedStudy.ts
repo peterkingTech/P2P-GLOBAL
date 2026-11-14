@@ -19,9 +19,12 @@ import { dispatchNotificationNow } from "./pushDispatch";
 // Membership is re-checked on every request, so someone who leaves a family
 // or circle loses access to its studies at once.
 
-export type ContentType = "kingdom_story" | "lesson";
+// "study_plan" (P2P Plans, proposal 249): a plan followed together. Each person keeps their own
+// enrollment and completions in the plan tables; the shared study only carries who is in it and the
+// discussion — joining never completes anything for anyone.
+export type ContentType = "kingdom_story" | "lesson" | "study_plan";
 export type Destination = "peer" | "family" | "church" | "circle" | "group";
-export const CONTENT_TYPES: readonly ContentType[] = ["kingdom_story", "lesson"];
+export const CONTENT_TYPES: readonly ContentType[] = ["kingdom_story", "lesson", "study_plan"];
 export const DESTINATIONS: readonly Destination[] = ["peer", "family", "church", "circle", "group"];
 export const GROUP_DESTINATIONS: readonly Destination[] = ["family", "church", "circle", "group"];
 export const INVITE_DAYS = 14;
@@ -173,9 +176,23 @@ export async function destinationName(type: Destination, groupId: string | null)
 export interface StudySection { id: string; number: number; title: string; questions: string[] }
 export interface StudyContent { type: ContentType; id: string; title: string; subtitle: string | null; sections: StudySection[] }
 
-/** Published content only; the sections are a story's chapters (with their reflection questions). */
-export async function loadContent(type: ContentType, id: string): Promise<StudyContent | null> {
+/** Published content only; the sections are a story's chapters (with their reflection questions), or a
+ *  plan's sessions (with their prepared study questions). `starter` = the person starting a study: a
+ *  participant's own plan can only be shared by its owner (an official plan must be published). */
+export async function loadContent(type: ContentType, id: string, starter?: string): Promise<StudyContent | null> {
   if (!isUuid(id)) return null;
+  if (type === "study_plan") {
+    const { data: p } = await db.from("p2p_study_plans").select("id,title,description,origin,owner_id,editorial_status").eq("id", id).maybeSingle();
+    if (!p) return null;
+    const plan = p as { id: string; title: string; description: string | null; origin: string; owner_id: string | null; editorial_status: string };
+    if (plan.origin === "p2p" ? plan.editorial_status !== "published" : plan.editorial_status === "archived" || (starter !== undefined && plan.owner_id !== starter)) return null;
+    const { data: ss } = await db.from("p2p_study_plan_sessions").select("id,position,title,questions").eq("plan_id", id).order("position", { ascending: true });
+    return {
+      type, id, title: plan.title, subtitle: plan.description,
+      sections: ((ss ?? []) as { id: string; position: number; title: string; questions: { text?: string }[] | null }[])
+        .map((s) => ({ id: s.id, number: s.position, title: s.title, questions: (s.questions ?? []).map((q) => String(q?.text ?? "")).filter((q) => q.trim()) })),
+    };
+  }
   if (type === "kingdom_story") {
     const { data: st } = await db.from("p2p_kingdom_stories").select("id,title,subtitle,status").eq("id", id).maybeSingle();
     if (!st || st.status !== "published") return null;

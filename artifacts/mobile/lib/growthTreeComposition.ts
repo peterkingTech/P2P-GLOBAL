@@ -5,7 +5,7 @@
 //
 // Meaning (never a second score — only the Growth Milestone Matrix decides stages):
 //   • body          ← the verified stage (Seed … Forest Builder); Forest of Nations is collective, never here;
-//   • roots         ← Foundations X/84 and learning units (more root detail as they grow — a view, not points);
+//   • roots         ← Foundations passed/total (server) and learning units (more root detail as they grow — a view, not points);
 //   • leaves        ← active weeks (canopy fills as participation accumulates; NEVER thinned by inactivity);
 //   • branches      ← P2P areas with verified evidence (one per area, strongest first);
 //   • fruit         ← ONE per verified contribution (ledger record id); a group session is one fruit;
@@ -99,8 +99,9 @@ export function composeTree(t: GrowthTree, today: string): TreePlan {
   if (lastStage && daysBetween(lastStage.achievedAt.slice(0, 10), today) <= RECENT_DAYS && branches) attachments.push({ id: "shoot-tip", kind: "shoot_tip", asset: "asset-micro-3-unfurling-shoot-tip", slot: slotFor(`shoot:${lastStage.stage}`, branches), meaning: `New milestone: ${lastStage.name}` });
 
   // Roots: detail grows with Foundations and learning units (never shrinks).
-  const lessons = t.roots.coreLessons.passed, units = t.roots.learningUnits;
-  const rootDetail = (lessons >= 84 ? 3 : lessons >= 42 || units >= 50 ? 2 : lessons > 0 || units > 0 ? 1 : 0) as TreePlan["rootDetail"];
+  // The Foundations total comes from the server (every published Foundations lesson), never a fixed number.
+  const lessons = t.roots.coreLessons.passed, units = t.roots.learningUnits, total = t.roots.coreLessons.total;
+  const rootDetail = (total > 0 && lessons >= total ? 3 : (total > 0 && lessons >= total / 2) || units >= 50 ? 2 : lessons > 0 || units > 0 ? 1 : 0) as TreePlan["rootDetail"];
   if (units > 0) attachments.push({ id: "root-tip", kind: "root_tip", asset: "asset-micro-5-active-root-tip", slot: { branch: 0, along: 0, around: unitHash(`roots:${units}`, 6) }, meaning: `Foundations ${lessons}/${t.roots.coreLessons.total} · ${units} learning units passed` });
 
   // Leaves: one cluster per two active weeks, up to what the body holds (inactivity removes none).

@@ -1,0 +1,114 @@
+{
+  "category": "hope",
+  "topics": [
+    { "slug": "eternal-life", "title": "Eternal Life", "description": "Life with God that begins now through Christ and lasts forever.",
+      "passages": [
+        "John 3:14-18 | Whoever believes has eternal life | promise",
+        "John 5:24-29 | He has passed from death to life | promise",
+        "John 10:27-30 | I give them eternal life | promise",
+        "John 17:1-3 | This is eternal life | prayer",
+        "Romans 6:20-23 | The free gift of God is eternal life | teaching",
+        "1 John 5:9-13 | That you may know you have eternal life | teaching",
+        "Daniel 12:1-3 | Some to everlasting life | prophecy",
+        "Matthew 19:16-30 | What must I do to have eternal life? | example",
+        "Titus 1:1-3 | Eternal life promised before the ages began | teaching",
+        "1 Timothy 6:11-12 | Take hold of eternal life | teaching",
+        "John 6:35-40 | Everyone who looks on the Son | promise",
+        "2 Corinthians 5:1-10 | An eternal house in the heavens | promise"
+      ] },
+    { "slug": "resurrection", "title": "Resurrection", "description": "Christ is risen, and those who belong to him will be raised.",
+      "passages": [
+        "1 Corinthians 15:12-28 | Christ the firstfruits | teaching",
+        "1 Corinthians 15:35-58 | Raised imperishable | promise",
+        "Matthew 28:1-10 | He is not here, he has risen | example",
+        "Luke 24:1-12 | Why seek the living among the dead? | example",
+        "John 20:1-18 | Mary Magdalene meets the risen Lord | example",
+        "John 11:17-27 | I am the resurrection and the life | promise",
+        "Romans 6:3-5 | United with him in a resurrection like his | teaching",
+        "Philippians 3:20-21 | He will transform our lowly body | promise",
+        "1 Thessalonians 4:13-18 | The dead in Christ will rise | promise",
+        "Isaiah 26:19 | Your dead shall live | prophecy",
+        "Ezekiel 37:1-14 | Can these bones live? | prophecy",
+        "Acts 2:22-32 | God raised him up | teaching"
+      ] },
+    { "slug": "the-return-of-christ", "title": "The Return of Christ", "description": "Jesus will come again; his people watch, wait and stay faithful.",
+      "passages": [
+        "Acts 1:6-11 | This Jesus will come in the same way | promise",
+        "John 14:1-3 | I will come again | promise",
+        "1 Thessalonians 4:13-18 | The Lord himself will descend | promise",
+        "1 Thessalonians 5:1-11 | Like a thief in the night | teaching",
+        "Matthew 24:36-44 | No one knows the day or hour | teaching",
+        "Matthew 25:1-13 | The ten virgins: keep watch | teaching | A parable Jesus told",
+        "Titus 2:11-14 | Waiting for our blessed hope | teaching",
+        "2 Peter 3:8-13 | The day of the Lord will come | prophecy",
+        "Revelation 22:12-21 | Surely I am coming soon | promise",
+        "Mark 13:24-37 | Stay awake | teaching",
+        "Hebrews 9:27-28 | He will appear a second time | promise",
+        "1 John 3:1-3 | When he appears we shall be like him | promise"
+      ] },
+    { "slug": "new-heaven-and-new-earth", "title": "New Heaven and New Earth", "description": "God's promise to make all things new and dwell with his people.",
+      "passages": [
+        "Revelation 21:1-8 | Behold, I am making all things new | promise",
+        "Revelation 21:22-27 | The Lamb is its lamp | prophecy",
+        "Revelation 22:1-5 | The river of the water of life | prophecy",
+        "Isaiah 65:17-25 | New heavens and a new earth | prophecy",
+        "Isaiah 11:1-9 | The wolf shall dwell with the lamb | prophecy",
+        "Isaiah 25:6-9 | He will swallow up death forever | prophecy",
+        "2 Peter 3:10-13 | We wait for new heavens and a new earth | promise",
+        "Romans 8:19-23 | Creation set free from bondage | promise",
+        "Hebrews 11:13-16 | A better country, a heavenly one | teaching",
+        "Hebrews 12:22-24 | The heavenly Jerusalem | teaching",
+        "Micah 4:1-4 | They shall beat their swords into ploughshares | prophecy",
+        "Matthew 19:27-30 | In the new world | promise"
+      ] },
+    { "slug": "gods-covenant", "title": "God's Covenant", "description": "God's binding promises to his people, fulfilled in the new covenant in Christ.",
+      "passages": [
+        "Genesis 9:8-17 | The rainbow covenant with Noah | example",
+        "Genesis 12:1-3 | In you all the families of the earth shall be blessed | promise",
+        "Genesis 15:1-21 | The covenant with Abram | example",
+        "Exodus 19:3-6 | A treasured possession, a kingdom of priests | teaching",
+        "2 Samuel 7:8-17 | Your throne shall be established forever | promise",
+        "Jeremiah 31:31-34 | I will make a new covenant | prophecy",
+        "Ezekiel 37:24-28 | An everlasting covenant of peace | prophecy",
+        "Luke 22:14-20 | The new covenant in my blood | teaching",
+        "Hebrews 8:6-13 | A better covenant | teaching",
+        "Galatians 3:15-18 | The promise to Abraham and his offspring | teaching",
+        "Psalm 105:7-11 | He remembers his covenant forever | praise",
+        "Hebrews 13:20-21 | The blood of the eternal covenant | prayer"
+      ] }
+  ],
+  "existingTopicAdditions": [
+    { "title": "God's Promises", "passages": [
+      "2 Corinthians 1:18-22 | All the promises find their Yes in him | teaching",
+      "2 Peter 1:3-4 | His precious and very great promises | teaching",
+      "Numbers 23:19 | Has he said, and will he not do it? | teaching",
+      "Hebrews 6:13-20 | It is impossible for God to lie | teaching",
+      "Romans 4:18-21 | Fully convinced God was able | example",
+      "Joshua 23:14 | Not one word has failed | example"
+    ] },
+    { "title": "Hope", "passages": [
+      "Romans 15:4-13 | The God of hope | prayer",
+      "1 Peter 1:3-5 | A living hope | praise",
+      "Hebrews 6:17-20 | An anchor of the soul | teaching",
+      "Psalm 130:5-8 | In his word I hope | prayer",
+      "Romans 8:24-25 | In this hope we were saved | teaching",
+      "Colossians 1:24-27 | Christ in you, the hope of glory | teaching"
+    ] },
+    { "title": "Protection", "passages": [
+      "Psalm 91:1-16 | He will cover you with his pinions | praise",
+      "Psalm 121:1-8 | The Lord will keep you | promise",
+      "2 Thessalonians 3:1-3 | He will guard you from the evil one | promise",
+      "Proverbs 18:10 | The name of the Lord is a strong tower | wisdom",
+      "John 17:11-15 | Keep them from the evil one | prayer",
+      "Psalm 46:1-7 | God is our refuge and strength | praise"
+    ] },
+    { "title": "Provision", "passages": [
+      "Philippians 4:15-20 | My God will supply every need | promise",
+      "Matthew 6:25-33 | Your Father knows you need them | teaching",
+      "1 Kings 17:8-16 | The jar of flour was not spent | example",
+      "Psalm 37:23-26 | I have not seen the righteous forsaken | wisdom",
+      "Exodus 16:13-21 | Manna each morning | example",
+      "2 Corinthians 9:8-11 | God is able to make all grace abound | promise"
+    ] }
+  ]
+}

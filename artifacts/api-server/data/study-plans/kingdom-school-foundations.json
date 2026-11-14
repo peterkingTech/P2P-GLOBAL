@@ -1,0 +1,16 @@
+{
+  "slug": "kingdom-school-foundations",
+  "title": "Kingdom School Foundations",
+  "description": "Follow every Kingdom School Foundations lesson in curriculum order at a pace you choose. The lessons, their order and their assessments are exactly those of Kingdom School; this plan only helps you schedule them.",
+  "focusType": "core_foundations",
+  "focusLabel": "Kingdom School Foundations",
+  "focusRef": {},
+  "collection": "core_foundations",
+  "derivedFrom": { "type": "foundations" },
+  "suggestedPace": "five_weekly",
+  "suggestedDays": 182,
+  "objectives": [
+    "Work through every Foundations lesson in order",
+    "Complete each lesson's assessment through Kingdom School as usual"
+  ]
+}

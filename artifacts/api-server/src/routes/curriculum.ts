@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { supabaseServiceRole as supabase } from "../lib/supabase";
+import { supabaseServiceRole as supabase, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
 import { getTranslation, translateAndStore, withTimeout, type StoredTranslation } from "../lib/translationEngine";
 
@@ -699,9 +699,28 @@ router.get("/plans/:planId", async (req, res) => {
   });
 });
 
+// Whose plan data a request may read or change (2026-11-14 privacy fix). A signed-in token always wins:
+// the userId in the path / body / query must be the caller's own (403 otherwise). App builds from before
+// this change send no token; they keep the old behaviour until PLANS_REQUIRE_AUTH=true is set, once the
+// new build is widely installed (the same staged approach as CIRCLES_REQUIRE_AUTH). Writes the error
+// response and returns null when the request can't proceed.
+async function planUser(req: import("express").Request, res: import("express").Response, claimed: string | undefined): Promise<string | null> {
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    const caller = await verifyCaller(req);
+    if (!caller) { res.status(401).json({ error: "Please sign in again." }); return null; }
+    if (claimed && claimed !== caller) { res.status(403).json({ error: "Not allowed" }); return null; }
+    return caller;
+  }
+  if (process.env.PLANS_REQUIRE_AUTH === "true") { res.status(401).json({ error: "Please sign in." }); return null; }
+  if (!claimed) { res.status(400).json({ error: "userId is required" }); return null; }
+  return claimed;
+}
+
 // GET /plans/:planId/progress/:userId
 router.get("/plans/:planId/progress/:userId", async (req, res) => {
-  const { planId, userId } = req.params;
+  const { planId } = req.params;
+  const userId = await planUser(req, res, req.params.userId);
+  if (!userId) return;
 
   const { data: modules } = await supabaseRead.from("p2p_modules").select("id").eq("curriculum_id", planId);
   const moduleIds = (modules ?? []).map((m) => m.id as string);
@@ -745,8 +764,8 @@ router.get("/plans/:planId/progress/:userId", async (req, res) => {
 // POST /plans/:planId/save — bookmark a plan for later
 router.post("/plans/:planId/save", async (req, res) => {
   const { planId } = req.params;
-  const { userId } = req.body as { userId?: string };
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+  const userId = await planUser(req, res, (req.body as { userId?: string })?.userId);
+  if (!userId) return;
 
   const { error } = await supabaseRead
     .from("p2p_plan_saves")
@@ -758,8 +777,8 @@ router.post("/plans/:planId/save", async (req, res) => {
 // DELETE /plans/:planId/save — remove a bookmark
 router.delete("/plans/:planId/save", async (req, res) => {
   const { planId } = req.params;
-  const userId = (req.query.userId as string) || (req.body as { userId?: string })?.userId;
-  if (!userId) return res.status(400).json({ error: "userId is required" });
+  const userId = await planUser(req, res, (req.query.userId as string) || (req.body as { userId?: string })?.userId);
+  if (!userId) return;
 
   const { error } = await supabaseRead
     .from("p2p_plan_saves")
@@ -772,7 +791,8 @@ router.delete("/plans/:planId/save", async (req, res) => {
 
 // GET /plans/saved/:userId — bookmarked plans, most recently saved first
 router.get("/plans/saved/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = await planUser(req, res, req.params.userId);
+  if (!userId) return;
   const { data: saves } = await supabaseRead
     .from("p2p_plan_saves")
     .select("plan_id,saved_at")
@@ -885,7 +905,8 @@ async function getUserPlanProgressMap(userId: string) {
 // GET /plans/active/:userId — plans currently in progress (0% < percent < 100%),
 // most recently active first
 router.get("/plans/active/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = await planUser(req, res, req.params.userId);
+  if (!userId) return;
   const progressMap = await getUserPlanProgressMap(userId);
   const activePlanIds = Array.from(progressMap.entries())
     .filter(([, p]) => p.completedLessons > 0 && p.percent < 100)
@@ -911,7 +932,8 @@ router.get("/plans/active/:userId", async (req, res) => {
 
 // GET /plans/completed/:userId — plans finished (100%)
 router.get("/plans/completed/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = await planUser(req, res, req.params.userId);
+  if (!userId) return;
   const progressMap = await getUserPlanProgressMap(userId);
   const completedPlanIds = Array.from(progressMap.entries())
     .filter(([, p]) => p.totalLessons > 0 && p.percent === 100)
@@ -983,7 +1005,8 @@ function textIncludesAny(haystack: string, needles: string[]): boolean {
 
 // GET /plans/recommended/:userId — top 6 scored recommendations with reasons
 router.get("/plans/recommended/:userId", async (req, res) => {
-  const { userId } = req.params;
+  const userId = await planUser(req, res, req.params.userId);
+  if (!userId) return;
 
   const [{ data: goalsRow }, progressMap] = await Promise.all([
     supabaseRead.from("p2p_user_goals").select("*").eq("user_id", userId).maybeSingle(),

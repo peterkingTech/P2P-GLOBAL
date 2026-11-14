@@ -257,7 +257,7 @@ function KingdomSchoolCards({
       <TouchableOpacity accessibilityRole="button"
         style={[cardSelectorStyles.card, cardSelectorStyles.electivesCard]}
         activeOpacity={0.9}
-        onPress={() => router.push("/plans?tab=find" as any)}
+        onPress={() => router.push("/plans/learning?tab=find" as any)}
       >
         <Ionicons name="star" size={22} color="#fff" />
         <Text style={cardSelectorStyles.cardTitle}>Electives</Text>

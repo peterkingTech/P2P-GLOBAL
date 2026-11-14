@@ -18,6 +18,8 @@ export interface GrowthJourney {
   disclaimer?: string;
   stage: GrowthStageInfo & { objective?: StageObjective; since: string; verification: "verified" | "legacy_unverified" | "exception"; legacyNote: string | null };
   next: (GrowthStageInfo & { objective?: StageObjective; eligible?: boolean; dimensions: GrowthDimension[] }) | null;
+  /** The engine's checklists for the stages after `next` (How My Tree Grows). Optional: older servers omit it. */
+  later?: (GrowthStageInfo & { objective?: StageObjective; dimensions: GrowthDimension[] })[];
   verified?: GrowthVerified;
   milestones: "draft" | "approved";
   promotionsEnabled: boolean;
@@ -103,6 +105,37 @@ export interface GrowthTree {
   fruits: TreeFruit[];
   fruitTotals: { verified: number; pendingReview: number; withdrawn: number; rejected: number };
   seeds: { ref: string; verifiedContributionsToThem: number; nowHelpingOthers: boolean; firstHelpedOthersOn: string | null }[];
+  // Added 2026-11-14 (My Growth). Optional: an older server doesn't send them, and every screen copes.
+  consistency?: TreeConsistency;
+  application?: TreeApplication[];
+  learningMilestones?: { units: number; date: string }[];
+  contributionsCounted?: number;
+  evidenceTruncated?: boolean;
   disclaimer: string; note: string;
 }
+/** The Matrix's own consistency facts (null = not calculated yet) + recent qualifying ledger evidence. */
+export interface TreeConsistency {
+  activeWeeks: number | null; activeMonths: number | null; journeyDays: number | null; daysInStage: number | null;
+  pausedDaysInStage: number | null; pausedNow: boolean; activeWeeksLast16: number | null; activeWeeksLast26: number | null;
+  firstActivityAt: string | null; recentDays: number; recentQualifying: number; lastQualifyingOn: string | null; calculatedFor: string;
+}
+/** One Application ledger record (kind and date only — never content). */
+export interface TreeApplication {
+  id: string; type: string; label: string; date: string; area: string; areaLabel: string;
+  status: "verified" | "pending_review" | "rejected" | "withdrawn"; countsTowardMilestone: boolean;
+}
 export const getGrowthTree = () => apiRequest<GrowthTree>("/growth/me/tree", {}, { fallbackError: "Couldn't load your tree." });
+
+// Learning Roots (GET /growth/me/learning-roots): my learning grouped by the curriculum's own structure.
+export type RootLessonStatus = "passed" | "returned" | "submitted" | "in_progress";
+export interface LearningRoot {
+  key: string; source: "foundations_curriculum" | "plan_category" | "kingdom_stories" | "curriculum_type"; title: string; categorySlug: string | null;
+  passed: number; submitted: number; returned: number; inProgress: number; practicalVerified: number;
+  lessons: { id: string; title: string; status: RootLessonStatus; passedOn: string | null; practicalVerified: number; group: string }[];
+}
+export interface LearningRoots {
+  roots: LearningRoot[];
+  totals: { passed: number; submitted: number; returned: number; inProgress: number };
+  themesStatus: "pending_review" | "approved"; note: string;
+}
+export const getLearningRoots = () => apiRequest<LearningRoots>("/growth/me/learning-roots", {}, { fallbackError: "Couldn't load your learning roots." });

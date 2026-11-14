@@ -648,18 +648,24 @@ router.get("/:userId", async (req, res) => {
 });
 
 // PATCH /profiles/:userId
+// Security (2026-11-14): this route used the service-role client with NO caller check, so anyone could
+// change any profile — including growth_level (which the earlier growth engine read as a stage) and role.
+// Now: only the signed-in owner, and never growth_level or role (growth is calculated on the server from
+// verified evidence; roles change only through the admin routes). The app itself does not call this route.
 router.patch("/:userId", async (req, res) => {
   const { userId } = req.params;
-  const body = req.body as Record<string, unknown>;
+  const caller = await verifyCaller(req);
+  if (!caller) return res.status(401).json({ error: "Please sign in." });
+  if (caller !== userId) return res.status(403).json({ error: "You can only change your own profile." });
+  const body = (req.body ?? {}) as Record<string, unknown>;
 
   const dbUpdates: Record<string, unknown> = {};
   if (body.displayName !== undefined) dbUpdates.full_name = body.displayName;
   if (body.country !== undefined) dbUpdates.country = body.country;
   if (body.languageCode !== undefined) dbUpdates.language = body.languageCode;
-  if (body.growthLevel !== undefined) dbUpdates.growth_level = body.growthLevel;
-  if (body.role !== undefined) dbUpdates.role = body.role;
   if (body.gifts !== undefined) dbUpdates.gifts = body.gifts;
   if (body.isPraying !== undefined) dbUpdates.is_praying = body.isPraying;
+  if (!Object.keys(dbUpdates).length) return res.status(400).json({ error: "Nothing to change." });
 
   const { data, error } = await supabase
     .from("p2p_profiles")

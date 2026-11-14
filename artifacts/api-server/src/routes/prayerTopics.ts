@@ -3,6 +3,12 @@ import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
 import { requireAdmin } from "../middleware/adminAuth";
 import { moveToBin, sendRecycleError } from "../lib/recycleBin";
 import { getTranslationByCode } from "../lib/bibleService";
+import { isVisibleLink } from "../lib/scriptureTopics";
+import categoriesData from "../../data/scripture-topics/categories.json";
+
+// Explore Scripture by Topic categories (data/scripture-topics, built by scripts/build-scripture-topics.mjs).
+const CATEGORY_BY_TITLE = new Map(Object.entries((categoriesData as { byTitle: Record<string, string> }).byTitle).map(([k, v]) => [k.toLowerCase(), v]));
+const topicCategory = (title: string) => CATEGORY_BY_TITLE.get(title.trim().toLowerCase()) ?? null;
 
 // "Pray the Word" Stage 1 — Scripture & Topic foundation (migration 142).
 // Mounted at /prayer/topics (public/user reads) and /prayer/admin (editorial
@@ -32,6 +38,9 @@ function mapScripture(row: Record<string, unknown>, link?: Record<string, unknow
     id: row.id, book: row.book, chapter: row.chapter, startVerse: row.start_verse, endVerse: row.end_verse,
     translationCode: row.translation_code, referenceDisplay: row.reference_display,
     ...(link ? { role: link.role, displayOrder: link.display_order, editorialNote: link.editorial_note } : {}),
+    // Optional editorial fields (proposed migration 248) — only sent when the row has them.
+    ...(link?.editorial_title ? { editorialTitle: link.editorial_title } : {}),
+    ...(link?.passage_kind ? { passageKind: link.passage_kind } : {}),
   };
 }
 function mapTopicProgress(row: Record<string, unknown>) {
@@ -44,14 +53,24 @@ function mapTopicProgress(row: Record<string, unknown>) {
 
 // ── Public/user reads ───────────────────────────────────────────────────────
 
-// GET /prayer/topics — published topics only, ordered for browsing.
+// GET /prayer/topics — published topics only, ordered for browsing. Each topic also carries (2026-11-14,
+// backwards-compatible additions) `scriptureCount` — how many of its passages a participant can see — and
+// `category` (the topic's own column once it exists, else the editorial collection's category for its title).
 router.get("/topics", async (req, res) => {
   const userId = await verifyCaller(req);
   if (!userId) return err(res, "Unauthorized", 401);
   const { data, error } = await db.from("p2p_prayer_topics").select("*")
     .eq("status", "published").order("display_order", { ascending: true }).order("title", { ascending: true });
   if (error) return err(res, error.message, 500);
-  return ok(res, (data ?? []).map(mapTopic));
+  const topics = (data ?? []) as Record<string, unknown>[];
+  const counts = new Map<string, number>();
+  const ids = topics.map((t) => String(t.id));
+  for (let i = 0; i < ids.length; i += 150) {
+    // "*" so the optional editorial_status column is read when it exists (and nothing breaks before it does).
+    const { data: links } = await db.from("p2p_topic_scriptures").select("*").in("topic_id", ids.slice(i, i + 150));
+    for (const l of (links ?? []) as Record<string, unknown>[]) if (isVisibleLink(l as { editorial_status?: string })) counts.set(String(l.topic_id), (counts.get(String(l.topic_id)) ?? 0) + 1);
+  }
+  return ok(res, topics.map((t) => ({ ...mapTopic(t), scriptureCount: counts.get(String(t.id)) ?? 0, category: (t.category as string | null) ?? topicCategory(String(t.title)) })));
 });
 
 // GET /prayer/scriptures/:id — a single bare reference, for callers that
@@ -79,13 +98,15 @@ router.get("/topics/:slug", async (req, res) => {
   if (!topic || topic.status !== "published") return err(res, "Topic not found", 404);
 
   const { data: links, error } = await db.from("p2p_topic_scriptures")
-    .select("role,display_order,editorial_note,scripture:p2p_scripture_references(*)")
+    .select("*,scripture:p2p_scripture_references(*)")
     .eq("topic_id", topic.id as string)
     .order("role", { ascending: true }).order("display_order", { ascending: true });
   if (error) return err(res, error.message, 500);
 
+  // Only passages an editor has approved or published are shown (rows from before editorial_status existed
+  // are published). Hidden ones are left out of this list AND of the progress count below, so positions agree.
   const scriptures = (links ?? [])
-    .filter((l: any) => l.scripture)
+    .filter((l: any) => l.scripture && isVisibleLink(l))
     .map((l: any) => mapScripture(l.scripture, l));
 
   // Enhancement Stage 2 — sequential lock/progression. current_scripture_order
@@ -116,7 +137,9 @@ router.put("/topics/:id/progress", async (req, res) => {
   const { completedScriptureOrder } = req.body as { completedScriptureOrder?: number };
   if (!completedScriptureOrder || completedScriptureOrder < 1) return err(res, "a valid completedScriptureOrder is required");
 
-  const { count: totalScriptures } = await db.from("p2p_topic_scriptures").select("id", { count: "exact", head: true }).eq("topic_id", topic.id as string);
+  // Visible passages only — the same list GET /topics/:slug shows (unreviewed passages never count).
+  const { data: allLinks } = await db.from("p2p_topic_scriptures").select("*").eq("topic_id", topic.id as string);
+  const totalScriptures = ((allLinks ?? []) as { editorial_status?: string }[]).filter((l) => isVisibleLink(l)).length;
 
   const { data: existing } = await db.from("p2p_prayer_topic_progress").select("current_scripture_order,completed_at")
     .eq("user_id", userId).eq("topic_id", topic.id as string).maybeSingle();

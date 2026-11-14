@@ -417,6 +417,8 @@ async function myLink(linkId: string, caller: string): Promise<LinkRow | null> {
 /** The database's own refusals (P2P_LINK…) become plain 409 answers. */
 function linkError(res: import("express").Response, e: { message?: string } | null) {
   const m = String(e?.message ?? "");
+  // The Growth Matrix rule (migration 239): a Guide must be ahead — e.g. resuming after the participant caught up.
+  if (m.startsWith("P2P_GUIDE_STAGE")) return err(res, "A Peer Guide must be at a higher Growth Stage than the person they guide, so this relationship can't be made active. Its history is kept.", 409);
   const text = m.replace(/^P2P_LINK[A-Z_]*:\s*/, "");
   return m.startsWith("P2P_LINK") ? err(res, text.charAt(0).toUpperCase() + text.slice(1) + ".", 409) : err(res, "Couldn't update the relationship.", 500);
 }

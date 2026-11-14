@@ -3,26 +3,30 @@ import { View, Text, StyleSheet, Platform } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors from "@/constants/colors";
-import { STAGES, PERSONAL_STAGE_COUNT } from "@/constants/stages";
+import { STAGES, PERSONAL_STAGE_COUNT, COLLECTIVE_STAGE_INDEX } from "@/constants/stages";
 import { IconButton } from "@/components/ui";
 import LivingTreeView, { bodyForStage } from "@/components/growth/LivingTreeView";
+import BotanicalModelView from "@/components/growth/BotanicalModelView";
 import { assetById } from "@/lib/growthTreeAssets";
 
 // Full-screen 3D view of a growth stage's real Meshy model (the hosted v2 copy, components/growth/
 // LivingTreeView — the same renderer as Home and My Tree). Turn it by dragging, zoom by pinching or with
 // the buttons, jump to its roots or canopy; a close-up copy downloads only when zoomed in (large trees).
-// ?stage=0…4 → that stage's model; ?mine=1 → your own tree with your verified fruit.
+// ?stage=0…4 → that stage's model; ?mine=1 → your own tree with your verified fruit; ?forest=1 → the
+// collective Forest of Nations globe (never a personal stage; "not available yet" until it is hosted).
+const FOREST_ASSET = "forest-of-nations-3d-landscape";
 const mb = (bytes: number) => (bytes / 1e6).toFixed(1);
 
 export default function Tree3DScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ stage?: string; mine?: string }>();
+  const params = useLocalSearchParams<{ stage?: string; mine?: string; forest?: string }>();
+  const forest = params.forest === "1";
   const n = Number(params.stage);
   const stageIndex = Number.isInteger(n) && n >= 0 && n < PERSONAL_STAGE_COUNT ? n : 0;
   const mine = params.mine === "1";
-  const stage = STAGES[stageIndex];
-  const asset = assetById(bodyForStage(stageIndex));
+  const stage = forest ? STAGES[COLLECTIVE_STAGE_INDEX] : STAGES[stageIndex];
+  const asset = assetById(forest ? FOREST_ASSET : bodyForStage(stageIndex));
   const topPad = insets.top + (Platform.OS === "web" ? 16 : 6);
 
   return (
@@ -31,15 +35,18 @@ export default function Tree3DScreen() {
       <View style={styles.header}>
         <IconButton palette="fixedLight" icon="chevron-back" accessibilityLabel="Back" onPress={() => router.back()} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.title} accessibilityRole="header">{mine ? `Your tree · ${stage.name}` : stage.name}</Text>
+          <Text style={styles.title} accessibilityRole="header">{forest ? stage.name : mine ? `Your tree · ${stage.name}` : stage.name}</Text>
           <Text style={styles.hint}>Drag to turn · pinch or use the buttons to zoom · two fingers to move</Text>
         </View>
       </View>
 
-      <LivingTreeView stageIndex={stageIndex} mode={mine ? "tree" : "stage"} showViewControls style={styles.stage} />
+      {forest
+        ? <BotanicalModelView assetId={FOREST_ASSET} style={styles.stage} label="Forest of Nations: a globe whose continents are covered in fruit trees" />
+        : <LivingTreeView stageIndex={stageIndex} mode={mine ? "tree" : "stage"} showViewControls style={styles.stage} />}
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Text style={styles.desc}>{stage.description}</Text>
+        {forest ? <Text style={styles.meta}>Not a personal stage: what P2P Global&apos;s participants build together.</Text> : null}
         {asset?.file ? (
           <Text style={styles.meta}>
             About {mb(asset.file.bytes)} MB to download, kept on your device afterwards.

@@ -72,7 +72,7 @@ const f = (name: string, source: string, sha256: string, sourceBytes: number, so
 const withClose = (file: AssetFile, close: { name: string; bytes: number; triangles: number }): AssetFile => ({ ...file, lods: ["standard", "close"], close });
 /** Second upload (owner approval 2026-11-13): the 17 lifecycle models — fruit development, leaves, blossom
  *  and buds, root sets — uploaded to Forests/models/v2/ (nothing existing overwritten) and verified byte for
- *  byte from their public URLs. Used by "How an apple tree grows" (lib/botanicalLifecycle.ts) only: they are
+ *  byte from their public URLs. Used by "How My Tree Grows" (lib/botanicalLifecycle.ts) only: they are
  *  never put on a person's tree (the composition doesn't use them; the stage trees carry their own leaves and roots). */
 const LIFECYCLE_UPLOAD = new Set([
   "asset-apple-stage-1-fruitlet", "asset-apple-stage-2-green", "asset-apple-stage-3-yellow-green", "asset-apple-stage-4-golden-yellow", "asset-04c-young-green-applelet",
@@ -99,7 +99,12 @@ export const TREE_ASSETS: TreeAsset[] = [
   a("asset-05-forest-builder-apple-tree", "body", "body", "Veteran apple tree with broad foundation roots (stage Forest Builder)",
     withClose(f("body-05-forest-builder.glb", "P2P - Bare Forest Builder_.glb", "546b6c93bcd98d8785049e27a2bb3f00fff78089362e44acbd52cc13ec486b31", 361645604, 7674068, 250000, 6497032),
       { name: "body-05-forest-builder.close.glb", bytes: 20302128, triangles: 1000000 }), { hasFoliage: true, release: "v2" }),
-  a("forest-of-nations-3d-landscape", "body", "landscape", "Collective forest — Global Forest only, never an individual stage (only a 2D image exists)"),
+  // Forest of Nations (owner's Meshy export 2026-11-14, Meshy-named only — identified by eye: a globe whose
+  // continents are covered in small fruit trees). Collective, never an individual stage. Welded + decimated
+  // in Blender (like the large trees) to a 300k standard copy and a close-up copy; not hosted yet.
+  a("forest-of-nations-3d-landscape", "body", "landscape", "Forest of Nations: a globe whose continents are covered in fruit trees — the collective forest, never an individual stage",
+    withClose(f("collective-forest-of-nations.glb", "export_Meshy_AI_2026-11-14_d4ff73.glb", "f9f584a9b4154d5ef426b15400808ce9b4f6eba9c1661451c59b7a4e0d0f9fb9", 338438596, 7630676, 299999, 8530708),
+      { name: "collective-forest-of-nations.close.glb", bytes: 19144136, triangles: 999999 }), { identifiedBy: "visual" }),
   a("asset-06-fruiting-spur-socket", "modular", "socket", "Woody fruiting spur: attachment point for blossoms and fruit",
     f("part-06-fruiting-spur.glb", "P2P - Fruiting Spur Twig Socket_.glb", "e6e9a0bf7f99ed35213dfad8739d091646e52798dcab3549e4942eebddc53816", 60091692, 1029868, 4000, 149616), { release: "v2" }),
   a("asset-07-single-leaf-particle", "modular", "leaf", "Single curved apple leaf for the canopy",
@@ -208,15 +213,15 @@ export type BotanicalCategory =
   | "structure"           // fruiting spur (where blossom and fruit attach)
   | "special";            // special teaching close-ups (not integrated)
 /** live = hosted and used; local_review = optimised copy on this computer only; reserved = validated, owner
- *  approval needed before any use; missing = no 3D file exists. */
-export type Integration = "live" | "local_review" | "reserved" | "missing";
+ *  approval needed before any use; excluded = the owner has ruled it out; missing = no 3D file exists. */
+export type Integration = "live" | "local_review" | "reserved" | "excluded" | "missing";
 const BOTANY: Record<string, { category: BotanicalCategory; use: string; integration: Integration; wind?: boolean }> = {
   "asset-00-germinating-seed": { category: "stage_tree", use: "Seed stage tree (Home, My Tree, stage cards)", integration: "live", wind: true },
   "asset-02-sprout": { category: "stage_tree", use: "Sprout stage tree", integration: "live", wind: true },
   "asset-03-young-apple-tree": { category: "stage_tree", use: "Young Tree stage tree", integration: "live", wind: true },
   "asset-04-fruitful-apple-tree": { category: "stage_tree", use: "Fruitful Tree stage tree", integration: "live", wind: true },
   "asset-05-forest-builder-apple-tree": { category: "stage_tree", use: "Forest Builder stage tree", integration: "live", wind: true },
-  "forest-of-nations-3d-landscape": { category: "collective", use: "Global Forest environment — no 3D model exists (2D image only)", integration: "missing" },
+  "forest-of-nations-3d-landscape": { category: "collective", use: "Forest of Nations: the collective global forest (Stages 'Together' card, Global Forest tab, full screen) — never an individual stage. Not hosted yet (upload needs owner approval)", integration: "local_review" },
   "asset-apple-stage-5-ripe-red": { category: "contribution_fruit", use: "Contribution fruit on the tree; ripe apple in the lifecycle", integration: "live" },
   "asset-apple-stage-6-striped-red": { category: "contribution_fruit", use: "Contribution fruit (variety only — it carries no meaning)", integration: "live" },
   "asset-04d-blushed-apple": { category: "contribution_fruit", use: "Contribution fruit; blushed apple in the lifecycle", integration: "live" },
@@ -242,7 +247,7 @@ const BOTANY: Record<string, { category: BotanicalCategory; use: string; integra
   "extra-roots-young": { category: "root", use: "Root development: young roots (the stage trees carry their own roots)", integration: "live" },
   "extra-roots-established": { category: "root", use: "Root development: established roots", integration: "live" },
   "extra-roots-deep": { category: "root", use: "Root development: deep roots", integration: "live" },
-  "special-half-apple-with-seeds": { category: "special", use: "Reserved: seed-in-the-fruit teaching close-up (not integrated)", integration: "reserved" },
+  "special-half-apple-with-seeds": { category: "special", use: "Excluded by the owner (2026-11-14) — never used", integration: "excluded" },
   "special-single-apple-on-stalk": { category: "special", use: "Reserved: single-fruit close-up (not integrated)", integration: "reserved" },
 };
 export interface BotanicalAsset extends TreeAsset { category: BotanicalCategory; use: string; integration: Integration; wind: boolean }
@@ -258,7 +263,7 @@ export const BOTANICAL_LOCAL_BASE_URL: string | null = process.env.EXPO_PUBLIC_B
 export type Availability = "hosted" | "local_review" | "unavailable";
 export function botanicalAvailability(id: string): Availability {
   const x = botanicalAsset(id);
-  if (!x?.file || x.integration === "reserved" || x.integration === "missing") return "unavailable";
+  if (!x?.file || x.integration === "reserved" || x.integration === "excluded" || x.integration === "missing") return "unavailable";
   if (x.release === "v2" && MODULAR_TREE_BASE_URL) return "hosted";
   return BOTANICAL_LOCAL_BASE_URL && x.integration === "local_review" ? "local_review" : "unavailable";
 }
@@ -267,4 +272,10 @@ export function botanicalAssetUrl(id: string): string | null {
   const x = botanicalAsset(id), av = botanicalAvailability(id);
   if (!x?.file || av === "unavailable") return null;
   return av === "hosted" ? modularFileUrl(id) : BOTANICAL_LOCAL_BASE_URL + x.file.name;
+}
+/** Its close-up copy (large models only; loaded only when zoomed in), from the same place, or null. */
+export function botanicalCloseUrl(id: string): string | null {
+  const x = botanicalAsset(id), av = botanicalAvailability(id);
+  if (!x?.file?.close || av === "unavailable") return null;
+  return av === "hosted" ? modularCloseUrl(id) : BOTANICAL_LOCAL_BASE_URL + x.file.close.name;
 }

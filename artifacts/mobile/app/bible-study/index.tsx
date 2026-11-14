@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, Platform, TextInput } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { useLayout, centeredMaxWidth } from "@/hooks/useLayout";
 import { loadPosition, type ReadingPosition } from "@/lib/bibleReadingPrefs";
 import { bookByCode } from "@/lib/bibleReaderApi";
 import { getTopics, type PrayerTopic } from "@/lib/prayerTopicsApi";
+import { groupTopics, searchTopics, topicKey } from "@/lib/scriptureTopicsUi";
 import { AppButton, IconButton } from "@/components/ui";
 import { BIBLE_COVER, BIBLE_COVER_BG, BIBLE_COVER_LABEL, ARTWORK_FILL } from "@/constants/artwork";
 import { useScrollToTopOnTabReselect, useTabCapsuleTopInset } from "@/components/IPadTabCapsule";
@@ -45,6 +46,9 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
   const [pos, setPos] = useState<ReadingPosition | null>(null);
   const [topics, setTopics] = useState<PrayerTopic[] | null>(null);
   const [topicsFailed, setTopicsFailed] = useState(false);
+  const [query, setQuery] = useState("");
+  const topicName = (title: string) => t(`scriptureTopics.names.${topicKey(title)}`, { defaultValue: title });
+  const shownTopics = useMemo(() => searchTopics(topics ?? [], query, (k) => t(`scriptureTopics.categories.${k}`)).filter(Boolean), [topics, query, t]);
 
   const load = useCallback(() => {
     loadPosition().then(setPos).catch(() => {});
@@ -126,18 +130,39 @@ export function BibleStudyHome({ asTab = false }: { asTab?: boolean }) {
           ))}
         </View>
 
-        <Text style={s.section} accessibilityRole="header">Explore Scripture by Topic</Text>
-        <Text style={[s.meta, { marginBottom: 10 }]}>Passages chosen by P2P editors for each topic. Open any passage to read it in context.</Text>
-        {topics === null && !topicsFailed ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel="Loading topics" />
+        {/* Explore Scripture by Topic — searchable, grouped by category, with each topic's passage count.
+            The search text stays when you open a topic and come back (this screen stays mounted). */}
+        <Text style={s.section} accessibilityRole="header">{t("scriptureTopics.title", { defaultValue: "Explore Scripture by Topic" })}</Text>
+        <Text style={[s.meta, { marginBottom: 10 }]}>{t("scriptureTopics.intro", { defaultValue: "Passages chosen by P2P editors for each topic. Open any passage to read it in context." })}</Text>
+        {topics === null && !topicsFailed ? <ActivityIndicator color={colors.accentGreen} accessibilityLabel={t("scriptureTopics.loading")} />
           : topicsFailed ? (
-            <AppButton label="Topics couldn't load. Try again" onPress={load} variant="tertiary" />
+            <AppButton label={t("scriptureTopics.failed")} onPress={load} variant="tertiary" />
           ) : topics && topics.length ? (
-            <View style={s.chips}>
-              {topics.map((t) => (
-                <AppButton label={`${t.title}`} onPress={() => router.push({ pathname: "/bible-study/topic/[slug]", params: { slug: t.slug } } as any)} variant="secondary" accessibilityLabel={`Topic: ${t.title}`} key={t.id} />
+            <View style={{ gap: 12 }}>
+              <View style={s.searchRow}>
+                <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+                <TextInput value={query} onChangeText={setQuery} placeholder={t("scriptureTopics.searchHint")} placeholderTextColor={colors.textMuted}
+                  accessibilityLabel={t("scriptureTopics.search")} style={s.searchInput} autoCorrect={false} returnKeyType="search" />
+                {query ? <IconButton icon="close-circle" size="sm" accessibilityLabel={t("scriptureTopics.clear")} onPress={() => setQuery("")} color={colors.textMuted} /> : null}
+              </View>
+              {!shownTopics.length ? <Text style={s.meta}>{t("scriptureTopics.noMatch", { query })}</Text> : groupTopics(shownTopics).map((g) => (
+                <View key={g.category} style={{ gap: 8 }}>
+                  <Text style={s.groupTitle} accessibilityRole="header">{t(`scriptureTopics.categories.${g.category}`)}</Text>
+                  <View style={s.chips}>
+                    {g.topics.map((tp) => {
+                      const name = topicName(tp.title);
+                      const count = typeof tp.scriptureCount === "number" ? t("scriptureTopics.count", { count: tp.scriptureCount }) : null;
+                      return (
+                        <AppButton key={tp.id} label={count ? `${name} · ${tp.scriptureCount}` : name} variant="secondary"
+                          accessibilityLabel={t("scriptureTopics.topicA11y", { title: name, count: count ?? "" })}
+                          onPress={() => router.push({ pathname: "/bible-study/topic/[slug]", params: { slug: tp.slug } } as any)} />
+                      );
+                    })}
+                  </View>
+                </View>
               ))}
             </View>
-          ) : <Text style={s.meta}>No topics are published yet.</Text>}
+          ) : <Text style={s.meta}>{t("scriptureTopics.none")}</Text>}
       </ScrollView>
     </View>
   );
@@ -165,6 +190,9 @@ function makeStyles(c: AppColors) {
     destIcon: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: c.lightCream },
     section: { fontSize: 17, lineHeight: 23, color: c.textDark, fontFamily: "Inter_700Bold", marginTop: 26, marginBottom: 4 },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    groupTitle: { fontSize: 13, color: c.textMid, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
+    searchRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 46, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
+    searchInput: { flex: 1, minHeight: 44, fontSize: 15, color: c.textDark, fontFamily: "Inter_400Regular" },
     chip: { minHeight: 40, paddingHorizontal: 14, justifyContent: "center", borderRadius: 20, borderWidth: 1, borderColor: c.borderBeige, backgroundColor: c.card },
     chipText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     retry: { minHeight: 44, justifyContent: "center" },

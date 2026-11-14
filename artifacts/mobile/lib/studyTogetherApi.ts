@@ -13,7 +13,7 @@ const authedFetch = (path: string, init?: RequestInit) => apiRequest(path, init,
 });
 const post = (path: string, body?: unknown) => authedFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) });
 
-export type StudyContentType = "kingdom_story" | "lesson";
+export type StudyContentType = "kingdom_story" | "lesson" | "study_plan";
 export type StudyDestination = "peer" | "family" | "church" | "circle" | "group";
 export type PeerRelationship = "peer_guide" | "disciple" | "connection" | "friend";
 
@@ -56,15 +56,15 @@ export interface MyStudies { invitations: StudyCard[]; active: StudyCard[]; conc
 export const getMyStudies = (): Promise<MyStudies> => authedFetch("/mine");
 
 // ── The Study Together hub: one collection over the real records ─────────────
-export type HubFilter = "all" | "kingdom_story" | "lesson" | "group_lessons";
-export const HUB_FILTER_LABELS: Record<HubFilter, string> = { all: "All", kingdom_story: "Kingdom Stories", lesson: "Kingdom School", group_lessons: "Family & Church studies" };
+export type HubFilter = "all" | "kingdom_story" | "lesson" | "study_plan" | "group_lessons";
+export const HUB_FILTER_LABELS: Record<HubFilter, string> = { all: "All", kingdom_story: "Kingdom Stories", lesson: "Kingdom School", study_plan: "P2P Plans", group_lessons: "Family & Church studies" };
 export interface HubItem { key: string; kind: "shared" | "group_lesson"; filter: Exclude<HubFilter, "all">; title: string; typeLabel: string; where: string; when: string; concluded: boolean; route: { pathname: string; params: Record<string, string> } }
 
 /** Every study the reader can open, newest activity first — references only, nothing copied. */
 export function hubItems(d: MyStudies): HubItem[] {
   const shared = (x: StudyCard, concluded: boolean): HubItem => ({
     key: `s:${x.id}`, kind: "shared", filter: x.contentType, title: x.title,
-    typeLabel: x.contentType === "kingdom_story" ? "Kingdom Story" : "Kingdom School lesson",
+    typeLabel: CONTENT_TYPE_LABELS[x.contentType] ?? "Study",
     where: x.destination.type === "peer" ? (x.isHost ? "With the peers you invited" : `With ${x.host.name}`) : `${DESTINATION_LABELS[x.destination.type]}${x.destination.name ? ` · ${x.destination.name}` : ""}`,
     when: x.lastOpenedAt ?? x.updatedAt, concluded, route: { pathname: "/study-together/[id]", params: { id: x.id } },
   });
@@ -80,7 +80,7 @@ export function hubItems(d: MyStudies): HubItem[] {
 }
 /** Only the filters that have something behind them (never an empty, pretend category). */
 export function hubFilters(items: HubItem[]): HubFilter[] {
-  return ["all", ...(["kingdom_story", "lesson", "group_lessons"] as const).filter((f) => items.some((i) => i.filter === f))];
+  return ["all", ...(["kingdom_story", "lesson", "study_plan", "group_lessons"] as const).filter((f) => items.some((i) => i.filter === f))];
 }
 export const getSharedStudy = (id: string): Promise<SharedStudy> => authedFetch(`/${id}`);
 export const respondToStudy = (id: string, response: "accepted" | "declined") => post(`/${id}/respond`, { response });
@@ -96,9 +96,13 @@ export const postStudyResponse = (id: string, input: { body: string; promptId?: 
 export const removeStudyResponse = (id: string, responseId: string) => authedFetch(`/${id}/responses/${responseId}`, { method: "DELETE" });
 export const markStudyOpened = (id: string) => post(`/${id}/opened`).catch(() => null);
 
-/** Where "Open the story / lesson" goes — each person reads with their own progress. */
-export function contentRoute(s: { contentType: StudyContentType; contentId: string }, sectionId?: string | null): { pathname: string; params: Record<string, string> } {
+export const CONTENT_TYPE_LABELS: Record<StudyContentType, string> = { kingdom_story: "Kingdom Story", lesson: "Kingdom School lesson", study_plan: "P2P Plan" };
+
+/** Where "Open the story / lesson / plan" goes — each person reads with their own progress. */
+export function contentRoute(s: { contentType: StudyContentType; contentId: string; id?: string }, sectionId?: string | null): { pathname: string; params: Record<string, string> } {
   if (s.contentType === "lesson") return { pathname: "/lesson/[id]", params: { id: s.contentId } };
+  // A plan opens with the reader's OWN run of it (their own schedule and completions).
+  if (s.contentType === "study_plan") return { pathname: "/study-plan/[id]", params: { id: s.contentId, ...(s.id ? { together: s.id } : {}) } };
   return sectionId
     ? { pathname: "/kingdom-stories/chapter", params: { id: s.contentId, chapter: sectionId } }
     : { pathname: "/kingdom-stories/[id]", params: { id: s.contentId } };
