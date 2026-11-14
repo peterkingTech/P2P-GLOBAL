@@ -75,7 +75,7 @@ A session can also have **supporting resources**. Supporting resources must help
   - Too many sessions on one study day is refused with a 422 that explains why and suggests a longer schedule.
   - The person can keep their choice knowingly.
 
-## Discovery, the builder and groups (2026-11-14, local; needs proposals 251 + 252)
+## Discovery, the builder and groups (2026-11-14; migrations 251 + 252 applied to production 18:12 UTC — the 20 subjects are drafts awaiting two editors)
 
 - **Discovery** (`api-server/src/lib/planDiscovery.ts`, `routes/planDiscovery.ts` at `/plan-discovery`): a subject (Bible book, Scripture topic, person / event / place / theme record, Core Foundations, a Kingdom School course) → published resources only.
   - **Direct:** an editor's link, a topic's core passages, a subject's own passages, a plan with the same focus, a course's own lessons, a story whose *narrative* is in the chosen book.

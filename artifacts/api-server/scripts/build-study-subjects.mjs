@@ -1,5 +1,7 @@
 // P2P PLANS — Biblical people / events as DRAFT subject records (owner decision 1a, 2026-11-14).
 //   node scripts/build-study-subjects.mjs [--offline]
+// NOTE (2026-11-14): the generated SQL was APPLIED as migrations/252_study_subjects_drafts.sql. Re-running writes a fresh copy
+// to docs/proposals/ for a NEW migration — never edit the applied file.
 // Source: P2P's OWN published Kingdom Stories (data/study-subjects/stories-*.json — ids, titles, each chapter's
 // Scripture references; no story text). For each story about a person or an event:
 //   • the subject's passages = the NARRATIVE references of its chapters (the chapter's own book — e.g.

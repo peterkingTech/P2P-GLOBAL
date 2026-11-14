@@ -1,3 +1,5 @@
+-- APPLIED TO PRODUCTION 2026-11-14 18:12:31 UTC (owner approval 2026-11-14; guarded single-transaction apply with in-transaction checks incl. rolled-back behaviour tests; backup C:/Users/offic/P2P-Backups/prod-c5e1812c-2026-11-14T18-12-26-731Z-tables-251-252 (JSON of every touched table)).
+-- The notes below were written before applying; "NOT APPLIED" there is historical.
 -- 251 — P2P Plans: discovery subjects, plan versions, Study Together in private groups, group plan history.
 -- Written 2026-11-14. NOT APPLIED. REQUIRES 245 (private groups) and 249 (P2P Plans).
 -- Owner decisions 2026-11-14: 1a (editorial subject records, seeded as drafts from P2P's own stories — see 252),
