@@ -20,7 +20,7 @@ export type DurationKey = (typeof DURATIONS)[number];
 export const DURATION_DAYS: Record<Exclude<DurationKey, "daily" | "custom">, number> = { weekly: 7, monthly: 30, quarterly: 91, half_year: 182, yearly: 365 };
 export const QUESTION_KINDS = ["observe", "context", "interpret", "consider", "apply"] as const;
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
-export const RESOURCE_KINDS = ["bible_passage", "lesson", "kingdom_story", "scripture_topic", "deep_study", "word_study", "commentary", "dictionary_term", "curriculum"] as const;
+export const RESOURCE_KINDS = ["bible_passage", "lesson", "kingdom_story", "scripture_topic", "deep_study", "word_study", "commentary", "dictionary_term", "curriculum", "reference_article"] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 export const EDITORIAL_FLOW: Record<string, string[]> = {
   draft: ["under_review", "archived"], under_review: ["draft", "approved"], approved: ["published", "draft"], published: ["archived"], archived: ["draft"],
@@ -60,7 +60,8 @@ export type Resource =
   | { kind: "scripture_topic"; slug: string }
   | ({ kind: "deep_study" | "commentary" } & Passage)
   | { kind: "word_study"; strongs: string }
-  | { kind: "dictionary_term"; key: string };
+  | { kind: "dictionary_term"; key: string }
+  | { kind: "reference_article"; id: string };
 /** An existing P2P resource, by reference (its own id / slug / Strong's number). A note says why it belongs. */
 export function validateResource(r: unknown): (Resource & { note?: string; title?: string }) | null {
   if (!r || typeof r !== "object") return null;
@@ -73,6 +74,8 @@ export function validateResource(r: unknown): (Resource & { note?: string; title
     case "scripture_topic": return typeof o.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(o.slug) && o.slug.length <= 80 ? { kind: "scripture_topic", slug: o.slug, ...extra } : null;
     case "word_study": return typeof o.strongs === "string" && /^[HG]\d{1,5}[a-z]?$/.test(o.strongs) ? { kind: "word_study", strongs: o.strongs, ...extra } : null;
     case "dictionary_term": return typeof o.key === "string" && /^[a-z0-9][a-z0-9_-]{0,79}$/.test(o.key) ? { kind: "dictionary_term", key: o.key, ...extra } : null;
+    // A Bible dictionary article (Easton's, Deep Study) by its own id.
+    case "reference_article": return typeof o.id === "string" && /^[a-z0-9][a-z0-9_-]{0,79}$/.test(o.id) ? { kind: "reference_article", id: o.id, ...extra } : null;
   }
   return null;
 }

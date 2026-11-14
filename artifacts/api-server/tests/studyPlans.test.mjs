@@ -92,7 +92,19 @@ const mockPlugin = { name: "mocks", setup(b) {
   b.onResolve({ filter: /(^|\/)supabase$/ }, () => ({ path: "supabase", namespace: "mock" }));
   b.onResolve({ filter: /(^|\/)sharedStudy$/ }, () => ({ path: "sharedStudy", namespace: "mock" }));
   b.onLoad({ filter: /^supabase$/, namespace: "mock" }, () => ({ loader: "js", contents: "export const supabaseServiceRole = globalThis.__plansDb; export const verifyCaller = async (req) => req.headers['x-test-user'] || null;" }));
-  b.onLoad({ filter: /^sharedStudy$/, namespace: "mock" }, () => ({ loader: "js", contents: "export const isDestinationMember = async (t, g, u) => (globalThis.__family[g] ?? []).includes(u);" }));
+  b.onLoad({ filter: /^sharedStudy$/, namespace: "mock" }, () => ({ loader: "js", contents: `export const isDestinationMember = async (t, g, u) => (globalThis.__family[g] ?? []).includes(u);
+    export const canLeadDestination = async (t, g, u) => (globalThis.__family[g] ?? [])[0] === u;
+    export const destinationMemberIds = async (t, g) => globalThis.__family[g] ?? [];
+    export const destinationName = async () => "Test family";
+    export const displayName = async () => "Someone";
+    export const groupsUserLeads = async (u) => Object.entries(globalThis.__family).filter(([, m]) => m[0] === u).map(([id]) => ({ type: "family", id, name: "Test family" }));
+    export const loadContent = async () => null; export const notify = async () => {}; export const profilesById = async () => new Map();
+    export const GROUP_DESTINATIONS = ["family", "church", "circle", "group", "private_group"];` }));
+  // Added 2026-11-14 with discovery: the dictionary and the discovery cache are not part of these tests.
+  b.onResolve({ filter: /(^|\/)referenceArticles$/ }, () => ({ path: "referenceArticles", namespace: "mock" }));
+  b.onResolve({ filter: /^\.\/planDiscovery$/ }, () => ({ path: "planDiscoveryRoute", namespace: "mock" }));
+  b.onLoad({ filter: /^referenceArticles$/, namespace: "mock" }, () => ({ loader: "js", contents: "export const getArticles = () => ({ byId: new Map([['love', { id: 'love', title: 'Love' }]]) });" }));
+  b.onLoad({ filter: /^planDiscoveryRoute$/, namespace: "mock" }, () => ({ loader: "js", contents: "export const invalidateDiscovery = () => {};" }));
 } };
 
 try {
@@ -215,7 +227,9 @@ try {
   r = await call("POST", `/${mineId}/start`, CAT, { durationKey: "daily", pace: "daily" });
   await call("POST", `/runs/${r.body.run.id}/sessions/${keepId}`, CAT);
   r = await call("PUT", `/${mineId}`, CAT, { ...draft, sessions: [{ id: keepId, ...draft.sessions[0], title: "By faith (edited)" }, draft.sessions[1], { title: "Moses", passages: [{ book: "HEB", chapter: 11, startVerse: 23, endVerse: 29 }] }] });
-  ok("editing keeps session ids, so completed sessions stay completed", r.status === 200 && T.p2p_study_plan_completions.some((c) => c.session_id === keepId) && T.p2p_study_plan_sessions.filter((s) => s.plan_id === mineId).length === 3);
+  ok("editing keeps session ids, so completed sessions stay completed", r.status === 200 && T.p2p_study_plan_completions.some((c) => c.session_id === keepId) && T.p2p_study_plan_sessions.filter((s) => s.plan_id === mineId && !s.retired_at).length === 3);
+  // 2026-11-14 (251): a session left out is RETIRED, never deleted.
+  ok("a session left out of an edit is retired, not deleted", T.p2p_study_plan_sessions.filter((s) => s.plan_id === mineId && s.retired_at).length === 1 && T.p2p_study_plan_sessions.filter((s) => s.plan_id === mineId).length === 4);
   ok("someone else can't edit or archive my plan", (await call("PUT", `/${mineId}`, ANN, draft)).status === 404 && (await call("DELETE", `/${mineId}`, ANN)).status === 404);
 
   // Editorial workflow (official plans).

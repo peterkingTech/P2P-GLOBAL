@@ -1,0 +1,983 @@
+{
+ "note": "Snapshot 2026-11-14 of P2P's PUBLISHED Kingdom Stories: ids, titles and each chapter's own Scripture references only (no story text). Source for scripts/build-study-subjects.mjs.",
+ "stories": [
+  {
+   "id": "a6c22b16-4d26-4ebf-b9da-379375e1578a",
+   "title": "Abraham: The Man Who Believed God’s Promise",
+   "chapters": [
+    {
+     "id": "7fd83c7c-4012-4180-a985-68034378c2f6",
+     "number": 1,
+     "title": "God Calls Abram to Leave the Familiar",
+     "refs": "Genesis 11:27–12:9; Hebrews 11:8–10"
+    },
+    {
+     "id": "c6693a8d-388c-41bf-8ddb-9f6443af07b8",
+     "number": 2,
+     "title": "The Promise Meets a Difficult Reality",
+     "refs": "Genesis 12:10–20; Psalm 56:3–4; Proverbs 3:5–6"
+    },
+    {
+     "id": "10ac8ca5-e0a9-45ce-b01e-0fabe7833519",
+     "number": 3,
+     "title": "Abram and Lot Choose Different Paths",
+     "refs": "Genesis 13:1–18; Philippians 2:3–4; James 3:17–18"
+    },
+    {
+     "id": "ca126337-ad75-4a84-95a9-589b7409b1a0",
+     "number": 4,
+     "title": "God Makes a Covenant with Abram",
+     "refs": "Genesis 15; Romans 4:1–5, 18–22; Galatians 3:6–9"
+    },
+    {
+     "id": "95ec033e-88df-4f3d-a64b-ab5bd0a3c14d",
+     "number": 5,
+     "title": "Hagar, Ishmael and the Danger of Rushing the Promise",
+     "refs": "Genesis 16; 21:8–21; Psalm 34:18; Galatians 4:21–31"
+    },
+    {
+     "id": "fed49050-c0e1-4ab8-aed9-2dce4d0e8c32",
+     "number": 6,
+     "title": "Isaac Is Born: The Promise Fulfilled",
+     "refs": "Genesis 17:15–21; 18:1–15; 21:1–7; Romans 4:18–22; Hebrews 11:11–12"
+    },
+    {
+     "id": "271d6706-cc76-4b86-9c3f-89aef4b22d61",
+     "number": 7,
+     "title": "Mount Moriah: Abraham’s Greatest Test",
+     "refs": "Genesis 22:1–19; Hebrews 11:17–19; James 2:21–23; John 3:16–17"
+    },
+    {
+     "id": "640d39ee-75e1-4bb0-a02a-0d0eb392b32d",
+     "number": 8,
+     "title": "Abraham’s Legacy: A Life of Faith and an Unfinished Promise",
+     "refs": "Genesis 23–25:11; Hebrews 11:8–16; Romans 4:13–25; Galatians 3:16–18"
+    }
+   ]
+  },
+  {
+   "id": "7277e4d8-93d7-428a-8873-867f470df959",
+   "title": "Creation: The Beginning of Everything",
+   "chapters": [
+    {
+     "id": "5f89120b-6ce1-4827-83d5-580bda1c9a69",
+     "number": 1,
+     "title": "Before Everything: In the Beginning",
+     "refs": "Genesis 1:1–2"
+    },
+    {
+     "id": "ef997b4c-a559-41ab-a31b-feab4842c280",
+     "number": 2,
+     "title": "Light, Sky, Land, and Seas",
+     "refs": "Genesis 1:3–13"
+    },
+    {
+     "id": "b5f87a74-8614-43ae-b138-10d8deeaf98d",
+     "number": 3,
+     "title": "The Sun, Moon, Stars, and Seasons",
+     "refs": "Genesis 1:14–19"
+    },
+    {
+     "id": "5ebc51bf-f32b-494f-a686-1365ded024be",
+     "number": 4,
+     "title": "The Living World",
+     "refs": "Genesis 1:20–25"
+    },
+    {
+     "id": "45da8f89-e1ce-4257-8563-206ab7368744",
+     "number": 5,
+     "title": "Humanity in the Image of God",
+     "refs": "Genesis 1:26–31"
+    },
+    {
+     "id": "196ad23b-97eb-433c-bfa7-fe230219ff27",
+     "number": 6,
+     "title": "The Seventh Day: Creation and Rest",
+     "refs": "Genesis 2:1–3"
+    }
+   ]
+  },
+  {
+   "id": "a8e8a9c4-3b59-4be0-8c25-ba29a2b4356e",
+   "title": "Daniel: Faithfulness in a Foreign Empire",
+   "chapters": [
+    {
+     "id": "a3b838fa-f592-4557-8ec1-2f083ca39d4f",
+     "number": 1,
+     "title": "Taken to Babylon: Faithfulness Begins in Exile",
+     "refs": "Daniel 1:1–21"
+    },
+    {
+     "id": "a612a53d-c27c-479d-aa9d-3a0a1df2b8d2",
+     "number": 2,
+     "title": "Nebuchadnezzar’s Dream: God Reveals What Kings Cannot Know",
+     "refs": "Daniel 2:1–49"
+    },
+    {
+     "id": "038311e7-0eea-4be6-aa67-803595441633",
+     "number": 3,
+     "title": "The Fiery Furnace: Faithfulness Under Threat",
+     "refs": "Daniel 3:1–30"
+    },
+    {
+     "id": "afdb39f3-686f-4fef-aef1-354a7fb9ffb8",
+     "number": 4,
+     "title": "The King Humbled: Pride, Power and Accountability",
+     "refs": "Daniel 4:1–37"
+    },
+    {
+     "id": "2fd0e20c-8210-4165-8495-cd7d5860fcb0",
+     "number": 5,
+     "title": "The Writing on the Wall: Babylon’s Feast and Fall",
+     "refs": "Daniel 5:1–31"
+    },
+    {
+     "id": "b8289933-fbdb-4c58-b244-3d925fe83c5a",
+     "number": 6,
+     "title": "Daniel in the Lions’ Den: Prayer Under Pressure",
+     "refs": "Daniel 6:1–28"
+    },
+    {
+     "id": "33dff5fd-18d3-48dd-9249-0ffcb20a61d7",
+     "number": 7,
+     "title": "The Four Beasts: Earthly Empires and God’s Everlasting Kingdom",
+     "refs": "Daniel 7:1–28"
+    },
+    {
+     "id": "3676fed7-1f3f-420e-b364-6077478749be",
+     "number": 8,
+     "title": "Daniel’s Prayer and the Visions of the Future",
+     "refs": "Daniel 9:1–27; Daniel 8:1–27; Daniel 10–12"
+    }
+   ]
+  },
+  {
+   "id": "403cba08-6bf5-480d-9681-a5544a847a80",
+   "title": "David: The Shepherd Who Became King",
+   "chapters": [
+    {
+     "id": "069220fb-8144-4841-a20c-f655b5b07121",
+     "number": 1,
+     "title": "The Shepherd Anointed by Samuel",
+     "refs": "1 Samuel 16:1–23; Psalm 78:70–72; Acts 13:22"
+    },
+    {
+     "id": "630faa76-ec41-4b15-b9e9-7a85527e41dc",
+     "number": 2,
+     "title": "David and Goliath: Courage Rooted in Faith",
+     "refs": "1 Samuel 17; Psalm 18:1–3; Ephesians 6:10–18"
+    },
+    {
+     "id": "e7bf8050-d8c7-4b0d-bfe5-597d96b9415d",
+     "number": 3,
+     "title": "Jonathan’s Friendship and Saul’s Jealousy",
+     "refs": "1 Samuel 18–20; Proverbs 17:17; Proverbs 27:6, 9–10"
+    },
+    {
+     "id": "646ca281-37f0-4e69-ac0e-4202e777f21b",
+     "number": 4,
+     "title": "David Becomes a Fugitive",
+     "refs": "1 Samuel 21–23; Psalm 34; Psalm 56; Psalm 142"
+    },
+    {
+     "id": "65a3139f-e5fe-40b9-8431-9db4ce811890",
+     "number": 5,
+     "title": "David Spares Saul in the Wilderness",
+     "refs": "1 Samuel 24 and 26; Romans 12:17–21; Proverbs 20:22"
+    },
+    {
+     "id": "b3b0d45e-c43a-4159-9a48-38fd1c980d92",
+     "number": 6,
+     "title": "David Becomes King and Unites Israel",
+     "refs": "2 Samuel 1–5; 1 Chronicles 11:1–9; Psalm 89:19–29"
+    },
+    {
+     "id": "b8b0afe1-00c5-4cb1-bbac-5dba0decabae",
+     "number": 7,
+     "title": "God’s Covenant with David",
+     "refs": "2 Samuel 6–7; Psalm 2:6–12; Psalm 89:3–4; Luke 1:30–33"
+    },
+    {
+     "id": "302c123d-114f-4c6e-9f3c-a0b3c4ed6426",
+     "number": 8,
+     "title": "David’s Sin with Bathsheba and the Death of Uriah",
+     "refs": "2 Samuel 11; Exodus 20:13–17; Psalm 51; Proverbs 28:13"
+    },
+    {
+     "id": "9b601167-dd31-48a9-af70-e75c3f39bf74",
+     "number": 9,
+     "title": "Nathan Confronts David: Confession and Repentance",
+     "refs": "2 Samuel 12; Psalm 32; Psalm 51; Proverbs 28:13; 1 John 1:8–9"
+    },
+    {
+     "id": "bcd4ad7e-c63c-4dd1-a4fd-97e81f8de36a",
+     "number": 10,
+     "title": "Trouble in David’s Household: Amnon, Tamar and Absalom",
+     "refs": "2 Samuel 13–14; Proverbs 4:23; Micah 6:8; Colossians 3:12–14"
+    },
+    {
+     "id": "ee31a1b0-442f-4132-b475-65b43faac184",
+     "number": 11,
+     "title": "Absalom’s Rebellion and David’s Grief",
+     "refs": "2 Samuel 15–19; Psalm 3; Psalm 41:9; Proverbs 16:18"
+    },
+    {
+     "id": "a401a96a-fb2e-4a19-a9db-2976129042fa",
+     "number": 12,
+     "title": "David’s Later Years and the Promise of a Greater King",
+     "refs": "2 Samuel 22–24; 1 Kings 1–2; 1 Chronicles 22–29; Psalm 72; Isaiah 9:6–7; Jeremiah 23:5–6; Luke 1:30–33"
+    }
+   ]
+  },
+  {
+   "id": "6120478c-9c95-40a7-ae69-06abbc4c82df",
+   "title": "Elisha: Serving God Through Miracles and Compassion",
+   "chapters": [
+    {
+     "id": "c31d3c1a-0b76-48ef-86e6-4b0faa783ff6",
+     "number": 1,
+     "title": "Elisha Receives Elijah’s Mantle",
+     "refs": "2 Kings 2:1–25"
+    },
+    {
+     "id": "392027fa-2fe7-4c74-be54-3f42ed9ed750",
+     "number": 2,
+     "title": "The Widow’s Oil: Provision in a Time of Debt",
+     "refs": "2 Kings 4:1–7"
+    },
+    {
+     "id": "a3f8fde5-4e78-436a-badc-8737882ce672",
+     "number": 3,
+     "title": "The Shunammite Woman: Hospitality, Grief and Hope",
+     "refs": "2 Kings 4:8–37"
+    },
+    {
+     "id": "b01173e3-15c5-46c1-bab2-8d910d07b6b3",
+     "number": 4,
+     "title": "The Poisoned Stew and the Feeding of a Hundred",
+     "refs": "2 Kings 4:38–44"
+    },
+    {
+     "id": "794844b5-17d7-4117-8790-0a468ad8922c",
+     "number": 5,
+     "title": "Naaman: A Powerful Man Learns Humility",
+     "refs": "2 Kings 5:1–27"
+    },
+    {
+     "id": "9f3683f4-4199-4a96-9dd2-9149e1c6a668",
+     "number": 6,
+     "title": "The Floating Axe Head: God Cares About Ordinary Losses",
+     "refs": "2 Kings 6:1–7"
+    },
+    {
+     "id": "35c8aab7-1abf-44c9-9398-d8a1daff91d1",
+     "number": 7,
+     "title": "Elisha and the Aramean Army: Seeing Beyond Fear",
+     "refs": "2 Kings 6:8–23"
+    },
+    {
+     "id": "0272d571-9ac4-4c43-bf45-cdeafc7c28ee",
+     "number": 8,
+     "title": "Samaria’s Siege: The Unexpected Good News",
+     "refs": "2 Kings 6:24–7:20"
+    },
+    {
+     "id": "82535e95-2981-45b0-987c-9e4d0bfc8b24",
+     "number": 9,
+     "title": "Elisha’s Final Prophecy, Death and Legacy",
+     "refs": "2 Kings 13:14–21"
+    }
+   ]
+  },
+  {
+   "id": "010efc52-33f5-4744-9823-3c64817ab37d",
+   "title": "Isaac: The Son of Promise",
+   "chapters": [
+    {
+     "id": "4933dbd8-1380-4ac4-99b0-44129a3ce49a",
+     "number": 1,
+     "title": "The Birth of the Promised Son",
+     "refs": "Genesis 17:15–21; 18:1–15; 21:1–8"
+    },
+    {
+     "id": "a0c4b6ba-c3c3-4852-beb4-0fa845705589",
+     "number": 2,
+     "title": "The Test on Mount Moriah: Isaac and God’s Provision",
+     "refs": "Genesis 22:1–19"
+    },
+    {
+     "id": "dc2b674b-f119-476a-afa7-ed5895e59e36",
+     "number": 3,
+     "title": "Isaac, Rebekah and a Marriage Guided by Prayer",
+     "refs": "Genesis 24:1–67"
+    },
+    {
+     "id": "51a66ad0-309b-429f-a5a0-2205851e6c8f",
+     "number": 4,
+     "title": "Isaac Faces Famine and Learns to Trust God",
+     "refs": "Genesis 26:1–33"
+    },
+    {
+     "id": "2c5c9e16-8ead-47f0-9bf1-c5507d54129a",
+     "number": 5,
+     "title": "Esau and Jacob: A Family Divided by Favouritism",
+     "refs": "Genesis 25:19–34; 27:1–45"
+    },
+    {
+     "id": "08a1fc6d-2167-4f6b-a91f-3cc6bcfd469e",
+     "number": 6,
+     "title": "God’s Promise Continues Through Jacob",
+     "refs": "Genesis 27:46–28:9; 28:1–5; 35:27–29; Hebrews 11:20; Romans 9:6–13"
+    }
+   ]
+  },
+  {
+   "id": "d1f43d1e-f0d4-4b45-8781-59969fd66eeb",
+   "title": "Isaiah: The Prophet of Holiness, Judgment and Hope",
+   "chapters": [
+    {
+     "id": "a870d3ad-6221-4598-8628-289c625f6d08",
+     "number": 1,
+     "title": "A Nation Called to Return to God",
+     "refs": "Isaiah 1:1–20"
+    },
+    {
+     "id": "21a15a03-cc9f-4aa5-8e63-65d8fae42066",
+     "number": 2,
+     "title": "Isaiah Sees the Holiness of God",
+     "refs": "Isaiah 6:1–13"
+    },
+    {
+     "id": "c270ff3e-3f82-4039-8c9e-cdb76fceb5d8",
+     "number": 3,
+     "title": "Immanuel: God With Us in a Time of Fear",
+     "refs": "Isaiah 7:1–16"
+    },
+    {
+     "id": "b6bdccba-b44f-48b3-9fce-2e6e71538bc1",
+     "number": 4,
+     "title": "The Prince of Peace: A Hope Beyond Failed Leadership",
+     "refs": "Isaiah 9:1–7"
+    },
+    {
+     "id": "c9308425-32d7-45ac-9b3b-8e0c4f0153e7",
+     "number": 5,
+     "title": "The Holy One of Israel and the Nations",
+     "refs": "Isaiah 10–12"
+    },
+    {
+     "id": "2d1a81f6-f895-4a97-8cb8-5063f9af7e68",
+     "number": 6,
+     "title": "Hezekiah, Jerusalem and the Assyrian Threat",
+     "refs": "Isaiah 36–39; 2 Kings 18–20"
+    },
+    {
+     "id": "65250258-aa2f-4c72-bf66-f890377d3bb9",
+     "number": 7,
+     "title": "The Suffering Servant and the Hope of Redemption",
+     "refs": "Isaiah 52:13–53:12; Isaiah 42:1–9; Isaiah 49:1–7; Acts 8:26–35"
+    },
+    {
+     "id": "6c140151-9988-4411-94db-72459b7becdb",
+     "number": 8,
+     "title": "New Heavens and a New Earth",
+     "refs": "Isaiah 65–66; Isaiah 2:1–4; Isaiah 11:1–9; Revelation 21–22"
+    }
+   ]
+  },
+  {
+   "id": "db0dc3b0-7312-4b8f-82a2-b4d9a6b305f2",
+   "title": "Israel in the Time of the Judges: When Everyone Did What Was Right in Their Own Eyes",
+   "chapters": [
+    {
+     "id": "9daa5b0f-19e9-46b9-94bd-9064811fdb9d",
+     "number": 1,
+     "title": "After Joshua: A New Generation Forgets God",
+     "refs": "Judges 1:1–2:23; Joshua 24:14–28; Deuteronomy 6:4–9"
+    },
+    {
+     "id": "59cc429d-52e7-4e5a-a27f-7c88f360b772",
+     "number": 2,
+     "title": "Othniel and Ehud: God Raises Unexpected Deliverers",
+     "refs": "Judges 3:7–31; Psalm 34:17–18; 1 Corinthians 1:26–29"
+    },
+    {
+     "id": "af2e497e-b2c8-4d73-a305-ae147b18df91",
+     "number": 3,
+     "title": "Deborah, Barak and Jael: Courage in a Time of Oppression",
+     "refs": "Judges 4–5; Exodus 15:20–21; Psalm 68:11; Hebrews 11:32–34"
+    },
+    {
+     "id": "b8882a81-ea1f-4e0f-93cc-ddd4ddd943a3",
+     "number": 4,
+     "title": "Gideon: From Fear to Faith",
+     "refs": "Judges 6–8; Hebrews 11:32; 2 Corinthians 12:9–10; Psalm 20:7"
+    },
+    {
+     "id": "3e09174a-3233-4f0a-af5b-751f743d2287",
+     "number": 5,
+     "title": "Jephthah: A Rash Vow and a Tragic Consequence",
+     "refs": "Judges 10:6–12:7; Leviticus 18:21; Deuteronomy 12:29–31; Ecclesiastes 5:2–6"
+    },
+    {
+     "id": "052bb075-cd36-413d-9455-0a57d93b3070",
+     "number": 6,
+     "title": "Samson: Great Strength, Serious Weaknesses",
+     "refs": "Judges 13–16; Numbers 6:1–21; Hebrews 11:32–34; Proverbs 16:18"
+    },
+    {
+     "id": "873066d1-6728-4f6b-932b-547b9e7871fe",
+     "number": 7,
+     "title": "When Everyone Did What Was Right in Their Own Eyes",
+     "refs": "Judges 17–21; Deuteronomy 12:8; Micah 6:8; Proverbs 14:12; 1 Samuel 8:1–22"
+    }
+   ]
+  },
+  {
+   "id": "ab70f075-5985-4368-8585-23298dce1366",
+   "title": "Israel in the Wilderness: Learning to Trust God",
+   "chapters": [
+    {
+     "id": "7932d235-35d6-48e8-823f-bfbb39376d95",
+     "number": 1,
+     "title": "Bitter Water and the Song of Deliverance",
+     "refs": "Exodus 15:1–27"
+    },
+    {
+     "id": "c768d709-5d72-4b56-af92-1e045587b57c",
+     "number": 2,
+     "title": "Manna, Quail and Daily Dependence",
+     "refs": "Exodus 16; Numbers 11:4–35"
+    },
+    {
+     "id": "5d5dbbc8-80c9-4b84-88d8-16e78b3041d8",
+     "number": 3,
+     "title": "Water from the Rock and Victory over Amalek",
+     "refs": "Exodus 17:1–16"
+    },
+    {
+     "id": "66092d46-3002-4e28-8315-c3140dc10437",
+     "number": 4,
+     "title": "Sinai: The Covenant and the Ten Commandments",
+     "refs": "Exodus 19–20"
+    },
+    {
+     "id": "33c6afee-e1c9-41f3-9eb6-1935bc2e36f1",
+     "number": 5,
+     "title": "The Golden Calf: When the People Turn Away",
+     "refs": "Exodus 32–34"
+    },
+    {
+     "id": "4fa32799-aba8-497c-aa3e-4bed5f2e7145",
+     "number": 6,
+     "title": "The Spies, the People’s Fear and the Cost of Distrust",
+     "refs": "Numbers 13–14; Deuteronomy 8"
+    }
+   ]
+  },
+  {
+   "id": "54cb6c20-742d-4fcc-b41f-f44884b9cd3d",
+   "title": "Jacob: The Deceiver Who Wrestled with God",
+   "chapters": [
+    {
+     "id": "7e8110ab-c3ef-450c-9c07-9c2966876bfa",
+     "number": 1,
+     "title": "The Birthright and the Blessing",
+     "refs": "Genesis 25:19–34; 27:1–45"
+    },
+    {
+     "id": "f691fb0e-583f-4236-b994-b7a09a944381",
+     "number": 2,
+     "title": "Jacob Meets God at Bethel",
+     "refs": "Genesis 28:10–22"
+    },
+    {
+     "id": "5ea53b04-8805-4420-a555-8e93da306714",
+     "number": 3,
+     "title": "Jacob Is Deceived by Laban",
+     "refs": "Genesis 29–31"
+    },
+    {
+     "id": "b05df7cb-1219-418f-b5b0-db0e33da5fc0",
+     "number": 4,
+     "title": "Jacob Prepares to Meet Esau",
+     "refs": "Genesis 31:17–32:21"
+    },
+    {
+     "id": "bb5fbaf4-eac2-424b-b62a-6a66afc08b01",
+     "number": 5,
+     "title": "Jacob Wrestles with God and Receives a New Name",
+     "refs": "Genesis 32:22–32"
+    },
+    {
+     "id": "ef99964b-dafd-434e-9fe6-c58505cd273d",
+     "number": 6,
+     "title": "Jacob and Esau Reconcile",
+     "refs": "Genesis 33:1–20; 35:9–15; 46:1–7; 49:28–33"
+    }
+   ]
+  },
+  {
+   "id": "f7373df3-4a14-4e28-b932-cfb08412cc1f",
+   "title": "Jeremiah: The Weeping Prophet and the Fall of Jerusalem",
+   "chapters": [
+    {
+     "id": "2470d24a-979b-459f-bf27-45ac73d49e11",
+     "number": 1,
+     "title": "Called Before He Felt Ready",
+     "refs": "Jeremiah 1:1–19"
+    },
+    {
+     "id": "333f5a21-6e9e-4ef8-950f-19a891c3b1d9",
+     "number": 2,
+     "title": "A Broken Covenant: When Worship and Justice Separate",
+     "refs": "Jeremiah 2:1–13 and Jeremiah 7:1–15"
+    },
+    {
+     "id": "5ba530a0-d019-4006-9ab2-3d78312927d0",
+     "number": 3,
+     "title": "The False Prophets: When People Promise Peace Without Truth",
+     "refs": "Jeremiah 6:13–15; Jeremiah 23:9–32"
+    },
+    {
+     "id": "5939a64c-e401-45ef-ba9c-d11d1c116c74",
+     "number": 4,
+     "title": "Jeremiah’s Persecution: Faithfulness in the Face of Rejection",
+     "refs": "Jeremiah 26 and Jeremiah 20:1–13"
+    },
+    {
+     "id": "41c36ac7-5a79-497f-9efe-3a1a32c14143",
+     "number": 5,
+     "title": "The King Burns God’s Word",
+     "refs": "Jeremiah 36"
+    },
+    {
+     "id": "7b76f072-7dd0-4df5-8e44-d40748a3ff44",
+     "number": 6,
+     "title": "Jeremiah’s Letter to the Exiles: Hope in a Strange Land",
+     "refs": "Jeremiah 29:1–14"
+    },
+    {
+     "id": "f0f5c6ef-6173-4534-a135-a20bd8847a01",
+     "number": 7,
+     "title": "Jerusalem Falls to Babylon: When the Warnings Become Reality",
+     "refs": "Jeremiah 39 and Jeremiah 52; 2 Kings 25; 2 Chronicles 36:15–21"
+    },
+    {
+     "id": "9ad9df2f-ce46-495f-8ccc-1e6123807a71",
+     "number": 8,
+     "title": "The New Covenant: Hope Beyond the Ruins",
+     "refs": "Jeremiah 31:27–40; Jeremiah 32:1–15; Jeremiah 33:14–18; Hebrews 8:6–13"
+    }
+   ]
+  },
+  {
+   "id": "71d048e2-4b0a-4401-b2f8-7114bdca4496",
+   "title": "Jonah: The Prophet Who Ran from God",
+   "chapters": [
+    {
+     "id": "5f25d6b4-a2dc-41bf-b18a-230017d6d2e0",
+     "number": 1,
+     "title": "The Call Jonah Tried to Escape",
+     "refs": "Jonah 1:1–3"
+    },
+    {
+     "id": "66111c24-912f-4609-b421-e422f4a2a080",
+     "number": 2,
+     "title": "The Storm, the Sailors and Jonah’s Confession",
+     "refs": "Jonah 1:4–16"
+    },
+    {
+     "id": "9a037e1f-9bb8-4fb2-b390-75ccbaf52732",
+     "number": 3,
+     "title": "Three Days in the Great Fish: Mercy in the Deep",
+     "refs": "Jonah 1:17–2:10"
+    },
+    {
+     "id": "80a210b5-50be-4add-ab5c-1133198ea312",
+     "number": 4,
+     "title": "Nineveh Repents: A City Responds to God’s Warning",
+     "refs": "Jonah 3:1–10"
+    },
+    {
+     "id": "8fc984b8-ad3c-4e7a-83f9-809d4fe333ae",
+     "number": 5,
+     "title": "Jonah’s Anger: Learning to Love Whom God Loves",
+     "refs": "Jonah 4:1–11"
+    }
+   ]
+  },
+  {
+   "id": "ed43906e-b307-4b33-ab71-61744fde8df2",
+   "title": "Joseph: From the Pit to the Palace",
+   "chapters": [
+    {
+     "id": "14972e20-653d-4dfa-989f-fcea61fea280",
+     "number": 1,
+     "title": "Joseph, the Beloved Son and the Dreams",
+     "refs": "Genesis 37:1–11"
+    },
+    {
+     "id": "0cc866ec-ddb0-4a7d-87d7-822fbef32952",
+     "number": 2,
+     "title": "Betrayed by His Brothers",
+     "refs": "Genesis 37:12–36"
+    },
+    {
+     "id": "5ab23b94-6d23-49af-afe1-29bcd01c67e6",
+     "number": 3,
+     "title": "Faithfulness in Potiphar’s House and the False Accusation",
+     "refs": "Genesis 39"
+    },
+    {
+     "id": "23f2cbec-5311-4888-ae4a-d6ff7b64a2e3",
+     "number": 4,
+     "title": "Joseph in Prison: Gifts, Waiting and a Forgotten Promise",
+     "refs": "Genesis 40"
+    },
+    {
+     "id": "ec89747d-4311-4e34-b19a-92cf70e0c372",
+     "number": 5,
+     "title": "From Prison to Pharaoh’s Palace",
+     "refs": "Genesis 41"
+    },
+    {
+     "id": "cf9ed56b-a97a-45e8-a2ea-69f34c0eda2b",
+     "number": 6,
+     "title": "Joseph Faces His Brothers and Chooses a Path Toward Reconciliation",
+     "refs": "Genesis 42–45"
+    },
+    {
+     "id": "7b471c3e-68f7-4814-9959-c065b86e132c",
+     "number": 7,
+     "title": "Jacob’s Family in Egypt: Joseph’s Faith and Final Hope",
+     "refs": "Genesis 46–50"
+    }
+   ]
+  },
+  {
+   "id": "58e89f32-cb67-4a28-9ee5-6cfc854e5aa2",
+   "title": "Joshua: Courage to Enter the Promised Land",
+   "chapters": [
+    {
+     "id": "2e9e482f-1abc-4b34-ad31-2ec2d7ea038b",
+     "number": 1,
+     "title": "Moses’ Successor: Joshua Receives the Call",
+     "refs": "Deuteronomy 31; Joshua 1:1–9"
+    },
+    {
+     "id": "90832a61-bb31-45b4-9e8a-405aabc54cc9",
+     "number": 2,
+     "title": "Crossing the Jordan River",
+     "refs": "Joshua 3–4"
+    },
+    {
+     "id": "060b55c5-de08-441c-a19f-bae58a6d89ff",
+     "number": 3,
+     "title": "Jericho: Faith, Obedience and the Fall of a City",
+     "refs": "Joshua 5:13–6:27"
+    },
+    {
+     "id": "bfe8d1f7-6601-4d5d-ad9f-da7b563dacff",
+     "number": 4,
+     "title": "Rahab: Faith That Takes a Risk",
+     "refs": "Joshua 2; Joshua 6:22–25"
+    },
+    {
+     "id": "1a68ec24-0835-470c-b80a-075ec3a63d65",
+     "number": 5,
+     "title": "Achan’s Sin and the Defeat at Ai",
+     "refs": "Joshua 7"
+    },
+    {
+     "id": "705fa3ec-0b48-4ade-9550-f318061c2a0e",
+     "number": 6,
+     "title": "Joshua Leads Israel Forward",
+     "refs": "Joshua 8–23"
+    },
+    {
+     "id": "c938267a-af1f-4ed4-8fd6-7c97791177b6",
+     "number": 7,
+     "title": "“Choose This Day”: Joshua’s Final Challenge",
+     "refs": "Joshua 23–24"
+    }
+   ]
+  },
+  {
+   "id": "771efd3d-4882-4e7a-9355-0057620dda61",
+   "title": "Moses: Called to Deliver God’s People",
+   "chapters": [
+    {
+     "id": "b1efb0c3-2d83-4aa5-bf94-cef803a5cefa",
+     "number": 1,
+     "title": "A People Oppressed in Egypt",
+     "refs": "Exodus 1"
+    },
+    {
+     "id": "ee39fc2f-b588-4d64-9b4a-55aaa6344fbd",
+     "number": 2,
+     "title": "The Child in the Basket",
+     "refs": "Exodus 2:1–10"
+    },
+    {
+     "id": "781e5c5d-ad54-4cf8-a963-ac5f46830b10",
+     "number": 3,
+     "title": "Moses Flees Egypt",
+     "refs": "Exodus 2:11–25"
+    },
+    {
+     "id": "d44656b6-80c0-47df-bf75-44fca3f2c2d2",
+     "number": 4,
+     "title": "The Burning Bush and God’s Call",
+     "refs": "Exodus 3–4"
+    },
+    {
+     "id": "75a4ea38-ed81-4a58-bd2c-3ec35e59b223",
+     "number": 5,
+     "title": "Moses Confronts Pharaoh",
+     "refs": "Exodus 5–7"
+    },
+    {
+     "id": "a157d29e-e20a-4cab-b959-36549eaa07f6",
+     "number": 6,
+     "title": "The Passover and the Night of Deliverance",
+     "refs": "Exodus 7–12"
+    },
+    {
+     "id": "0703166f-b365-466c-8c41-372c8842ea42",
+     "number": 7,
+     "title": "Through the Sea: Deliverance and a New Beginning",
+     "refs": "Exodus 13–14"
+    }
+   ]
+  },
+  {
+   "id": "fef60017-47e2-47ac-8bcf-aed6978e8cdb",
+   "title": "Ruth: Loyalty, Redemption and the Faithfulness of God",
+   "chapters": [
+    {
+     "id": "8f67a915-b587-4223-a5b7-5f531a0e5d41",
+     "number": 1,
+     "title": "Naomi’s Loss and Ruth’s Decision",
+     "refs": "Ruth 1:1–22; Psalm 34:18; Romans 12:15"
+    },
+    {
+     "id": "d153c358-5a95-4b5e-a305-8252d4d4c946",
+     "number": 2,
+     "title": "Ruth Gleans in the Field of Boaz",
+     "refs": "Ruth 2; Leviticus 19:9–10; Deuteronomy 24:19–22; James 2:14–17"
+    },
+    {
+     "id": "90cc1198-8ddc-4802-9794-fb956cdbedc6",
+     "number": 3,
+     "title": "Naomi Recognises a Family Redeemer",
+     "refs": "Ruth 2:18–23; Leviticus 25:25; Psalm 68:5–6"
+    },
+    {
+     "id": "59675143-c96c-44b9-a7d4-033d614d2d36",
+     "number": 4,
+     "title": "Ruth Approaches Boaz",
+     "refs": "Ruth 3; Proverbs 31:10–31; Psalm 37:5–6"
+    },
+    {
+     "id": "4ba5c297-b7a5-4cea-aa02-36375d632dc0",
+     "number": 5,
+     "title": "Boaz Acts as Redeemer",
+     "refs": "Ruth 4:1–12; Leviticus 25:25; Deuteronomy 25:5–10"
+    },
+    {
+     "id": "dae6d41d-81a1-4468-aa5c-53d2d8f21090",
+     "number": 6,
+     "title": "Obed’s Birth and Ruth’s Place in the Story of Jesus",
+     "refs": "Ruth 4:13–22; 2 Samuel 7:12–16; Matthew 1:1–17; Luke 3:31–38"
+    }
+   ]
+  },
+  {
+   "id": "11f80082-6943-4186-89af-e41a3579607d",
+   "title": "Samuel: Hearing God in a Time of Spiritual Decline",
+   "chapters": [
+    {
+     "id": "19193c09-42f7-433b-8de0-c30fc6df72f4",
+     "number": 1,
+     "title": "Hannah’s Prayer and the Gift of Samuel",
+     "refs": "1 Samuel 1:1–28; Psalm 113:7–9; Luke 1:46–55"
+    },
+    {
+     "id": "89767c83-1d08-41fe-bbec-27453b0d4433",
+     "number": 2,
+     "title": "Samuel Hears the Voice of the Lord",
+     "refs": "1 Samuel 2:12–3:21; Psalm 25:4–5; John 10:27; James 1:19–22"
+    },
+    {
+     "id": "1a9796db-00c9-43ae-b457-b92bd060f706",
+     "number": 3,
+     "title": "The Ark of God and the Fall of Eli’s Household",
+     "refs": "1 Samuel 4–7; Psalm 78:56–64; Jeremiah 7:1–15"
+    },
+    {
+     "id": "bd187ac4-f769-4b5c-8a1e-04553dc7ff70",
+     "number": 4,
+     "title": "Samuel Leads Israel Back to God",
+     "refs": "1 Samuel 7; Deuteronomy 6:4–9; Joshua 24:14–24"
+    },
+    {
+     "id": "27448779-bf6b-4f11-b206-241a04eb301b",
+     "number": 5,
+     "title": "Israel Demands a King",
+     "refs": "1 Samuel 8; Deuteronomy 17:14–20; Psalm 146:3–5"
+    },
+    {
+     "id": "df06c0fc-b3e3-41fb-bdb6-fd5cb98156c0",
+     "number": 6,
+     "title": "Samuel Anoints Saul, Israel’s First King",
+     "refs": "1 Samuel 9–12; Deuteronomy 17:14–20; 1 Samuel 15:22–23"
+    }
+   ]
+  },
+  {
+   "id": "4f9ff8e7-3b00-41d2-ae49-1c85d08f5527",
+   "title": "Saul: Israel’s First King and the Cost of Disobedience",
+   "chapters": [
+    {
+     "id": "7a9caa90-5ebf-4e2a-b5ae-d9c0f94556ac",
+     "number": 1,
+     "title": "Saul’s Promising Beginning",
+     "refs": "1 Samuel 9–11; 1 Samuel 10:1–10; 1 Samuel 12:13–25"
+    },
+    {
+     "id": "10555e73-863b-40ad-b2f2-1b07898fff7b",
+     "number": 2,
+     "title": "Saul’s Impatience and the Cost of Acting Without Obedience",
+     "refs": "1 Samuel 13; Proverbs 3:5–6; Psalm 27:14"
+    },
+    {
+     "id": "83f6dd3c-88e4-45ca-96ee-307839a07dce",
+     "number": 3,
+     "title": "Saul’s Disobedience in the Battle Against Amalek",
+     "refs": "1 Samuel 15; Deuteronomy 25:17–19; Hosea 6:6; Matthew 9:13"
+    },
+    {
+     "id": "cf57c0e6-55f6-4514-bc46-5695f48417b0",
+     "number": 4,
+     "title": "David Is Anointed While Saul Is Still King",
+     "refs": "1 Samuel 16:1–13; Psalm 78:70–72; Acts 13:22"
+    },
+    {
+     "id": "2a930f01-dba3-48af-b146-06ae2613f17b",
+     "number": 5,
+     "title": "David Defeats Goliath and Saul Becomes Jealous",
+     "refs": "1 Samuel 17–18; Psalm 20:7; Zechariah 4:6"
+    },
+    {
+     "id": "774aa645-0f54-4a14-99a1-a73a07ef5d9e",
+     "number": 6,
+     "title": "David Spares Saul and Refuses Revenge",
+     "refs": "1 Samuel 19–24; 26; Romans 12:17–21; Proverbs 20:22"
+    }
+   ]
+  },
+  {
+   "id": "dc1540b1-4878-49b3-aa91-8757b630d068",
+   "title": "Solomon: Wisdom, Glory and a Divided Heart",
+   "chapters": [
+    {
+     "id": "798db4aa-7b54-418a-bc4d-fdb56c9335e1",
+     "number": 1,
+     "title": "Solomon Becomes King",
+     "refs": "1 Kings 1–2; 1 Chronicles 22:6–13; 28:9–10; Proverbs 16:12"
+    },
+    {
+     "id": "47181bec-72e0-41b9-ae2d-630defa44e18",
+     "number": 2,
+     "title": "Solomon Asks God for Wisdom",
+     "refs": "1 Kings 3:1–15; James 1:5; Proverbs 2:1–11; Proverbs 9:10"
+    },
+    {
+     "id": "7cc9ce48-f1d2-4414-abd6-2d5733011cf5",
+     "number": 3,
+     "title": "Solomon’s Wisdom Put to the Test",
+     "refs": "1 Kings 3:16–28; Proverbs 18:13; Proverbs 31:8–9; James 3:17"
+    },
+    {
+     "id": "6a4b4161-5847-4c3b-a735-4aeb000ff50e",
+     "number": 4,
+     "title": "Solomon Builds the Temple",
+     "refs": "1 Kings 5–6; 2 Chronicles 2–3; Exodus 25:8–9; 1 Chronicles 28:9–20; Acts 7:44–50"
+    },
+    {
+     "id": "1c5a4f8b-b03c-4a14-8226-cd66134ac4e6",
+     "number": 5,
+     "title": "The Temple Is Dedicated",
+     "refs": "1 Kings 8; Deuteronomy 12:5–11; 2 Chronicles 6–7; John 4:19–24"
+    },
+    {
+     "id": "dce73c9b-39d3-421f-9a19-e1b35590392b",
+     "number": 6,
+     "title": "Solomon’s Fame, Wealth and International Influence",
+     "refs": "1 Kings 4; 1 Kings 9–10; Deuteronomy 17:14–20; Proverbs 11:2; Matthew 6:19–21"
+    },
+    {
+     "id": "e1b26a74-05ab-4ff8-b6f6-c5e8348e17a1",
+     "number": 7,
+     "title": "Solomon’s Heart Turns Away from God",
+     "refs": "1 Kings 11:1–13; Deuteronomy 7:1–4; Deuteronomy 17:14–20; Matthew 6:24; James 1:14–15"
+    },
+    {
+     "id": "b21a4e2f-c310-48f7-ae04-715332e4f279",
+     "number": 8,
+     "title": "The Consequences of Solomon’s Choices",
+     "refs": "1 Kings 11:14–40; Proverbs 14:34; Galatians 6:7–9; James 3:13–18"
+    },
+    {
+     "id": "f4e67985-c0c1-467a-952d-e4c3a202bcba",
+     "number": 9,
+     "title": "Solomon Dies and the Kingdom Approaches Division",
+     "refs": "1 Kings 11:41–43; 1 Kings 12:1–24; 2 Chronicles 10–11; Proverbs 15:1; Philippians 2:3–4"
+    }
+   ]
+  },
+  {
+   "id": "a1c19df1-d0c4-45af-afc4-a829476c7c8e",
+   "title": "The Fall of Humanity",
+   "chapters": [
+    {
+     "id": "fc3ba596-7aad-481c-a344-875879135396",
+     "number": 1,
+     "title": "A Good World and a Clear Command",
+     "refs": "Genesis 1:26–31; Genesis 2:8–17"
+    },
+    {
+     "id": "64973005-691f-4bd3-8c50-f6fcccd09cac",
+     "number": 2,
+     "title": "The Serpent Questions God’s Word",
+     "refs": "Genesis 3:1–5; John 8:44; James 1:13–15"
+    },
+    {
+     "id": "c0dfa09b-b866-4ea1-ad9a-31f312f74393",
+     "number": 3,
+     "title": "The Choice and the Fall",
+     "refs": "Genesis 3:6–8; Romans 5:12–19"
+    },
+    {
+     "id": "6560bda8-eed9-45d5-948e-2eda3f96d1b7",
+     "number": 4,
+     "title": "Hiding, Blame and God’s Judgment",
+     "refs": "Genesis 3:9–19; Psalm 32:1–5"
+    },
+    {
+     "id": "630de158-a2c6-42db-b996-9a5dbdd167e8",
+     "number": 5,
+     "title": "Outside Eden: Consequences, Mercy and Hope",
+     "refs": "Genesis 3:20–24; Genesis 3:15; Romans 8:18–25"
+    },
+    {
+     "id": "84302273-f188-49a8-9f78-017c4591a0e9",
+     "number": 6,
+     "title": "Adam and Christ: The Christian Answer to the Fall",
+     "refs": "Romans 5:12–21; 1 Corinthians 15:21–22, 45–49; John 3:16–17; Revelation 21:1–5"
+    }
+   ]
+  }
+ ]
+}

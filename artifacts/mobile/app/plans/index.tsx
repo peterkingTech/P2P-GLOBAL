@@ -10,13 +10,19 @@ import { AppButton, ChipRow, FilterChip, IconButton } from "@/components/ui";
 import { withScreenBoundary } from "@/components/ScreenErrorBoundary";
 import { getMyPlans, getPlans, type FocusType, type MyPlans, type PlanCard, type RunItem } from "@/lib/studyPlansApi";
 import { FOCUS_TYPES, dueKey, filterPlans, shelves, todayIso } from "@/lib/studyPlansUi";
+import { getSubjectTypes, type SubjectType } from "@/lib/planDiscoveryApi";
 
 // P2P PLANS — HOME (owner brief 2026-11-14). One plan system: continue your plans, explore (search, focus
 // filter, discovery collections — shelves, not separate systems), and My Plans (active, paused, completed,
 // created by me, saved, together). The Learning Centre's topic plans keep their own browser
 // (/plans/learning, unchanged). No streaks, no "late", no points.
-type MineTab = "active" | "paused" | "completed" | "created" | "saved" | "together";
-const MINE_TABS: MineTab[] = ["active", "paused", "completed", "created", "saved", "together"];
+type MineTab = "active" | "paused" | "completed" | "drafts" | "created" | "saved" | "together";
+const MINE_TABS: MineTab[] = ["active", "paused", "completed", "drafts", "created", "saved", "together"];
+// Explore-by-subject shortcuts (shown only when that kind of subject has records).
+const SUBJECT_SHORTCUTS: { type: SubjectType; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
+  { type: "bible_book", icon: "book-outline" }, { type: "bible_topic", icon: "pricetags-outline" }, { type: "biblical_person", icon: "person-outline" },
+  { type: "biblical_event", icon: "time-outline" }, { type: "core_foundations", icon: "school-outline" }, { type: "kingdom_school", icon: "library-outline" },
+];
 
 function PlansHome() {
   const router = useRouter();
@@ -31,9 +37,11 @@ function PlansHome() {
   const [focus, setFocus] = useState<FocusType | null>(null);
   const [together, setTogether] = useState(false);
   const [tab, setTab] = useState<MineTab>("active");
+  const [subjectTypes, setSubjectTypes] = useState<Set<SubjectType>>(new Set(["bible_book", "bible_topic"]));
   const load = useCallback(() => {
     setError(null);
     Promise.all([getPlans(), getMyPlans()]).then(([p, m]) => { setPlans(p.plans); setMine(m); }, (e) => setError(e?.status === 503 ? t("p2pPlans.notAvailable") : e?.message ?? t("p2pPlans.notAvailable")));
+    getSubjectTypes().then((r) => setSubjectTypes(new Set(r.types.filter((x) => x.count > 0).map((x) => x.type))), () => {});
   }, [t]);
   useFocusEffect(load);
   const today = todayIso();
@@ -65,6 +73,7 @@ function PlansHome() {
           <Text style={s.pill}>{t(`p2pPlans.mode.${i.run.mode}`)}</Text>
         </View>
         <Text style={s.cardTitle}>{i.plan.title}</Text>
+        {i.group ? <Text style={s.small}>{t("p2pPlans.home.withGroup", { name: i.group.name ?? "" })}</Text> : null}
         <Text style={s.progress}>{t("p2pPlans.progress", { completed: i.progress.completed, total: i.progress.total })} · {t(`p2pPlans.pace.${i.run.pace}`)}{i.run.status === "paused" ? ` · ${t("p2pPlans.status.paused")}` : ""}</Text>
         {i.current ? <Text style={s.body}>{t("p2pPlans.current", { title: i.current.title })}{due ? ` · ${t(`p2pPlans.${due.key}`, { date: due.date ? fmt(due.date) : "" })}` : ""}</Text> : null}
         {i.next ? <Text style={s.small}>{t("p2pPlans.next", { title: i.next.title })}</Text> : null}
@@ -74,6 +83,7 @@ function PlansHome() {
   const mineList = (): (RunItem | PlanCard)[] => {
     if (!mine) return [];
     if (tab === "together") return [...mine.active, ...mine.paused, ...mine.completed].filter((i) => i.run.mode === "together");
+    if (tab === "drafts") return mine.drafts ?? [];
     return mine[tab];
   };
 
@@ -97,6 +107,24 @@ function PlansHome() {
             <Text style={s.section} accessibilityRole="header">{t("p2pPlans.continue")}</Text>
             {mine.active.length || mine.paused.length ? [...mine.active, ...mine.paused].map((i) => <RunCard key={i.run.id} i={i} />) : <Text style={s.meta}>{t("p2pPlans.continueEmpty")}</Text>}
 
+            <TouchableOpacity style={[s.card, s.journey]} onPress={() => router.push("/plans/discover" as any)} accessibilityRole="button" accessibilityLabel={`${t("p2pPlans.home.journeyTitle")}. ${t("p2pPlans.home.journeyHint")}`}>
+              <View style={s.rowBetween}>
+                <Ionicons name="sparkles-outline" size={22} color={c.primaryGreen} />
+                <Text style={[s.cardTitle, { flex: 1 }]}>{t("p2pPlans.home.journeyTitle")}</Text>
+                <Ionicons name="chevron-forward" size={18} color={c.textMid} />
+              </View>
+              <Text style={s.small}>{t("p2pPlans.home.journeyHint")}</Text>
+            </TouchableOpacity>
+            <Text style={s.section} accessibilityRole="header">{t("p2pPlans.home.bySubject")}</Text>
+            <View style={s.grid}>
+              {SUBJECT_SHORTCUTS.filter((x) => subjectTypes.has(x.type)).map((x) => (
+                <TouchableOpacity key={x.type} style={s.tile} onPress={() => router.push({ pathname: "/plans/discover", params: { start: x.type } } as any)} accessibilityRole="button" accessibilityLabel={t(`p2pPlans.subjectType.${x.type}`)}>
+                  <Ionicons name={x.icon} size={20} color={c.accentGreen} />
+                  <Text style={s.tileText}>{t(`p2pPlans.subjectType.${x.type}`)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <Text style={s.section} accessibilityRole="header">{t("p2pPlans.explore")}</Text>
             <TextInput value={q} onChangeText={setQ} placeholder={t("p2pPlans.searchPlaceholder")} placeholderTextColor={c.textMuted} style={s.input} accessibilityLabel={t("p2pPlans.search")} />
             <ChipRow accessibilityLabel={t("p2pPlans.explore")} single>
@@ -117,6 +145,15 @@ function PlansHome() {
                 <Ionicons name="chevron-forward" size={18} color={c.textMid} />
               </View>
               <Text style={s.small}>{t("p2pPlans.learningPlansHint")}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[s.card, s.learning]} onPress={() => router.push("/study-together" as any)} accessibilityRole="button" accessibilityLabel={`${t("p2pPlans.home.togetherTitle")}. ${t("p2pPlans.home.togetherHint")}`}>
+              <View style={s.rowBetween}>
+                <Ionicons name="people-outline" size={20} color={c.amber} />
+                <Text style={[s.cardTitle, { flex: 1 }]}>{t("p2pPlans.home.togetherTitle")}</Text>
+                <Ionicons name="chevron-forward" size={18} color={c.textMid} />
+              </View>
+              <Text style={s.small}>{t("p2pPlans.home.togetherHint")}</Text>
             </TouchableOpacity>
 
             <Text style={s.section} accessibilityRole="header">{t("p2pPlans.myPlans")}</Text>
@@ -147,6 +184,10 @@ function makeStyles(c: AppColors) {
     group: { fontSize: 12.5, letterSpacing: 0.6, fontFamily: "Inter_700Bold", color: c.textMuted, textTransform: "uppercase", marginTop: 6 },
     card: { padding: 14, gap: 5, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
     learning: { backgroundColor: c.cardBeige },
+    journey: { borderColor: c.primaryGreen, borderWidth: 1.5 },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    tile: { flexGrow: 1, flexBasis: 150, minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.borderBeige },
+    tileText: { flex: 1, fontSize: 14, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     cardTitle: { fontSize: 16, color: c.textDark, fontFamily: "Inter_700Bold" },
     kicker: { fontSize: 11.5, color: c.accentGreen, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4, flexShrink: 1 },
     progress: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },

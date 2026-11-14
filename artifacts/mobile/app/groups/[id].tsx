@@ -85,6 +85,8 @@ export default function GroupInfo() {
           </TouchableOpacity>
         ) : null}
         <AppButton label="Open chat" icon="chatbubbles-outline" onPress={() => router.push(`/messages/${g.id}` as any)} style={{ alignSelf: "stretch" }} />
+        {/* P2P Plans (2026-11-14): the group's active plan, its completed plans, and choosing the next one. */}
+        <AppButton label="Group plans" icon="reader-outline" variant="secondary" onPress={() => router.push({ pathname: "/plans/group", params: { type: "private_group", id: g.id } } as any)} style={{ alignSelf: "stretch" }} />
       </View>
       {notice ? <Text style={s.notice} accessibilityLiveRegion="polite">{notice}</Text> : null}
 

@@ -23,10 +23,12 @@ import { dispatchNotificationNow } from "./pushDispatch";
 // enrollment and completions in the plan tables; the shared study only carries who is in it and the
 // discussion — joining never completes anything for anyone.
 export type ContentType = "kingdom_story" | "lesson" | "study_plan";
-export type Destination = "peer" | "family" | "church" | "circle" | "group";
+// "private_group" (migration 251): a private group (migration 245 — a group conversation). Its members are
+// the conversation's members; its admins lead it. A closed (archived) group can't start or join studies.
+export type Destination = "peer" | "family" | "church" | "circle" | "group" | "private_group";
 export const CONTENT_TYPES: readonly ContentType[] = ["kingdom_story", "lesson", "study_plan"];
-export const DESTINATIONS: readonly Destination[] = ["peer", "family", "church", "circle", "group"];
-export const GROUP_DESTINATIONS: readonly Destination[] = ["family", "church", "circle", "group"];
+export const DESTINATIONS: readonly Destination[] = ["peer", "family", "church", "circle", "group", "private_group"];
+export const GROUP_DESTINATIONS: readonly Destination[] = ["family", "church", "circle", "group", "private_group"];
 export const INVITE_DAYS = 14;
 export const MAX_PEER_INVITES = 5;
 export const MAX_GROUP_NOTIFY = 300;
@@ -77,8 +79,20 @@ export async function invitablePeers(userId: string): Promise<Map<string, PeerRe
 
 // ── Groups ───────────────────────────────────────────────────────────────────
 
+/** A private group's member row (null = not a member, or no such open group). */
+async function privateGroupRole(groupId: string, userId: string): Promise<"admin" | "member" | null> {
+  if (!isUuid(groupId)) return null;
+  const [{ data: g }, { data: m }] = await Promise.all([
+    db.from("p2p_conversations").select("id,archived_at").eq("id", groupId).eq("conversation_type", "private_group").maybeSingle(),
+    db.from("p2p_conversation_members").select("role").eq("conversation_id", groupId).eq("user_id", userId).maybeSingle(),
+  ]);
+  if (!g || (g as { archived_at: string | null }).archived_at || !m) return null;
+  return (m as { role: string }).role === "admin" ? "admin" : "member";
+}
+
 export async function isDestinationMember(type: Destination, groupId: string, userId: string): Promise<boolean> {
   if (type === "family" || type === "church") return isGroupMember(type, groupId, userId);
+  if (type === "private_group") return (await privateGroupRole(groupId, userId)) !== null;
   if (type === "circle") {
     const { data: c } = await db.from("p2p_peer_circles").select("leader_id").eq("id", groupId).maybeSingle();
     if (!c) return false;
@@ -98,6 +112,7 @@ export async function isDestinationMember(type: Destination, groupId: string, us
 
 export async function canLeadDestination(type: Destination, groupId: string, userId: string): Promise<boolean> {
   if (type === "family" || type === "church") return canManageGroupLearning(type, groupId, userId);
+  if (type === "private_group") return (await privateGroupRole(groupId, userId)) === "admin";
   if (type === "circle") {
     const { data } = await db.from("p2p_peer_circles").select("leader_id").eq("id", groupId).maybeSingle();
     return data?.leader_id === userId;
@@ -127,6 +142,9 @@ export async function destinationMemberIds(type: Destination, groupId: string): 
     const { data: g } = await db.from("p2p_groups").select("peer_guide_id").eq("id", groupId).maybeSingle();
     if (g?.peer_guide_id) ids.add(g.peer_guide_id as string);
     const { data } = await db.from("p2p_group_members").select("user_id").eq("group_id", groupId);
+    for (const r of (data ?? []) as { user_id: string }[]) ids.add(r.user_id);
+  } else if (type === "private_group") {
+    const { data } = await db.from("p2p_conversation_members").select("user_id").eq("conversation_id", groupId);
     for (const r of (data ?? []) as { user_id: string }[]) ids.add(r.user_id);
   }
   return Array.from(ids);
@@ -160,12 +178,19 @@ export async function groupsUserLeads(userId: string): Promise<LedGroup[]> {
   }
   for (const c of circles ?? []) out.push({ type: "circle", id: c.id as string, name: (c.name as string) ?? "Circle" });
   for (const g of groups ?? []) out.push({ type: "group", id: g.id as string, name: (g.name as string) ?? "Group" });
+  // Private groups the user administers (open ones only).
+  const { data: adm } = await db.from("p2p_conversation_members").select("conversation_id").eq("user_id", userId).eq("role", "admin");
+  const admIds = ((adm ?? []) as { conversation_id: string }[]).map((r) => r.conversation_id);
+  if (admIds.length) {
+    const { data: pg } = await db.from("p2p_conversations").select("id,name,archived_at").in("id", admIds).eq("conversation_type", "private_group");
+    for (const g of (pg ?? []) as { id: string; name: string | null; archived_at: string | null }[]) if (!g.archived_at) out.push({ type: "private_group", id: g.id, name: g.name ?? "Group" });
+  }
   return out;
 }
 
 export async function destinationName(type: Destination, groupId: string | null): Promise<string | null> {
   if (!groupId) return null;
-  const table = type === "family" ? "p2p_families" : type === "church" ? "p2p_churches" : type === "circle" ? "p2p_peer_circles" : type === "group" ? "p2p_groups" : null;
+  const table = type === "family" ? "p2p_families" : type === "church" ? "p2p_churches" : type === "circle" ? "p2p_peer_circles" : type === "group" ? "p2p_groups" : type === "private_group" ? "p2p_conversations" : null;
   if (!table) return null;
   const { data } = await db.from(table).select("name").eq("id", groupId).maybeSingle();
   return (data?.name as string) ?? null;
@@ -186,10 +211,11 @@ export async function loadContent(type: ContentType, id: string, starter?: strin
     if (!p) return null;
     const plan = p as { id: string; title: string; description: string | null; origin: string; owner_id: string | null; editorial_status: string };
     if (plan.origin === "p2p" ? plan.editorial_status !== "published" : plan.editorial_status === "archived" || (starter !== undefined && plan.owner_id !== starter)) return null;
-    const { data: ss } = await db.from("p2p_study_plan_sessions").select("id,position,title,questions").eq("plan_id", id).order("position", { ascending: true });
+    // select("*") reads the same before and after 251; retired sessions are no longer part of the plan.
+    const { data: ss } = await db.from("p2p_study_plan_sessions").select("*").eq("plan_id", id).order("position", { ascending: true });
     return {
       type, id, title: plan.title, subtitle: plan.description,
-      sections: ((ss ?? []) as { id: string; position: number; title: string; questions: { text?: string }[] | null }[])
+      sections: ((ss ?? []) as { id: string; position: number; title: string; questions: { text?: string }[] | null; retired_at?: string | null }[]).filter((s) => !s.retired_at)
         .map((s) => ({ id: s.id, number: s.position, title: s.title, questions: (s.questions ?? []).map((q) => String(q?.text ?? "")).filter((q) => q.trim()) })),
     };
   }
@@ -233,19 +259,23 @@ export async function displayName(userId: string): Promise<string> {
 
 /** Every group the user belongs to (active member, or its leader), by type. */
 export async function myGroupIds(userId: string): Promise<Record<string, string[]>> {
-  const [{ data: fam }, { data: ch }, { data: circ }, { data: led }, { data: grp }, { data: grpLed }] = await Promise.all([
+  const [{ data: fam }, { data: ch }, { data: circ }, { data: led }, { data: grp }, { data: grpLed }, { data: conv }] = await Promise.all([
     db.from("p2p_family_members").select("family_id").eq("user_id", userId).eq("status", "active"),
     db.from("p2p_church_members").select("church_id").eq("user_id", userId).eq("is_active", true),
     db.from("p2p_peer_circle_members").select("circle_id").eq("user_id", userId).eq("status", "active"),
     db.from("p2p_peer_circles").select("id").eq("leader_id", userId),
     db.from("p2p_group_members").select("group_id").eq("user_id", userId),
     db.from("p2p_groups").select("id").eq("peer_guide_id", userId),
+    db.from("p2p_conversation_members").select("conversation_id").eq("user_id", userId),
   ]);
+  const convIds = ((conv ?? []) as { conversation_id: string }[]).map((r) => r.conversation_id);
+  const { data: pgs } = convIds.length ? await db.from("p2p_conversations").select("id,archived_at").in("id", convIds).eq("conversation_type", "private_group") : { data: [] };
   return {
     family: (fam ?? []).map((r) => r.family_id as string),
     church: (ch ?? []).map((r) => r.church_id as string),
     circle: [...(circ ?? []).map((r) => r.circle_id as string), ...(led ?? []).map((r) => r.id as string)],
     group: [...(grp ?? []).map((r) => r.group_id as string), ...(grpLed ?? []).map((r) => r.id as string)],
+    private_group: ((pgs ?? []) as { id: string; archived_at: string | null }[]).filter((g) => !g.archived_at).map((g) => g.id),
   };
 }
 

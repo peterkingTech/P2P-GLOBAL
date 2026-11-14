@@ -36,6 +36,8 @@ import { listen, useListenOwner, useListenState, type ListenContent, type StartA
 import { bibleListenContent, bibleListenKey } from "@/lib/listen/bibleContent";
 import { usePerfVisit } from "@/lib/perf";
 import { loadLocale } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
+import { deliverPick } from "@/lib/passagePick";
 
 // The P2P Bible reader. Scripture comes from the server (licensed API.Bible
 // translations only, never stored in our database); highlights, notes and
@@ -43,7 +45,8 @@ import { loadLocale } from "@/lib/i18n";
 // the P2P theme. Opening this from a Gathering pushes it ON TOP of the call
 // screen, so the call keeps running; the Return bar goes back to it.
 
-type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string; compare?: string };
+// pick=plan: opened from the P2P Plans builder to CHOOSE a passage (a reference is handed back; nothing else changes).
+type Params = { book?: string; chapter?: string; v?: string; ve?: string; t?: string; compare?: string; pick?: string };
 // How a tap selects text. Verse (default) and Passage select whole verses;
 // Word, Phrase and Sentence select exact words — never silently widened.
 type SelectMode = "verse" | "word" | "phrase" | "sentence" | "passage";
@@ -62,6 +65,8 @@ const EMPTY_MY: MyData = { available: true, highlights: [], notes: [], bookmarks
 export default function BibleReaderScreen() {
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
+  const { t: tr } = useTranslation();
+  const picking = params.pick === "plan";
   const insets = useSafeAreaInsets();
   const { colors: c, resolvedMode } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -184,7 +189,8 @@ export default function BibleReaderScreen() {
         pendingScroll.current = loc.v ?? loc.at ?? null;
         setRenderKey((n) => n + 1);
         setData(ch);
-        savePosition({ translation: loc.t, book: loc.book, chapter: loc.chapter });
+        // Choosing a passage for a plan never moves the person's own reading place.
+        if (!picking) savePosition({ translation: loc.t, book: loc.book, chapter: loc.chapter });
         if (loc.v) {
           const ve = loc.ve ?? loc.v;
           const endLen = ch.verses.find((x) => x.verse === ve)?.text.length ?? 0;
@@ -696,6 +702,17 @@ export default function BibleReaderScreen() {
         </TouchableOpacity>
       )}
 
+      {picking && !sel && data && loc && (
+        <View style={[styles.actionBar, { paddingBottom: insets.bottom + 10 }]} accessibilityRole="toolbar" accessibilityLabel={tr("p2pPlans.pick.title")}>
+          <Text style={styles.actionRef}>{tr("p2pPlans.pick.title")}</Text>
+          <Text style={styles.pickHint}>{tr("p2pPlans.pick.hint")}</Text>
+          <View style={styles.pickRow}>
+            <AppButton size="sm" icon="add" label={tr("p2pPlans.pick.wholeChapter", { ref: book ? formatRef(book, loc.chapter) : "" })} onPress={() => { deliverPick({ book: loc.book, chapter: loc.chapter }); router.back(); }} />
+            <AppButton size="sm" variant="secondary" label={tr("p2pPlans.pick.cancel")} onPress={() => router.back()} />
+          </View>
+        </View>
+      )}
+
       {sel && data && (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + 10 }]} accessibilityRole="toolbar">
           <View style={styles.actionHead}>
@@ -703,6 +720,10 @@ export default function BibleReaderScreen() {
             {busy ? <ActivityIndicator size="small" color={c.accentGreen} /> : null}
             <IconButton icon="close" accessibilityLabel="Clear selection" onPress={() => { setRange(null); anchorRef.current = null; }} color={c.textMid} />
           </View>
+          {picking && loc ? (
+            <AppButton icon="checkmark" label={tr("p2pPlans.pick.add", { ref: book ? formatRef(book, loc.chapter, sel.start, sel.end) : "" })} accessibilityLabel={tr("p2pPlans.pick.add", { ref: book ? formatRef(book, loc.chapter, sel.start, sel.end) : "" })}
+              onPress={() => { deliverPick({ book: loc.book, chapter: loc.chapter, startVerse: sel.start, endVerse: sel.end }); router.back(); }} style={{ alignSelf: "stretch" }} />
+          ) : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeRow} accessibilityRole="radiogroup">
             {MODES.map((m) => (
               <TouchableOpacity key={m.key} style={[styles.modeChip, mode === m.key && styles.modeChipOn]} onPress={() => chooseMode(m.key)}
@@ -916,6 +937,8 @@ function makeStyles(c: AppColors) {
     exitFocusText: { fontSize: 13, color: c.textDark, fontFamily: "Inter_600SemiBold" },
     actionBar: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: c.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 1, borderColor: c.borderBeige, paddingHorizontal: 14, paddingTop: 8, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: -2 }, elevation: 10 },
     actionHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+    pickHint: { fontSize: 13, color: c.textMid, fontFamily: "Inter_400Regular", lineHeight: 18 },
+    pickRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     actionRef: { flex: 1, fontSize: 15, color: c.textDark, fontFamily: "Inter_700Bold" },
     swatches: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: 2 },
     swatchHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },

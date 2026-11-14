@@ -181,12 +181,19 @@ function PlanDetailsScreen() {
         </View>
 
         {/* ── Start ── */}
-        {!me ? (
+        {p.draft ? (
+          <View style={[s.card, { gap: 8 }]}>
+            <Text style={s.cardTitle}>{t("p2pPlans.detail.draftTitle")}</Text>
+            <Text style={s.small}>{t("p2pPlans.detail.draftHint")}</Text>
+            <AppButton size="sm" icon="create-outline" label={t("p2pPlans.detail.finishDraft")} onPress={() => router.push({ pathname: "/plans/builder", params: { id: p.id } } as any)} />
+          </View>
+        ) : !me ? (
           <View style={{ gap: 10 }}>
             {panel === null ? (
               <View style={s.buttons}>
                 <AppButton icon="person-outline" label={t("p2pPlans.detail.startIndividually")} onPress={() => setPanel("individual")} />
                 {p.togetherSuitable ? <AppButton icon="people-outline" variant="secondary" label={t("p2pPlans.detail.startTogether")} onPress={openTogether} /> : null}
+                {p.togetherSuitable && (p.official || p.mine) ? <AppButton icon="people-circle-outline" variant="secondary" label={t("p2pPlans.detail.withGroup")} onPress={() => router.push({ pathname: "/plans/together", params: { planId: p.id } } as any)} /> : null}
                 <AppButton icon={p.saved ? "bookmark" : "bookmark-outline"} variant="tertiary" label={p.saved ? t("p2pPlans.detail.unsave") : t("p2pPlans.detail.save")} onPress={() => savePlan(p.id, !p.saved).then(load)} />
               </View>
             ) : (
@@ -245,6 +252,8 @@ function PlanDetailsScreen() {
               <View style={{ flex: 1, gap: 1 }}>
                 <Text style={s.sessionTitle}>{x.position}. {x.title}</Text>
                 <Text style={s.small}>{x.derived ? x.group ?? "" : x.passages.map((y) => y.display ?? passageText(y)).join("; ")}{due ? ` · ${t(`p2pPlans.${due.key}`, { date: due.date ? fmt(due.date) : "" })}` : ""}</Text>
+                {x.retired ? <Text style={s.versionNote}>{t("p2pPlans.version.retired")}</Text> : null}
+                {x.addedLater ? <Text style={s.versionNote}>{t("p2pPlans.version.addedLater")}</Text> : null}
               </View>
               <Ionicons name="chevron-forward" size={16} color={c.textMid} />
             </TouchableOpacity>
@@ -280,6 +289,7 @@ export default withScreenBoundary(PlanDetailsScreen, "Plan");
 
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
+    versionNote: { fontSize: 12, color: c.amber, fontFamily: "Inter_600SemiBold" },
     screen: { flex: 1, backgroundColor: c.lightCream },
     center: { alignItems: "center", justifyContent: "center", flex: 1 },
     header: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingBottom: 6 },

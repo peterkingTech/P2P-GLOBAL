@@ -75,6 +75,28 @@ A session can also have **supporting resources**. Supporting resources must help
   - Too many sessions on one study day is refused with a 422 that explains why and suggests a longer schedule.
   - The person can keep their choice knowingly.
 
+## Discovery, the builder and groups (2026-11-14, local; needs proposals 251 + 252)
+
+- **Discovery** (`api-server/src/lib/planDiscovery.ts`, `routes/planDiscovery.ts` at `/plan-discovery`): a subject (Bible book, Scripture topic, person / event / place / theme record, Core Foundations, a Kingdom School course) → published resources only.
+  - **Direct:** an editor's link, a topic's core passages, a subject's own passages, a plan with the same focus, a course's own lessons, a story whose *narrative* is in the chosen book.
+  - **Supporting:** Scripture overlap. This covers a story chapter that *retells* one of the subject's passages, a lesson memory verse in it, and a topic's supporting passages.
+  - **Further:** commentary and Deep Study for the subject's passages, the dictionary article with the same headword, and stories that only *quote* a verse.
+  - Never keyword matching. Every item carries a reason code.
+- **Subjects** (people and events) are editorial records (`p2p_study_subjects`, `p2p_subject_resource_links`, both with four eyes). Proposal 252 seeds 20 drafts from P2P's own stories (`scripts/build-study-subjects.mjs`, review guide `docs/study-subjects-review.md`).
+- **Builder** (`app/plans/builder.tsx`), five steps:
+  1. focus;
+  2. content (P2P's journey, or your own picks; Scripture through the Bible reader's `pick=plan` mode);
+  3. supporting resources;
+  4. schedule and study mode;
+  5. review.
+
+  It also handles drafts, and creates are retry-safe through a `clientKey`.
+- **Versions:** editing never deletes a session; it is retired. Each run keeps `required_session_ids`, so sessions added later are optional for that run.
+- **Groups:**
+  - **Routes:** `/study-plans/groups/*` and `POST /study-plans/:id/groups`.
+  - **App screens:** `app/plans/group.tsx` and `app/plans/together.tsx`.
+  - **Rules:** one active plan per group, completed plans kept as history, and new private groups made atomically by `p2p_create_plan_group`.
+
 ## Tests
 
 - API rules and routes: `api-server/tests/studyPlans.test.mjs`

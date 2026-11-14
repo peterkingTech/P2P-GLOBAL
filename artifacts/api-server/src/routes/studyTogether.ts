@@ -223,6 +223,8 @@ router.post("/", async (req, res) => {
         const { data: again } = await db.from("p2p_shared_studies").select("id").eq("destination_type", dest).eq("destination_id", groupId)
           .eq("content_type", type).eq("content_id", content.id).eq("status", "active").maybeSingle();
         if (again) return res.json({ id: again.id, existing: true });
+        // One active plan per group (migration 251): the group finishes its plan before starting another.
+        if (type === "study_plan") throw new StudyError(409, "This group already has an active plan. Complete it in the group's Plans before starting another.");
       }
       throw error;
     }

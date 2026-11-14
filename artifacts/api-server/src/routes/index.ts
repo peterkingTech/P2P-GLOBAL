@@ -24,6 +24,7 @@ import bibleTranslationsAdminRouter from "./bibleTranslationsAdmin";
 import recycleBinRouter from "./recycleBin";
 import studyTogetherRouter from "./studyTogether";
 import studyPlansRouter from "./studyPlans";
+import planDiscoveryRouter from "./planDiscovery";
 import scriptureCollectionsRouter from "./scriptureCollections";
 import scriptureLibraryRouter from "./scriptureLibrary";
 import peerEvaluationRouter from "./peerEvaluation";
@@ -80,6 +81,7 @@ router.use("/missions", missionsRouter); // Missions — new independent content
 router.use("/kingdom-wins", kingdomWinsRouter); // Kingdom Wins / Testimonies — peer-authored "look what God has done" domain, independent from the Prayer Wall and Missions
 router.use("/kingdom-stories", kingdomStoriesRouter); // Kingdom Stories — P2P-curated EDITORIAL content (Christian history/revival/missions/etc.), admin_content/super_admin write-gated, distinct from peer-authored Kingdom Wins
 router.use("/study-together", studyTogetherRouter); // Study Together shared (async) studies (migration 216); the live in-call study stays in calls.ts
+router.use("/plan-discovery", planDiscoveryRouter); // P2P Plans resource discovery — subjects → published resources, direct / supporting / further (2026-11-14)
 router.use("/study-plans", studyPlansRouter); // P2P Plans — one plan system organising existing resources (proposal 249); Together reuses Study Together
 router.use("/scripture-collections", scriptureCollectionsRouter); // Scripture collections + playlists: private by default, shared with peers / groups / studies (migration 220)
 router.use("/scripture-library", scriptureLibraryRouter); // Scripture Listening Library: owner-only favourites, listening history, resume, multi-destination save (migration 227)

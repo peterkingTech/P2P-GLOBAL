@@ -4,6 +4,7 @@
 // progress — the estimate below is only a preview while choosing.
 import { CANON, bibleRoute, readerTarget } from "@/lib/bibleReaderApi";
 import type { Collection, DurationKey, FocusType, Pace, Passage, PlanCard, PlanInput, Resource } from "@/lib/studyPlansApi";
+import type { Journey, Recommendation, SubjectType, Target } from "@/lib/planDiscoveryApi";
 
 export const COLLECTIONS: Collection[] = ["bible_books", "topical", "life_of_jesus", "biblical_history", "core_foundations", "kingdom_school", "kingdom_stories", "deep_study"];
 export const FOCUS_TYPES: FocusType[] = ["bible_book", "bible_topic", "biblical_person", "biblical_event", "theme", "core_foundations", "kingdom_school", "kingdom_stories", "deep_study"];
@@ -26,8 +27,56 @@ export function resourceRoute(r: Resource): Route | null {
     case "word_study": return r.strongs ? { pathname: "/study-tools/word/[strongs]", params: { strongs: r.strongs } } : null;
     case "dictionary_term": return r.key ? { pathname: "/dictionary/term/[key]", params: { key: r.key } } : null;
     case "curriculum": return r.id ? { pathname: "/plan/[id]", params: { id: r.id } } : null;
+    case "reference_article": return r.id ? { pathname: "/dictionary/article/[id]", params: { id: r.id } } : null;
   }
   return null;
+}
+/** A recommendation's target: a resource's own screen, a subject (explored in discovery) or a prepared plan. */
+export function targetRoute(x: Target, reason?: { params?: Record<string, string | number> }): Route | null {
+  if (x.kind === "plan") return x.id ? { pathname: "/study-plan/[id]", params: { id: x.id } } : null;
+  if (x.kind === "subject") {
+    const type = SUBJECT_TYPE_FOR_KIND[String(reason?.params?.kind ?? "")];
+    return x.id && type ? { pathname: "/plans/discover", params: { type, key: x.id } } : null;
+  }
+  return resourceRoute(x as Resource);
+}
+const SUBJECT_TYPE_FOR_KIND: Record<string, SubjectType> = { person: "biblical_person", event: "biblical_event", place: "biblical_place", theme: "theme" };
+/** The plan's one main focus for a chosen subject (a place is a theme-type focus in the plan record). */
+export function focusFor(type: SubjectType, key: string): { focusType: FocusType; focusRef: Record<string, unknown> } {
+  switch (type) {
+    case "bible_book": return { focusType: "bible_book", focusRef: { book: key } };
+    case "bible_topic": return { focusType: "bible_topic", focusRef: { topicSlug: key } };
+    case "biblical_person": return { focusType: "biblical_person", focusRef: { subjectId: key } };
+    case "biblical_event": return { focusType: "biblical_event", focusRef: { subjectId: key } };
+    case "biblical_place": case "theme": return { focusType: "theme", focusRef: { subjectId: key } };
+    case "core_foundations": return { focusType: "core_foundations", focusRef: {} };
+    case "kingdom_school": return { focusType: "kingdom_school", focusRef: { curriculumId: key } };
+  }
+}
+/** Prepared study questions for a Scripture session, in the person's language. A learning aid — never an exam. */
+export function templateQuestions(t: (k: string, o?: Record<string, unknown>) => string, focus: string, passage: string): { kind: "observe" | "context" | "interpret" | "apply"; text: string }[] {
+  return (["observe", "context", "interpret", "apply"] as const).map((kind) => ({ kind, text: t(`p2pPlans.questionTemplate.${kind}`, { passage, focus }) }));
+}
+/** A suggested journey → plan sessions (questions added in the person's language). */
+export function journeySessions(j: Journey, t: (k: string, o?: Record<string, unknown>) => string, focus: string): PlanInput["sessions"] {
+  return j.sessions.map((x) => ({ title: x.title, intro: x.intro, passages: x.passages, primaryResource: x.primaryResource, supporting: x.supporting, reflection: x.reflection, prayer: x.prayer,
+    questions: x.templateQuestions && x.passages[0] ? templateQuestions(t, focus, passageText(x.passages[0])) : [] }));
+}
+/** Why P2P recommended something, in words. */
+export function reasonText(t: (k: string, o?: Record<string, unknown>) => string, r: Recommendation["reason"]): string {
+  if (r.code === "editorial") return String(r.params?.text ?? "");
+  return t(`p2pPlans.reason.${r.code}`, { ...(r.params ?? {}) });
+}
+/** A random key so a retried create (double tap, dropped connection) returns what was already made. */
+export function newClientKey(): string {
+  let k = "";
+  for (let i = 0; i < 24; i++) k += "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)];
+  return k;
+}
+/** Moves one item up or down (reordering sessions in the builder). */
+export function move<T>(list: T[], from: number, to: number): T[] {
+  if (to < 0 || to >= list.length || from === to) return list;
+  const next = [...list]; const [x] = next.splice(from, 1); next.splice(to, 0, x); return next;
 }
 /** A passage opens in the existing Bible reader (the reader keeps the person's chosen translation). */
 export const passageRoute = (p: Passage) => resourceRoute({ kind: "bible_passage", ...p });

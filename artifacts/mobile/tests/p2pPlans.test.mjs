@@ -26,7 +26,10 @@ mods["@/lib/bibleReaderApi"] = load("lib/bibleReaderApi.ts");
 const U = load("lib/studyPlansUi.ts");
 const en = JSON.parse(src("locales/en.json")).p2pPlans;
 const home = src("app/plans/index.tsx"), detail = src("app/study-plan/[id].tsx"), session = src("app/study-plan/session.tsx"), builder = src("app/plans/builder.tsx");
-const screens = home + detail + session + builder;
+// 2026-11-14 (discovery + groups): the new screens and components are held to the same rules.
+const discoverScreen = src("app/plans/discover.tsx"), groupScreen = src("app/plans/group.tsx"), togetherScreen = src("app/plans/together.tsx");
+const planComponents = src("components/plans/SubjectPicker.tsx") + src("components/plans/Recommendations.tsx") + src("components/plans/GroupChooser.tsx");
+const screens = home + detail + session + builder + discoverScreen + groupScreen + togetherScreen + planComponents;
 const routeExists = (r) => { const p = r.pathname.replace(/^\//, ""); return ["", ".tsx", "/index.tsx"].some((x) => existsSync(path.join(root, "app", p + x))) || existsSync(path.join(root, "app/(tabs)", p + ".tsx")); };
 
 // ── Resources open their EXISTING screens, by their own ids ──
@@ -59,7 +62,7 @@ ok("collections: official plans by shelf in order, the person's own last", U.she
 ok("filters: focus, search (accents/apostrophes ignored), together", U.filterPlans(cat, { focus: "theme" }).length === 1 && U.filterPlans(cat, { q: "ROMANS" }).length === 1 && U.filterPlans(cat, { together: true }).length === 3);
 
 // ── Screens ──
-ok("10. home: continue, explore (search + focus + collections), My Plans tabs incl. paused/created/saved/together", home.includes('t("p2pPlans.continue")') && home.includes("shelves(plans)") && home.includes("filterPlans(") && /MINE_TABS: MineTab\[\] = \["active", "paused", "completed", "created", "saved", "together"\]/.test(home));
+ok("10. home: continue, explore (search + focus + collections), My Plans tabs incl. paused/created/saved/together", home.includes('t("p2pPlans.continue")') && home.includes("shelves(plans)") && home.includes("filterPlans(") && /MINE_TABS: MineTab\[\] = \["active", "paused", "completed", "drafts", "created", "saved", "together"\]/.test(home));
 ok("10. the Learning Centre topic plans keep their own browser (moved, unchanged) and are linked", existsSync(path.join(root, "app/plans/learning.tsx")) && src("app/plans/learning.tsx").includes("Recommended for You") && home.includes('"/plans/learning"'));
 ok("11. details: focus, primary + supporting kinds, sessions, schedule, mode, objectives, questions, sample; start individually / together / save", ["mainFocus", "primary", "supporting", "sessions", "suggested", "mode", "objectives", "questions", "sample", "startIndividually", "startTogether", "save"].every((k) => detail.includes(`p2pPlans.detail.${k}`)));
 ok("11. joining a group is never forced (individual start is separate)", detail.includes('setPanel("individual")') && detail.includes("openTogether"));
@@ -71,14 +74,17 @@ ok("14. opening a session completes nothing; completion is an explicit action; l
 ok("8. schedule: duration + pace + start date; a server refusal is explained with a suggestion, never silently changed", detail.includes("SchedulePicker") && detail.includes("problem.suggestion") && detail.includes("acceptSchedule"));
 ok("9. together uses Study Together (shared study first, then my own run)", detail.includes("startSharedStudy(") && detail.includes('contentType: "study_plan"') && detail.includes("sharedStudyId"));
 ok("9. Study Together knows plans and opens each person's own run", src("lib/studyTogetherApi.ts").includes('study_plan: "P2P Plan"') && src("lib/studyTogetherApi.ts").includes('pathname: "/study-plan/[id]"'));
-ok("12. builder: 7 steps, Bible chapters/passages or existing lessons by id, supporting per session, then create (and start)", [1, 2, 3, 4, 5, 6, 7].every((n) => en.builder[`step${n}`]) && builder.includes("chapterSessions(") && builder.includes('kind: "lesson", id: l.id') && builder.includes("addSupport(") && builder.includes("createPlan("));
+// 2026-11-14 brief §8: five guided steps (focus, content, supporting, schedule + mode, review).
+ok("12. builder: 5 steps; P2P's journey or own picks; Scripture through the Bible reader; supporting per session; draft, create (and start)",
+  [1, 2, 3, 4, 5].every((n) => en.builder[`s${n}`] && en.builder[`h${n}`]) && builder.includes("getJourney(") && builder.includes("journeySessions(") && builder.includes("pickRoute(")
+  && builder.includes("addSupport(") && builder.includes("createPlan(") && builder.includes("saveDraft") && builder.includes("clientKey: keys.current.create"));
 ok("15. a participant's plan is shown as theirs, never as official P2P curriculum", /isn't official P2P curriculum/.test(en.builder.privateNote) && detail.includes('t("p2pPlans.detail.notOfficial")'));
 ok("18. Growth Matrix: the app never claims credit for plan sessions", /doesn't award Growth Matrix credit/.test(en.detail.growthNote) && !/growthApi"\)?;?[^\n]*(record|award)/.test(screens));
 ok("no Bible text in the plan screens (references only)", !/bible\.helloao|verseText|getChapter\(/.test(screens));
-const keys = [...screens.matchAll(/t\(`?"?p2pPlans\.([a-zA-Z0-9_.]+)/g)].map((m) => m[1]).filter((k) => !k.endsWith(".") && k !== "builder.step"); // builder.step${n} is checked below
+const keys = [...screens.matchAll(/t\(`?"?p2pPlans\.([a-zA-Z0-9_.]+)/g)].map((m) => m[1]).filter((k) => !k.endsWith(".") && !k.endsWith("_") && !["builder.step", "builder.s", "builder.h"].includes(k)); // dynamic keys (builder.s${n}, h${n}, start_${key}) are checked in 12 / below
 const get = (k) => k.split(".").reduce((o, p) => (o == null ? o : o[p]), en);
 ok("17. every fixed p2pPlans key used by the screens exists in English", keys.every((k) => get(k) !== undefined || (get(k + "_one") && get(k + "_other"))), keys.filter((k) => get(k) === undefined && !get(k + "_one")).join());
-ok("17. every focus, collection, kind, duration and pace has a label", U.FOCUS_TYPES.every((f) => en.focus[f]) && [...U.COLLECTIONS, "mine"].every((c) => en.collection[c]) && U.DURATIONS.every((d) => en.duration[d]) && U.PACES.every((p) => en.pace[p]) && Object.keys(en.kind).length === 9);
+ok("17. every focus, collection, kind, duration and pace has a label", U.FOCUS_TYPES.every((f) => en.focus[f]) && [...U.COLLECTIONS, "mine"].every((c) => en.collection[c]) && U.DURATIONS.every((d) => en.duration[d]) && U.PACES.every((p) => en.pace[p]) && Object.keys(en.kind).length === 10);
 ok("17. RTL-safe (no hard left/right spacing or alignment)", !/paddingLeft|paddingRight|marginLeft|marginRight|textAlign: "left"|textAlign: "right"/.test(screens));
 ok("routes registered with their own header", ["plans/index", "plans/learning", "plans/builder", "study-plan/[id]", "study-plan/session"].every((r) => src("app/_layout.tsx").includes(`"${r}"`)));
 ok("Learning tab has a P2P Plans tile", src("components/LearningHub.tsx").includes('route: "/plans"'));

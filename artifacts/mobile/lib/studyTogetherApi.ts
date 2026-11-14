@@ -14,11 +14,11 @@ const authedFetch = (path: string, init?: RequestInit) => apiRequest(path, init,
 const post = (path: string, body?: unknown) => authedFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) });
 
 export type StudyContentType = "kingdom_story" | "lesson" | "study_plan";
-export type StudyDestination = "peer" | "family" | "church" | "circle" | "group";
+export type StudyDestination = "peer" | "family" | "church" | "circle" | "group" | "private_group";
 export type PeerRelationship = "peer_guide" | "disciple" | "connection" | "friend";
 
 export const DESTINATION_LABELS: Record<StudyDestination, string> = {
-  peer: "A Peer", family: "Family Circle", church: "Church", circle: "Circle", group: "Group",
+  peer: "A Peer", family: "Family Circle", church: "Church", circle: "Circle", group: "Group", private_group: "Group",
 };
 export const RELATIONSHIP_LABELS: Record<PeerRelationship, string> = {
   peer_guide: "Your Peer Guide", disciple: "Your disciple", friend: "P2P connection", connection: "In your group",

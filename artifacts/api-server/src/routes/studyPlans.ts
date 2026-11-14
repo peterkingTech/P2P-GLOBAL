@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { supabaseServiceRole as db, verifyCaller } from "../lib/supabase";
-import { isDestinationMember, type Destination } from "../lib/sharedStudy";
+import { canLeadDestination, destinationMemberIds, destinationName, displayName, groupsUserLeads, isDestinationMember, loadContent, notify, profilesById, type Destination, GROUP_DESTINATIONS } from "../lib/sharedStudy";
+import { getArticles } from "../lib/referenceArticles";
+import { invalidateDiscovery } from "./planDiscovery";
 import {
   COLLECTIONS, DURATIONS, EDITORIAL_FLOW, FOCUS_TYPES, PACES, addDays, durationDays, feasibility, isIsoDate, isUuid, passageDisplay,
   progressOf, resourceKinds, schedule, validateSession, type DurationKey, type Pace, type Passage, type Resource, type SessionInput,
@@ -20,6 +22,14 @@ import {
 //   POST   /:id/start                          { mode, durationKey, customDays?, pace, startDate, sharedStudyId?, acceptSchedule? }
 //   PATCH  /runs/:runId                        { action: pause | resume | leave } or { durationKey, customDays, pace } or { showQuestions }
 //   POST   /runs/:runId/sessions/:sessionId    mark a session complete · DELETE = undo
+//   Groups (2026-11-14, migration 251) — a group's plans over time; the group and its plans have separate lives:
+//   GET    /groups/mine                        groups I lead (can attach a plan to), with their active plan
+//   GET    /groups/:type/:id                   members: the active plan, completed plans (history), group-level counts
+//   POST   /groups/:type/:id/plans             leaders: { planId, schedule?, clientKey? } attach the ACTUAL plan (one active at a time)
+//   POST   /groups/:type/:id/plans/:studyId/complete   leaders: the plan is completed; the group continues
+//   POST   /:id/groups                         { name, description?, schedule?, clientKey? } create a private group from this plan
+// Versions (251): editing a plan that people follow never deletes a session — it is retired and the plan's
+// version goes up; each run keeps the sessions it started with (required_session_ids).
 // Identity always comes from the token. Completing a session is a PLAN record only: nothing here writes
 // Growth Matrix evidence, and a lesson session reads the lesson's own records (which stay authoritative).
 // Together = a Study Together shared study (content_type 'study_plan'); each person keeps their own run.
@@ -31,13 +41,20 @@ type Plan = {
   plan_kind: "scripture" | "structured" | "mixed"; collection: string | null; derived_from: { type: "foundations" | "curriculum"; id?: string } | null; language: string;
   origin: "p2p" | "participant"; owner_id: string | null; editorial_status: string; objectives: string[]; suggested_pace: Pace; suggested_days: number | null;
   together_suitable: boolean; submitted_by: string | null; reviewed_by: string | null; published_at: string | null; created_at: string; updated_at: string;
+  // Migration 251 (absent before it is applied — every use has a fallback).
+  version?: number; is_draft?: boolean; client_key?: string | null;
 };
-type SessionRow = { id: string; plan_id: string; position: number; title: string; intro: string | null; passages: Passage[]; primary_resource: Resource | null; supporting: Resource[]; questions: { kind: string; text: string }[]; reflection: string | null; prayer: string | null };
+type SessionRow = { id: string; plan_id: string; position: number; title: string; intro: string | null; passages: Passage[]; primary_resource: Resource | null; supporting: Resource[]; questions: { kind: string; text: string }[]; reflection: string | null; prayer: string | null;
+  added_in_version?: number; retired_at?: string | null; retired_in_version?: number | null };
 type Run = { id: string; user_id: string; plan_id: string; mode: "individual" | "together"; shared_study_id: string | null; duration_key: DurationKey; target_days: number; pace: Pace;
-  start_date: string; anchor_date: string; status: "active" | "paused" | "completed" | "left"; paused_at: string | null; completed_at: string | null; show_questions: boolean; created_at: string; updated_at: string };
+  start_date: string; anchor_date: string; status: "active" | "paused" | "completed" | "left"; paused_at: string | null; completed_at: string | null; show_questions: boolean; created_at: string; updated_at: string;
+  plan_version?: number | null; required_session_ids?: string[] | null };
 /** A session as the app sees it: stored, or derived live from a curriculum's real lessons. */
 type Session = { id: string; position: number; title: string; group: string | null; intro: string | null; passages: (Passage & { display: string })[]; primaryResource: (Resource & { label?: string | null }) | null;
-  supporting: (Resource & { label?: string | null; display?: string })[]; questions: { kind: string; text: string }[]; reflection: string | null; prayer: string | null; derived: boolean; lessonState?: "passed" | "completed" | "open" };
+  supporting: (Resource & { label?: string | null; display?: string })[]; questions: { kind: string; text: string }[]; reflection: string | null; prayer: string | null; derived: boolean; lessonState?: "passed" | "completed" | "open";
+  /** For one person's run: retired = removed from the plan after they started (still part of THEIR run);
+   *  addedLater = added after they started (optional for them, never blocks their completion). */
+  retired?: boolean; addedLater?: boolean };
 
 const today = () => new Date().toISOString().slice(0, 10);
 async function caller(req: Request, res: Response): Promise<string | null> {
@@ -86,8 +103,12 @@ async function loadPlanFor(id: string, userId: string): Promise<{ plan: Plan; ed
   const mine = (runs ?? []) as { shared_study_id: string | null; status: string }[];
   if (mine.length) return { plan, editor: false };
   // Someone in an active Study Together study of this plan (e.g. a friend's own plan they were invited to).
-  const { data: studies } = await db.from("p2p_shared_studies").select("id").eq("content_type", "study_plan").eq("content_id", plan.id).eq("status", "active");
-  for (const s of (studies ?? []) as { id: string }[]) if (await inSharedStudy(s.id, userId, plan.id)) return { plan, editor: false };
+  const { data: studies } = await db.from("p2p_shared_studies").select("id,status,destination_type,destination_id").eq("content_type", "study_plan").eq("content_id", plan.id);
+  for (const s of (studies ?? []) as { id: string; status: string; destination_type: Destination; destination_id: string | null }[]) {
+    if (s.status === "active" && await inSharedStudy(s.id, userId, plan.id)) return { plan, editor: false };
+    // A group's completed plan stays in its history: its members can revisit it (read only).
+    if (s.status === "concluded" && s.destination_id && await isDestinationMember(s.destination_type, s.destination_id, userId)) return { plan, editor: false };
+  }
   throw new PlanError(404, "This plan isn't available.");
 }
 
@@ -140,14 +161,22 @@ async function labels(resources: Resource[]): Promise<Map<string, string>> {
   for (const r of (s.data ?? []) as { id: string; title: string; status: string }[]) if (r.status === "published") m.set(`kingdom_story:${r.id}`, r.title);
   for (const r of (c.data ?? []) as { id: string; title: string }[]) m.set(`curriculum:${r.id}`, r.title);
   for (const r of (t.data ?? []) as { slug: string; title: string; status: string }[]) if (r.status === "published") m.set(`scripture_topic:${r.slug}`, r.title);
+  const arts = resources.filter((r) => r.kind === "reference_article");
+  if (arts.length) { try { const a = getArticles(); for (const r of arts) { const x = a.byId.get((r as { id: string }).id); if (x) m.set(`reference_article:${x.id}`, x.title); } } catch { /* dictionary not loaded: shown as unavailable */ } }
   return m;
 }
 const refKey = (r: Resource) => ("id" in r ? `${r.kind}:${r.id}` : "slug" in r ? `${r.kind}:${r.slug}` : null);
-async function sessionsOf(plan: Plan, userId: string): Promise<Session[]> {
-  if (plan.derived_from) return derivedSessions(plan, userId);
+/** The plan's current sessions — or, for one person's RUN, the sessions of the version they started with:
+ *  a session retired later stays in their run (with their completion); one added later is optional for them. */
+async function sessionsOf(plan: Plan, userId: string, run?: Run | null): Promise<Session[]> {
+  const req = Array.isArray(run?.required_session_ids) ? new Set(run!.required_session_ids) : null;
+  if (plan.derived_from) {
+    const ss = await derivedSessions(plan, userId);
+    return req ? ss.map((x) => (req.has(x.id) ? x : { ...x, addedLater: true })) : ss;
+  }
   const { data, error } = await db.from("p2p_study_plan_sessions").select("*").eq("plan_id", plan.id).order("position", { ascending: true });
   if (error) throw error;
-  const rows = (data ?? []) as SessionRow[];
+  const rows = ((data ?? []) as SessionRow[]).filter((r) => !r.retired_at || (req && req.has(r.id)));
   const all = rows.flatMap((r) => [...(r.primary_resource ? [r.primary_resource] : []), ...(r.supporting ?? [])]);
   const names = await labels(all);
   // A referenced resource that is no longer available says so (label null) — never a broken link.
@@ -156,15 +185,18 @@ async function sessionsOf(plan: Plan, userId: string): Promise<Session[]> {
     return { ...r, label: k ? names.get(k) ?? null : null, ...("book" in r ? { display: passageDisplay(r as Passage) } : {}) };
   };
   return rows.map((r) => ({ id: r.id, position: r.position, title: r.title, group: null, intro: r.intro, passages: (r.passages ?? []).map((p) => ({ ...p, display: passageDisplay(p) })),
-    primaryResource: r.primary_resource ? withLabel(r.primary_resource) : null, supporting: (r.supporting ?? []).map(withLabel), questions: r.questions ?? [], reflection: r.reflection, prayer: r.prayer, derived: false }));
+    primaryResource: r.primary_resource ? withLabel(r.primary_resource) : null, supporting: (r.supporting ?? []).map(withLabel), questions: r.questions ?? [], reflection: r.reflection, prayer: r.prayer, derived: false,
+    ...(r.retired_at ? { retired: true } : {}), ...(req && !req.has(r.id) ? { addedLater: true } : {}) }));
 }
+/** What counts towards a run: everything except sessions added after the person started. */
+const required = (ss: Session[]) => ss.filter((x) => !x.addedLater);
 function doneSet(sessions: Session[], completions: string[]): Set<string> {
   const set = new Set(completions);
   for (const s of sessions) if (s.derived && s.lessonState && s.lessonState !== "open") set.add(s.id);
   return set;
 }
 function card(p: Plan, extra: Record<string, unknown> = {}) {
-  return { id: p.id, slug: p.slug, title: p.title, description: p.description, focusType: p.focus_type, focusLabel: p.focus_label, focusRef: p.focus_ref, kind: p.plan_kind,
+  return { id: p.id, slug: p.slug, version: p.version ?? 1, draft: !!p.is_draft, title: p.title, description: p.description, focusType: p.focus_type, focusLabel: p.focus_label, focusRef: p.focus_ref, kind: p.plan_kind,
     collection: p.collection, origin: p.origin, official: p.origin === "p2p", editorialStatus: p.editorial_status, language: p.language, derived: !!p.derived_from,
     suggestedPace: p.suggested_pace, suggestedDays: p.suggested_days, togetherSuitable: p.together_suitable, objectives: p.objectives ?? [], ...extra };
 }
@@ -221,17 +253,23 @@ router.get("/mine", async (req, res) => {
       db.from("p2p_plan_saves").select("plan_id,saved_at").eq("user_id", userId),
     ]);
     const plans = new Map(((planRows ?? []) as Plan[]).map((p) => [p.id, p]));
+    // Which group each "together" run belongs to (name only — never other members' progress).
+    const studyIds = [...new Set(runs.map((r) => r.shared_study_id).filter(Boolean) as string[])];
+    const { data: studyRows } = studyIds.length ? await db.from("p2p_shared_studies").select("id,destination_type,destination_id,status").in("id", studyIds) : { data: [] };
+    const groupOf = new Map<string, { type: Destination; id: string; name: string | null } | null>();
+    for (const st of (studyRows ?? []) as { id: string; destination_type: Destination; destination_id: string | null }[])
+      groupOf.set(st.id, st.destination_id ? { type: st.destination_type, id: st.destination_id, name: await destinationName(st.destination_type, st.destination_id) } : null);
     const items = [];
     for (const r of runs) {
       const p = plans.get(r.plan_id);
       if (!p) continue;
-      const sessions = await sessionsOf(p, userId);
+      const sessions = required(await sessionsOf(p, userId, r));
       const { data: comp } = await db.from("p2p_study_plan_completions").select("session_id").eq("enrollment_id", r.id);
       const done = doneSet(sessions, ((comp ?? []) as { session_id: string }[]).map((c) => c.session_id));
       const prog = progressOf(sessions, done);
       const sched = schedule(sessions, done, { anchor: r.anchor_date, days: r.target_days, pace: r.pace });
       const cur = sessions.find((s) => s.id === prog.currentId), nxt = sessions.find((s) => s.id === prog.nextId);
-      items.push({ run: runOut(r), plan: card(p), progress: { completed: prog.completed, total: prog.total, finished: prog.finished },
+      items.push({ run: runOut(r), plan: card(p), progress: { completed: prog.completed, total: prog.total, finished: prog.finished }, group: r.shared_study_id ? groupOf.get(r.shared_study_id) ?? null : null,
         current: cur ? { id: cur.id, title: cur.title, position: cur.position, dueDate: sched.find((x) => x.id === cur.id)?.dueDate ?? null } : null,
         next: nxt ? { id: nxt.id, title: nxt.title, position: nxt.position, dueDate: sched.find((x) => x.id === nxt.id)?.dueDate ?? null } : null });
     }
@@ -241,7 +279,8 @@ router.get("/mine", async (req, res) => {
       active: items.filter((i) => i.run.status === "active" && !i.progress.finished),
       paused: items.filter((i) => i.run.status === "paused"),
       completed: items.filter((i) => i.run.status === "completed" || (i.run.status === "active" && i.progress.finished)),
-      created: ((own ?? []) as Plan[]).map((p) => card(p)),
+      created: ((own ?? []) as Plan[]).filter((p) => !p.is_draft).map((p) => card(p)),
+      drafts: ((own ?? []) as Plan[]).filter((p) => p.is_draft).map((p) => card(p)),
       saved: ((savedPlans ?? []) as Plan[]).filter((p) => isLive(p) || p.owner_id === userId).map((p) => card(p)),
     });
   } catch (e) { return fail(res, e); }
@@ -260,23 +299,25 @@ router.get("/:id", async (req, res) => {
   if (!userId) return;
   try {
     const { plan, editor } = await loadPlanFor(String(req.params.id), userId);
-    const sessions = await sessionsOf(plan, userId);
     const run = await currentRun(plan.id, userId) ?? (await (async () => {
       const { data } = await db.from("p2p_study_plan_enrollments").select("*").eq("plan_id", plan.id).eq("user_id", userId).eq("status", "completed").order("completed_at", { ascending: false }).limit(1);
       return ((data ?? []) as Run[])[0] ?? null;
     })());
+    // With a run: the sessions of the version the person started with (see sessionsOf).
+    const sessions = await sessionsOf(plan, userId, run);
     let mine = null;
     if (run) {
       const { data: comp } = await db.from("p2p_study_plan_completions").select("session_id,completed_at").eq("enrollment_id", run.id);
       const c = (comp ?? []) as { session_id: string; completed_at: string }[];
-      const done = doneSet(sessions, c.map((x) => x.session_id));
-      const sched = schedule(sessions, done, { anchor: run.anchor_date, days: run.target_days, pace: run.pace });
-      mine = { run: runOut(run), progress: progressOf(sessions, done), schedule: sched, completedAt: Object.fromEntries(c.map((x) => [x.session_id, x.completed_at])) };
+      const req = required(sessions);
+      const done = doneSet(req, c.map((x) => x.session_id));
+      const sched = schedule(req, done, { anchor: run.anchor_date, days: run.target_days, pace: run.pace });
+      mine = { run: runOut(run), progress: progressOf(req, done), schedule: sched, completedAt: Object.fromEntries(c.map((x) => [x.session_id, x.completed_at])) };
     }
     const kinds = resourceKinds(sessions.map((s) => ({ passages: s.passages, primaryResource: s.primaryResource, supporting: s.supporting })));
     const { data: sv } = await db.from("p2p_plan_saves").select("plan_id").eq("user_id", userId).eq("plan_id", plan.id).maybeSingle();
     return res.json({
-      plan: card(plan, { sessionCount: sessions.length, questionsIncluded: sessions.some((s) => s.questions.length), primaryKinds: kinds.primary, supportingKinds: kinds.supporting,
+      plan: card(plan, { sessionCount: sessions.filter((x) => !x.retired).length, questionsIncluded: sessions.some((s) => s.questions.length), primaryKinds: kinds.primary, supportingKinds: kinds.supporting,
         saved: !!sv, mine: plan.owner_id === userId, canEdit: plan.owner_id === userId ? plan.editorial_status === "draft" : editor && plan.editorial_status === "draft", editor }),
       sessions, me: mine,
       note: "Completing a session is your own plan record. It never awards Growth Matrix credit; lessons count only through their own assessment.",
@@ -285,7 +326,15 @@ router.get("/:id", async (req, res) => {
 });
 
 // ── Create / edit (builder; editors for official drafts) ─────────────────────────
-function readPlanBody(b: Record<string, unknown>) {
+/** A plan that follows a curriculum's real lessons: all of Core Foundations, or one course. */
+function readDerived(v: unknown): { type: "foundations" } | { type: "curriculum"; id: string } | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type === "foundations") return { type: "foundations" };
+  if (o.type === "curriculum" && isUuid(o.id)) return { type: "curriculum", id: o.id };
+  throw new PlanError(400, "Choose the curriculum this plan follows.");
+}
+function readPlanBody(b: Record<string, unknown>, opts: { allowEmpty?: boolean } = {}) {
   const title = typeof b.title === "string" ? b.title.trim() : "";
   if (!title || title.length > 200) throw new PlanError(400, "Give the plan a title.");
   const focusType = String(b.focusType ?? "");
@@ -296,7 +345,10 @@ function readPlanBody(b: Record<string, unknown>) {
   const pace = (PACES as readonly string[]).includes(String(b.suggestedPace)) ? b.suggestedPace as Pace : "daily";
   const days = Number.isInteger(b.suggestedDays) && (b.suggestedDays as number) > 0 && (b.suggestedDays as number) <= 3660 ? b.suggestedDays as number : null;
   const raw = Array.isArray(b.sessions) ? b.sessions : [];
-  if (!raw.length) throw new PlanError(400, "Add at least one session.");
+  const derivedFrom = readDerived(b.derivedFrom);
+  // A curriculum plan's sessions ARE the curriculum's lessons (read live); nothing is copied into the plan.
+  if (derivedFrom && raw.length) throw new PlanError(400, "A plan that follows a curriculum takes its sessions from the curriculum.");
+  if (!derivedFrom && !raw.length && !opts.allowEmpty) throw new PlanError(400, "Add at least one session.");
   if (raw.length > 400) throw new PlanError(400, "A plan can have up to 400 sessions.");
   const sessions: (SessionInput & { id?: string })[] = raw.map((s) => {
     const v = validateSession(s);
@@ -309,7 +361,7 @@ function readPlanBody(b: Record<string, unknown>) {
   const scripture = sessions.every((s) => s.passages.length && !s.primaryResource), structured = sessions.every((s) => !s.passages.length && s.primaryResource);
   const objectives = Array.isArray(b.objectives) ? b.objectives.filter((o): o is string => typeof o === "string" && !!o.trim()).map((o) => o.trim().slice(0, 300)).slice(0, 8) : [];
   const collection = (COLLECTIONS as readonly string[]).includes(String(b.collection)) ? String(b.collection) : null;
-  return { title, focusType, focusLabel, focusRef, description, pace, days, sessions, kind: scripture ? "scripture" : structured ? "structured" : "mixed", objectives, collection };
+  return { title, focusType, focusLabel, focusRef, description, pace, days, sessions, kind: derivedFrom ? "structured" : scripture ? "scripture" : structured ? "structured" : "mixed", objectives, collection, derivedFrom };
 }
 /** Referenced lessons, stories, curriculums and topics must exist and be published. */
 async function checkReferences(sessions: SessionInput[]) {
@@ -324,22 +376,60 @@ async function checkReferences(sessions: SessionInput[]) {
     if (lessonIds.some((l) => !ok.has(l))) throw new PlanError(400, "One of the lessons you chose isn't available.");
   }
 }
-async function writeSessions(planId: string, sessions: (SessionInput & { id?: string })[], replace: boolean) {
+type Changes = { added: string[]; retired: string[]; edited: string[] };
+const noColumn = (e: unknown) => ["42703", "PGRST204", "42P01", "PGRST205"].includes(String((e as { code?: string } | null)?.code ?? ""));
+async function writeSessions(planId: string, sessions: (SessionInput & { id?: string })[], replace: boolean, version = 1): Promise<Changes> {
   const row = (s: SessionInput, i: number) => ({ plan_id: planId, position: i + 1, title: s.title, intro: s.intro, passages: s.passages, primary_resource: s.primaryResource, supporting: s.supporting,
     questions: s.questions, reflection: s.reflection, prayer: s.prayer, updated_at: new Date().toISOString() });
-  if (!replace) { const { error } = await db.from("p2p_study_plan_sessions").insert(sessions.map(row)); if (error) throw error; return; }
-  // Editing keeps each session's id, so completions on sessions that stay are never lost.
-  const { data: existing } = await db.from("p2p_study_plan_sessions").select("id").eq("plan_id", planId);
+  const changes: Changes = { added: [], retired: [], edited: [] };
+  if (!replace) {
+    if (!sessions.length) return changes;
+    const { data, error } = await db.from("p2p_study_plan_sessions").insert(sessions.map(row)).select("id");
+    if (error) throw error;
+    changes.added = ((data ?? []) as { id: string }[]).map((r) => r.id);
+    return changes;
+  }
+  // Editing keeps each session's id. A session left out is RETIRED, never deleted: anyone who completed it keeps
+  // that completion, and runs that started with it keep it (migration 251).
+  const { data: existing } = await db.from("p2p_study_plan_sessions").select("*").eq("plan_id", planId);
+  const current = ((existing ?? []) as SessionRow[]).filter((r) => !r.retired_at);
   const keep = new Set(sessions.map((s) => s.id).filter(Boolean) as string[]);
-  const gone = ((existing ?? []) as { id: string }[]).map((r) => r.id).filter((id) => !keep.has(id));
-  if (gone.length) { const { error } = await db.from("p2p_study_plan_sessions").delete().in("id", gone); if (error) throw error; }
-  // Move kept sessions out of the way first (positions are unique per plan).
+  const gone = current.map((r) => r.id).filter((id) => !keep.has(id));
+  if (gone.length) {
+    const { error } = await db.from("p2p_study_plan_sessions").update({ retired_at: new Date().toISOString(), retired_in_version: version }).in("id", gone).eq("plan_id", planId);
+    if (error) { if (noColumn(error)) throw new PlanError(409, "Removing sessions needs the latest P2P update. You can still edit or add sessions."); throw error; }
+    changes.retired = gone;
+  }
+  const same = (r: SessionRow, s: SessionInput) => JSON.stringify([r.title, r.intro, r.passages, r.primary_resource, r.supporting ?? [], r.questions ?? [], r.reflection, r.prayer])
+    === JSON.stringify([s.title, s.intro, s.passages, s.primaryResource, s.supporting, s.questions, s.reflection, s.prayer]);
+  // Move kept sessions out of the way first (positions are unique among a plan's current sessions).
   for (const [i, s] of sessions.entries()) if (s.id) await db.from("p2p_study_plan_sessions").update({ position: 1000 - i }).eq("id", s.id).eq("plan_id", planId);
   for (const [i, s] of sessions.entries()) {
-    if (s.id) { const { error } = await db.from("p2p_study_plan_sessions").update(row(s, i)).eq("id", s.id).eq("plan_id", planId); if (error) throw error; }
-    else { const { error } = await db.from("p2p_study_plan_sessions").insert(row(s, i)); if (error) throw error; }
+    const was = s.id ? current.find((r) => r.id === s.id) : undefined;
+    if (s.id && was) {
+      const { error } = await db.from("p2p_study_plan_sessions").update(row(s, i)).eq("id", s.id).eq("plan_id", planId);
+      if (error) throw error;
+      if (!same(was, s)) changes.edited.push(s.id);
+    } else {
+      const ins = { ...row(s, i), ...(version > 1 ? { added_in_version: version } : {}) };
+      let { data, error } = await db.from("p2p_study_plan_sessions").insert(ins).select("id").single();
+      if (error && noColumn(error)) ({ data, error } = await db.from("p2p_study_plan_sessions").insert(row(s, i)).select("id").single());
+      if (error) throw error;
+      changes.added.push((data as { id: string }).id);
+    }
   }
+  return changes;
 }
+/** Plans tables before / after 251: insert with the new columns, or without them when they don't exist yet. */
+async function insertTolerant(table: string, full: Record<string, unknown>, newCols: string[]) {
+  let r = await db.from(table).insert(full).select("*").single();
+  if (r.error && noColumn(r.error)) {
+    const base = Object.fromEntries(Object.entries(full).filter(([k]) => !newCols.includes(k)));
+    r = await db.from(table).insert(base).select("*").single();
+  }
+  return r;
+}
+const clientKeyOf = (v: unknown) => (typeof v === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(v) ? v : null);
 
 router.post("/", async (req, res) => {
   const userId = await caller(req, res);
@@ -348,18 +438,40 @@ router.post("/", async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const official = b.official === true;
     if (official && !(await isEditor(userId))) throw new PlanError(403, "Only content editors can create P2P plans.");
-    const p = readPlanBody(b);
+    const isDraft = b.draft === true;
+    if (official && isDraft) throw new PlanError(400, "Official plans use the editorial workflow instead of drafts.");
+    // The same request sent twice (double tap, retry after a dropped connection) returns the plan already made.
+    const clientKey = clientKeyOf(b.clientKey);
+    if (clientKey) {
+      const { data: had, error: hadErr } = await db.from("p2p_study_plans").select("id").eq("created_by", userId).eq("client_key", clientKey).maybeSingle();
+      if (!hadErr && had) return res.json({ id: (had as { id: string }).id, existing: true });
+    }
+    const p = readPlanBody(b, { allowEmpty: isDraft });
     await checkReferences(p.sessions);
+    if (p.derivedFrom?.type === "curriculum") {
+      const { data: cur } = await db.from("p2p_curriculums").select("id,status,type").eq("id", p.derivedFrom.id).maybeSingle();
+      const c = cur as { status: string; type: string } | null;
+      if (!c || c.status !== "published" || (c.type !== "plan" && c.type !== "core")) throw new PlanError(400, "That course isn't available.");
+    }
     if (!official) {
       const { data: mine } = await db.from("p2p_study_plans").select("id").eq("owner_id", userId).eq("editorial_status", "draft");
       if (((mine ?? []) as unknown[]).length >= 50) throw new PlanError(409, "You have 50 plans. Archive one to create another.");
     }
-    const { data: plan, error } = await db.from("p2p_study_plans").insert({
+    const row = {
       title: p.title, description: p.description, focus_type: p.focusType, focus_ref: p.focusRef, focus_label: p.focusLabel, plan_kind: p.kind,
       collection: official ? p.collection : null, origin: official ? "p2p" : "participant", owner_id: official ? null : userId, editorial_status: "draft",
-      objectives: p.objectives, suggested_pace: p.pace, suggested_days: p.days, created_by: userId,
-    }).select("*").single();
-    if (error) throw error;
+      objectives: p.objectives, suggested_pace: p.pace, suggested_days: p.days, created_by: userId, derived_from: p.derivedFrom,
+      ...(isDraft ? { is_draft: true } : {}), ...(clientKey ? { client_key: clientKey } : {}),
+    };
+    const { data: plan, error } = isDraft ? await db.from("p2p_study_plans").insert(row).select("*").single() : await insertTolerant("p2p_study_plans", row, ["client_key"]);
+    if (error) {
+      if (isDraft && noColumn(error)) throw new PlanError(503, "Saving drafts needs the latest P2P update.");
+      if ((error as { code?: string }).code === "23505" && clientKey) {
+        const { data: had } = await db.from("p2p_study_plans").select("id").eq("created_by", userId).eq("client_key", clientKey).maybeSingle();
+        if (had) return res.json({ id: (had as { id: string }).id, existing: true });
+      }
+      throw error;
+    }
     await writeSessions((plan as Plan).id, p.sessions, false);
     return res.status(201).json({ id: (plan as Plan).id });
   } catch (e) { return fail(res, e); }
@@ -374,13 +486,31 @@ router.put("/:id", async (req, res) => {
     if (!(mine || editor)) throw new PlanError(403, "You can only edit your own plans.");
     if (plan.editorial_status !== "draft") throw new PlanError(409, "Only a draft can be edited. Move it back to draft first.");
     if (plan.derived_from) throw new PlanError(409, "This plan follows its curriculum; its sessions can't be edited here.");
-    const p = readPlanBody((req.body ?? {}) as Record<string, unknown>);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // A builder draft can be saved incomplete; "draft: false" finishes it (then it needs at least one session).
+    const isDraft = typeof body.draft === "boolean" && mine ? body.draft : !!plan.is_draft;
+    const p = readPlanBody(body, { allowEmpty: isDraft });
+    if (p.derivedFrom) throw new PlanError(409, "This plan's sessions can't be replaced by a curriculum. Create a new plan instead.");
     await checkReferences(p.sessions);
-    const { error } = await db.from("p2p_study_plans").update({ title: p.title, description: p.description, focus_type: p.focusType, focus_ref: p.focusRef, focus_label: p.focusLabel,
-      plan_kind: p.kind, objectives: p.objectives, suggested_pace: p.pace, suggested_days: p.days, ...(editor ? { collection: p.collection } : {}), updated_at: new Date().toISOString() }).eq("id", plan.id);
+    // A new VERSION only once someone follows the plan (a draft being written isn't history yet).
+    const { data: anyRun } = await db.from("p2p_study_plan_enrollments").select("id").eq("plan_id", plan.id).limit(1);
+    const followed = ((anyRun ?? []) as unknown[]).length > 0;
+    const next = followed ? (plan.version ?? 1) + 1 : plan.version ?? 1;
+    const changes = await writeSessions(plan.id, p.sessions, true, next);
+    const changed = followed && changes.added.length + changes.retired.length + changes.edited.length > 0;
+    const patch: Record<string, unknown> = { title: p.title, description: p.description, focus_type: p.focusType, focus_ref: p.focusRef, focus_label: p.focusLabel,
+      plan_kind: p.kind, objectives: p.objectives, suggested_pace: p.pace, suggested_days: p.days, ...(editor ? { collection: p.collection } : {}), updated_at: new Date().toISOString() };
+    if (plan.is_draft !== undefined) patch.is_draft = isDraft;
+    // A significant change is recorded, so earlier progress stays understandable (251).
+    if (changed && plan.version !== undefined) {
+      patch.version = next;
+      const { data: now } = await db.from("p2p_study_plan_sessions").select("id,position,title,retired_at").eq("plan_id", plan.id);
+      await db.from("p2p_study_plan_versions").insert({ plan_id: plan.id, version: next, changed_by: userId, changes,
+        sessions: ((now ?? []) as { id: string; position: number; title: string; retired_at: string | null }[]).filter((x) => !x.retired_at).sort((a, b) => a.position - b.position).map(({ id, position, title }) => ({ id, position, title })) });
+    }
+    const { error } = await db.from("p2p_study_plans").update(patch).eq("id", plan.id);
     if (error) throw error;
-    await writeSessions(plan.id, p.sessions, true);
-    return res.json({ id: plan.id });
+    return res.json({ id: plan.id, version: patch.version ?? plan.version ?? 1, changes });
   } catch (e) { return fail(res, e); }
 });
 
@@ -415,6 +545,7 @@ router.post("/:id/status", async (req, res) => {
     if (to === "draft") Object.assign(patch, { reviewed_by: null, reviewed_at: null });
     const { error } = await db.from("p2p_study_plans").update(patch).eq("id", plan.id);
     if (error) throw error;
+    invalidateDiscovery();
     return res.json({ id: plan.id, status: to });
   } catch (e) { return fail(res, e); }
 });
@@ -453,31 +584,47 @@ function readSchedule(b: Record<string, unknown>, sessions: number, anchor: stri
   return { durationKey, pace, days, feasibility: f };
 }
 
+/** A member of a group may follow the group's plan even when it is someone else's own plan. */
+async function followsInGroup(planId: string, userId: string, studyId: unknown): Promise<boolean> {
+  return typeof studyId === "string" && (await inSharedStudy(studyId, userId, planId));
+}
+
 router.post("/:id/start", async (req, res) => {
   const userId = await caller(req, res);
   if (!userId) return;
   try {
     const { plan } = await loadPlanFor(String(req.params.id), userId);
-    if (!(isLive(plan) || plan.owner_id === userId)) throw new PlanError(409, "This plan isn't published yet.");
-    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!(isLive(plan) || plan.owner_id === userId || await followsInGroup(plan.id, userId, (req.body ?? {}).sharedStudyId))) throw new PlanError(409, "This plan isn't published yet.");
+    if (plan.is_draft) throw new PlanError(409, "Finish this plan before starting it.");
+    let b = (req.body ?? {}) as Record<string, unknown>;
     const existing = await currentRun(plan.id, userId);
     if (existing) throw new PlanError(409, "You're already following this plan.", { runId: existing.id });
     const mode = b.mode === "together" ? "together" : "individual";
-    const startDate = b.startDate === undefined ? today() : b.startDate;
-    if (!isIsoDate(startDate)) throw new PlanError(400, "Choose a start date.");
+    const askedDate = b.startDate === undefined ? today() : b.startDate;
+    if (!isIsoDate(askedDate)) throw new PlanError(400, "Choose a start date.");
+    let startDate: string = askedDate;
     if (startDate < addDays(today(), -1) || startDate > addDays(today(), 366)) throw new PlanError(400, "Choose a start date from today up to a year ahead.");
     let shared: string | null = null;
     if (mode === "together") {
       shared = String(b.sharedStudyId ?? "");
       // Together reuses Study Together: the person must already take part in that shared study of THIS plan.
       if (!(await inSharedStudy(shared, userId, plan.id))) throw new PlanError(403, "Join the Study Together study of this plan first.");
+      // The group's own schedule is the default; each person may still choose their own.
+      if (b.durationKey === undefined) {
+        const { data: st } = await db.from("p2p_shared_studies").select("*").eq("id", shared).maybeSingle();
+        const gs = (st as { plan_schedule?: Record<string, unknown> | null } | null)?.plan_schedule;
+        if (gs) b = { ...b, durationKey: gs.durationKey, pace: b.pace ?? gs.pace, customDays: b.customDays ?? gs.customDays };
+        if (gs && b.startDate === undefined && isIsoDate(gs.startDate) && gs.startDate >= today() && gs.startDate <= addDays(today(), 366)) startDate = gs.startDate;
+      }
     }
     const sessions = await sessionsOf(plan, userId);
     if (!sessions.length) throw new PlanError(409, "This plan has no sessions yet.");
     const s = readSchedule(b, sessions.length, startDate);
-    const { data, error } = await db.from("p2p_study_plan_enrollments").insert({ user_id: userId, plan_id: plan.id, mode, shared_study_id: shared, duration_key: s.durationKey,
-      target_days: s.days, pace: s.pace, start_date: startDate, anchor_date: startDate, status: "active" }).select("*").single();
-    if (error) throw error;
+    // What was required when the person started (251): later edits to the plan never change THIS run's finish line.
+    const { data, error } = await insertTolerant("p2p_study_plan_enrollments", { user_id: userId, plan_id: plan.id, mode, shared_study_id: shared, duration_key: s.durationKey,
+      target_days: s.days, pace: s.pace, start_date: startDate, anchor_date: startDate, status: "active", plan_version: plan.version ?? 1, required_session_ids: sessions.map((x) => x.id) },
+      ["plan_version", "required_session_ids"]);
+    if (error) { if ((error as { code?: string }).code === "23505") throw new PlanError(409, "You're already following this plan."); throw error; }
     return res.status(201).json({ run: runOut(data as Run), perDay: s.feasibility.perDay });
   } catch (e) { return fail(res, e); }
 });
@@ -509,7 +656,7 @@ router.patch("/runs/:runId", async (req, res) => {
     else if (b.durationKey !== undefined || b.pace !== undefined) {
       if (r.status === "left" || r.status === "completed") throw new PlanError(409, "This plan has finished.");
       const { plan } = await loadPlanFor(r.plan_id, userId);
-      const sessions = await sessionsOf(plan, userId);
+      const sessions = required(await sessionsOf(plan, userId, r));
       const { data: comp } = await db.from("p2p_study_plan_completions").select("session_id").eq("enrollment_id", r.id);
       const remaining = sessions.length - doneSet(sessions, ((comp ?? []) as { session_id: string }[]).map((c) => c.session_id)).size;
       const s = readSchedule(b, Math.max(1, remaining), today());
@@ -531,8 +678,9 @@ async function sessionAction(req: Request, res: Response, complete: boolean) {
     if (r.status === "paused") throw new PlanError(409, "Resume the plan to continue.");
     const { plan } = await loadPlanFor(r.plan_id, userId);
     const sid = String(req.params.sessionId);
-    const sessions = await sessionsOf(plan, userId);
-    const s = sessions.find((x) => x.id === sid);
+    const all = await sessionsOf(plan, userId, r);
+    const sessions = required(all);
+    const s = all.find((x) => x.id === sid);
     if (!s) throw new PlanError(404, "That session isn't part of this plan.");
     if (s.derived) throw new PlanError(409, "This session is complete when its lesson is complete — finish the lesson itself.");
     if (complete) {
@@ -549,5 +697,180 @@ async function sessionAction(req: Request, res: Response, complete: boolean) {
 }
 router.post("/runs/:runId/sessions/:sessionId", (req, res) => sessionAction(req, res, true));
 router.delete("/runs/:runId/sessions/:sessionId", (req, res) => sessionAction(req, res, false));
+
+// ── Groups: a group's plans over time ───────────────────────────────────────────
+// The group and the plan have separate lives. A group (Family, Church, Circle, group, private group) has at
+// most ONE active plan; completing it moves it to the group's history and the group carries on. Each member's
+// progress is their own run; the group sees counts only (how many started / finished), never who or what.
+type StudyRow = { id: string; content_type: string; content_id: string; title: string; host_id: string; destination_type: Destination; destination_id: string | null;
+  status: "active" | "concluded"; created_at: string; concluded_at: string | null; plan_schedule?: Record<string, unknown> | null; completed_by?: string | null };
+const isGroupType = (v: unknown): v is Destination => (GROUP_DESTINATIONS as readonly string[]).includes(String(v));
+function readGroupSchedule(v: unknown): Record<string, unknown> | null {
+  if (v == null) return null;
+  if (typeof v !== "object" || Array.isArray(v)) throw new PlanError(400, "Choose the group's schedule.");
+  const o = v as Record<string, unknown>;
+  if (!(DURATIONS as readonly string[]).includes(String(o.durationKey))) throw new PlanError(400, "Choose how long the group will take.");
+  if (!(PACES as readonly string[]).includes(String(o.pace))) throw new PlanError(400, "Choose the group's schedule.");
+  if (o.startDate !== undefined && !isIsoDate(o.startDate)) throw new PlanError(400, "Choose a start date.");
+  const custom = o.durationKey === "custom" ? Number(o.customDays) : undefined;
+  if (custom !== undefined && !(Number.isInteger(custom) && custom >= 1 && custom <= 3660)) throw new PlanError(400, "Choose a number of days between 1 and 3,660.");
+  return { durationKey: o.durationKey, pace: o.pace, ...(o.startDate ? { startDate: o.startDate } : {}), ...(custom ? { customDays: custom } : {}) };
+}
+async function groupSummary(type: Destination, id: string) {
+  const [name, members] = await Promise.all([destinationName(type, id), destinationMemberIds(type, id)]);
+  let description: string | null = null, photoUrl: string | null = null;
+  if (type === "private_group") {
+    const { data } = await db.from("p2p_conversations").select("description,photo_url").eq("id", id).maybeSingle();
+    description = (data as { description: string | null } | null)?.description ?? null; photoUrl = (data as { photo_url: string | null } | null)?.photo_url ?? null;
+  }
+  return { type, id, name, description, photoUrl, members: members.length };
+}
+async function groupPlanStudies(type: Destination, id: string): Promise<StudyRow[]> {
+  const { data, error } = await db.from("p2p_shared_studies").select("*").eq("destination_type", type).eq("destination_id", id).eq("content_type", "study_plan").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as StudyRow[];
+}
+
+router.get("/groups/mine", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    // Only groups this person may attach a plan to (they lead them); private groups' membership stays private.
+    const led = await groupsUserLeads(userId);
+    const out = [];
+    for (const g of led.slice(0, 60)) {
+      const [summary, studies] = await Promise.all([groupSummary(g.type, g.id), groupPlanStudies(g.type, g.id)]);
+      const active = studies.find((x) => x.status === "active") ?? null;
+      out.push({ ...summary, canAttach: true, activePlan: active ? { studyId: active.id, planId: active.content_id, title: active.title } : null, completedPlans: studies.filter((x) => x.status === "concluded").length });
+    }
+    return res.json({ groups: out });
+  } catch (e) { return fail(res, e); }
+});
+
+router.get("/groups/:type/:id", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    const type = req.params.type, id = String(req.params.id);
+    if (!isGroupType(type) || !isUuid(id)) throw new PlanError(404, "This group isn't available.");
+    // Not a member → the same answer as "no such group".
+    if (!(await isDestinationMember(type, id, userId))) throw new PlanError(404, "This group isn't available.");
+    const [group, canLead, studies] = await Promise.all([groupSummary(type, id), canLeadDestination(type, id, userId), groupPlanStudies(type, id)]);
+    const planIds = [...new Set(studies.map((x) => x.content_id))];
+    const { data: planRows } = planIds.length ? await db.from("p2p_study_plans").select("*").in("id", planIds) : { data: [] };
+    const plans = new Map(((planRows ?? []) as Plan[]).map((p) => [p.id, p]));
+    const sIds = studies.map((x) => x.id);
+    const { data: runRows } = sIds.length ? await db.from("p2p_study_plan_enrollments").select("*").in("shared_study_id", sIds) : { data: [] };
+    const runs = ((runRows ?? []) as Run[]).filter((r) => r.status !== "left");
+    const item = async (st: StudyRow) => {
+      const p = plans.get(st.content_id);
+      const mineRun = runs.find((r) => r.shared_study_id === st.id && r.user_id === userId) ?? null;
+      let mine = null;
+      if (p && mineRun) {
+        const ss = required(await sessionsOf(p, userId, mineRun));
+        const { data: comp } = await db.from("p2p_study_plan_completions").select("session_id").eq("enrollment_id", mineRun.id);
+        const prog = progressOf(ss, doneSet(ss, ((comp ?? []) as { session_id: string }[]).map((c) => c.session_id)));
+        mine = { runId: mineRun.id, status: mineRun.status, completed: prog.completed, total: prog.total, finished: prog.finished || mineRun.status === "completed" };
+      }
+      const theirs = runs.filter((r) => r.shared_study_id === st.id);
+      return { studyId: st.id, status: st.status, plan: p ? card(p) : { id: st.content_id, title: st.title, unavailable: true }, schedule: st.plan_schedule ?? null,
+        startedAt: st.created_at, completedAt: st.concluded_at,
+        // Group-level counts only — never who, and never anyone's answers, reflections or assessments.
+        overview: { members: group.members, following: theirs.length, finished: theirs.filter((r) => r.status === "completed").length }, mine };
+    };
+    const active = studies.find((x) => x.status === "active");
+    return res.json({
+      group, canLead,
+      active: active ? await item(active) : null,
+      history: await Promise.all(studies.filter((x) => x.status === "concluded").map(item)),
+      note: "Each member's progress is their own. Completing a plan never ends the group, and it never awards Growth Matrix credit.",
+    });
+  } catch (e) { return fail(res, e); }
+});
+
+router.post("/groups/:type/:id/plans", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    const type = req.params.type, id = String(req.params.id);
+    if (!isGroupType(type) || !isUuid(id)) throw new PlanError(404, "This group isn't available.");
+    if (!(await isDestinationMember(type, id, userId))) throw new PlanError(404, "This group isn't available.");
+    if (!(await canLeadDestination(type, id, userId))) throw new PlanError(403, "Only the group's leaders can choose its plan.");
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const clientKey = clientKeyOf(b.clientKey);
+    if (clientKey) {
+      const { data: had, error: hadErr } = await db.from("p2p_shared_studies").select("id").eq("host_id", userId).eq("client_key", clientKey).maybeSingle();
+      if (!hadErr && had) return res.json({ studyId: (had as { id: string }).id, existing: true });
+    }
+    // The ACTUAL plan (a published P2P plan, or the leader's own plan) — never a copy.
+    const planId = String(b.planId ?? "");
+    const content = await loadContent("study_plan", planId, userId);
+    if (!content) throw new PlanError(404, "This plan isn't available to share.");
+    const { data: pr } = await db.from("p2p_study_plans").select("*").eq("id", planId).maybeSingle();
+    if ((pr as Plan | null)?.is_draft) throw new PlanError(409, "Finish this plan before sharing it.");
+    const schedule = readGroupSchedule(b.schedule);
+    const studies = await groupPlanStudies(type, id);
+    const active = studies.find((x) => x.status === "active");
+    if (active) throw new PlanError(409, "This group already has an active plan. Complete it first.", { activeStudyId: active.id });
+    const { data: st, error } = await insertTolerant("p2p_shared_studies", { content_type: "study_plan", content_id: planId, title: content.title.slice(0, 300), host_id: userId,
+      destination_type: type, destination_id: id, current_section_id: content.sections[0]?.id ?? null, plan_schedule: schedule, ...(clientKey ? { client_key: clientKey } : {}) }, ["plan_schedule", "client_key"]);
+    if (error) {
+      if ((error as { code?: string }).code === "23505") throw new PlanError(409, "This group already has an active plan. Complete it first.");
+      throw error;
+    }
+    const study = st as StudyRow;
+    await db.from("p2p_shared_study_members").insert({ study_id: study.id, user_id: userId, role: "host", status: "accepted", responded_at: new Date().toISOString(), last_opened_at: new Date().toISOString() });
+    const members = (await destinationMemberIds(type, id)).filter((u) => u !== userId);
+    const [who, groupName] = await Promise.all([displayName(userId), destinationName(type, id)]);
+    await notify(members, { title: "A new group plan", message: `${who} chose "${content.title}" for ${groupName ?? "your group"}.`, type: "shared_study_started", studyId: study.id });
+    return res.status(201).json({ studyId: study.id });
+  } catch (e) { return fail(res, e); }
+});
+
+router.post("/groups/:type/:id/plans/:studyId/complete", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    const type = req.params.type, id = String(req.params.id), studyId = String(req.params.studyId);
+    if (!isGroupType(type) || !isUuid(id) || !isUuid(studyId)) throw new PlanError(404, "This group isn't available.");
+    if (!(await isDestinationMember(type, id, userId))) throw new PlanError(404, "This group isn't available.");
+    if (!(await canLeadDestination(type, id, userId))) throw new PlanError(403, "Only the group's leaders can complete its plan.");
+    const { data } = await db.from("p2p_shared_studies").select("*").eq("id", studyId).maybeSingle();
+    const st = data as StudyRow | null;
+    if (!st || st.destination_type !== type || st.destination_id !== id || st.content_type !== "study_plan") throw new PlanError(404, "That plan isn't part of this group.");
+    if (st.status === "concluded") return res.json({ completed: true, existing: true });
+    // The plan is completed for the GROUP; the group stays, and every member keeps their own run and history.
+    const now = new Date().toISOString();
+    let { error } = await db.from("p2p_shared_studies").update({ status: "concluded", concluded_at: now, updated_at: now, completed_by: userId }).eq("id", st.id).eq("status", "active");
+    if (error && noColumn(error)) ({ error } = await db.from("p2p_shared_studies").update({ status: "concluded", concluded_at: now, updated_at: now }).eq("id", st.id).eq("status", "active"));
+    if (error) throw error;
+    return res.json({ completed: true });
+  } catch (e) { return fail(res, e); }
+});
+
+router.post("/:id/groups", async (req, res) => {
+  const userId = await caller(req, res);
+  if (!userId) return;
+  try {
+    const { plan } = await loadPlanFor(String(req.params.id), userId);
+    if (!(isLive(plan) || plan.owner_id === userId)) throw new PlanError(409, "This plan isn't published yet.");
+    if (plan.is_draft) throw new PlanError(409, "Finish this plan before creating a group for it.");
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const name = typeof b.name === "string" ? b.name.trim() : "";
+    if (!name || name.length > 80) throw new PlanError(400, "Give the group a name (up to 80 characters).");
+    const description = typeof b.description === "string" && b.description.trim() ? b.description.trim().slice(0, 1000) : null;
+    const schedule = readGroupSchedule(b.schedule);
+    const clientKey = clientKeyOf(b.clientKey);
+    // One transaction: the private group, its creator as admin, and the plan's Study Together study (251).
+    const { data, error } = await db.rpc("p2p_create_plan_group", { p_owner: userId, p_plan: plan.id, p_name: name, p_description: description, p_schedule: schedule, p_client_key: clientKey });
+    if (error) {
+      const code = String((error as { code?: string }).code ?? "");
+      if (code === "42883" || code === "PGRST202") throw new PlanError(503, "Creating a group from a plan needs the latest P2P update.");
+      throw error;
+    }
+    const r = (Array.isArray(data) ? data[0] : data) as { group_id: string; study_id: string; existing: boolean };
+    return res.status(r.existing ? 200 : 201).json({ groupId: r.group_id, studyId: r.study_id, existing: r.existing, groupType: "private_group" });
+  } catch (e) { return fail(res, e); }
+});
 
 export default router;
